@@ -18,6 +18,9 @@ export const metadata: Metadata = {
     description: "BitFactory - CryptoMiner Dashboard",
 };
 
+import { AuthProvider } from "@/lib/contexts/auth-context";
+import { ThemeProvider } from "./theme-provider";
+
 export default function RootLayout({
                                        children,
                                    }: Readonly<{
@@ -29,7 +32,11 @@ export default function RootLayout({
             className={`${geistSans.variable} ${geistMono.variable} antialiased`}
             suppressHydrationWarning={true}
         >
-        {children}
+            <AuthProvider>
+                <ThemeProvider>
+                    {children}
+                </ThemeProvider>
+            </AuthProvider>
         </body>
         </html>
     );

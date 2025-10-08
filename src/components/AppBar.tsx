@@ -10,7 +10,9 @@ import {
     Box,
     Button,
     Stack,
+    CircularProgress,
 } from "@mui/material";
+import { useAuth } from "@/lib/contexts/auth-context";
 import SettingsIcon from "@mui/icons-material/Settings";
 import AccountCircle from "@mui/icons-material/AccountCircle";
 import DarkModeIcon from "@mui/icons-material/DarkMode";
@@ -21,16 +23,13 @@ import AccountBalanceWalletIcon from "@mui/icons-material/AccountBalanceWallet";
 import Link from "next/link";
 import Image from "next/image";
 
-interface AppBarProps {
-    onDarkModeToggle: () => void;
-    darkMode: boolean;
-}
+import { useTheme } from "@/app/theme-provider";
 
-export default function AppBarComponent({
-                                            onDarkModeToggle,
-                                            darkMode,
-                                        }: AppBarProps) {
+export default function AppBarComponent() {
+    const { darkMode, toggleDarkMode } = useTheme();
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+    const [isLoggingOut, setIsLoggingOut] = useState(false);
+    const { logout } = useAuth();
 
     const handleMenu = (event: React.MouseEvent<HTMLElement>) => {
         setAnchorEl(event.currentTarget);
@@ -38,6 +37,18 @@ export default function AppBarComponent({
 
     const handleClose = () => {
         setAnchorEl(null);
+    };
+
+    const handleLogout = async () => {
+        try {
+            setIsLoggingOut(true);
+            await logout();
+        } catch (error) {
+            console.error('Logout failed:', error);
+        } finally {
+            setIsLoggingOut(false);
+            handleClose();
+        }
     };
 
     return (
@@ -117,7 +128,7 @@ export default function AppBarComponent({
                 </Box>
 
                 {/* Dark Mode Toggle */}
-                <IconButton onClick={onDarkModeToggle} sx={{ color: darkMode ? "white" : "black" }}>
+                <IconButton onClick={toggleDarkMode} sx={{ color: darkMode ? "white" : "black" }}>
                     {darkMode ? <LightModeIcon /> : <DarkModeIcon />}
                 </IconButton>
 
@@ -137,8 +148,23 @@ export default function AppBarComponent({
                     <MenuItem component={Link} href="/account-settings" onClick={handleClose}>
                         Account Settings
                     </MenuItem>
-                    <MenuItem component={Link} href="/login" onClick={handleClose}>
-                        Sign Out
+                    <MenuItem
+                        onClick={handleLogout}
+                        disabled={isLoggingOut}
+                        sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 1
+                        }}
+                    >
+                        {isLoggingOut ? (
+                            <>
+                                <CircularProgress size={16} />
+                                Signing Out...
+                            </>
+                        ) : (
+                            'Sign Out'
+                        )}
                     </MenuItem>
                 </Menu>
             </Toolbar>

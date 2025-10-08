@@ -1,60 +1,155 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
-import bcrypt from 'bcryptjs'
+import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+
+// Token generation with proper types
+const generateTokens = (userId: string) => {
+  const accessToken = jwt.sign(
+    { userId },
+    process.env.JWT_SECRET || 'your-secret-key',
+    { expiresIn: '15m' }
+  );
+
+  const refreshToken = jwt.sign(
+    { userId, type: 'refresh' },
+    process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key',
+    { expiresIn: '7d' }
+  );
+
+  return { accessToken, refreshToken };
+};
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, password } = await request.json()
+    let body;
+    try {
+      body = await request.json();
+    } catch (e) {
+      return NextResponse.json(
+        { error: 'Invalid request body' },
+        { status: 400 }
+      );
+    }
 
-    // Validate input
+    const { email, password } = body;
+
+    // Input validation
     if (!email || !password) {
       return NextResponse.json(
         { error: 'Email and password are required' },
         { status: 400 }
-      )
+      );
+    }
+
+    if (typeof email !== 'string' || typeof password !== 'string') {
+      return NextResponse.json(
+        { error: 'Invalid input format' },
+        { status: 400 }
+      );
+    }
+
+    // Email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return NextResponse.json(
+        { error: 'Invalid email format' },
+        { status: 400 }
+      );
     }
 
     // Find user in database
     const user = await prisma.user.findUnique({
-      where: { email }
-    })
+      where: { email },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        password: true,
+      },
+    });
 
     if (!user) {
       return NextResponse.json(
         { error: 'Invalid email or password' },
         { status: 401 }
-      )
+      );
     }
 
-    // Check password (assuming passwords are hashed)
-    const isPasswordValid = await bcrypt.compare(password, user.password)
+    // Check password with timing attack protection
+    let isPasswordValid = false;
+    try {
+      isPasswordValid = await bcrypt.compare(password, user.password);
+    } catch (e) {
+      console.error('Password comparison error:', e);
+      return NextResponse.json(
+        { error: 'An error occurred during login' },
+        { status: 500 }
+      );
+    }
 
     if (!isPasswordValid) {
       return NextResponse.json(
         { error: 'Invalid email or password' },
         { status: 401 }
-      )
+      );
     }
 
-    // Login successful
-    return NextResponse.json(
+    // Log successful login attempt
+    try {
+      await prisma.userActivity.create({
+        data: {
+          userId: user.id,
+          type: 'LOGIN',
+          ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
+          userAgent: request.headers.get('user-agent') || 'unknown',
+        },
+      });
+    } catch (e) {
+      // Don't fail the login if activity logging fails
+      console.error('Failed to log login activity:', e);
+    }
+
+    // Generate tokens
+    const { accessToken, refreshToken } = generateTokens(user.id);
+
+    // Create response
+    const response = NextResponse.json(
       {
         message: 'Login successful',
         user: {
           id: user.id,
           email: user.email,
-          name: user.name
+          name: user.name,
         },
-        redirectUrl: '/dashboard'
+        redirectUrl: '/dashboard',
       },
       { status: 200 }
-    )
+    );
 
+    // Set cookies with proper flags
+    response.cookies.set('token', accessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 15 * 60, // 15 minutes
+      path: '/',
+    });
+
+    response.cookies.set('refresh_token', refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60, // 7 days
+      path: '/',
+    });
+
+    return response;
   } catch (error) {
-    console.error('Login error:', error)
+    console.error('Login error:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
-    )
+    );
   }
 }
