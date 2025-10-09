@@ -2,6 +2,7 @@
 
 import React from "react";
 import { Box, Typography, Paper, Grid } from "@mui/material";
+import ElectricityCostTable from "@/components/ElectricityCostTable";
 
 export default function WalletPage() {
     return (
@@ -23,8 +24,8 @@ export default function WalletPage() {
                 Overview of your mining earnings and transactions.
             </Typography>
 
-            <Grid container spacing={3} sx={{ mt: 1 }}>
-                <Grid item xs={12} sm={6} md={4}>
+            <Box sx={{ display: 'flex', gap: 3, mt: 2, flexWrap: 'wrap' }}>
+                <Box sx={{ flex: '1 1 300px', minWidth: '300px' }}>
                     <Paper
                         sx={{
                             p: 3,
@@ -39,8 +40,8 @@ export default function WalletPage() {
                             $0.00
                         </Typography>
                     </Paper>
-                </Grid>
-                <Grid item xs={12} sm={6} md={4}>
+                </Box>
+                <Box sx={{ flex: '1 1 300px', minWidth: '300px' }}>
                     <Paper
                         sx={{
                             p: 3,
@@ -55,8 +56,8 @@ export default function WalletPage() {
                             $0.00
                         </Typography>
                     </Paper>
-                </Grid>
-                <Grid item xs={12} sm={6} md={4}>
+                </Box>
+                <Box sx={{ flex: '1 1 300px', minWidth: '300px' }}>
                     <Paper
                         sx={{
                             p: 3,
@@ -69,8 +70,11 @@ export default function WalletPage() {
                         <Typography variant="subtitle1">Wallet Address</Typography>
                         <Typography variant="h6">0x1234...abcd</Typography>
                     </Paper>
-                </Grid>
-            </Grid>
+                </Box>
+            </Box>
+
+            {/* Electricity Cost Table */}
+            <ElectricityCostTable />
         </Box>
     );
 }
