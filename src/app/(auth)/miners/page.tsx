@@ -1,18 +1,12 @@
 "use client";
 
-import { Box, Typography, Paper } from "@mui/material";
+import { Box } from "@mui/material";
+import HostedMinersList from "@/components/HostedMinersList";
 
 export default function Miners() {
     return (
-        <Box sx={{ p: 3, mt: 2, minHeight: "100vh" }}>
-            <Typography variant="h4" fontWeight="bold" gutterBottom>
-                My Miners
-            </Typography>
-            <Paper sx={{ p: 3, mt: 2 }}>
-                <Typography>
-                    You have no miners yet. Add your mining rigs to see their status here.
-                </Typography>
-            </Paper>
+        <Box sx={{ p: 5, mt: 2, minHeight: "100vh" }}>
+            <HostedMinersList />
         </Box>
     );
 }
