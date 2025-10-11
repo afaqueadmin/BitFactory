@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -84,11 +85,13 @@ export default function Login() {
                 }}
             >
                 {/* Logo */}
-                <Box mb={3}>
-                    <img
+                <Box mb={3} sx={{ display: "flex", justifyContent: "center" }}>
+                    <Image
                         src="/BitfactoryLogo.webp"
                         alt="BitFactory Logo"
-                        style={{ width: 150, height: "auto", margin: "0 auto" }}
+                        width={150}
+                        height={48}
+                        style={{ height: "auto" }}
                     />
                 </Box>
 
