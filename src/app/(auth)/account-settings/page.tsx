@@ -1,3 +1,603 @@
-export default function Page() {
-    return <h1>Account Settings Page</h1>;
+"use client";
+
+import React, { useEffect, useState } from 'react';
+import {
+    Box,
+    Paper,
+    Typography,
+    TextField,
+    Button,
+    Grid as MuiGrid,
+    Avatar,
+    Table,
+    TableBody,
+    TableCell,
+    TableContainer,
+    TableHead,
+    TableRow,
+    Alert,
+    CircularProgress,
+    useTheme,
+} from '@mui/material';
+import { PhotoCamera } from '@mui/icons-material';
+
+// Create a Grid component that includes the 'item' prop
+const Grid = MuiGrid as React.ComponentType<any>;
+
+interface UserProfile {
+    name: string;
+    email: string;
+    phoneNumber: string;
+    dateOfBirth: string;
+    country: string;
+    city: string;
+    streetAddress: string;
+}
+
+interface Activity {
+    id: string;
+    type: string;
+    ipAddress: string;
+    userAgent: string;
+    createdAt: string;
+}
+
+export default function AccountSettings() {
+    const theme = useTheme();
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [success, setSuccess] = useState<string | null>(null);
+    const [activities, setActivities] = useState<Activity[]>([]);
+    const [formData, setFormData] = useState<UserProfile>({
+        name: '',
+        email: '',
+        phoneNumber: '',
+        dateOfBirth: '',
+        country: '',
+        city: '',
+        streetAddress: '',
+    });
+
+    // Safely handle null values in form data
+    const getFormValue = (value: any) => {
+        return value === null ? '' : value;
+    };
+
+    // Fetch user data
+    useEffect(() => {
+        const fetchUserProfile = async () => {
+            try {
+                setError(null);
+                console.log('Fetching user profile...');
+                
+                // First check if we're authenticated
+                const authCheckResponse = await fetch('/api/auth/check', {
+                    credentials: 'include',
+                    headers: {
+                        'Cache-Control': 'no-cache',
+                    },
+                });
+
+                if (!authCheckResponse.ok) {
+                    throw new Error('Authentication check failed');
+                }
+
+                const response = await fetch('/api/user/profile', {
+                    credentials: 'include',
+                    headers: {
+                        'Cache-Control': 'no-cache',
+                    },
+                });
+                
+                const data = await response.json();
+                console.log('Profile Response:', {
+                    status: response.status,
+                    ok: response.ok,
+                    data: data
+                });
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to fetch profile');
+                }                setFormData({
+                    ...data.user,
+                    dateOfBirth: data.user.dateOfBirth 
+                        ? new Date(data.user.dateOfBirth).toISOString().split('T')[0]
+                        : '',
+                });
+                setActivities(data.recentActivities);
+            } catch (error) {
+                console.error('Error loading profile:', error);
+                if (error instanceof Error) {
+                    if (error.message === 'Authentication check failed') {
+                        setError('Your session has expired. Please log in again.');
+                        // Redirect to login
+                        window.location.href = '/login';
+                        return;
+                    }
+                    setError(error.message);
+                } else {
+                    setError('Failed to load profile data');
+                }
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchUserProfile();
+    }, []);
+
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({
+            ...prev,
+            [name]: value
+        }));
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setSaving(true);
+        setError(null);
+        setSuccess(null);
+
+        try {
+            const response = await fetch('/api/user/profile', {
+                method: 'PATCH',
+                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Cache-Control': 'no-cache',
+                },
+                body: JSON.stringify(formData),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to update profile');
+            }
+
+            setSuccess('Profile updated successfully!');
+        } catch (error) {
+            setError('Failed to update profile');
+            console.error('Error updating profile:', error);
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    if (loading) {
+        return (
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+                <CircularProgress />
+            </Box>
+        );
+    }
+
+    return (
+        <Box 
+            sx={{ 
+                p: { xs: 2, sm: 3 }, 
+                mt: { xs: 1, sm: 2 }, 
+                maxWidth: 1200, 
+                mx: 'auto',
+                minHeight: '100vh',
+                bgcolor: theme => theme.palette.mode === 'dark' ? 'background.default' : 'grey.50'
+            }}
+        >
+            <Typography 
+                variant="h4" 
+                fontWeight="bold" 
+                gutterBottom
+                sx={{
+                    color: theme => theme.palette.mode === 'dark' ? 'primary.light' : 'primary.dark',
+                    mb: 3,
+                    borderBottom: theme => `2px solid ${theme.palette.primary.main}`,
+                    pb: 1
+                }}
+            >
+                Account Settings
+            </Typography>
+
+            {/* Profile Section */}
+            <Paper 
+                elevation={3}
+                sx={{ 
+                    p: { xs: 2, sm: 4 }, 
+                    mb: 4,
+                    borderRadius: 2,
+                    background: theme => theme.palette.mode === 'dark' 
+                        ? 'linear-gradient(145deg, rgba(40,40,40,0.9), rgba(30,30,30,0.9))' 
+                        : 'linear-gradient(145deg, rgba(255,255,255,0.9), rgba(250,250,250,0.9))',
+                    backdropFilter: 'blur(10px)',
+                    border: theme => `1px solid ${theme.palette.divider}`
+                }}
+            >
+                <Grid container spacing={4}>
+                    {/* Profile Photo Section */}
+                    <Grid item xs={12} md={3}>
+                        <Box sx={{ 
+                            textAlign: 'center',
+                            position: 'relative',
+                            '&:hover .upload-overlay': {
+                                opacity: 1
+                            }
+                        }}>
+                            <Avatar
+                                sx={{
+                                    width: { xs: 100, sm: 120, md: 140 },
+                                    height: { xs: 100, sm: 120, md: 140 },
+                                    mx: 'auto',
+                                    mb: 2,
+                                    bgcolor: theme.palette.primary.main,
+                                    fontSize: { xs: '2.5rem', sm: '3rem', md: '3.5rem' },
+                                    border: theme => `4px solid ${theme.palette.primary.main}`,
+                                    boxShadow: theme => `0 0 20px ${theme.palette.primary.main}40`
+                                }}
+                            >
+                                {formData.name?.charAt(0) || 'U'}
+                            </Avatar>
+                            <Button
+                                component="label"
+                                variant="contained"
+                                startIcon={<PhotoCamera />}
+                                sx={{ 
+                                    mt: 1,
+                                    background: theme => theme.palette.mode === 'dark' 
+                                        ? 'rgba(255,255,255,0.1)' 
+                                        : 'rgba(0,0,0,0.1)',
+                                    backdropFilter: 'blur(5px)',
+                                    '&:hover': {
+                                        background: theme => theme.palette.mode === 'dark' 
+                                            ? 'rgba(255,255,255,0.2)' 
+                                            : 'rgba(0,0,0,0.2)'
+                                    }
+                                }}
+                                disabled // Temporarily disabled
+                            >
+                                Upload Photo
+                                <input
+                                    hidden
+                                    accept="image/*"
+                                    type="file"
+                                    onChange={() => {}}
+                                    disabled
+                                />
+                            </Button>
+                        </Box>
+                    </Grid>
+
+                    {/* Form Fields */}
+                    <Grid item xs={12} md={9}>
+                        <Box 
+                            component="form" 
+                            onSubmit={handleSubmit}
+                            sx={{
+                                '& .MuiTextField-root': {
+                                    '& .MuiOutlinedInput-root': {
+                                        '&:hover fieldset': {
+                                            borderColor: theme => theme.palette.primary.main,
+                                        },
+                                        '&.Mui-focused fieldset': {
+                                            borderWidth: '2px',
+                                        }
+                                    }
+                                }
+                            }}
+                        >
+                            <Grid container spacing={3}>
+                                {error && (
+                                    <Grid item xs={12}>
+                                        <Alert 
+                                            severity="error"
+                                            sx={{
+                                                borderRadius: 2,
+                                                '& .MuiAlert-icon': {
+                                                    fontSize: '1.5rem'
+                                                }
+                                            }}
+                                        >
+                                            {error}
+                                        </Alert>
+                                    </Grid>
+                                )}
+                                {success && (
+                                    <Grid item xs={12}>
+                                        <Alert 
+                                            severity="success"
+                                            sx={{
+                                                borderRadius: 2,
+                                                '& .MuiAlert-icon': {
+                                                    fontSize: '1.5rem'
+                                                }
+                                            }}
+                                        >
+                                            {success}
+                                        </Alert>
+                                    </Grid>
+                                )}
+                                
+                                <Grid item xs={12} sm={6}>
+                                    <TextField
+                                        fullWidth
+                                        label="Name"
+                                        name="name"
+                                        value={getFormValue(formData.name)}
+                                        onChange={handleInputChange}
+                                        variant="outlined"
+                                        sx={{ 
+                                            '& label.Mui-focused': {
+                                                color: theme => theme.palette.primary.main
+                                            }
+                                        }}
+                                    />
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <TextField
+                                        fullWidth
+                                        required
+                                        label="Email"
+                                        name="email"
+                                        type="email"
+                                        value={getFormValue(formData.email)}
+                                        onChange={handleInputChange}
+                                        variant="outlined"
+                                        sx={{ 
+                                            '& label.Mui-focused': {
+                                                color: theme => theme.palette.primary.main
+                                            }
+                                        }}
+                                    />
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <TextField
+                                        fullWidth
+                                        label="Phone Number"
+                                        name="phoneNumber"
+                                        value={getFormValue(formData.phoneNumber)}
+                                        onChange={handleInputChange}
+                                        variant="outlined"
+                                        sx={{ 
+                                            '& label.Mui-focused': {
+                                                color: theme => theme.palette.primary.main
+                                            }
+                                        }}
+                                    />
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <TextField
+                                        fullWidth
+                                        label="Date of Birth"
+                                        name="dateOfBirth"
+                                        type="date"
+                                        value={getFormValue(formData.dateOfBirth)}
+                                        onChange={handleInputChange}
+                                        InputLabelProps={{ shrink: true }}
+                                        variant="outlined"
+                                        sx={{ 
+                                            '& label.Mui-focused': {
+                                                color: theme => theme.palette.primary.main
+                                            }
+                                        }}
+                                    />
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <TextField
+                                        fullWidth
+                                        label="Country"
+                                        name="country"
+                                        value={getFormValue(formData.country)}
+                                        onChange={handleInputChange}
+                                        variant="outlined"
+                                        sx={{ 
+                                            '& label.Mui-focused': {
+                                                color: theme => theme.palette.primary.main
+                                            }
+                                        }}
+                                    />
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <TextField
+                                        fullWidth
+                                        label="City"
+                                        name="city"
+                                        value={getFormValue(formData.city)}
+                                        onChange={handleInputChange}
+                                        variant="outlined"
+                                        sx={{ 
+                                            '& label.Mui-focused': {
+                                                color: theme => theme.palette.primary.main
+                                            }
+                                        }}
+                                    />
+                                </Grid>
+                                <Grid item xs={12}>
+                                    <TextField
+                                        fullWidth
+                                        label="Street Address"
+                                        name="streetAddress"
+                                        value={getFormValue(formData.streetAddress)}
+                                        onChange={handleInputChange}
+                                        multiline
+                                        rows={2}
+                                        variant="outlined"
+                                        sx={{ 
+                                            '& label.Mui-focused': {
+                                                color: theme => theme.palette.primary.main
+                                            }
+                                        }}
+                                    />
+                                </Grid>
+                                <Grid item xs={12}>
+                                    <Button
+                                        type="submit"
+                                        variant="contained"
+                                        disabled={saving}
+                                        sx={{ 
+                                            mt: 2,
+                                            px: 4,
+                                            py: 1.5,
+                                            background: theme => `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.primary.dark})`,
+                                            boxShadow: theme => `0 4px 20px ${theme.palette.primary.main}40`,
+                                            '&:hover': {
+                                                background: theme => `linear-gradient(45deg, ${theme.palette.primary.dark}, ${theme.palette.primary.main})`,
+                                                boxShadow: theme => `0 6px 25px ${theme.palette.primary.main}60`,
+                                            }
+                                        }}
+                                    >
+                                        {saving ? 'Saving...' : 'Save Changes'}
+                                    </Button>
+                                </Grid>
+                            </Grid>
+                        </Box>
+                    </Grid>
+                </Grid>
+            </Paper>
+
+            {/* Recent Activity Section */}
+            <Typography 
+                variant="h5" 
+                fontWeight="bold" 
+                gutterBottom
+                sx={{
+                    color: theme => theme.palette.mode === 'dark' ? 'primary.light' : 'primary.dark',
+                    borderBottom: theme => `2px solid ${theme.palette.primary.main}`,
+                    pb: 1,
+                    mb: 3
+                }}
+            >
+                Recent Activity
+            </Typography>
+            <Paper 
+                elevation={3}
+                sx={{ 
+                    width: '100%', 
+                    overflow: 'hidden',
+                    borderRadius: 2,
+                    background: theme => theme.palette.mode === 'dark' 
+                        ? 'linear-gradient(145deg, rgba(40,40,40,0.9), rgba(30,30,30,0.9))' 
+                        : 'linear-gradient(145deg, rgba(255,255,255,0.9), rgba(250,250,250,0.9))',
+                    backdropFilter: 'blur(10px)',
+                    border: theme => `1px solid ${theme.palette.divider}`
+                }}
+            >
+                <TableContainer 
+                    sx={{ 
+                        maxHeight: 440,
+                        '&::-webkit-scrollbar': {
+                            width: '8px',
+                            height: '8px',
+                        },
+                        '&::-webkit-scrollbar-track': {
+                            background: 'transparent',
+                        },
+                        '&::-webkit-scrollbar-thumb': {
+                            background: theme => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)',
+                            borderRadius: '4px',
+                            '&:hover': {
+                                background: theme => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)',
+                            }
+                        }
+                    }}
+                >
+                    <Table stickyHeader>
+                        <TableHead>
+                            <TableRow>
+                                <TableCell 
+                                    sx={{ 
+                                        fontWeight: 'bold',
+                                        background: theme => theme.palette.mode === 'dark' 
+                                            ? 'rgba(0,0,0,0.5)' 
+                                            : 'rgba(255,255,255,0.9)',
+                                        color: theme => theme.palette.primary.main
+                                    }}
+                                >
+                                    Date
+                                </TableCell>
+                                <TableCell 
+                                    sx={{ 
+                                        fontWeight: 'bold',
+                                        background: theme => theme.palette.mode === 'dark' 
+                                            ? 'rgba(0,0,0,0.5)' 
+                                            : 'rgba(255,255,255,0.9)',
+                                        color: theme => theme.palette.primary.main
+                                    }}
+                                >
+                                    Activity
+                                </TableCell>
+                                <TableCell 
+                                    sx={{ 
+                                        fontWeight: 'bold',
+                                        background: theme => theme.palette.mode === 'dark' 
+                                            ? 'rgba(0,0,0,0.5)' 
+                                            : 'rgba(255,255,255,0.9)',
+                                        color: theme => theme.palette.primary.main
+                                    }}
+                                >
+                                    IP Address
+                                </TableCell>
+                                <TableCell 
+                                    sx={{ 
+                                        fontWeight: 'bold',
+                                        background: theme => theme.palette.mode === 'dark' 
+                                            ? 'rgba(0,0,0,0.5)' 
+                                            : 'rgba(255,255,255,0.9)',
+                                        color: theme => theme.palette.primary.main
+                                    }}
+                                >
+                                    Device
+                                </TableCell>
+                            </TableRow>
+                        </TableHead>
+                        <TableBody>
+                            {activities.map((activity) => (
+                                <TableRow 
+                                    key={activity.id} 
+                                    hover
+                                    sx={{
+                                        transition: 'background-color 0.2s',
+                                        '&:hover': {
+                                            backgroundColor: theme => theme.palette.mode === 'dark' 
+                                                ? 'rgba(255,255,255,0.05)' 
+                                                : 'rgba(0,0,0,0.05)'
+                                        }
+                                    }}
+                                >
+                                    <TableCell sx={{ color: theme => theme.palette.text.secondary }}>
+                                        {new Date(activity.createdAt).toLocaleString()}
+                                    </TableCell>
+                                    <TableCell sx={{ color: theme => theme.palette.primary.main, fontWeight: 'medium' }}>
+                                        {activity.type}
+                                    </TableCell>
+                                    <TableCell sx={{ color: theme => theme.palette.text.secondary }}>
+                                        {activity.ipAddress}
+                                    </TableCell>
+                                    <TableCell sx={{ color: theme => theme.palette.text.secondary }}>
+                                        {activity.userAgent}
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                            {activities.length === 0 && (
+                                <TableRow>
+                                    <TableCell 
+                                        colSpan={4} 
+                                        align="center"
+                                        sx={{ 
+                                            py: 6,
+                                            color: theme => theme.palette.text.secondary,
+                                            fontStyle: 'italic',
+                                            fontSize: '0.95rem'
+                                        }}
+                                    >
+                                        No recent activity
+                                    </TableCell>
+                                </TableRow>
+                            )}
+                        </TableBody>
+                    </Table>
+                </TableContainer>
+            </Paper>
+        </Box>
+    );
 }

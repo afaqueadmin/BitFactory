@@ -144,8 +144,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = async () => {
     setIsLoading(true);
     try {
-      // Clear user state first to prevent any authenticated requests
+      // Clear all user data and state
       setUser(null);
+      
+      // Clear any cached user data
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('bitfactory_user_data');
+      }
 
       // Clear router cache
       router.refresh();

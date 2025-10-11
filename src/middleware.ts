@@ -25,7 +25,8 @@ const protectedPaths = new Set([
   '/settings',
   '/miners',
   '/wallet',
-  '/account-settings'
+  '/account-settings',
+  '/api/user/profile'
 ]);
 
 export async function middleware(request: NextRequest) {

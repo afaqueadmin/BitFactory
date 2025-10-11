@@ -21,7 +21,7 @@
  * - Button has aria-label
  */
 
-import React from "react";
+import React, { useState } from "react";
 import {
     Box,
     Card,
@@ -35,6 +35,7 @@ import {
     SvgIcon,
 } from "@mui/material";
 import StorageIcon from "@mui/icons-material/Storage";
+import AddMinerModal from "./AddMinerModal";
 
 export interface HostedMinersCardProps {
     runningCount: number;
@@ -50,6 +51,7 @@ export default function HostedMinersCard({
                                              onAddMiner,
                                          }: HostedMinersCardProps) {
     const theme = useTheme();
+    const [isModalOpen, setIsModalOpen] = useState(false);
 
     // progress color uses success/main or custom green
     const progressSx = {
@@ -137,8 +139,8 @@ export default function HostedMinersCard({
                         variant="contained"
                         color="primary"
                         onClick={() => {
+                            setIsModalOpen(true);
                             if (onAddMiner) onAddMiner();
-                            else console.log("Add Miner clicked (stub)");
                         }}
                         aria-label="Add miner"
                         sx={{
@@ -154,6 +156,12 @@ export default function HostedMinersCard({
                     </Button>
                 </Box>
             </CardContent>
+
+            {/* Add Miner Modal */}
+            <AddMinerModal
+                open={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+            />
         </Card>
     );
 }

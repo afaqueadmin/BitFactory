@@ -22,6 +22,7 @@ import StorageIcon from "@mui/icons-material/Storage";
 import AccountBalanceWalletIcon from "@mui/icons-material/AccountBalanceWallet";
 import Link from "next/link";
 import Image from "next/image";
+import { usePathname } from 'next/navigation';
 
 import { useTheme } from "@/app/theme-provider";
 
@@ -30,6 +31,7 @@ export default function AppBarComponent() {
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
     const [isLoggingOut, setIsLoggingOut] = useState(false);
     const { logout } = useAuth();
+    const pathname = usePathname(); // Get current path
 
     const handleMenu = (event: React.MouseEvent<HTMLElement>) => {
         setAnchorEl(event.currentTarget);
@@ -49,9 +51,7 @@ export default function AppBarComponent() {
             setIsLoggingOut(false);
             handleClose();
         }
-    };
-
-    return (
+    };    return (
         <AppBar
             position="fixed"
             sx={{
@@ -87,8 +87,20 @@ export default function AppBarComponent() {
                                 textTransform: "none",
                                 fontWeight: 500,
                                 px: 2,
+                                position: 'relative',
                                 '&:hover': {
                                     backgroundColor: darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'
+                                },
+                                '&::after': {
+                                    content: '""',
+                                    position: 'absolute',
+                                    bottom: 0,
+                                    left: 8,
+                                    right: 8,
+                                    height: 2,
+                                    backgroundColor: 'primary.main',
+                                    transform: pathname === '/dashboard' ? 'scaleX(1)' : 'scaleX(0)',
+                                    transition: 'transform 0.2s ease-in-out'
                                 }
                             }}
                         >
@@ -102,8 +114,20 @@ export default function AppBarComponent() {
                                 textTransform: "none",
                                 fontWeight: 500,
                                 px: 2,
+                                position: 'relative',
                                 '&:hover': {
                                     backgroundColor: darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'
+                                },
+                                '&::after': {
+                                    content: '""',
+                                    position: 'absolute',
+                                    bottom: 0,
+                                    left: 8,
+                                    right: 8,
+                                    height: 2,
+                                    backgroundColor: 'primary.main',
+                                    transform: pathname === '/miners' ? 'scaleX(1)' : 'scaleX(0)',
+                                    transition: 'transform 0.2s ease-in-out'
                                 }
                             }}
                         >
@@ -117,8 +141,20 @@ export default function AppBarComponent() {
                                 textTransform: "none",
                                 fontWeight: 500,
                                 px: 2,
+                                position: 'relative',
                                 '&:hover': {
                                     backgroundColor: darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'
+                                },
+                                '&::after': {
+                                    content: '""',
+                                    position: 'absolute',
+                                    bottom: 0,
+                                    left: 8,
+                                    right: 8,
+                                    height: 2,
+                                    backgroundColor: 'primary.main',
+                                    transform: pathname === '/wallet' ? 'scaleX(1)' : 'scaleX(0)',
+                                    transition: 'transform 0.2s ease-in-out'
                                 }
                             }}
                         >

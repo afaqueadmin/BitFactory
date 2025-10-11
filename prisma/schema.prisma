@@ -20,6 +20,11 @@ model User {
   email         String         @unique
   name          String?
   password      String
+  phoneNumber   String?
+  dateOfBirth   DateTime?
+  country       String?
+  city          String?
+  streetAddress String?
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   blacklisted   TokenBlacklist[]
