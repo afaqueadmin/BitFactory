@@ -16,6 +16,13 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
     title: "BitFactory",
     description: "BitFactory - CryptoMiner Dashboard",
+    icons: {
+        icon: [
+            { url: '/favicon.svg', sizes: 'any', type: 'image/svg+xml' },
+        ],
+        apple: '/favicon.svg', // For Apple devices
+        shortcut: '/favicon.svg',
+    },
 };
 
 import { AuthProvider } from "@/lib/contexts/auth-context";
