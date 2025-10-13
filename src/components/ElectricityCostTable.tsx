@@ -12,8 +12,12 @@ import {
     TableRow,
     Typography,
     TableSortLabel,
+    TablePagination,
+    TextField,
+    InputAdornment,
     useTheme,
 } from "@mui/material";
+import SearchIcon from "@mui/icons-material/Search";
 import { visuallyHidden } from "@mui/utils";
 
 interface ElectricityData {
@@ -220,6 +224,9 @@ export default function ElectricityCostTable() {
     const theme = useTheme();
     const [order, setOrder] = useState<Order>('desc');
     const [orderBy, setOrderBy] = useState<OrderBy>('date');
+    const [page, setPage] = useState(0);
+    const [rowsPerPage, setRowsPerPage] = useState(5);
+    const [searchTerm, setSearchTerm] = useState('');
 
     const handleRequestSort = (
         event: React.MouseEvent<unknown>,
@@ -230,10 +237,36 @@ export default function ElectricityCostTable() {
         setOrderBy(property);
     };
 
+    const handleChangePage = (event: unknown, newPage: number) => {
+        setPage(newPage);
+    };
+
+    const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
+        setRowsPerPage(parseInt(event.target.value, 10));
+        setPage(0);
+    };
+
+    const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        setSearchTerm(event.target.value);
+        setPage(0); // Reset to first page when searching
+    };
+
+    // Filter data based on search term
+    const filteredData = React.useMemo(() => {
+        if (!searchTerm) return dummyData;
+        
+        return dummyData.filter((row) =>
+            Object.values(row).some((value) =>
+                value.toString().toLowerCase().includes(searchTerm.toLowerCase())
+            )
+        );
+    }, [searchTerm]);
+
     const visibleRows = React.useMemo(
         () =>
-            stableSort(dummyData, getComparator(order, orderBy)),
-        [order, orderBy],
+            stableSort(filteredData, getComparator(order, orderBy))
+                .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage),
+        [order, orderBy, page, rowsPerPage, filteredData],
     );
 
     const getAmountColor = (amount: string) => {
@@ -252,9 +285,30 @@ export default function ElectricityCostTable() {
 
     return (
         <Box sx={{ width: '100%', mt: 3 }}>
-            <Typography variant="h6" fontWeight="bold" gutterBottom>
-                Electricity Cost History
-            </Typography>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Typography variant="h6" fontWeight="bold">
+                    Electricity Cost History
+                </Typography>
+                <TextField
+                    size="small"
+                    placeholder="Search transactions..."
+                    value={searchTerm}
+                    onChange={handleSearchChange}
+                    sx={{ 
+                        minWidth: 250,
+                        '& .MuiOutlinedInput-root': {
+                            backgroundColor: theme.palette.background.paper,
+                        }
+                    }}
+                    InputProps={{
+                        startAdornment: (
+                            <InputAdornment position="start">
+                                <SearchIcon sx={{ color: theme.palette.text.secondary }} />
+                            </InputAdornment>
+                        ),
+                    }}
+                />
+            </Box>
             <Paper
                 sx={{
                     width: '100%',
@@ -326,6 +380,26 @@ export default function ElectricityCostTable() {
                         </TableBody>
                     </Table>
                 </TableContainer>
+                <TablePagination
+                    rowsPerPageOptions={[5, 10, 25]}
+                    component="div"
+                    count={filteredData.length}
+                    rowsPerPage={rowsPerPage}
+                    page={page}
+                    onPageChange={handleChangePage}
+                    onRowsPerPageChange={handleChangeRowsPerPage}
+                    sx={{
+                        borderTop: `1px solid ${theme.palette.divider}`,
+                        '& .MuiTablePagination-toolbar': {
+                            paddingLeft: 2,
+                            paddingRight: 1,
+                        },
+                        '& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows': {
+                            margin: 0,
+                            fontSize: '0.875rem',
+                        },
+                    }}
+                />
             </Paper>
         </Box>
     );
