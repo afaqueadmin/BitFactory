@@ -18,7 +18,13 @@ import {
     Alert,
     CircularProgress,
     useTheme,
+    Dialog,
+    DialogContent,
+    DialogTitle,
+    Fade,
+    IconButton,
 } from '@mui/material';
+import { CheckCircleOutline, Close, ErrorOutline } from '@mui/icons-material';
 import { PhotoCamera } from '@mui/icons-material';
 
 // Create a Grid component that includes the 'item' prop
@@ -160,7 +166,8 @@ export default function AccountSettings() {
 
             setSuccess('Profile updated successfully!');
         } catch (error) {
-            setError('Failed to update profile');
+            const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred while updating your profile. Please try again later.';
+            setError(errorMessage);
             console.error('Error updating profile:', error);
         } finally {
             setSaving(false);
@@ -287,36 +294,172 @@ export default function AccountSettings() {
                             }}
                         >
                             <Grid container spacing={3}>
-                                {error && (
-                                    <Grid item xs={12}>
-                                        <Alert 
-                                            severity="error"
+                                {/* Error Dialog */}
+                                <Dialog
+                                    open={Boolean(error)}
+                                    onClose={() => setError(null)}
+                                    TransitionComponent={Fade}
+                                    TransitionProps={{ timeout: 500 }}
+                                    PaperProps={{
+                                        sx: {
+                                            borderRadius: 3,
+                                            minWidth: '300px',
+                                            background: theme => theme.palette.mode === 'dark'
+                                                ? 'linear-gradient(145deg, rgba(40,40,40,0.95), rgba(30,30,30,0.95))'
+                                                : 'linear-gradient(145deg, rgba(255,255,255,0.95), rgba(250,250,250,0.95))',
+                                            backdropFilter: 'blur(10px)',
+                                            border: theme => `1px solid ${theme.palette.error.main}40`,
+                                            boxShadow: theme => `0 8px 32px ${theme.palette.error.main}30`,
+                                        }
+                                    }}
+                                >
+                                    <DialogTitle 
+                                        sx={{ 
+                                            textAlign: 'center',
+                                            pt: 3,
+                                            pb: 0
+                                        }}
+                                    >
+                                        <IconButton
+                                            onClick={() => setError(null)}
                                             sx={{
-                                                borderRadius: 2,
-                                                '& .MuiAlert-icon': {
-                                                    fontSize: '1.5rem'
-                                                }
+                                                position: 'absolute',
+                                                right: 8,
+                                                top: 8,
+                                                color: theme => theme.palette.grey[500],
+                                            }}
+                                        >
+                                            <Close />
+                                        </IconButton>
+                                        <ErrorOutline 
+                                            sx={{ 
+                                                fontSize: '4rem',
+                                                color: 'error.main',
+                                                mb: 1
+                                            }} 
+                                        />
+                                    </DialogTitle>
+                                    <DialogContent>
+                                        <Typography 
+                                            variant="h6" 
+                                            align="center" 
+                                            sx={{ 
+                                                mb: 2,
+                                                color: theme => theme.palette.mode === 'dark' 
+                                                    ? theme.palette.error.light 
+                                                    : theme.palette.error.dark,
+                                                fontWeight: 'bold'
+                                            }}
+                                        >
+                                            Error
+                                        </Typography>
+                                        <Typography 
+                                            align="center" 
+                                            sx={{ 
+                                                mb: 3,
+                                                color: theme => theme.palette.text.secondary
                                             }}
                                         >
                                             {error}
-                                        </Alert>
-                                    </Grid>
-                                )}
-                                {success && (
-                                    <Grid item xs={12}>
-                                        <Alert 
-                                            severity="success"
+                                        </Typography>
+                                        <Box sx={{ textAlign: 'center', mb: 2 }}>
+                                            <Button
+                                                onClick={() => setError(null)}
+                                                variant="contained"
+                                                sx={{
+                                                    px: 4,
+                                                    background: theme => `linear-gradient(45deg, ${theme.palette.error.main}, ${theme.palette.error.dark})`,
+                                                    boxShadow: theme => `0 4px 20px ${theme.palette.error.main}40`,
+                                                    '&:hover': {
+                                                        background: theme => `linear-gradient(45deg, ${theme.palette.error.dark}, ${theme.palette.error.main})`,
+                                                        boxShadow: theme => `0 6px 25px ${theme.palette.error.main}60`,
+                                                    }
+                                                }}
+                                            >
+                                                Close
+                                            </Button>
+                                        </Box>
+                                    </DialogContent>
+                                </Dialog>
+
+                                {/* Success Dialog */}
+                                <Dialog
+                                    open={Boolean(success)}
+                                    onClose={() => setSuccess(null)}
+                                    TransitionComponent={Fade}
+                                    TransitionProps={{ timeout: 500 }}
+                                    PaperProps={{
+                                        sx: {
+                                            borderRadius: 3,
+                                            minWidth: '300px',
+                                            background: theme => theme.palette.mode === 'dark'
+                                                ? 'linear-gradient(145deg, rgba(40,40,40,0.95), rgba(30,30,30,0.95))'
+                                                : 'linear-gradient(145deg, rgba(255,255,255,0.95), rgba(250,250,250,0.95))',
+                                            backdropFilter: 'blur(10px)',
+                                            border: theme => `1px solid ${theme.palette.primary.main}40`,
+                                            boxShadow: theme => `0 8px 32px ${theme.palette.primary.main}30`,
+                                        }
+                                    }}
+                                >
+                                    <DialogTitle 
+                                        sx={{ 
+                                            textAlign: 'center',
+                                            pt: 3,
+                                            pb: 0
+                                        }}
+                                    >
+                                        <IconButton
+                                            onClick={() => setSuccess(null)}
                                             sx={{
-                                                borderRadius: 2,
-                                                '& .MuiAlert-icon': {
-                                                    fontSize: '1.5rem'
-                                                }
+                                                position: 'absolute',
+                                                right: 8,
+                                                top: 8,
+                                                color: theme => theme.palette.grey[500],
+                                            }}
+                                        >
+                                            <Close />
+                                        </IconButton>
+                                        <CheckCircleOutline 
+                                            sx={{ 
+                                                fontSize: '4rem',
+                                                color: 'success.main',
+                                                mb: 1
+                                            }} 
+                                        />
+                                    </DialogTitle>
+                                    <DialogContent>
+                                        <Typography 
+                                            variant="h6" 
+                                            align="center" 
+                                            sx={{ 
+                                                mb: 2,
+                                                color: theme => theme.palette.mode === 'dark' 
+                                                    ? theme.palette.primary.light 
+                                                    : theme.palette.primary.dark,
+                                                fontWeight: 'bold'
                                             }}
                                         >
                                             {success}
-                                        </Alert>
-                                    </Grid>
-                                )}
+                                        </Typography>
+                                        <Box sx={{ textAlign: 'center', mb: 2 }}>
+                                            <Button
+                                                onClick={() => setSuccess(null)}
+                                                variant="contained"
+                                                sx={{
+                                                    px: 4,
+                                                    background: theme => `linear-gradient(45deg, ${theme.palette.success.main}, ${theme.palette.success.dark})`,
+                                                    boxShadow: theme => `0 4px 20px ${theme.palette.success.main}40`,
+                                                    '&:hover': {
+                                                        background: theme => `linear-gradient(45deg, ${theme.palette.success.dark}, ${theme.palette.success.main})`,
+                                                        boxShadow: theme => `0 6px 25px ${theme.palette.success.main}60`,
+                                                    }
+                                                }}
+                                            >
+                                                OK
+                                            </Button>
+                                        </Box>
+                                    </DialogContent>
+                                </Dialog>
                                 
                                 <Grid item xs={12} sm={6}>
                                     <TextField
