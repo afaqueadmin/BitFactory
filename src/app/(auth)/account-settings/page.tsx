@@ -40,6 +40,8 @@ interface UserProfile {
     streetAddress: string;
     companyName: string;
     vatNumber: string;
+    profileImage?: string;
+    profileImageId?: string;
 }
 
 interface Activity {
@@ -67,6 +69,8 @@ export default function AccountSettings() {
         streetAddress: '',
         companyName: '',
         vatNumber: '',
+        profileImage: '',
+        profileImageId: '',
     });
 
     // Safely handle null values in form data
@@ -236,6 +240,7 @@ export default function AccountSettings() {
                             }
                         }}>
                             <Avatar
+                                src={formData.profileImage || undefined}
                                 sx={{
                                     width: { xs: 100, sm: 120, md: 140 },
                                     height: { xs: 100, sm: 120, md: 140 },
@@ -265,15 +270,59 @@ export default function AccountSettings() {
                                             : 'rgba(0,0,0,0.2)'
                                     }
                                 }}
-                                disabled // Temporarily disabled
                             >
                                 Upload Photo
                                 <input
                                     hidden
                                     accept="image/*"
                                     type="file"
-                                    onChange={() => {}}
-                                    disabled
+                                    onChange={async (e) => {
+                                        if (!e.target.files?.[0]) return;
+                                
+                                        const file = e.target.files[0];
+                                        console.log('Selected file:', {
+                                            name: file.name,
+                                            type: file.type,
+                                            size: file.size
+                                        });
+                                        
+                                        // Check file size
+                                        if (file.size > 10 * 1024 * 1024) {
+                                            setError('File size must be less than 10MB');
+                                            return;
+                                        }
+                                
+                                        // Create form data
+                                        const formData = new FormData();
+                                        formData.append('image', file);
+                                
+                                        try {
+                                            console.log('Sending upload request...');
+                                            const response = await fetch('/api/user/upload-image', {
+                                                method: 'POST',
+                                                credentials: 'include',
+                                                body: formData,
+                                            });
+                                
+                                            const data = await response.json();
+                                            console.log('Upload response:', data);
+                                
+                                            if (!response.ok) {
+                                                throw new Error(data.error || 'Failed to upload image');
+                                            }
+                                            
+                                            setFormData(prev => ({
+                                                ...prev,
+                                                profileImage: data.imageUrl,
+                                                profileImageId: data.publicId
+                                            }));
+                                
+                                            setSuccess('Profile image updated successfully!');
+                                        } catch (error) {
+                                            console.error('Upload error:', error);
+                                            setError(error instanceof Error ? error.message : 'Failed to upload image');
+                                        }
+                                    }}
                                 />
                             </Button>
                         </Box>

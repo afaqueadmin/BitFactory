@@ -19,6 +19,7 @@
     "@types/lru-cache": "^7.10.9",
     "@upstash/redis": "^1.35.5",
     "bcryptjs": "^3.0.2",
+    "cloudinary": "^2.7.0",
     "jsonwebtoken": "^9.0.2",
     "lru-cache": "^11.2.2",
     "next": "15.5.3",
