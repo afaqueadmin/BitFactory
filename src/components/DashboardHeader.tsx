@@ -1,23 +1,24 @@
+// src/components/DashboardHeader.tsx
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { Box, Typography, Stack, Chip } from "@mui/material";
+/**
+ * DashboardHeader
+ * - Renders the large greeting and centered filter chips (pills).
+ * - Fully responsive: chips wrap on small screens.
+ *
+ * Props: none (this component is presentational).
+ *
+ * Uses MUI components and respects theme (dark/light).
+ */
+
+import React from "react";
+import { Box, Typography, Stack, Chip, Skeleton } from "@mui/material";
 import { useUser } from "@/lib/hooks/useUser";
 
 export default function DashboardHeader() {
     const { user, loading, error } = useUser();
-    const [mounted, setMounted] = useState(false);
-    
-    useEffect(() => {
-        setMounted(true);
-    }, []);
 
-    // Don't show anything until after hydration
-    if (!mounted) {
-        return null;
-    }
-
-    // Get time-based greeting
+    // Format the greeting based on time of day
     const getGreeting = () => {
         const hour = new Date().getHours();
         if (hour < 12) return "Good Morning";
@@ -33,9 +34,10 @@ export default function DashboardHeader() {
                 textAlign: "center",
                 mb: { xs: 4, md: 5 },
                 mt: { xs: 3, md: 4 },
-                py: { xs: 2, md: 3 },
+                py: { xs: 2, md: 3                                           },
             }}
         >
+            {/* Large greeting */}
             <Typography
                 id="dashboard-greeting"
                 variant="h3"
@@ -44,13 +46,18 @@ export default function DashboardHeader() {
                     fontWeight: 700,
                     mb: { xs: 3, md: 4 },
                     lineHeight: 1.2,
+                    // Responsive font sizing
                     fontSize: { xs: "1.6rem", sm: "2.2rem", md: "2.6rem" },
                 }}
             >
-                {error ? (
-                    <Box sx={{ color: 'text.secondary' }}>
-                        Welcome Back
-                    </Box>
+                {loading ? (
+                    <Skeleton 
+                        width="80%" 
+                        sx={{ 
+                            mx: 'auto',
+                            height: { xs: '2rem', sm: '2.75rem', md: '3.25rem' }
+                        }} 
+                    />
                 ) : (
                     <>
                         {getGreeting()},{' '}

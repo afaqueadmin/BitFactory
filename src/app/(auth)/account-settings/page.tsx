@@ -341,11 +341,17 @@ export default function AccountSettings() {
                                         name="email"
                                         type="email"
                                         value={getFormValue(formData.email)}
-                                        onChange={handleInputChange}
+                                        InputProps={{
+                                            readOnly: true,
+                                        }}
                                         variant="outlined"
                                         sx={{ 
                                             '& label.Mui-focused': {
                                                 color: theme => theme.palette.primary.main
+                                            },
+                                            '& .MuiInputBase-input.Mui-readOnly': {
+                                                cursor: 'not-allowed',
+                                                bgcolor: theme => theme.palette.action.disabledBackground
                                             }
                                         }}
                                     />
@@ -374,6 +380,9 @@ export default function AccountSettings() {
                                         value={getFormValue(formData.dateOfBirth)}
                                         onChange={handleInputChange}
                                         InputLabelProps={{ shrink: true }}
+                                        inputProps={{
+                                            max: new Date().toISOString().split('T')[0]
+                                        }}
                                         variant="outlined"
                                         sx={{ 
                                             '& label.Mui-focused': {
