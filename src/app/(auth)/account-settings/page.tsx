@@ -38,6 +38,8 @@ interface UserProfile {
     country: string;
     city: string;
     streetAddress: string;
+    companyName: string;
+    vatNumber: string;
 }
 
 interface Activity {
@@ -63,6 +65,8 @@ export default function AccountSettings() {
         country: '',
         city: '',
         streetAddress: '',
+        companyName: '',
+        vatNumber: '',
     });
 
     // Safely handle null values in form data
@@ -573,6 +577,36 @@ export default function AccountSettings() {
                                         onChange={handleInputChange}
                                         multiline
                                         rows={2}
+                                        variant="outlined"
+                                        sx={{ 
+                                            '& label.Mui-focused': {
+                                                color: theme => theme.palette.primary.main
+                                            }
+                                        }}
+                                    />
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <TextField
+                                        fullWidth
+                                        label="Company Name"
+                                        name="companyName"
+                                        value={getFormValue(formData.companyName)}
+                                        onChange={handleInputChange}
+                                        variant="outlined"
+                                        sx={{ 
+                                            '& label.Mui-focused': {
+                                                color: theme => theme.palette.primary.main
+                                            }
+                                        }}
+                                    />
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <TextField
+                                        fullWidth
+                                        label="VAT Number"
+                                        name="vatNumber"
+                                        value={getFormValue(formData.vatNumber)}
+                                        onChange={handleInputChange}
                                         variant="outlined"
                                         sx={{ 
                                             '& label.Mui-focused': {

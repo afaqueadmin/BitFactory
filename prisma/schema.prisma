@@ -25,6 +25,8 @@ model User {
   country       String?
   city          String?
   streetAddress String?
+  companyName   String?
+  vatNumber     String?
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   blacklisted   TokenBlacklist[]
