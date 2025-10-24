@@ -6,28 +6,33 @@ import {
     AppBar,
     Toolbar,
     IconButton,
-    useTheme,
+    styled,
 } from "@mui/material";
 import SettingsIcon from "@mui/icons-material/Settings";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import Image from "next/image";
 
-export default function AdminHeader() {
-    const theme = useTheme();
+const StyledAppBar = styled(AppBar)(({ theme }) => ({
+    backgroundColor: theme.palette.background.paper,
+    color: theme.palette.text.primary,
+    borderBottom: `1px solid ${theme.palette.divider}`,
+}));
 
+const StyledIconButton = styled(IconButton)(({ theme }) => ({
+    '&:hover': {
+        backgroundColor: theme.palette.action.hover,
+    },
+}));
+
+export default function AdminHeader() {
     return (
-        <AppBar 
+        <StyledAppBar 
             position="sticky" 
             elevation={2}
-            sx={{ 
-                backgroundColor: theme.palette.background.paper,
-                color: theme.palette.text.primary,
-                borderBottom: `1px solid ${theme.palette.divider}`
-            }}
         >
-            <Toolbar sx={{ justifyContent: "space-between" }}>
+            <Toolbar>
                 {/* Left Side - BitFactory Logo */}
-                <Box sx={{ display: "flex", alignItems: "center" }}>
+                <Box sx={{ display: "flex", alignItems: "center", flexGrow: 1 }}>
                     <Image
                         src="/BitfactoryLogo.webp"
                         alt="BitFactory Logo"
@@ -39,33 +44,23 @@ export default function AdminHeader() {
                 </Box>
 
                 {/* Right Side - Settings and Account Icons */}
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                    <IconButton
+                <Box sx={{ display: "flex", gap: 1 }}>
+                    <StyledIconButton
                         size="large"
                         aria-label="settings"
                         color="inherit"
-                        sx={{
-                            "&:hover": {
-                                backgroundColor: theme.palette.action.hover,
-                            },
-                        }}
                     >
                         <SettingsIcon />
-                    </IconButton>
-                    <IconButton
+                    </StyledIconButton>
+                    <StyledIconButton
                         size="large"
                         aria-label="account"
                         color="inherit"
-                        sx={{
-                            "&:hover": {
-                                backgroundColor: theme.palette.action.hover,
-                            },
-                        }}
                     >
                         <AccountCircleIcon />
-                    </IconButton>
+                    </StyledIconButton>
                 </Box>
             </Toolbar>
-        </AppBar>
+        </StyledAppBar>
     );
 }
