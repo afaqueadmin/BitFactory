@@ -13,6 +13,7 @@ model User {
   email         String           @unique
   name          String?
   password      String
+  role          String          @default("USER")
   city          String?
   country       String?
   dateOfBirth   DateTime?
@@ -26,6 +27,7 @@ model User {
   updatedAt     DateTime         @updatedAt
   blacklisted   TokenBlacklist[]
   activities    UserActivity[]
+  miners        Miner[]
 
   @@map("users")
 }
@@ -53,4 +55,35 @@ model UserActivity {
 
   @@index([userId])
   @@map("user_activities")
+}
+
+model Miner {
+  id            String    @id @default(cuid())
+  name          String
+  model         String
+  status        String    @default("INACTIVE") // ACTIVE or INACTIVE
+  powerUsage    Float     // in kilowatts
+  hashRate      Float     // in TH/s
+  userId        String
+  spaceId       String
+  user          User      @relation(fields: [userId], references: [id])
+  space         Space     @relation(fields: [spaceId], references: [id])
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@map("miners")
+}
+
+model Space {
+  id            String    @id @default(cuid())
+  name          String
+  location      String
+  capacity      Int       // Total number of mining spots
+  powerCapacity Float     // Total power capacity in kilowatts
+  status        String    @default("AVAILABLE") // AVAILABLE or OCCUPIED
+  miners        Miner[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@map("spaces")
 }
