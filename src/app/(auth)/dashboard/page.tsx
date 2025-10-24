@@ -20,7 +20,7 @@
      */
 
     import React from "react";
-    import { Container, Grid, Box, Typography } from "@mui/material";
+    import { Container, Grid, Box, Typography, CircularProgress, Alert } from "@mui/material";
     import DashboardHeader from "@/components/DashboardHeader";
     import HostedMinersCard from "@/components/HostedMinersCard";
     import MarketplaceCard from "@/components/MarketplaceCard";
@@ -29,11 +29,13 @@
     import AttachMoneyIcon from "@mui/icons-material/AttachMoney";
     import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
     import ShowChartIcon from "@mui/icons-material/ShowChart";
-    // Add this import to your dashboard page
     import MiningEarningsChart from "@/components/MiningEarningsChart";
+    import { useUser } from "@/lib/hooks/useUser";
 
     
     export default function DashboardPage() {
+        const { user, recentActivities, loading, error } = useUser();
+        
         // demo/hardcoded values (page-level only)
         const hosted = {
             runningCount: 3,
@@ -45,6 +47,22 @@
             runningCount: 0,
             comingSoon: true,
         };
+
+        if (loading) {
+            return (
+                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+                    <CircularProgress />
+                </Box>
+            );
+        }
+
+        if (error) {
+            return (
+                <Box sx={{ p: 2 }}>
+                    <Alert severity="error">{error}</Alert>
+                </Box>
+            );
+        }
 
         return (
             <Box component="main" sx={{ pt: 2, pb: 4 }}>

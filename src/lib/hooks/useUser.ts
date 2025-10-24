@@ -1,12 +1,31 @@
 import { useState, useEffect } from 'react';
 
+interface UserActivity {
+  id: string;
+  type: string;
+  ipAddress: string;
+  userAgent: string;
+  createdAt: string;
+}
+
 interface UserData {
-  name: string;
+  id?: string;
+  name: string | null;
   email: string;
+  phoneNumber: string | null;
+  dateOfBirth: string | null;
+  country: string | null;
+  city: string | null;
+  streetAddress: string | null;
+  companyName: string | null;
+  vatNumber: string | null;
+  profileImage: string | null;
+  profileImageId: string | null;
 }
 
 export function useUser() {
   const [user, setUser] = useState<UserData | null>(null);
+  const [recentActivities, setRecentActivities] = useState<UserActivity[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -30,6 +49,7 @@ export function useUser() {
         }
 
         setUser(data.user);
+        setRecentActivities(data.recentActivities || []);
       } catch (err) {
         console.error('Error fetching user data:', err);
         setError(err instanceof Error ? err.message : 'Failed to fetch user data');
@@ -41,5 +61,5 @@ export function useUser() {
     fetchUser();
   }, []);
 
-  return { user, loading, error };
+  return { user, recentActivities, loading, error };
 }

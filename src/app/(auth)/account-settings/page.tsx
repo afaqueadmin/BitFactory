@@ -311,8 +311,46 @@ export default function AccountSettings() {
                                                 throw new Error(data.error || 'Failed to upload image');
                                             }
                                             
-                                            setFormData(prev => ({
-                                                ...prev,
+                                            // Get current user data first
+                                            const userResponse = await fetch('/api/user/profile', {
+                                                credentials: 'include',
+                                                headers: {
+                                                    'Cache-Control': 'no-cache',
+                                                },
+                                            });
+                                            
+                                            if (!userResponse.ok) {
+                                                throw new Error('Failed to fetch current user data');
+                                            }
+                                            
+                                            const userData = await userResponse.json();
+                                            
+                                            // Create updated profile data
+                                            const updatedProfileData = {
+                                                ...userData.user, // Keep all existing user data
+                                                profileImage: data.imageUrl,
+                                                profileImageId: data.publicId
+                                            };
+
+                                            // Save all profile data including the new image
+                                            const profileResponse = await fetch('/api/user/profile', {
+                                                method: 'PATCH',
+                                                credentials: 'include',
+                                                headers: {
+                                                    'Content-Type': 'application/json',
+                                                    'Cache-Control': 'no-cache',
+                                                },
+                                                body: JSON.stringify(updatedProfileData),
+                                            });
+
+                                            if (!profileResponse.ok) {
+                                                const errorData = await profileResponse.json();
+                                                throw new Error(errorData.error || 'Failed to update profile with new image');
+                                            }
+
+                                            // Update form data with the new image
+                                            setFormData(prevData => ({
+                                                ...prevData,
                                                 profileImage: data.imageUrl,
                                                 profileImageId: data.publicId
                                             }));
