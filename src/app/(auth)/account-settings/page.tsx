@@ -18,7 +18,13 @@ import {
     Alert,
     CircularProgress,
     useTheme,
+    Dialog,
+    DialogContent,
+    DialogTitle,
+    Fade,
+    IconButton,
 } from '@mui/material';
+import { CheckCircleOutline, Close, ErrorOutline } from '@mui/icons-material';
 import { PhotoCamera } from '@mui/icons-material';
 
 // Create a Grid component that includes the 'item' prop
@@ -32,6 +38,10 @@ interface UserProfile {
     country: string;
     city: string;
     streetAddress: string;
+    companyName: string;
+    vatNumber: string;
+    profileImage?: string;
+    profileImageId?: string;
 }
 
 interface Activity {
@@ -57,6 +67,10 @@ export default function AccountSettings() {
         country: '',
         city: '',
         streetAddress: '',
+        companyName: '',
+        vatNumber: '',
+        profileImage: '',
+        profileImageId: '',
     });
 
     // Safely handle null values in form data
@@ -160,7 +174,8 @@ export default function AccountSettings() {
 
             setSuccess('Profile updated successfully!');
         } catch (error) {
-            setError('Failed to update profile');
+            const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred while updating your profile. Please try again later.';
+            setError(errorMessage);
             console.error('Error updating profile:', error);
         } finally {
             setSaving(false);
@@ -225,6 +240,7 @@ export default function AccountSettings() {
                             }
                         }}>
                             <Avatar
+                                src={formData.profileImage || undefined}
                                 sx={{
                                     width: { xs: 100, sm: 120, md: 140 },
                                     height: { xs: 100, sm: 120, md: 140 },
@@ -254,15 +270,97 @@ export default function AccountSettings() {
                                             : 'rgba(0,0,0,0.2)'
                                     }
                                 }}
-                                disabled // Temporarily disabled
                             >
                                 Upload Photo
                                 <input
                                     hidden
                                     accept="image/*"
                                     type="file"
-                                    onChange={() => {}}
-                                    disabled
+                                    onChange={async (e) => {
+                                        if (!e.target.files?.[0]) return;
+                                
+                                        const file = e.target.files[0];
+                                        console.log('Selected file:', {
+                                            name: file.name,
+                                            type: file.type,
+                                            size: file.size
+                                        });
+                                        
+                                        // Check file size
+                                        if (file.size > 10 * 1024 * 1024) {
+                                            setError('File size must be less than 10MB');
+                                            return;
+                                        }
+                                
+                                        // Create form data
+                                        const formData = new FormData();
+                                        formData.append('image', file);
+                                
+                                        try {
+                                            console.log('Sending upload request...');
+                                            const response = await fetch('/api/user/upload-image', {
+                                                method: 'POST',
+                                                credentials: 'include',
+                                                body: formData,
+                                            });
+                                
+                                            const data = await response.json();
+                                            console.log('Upload response:', data);
+                                
+                                            if (!response.ok) {
+                                                throw new Error(data.error || 'Failed to upload image');
+                                            }
+                                            
+                                            // Get current user data first
+                                            const userResponse = await fetch('/api/user/profile', {
+                                                credentials: 'include',
+                                                headers: {
+                                                    'Cache-Control': 'no-cache',
+                                                },
+                                            });
+                                            
+                                            if (!userResponse.ok) {
+                                                throw new Error('Failed to fetch current user data');
+                                            }
+                                            
+                                            const userData = await userResponse.json();
+                                            
+                                            // Create updated profile data
+                                            const updatedProfileData = {
+                                                ...userData.user, // Keep all existing user data
+                                                profileImage: data.imageUrl,
+                                                profileImageId: data.publicId
+                                            };
+
+                                            // Save all profile data including the new image
+                                            const profileResponse = await fetch('/api/user/profile', {
+                                                method: 'PATCH',
+                                                credentials: 'include',
+                                                headers: {
+                                                    'Content-Type': 'application/json',
+                                                    'Cache-Control': 'no-cache',
+                                                },
+                                                body: JSON.stringify(updatedProfileData),
+                                            });
+
+                                            if (!profileResponse.ok) {
+                                                const errorData = await profileResponse.json();
+                                                throw new Error(errorData.error || 'Failed to update profile with new image');
+                                            }
+
+                                            // Update form data with the new image
+                                            setFormData(prevData => ({
+                                                ...prevData,
+                                                profileImage: data.imageUrl,
+                                                profileImageId: data.publicId
+                                            }));
+                                
+                                            setSuccess('Profile image updated successfully!');
+                                        } catch (error) {
+                                            console.error('Upload error:', error);
+                                            setError(error instanceof Error ? error.message : 'Failed to upload image');
+                                        }
+                                    }}
                                 />
                             </Button>
                         </Box>
@@ -287,36 +385,172 @@ export default function AccountSettings() {
                             }}
                         >
                             <Grid container spacing={3}>
-                                {error && (
-                                    <Grid item xs={12}>
-                                        <Alert 
-                                            severity="error"
+                                {/* Error Dialog */}
+                                <Dialog
+                                    open={Boolean(error)}
+                                    onClose={() => setError(null)}
+                                    TransitionComponent={Fade}
+                                    TransitionProps={{ timeout: 500 }}
+                                    PaperProps={{
+                                        sx: {
+                                            borderRadius: 3,
+                                            minWidth: '300px',
+                                            background: theme => theme.palette.mode === 'dark'
+                                                ? 'linear-gradient(145deg, rgba(40,40,40,0.95), rgba(30,30,30,0.95))'
+                                                : 'linear-gradient(145deg, rgba(255,255,255,0.95), rgba(250,250,250,0.95))',
+                                            backdropFilter: 'blur(10px)',
+                                            border: theme => `1px solid ${theme.palette.error.main}40`,
+                                            boxShadow: theme => `0 8px 32px ${theme.palette.error.main}30`,
+                                        }
+                                    }}
+                                >
+                                    <DialogTitle 
+                                        sx={{ 
+                                            textAlign: 'center',
+                                            pt: 3,
+                                            pb: 0
+                                        }}
+                                    >
+                                        <IconButton
+                                            onClick={() => setError(null)}
                                             sx={{
-                                                borderRadius: 2,
-                                                '& .MuiAlert-icon': {
-                                                    fontSize: '1.5rem'
-                                                }
+                                                position: 'absolute',
+                                                right: 8,
+                                                top: 8,
+                                                color: theme => theme.palette.grey[500],
+                                            }}
+                                        >
+                                            <Close />
+                                        </IconButton>
+                                        <ErrorOutline 
+                                            sx={{ 
+                                                fontSize: '4rem',
+                                                color: 'error.main',
+                                                mb: 1
+                                            }} 
+                                        />
+                                    </DialogTitle>
+                                    <DialogContent>
+                                        <Typography 
+                                            variant="h6" 
+                                            align="center" 
+                                            sx={{ 
+                                                mb: 2,
+                                                color: theme => theme.palette.mode === 'dark' 
+                                                    ? theme.palette.error.light 
+                                                    : theme.palette.error.dark,
+                                                fontWeight: 'bold'
+                                            }}
+                                        >
+                                            Error
+                                        </Typography>
+                                        <Typography 
+                                            align="center" 
+                                            sx={{ 
+                                                mb: 3,
+                                                color: theme => theme.palette.text.secondary
                                             }}
                                         >
                                             {error}
-                                        </Alert>
-                                    </Grid>
-                                )}
-                                {success && (
-                                    <Grid item xs={12}>
-                                        <Alert 
-                                            severity="success"
+                                        </Typography>
+                                        <Box sx={{ textAlign: 'center', mb: 2 }}>
+                                            <Button
+                                                onClick={() => setError(null)}
+                                                variant="contained"
+                                                sx={{
+                                                    px: 4,
+                                                    background: theme => `linear-gradient(45deg, ${theme.palette.error.main}, ${theme.palette.error.dark})`,
+                                                    boxShadow: theme => `0 4px 20px ${theme.palette.error.main}40`,
+                                                    '&:hover': {
+                                                        background: theme => `linear-gradient(45deg, ${theme.palette.error.dark}, ${theme.palette.error.main})`,
+                                                        boxShadow: theme => `0 6px 25px ${theme.palette.error.main}60`,
+                                                    }
+                                                }}
+                                            >
+                                                Close
+                                            </Button>
+                                        </Box>
+                                    </DialogContent>
+                                </Dialog>
+
+                                {/* Success Dialog */}
+                                <Dialog
+                                    open={Boolean(success)}
+                                    onClose={() => setSuccess(null)}
+                                    TransitionComponent={Fade}
+                                    TransitionProps={{ timeout: 500 }}
+                                    PaperProps={{
+                                        sx: {
+                                            borderRadius: 3,
+                                            minWidth: '300px',
+                                            background: theme => theme.palette.mode === 'dark'
+                                                ? 'linear-gradient(145deg, rgba(40,40,40,0.95), rgba(30,30,30,0.95))'
+                                                : 'linear-gradient(145deg, rgba(255,255,255,0.95), rgba(250,250,250,0.95))',
+                                            backdropFilter: 'blur(10px)',
+                                            border: theme => `1px solid ${theme.palette.primary.main}40`,
+                                            boxShadow: theme => `0 8px 32px ${theme.palette.primary.main}30`,
+                                        }
+                                    }}
+                                >
+                                    <DialogTitle 
+                                        sx={{ 
+                                            textAlign: 'center',
+                                            pt: 3,
+                                            pb: 0
+                                        }}
+                                    >
+                                        <IconButton
+                                            onClick={() => setSuccess(null)}
                                             sx={{
-                                                borderRadius: 2,
-                                                '& .MuiAlert-icon': {
-                                                    fontSize: '1.5rem'
-                                                }
+                                                position: 'absolute',
+                                                right: 8,
+                                                top: 8,
+                                                color: theme => theme.palette.grey[500],
+                                            }}
+                                        >
+                                            <Close />
+                                        </IconButton>
+                                        <CheckCircleOutline 
+                                            sx={{ 
+                                                fontSize: '4rem',
+                                                color: 'success.main',
+                                                mb: 1
+                                            }} 
+                                        />
+                                    </DialogTitle>
+                                    <DialogContent>
+                                        <Typography 
+                                            variant="h6" 
+                                            align="center" 
+                                            sx={{ 
+                                                mb: 2,
+                                                color: theme => theme.palette.mode === 'dark' 
+                                                    ? theme.palette.primary.light 
+                                                    : theme.palette.primary.dark,
+                                                fontWeight: 'bold'
                                             }}
                                         >
                                             {success}
-                                        </Alert>
-                                    </Grid>
-                                )}
+                                        </Typography>
+                                        <Box sx={{ textAlign: 'center', mb: 2 }}>
+                                            <Button
+                                                onClick={() => setSuccess(null)}
+                                                variant="contained"
+                                                sx={{
+                                                    px: 4,
+                                                    background: theme => `linear-gradient(45deg, ${theme.palette.success.main}, ${theme.palette.success.dark})`,
+                                                    boxShadow: theme => `0 4px 20px ${theme.palette.success.main}40`,
+                                                    '&:hover': {
+                                                        background: theme => `linear-gradient(45deg, ${theme.palette.success.dark}, ${theme.palette.success.main})`,
+                                                        boxShadow: theme => `0 6px 25px ${theme.palette.success.main}60`,
+                                                    }
+                                                }}
+                                            >
+                                                OK
+                                            </Button>
+                                        </Box>
+                                    </DialogContent>
+                                </Dialog>
                                 
                                 <Grid item xs={12} sm={6}>
                                     <TextField
@@ -341,11 +575,17 @@ export default function AccountSettings() {
                                         name="email"
                                         type="email"
                                         value={getFormValue(formData.email)}
-                                        onChange={handleInputChange}
+                                        InputProps={{
+                                            readOnly: true,
+                                        }}
                                         variant="outlined"
                                         sx={{ 
                                             '& label.Mui-focused': {
                                                 color: theme => theme.palette.primary.main
+                                            },
+                                            '& .MuiInputBase-input.Mui-readOnly': {
+                                                cursor: 'not-allowed',
+                                                bgcolor: theme => theme.palette.action.disabledBackground
                                             }
                                         }}
                                     />
@@ -374,6 +614,9 @@ export default function AccountSettings() {
                                         value={getFormValue(formData.dateOfBirth)}
                                         onChange={handleInputChange}
                                         InputLabelProps={{ shrink: true }}
+                                        inputProps={{
+                                            max: new Date().toISOString().split('T')[0]
+                                        }}
                                         variant="outlined"
                                         sx={{ 
                                             '& label.Mui-focused': {
@@ -421,6 +664,36 @@ export default function AccountSettings() {
                                         onChange={handleInputChange}
                                         multiline
                                         rows={2}
+                                        variant="outlined"
+                                        sx={{ 
+                                            '& label.Mui-focused': {
+                                                color: theme => theme.palette.primary.main
+                                            }
+                                        }}
+                                    />
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <TextField
+                                        fullWidth
+                                        label="Company Name"
+                                        name="companyName"
+                                        value={getFormValue(formData.companyName)}
+                                        onChange={handleInputChange}
+                                        variant="outlined"
+                                        sx={{ 
+                                            '& label.Mui-focused': {
+                                                color: theme => theme.palette.primary.main
+                                            }
+                                        }}
+                                    />
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <TextField
+                                        fullWidth
+                                        label="VAT Number"
+                                        name="vatNumber"
+                                        value={getFormValue(formData.vatNumber)}
+                                        onChange={handleInputChange}
                                         variant="outlined"
                                         sx={{ 
                                             '& label.Mui-focused': {

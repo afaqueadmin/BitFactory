@@ -51,7 +51,9 @@ export default function AppBarComponent() {
             setIsLoggingOut(false);
             handleClose();
         }
-    };    return (
+    };
+
+    return (
         <AppBar
             position="fixed"
             sx={{

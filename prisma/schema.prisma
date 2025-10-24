@@ -13,13 +13,17 @@ model User {
   email         String           @unique
   name          String?
   password      String
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
   city          String?
   country       String?
   dateOfBirth   DateTime?
   phoneNumber   String?
   streetAddress String?
+  companyName   String?
+  vatNumber     String?
+  profileImage  String?
+  profileImageId String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
   blacklisted   TokenBlacklist[]
   activities    UserActivity[]
 

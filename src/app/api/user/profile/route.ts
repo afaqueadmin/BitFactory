@@ -41,6 +41,10 @@ export async function GET(request: NextRequest) {
         country: true,
         city: true,
         streetAddress: true,
+        profileImage: true,
+        profileImageId: true,
+        companyName: true,
+        vatNumber: true,
       },
     });
 
@@ -57,9 +61,12 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ user, recentActivities });
   } catch (error) {
-    console.error('Error fetching user profile:', error);
+    console.error('Error fetching user profile:', error instanceof Error ? error.message : error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { 
+        error: 'Internal server error',
+        details: error instanceof Error ? error.message : String(error)
+      },
       { status: 500 }
     );
   }
@@ -110,6 +117,10 @@ export async function PATCH(request: NextRequest) {
         country: data.country,
         city: data.city,
         streetAddress: data.streetAddress,
+        companyName: data.companyName,
+        vatNumber: data.vatNumber,
+        profileImage: data.profileImage,
+        profileImageId: data.profileImageId,
       },
       select: {
         email: true,
@@ -119,6 +130,10 @@ export async function PATCH(request: NextRequest) {
         country: true,
         city: true,
         streetAddress: true,
+        profileImage: true,
+        profileImageId: true,
+        companyName: true,
+        vatNumber: true,
       },
     });
 
