@@ -1,24 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
+import { generateTokens } from '@/lib/jwt';
 
-// Token generation with proper types
-const generateTokens = (userId: string, role: string) => {
-  const accessToken = jwt.sign(
-    { userId, role },
-    process.env.JWT_SECRET || 'your-secret-key',
-    { expiresIn: '15m' }
-  );
-
-  const refreshToken = jwt.sign(
-    { userId, role, type: 'refresh' },
-    process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key',
-    { expiresIn: '7d' }
-  );
-
-  return { accessToken, refreshToken };
-};
+// Add runtime config for Node.js runtime
+export const runtime = 'nodejs';
 
 export async function POST(request: NextRequest) {
   try {
@@ -112,7 +98,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate tokens with role
-    const { accessToken, refreshToken } = generateTokens(user.id, user.role);
+    const { accessToken, refreshToken } = await generateTokens(user.id, user.role);
 
     // Determine redirect URL based on role
     const redirectUrl = user.role === 'ADMIN' ? '/adminpanel' : '/dashboard';

@@ -1,39 +1,58 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import jwt from 'jsonwebtoken';
+import { verifyJwtToken } from '@/lib/jwt';
 
-// Enable request logging middleware
-export const middleware = async (request: NextRequest) => {
-  console.log(`${request.method} ${request.url} - Request received`);
-  return NextResponse.next();
-};
+// Route segment config
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
-// Helper to get user ID from token
-const getUserIdFromToken = (token: string) => {
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key') as { userId: string };
-    return decoded.userId;
-  } catch (error) {
-    return null;
-  }
-};
+// Segment configuration to ensure this is treated as an API route
+export const fetchCache = 'force-no-store';
+export const preferredRegion = 'auto';
 
 // GET: Fetch user profile
 export async function GET(request: NextRequest) {
+  console.log('Profile API [GET]: Starting handler');
+  
   try {
     const token = request.cookies.get('token')?.value;
+    console.log('Profile API [GET]: Token present:', !!token);
+
     if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return Response.json(
+        { error: 'Unauthorized' },
+        { 
+          status: 401,
+          headers: {
+            'Cache-Control': 'no-store, no-cache, must-revalidate',
+          },
+        }
+      );
     }
 
-    const userId = getUserIdFromToken(token);
-    if (!userId) {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
+    let userId: string;
+    try {
+      const decoded = await verifyJwtToken(token);
+      userId = decoded.userId;
+      console.log('Profile API [GET]: Token verified, userId:', userId);
+    } catch (error) {
+      console.error('Profile API [GET]: Token verification failed:', error);
+      return Response.json(
+        { error: 'Invalid token' },
+        { 
+          status: 401,
+          headers: {
+            'Cache-Control': 'no-store, no-cache, must-revalidate',
+          },
+        }
+      );
     }
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: {
+        id: true,
         email: true,
         name: true,
         phoneNumber: true,
@@ -50,7 +69,16 @@ export async function GET(request: NextRequest) {
     });
 
     if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      console.error('Profile API [GET]: User not found for id:', userId);
+      return Response.json(
+        { error: 'User not found' },
+        { 
+          status: 404,
+          headers: {
+            'Cache-Control': 'no-store, no-cache, must-revalidate',
+          },
+        }
+      );
     }
 
     // Fetch recent activities
@@ -60,15 +88,30 @@ export async function GET(request: NextRequest) {
       take: 10,
     });
 
-    return NextResponse.json({ user, recentActivities });
+    console.log('Profile API [GET]: Successfully fetched data');
+    
+    return Response.json(
+      { user, recentActivities },
+      {
+        status: 200,
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate',
+        },
+      }
+    );
   } catch (error) {
-    console.error('Error fetching user profile:', error instanceof Error ? error.message : error);
-    return NextResponse.json(
+    console.error('Profile API [GET]: Error:', error);
+    return Response.json(
       { 
         error: 'Internal server error',
         details: error instanceof Error ? error.message : String(error)
       },
-      { status: 500 }
+      { 
+        status: 500,
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate',
+        },
+      }
     );
   }
 }
@@ -78,19 +121,46 @@ export async function PATCH(request: NextRequest) {
   try {
     const token = request.cookies.get('token')?.value;
     if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return Response.json(
+        { error: 'Unauthorized' },
+        { 
+          status: 401,
+          headers: {
+            'Cache-Control': 'no-store, no-cache, must-revalidate',
+          },
+        }
+      );
     }
 
-    const userId = getUserIdFromToken(token);
-    if (!userId) {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
+    let userId: string;
+    try {
+      const decoded = await verifyJwtToken(token);
+      userId = decoded.userId;
+    } catch (error) {
+      return Response.json(
+        { error: 'Invalid token' },
+        { 
+          status: 401,
+          headers: {
+            'Cache-Control': 'no-store, no-cache, must-revalidate',
+          },
+        }
+      );
     }
 
     const data = await request.json();
     
     // Validate required fields
     if (!data.email?.trim()) {
-      return NextResponse.json({ error: 'Email is required' }, { status: 400 });
+      return Response.json(
+        { error: 'Email is required' },
+        { 
+          status: 400,
+          headers: {
+            'Cache-Control': 'no-store, no-cache, must-revalidate',
+          },
+        }
+      );
     }
 
     // Check if email is being changed and if it's already taken
@@ -103,7 +173,15 @@ export async function PATCH(request: NextRequest) {
       });
 
       if (existingUser) {
-        return NextResponse.json({ error: 'Email already in use' }, { status: 400 });
+        return Response.json(
+          { error: 'Email already in use' },
+          { 
+            status: 400,
+            headers: {
+              'Cache-Control': 'no-store, no-cache, must-revalidate',
+            },
+          }
+        );
       }
     }
 
@@ -124,6 +202,7 @@ export async function PATCH(request: NextRequest) {
         profileImageId: data.profileImageId,
       },
       select: {
+        id: true,
         email: true,
         name: true,
         phoneNumber: true,
@@ -149,12 +228,25 @@ export async function PATCH(request: NextRequest) {
       },
     });
 
-    return NextResponse.json({ user: updatedUser });
+    return Response.json(
+      { user: updatedUser },
+      {
+        status: 200,
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate',
+        },
+      }
+    );
   } catch (error) {
-    console.error('Error updating user profile:', error);
-    return NextResponse.json(
+    console.error('Profile API [PATCH]: Error:', error);
+    return Response.json(
       { error: 'Internal server error' },
-      { status: 500 }
+      { 
+        status: 500,
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate',
+        },
+      }
     );
   }
 }

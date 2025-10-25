@@ -1,7 +1,10 @@
 import { v2 as cloudinary } from 'cloudinary';
 import { prisma } from '@/lib/prisma';
 import { cookies } from 'next/headers';
-import jwt from 'jsonwebtoken';
+import { verifyJwtToken } from '@/lib/jwt';
+
+// Add runtime config for Node.js runtime
+export const runtime = 'nodejs';
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -25,14 +28,14 @@ export async function POST(req: Request) {
 
     let decodedToken;
     try {
-      decodedToken = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+      decodedToken = await verifyJwtToken(token);
       console.log('Token verified successfully:', decodedToken);
     } catch (error) {
       console.error('Token verification error:', error);
       return Response.json({ error: 'Invalid token - Verification failed' }, { status: 401 });
     }
 
-    const userId = typeof decodedToken === 'object' ? decodedToken.userId : null;
+    const userId = decodedToken.userId;
     if (!userId) {
       return Response.json({ error: 'Invalid token - Missing user ID' }, { status: 401 });
     }

@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import jwt from 'jsonwebtoken';
+import { verifyJwtToken } from '@/lib/jwt';
+
+// Add runtime config for Node.js runtime
+export const runtime = 'nodejs';
 
 export async function POST(request: NextRequest) {
   try {
@@ -10,7 +13,7 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key') as { userId: string; role: string };
+      const decoded = await verifyJwtToken(token);
       return NextResponse.json({ 
         isValid: true, 
         userId: decoded.userId,
