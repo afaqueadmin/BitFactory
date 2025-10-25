@@ -1,64 +1,58 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import jwt from 'jsonwebtoken';
+import { verifyJwtToken } from '@/lib/jwt';
 
-// Paths that don't require authentication
+// Publicly accessible paths (no authentication required)
 const publicPaths = new Set([
   '/',
   '/login',
-  '/api/login',
-  '/api/auth/check',
-  '/api/auth/signout',
-  '/api/auth/refresh',
   '/BitfactoryLogo.webp',
   '/file.svg',
   '/globe.svg',
   '/logo.webp',
   '/next.svg',
   '/vercel.svg',
-  '/window.svg'
+  '/window.svg',
+  '/favicon.svg',
 ]);
 
-// Protected paths that require authentication
-const protectedPaths = new Set([
-  '/dashboard',
-  '/profile',
-  '/settings',
-  '/miners',
-  '/wallet',
-  '/account-settings',
-  '/api/user/profile'
-]);
+// Role-based default redirects
+const getDefaultPathForRole = (role: string) => {
+  switch (role) {
+    case 'ADMIN':
+      return '/adminpanel';
+    case 'CLIENT':
+      return '/dashboard';
+    default:
+      return '/login';
+  }
+};
 
-// Admin-only paths
-const adminPaths = new Set([
-  '/adminpanel',
-  '/(manage)'
-]);
-
-// Client-only paths
-const clientPaths = new Set([
-  '/dashboard'
-]);
+// Check if a path is inside a route group folder like (auth) or (manage)
+const isInRouteGroup = (pathname: string, group: string) => {
+  return pathname.startsWith(`/${group}`) || pathname.includes(`/(${group})`);
+};
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Check if the path is public
+  // ✅ Skip all API routes entirely (no JSON parse errors)
+  if (pathname.startsWith('/api/')) {
+    return NextResponse.next();
+  }
+
+  // ✅ Allow public assets and login page
   if (publicPaths.has(pathname)) {
-    // If user is logged in and tries to access login page, redirect to dashboard
+    // Prevent logged-in users from visiting /login again
     if (pathname === '/login') {
       const token = request.cookies.get('token')?.value;
       if (token) {
         try {
-          const authCheck = await fetch(new URL('/api/auth/check', request.url), {
-            headers: { cookie: request.headers.get('cookie') || '' }
-          });
-          if (authCheck.ok) {
-            return NextResponse.redirect(new URL('/dashboard', request.url));
-          }
+          const decoded = await verifyJwtToken(token);
+          const redirectPath = getDefaultPathForRole(decoded.role);
+          return NextResponse.redirect(new URL(redirectPath, request.url));
         } catch (error) {
-          console.error('Auth check error:', error);
+          console.error('Token verification failed at /login:', error);
         }
       }
     }
@@ -69,106 +63,58 @@ export async function middleware(request: NextRequest) {
     const token = request.cookies.get('token')?.value;
     const refreshToken = request.cookies.get('refresh_token')?.value;
 
-    // No tokens present, redirect to login
+    // No token = unauthenticated user
     if (!token && !refreshToken) {
-      if (pathname.startsWith('/api/')) {
-        return NextResponse.json(
-          { error: 'Unauthorized', code: 'NO_TOKEN' },
-          { status: 401 }
-        );
-      }
       return NextResponse.redirect(new URL('/login', request.url));
     }
 
-    // First verify the token and get user info
-    let decodedToken = null;
+    // Decode JWT
+    let decoded: any = null;
     if (token) {
       try {
-        decodedToken = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key') as { userId: string, role: string };
-        console.log('Token successfully decoded:', { userId: decodedToken.userId, role: decodedToken.role });
-
-        // Handle role-based access
-        if (decodedToken.role === 'ADMIN') {
-          // Redirect admins to admin panel on login
-          if (pathname === '/login') {
-            return NextResponse.redirect(new URL('/adminpanel', request.url));
-          }
-          
-          // Allow access to admin paths
-          if (pathname.includes('(manage)') || pathname.startsWith('/adminpanel')) {
-            return NextResponse.next();
-          }
-        } else if (decodedToken.role === 'CLIENT') {
-          // Redirect clients to dashboard on login
-          if (pathname === '/login') {
-            return NextResponse.redirect(new URL('/dashboard', request.url));
-          }
-          
-          // Block access to admin paths
-          if (pathname.includes('(manage)') || pathname.startsWith('/adminpanel')) {
-            console.log('Client attempting to access admin route');
-            return NextResponse.redirect(new URL('/dashboard', request.url));
-          }
-        }
-      } catch (error) {
-        console.log('Token verification failed:', error);
-        // Don't redirect yet, let the auth check handle invalid tokens
+        decoded = await verifyJwtToken(token);
+        console.log('✅ Token verified:', decoded);
+      } catch (err) {
+        console.error('❌ Invalid JWT token:', err);
       }
     }
 
-    // Verify token validity with backend
-    const authCheck = await fetch(new URL('/api/auth/check', request.url), {
-      headers: {
-        cookie: request.headers.get('cookie') || '',
-      },
-    });
-
-    const authResult = await authCheck.json();
-
-    if (!authCheck.ok || !authResult.isAuthenticated) {
-      // Clear invalid cookies
-      const response = pathname.startsWith('/api/')
-        ? NextResponse.json({ error: 'Unauthorized', code: 'INVALID_TOKEN' }, { status: 401 })
-        : NextResponse.redirect(new URL('/login', request.url));
-
-      // Clear cookies on authentication failure or logout
-      const cookieNames = ['token', 'refresh_token'] as const;
-      cookieNames.forEach((cookieName: typeof cookieNames[number]) => {
-        response.cookies.set(cookieName, '', {
-          maxAge: 0,
-          path: '/',
-          secure: process.env.NODE_ENV === 'production',
-          httpOnly: true,
-          sameSite: 'strict',
-          expires: new Date(0)
-        });
-      });
-
+    // If decoding failed → redirect to login
+    if (!decoded) {
+      const response = NextResponse.redirect(new URL('/login', request.url));
+      response.cookies.set('token', '', { maxAge: 0, path: '/' });
+      response.cookies.set('refresh_token', '', { maxAge: 0, path: '/' });
       return response;
     }
 
-    // For authenticated users, ensure they can't access public auth pages
-    if (pathname === '/login') {
-      return NextResponse.redirect(new URL('/dashboard', request.url));
+    // ✅ Role-based access control
+    const userRole = decoded.role;
+
+    if (userRole === 'ADMIN') {
+      // Prevent admin from accessing client routes
+      if (isInRouteGroup(pathname, 'auth') || pathname === '/dashboard') {
+        return NextResponse.redirect(new URL('/adminpanel', request.url));
+      }
     }
 
+    if (userRole === 'CLIENT') {
+      // Prevent client from accessing admin routes
+      if (isInRouteGroup(pathname, 'manage') || pathname === '/adminpanel') {
+        return NextResponse.redirect(new URL('/dashboard', request.url));
+      }
+    }
+
+    // ✅ Allow everything else (user is valid)
     return NextResponse.next();
   } catch (error) {
-    console.error('Auth middleware error:', error);
+    console.error('Middleware auth error:', error);
     return NextResponse.redirect(new URL('/login', request.url));
   }
 }
 
-// Configure which routes require the middleware
+// ✅ Apply middleware to all routes except static files
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public folder files
-     */
     '/((?!_next/static|_next/image|favicon.ico).*)',
   ],
 };
