@@ -20,7 +20,7 @@
      */
 
     import React from "react";
-    import { Container, Grid, Box, Typography, CircularProgress, Alert } from "@mui/material";
+    import {Container, Grid, Box, Typography, CircularProgress, Alert, useTheme} from "@mui/material";
     import DashboardHeader from "@/components/DashboardHeader";
     import HostedMinersCard from "@/components/HostedMinersCard";
     import MarketplaceCard from "@/components/MarketplaceCard";
@@ -35,7 +35,8 @@
     
     export default function DashboardPage() {
         const { user, recentActivities, loading, error } = useUser();
-        
+        const theme = useTheme();
+
         // demo/hardcoded values (page-level only)
         const hosted = {
             runningCount: 3,
@@ -140,15 +141,15 @@
                     {/* Chart Section with Main Heading */}
                     <Box sx={{ mt: 4 }}>
                         <Typography 
-                            variant="h4" 
+                            variant="h4"
+                            fontWeight="bold"
                             sx={{ 
-                                background: 'black',
+                                background: theme.palette.text.primary,
                                 WebkitBackgroundClip: 'text',
                                 WebkitTextFillColor: 'transparent',
-                                fontWeight: 500,
                                 mb: 3,
                                 fontSize: { xs: '1.5rem', md: '2rem' },
-                                textAlign: 'left'
+                                textAlign: 'left',
                             }}
                         >
                             Total overview of your Miner Hosted Miners
