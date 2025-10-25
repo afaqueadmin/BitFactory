@@ -45,6 +45,7 @@ export async function GET(request: NextRequest) {
         profileImageId: true,
         companyName: true,
         vatNumber: true,
+        role: true,
       },
     });
 
@@ -134,6 +135,7 @@ export async function PATCH(request: NextRequest) {
         profileImageId: true,
         companyName: true,
         vatNumber: true,
+        role: true,
       },
     });
 

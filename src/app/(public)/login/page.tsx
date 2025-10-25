@@ -50,7 +50,9 @@ export default function Login() {
 
             if (response.ok) {
                 // ✅ Login successful
-                router.push(data.redirectUrl || "/dashboard");
+                console.log("Login successful, redirecting to:", data.redirectUrl);
+                router.refresh(); // Refresh router cache
+                router.replace(data.redirectUrl); // Use replace instead of push
             } else {
                 // ❌ Login failed
                 setError(data.error || "Login failed");

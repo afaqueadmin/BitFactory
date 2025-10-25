@@ -3,9 +3,9 @@ import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
 
 // Helper function to verify JWT
-const verifyToken = async (token: string): Promise<{ userId: string } | null> => {
+const verifyToken = async (token: string): Promise<{ userId: string, role: string } | null> => {
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key') as { userId: string };
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key') as { userId: string, role: string };
     return decoded;
   } catch (error) {
     return null;
@@ -13,33 +13,33 @@ const verifyToken = async (token: string): Promise<{ userId: string } | null> =>
 };
 
 // Helper function to verify refresh token
-const verifyRefreshToken = async (token: string): Promise<{ userId: string } | null> => {
+const verifyRefreshToken = async (token: string): Promise<{ userId: string, role: string } | null> => {
   try {
     const decoded = jwt.verify(
       token,
       process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key'
-    ) as { userId: string, type: 'refresh' };
+    ) as { userId: string, role: string, type: 'refresh' };
     
     if (decoded.type !== 'refresh') {
       return null;
     }
     
-    return decoded;
+    return { userId: decoded.userId, role: decoded.role };
   } catch (error) {
     return null;
   }
 };
 
 // Generate new tokens
-const generateTokens = (userId: string) => {
+const generateTokens = (userId: string, role: string) => {
   const accessToken = jwt.sign(
-    { userId },
+    { userId, role },
     process.env.JWT_SECRET || 'your-secret-key',
     { expiresIn: '15m' }
   );
 
   const refreshToken = jwt.sign(
-    { userId, type: 'refresh' },
+    { userId, role, type: 'refresh' },
     process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key',
     { expiresIn: '7d' }
   );
@@ -70,6 +70,7 @@ export async function GET(request: NextRequest) {
             id: true,
             email: true,
             name: true,
+            role: true,
           }
         });
 
@@ -89,16 +90,17 @@ export async function GET(request: NextRequest) {
         // Get user data
         const user = await prisma.user.findUnique({
           where: { id: decoded.userId },
-          select: {
+            select: {
             id: true,
             email: true,
             name: true,
+            role: true,
           }
         });
 
         if (user) {
           // Generate new tokens
-          const { accessToken, refreshToken: newRefreshToken } = generateTokens(user.id);
+          const { accessToken, refreshToken: newRefreshToken } = generateTokens(user.id, user.role);
 
           // Create response with new tokens
           const response = NextResponse.json({
