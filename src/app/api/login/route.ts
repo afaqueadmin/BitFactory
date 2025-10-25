@@ -4,15 +4,15 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
 // Token generation with proper types
-const generateTokens = (userId: string) => {
+const generateTokens = (userId: string, role: string) => {
   const accessToken = jwt.sign(
-    { userId },
+    { userId, role },
     process.env.JWT_SECRET || 'your-secret-key',
     { expiresIn: '15m' }
   );
 
   const refreshToken = jwt.sign(
-    { userId, type: 'refresh' },
+    { userId, role, type: 'refresh' },
     process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key',
     { expiresIn: '7d' }
   );
@@ -66,6 +66,7 @@ export async function POST(request: NextRequest) {
         email: true,
         name: true,
         password: true,
+        role: true,
       },
     });
 
@@ -110,8 +111,11 @@ export async function POST(request: NextRequest) {
       console.error('Failed to log login activity:', e);
     }
 
-    // Generate tokens
-    const { accessToken, refreshToken } = generateTokens(user.id);
+    // Generate tokens with role
+    const { accessToken, refreshToken } = generateTokens(user.id, user.role);
+
+    // Determine redirect URL based on role
+    const redirectUrl = user.role === 'ADMIN' ? '/adminpanel' : '/dashboard';
 
     // Create response
     const response = NextResponse.json(
@@ -121,8 +125,9 @@ export async function POST(request: NextRequest) {
           id: user.id,
           email: user.email,
           name: user.name,
+          role: user.role,
         },
-        redirectUrl: '/dashboard',
+        redirectUrl,
       },
       { status: 200 }
     );

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import jwt from 'jsonwebtoken';
 
 // Paths that don't require authentication
 const publicPaths = new Set([
@@ -27,6 +28,17 @@ const protectedPaths = new Set([
   '/wallet',
   '/account-settings',
   '/api/user/profile'
+]);
+
+// Admin-only paths
+const adminPaths = new Set([
+  '/adminpanel',
+  '/(manage)'
+]);
+
+// Client-only paths
+const clientPaths = new Set([
+  '/dashboard'
 ]);
 
 export async function middleware(request: NextRequest) {
@@ -68,7 +80,43 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/login', request.url));
     }
 
-    // Verify token validity
+    // First verify the token and get user info
+    let decodedToken = null;
+    if (token) {
+      try {
+        decodedToken = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key') as { userId: string, role: string };
+        console.log('Token successfully decoded:', { userId: decodedToken.userId, role: decodedToken.role });
+
+        // Handle role-based access
+        if (decodedToken.role === 'ADMIN') {
+          // Redirect admins to admin panel on login
+          if (pathname === '/login') {
+            return NextResponse.redirect(new URL('/adminpanel', request.url));
+          }
+          
+          // Allow access to admin paths
+          if (pathname.includes('(manage)') || pathname.startsWith('/adminpanel')) {
+            return NextResponse.next();
+          }
+        } else if (decodedToken.role === 'CLIENT') {
+          // Redirect clients to dashboard on login
+          if (pathname === '/login') {
+            return NextResponse.redirect(new URL('/dashboard', request.url));
+          }
+          
+          // Block access to admin paths
+          if (pathname.includes('(manage)') || pathname.startsWith('/adminpanel')) {
+            console.log('Client attempting to access admin route');
+            return NextResponse.redirect(new URL('/dashboard', request.url));
+          }
+        }
+      } catch (error) {
+        console.log('Token verification failed:', error);
+        // Don't redirect yet, let the auth check handle invalid tokens
+      }
+    }
+
+    // Verify token validity with backend
     const authCheck = await fetch(new URL('/api/auth/check', request.url), {
       headers: {
         cookie: request.headers.get('cookie') || '',

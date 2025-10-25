@@ -7,6 +7,7 @@ interface User {
   id: string;
   email: string;
   name?: string;
+  role: string;
 }
 
 interface AuthContextType {
@@ -45,6 +46,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsLoading(true);
 
       // First check auth status with no-cache headers
+      console.log("Checking auth status...");
       const authCheck = await fetch('/api/auth/check', {
         credentials: 'include',
         headers: {
@@ -54,6 +56,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
 
       const authData = await authCheck.json();
+      console.log("Auth check response:", authData);
 
       if (!authCheck.ok) {
         // If token expired but we have refresh token, it will be handled by the check endpoint
