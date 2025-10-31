@@ -37,7 +37,7 @@ export default function WalletPage() {
                     >
                         <Typography variant="subtitle1">Total Earnings</Typography>
                         <Typography variant="h5" fontWeight="bold">
-                            $0.00
+                            ₿ 0.00
                         </Typography>
                     </Paper>
                 </Box>
@@ -53,7 +53,7 @@ export default function WalletPage() {
                     >
                         <Typography variant="subtitle1">Pending Payouts</Typography>
                         <Typography variant="h5" fontWeight="bold">
-                            $0.00
+                            ₿ 0.00
                         </Typography>
                     </Paper>
                 </Box>

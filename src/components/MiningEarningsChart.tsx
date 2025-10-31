@@ -102,7 +102,7 @@ export default function MiningEarningsChart({
             tick={{ fontSize: 12, fill: theme.palette.text.secondary }}
             domain={[0, 'dataMax + 2']}
             label={{ 
-              value: 'Amount (€)', 
+              value: 'Amount ($)',
               angle: -90, 
               position: 'insideLeft',
               style: { textAnchor: 'middle', fill: theme.palette.text.secondary }
@@ -110,7 +110,7 @@ export default function MiningEarningsChart({
           />
           <Tooltip 
             formatter={(value: any, name: string) => [
-              `€${Number(value).toFixed(2)}`, 
+              `$${Number(value).toFixed(2)}`,
               name === 'earnings' ? 'Earnings' : 'Costs'
             ]}
             labelFormatter={(value) => new Date(value).toLocaleDateString('en-US', {
