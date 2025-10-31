@@ -1,143 +1,132 @@
 import { NextRequest, NextResponse } from 'next/server';
-import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
-import generateTokens from "@/lib/helpers/generateTokens";
+import { verifyJwtToken, signJwtToken } from '@/lib/jwt';
 
-// Helper function to verify JWT
-const verifyToken = async (token: string): Promise<{ userId: string, role: string } | null> => {
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key') as { userId: string, role: string };
-    return decoded;
-  } catch (error) {
-    return null;
-  }
-};
+// Runtime config
+export const runtime = 'nodejs';
 
-// Helper function to verify refresh token
-const verifyRefreshToken = async (token: string): Promise<{ userId: string, role: string } | null> => {
-  try {
-    const decoded = jwt.verify(
-      token,
-      process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key'
-    ) as { userId: string, role: string, type: 'refresh' };
-    
-    if (decoded.type !== 'refresh') {
-      return null;
-    }
-    
-    return { userId: decoded.userId, role: decoded.role };
-  } catch (error) {
-    return null;
-  }
+// Config options
+const generateTokens = async (userId: string, role: string) => {
+    const accessToken = await signJwtToken({ userId, role });
+    const refreshToken = await signJwtToken({ userId, role, type: 'refresh' }, '7d');
+    return { accessToken, refreshToken };
 };
 
 export async function GET(request: NextRequest) {
-  try {
-    const accessToken = request.cookies.get('token')?.value;
-    const refreshToken = request.cookies.get('refresh_token')?.value;
+    try {
+        const accessToken = request.cookies.get('token')?.value;
+        const refreshToken = request.cookies.get('refresh_token')?.value;
 
-    if (!accessToken && !refreshToken) {
-      return NextResponse.json(
-        { isAuthenticated: false },
-        { status: 401 }
-      );
-    }
+        if (!accessToken && !refreshToken) {
+            return NextResponse.json(
+                { isAuthenticated: false },
+                { status: 401 }
+            );
+        }
 
-    // Try to verify the access token first
-    if (accessToken) {
-      const decoded = await verifyToken(accessToken);
-      if (decoded) {
-        // Get user data
-        const user = await prisma.user.findUnique({
-          where: { id: decoded.userId },
-          select: { 
-            id: true,
-            email: true,
-            name: true,
-            role: true,
-          }
+        // Try to verify the access token first
+        if (accessToken) {
+            try {
+                const decoded = await verifyJwtToken(accessToken);
+                // Get user data
+                const user = await prisma.user.findUnique({
+                    where: { id: decoded.userId },
+                    select: {
+                        id: true,
+                        email: true,
+                        name: true,
+                        role: true,
+                    }
+                });
+
+                if (user) {
+                    return NextResponse.json({
+                        isAuthenticated: true,
+                        user
+                    });
+                }
+            } catch (error) {
+                console.error('Access token verification failed:', error);
+                // Fall through to refresh token check
+            }
+        }
+
+        // If access token is invalid or expired, try refresh token
+        if (refreshToken) {
+            try {
+                const decoded = await verifyJwtToken(refreshToken);
+                if (decoded && decoded.type === 'refresh') {
+                    // Get user data
+                    const user = await prisma.user.findUnique({
+                        where: { id: decoded.userId },
+                        select: {
+                            id: true,
+                            email: true,
+                            name: true,
+                            role: true,
+                        }
+                    });
+
+                    if (user) {
+                        // Generate new tokens
+                        const { accessToken, refreshToken: newRefreshToken } = await generateTokens(user.id, user.role);
+
+                        // Create response with new tokens
+                        const response = NextResponse.json({
+                            isAuthenticated: true,
+                            user
+                        });
+
+                        // Set new cookies
+                        response.cookies.set('token', accessToken, {
+                            httpOnly: true,
+                            secure: process.env.NODE_ENV === 'production',
+                            sameSite: 'strict',
+                            maxAge: 15 * 60, // 15 minutes
+                            path: '/',
+                        });
+
+                        response.cookies.set('refresh_token', newRefreshToken, {
+                            httpOnly: true,
+                            secure: process.env.NODE_ENV === 'production',
+                            sameSite: 'strict',
+                            maxAge: 7 * 24 * 60 * 60, // 7 days
+                            path: '/',
+                        });
+
+                        return response;
+                    }
+                }
+            } catch (error) {
+                console.error('Refresh token verification failed:', error);
+                // Fall through to clear cookies
+            }
+        }
+
+        // If both tokens are invalid
+        const response = NextResponse.json(
+            { isAuthenticated: false },
+            { status: 401 }
+        );
+
+        // Clear invalid cookies
+        ['token', 'refresh_token'].forEach(cookieName => {
+            response.cookies.set(cookieName, '', {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: 'strict',
+                maxAge: 0,
+                path: '/',
+                expires: new Date(0),
+            });
         });
 
-        if (user) {
-          return NextResponse.json({
-            isAuthenticated: true,
-            user
-          });
-        }
-      }
+        return response;
+    } catch (error) {
+        console.error('Auth check error:', error);
+        return NextResponse.json(
+            { error: 'Internal server error' },
+            { status: 500 }
+        );
     }
-
-    // If access token is invalid or expired, try refresh token
-    if (refreshToken) {
-      const decoded = await verifyRefreshToken(refreshToken);
-      if (decoded) {
-        // Get user data
-        const user = await prisma.user.findUnique({
-          where: { id: decoded.userId },
-            select: {
-            id: true,
-            email: true,
-            name: true,
-            role: true,
-          }
-        });
-
-        if (user) {
-          // Generate new tokens
-          const { accessToken, refreshToken: newRefreshToken } = generateTokens(user.id, user.role);
-
-          // Create response with new tokens
-          const response = NextResponse.json({
-            isAuthenticated: true,
-            user
-          });
-
-          // Set new cookies
-          response.cookies.set('token', accessToken, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict',
-            maxAge: 15 * 60, // 15 minutes
-            path: '/',
-          });
-
-          response.cookies.set('refresh_token', newRefreshToken, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict',
-            maxAge: 7 * 24 * 60 * 60, // 7 days
-            path: '/',
-          });
-
-          return response;
-        }
-      }
-    }
-
-    // If both tokens are invalid
-    const response = NextResponse.json(
-      { isAuthenticated: false },
-      { status: 401 }
-    );
-
-    // Clear invalid cookies
-    ['token', 'refresh_token'].forEach(cookieName => {
-      response.cookies.set(cookieName, '', {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
-        maxAge: 0,
-        path: '/',
-        expires: new Date(0),
-      });
-    });
-
-    return response;
-  } catch (error) {
-    console.error('Auth check error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
-  }
 }

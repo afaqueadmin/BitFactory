@@ -35,24 +35,77 @@ export function useUser() {
         setLoading(true);
         setError(null);
 
-        const response = await fetch('/api/user/profile', {
+        console.log('Starting user fetch process...');
+
+        // First verify the auth status
+        const authCheck = await fetch('/api/auth/check', {
           credentials: 'include',
           headers: {
             'Cache-Control': 'no-cache',
           },
         });
 
-        const data = await response.json();
+        console.log('Auth Check Status:', authCheck.status);
+        console.log('Auth Check Headers:', Object.fromEntries(authCheck.headers.entries()));
 
-        if (!response.ok) {
-          throw new Error(data.error || 'Failed to fetch user data');
+        // Get auth check response as text first
+        const authCheckText = await authCheck.text();
+        console.log('Auth Check Raw Response:', authCheckText);
+
+        // Try to parse the auth check response
+        let authData;
+        try {
+          authData = JSON.parse(authCheckText);
+        } catch (e) {
+          console.error('Failed to parse auth check response:', e);
+          throw new Error('Invalid authentication response');
         }
 
-        setUser(data.user);
-        setRecentActivities(data.recentActivities || []);
+        // Check if auth was successful
+        if (!authCheck.ok || !authData.isAuthenticated) {
+          throw new Error(authData.error || 'Authentication failed');
+        }
+
+        // Then fetch the user profile
+        console.log('Fetching user profile...');
+        const profileResponse = await fetch('/api/user/profile', {
+          credentials: 'include',
+          headers: {
+            'Cache-Control': 'no-cache',
+          },
+        });
+
+        console.log('Profile Response Status:', profileResponse.status);
+        console.log('Profile Response Headers:', Object.fromEntries(profileResponse.headers.entries()));
+
+        // Get profile response as text first
+        const profileText = await profileResponse.text();
+        console.log('Profile Raw Response:', profileText);
+
+        // Try to parse the profile response
+        let profileData;
+        try {
+          profileData = JSON.parse(profileText);
+        } catch (e) {
+          console.error('Failed to parse profile response:', e);
+          throw new Error('Invalid profile response');
+        }
+
+        if (!profileResponse.ok) {
+          throw new Error(profileData.error || 'Failed to fetch user data');
+        }
+
+        if (!profileData.user) {
+          throw new Error('User data is missing from response');
+        }
+
+        setUser(profileData.user);
+        setRecentActivities(profileData.recentActivities || []);
       } catch (err) {
-        console.error('Error fetching user data:', err);
+        console.error('Error in user fetch process:', err);
         setError(err instanceof Error ? err.message : 'Failed to fetch user data');
+        setUser(null);
+        setRecentActivities([]);
       } finally {
         setLoading(false);
       }

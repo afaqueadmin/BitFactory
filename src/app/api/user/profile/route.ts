@@ -1,151 +1,253 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import {getUserInfoFromToken} from "@/lib/helpers/getUserInfoFromToken";
+import { verifyJwtToken } from '@/lib/jwt';
 
-// Enable request logging middleware
-export const middleware = async (request: NextRequest) => {
-  console.log(`${request.method} ${request.url} - Request received`);
-  return NextResponse.next();
-};
+// Route segment config
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
+// Segment configuration to ensure this is treated as an API route
+export const fetchCache = 'force-no-store';
+export const preferredRegion = 'auto';
 
 // GET: Fetch user profile
 export async function GET(request: NextRequest) {
-  try {
-    const token = request.cookies.get('token')?.value;
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    console.log('Profile API [GET]: Starting handler');
+
+    try {
+        const token = request.cookies.get('token')?.value;
+        console.log('Profile API [GET]: Token present:', !!token);
+
+        if (!token) {
+            return Response.json(
+                { error: 'Unauthorized' },
+                {
+                    status: 401,
+                    headers: {
+                        'Cache-Control': 'no-store, no-cache, must-revalidate',
+                    },
+                }
+            );
+        }
+
+        let userId: string;
+        try {
+            const decoded = await verifyJwtToken(token);
+            userId = decoded.userId;
+            console.log('Profile API [GET]: Token verified, userId:', userId);
+        } catch (error) {
+            console.error('Profile API [GET]: Token verification failed:', error);
+            return Response.json(
+                { error: 'Invalid token' },
+                {
+                    status: 401,
+                    headers: {
+                        'Cache-Control': 'no-store, no-cache, must-revalidate',
+                    },
+                }
+            );
+        }
+
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+            select: {
+                id: true,
+                email: true,
+                name: true,
+                phoneNumber: true,
+                dateOfBirth: true,
+                country: true,
+                city: true,
+                streetAddress: true,
+                profileImage: true,
+                profileImageId: true,
+                companyName: true,
+                vatNumber: true,
+                role: true,
+                twoFactorEnabled: true,
+            },
+        });
+
+        if (!user) {
+            console.error('Profile API [GET]: User not found for id:', userId);
+            return Response.json(
+                { error: 'User not found' },
+                {
+                    status: 404,
+                    headers: {
+                        'Cache-Control': 'no-store, no-cache, must-revalidate',
+                    },
+                }
+            );
+        }
+
+        // Fetch recent activities
+        const recentActivities = await prisma.userActivity.findMany({
+            where: { userId },
+            orderBy: { createdAt: 'desc' },
+            take: 10,
+        });
+
+        console.log('Profile API [GET]: Successfully fetched data');
+
+        return Response.json(
+            { user, recentActivities },
+            {
+                status: 200,
+                headers: {
+                    'Cache-Control': 'no-store, no-cache, must-revalidate',
+                },
+            }
+        );
+    } catch (error) {
+        console.error('Profile API [GET]: Error:', error);
+        return Response.json(
+            {
+                error: 'Internal server error',
+                details: error instanceof Error ? error.message : String(error)
+            },
+            {
+                status: 500,
+                headers: {
+                    'Cache-Control': 'no-store, no-cache, must-revalidate',
+                },
+            }
+        );
     }
-
-    const { userId } = getUserInfoFromToken(token);
-    if (!userId) {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        email: true,
-        name: true,
-        phoneNumber: true,
-        dateOfBirth: true,
-        country: true,
-        city: true,
-        streetAddress: true,
-        profileImage: true,
-        profileImageId: true,
-        companyName: true,
-        vatNumber: true,
-        role: true,
-        twoFactorEnabled: true,
-      },
-    });
-
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
-    }
-
-    // Fetch recent activities
-    const recentActivities = await prisma.userActivity.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-      take: 10,
-    });
-
-    return NextResponse.json({ user, recentActivities });
-  } catch (error) {
-    console.error('Error fetching user profile:', error instanceof Error ? error.message : error);
-    return NextResponse.json(
-      { 
-        error: 'Internal server error',
-        details: error instanceof Error ? error.message : String(error)
-      },
-      { status: 500 }
-    );
-  }
 }
 
 // PATCH: Update user profile
 export async function PATCH(request: NextRequest) {
-  try {
-    const token = request.cookies.get('token')?.value;
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    try {
+        const token = request.cookies.get('token')?.value;
+        if (!token) {
+            return Response.json(
+                { error: 'Unauthorized' },
+                {
+                    status: 401,
+                    headers: {
+                        'Cache-Control': 'no-store, no-cache, must-revalidate',
+                    },
+                }
+            );
+        }
+
+        let userId: string;
+        try {
+            const decoded = await verifyJwtToken(token);
+            userId = decoded.userId;
+        } catch (error) {
+            return Response.json(
+                { error: 'Invalid token' },
+                {
+                    status: 401,
+                    headers: {
+                        'Cache-Control': 'no-store, no-cache, must-revalidate',
+                    },
+                }
+            );
+        }
+
+        const data = await request.json();
+
+        // Validate required fields
+        if (!data.email?.trim()) {
+            return Response.json(
+                { error: 'Email is required' },
+                {
+                    status: 400,
+                    headers: {
+                        'Cache-Control': 'no-store, no-cache, must-revalidate',
+                    },
+                }
+            );
+        }
+
+        // Check if email is being changed and if it's already taken
+        if (data.email) {
+            const existingUser = await prisma.user.findFirst({
+                where: {
+                    email: data.email,
+                    NOT: { id: userId },
+                },
+            });
+
+            if (existingUser) {
+                return Response.json(
+                    { error: 'Email already in use' },
+                    {
+                        status: 400,
+                        headers: {
+                            'Cache-Control': 'no-store, no-cache, must-revalidate',
+                        },
+                    }
+                );
+            }
+        }
+
+        // Update user profile
+        const updatedUser = await prisma.user.update({
+            where: { id: userId },
+            data: {
+                email: data.email,
+                name: data.name,
+                phoneNumber: data.phoneNumber,
+                dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : undefined,
+                country: data.country,
+                city: data.city,
+                streetAddress: data.streetAddress,
+                companyName: data.companyName,
+                vatNumber: data.vatNumber,
+                profileImage: data.profileImage,
+                profileImageId: data.profileImageId,
+            },
+            select: {
+                id: true,
+                email: true,
+                name: true,
+                phoneNumber: true,
+                dateOfBirth: true,
+                country: true,
+                city: true,
+                streetAddress: true,
+                profileImage: true,
+                profileImageId: true,
+                companyName: true,
+                vatNumber: true,
+                role: true,
+            },
+        });
+
+        // Log the profile update activity
+        await prisma.userActivity.create({
+            data: {
+                userId,
+                type: 'PROFILE_UPDATE',
+                ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
+                userAgent: request.headers.get('user-agent') || 'unknown',
+            },
+        });
+
+        return Response.json(
+            { user: updatedUser },
+            {
+                status: 200,
+                headers: {
+                    'Cache-Control': 'no-store, no-cache, must-revalidate',
+                },
+            }
+        );
+    } catch (error) {
+        console.error('Profile API [PATCH]: Error:', error);
+        return Response.json(
+            { error: 'Internal server error' },
+            {
+                status: 500,
+                headers: {
+                    'Cache-Control': 'no-store, no-cache, must-revalidate',
+                },
+            }
+        );
     }
-
-    const userId = getUserIdFromToken(token);
-    if (!userId) {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
-    }
-
-    const data = await request.json();
-    
-    // Validate required fields
-    if (!data.email?.trim()) {
-      return NextResponse.json({ error: 'Email is required' }, { status: 400 });
-    }
-
-    // Check if email is being changed and if it's already taken
-    if (data.email) {
-      const existingUser = await prisma.user.findFirst({
-        where: {
-          email: data.email,
-          NOT: { id: userId },
-        },
-      });
-
-      if (existingUser) {
-        return NextResponse.json({ error: 'Email already in use' }, { status: 400 });
-      }
-    }
-
-    // Update user profile
-    const updatedUser = await prisma.user.update({
-      where: { id: userId },
-      data: {
-        email: data.email,
-        name: data.name,
-        phoneNumber: data.phoneNumber,
-        dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : undefined,
-        country: data.country,
-        city: data.city,
-        streetAddress: data.streetAddress,
-        companyName: data.companyName,
-        vatNumber: data.vatNumber,
-        profileImage: data.profileImage,
-        profileImageId: data.profileImageId,
-      },
-      select: {
-        email: true,
-        name: true,
-        phoneNumber: true,
-        dateOfBirth: true,
-        country: true,
-        city: true,
-        streetAddress: true,
-        profileImage: true,
-        profileImageId: true,
-        companyName: true,
-        vatNumber: true,
-        role: true,
-      },
-    });
-
-    // Log the profile update activity
-    await prisma.userActivity.create({
-      data: {
-        userId,
-        type: 'PROFILE_UPDATE',
-        ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
-        userAgent: request.headers.get('user-agent') || 'unknown',
-      },
-    });
-
-    return NextResponse.json({ user: updatedUser });
-  } catch (error) {
-    console.error('Error updating user profile:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
-  }
 }
