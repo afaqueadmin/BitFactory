@@ -16,6 +16,7 @@ import {
 } from "@mui/material";
 import Visibility from "@mui/icons-material/Visibility";
 import VisibilityOff from "@mui/icons-material/VisibilityOff";
+import TwoFactorVerification from "@/components/TwoFactorVerification";
 
 export default function Login() {
     const router = useRouter();
@@ -26,6 +27,7 @@ export default function Login() {
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState("");
+    const [showTwoFactor, setShowTwoFactor] = useState(false);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
@@ -53,16 +55,26 @@ export default function Login() {
                 console.log("Login successful, redirecting to:", data.redirectUrl);
                 router.refresh(); // Refresh router cache
                 router.replace(data.redirectUrl); // Use replace instead of push
+                if (data.requiresTwoFactor) {
+                    setShowTwoFactor(true);
+                    router.replace('/two-factor-authentication'); // Navigate to 2FA page
+                }
             } else {
                 // ❌ Login failed
                 setError(data.error || "Login failed");
             }
         } catch (err) {
-            console.error("Login error:", err);
-            setError("Network error. Please try again.");
+            setError("An error occurred during login");
         } finally {
             setIsLoading(false);
         }
+    };
+
+    const handleTwoFactorVerified = (redirectUrl: string) => {
+        router.refresh(); // Refresh router cache
+        // router.replace(data.redirectUrl); // Use replace instead of push
+
+        router.replace(redirectUrl);
     };
 
     return (
@@ -72,107 +84,114 @@ export default function Login() {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                bgcolor: "background.default",
-                px: 2,
+                p: 2,
             }}
         >
-            <Paper
-                elevation={6}
-                sx={{
-                    p: 4,
-                    maxWidth: 400,
-                    width: "100%",
-                    borderRadius: 3,
-                    textAlign: "center",
-                }}
-            >
-                {/* Logo */}
-                <Box mb={3} sx={{ display: "flex", justifyContent: "center" }}>
-                    <Image
-                        src="/BitfactoryLogo.webp"
-                        alt="BitFactory Logo"
-                        width={150}
-                        height={48}
-                        style={{ height: "auto" }}
-                    />
-                </Box>
+            {showTwoFactor ? (
+                <TwoFactorVerification
+                    email={formData.email}
+                    onVerified={handleTwoFactorVerified}
+                />
+            ) : (
+                <Paper
+                    elevation={3}
+                    sx={{
+                        p: 4,
+                        width: "100%",
+                        maxWidth: 400,
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                    }}
+                >
+                    {/* Logo */}
+                    <Box mb={3} sx={{ display: "flex", justifyContent: "center" }}>
+                        <Image
+                            src="/BitfactoryLogo.webp"
+                            alt="BitFactory Logo"
+                            width={150}
+                            height={48}
+                            style={{ height: "auto" }}
+                        />
+                    </Box>
 
-                <Typography variant="h5" fontWeight="bold" mb={1}>
-                    Welcome
-                </Typography>
-                <Typography variant="body2" color="text.secondary" mb={3}>
-                    Log in to BitFactory to continue.
-                </Typography>
-
-                {/* Error Message */}
-                {error && (
-                    <Alert severity="error" sx={{ mb: 2 }}>
-                        {error}
-                    </Alert>
-                )}
-
-                {/* Form */}
-                <Box component="form" onSubmit={handleSubmit} noValidate>
-                    <TextField
-                        fullWidth
-                        required
-                        name="email"
-                        label="Email Address"
-                        type="email"
-                        value={formData.email}
-                        onChange={handleChange}
-                        margin="normal"
-                    />
-
-                    <TextField
-                        fullWidth
-                        required
-                        name="password"
-                        label="Password"
-                        type={showPassword ? "text" : "password"}
-                        value={formData.password}
-                        onChange={handleChange}
-                        margin="normal"
-                        InputProps={{
-                            endAdornment: (
-                                <InputAdornment position="end">
-                                    <IconButton
-                                        onClick={() => setShowPassword(!showPassword)}
-                                        edge="end"
-                                    >
-                                        {showPassword ? <VisibilityOff /> : <Visibility />}
-                                    </IconButton>
-                                </InputAdornment>
-                            ),
-                        }}
-                    />
-
-                    <Button
-                        type="submit"
-                        fullWidth
-                        variant="contained"
-                        color="primary"
-                        sx={{ mt: 3, mb: 1 }}
-                        disabled={isLoading}
-                        startIcon={isLoading ? <CircularProgress size={20} /> : null}
-                    >
-                        {isLoading ? "Loading..." : "Continue"}
-                    </Button>
-                </Box>
-
-                {/* Test User Info */}
-                <Box mt={2} fontSize={14} color="text.secondary">
-                    <Typography>
-                        💡 Test user created in database:
+                    <Typography variant="h5" fontWeight="bold" mb={1}>
+                        Welcome
                     </Typography>
-                    <Typography>
-                        Email: <code>admin@example.com</code>
+                    <Typography variant="body2" color="text.secondary" mb={3}>
+                        Log in to BitFactory to continue.
                     </Typography>
-                    <Typography>
-                        Password: <code>123456</code>
-                    </Typography>
-                </Box>
-            </Paper>
+
+                    {/* Error Message */}
+                    {error && (
+                        <Alert severity="error" sx={{ mb: 2 }}>
+                            {error}
+                        </Alert>
+                    )}
+
+                    {/* Form */}
+                    <Box component="form" onSubmit={handleSubmit} noValidate>
+                        <TextField
+                            fullWidth
+                            required
+                            name="email"
+                            label="Email Address"
+                            type="email"
+                            value={formData.email}
+                            onChange={handleChange}
+                            margin="normal"
+                        />
+
+                        <TextField
+                            fullWidth
+                            required
+                            name="password"
+                            label="Password"
+                            type={showPassword ? "text" : "password"}
+                            value={formData.password}
+                            onChange={handleChange}
+                            margin="normal"
+                            InputProps={{
+                                endAdornment: (
+                                    <InputAdornment position="end">
+                                        <IconButton
+                                            onClick={() => setShowPassword(!showPassword)}
+                                            edge="end"
+                                        >
+                                            {showPassword ? <VisibilityOff /> : <Visibility />}
+                                        </IconButton>
+                                    </InputAdornment>
+                                ),
+                            }}
+                        />
+
+                        <Button
+                            type="submit"
+                            fullWidth
+                            variant="contained"
+                            color="primary"
+                            sx={{ mt: 3, mb: 1 }}
+                            disabled={isLoading}
+                            startIcon={isLoading ? <CircularProgress size={20} /> : null}
+                        >
+                            {isLoading ? "Loading..." : "Continue"}
+                        </Button>
+                    </Box>
+
+                    {/* Test User Info */}
+                    <Box mt={2} fontSize={14} color="text.secondary">
+                        <Typography>
+                            💡 Test user created in database:
+                        </Typography>
+                        <Typography>
+                            Email: <code>admin@example.com</code>
+                        </Typography>
+                        <Typography>
+                            Password: <code>123456</code>
+                        </Typography>
+                    </Box>
+                </Paper>
+            )}
         </Box>
     );
 }

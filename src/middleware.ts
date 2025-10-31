@@ -10,6 +10,7 @@ const publicPaths = new Set([
   '/api/auth/check',
   '/api/auth/signout',
   '/api/auth/refresh',
+  '/api/auth/2fa/validate',  // Adding 2FA validation endpoint
   '/BitfactoryLogo.webp',
   '/file.svg',
   '/globe.svg',
@@ -168,7 +169,8 @@ export const config = {
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
      * - public folder files
+     * - 2FA validation endpoint
      */
-    '/((?!_next/static|_next/image|favicon.ico).*)',
+    '/((?!_next/static|_next/image|favicon.ico|api/auth/2fa/validate).*)',
   ],
 };

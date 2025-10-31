@@ -1,21 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import jwt from 'jsonwebtoken';
+import {getUserInfoFromToken} from "@/lib/helpers/getUserInfoFromToken";
 
 // Enable request logging middleware
 export const middleware = async (request: NextRequest) => {
   console.log(`${request.method} ${request.url} - Request received`);
   return NextResponse.next();
-};
-
-// Helper to get user ID from token
-const getUserIdFromToken = (token: string) => {
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key') as { userId: string };
-    return decoded.userId;
-  } catch (error) {
-    return null;
-  }
 };
 
 // GET: Fetch user profile
@@ -26,7 +16,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const userId = getUserIdFromToken(token);
+    const { userId } = getUserInfoFromToken(token);
     if (!userId) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
@@ -46,6 +36,7 @@ export async function GET(request: NextRequest) {
         companyName: true,
         vatNumber: true,
         role: true,
+        twoFactorEnabled: true,
       },
     });
 

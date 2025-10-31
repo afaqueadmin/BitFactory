@@ -26,6 +26,7 @@ import {
 } from '@mui/material';
 import { CheckCircleOutline, Close, ErrorOutline } from '@mui/icons-material';
 import { PhotoCamera } from '@mui/icons-material';
+import TwoFactorSettings from '@/components/TwoFactorSettings';
 
 // Create a Grid component that includes the 'item' prop
 const Grid = MuiGrid as React.ComponentType<any>;
@@ -42,6 +43,7 @@ interface UserProfile {
     vatNumber: string;
     profileImage?: string;
     profileImageId?: string;
+    twoFactorEnabled: boolean;
 }
 
 interface Activity {
@@ -71,6 +73,7 @@ export default function AccountSettings() {
         vatNumber: '',
         profileImage: '',
         profileImageId: '',
+        twoFactorEnabled: false,
     });
 
     // Safely handle null values in form data
@@ -727,6 +730,11 @@ export default function AccountSettings() {
                     </Grid>
                 </Grid>
             </Paper>
+
+            {/* Two Factor Authentication Section */}
+            <Box sx={{ mt: 4 }}>
+                <TwoFactorSettings twoFactorEnabled={formData.twoFactorEnabled} />
+            </Box>
 
             {/* Recent Activity Section */}
             <Typography 

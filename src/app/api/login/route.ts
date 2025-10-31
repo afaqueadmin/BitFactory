@@ -1,24 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
-
-// Token generation with proper types
-const generateTokens = (userId: string, role: string) => {
-  const accessToken = jwt.sign(
-    { userId, role },
-    process.env.JWT_SECRET || 'your-secret-key',
-    { expiresIn: '15m' }
-  );
-
-  const refreshToken = jwt.sign(
-    { userId, role, type: 'refresh' },
-    process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key',
-    { expiresIn: '7d' }
-  );
-
-  return { accessToken, refreshToken };
-};
+import generateTokens from "@/lib/helpers/generateTokens";
 
 export async function POST(request: NextRequest) {
   try {
@@ -67,6 +50,7 @@ export async function POST(request: NextRequest) {
         name: true,
         password: true,
         role: true,
+        twoFactorEnabled: true,
       },
     });
 
@@ -77,17 +61,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check password with timing attack protection
-    let isPasswordValid = false;
-    try {
-      isPasswordValid = await bcrypt.compare(password, user.password);
-    } catch (e) {
-      console.error('Password comparison error:', e);
-      return NextResponse.json(
-        { error: 'An error occurred during login' },
-        { status: 500 }
-      );
-    }
+    // Verify password
+    const isPasswordValid = await bcrypt.compare(password, user.password);
 
     if (!isPasswordValid) {
       return NextResponse.json(
@@ -96,26 +71,37 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Log successful login attempt
-    try {
-      await prisma.userActivity.create({
-        data: {
-          userId: user.id,
-          type: 'LOGIN',
-          ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
-          userAgent: request.headers.get('user-agent') || 'unknown',
-        },
+      // Generate tokens with role
+      const { accessToken, refreshToken } = generateTokens(user.id, user.role);
+
+    console.log(process.env)
+      const isTwoFactorEnabled = process.env.TWO_FACTOR_ENABLED === 'true' || false;
+      // If 2FA is enabled, return a special response
+    if (isTwoFactorEnabled && user.twoFactorEnabled) {
+      return NextResponse.json({
+        requiresTwoFactor: true,
+        message: 'Please enter your 2FA code',
+        env: process.env
       });
-    } catch (e) {
-      // Don't fail the login if activity logging fails
-      console.error('Failed to log login activity:', e);
     }
 
-    // Generate tokens with role
-    const { accessToken, refreshToken } = generateTokens(user.id, user.role);
+      // Log successful login attempt
+      try {
+          await prisma.userActivity.create({
+              data: {
+                  userId: user.id,
+                  type: 'LOGIN',
+                  ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
+                  userAgent: request.headers.get('user-agent') || 'unknown',
+              },
+          });
+      } catch (e) {
+          // Don't fail the login if activity logging fails
+          console.error('Failed to log login activity:', e);
+      }
 
-    // Determine redirect URL based on role
-    const redirectUrl = user.role === 'ADMIN' ? '/adminpanel' : '/dashboard';
+      // Determine redirect URL based on role
+      const redirectUrl = user.role === 'ADMIN' ? '/adminpanel' : '/dashboard';
 
     // Create response
     const response = NextResponse.json(

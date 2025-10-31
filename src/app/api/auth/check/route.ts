@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
+import generateTokens from "@/lib/helpers/generateTokens";
 
 // Helper function to verify JWT
 const verifyToken = async (token: string): Promise<{ userId: string, role: string } | null> => {
@@ -28,23 +29,6 @@ const verifyRefreshToken = async (token: string): Promise<{ userId: string, role
   } catch (error) {
     return null;
   }
-};
-
-// Generate new tokens
-const generateTokens = (userId: string, role: string) => {
-  const accessToken = jwt.sign(
-    { userId, role },
-    process.env.JWT_SECRET || 'your-secret-key',
-    { expiresIn: '15m' }
-  );
-
-  const refreshToken = jwt.sign(
-    { userId, role, type: 'refresh' },
-    process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key',
-    { expiresIn: '7d' }
-  );
-
-  return { accessToken, refreshToken };
 };
 
 export async function GET(request: NextRequest) {
