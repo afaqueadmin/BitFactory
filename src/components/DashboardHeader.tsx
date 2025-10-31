@@ -18,14 +18,6 @@ import { useUser } from "@/lib/hooks/useUser";
 export default function DashboardHeader() {
     const { user, loading, error } = useUser();
 
-    // Format the greeting based on time of day
-    const getGreeting = () => {
-        const hour = new Date().getHours();
-        if (hour < 12) return "Good Morning";
-        if (hour < 18) return "Good Afternoon";
-        return "Good Evening";
-    };
-
     return (
         <Box
             component="section"
@@ -60,7 +52,7 @@ export default function DashboardHeader() {
                     />
                 ) : (
                     <>
-                        {getGreeting()},{' '}
+                        Hello,&nbsp;
                         <Box 
                             component="span" 
                             sx={{ 
