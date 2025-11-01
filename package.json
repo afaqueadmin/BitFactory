@@ -6,9 +6,14 @@
     "dev": "next dev --turbopack",
     "build": "next build --turbopack",
     "start": "next start",
-    "lint": "eslint",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts",
-    "migrate:dev": "npx prisma migrate dev"
+    "migrate:dev": "npx prisma migrate dev",
+    "prepare": "husky install"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx}": ["eslint --fix", "prettier --write"]
   },
   "prisma": {
     "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"
@@ -49,8 +54,10 @@
     "@types/react-dom": "^19",
     "@types/speakeasy": "^2.0.10",
     "bcrypt": "^6.0.0",
-    "eslint": "^9",
+    "eslint": "^9.39.0",
     "eslint-config-next": "15.5.3",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.6",
     "tailwindcss": "^4",
     "ts-node": "^10.9.2",
     "typescript": "^5"
