@@ -1,12 +1,10 @@
 import React from "react";
-import AdminHeader from "@/components/admin/AdminHeader";
 import AdminStatCard from "@/components/admin/AdminStatCard";
 import { Box } from "@mui/material";
 
 export default function AdminDashboard() {
     return (
         <>
-            <AdminHeader />
             <Box sx={{ 
                 p: 4, 
                 backgroundColor: '#f5f5f7',
@@ -14,9 +12,15 @@ export default function AdminDashboard() {
             }}>
                 <Box sx={{ 
                     display: 'grid',
-                    gridTemplateColumns: 'repeat(2, 1fr)',
-                    gap: 3,
-                    maxWidth: 1400
+                    gridTemplateColumns: {
+                        xs: '1fr',
+                        sm: 'repeat(2, 1fr)',
+                        md: 'repeat(2, 1fr)',
+                        lg: 'repeat(2, 1fr)'
+                    },
+                    gap: { xs: 2, sm: 3 },
+                    maxWidth: { sm: '100%', lg: 1400 },
+                    mx: 'auto'
                 }}>
                     {/* Miners Card */}
                     <AdminStatCard

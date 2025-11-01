@@ -1,6 +1,6 @@
 "use client";
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     Drawer,
     List,
@@ -8,8 +8,14 @@ import {
     ListItemIcon,
     ListItemText,
     Box,
-    styled,
+    IconButton,
+    ListItemButton,
+    useTheme,
+    useMediaQuery,
 } from '@mui/material';
+import MenuIcon from '@mui/icons-material/Menu';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import {
     Dashboard as DashboardIcon,
     Group as CustomersIcon,
@@ -17,18 +23,11 @@ import {
     Storage as SpacesIcon,
     Power as PowerIcon,
 } from '@mui/icons-material';
-import { usePathname, useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 
 const DRAWER_WIDTH = 240;
-
-const StyledDrawer = styled(Drawer)(() => ({
-    width: DRAWER_WIDTH,
-    flexShrink: 0,
-    '& .MuiDrawer-paper': {
-        width: DRAWER_WIDTH,
-        boxSizing: 'border-box',
-    },
-}));
+const COLLAPSED_WIDTH = 72;
 
 const adminRoutes = [
     { path: '/adminpanel', label: 'Dashboard', icon: <DashboardIcon /> },
@@ -39,41 +38,44 @@ const adminRoutes = [
 ];
 
 export default function AdminSidebar() {
-    const router = useRouter();
+    const theme = useTheme();
+    // Avoid SSR mismatch for media queries by disabling SSR mode for this hook.
+    // This makes the value consistent during hydration and prevents the drawer
+    // from rendering in a different variant on server vs client.
+    const isDesktop = useMediaQuery(theme.breakpoints.up('md'), { noSsr: true });
     const pathname = usePathname();
 
-    return (
-        <StyledDrawer
-            variant="permanent"
-            anchor="left"
-        >
-            <Box sx={{ overflow: 'auto', mt: 8 }}>
-                <List>
-                    {adminRoutes.map((route) => (
-                        <ListItem
-                            button
-                            key={route.path}
-                            onClick={() => router.push(route.path)}
-                            sx={{
-                                backgroundColor: pathname === route.path ? 'action.selected' : 'transparent',
-                                '&:hover': {
-                                    backgroundColor: 'action.hover',
-                                },
-                            }}
-                        >
-                            <ListItemIcon sx={{ color: pathname === route.path ? 'primary.main' : 'inherit' }}>
-                                {route.icon}
-                            </ListItemIcon>
-                            <ListItemText 
-                                primary={route.label}
-                                sx={{ 
-                                    color: pathname === route.path ? 'primary.main' : 'inherit'
-                                }}
-                            />
-                        </ListItem>
-                    ))}
-                </List>
-            </Box>
-        </StyledDrawer>
-    );
+    // mobile open state (temporary drawer)
+    const [mobileOpen, setMobileOpen] = useState(false);
+    // collapse state for desktop
+    const [collapsed, setCollapsed] = useState(false);
+
+    // persist collapsed preference
+    useEffect(() => {
+        const saved = typeof window !== 'undefined' ? localStorage.getItem('adminSidebarCollapsed') : null;
+        if (saved !== null) {
+            setCollapsed(saved === 'true');
+        }
+    }, []);
+
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('adminSidebarCollapsed', collapsed.toString());
+        }
+    }, [collapsed]);
+
+    const toggleMobile = () => setMobileOpen((s) => !s);
+    const handleCloseMobile = () => setMobileOpen(false);
+    const toggleCollapse = () => setCollapsed((s) => !s);
+
+    const drawerWidth = isDesktop ? (collapsed ? COLLAPSED_WIDTH : DRAWER_WIDTH) : DRAWER_WIDTH;
+
+    // publish current drawer width to a CSS variable so layouts can read it
+    useEffect(() => {
+        if (typeof document !== 'undefined') {
+            document.documentElement.style.setProperty('--admin-drawer-width', `${drawerWidth}px`);
+        }
+    }, [drawerWidth]);
+
+    return null;
 }
