@@ -272,9 +272,9 @@ export default function TwoFactorSettings({
             </Typography>
             <Grid container spacing={1} sx={{ mt: 1 }}>
               {backupCodes.map((code, index) => (
-                <Grid item xs={6} key={index}>
-                  <Typography variant="mono">{code}</Typography>
-                </Grid>
+                <Typography key={index} variant="body1">
+                  {code}
+                </Typography>
               ))}
             </Grid>
           </DialogContent>
