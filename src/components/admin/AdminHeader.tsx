@@ -16,6 +16,9 @@ import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/contexts/auth-context";
+import LightModeIcon from "@mui/icons-material/LightMode";
+import DarkModeIcon from "@mui/icons-material/DarkMode";
+import {useTheme} from "@/app/theme-provider";
 
 const StyledAppBar = styled(AppBar)(({ theme }) => ({
     backgroundColor: theme.palette.background.paper,
@@ -35,6 +38,7 @@ export default function AdminHeader() {
     const [settingsAnchorEl, setSettingsAnchorEl] = useState<null | HTMLElement>(null);
     const [accountAnchorEl, setAccountAnchorEl] = useState<null | HTMLElement>(null);
     const [isLoggingOut, setIsLoggingOut] = useState(false);
+    const { darkMode, toggleDarkMode } = useTheme();
 
     const handleSettingsClick = (event: React.MouseEvent<HTMLElement>) => {
         setSettingsAnchorEl(event.currentTarget);
@@ -86,6 +90,16 @@ export default function AdminHeader() {
 
                 {/* Right Side - Settings and Account Icons */}
                 <Box sx={{ display: "flex", gap: 1 }}>
+                    {/* Dark Mode Toggle */}
+                    <StyledIconButton
+                        size="large"
+                        aria-label="darkmode"
+                        color="inherit"
+                        onClick={toggleDarkMode}
+                    >
+                        {darkMode ? <LightModeIcon /> : <DarkModeIcon />}
+                    </StyledIconButton>
+
                     <StyledIconButton
                         size="large"
                         aria-label="settings"
