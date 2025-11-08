@@ -1,81 +1,366 @@
-// "use client";
+"use client";
 
-// import React, { useState, useEffect } from 'react';
-// import {
-//     Drawer,
-//     List,
-//     ListItem,
-//     ListItemIcon,
-//     ListItemText,
-//     Box,
-//     IconButton,
-//     ListItemButton,
-//     useTheme,
-//     useMediaQuery,
-// } from '@mui/material';
-// import MenuIcon from '@mui/icons-material/Menu';
-// import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
-// import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-// import {
-//     Dashboard as DashboardIcon,
-//     Group as CustomersIcon,
-//     Memory as MinersIcon,
-//     Storage as SpacesIcon,
-//     Power as PowerIcon,
-// } from '@mui/icons-material';
-// import Link from 'next/link';
-// import { usePathname } from 'next/navigation';
+import React from "react";
+import {
+  Box,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
+  ListItemButton,
+  Collapse,
+  IconButton,
+  Tooltip,
+} from "@mui/material";
+import {
+  Dashboard as DashboardIcon,
+  Group as CustomersIcon,
+  Memory as HardwareIcon,
+  CloudQueue as PoolsIcon,
+  LocationOn as LocationsIcon,
+  Inventory as InventoryIcon,
+  Receipt as InvoicesIcon,
+  Settings as CustomizeIcon,
+  Download as DownloadsIcon,
+  Storage as MinersIcon,
+  Timeline as OverviewIcon,
+  AttachMoney as RevenueIcon,
+  Construction as SelfMiningIcon,
+  ShoppingCart as ECommerceIcon,
+  PriceCheck as HostingPricesIcon,
+  Bolt as ConsumptionIcon,
+  Payment as TransactionsIcon,
+  ChevronLeft,
+  ChevronRight,
+} from "@mui/icons-material";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 
-// const DRAWER_WIDTH = 240;
-// const COLLAPSED_WIDTH = 72;
+interface SidebarItem {
+  title: string;
+  icon: React.ReactNode;
+  path?: string;
+  items?: SidebarItem[];
+}
 
-// const adminRoutes = [
-//     { path: '/adminpanel', label: 'Dashboard', icon: <DashboardIcon /> },
-//     { path: '/adminpanel/miners', label: 'Miners', icon: <MinersIcon /> },
-//     { path: '/adminpanel/spaces', label: 'Spaces', icon: <SpacesIcon /> },
-//     { path: '/adminpanel/customers', label: 'Customers', icon: <CustomersIcon /> },
-//     { path: '/adminpanel/power', label: 'Power', icon: <PowerIcon /> },
-// ];
+const sidebarItems: SidebarItem[] = [
+  {
+    title: "Dashboard",
+    icon: <DashboardIcon />,
+    path: "/dashboard",
+    // items: [
+    //   { title: "Dashboard", icon: <DashboardIcon />, path: "/dashboard" },
+    // ],
+  },
+  {
+    title: "Customers",
+    icon: <CustomersIcon />,
+    items: [
+      {
+        title: "Overview",
+        icon: <OverviewIcon />,
+        path: "/customers/overview",
+      },
+      {
+        title: "Own Revenue",
+        icon: <RevenueIcon />,
+        path: "/customers/revenue",
+      },
+      {
+        title: "Own Transactions",
+        icon: <TransactionsIcon />,
+        path: "/customers/transactions",
+      },
+    ],
+  },
+  {
+    title: "Hardware",
+    icon: <HardwareIcon />,
+    items: [
+      {
+        title: "Self Mining",
+        icon: <SelfMiningIcon />,
+        path: "/hardware/self-mining",
+      },
+      { title: "Own Miners", icon: <MinersIcon />, path: "/hardware/miners" },
+    ],
+  },
+  {
+    title: "E-Commerce",
+    icon: <ECommerceIcon />,
+    items: [
+      {
+        title: "Hosting Prices",
+        icon: <HostingPricesIcon />,
+        path: "/ecommerce/hosting-prices",
+      },
+      {
+        title: "Total Consumptions",
+        icon: <ConsumptionIcon />,
+        path: "/ecommerce/consumptions",
+      },
+    ],
+  },
+  {
+    title: "Downloads",
+    icon: <DownloadsIcon />,
+    path: "/downloads",
+  },
+  {
+    title: "Locations",
+    icon: <LocationsIcon />,
+    path: "/locations",
+  },
+  {
+    title: "Pools",
+    icon: <PoolsIcon />,
+    path: "/pools",
+  },
+  {
+    title: "Customers",
+    icon: <CustomersIcon />,
+    path: "/customers",
+  },
+  {
+    title: "All Miners",
+    icon: <MinersIcon />,
+    path: "/miners",
+  },
+  {
+    title: "Inventory",
+    icon: <InventoryIcon />,
+    path: "/inventory",
+  },
+  {
+    title: "Invoices",
+    icon: <InvoicesIcon />,
+    path: "/invoices",
+  },
+  {
+    title: "Customize",
+    icon: <CustomizeIcon />,
+    path: "/customize",
+  },
+];
 
-// export default function AdminSidebar() {
-//     const theme = useTheme();
-//     // Avoid SSR mismatch for media queries by disabling SSR mode for this hook.
-//     // This makes the value consistent during hydration and prevents the drawer
-//     // from rendering in a different variant on server vs client.
-//     const isDesktop = useMediaQuery(theme.breakpoints.up('md'), { noSsr: true });
-//     const pathname = usePathname();
+export default function AdminSidebar() {
+  const [sideBarOpen, setSideBarOpen] = React.useState(true);
+  const [isHovered, setIsHovered] = React.useState(false);
+  const pathname = usePathname();
+  const [expandedItems, setExpandedItems] = React.useState<string[]>([]);
 
-//     // mobile open state (temporary drawer)
-//     const [mobileOpen, setMobileOpen] = useState(false);
-//     // collapse state for desktop
-//     const [collapsed, setCollapsed] = useState(false);
+  const handleExpandClick = (title: string) => {
+    if (!sideBarOpen && !isHovered) return;
+    setExpandedItems((prev) =>
+      prev.includes(title)
+        ? prev.filter((item) => item !== title)
+        : [...prev, title],
+    );
+  };
 
-//     // persist collapsed preference
-//     useEffect(() => {
-//         const saved = typeof window !== 'undefined' ? localStorage.getItem('adminSidebarCollapsed') : null;
-//         if (saved !== null) {
-//             setCollapsed(saved === 'true');
-//         }
-//     }, []);
+  const toggleCollapse = () => {
+    setSideBarOpen((prev) => !prev);
+    // Close all expanded items when collapsing
+    if (sideBarOpen) {
+      setExpandedItems([]);
+    }
+  };
 
-//     useEffect(() => {
-//         if (typeof window !== 'undefined') {
-//             localStorage.setItem('adminSidebarCollapsed', collapsed.toString());
-//         }
-//     }, [collapsed]);
+  const handleMouseEnter = () => {
+    if (!sideBarOpen) {
+      setIsHovered(true);
+    }
+  };
 
-//     const toggleMobile = () => setMobileOpen((s) => !s);
-//     const handleCloseMobile = () => setMobileOpen(false);
-//     const toggleCollapse = () => setCollapsed((s) => !s);
+  const handleMouseLeave = () => {
+    setIsHovered(false);
+    if (!sideBarOpen) {
+      setExpandedItems([]);
+    }
+  };
 
-//     const drawerWidth = isDesktop ? (collapsed ? COLLAPSED_WIDTH : DRAWER_WIDTH) : DRAWER_WIDTH;
+  const renderSidebarItems = (items: SidebarItem[]) => {
+    const isExpanded = sideBarOpen || isHovered;
+    return items.map((item) => (
+      <React.Fragment key={item.title}>
+        <ListItem disablePadding>
+          <Tooltip title={isExpanded ? "" : item.title} placement="right" arrow>
+            <ListItemButton
+              component={item.path ? Link : "div"}
+              href={item.path || "#"}
+              onClick={() => item.items && handleExpandClick(item.title)}
+              selected={item.path === pathname}
+              sx={{
+                borderRadius: 1,
+                mb: 0.5,
+                color: "text.secondary",
+                minHeight: 44,
+                "&.Mui-selected": {
+                  color: "primary.main",
+                  bgcolor: "action.selected",
+                  "& .MuiListItemIcon-root": {
+                    color: "primary.main",
+                  },
+                },
+                "&:hover": {
+                  bgcolor: "action.hover",
+                },
+                justifyContent: isExpanded ? "flex-start" : "center",
+                px: isExpanded ? 1.5 : 2,
+                whiteSpace: "nowrap",
+              }}
+            >
+              <ListItemIcon
+                sx={{
+                  minWidth: isExpanded ? 40 : 0,
+                  color: "inherit",
+                  justifyContent: "center",
+                }}
+              >
+                {item.icon}
+              </ListItemIcon>
+              {isExpanded && (
+                <ListItemText
+                  primary={item.title}
+                  primaryTypographyProps={{
+                    fontSize: "0.875rem",
+                    fontWeight: item.path === pathname ? 600 : 400,
+                  }}
+                />
+              )}
+            </ListItemButton>
+          </Tooltip>
+        </ListItem>
+        {isExpanded && item.items && (
+          <Collapse
+            in={expandedItems.includes(item.title)}
+            timeout="auto"
+            unmountOnExit
+          >
+            <List component="div" disablePadding>
+              {item.items.map((subItem) => (
+                <Tooltip
+                  key={subItem.title}
+                  title={isExpanded ? "" : subItem.title}
+                  placement="right"
+                  arrow
+                >
+                  <ListItemButton
+                    component={Link}
+                    href={subItem.path || "#"}
+                    selected={subItem.path === pathname}
+                    sx={{
+                      pl: 4,
+                      py: 1,
+                      borderRadius: 1,
+                      mb: 0.5,
+                      color: "text.secondary",
+                      minHeight: 40,
+                      "&.Mui-selected": {
+                        color: "primary.main",
+                        bgcolor: "action.selected",
+                        "& .MuiListItemIcon-root": {
+                          color: "primary.main",
+                        },
+                      },
+                      "&:hover": {
+                        bgcolor: "action.hover",
+                      },
+                      justifyContent: isExpanded ? "flex-start" : "center",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    <ListItemIcon
+                      sx={{
+                        minWidth: isExpanded ? 40 : 0,
+                        color: "inherit",
+                        justifyContent: "center",
+                      }}
+                    >
+                      {subItem.icon}
+                    </ListItemIcon>
+                    {isExpanded && (
+                      <ListItemText
+                        primary={subItem.title}
+                        primaryTypographyProps={{
+                          fontSize: "0.875rem",
+                          fontWeight: subItem.path === pathname ? 600 : 400,
+                        }}
+                      />
+                    )}
+                  </ListItemButton>
+                </Tooltip>
+              ))}
+            </List>
+          </Collapse>
+        )}
+      </React.Fragment>
+    ));
+  };
 
-//     // publish current drawer width to a CSS variable so layouts can read it
-//     useEffect(() => {
-//         if (typeof document !== 'undefined') {
-//             document.documentElement.style.setProperty('--admin-drawer-width', `${drawerWidth}px`);
-//         }
-//     }, [drawerWidth]);
-
-//     return null;
-// }
+  return (
+    <Box
+      component="nav"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      sx={{
+        width: sideBarOpen || isHovered ? 280 : 72,
+        flexShrink: 0,
+        borderRight: 1,
+        borderColor: "divider",
+        bgcolor: "background.paper",
+        overflow: "hidden",
+        transition: (theme) =>
+          theme.transitions.create(["width"], {
+            easing: theme.transitions.easing.sharp,
+            duration: theme.transitions.duration.standard,
+          }),
+        "&:hover": {
+          overflowY: "auto",
+        },
+        "&::-webkit-scrollbar": {
+          width: "4px",
+        },
+        "&::-webkit-scrollbar-track": {
+          background: "transparent",
+        },
+        "&::-webkit-scrollbar-thumb": {
+          background: "rgba(0,0,0,0.2)",
+          borderRadius: "2px",
+        },
+        "&:hover::-webkit-scrollbar-thumb": {
+          background: "rgba(0,0,0,0.3)",
+        },
+      }}
+    >
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          mb: 3,
+          position: "relative",
+        }}
+      >
+        <IconButton
+          onClick={toggleCollapse}
+          sx={{
+            backgroundColor: "transparent", // Ensures no background color
+            "&:hover": {
+              backgroundColor: "transparent", // Removes hover background effect
+            },
+            mt: 13,
+            position: "absolute",
+            right: 0,
+            zIndex: 1,
+          }}
+        >
+          {sideBarOpen || isHovered ? <ChevronLeft /> : <ChevronRight />}
+        </IconButton>
+      </Box>
+      <List sx={{ px: sideBarOpen || isHovered ? 2 : 1 }}>
+        {renderSidebarItems(sidebarItems)}
+      </List>
+    </Box>
+  );
+}

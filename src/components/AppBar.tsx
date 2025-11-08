@@ -17,8 +17,6 @@ import SettingsIcon from "@mui/icons-material/Settings";
 import AccountCircle from "@mui/icons-material/AccountCircle";
 import DarkModeIcon from "@mui/icons-material/DarkMode";
 import LightModeIcon from "@mui/icons-material/LightMode";
-import DashboardIcon from "@mui/icons-material/Dashboard";
-import StorageIcon from "@mui/icons-material/Storage";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
@@ -202,9 +200,9 @@ export default function AppBarComponent() {
           open={Boolean(anchorEl)}
           onClose={handleClose}
         >
-          <MenuItem component={Link} href="/profile" onClick={handleClose}>
-            Profile
-          </MenuItem>
+          {/*<MenuItem component={Link} href="/profile" onClick={handleClose}>*/}
+          {/*  Profile*/}
+          {/*</MenuItem>*/}
           <MenuItem
             component={Link}
             href="/account-settings"
