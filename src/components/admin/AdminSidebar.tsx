@@ -45,11 +45,12 @@ interface SidebarItem {
 
 const sidebarItems: SidebarItem[] = [
   {
-    title: "Home",
+    title: "Dashboard",
     icon: <DashboardIcon />,
-    items: [
-      { title: "Dashboard", icon: <DashboardIcon />, path: "/dashboard" },
-    ],
+    path: "/dashboard",
+    // items: [
+    //   { title: "Dashboard", icon: <DashboardIcon />, path: "/dashboard" },
+    // ],
   },
   {
     title: "Customers",
@@ -334,27 +335,21 @@ export default function AdminSidebar() {
     >
       <Box
         sx={{
-          p: sideBarOpen || isHovered ? 3 : 1,
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          mb: sideBarOpen || isHovered ? 3 : 2,
+          mb: 3,
           position: "relative",
         }}
       >
-        {/*{sideBarOpen && (*/}
-        {/*    <Typography variant="h6" color="primary" fontWeight="bold">*/}
-        {/*        BitFactory*/}
-        {/*    </Typography>*/}
-        {/*)}*/}
         <IconButton
           onClick={toggleCollapse}
           sx={{
-            backgroundColor: (theme) => theme.palette.background.default,
+            backgroundColor: "transparent", // Ensures no background color
             "&:hover": {
-              backgroundColor: (theme) => theme.palette.action.hover,
+              backgroundColor: "transparent", // Removes hover background effect
             },
-            mt: 5,
+            mt: 13,
             position: "absolute",
             right: 0,
             zIndex: 1,
