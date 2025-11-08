@@ -138,6 +138,7 @@ export default function Login() {
               label="Email Address"
               type="email"
               value={formData.email}
+              InputLabelProps={{ shrink: true }}
               onChange={handleChange}
               margin="normal"
             />
@@ -149,6 +150,7 @@ export default function Login() {
               label="Password"
               type={showPassword ? "text" : "password"}
               value={formData.password}
+              InputLabelProps={{ shrink: true }}
               onChange={handleChange}
               margin="normal"
               InputProps={{

@@ -28,7 +28,8 @@ import { PhotoCamera } from "@mui/icons-material";
 import TwoFactorSettings from "@/components/TwoFactorSettings";
 
 // Create a Grid component that includes the 'item' prop
-const Grid = MuiGrid as React.ComponentType<never>;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const Grid = MuiGrid as React.ComponentType<any>;
 
 interface UserProfile {
   name: string;
@@ -700,23 +701,6 @@ export default function AccountSettings() {
                     }}
                   />
                 </Grid>
-                <Grid item xs={12}>
-                  <TextField
-                    fullWidth
-                    label="Street Address"
-                    name="streetAddress"
-                    value={getFormValue(formData.streetAddress)}
-                    onChange={handleInputChange}
-                    multiline
-                    rows={2}
-                    variant="outlined"
-                    sx={{
-                      "& label.Mui-focused": {
-                        color: (theme) => theme.palette.primary.main,
-                      },
-                    }}
-                  />
-                </Grid>
                 <Grid item xs={12} sm={6}>
                   <TextField
                     fullWidth
@@ -741,6 +725,24 @@ export default function AccountSettings() {
                     onChange={handleInputChange}
                     variant="outlined"
                     sx={{
+                      "& label.Mui-focused": {
+                        color: (theme) => theme.palette.primary.main,
+                      },
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    label="Street Address"
+                    name="streetAddress"
+                    value={getFormValue(formData.streetAddress)}
+                    onChange={handleInputChange}
+                    multiline
+                    rows={2}
+                    variant="outlined"
+                    sx={{
+                      mr: 0.6,
                       "& label.Mui-focused": {
                         color: (theme) => theme.palette.primary.main,
                       },
