@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import {
   Box,
-  Grid,
+  Grid as MuiGrid,
   Paper,
   Typography,
   Table,
@@ -72,6 +72,10 @@ const mockTableData: CustomerTableData[] = [
     joinDate: "2025-03-10",
   },
 ];
+
+// Create a Grid component that includes the 'item' prop
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const Grid = MuiGrid as React.ComponentType<any>;
 
 export default function CustomerOverview() {
   const [createModalOpen, setCreateModalOpen] = useState(false);
