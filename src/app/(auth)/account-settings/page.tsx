@@ -91,7 +91,8 @@ export default function AccountSettings() {
   const [isPasswordChanging, setIsPasswordChanging] = useState(false);
 
   // Safely handle null values in form data
-  const getFormValue = (value: never) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const getFormValue = (value: any) => {
     return value === null ? "" : value;
   };
 
