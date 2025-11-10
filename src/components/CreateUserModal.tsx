@@ -15,6 +15,8 @@ import {
   InputLabel,
   IconButton,
   CircularProgress,
+  FormControlLabel,
+  Checkbox,
 } from "@mui/material";
 import { Close as CloseIcon } from "@mui/icons-material";
 
@@ -34,6 +36,7 @@ export default function CreateUserModal({
     name: "",
     email: "",
     role: "CLIENT",
+    sendEmail: true,
   });
   const [error, setError] = useState("");
 
@@ -63,6 +66,7 @@ export default function CreateUserModal({
         name: "",
         email: "",
         role: "CLIENT",
+        sendEmail: true,
       });
     } catch (error) {
       setError(
@@ -148,6 +152,20 @@ export default function CreateUserModal({
                 <MenuItem value="ADMIN">Admin</MenuItem>
               </Select>
             </FormControl>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={formData.sendEmail}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      sendEmail: e.target.checked,
+                    }))
+                  }
+                />
+              }
+              label="Send welcome email to user"
+            />
             {error && <Box sx={{ color: "error.main", mt: 1 }}>{error}</Box>}
           </Box>
         </DialogContent>

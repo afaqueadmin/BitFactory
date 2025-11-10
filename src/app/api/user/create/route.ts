@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { name, email, role } = await request.json();
+    const { name, email, role, sendEmail } = await request.json();
 
     // Validate input
     if (!name || !email || !role) {
@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    if (process.env.NODE_ENV === "production") {
+    if (process.env.NODE_ENV === "production" && sendEmail) {
       // Send welcome email with credentials
       const emailResult = await sendWelcomeEmail(email, tempPassword);
       if (!emailResult.success) {
