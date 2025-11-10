@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { hash } from "bcrypt";
 import { NextRequest, NextResponse } from "next/server";
 import { verifyJwtToken } from "@/lib/jwt";
+import { sendWelcomeEmail } from "@/lib/email";
 
 export async function POST(request: NextRequest) {
   try {
@@ -96,12 +97,16 @@ export async function POST(request: NextRequest) {
         type: "USER_CREATED",
         ipAddress: request.headers.get("x-forwarded-for") || "unknown",
         userAgent: request.headers.get("user-agent") || "unknown",
-        // details: `Created user: ${email} with role: ${role}`,
       },
     });
 
-    //@TODO: In a production environment, you would want to send an email to the user
-    // with their temporary password and instructions to change it
+    if (process.env.NODE_ENV === "production") {
+      // Send welcome email with credentials
+      const emailResult = await sendWelcomeEmail(email, tempPassword);
+      if (!emailResult.success) {
+        console.error("Failed to send welcome email:", emailResult.error);
+      }
+    }
 
     return NextResponse.json(
       {
