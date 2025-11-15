@@ -13,7 +13,7 @@ import {
   CircularProgress,
 } from "@mui/material";
 import { useAuth } from "@/lib/contexts/auth-context";
-import SettingsIcon from "@mui/icons-material/Settings";
+// import SettingsIcon from "@mui/icons-material/Settings";
 import AccountCircle from "@mui/icons-material/AccountCircle";
 import DarkModeIcon from "@mui/icons-material/DarkMode";
 import LightModeIcon from "@mui/icons-material/LightMode";
@@ -180,13 +180,13 @@ export default function AppBarComponent() {
         </IconButton>
 
         {/* Settings */}
-        <IconButton
-          component={Link}
-          href="/settings"
-          sx={{ color: darkMode ? "white" : "black" }}
-        >
-          <SettingsIcon />
-        </IconButton>
+        {/*<IconButton*/}
+        {/*  component={Link}*/}
+        {/*  href="/settings"*/}
+        {/*  sx={{ color: darkMode ? "white" : "black" }}*/}
+        {/*>*/}
+        {/*  <SettingsIcon />*/}
+        {/*</IconButton>*/}
 
         {/* Account Menu */}
         <IconButton
