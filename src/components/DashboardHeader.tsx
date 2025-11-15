@@ -16,58 +16,59 @@ import { Box, Typography, Stack, Chip, Skeleton } from "@mui/material";
 import { useUser } from "@/lib/hooks/useUser";
 
 export default function DashboardHeader() {
-    const { user, loading, error } = useUser();
+  const { user, loading, error } = useUser();
 
-    return (
-        <Box
-            component="section"
-            aria-labelledby="dashboard-greeting"
+  return (
+    <Box
+      component="section"
+      aria-labelledby="dashboard-greeting"
+      sx={{
+        textAlign: "center",
+        mb: { xs: 4, md: 5 },
+        mt: { xs: 3, md: 4 },
+        py: { xs: 2, md: 3 },
+      }}
+    >
+      {/* Large greeting */}
+      <Typography
+        id="dashboard-greeting"
+        variant="h3"
+        component="h1"
+        sx={{
+          fontWeight: 700,
+          mb: { xs: 3, md: 4 },
+          lineHeight: 1.2,
+          // Responsive font sizing
+          fontSize: { xs: "1.6rem", sm: "2.2rem", md: "2.6rem" },
+        }}
+      >
+        {loading ? (
+          <Skeleton
+            width="80%"
             sx={{
-                textAlign: "center",
-                mb: { xs: 4, md: 5 },
-                mt: { xs: 3, md: 4 },
-                py: { xs: 2, md: 3                                           },
+              mx: "auto",
+              height: { xs: "2rem", sm: "2.75rem", md: "3.25rem" },
             }}
-        >
-            {/* Large greeting */}
-            <Typography
-                id="dashboard-greeting"
-                variant="h3"
-                component="h1"
-                sx={{
-                    fontWeight: 700,
-                    mb: { xs: 3, md: 4 },
-                    lineHeight: 1.2,
-                    // Responsive font sizing
-                    fontSize: { xs: "1.6rem", sm: "2.2rem", md: "2.6rem" },
-                }}
+          />
+        ) : (
+          <>
+            Hello,&nbsp;
+            <Box
+              component="span"
+              sx={{
+                color: "primary.main",
+                display: "inline-block",
+              }}
             >
-                {loading ? (
-                    <Skeleton 
-                        width="80%" 
-                        sx={{ 
-                            mx: 'auto',
-                            height: { xs: '2rem', sm: '2.75rem', md: '3.25rem' }
-                        }} 
-                    />
-                ) : (
-                    <>
-                        Hello,&nbsp;
-                        <Box 
-                            component="span" 
-                            sx={{ 
-                                color: 'primary.main',
-                                display: 'inline-block',
-                            }}
-                        >
-                            {user?.name || 'Guest'}
-                        </Box>
-                    </>
-                )}
-            </Typography>
+              {user?.name || "Guest"}
+            </Box>
+          </>
+        )}
+      </Typography>
 
-            {/* Centered chip filters */}
-            <Stack
+      {/* Centered chip filters */}
+      {/* commented to hide these for now will be removed soon */}
+      {/* <Stack
                 direction="row"
                 spacing={1.5}
                 justifyContent="center"
@@ -89,7 +90,7 @@ export default function DashboardHeader() {
                 />
                 <Chip label="Network" clickable variant="outlined" />
                 <Chip label="Temperature" clickable variant="outlined" />
-            </Stack>
-        </Box>
-    );
+            </Stack> */}
+    </Box>
+  );
 }

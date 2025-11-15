@@ -27,11 +27,8 @@ import {
   Card,
   CardContent,
   Typography,
-  LinearProgress,
-  Chip,
   Button,
   useTheme,
-  Stack,
   SvgIcon,
 } from "@mui/material";
 import StorageIcon from "@mui/icons-material/Storage";
@@ -52,21 +49,6 @@ export default function HostedMinersCard({
 }: HostedMinersCardProps) {
   const theme = useTheme();
   const [isModalOpen, setIsModalOpen] = useState(false);
-
-  // progress color uses success/main or custom green
-  const progressSx = {
-    height: 10,
-    borderRadius: 5,
-    // custom bar color
-    "& .MuiLinearProgress-bar": {
-      borderRadius: 5,
-      backgroundColor: "#00C853", // green as requested
-    },
-    backgroundColor:
-      theme.palette.mode === "dark"
-        ? "rgba(255,255,255,0.08)"
-        : "rgba(0,0,0,0.06)",
-  };
 
   return (
     <Card
@@ -98,67 +80,101 @@ export default function HostedMinersCard({
           </Typography>
         </Box>
 
-        {/* Subtitle */}
-        <Typography variant="body2" color="text.secondary">
-          {runningCount} running
-        </Typography>
+        {/* Header with running count and error count */}
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <Typography
+            variant="body2"
+            color="text.secondary"
+            sx={{ fontWeight: 600 }}
+          >
+            {runningCount} running
+          </Typography>
+          <Typography variant="body2" color="error" sx={{ fontWeight: 600 }}>
+            {errorCount} error{errorCount !== 1 ? "s" : ""}
+          </Typography>
+        </Box>
 
-        {/* Long progress bar */}
+        {/* Split progress bar - green for running, red for errors */}
         <Box sx={{ width: "100%", mt: 1 }}>
-          <LinearProgress
-            variant="determinate"
-            value={Math.max(0, Math.min(100, progress))}
-            sx={progressSx}
-            aria-valuenow={progress}
-            aria-valuemin={0}
-            aria-valuemax={100}
-            role="progressbar"
-          />
+          <Box
+            sx={{
+              display: "flex",
+              height: 10,
+              borderRadius: 5,
+              overflow: "hidden",
+              backgroundColor:
+                theme.palette.mode === "dark"
+                  ? "rgba(255,255,255,0.08)"
+                  : "rgba(0,0,0,0.06)",
+            }}
+          >
+            {/* Green section for running miners */}
+            <Box
+              sx={{
+                flex: runningCount,
+                backgroundColor: "#00C853",
+                height: "100%",
+              }}
+              role="progressbar"
+              aria-valuenow={runningCount}
+              aria-label={`${runningCount} miners running`}
+            />
+            {/* Red section for errors */}
+            {errorCount > 0 && (
+              <Box
+                sx={{
+                  flex: errorCount,
+                  backgroundColor: "#FF5252",
+                  height: "100%",
+                }}
+                role="progressbar"
+                aria-valuenow={errorCount}
+                aria-label={`${errorCount} errors`}
+              />
+            )}
+          </Box>
         </Box>
 
         {/* Spacer to push controls to bottom */}
         <Box sx={{ flex: 1 }} />
 
-        {/* Bottom row: error chip left, add button right */}
-        <Box
-          sx={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 2,
-            mt: 1,
-          }}
-        >
-          <Stack direction="row" spacing={1} alignItems="center">
-            <Chip
-              label={`Errors: ${errorCount}`}
-              color={errorCount > 0 ? "error" : "default"}
-              variant={errorCount > 0 ? "filled" : "outlined"}
-              sx={{ fontWeight: 600 }}
-              aria-live="polite"
-            />
-          </Stack>
-
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={() => {
-              setIsModalOpen(true);
-              if (onAddMiner) onAddMiner();
-            }}
-            aria-label="Add miner"
-            sx={{
-              borderRadius: 8,
-              px: 2.5,
-              py: 1,
-              textTransform: "uppercase",
-              boxShadow: "0px 6px 12px rgba(0,0,0,0.08)",
-              fontWeight: 700,
-            }}
-          >
-            ADD MINER
-          </Button>
-        </Box>
+        {/* Bottom row: add button right */}
+        {/* hidden for now will be removed soon based on decision */}
+        {/* <Box
+                    sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "flex-end",
+                        gap: 2,
+                        mt: 1,
+                    }}
+                >
+                    <Button
+                        variant="contained"
+                        color="primary"
+                        onClick={() => {
+                            setIsModalOpen(true);
+                            if (onAddMiner) onAddMiner();
+                        }}
+                        aria-label="Add miner"
+                        sx={{
+                            borderRadius: 8,
+                            px: 2.5,
+                            py: 1,
+                            textTransform: "uppercase",
+                            boxShadow: "0px 6px 12px rgba(0,0,0,0.08)",
+                            fontWeight: 700,
+                        }}
+                    >
+                        ADD MINER
+                    </Button>
+                </Box> */}
       </CardContent>
 
       {/* Add Miner Modal */}
