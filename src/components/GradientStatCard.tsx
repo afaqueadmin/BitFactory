@@ -60,14 +60,15 @@ export default function GradientStatCard({
         boxShadow: "0px 6px 18px rgba(2,6,23,0.06)",
         color: "#fff",
         p: 2,
+        minHeight: 120,
         display: "flex",
         flexDirection: "column",
-        justifyContent: "space-between",
+        justifyContent: "space-around",
         background: `${overlay} ${baseGradient}`,
       }}
     >
       {/* Middle: title & value */}
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+      <Box sx={{ display: "flex", alignItems: "center" }}>
         {icon && (
           <SvgIcon sx={{ color: "rgba(255,255,255,0.9)" }}>{icon}</SvgIcon>
         )}
