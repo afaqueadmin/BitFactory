@@ -70,6 +70,11 @@ export default function Login() {
     }
   };
 
+  const handleForgotPassword = () => {
+    // Navigate to forgot password page (create route if not existing)
+    router.push("/forgot-password");
+  };
+
   const handleTwoFactorVerified = (redirectUrl: string) => {
     router.refresh(); // Refresh router cache
     // router.replace(data.redirectUrl); // Use replace instead of push
@@ -105,7 +110,7 @@ export default function Login() {
           }}
         >
           {/* Logo */}
-          <Box mb={3} sx={{ display: "flex", justifyContent: "center" }}>
+          <Box mb={1} sx={{ display: "flex", justifyContent: "center" }}>
             <Image
               src="/BitfactoryLogo.webp"
               alt="BitFactory Logo"
@@ -115,10 +120,7 @@ export default function Login() {
             />
           </Box>
 
-          <Typography variant="h5" fontWeight="bold" mb={1} mt={-2}>
-            Welcome
-          </Typography>
-          <Typography variant="body2" color="text.secondary" mb={3}>
+          <Typography variant="body2" color="text.main" mb={3} fontSize={16}>
             Login To Your Bitcoin Mining Factory.
           </Typography>
 
@@ -165,6 +167,17 @@ export default function Login() {
               }}
             />
 
+            <Box display="flex" mt={1}>
+              <Button
+                variant="text"
+                size="small"
+                onClick={handleForgotPassword}
+                sx={{ textTransform: "none" }}
+              >
+                Forgot password?
+              </Button>
+            </Box>
+
             <Button
               type="submit"
               fullWidth
@@ -177,14 +190,19 @@ export default function Login() {
               {isLoading ? "Loading..." : "Continue"}
             </Button>
 
-            {/* Signup prompt */}
+            {/* Signup prompt (inline, no gap) */}
             <Box
               mt={2}
               display="flex"
               justifyContent="center"
               alignItems="center"
             >
-              <Typography variant="body2" color="text.secondary" sx={{ mr: 1 }}>
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                component="span"
+                sx={{ mr: 0 }}
+              >
                 Don&apos;t have an account?
               </Typography>
               <Button
@@ -193,7 +211,8 @@ export default function Login() {
                 target="_blank"
                 rel="noopener noreferrer"
                 variant="text"
-                size="small"
+                size="medium"
+                sx={{ textTransform: "none", ml: 0 }}
               >
                 Sign up
               </Button>
