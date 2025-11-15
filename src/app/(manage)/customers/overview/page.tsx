@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Box,
   Grid as MuiGrid,
@@ -14,64 +14,36 @@ import {
   TableRow,
   Chip,
   Button,
+  CircularProgress,
+  Alert,
 } from "@mui/material";
 import { Add as AddIcon } from "@mui/icons-material";
 import AdminValueCard from "@/components/admin/AdminValueCard";
 import CreateUserModal from "@/components/CreateUserModal";
-
-interface CustomerStats {
-  totalCustomers: number;
-  activeCustomers: number;
-  totalRevenue: number;
-  totalMiners: number;
-}
 
 interface CustomerTableData {
   id: string;
   name: string;
   email: string;
   miners: number;
-  revenue: number;
   status: "active" | "inactive";
   joinDate: string;
 }
 
-const mockCustomerStats: CustomerStats = {
-  totalCustomers: 150,
-  activeCustomers: 125,
-  totalRevenue: 750000,
-  totalMiners: 450,
-};
-
-const mockTableData: CustomerTableData[] = [
-  {
-    id: "1",
-    name: "John Doe",
-    email: "john@example.com",
-    miners: 5,
-    revenue: 25000,
-    status: "active",
-    joinDate: "2025-01-15",
-  },
-  {
-    id: "2",
-    name: "Jane Smith",
-    email: "jane@example.com",
-    miners: 3,
-    revenue: 15000,
-    status: "active",
-    joinDate: "2025-02-20",
-  },
-  {
-    id: "3",
-    name: "Bob Wilson",
-    email: "bob@example.com",
-    miners: 2,
-    revenue: 10000,
-    status: "inactive",
-    joinDate: "2025-03-10",
-  },
-];
+interface FetchedUser {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  city: string;
+  country: string;
+  phoneNumber: string;
+  companyName: string;
+  twoFactorEnabled: boolean;
+  joinDate: string;
+  miners: number;
+  status: "active" | "inactive";
+}
 
 // Create a Grid component that includes the 'item' prop
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -79,10 +51,67 @@ const Grid = MuiGrid as React.ComponentType<any>;
 
 export default function CustomerOverview() {
   const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [users, setUsers] = useState<CustomerTableData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [customerStats, setCustomerStats] = useState({
+    totalCustomers: 0,
+    activeCustomers: 0,
+    totalRevenue: 0,
+    totalMiners: 0,
+  });
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const fetchUsers = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await fetch("/api/user/all", {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch users");
+      }
+
+      const data = await response.json();
+
+      if (data.users) {
+        setUsers(data.users);
+
+        // Calculate stats
+        const totalMiners = data.users.reduce(
+          (sum: number, user: FetchedUser) => sum + user.miners,
+          0,
+        );
+        const activeCount = data.users.filter(
+          (user: FetchedUser) => user.status === "active",
+        ).length;
+
+        setCustomerStats({
+          totalCustomers: data.users.length,
+          activeCustomers: activeCount,
+          totalRevenue: 0, // Revenue calculation would depend on your business logic
+          totalMiners: totalMiners,
+        });
+      }
+    } catch (err) {
+      console.error("Error fetching users:", err);
+      setError("Failed to load customers. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleUserCreated = () => {
     // Refresh the customer list/stats
-    // You can add the refresh logic here
+    fetchUsers();
   };
 
   return (
@@ -141,21 +170,21 @@ export default function CustomerOverview() {
         <Grid item xs={12} sm={6} md={3}>
           <AdminValueCard
             title="Total Customers"
-            value={mockCustomerStats.totalCustomers}
+            value={customerStats.totalCustomers}
             type="number"
           />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
           <AdminValueCard
             title="Active Customers"
-            value={mockCustomerStats.activeCustomers}
+            value={customerStats.activeCustomers}
             type="number"
           />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
           <AdminValueCard
             title="Total Revenue"
-            value={mockCustomerStats.totalRevenue}
+            value={customerStats.totalRevenue}
             type="currency"
             subtitle="USD"
           />
@@ -163,7 +192,7 @@ export default function CustomerOverview() {
         <Grid item xs={12} sm={6} md={3}>
           <AdminValueCard
             title="Total Miners"
-            value={mockCustomerStats.totalMiners}
+            value={customerStats.totalMiners}
             type="number"
           />
         </Grid>
@@ -187,54 +216,65 @@ export default function CustomerOverview() {
         <Typography variant="h6" sx={{ mb: 3, fontWeight: "medium" }}>
           Recent Customers
         </Typography>
-        <TableContainer>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>Customer</TableCell>
-                <TableCell>Email</TableCell>
-                <TableCell align="center">Miners</TableCell>
-                <TableCell align="right">Revenue</TableCell>
-                <TableCell align="center">Status</TableCell>
-                <TableCell>Join Date</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {mockTableData.map((customer) => (
-                <TableRow
-                  key={customer.id}
-                  sx={{
-                    "&:last-child td, &:last-child th": { border: 0 },
-                    "&:hover": {
-                      backgroundColor: "action.hover",
-                    },
-                  }}
-                >
-                  <TableCell component="th" scope="row">
-                    {customer.name}
-                  </TableCell>
-                  <TableCell>{customer.email}</TableCell>
-                  <TableCell align="center">{customer.miners}</TableCell>
-                  <TableCell align="right">
-                    ${customer.revenue.toLocaleString()}
-                  </TableCell>
-                  <TableCell align="center">
-                    <Chip
-                      label={customer.status}
-                      color={
-                        customer.status === "active" ? "success" : "default"
-                      }
-                      size="small"
-                    />
-                  </TableCell>
-                  <TableCell>
-                    {new Date(customer.joinDate).toLocaleDateString()}
-                  </TableCell>
+
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error}
+          </Alert>
+        )}
+
+        {loading ? (
+          <Box sx={{ display: "flex", justifyContent: "center", p: 3 }}>
+            <CircularProgress />
+          </Box>
+        ) : users.length === 0 ? (
+          <Typography color="text.secondary" sx={{ p: 2 }}>
+            No customers found
+          </Typography>
+        ) : (
+          <TableContainer>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Customer</TableCell>
+                  <TableCell>Email</TableCell>
+                  <TableCell align="center">Miners</TableCell>
+                  <TableCell align="center">Status</TableCell>
+                  <TableCell>Join Date</TableCell>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
+              </TableHead>
+              <TableBody>
+                {users.map((customer) => (
+                  <TableRow
+                    key={customer.id}
+                    sx={{
+                      "&:last-child td, &:last-child th": { border: 0 },
+                      "&:hover": {
+                        backgroundColor: "action.hover",
+                      },
+                    }}
+                  >
+                    <TableCell component="th" scope="row">
+                      {customer.name}
+                    </TableCell>
+                    <TableCell>{customer.email}</TableCell>
+                    <TableCell align="center">{customer.miners}</TableCell>
+                    <TableCell align="center">
+                      <Chip
+                        label={customer.status}
+                        color={
+                          customer.status === "active" ? "success" : "default"
+                        }
+                        size="small"
+                      />
+                    </TableCell>
+                    <TableCell>{customer.joinDate}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        )}
       </Paper>
 
       {/* Activity Chart Section */}
