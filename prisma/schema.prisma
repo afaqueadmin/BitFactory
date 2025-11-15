@@ -25,7 +25,7 @@ model User {
   phoneNumber   String?
   streetAddress String?
   companyName   String?
-  vatNumber     String?
+  idNumber      String?
   profileImage  String?
   profileImageId String?
   twoFactorEnabled Boolean      @default(false)

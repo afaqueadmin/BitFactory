@@ -40,7 +40,7 @@ interface UserProfile {
   city: string;
   streetAddress: string;
   companyName: string;
-  vatNumber: string;
+  idNumber: string;
   profileImage?: string;
   profileImageId?: string;
   twoFactorEnabled: boolean;
@@ -70,7 +70,7 @@ export default function AccountSettings() {
     city: "",
     streetAddress: "",
     companyName: "",
-    vatNumber: "",
+    idNumber: "",
     profileImage: "",
     profileImageId: "",
     twoFactorEnabled: false,
@@ -799,9 +799,9 @@ export default function AccountSettings() {
                 <Grid item xs={12} sm={6}>
                   <TextField
                     fullWidth
-                    label="VAT Number"
-                    name="vatNumber"
-                    value={getFormValue(formData.vatNumber)}
+                    label="ID Number"
+                    name="idNumber"
+                    value={getFormValue(formData.idNumber)}
                     onChange={handleInputChange}
                     variant="outlined"
                     sx={{
