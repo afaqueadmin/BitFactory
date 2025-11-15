@@ -23,6 +23,7 @@ import {
   Fade,
   IconButton,
 } from "@mui/material";
+
 import { CheckCircleOutline, Close, ErrorOutline } from "@mui/icons-material";
 import { PhotoCamera } from "@mui/icons-material";
 import TwoFactorSettings from "@/components/TwoFactorSettings";
@@ -745,8 +746,13 @@ export default function AccountSettings() {
                     }}
                     variant="outlined"
                     sx={{
+                      width: "100%",
                       "& label.Mui-focused": {
                         color: (theme) => theme.palette.primary.main,
+                      },
+                      // ensure the input root fills the grid column like other fields
+                      "& .MuiOutlinedInput-root": {
+                        width: "100%",
                       },
                     }}
                   />
@@ -811,20 +817,21 @@ export default function AccountSettings() {
                     }}
                   />
                 </Grid>
-                <Grid item xs={12}>
+                <Grid item xs={12} sm={12} md={12} lg={12}>
                   <TextField
                     fullWidth
                     label="Street Address"
                     name="streetAddress"
                     value={getFormValue(formData.streetAddress)}
                     onChange={handleInputChange}
-                    multiline
-                    rows={2}
                     variant="outlined"
                     sx={{
-                      mr: 0.6,
+                      width: "100%",
                       "& label.Mui-focused": {
                         color: (theme) => theme.palette.primary.main,
+                      },
+                      "& .MuiInputBase-root": {
+                        width: "100%",
                       },
                     }}
                   />
