@@ -39,7 +39,7 @@ export default function Home() {
             <Image
               src="/BitfactoryLogo.webp"
               alt="Bitfactory logo"
-              width={220}
+              width={250}
               height={0}
               priority
               style={{
@@ -51,21 +51,12 @@ export default function Home() {
           </Box>
 
           <Typography
-            variant="h5"
-            fontWeight={500}
-            mb={4}
-            sx={{ color: theme.palette.text.primary }}
-          >
-            Welcome
-          </Typography>
-
-          <Typography
             variant="body1"
             mb={4}
-            sx={{ color: "text.secondary", maxWidth: 500 }}
+            fontSize={25}
+            sx={{ color: "text.main", maxWidth: 500 }}
           >
-            Login to your Bitcoin mining dashboard and manage your mining
-            operations easily and securely.
+            Login to your Bitcoin mining Factory
           </Typography>
 
           <Button

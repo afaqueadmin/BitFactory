@@ -126,9 +126,9 @@ export default function DashboardPage() {
         >
           <Box sx={{ flex: { xs: 1, md: "1 1 25%" }, minWidth: 0 }}>
             <GradientStatCard
-              title="USD Account"
+              title="Balance"
               value="$ 0.00"
-              caption="yesterday"
+              // caption="yesterday"
               gradient="linear-gradient(135deg, #00C6FF 0%, #0072FF 100%)"
               icon={<AttachMoneyIcon fontSize="small" />}
             />
@@ -138,7 +138,7 @@ export default function DashboardPage() {
             <GradientStatCard
               title="COSTS"
               value="$ 12.34"
-              caption="yesterday"
+              // caption="yesterday"
               gradient="linear-gradient(135deg, #00BFA6 0%, #1DE9B6 100%)"
               icon={<AttachMoneyIcon fontSize="small" />}
             />
@@ -148,7 +148,7 @@ export default function DashboardPage() {
             <GradientStatCard
               title="Estimated mining days left"
               value="7 days"
-              caption="days"
+              // caption="days"
               gradient="linear-gradient(135deg, #2196F3 0%, #21CBF3 100%)"
               icon={<CalendarTodayIcon fontSize="small" />}
             />
@@ -158,7 +158,7 @@ export default function DashboardPage() {
             <GradientStatCard
               title="Estimate monthly cost"
               value="$ 45.60"
-              caption="month"
+              // caption="month"
               gradient="linear-gradient(135deg, #FFB300 0%, #FFCA28 100%)"
               icon={<ShowChartIcon fontSize="small" />}
             />
