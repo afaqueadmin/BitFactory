@@ -2,11 +2,10 @@
 
 import { Box, Typography } from "@mui/material";
 import HostedMinersList from "@/components/HostedMinersList";
-import HostedMinersCard from "@/components/HostedMinersCard";
-import GradientStatCard from "@/components/GradientStatCard";
-import AttachMoneyIcon from "@mui/icons-material/AttachMoney";
-import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
-import ShowChartIcon from "@mui/icons-material/ShowChart";
+import BalanceCard from "@/components/dashboardCards/BalanceCard";
+import CostsCard from "@/components/dashboardCards/CostsCard";
+import EstimatedMonthlyCostCard from "@/components/dashboardCards/EstimatedMonthlyCostCard";
+import EstimatedMiningDaysLeftCard from "@/components/dashboardCards/EstimatedMiningDaysLeftCard";
 
 export default function Miners() {
   return (
@@ -36,43 +35,19 @@ export default function Miners() {
         }}
       >
         <Box sx={{ flex: { xs: 1, md: "1 1 25%" }, minWidth: 0 }}>
-          <GradientStatCard
-            title="USD Account"
-            value="$ 0.00"
-            // caption="yesterday"
-            gradient="linear-gradient(135deg, #00C6FF 0%, #0072FF 100%)"
-            icon={<AttachMoneyIcon fontSize="small" />}
-          />
+          <BalanceCard value={0.0} />
         </Box>
 
         <Box sx={{ flex: { xs: 1, md: "1 1 25%" }, minWidth: 0 }}>
-          <GradientStatCard
-            title="COSTS"
-            value="$ 12.34"
-            // caption="yesterday"
-            gradient="linear-gradient(135deg, #00BFA6 0%, #1DE9B6 100%)"
-            icon={<AttachMoneyIcon fontSize="small" />}
-          />
+          <CostsCard value={12.34} />
         </Box>
 
         <Box sx={{ flex: { xs: 1, md: "1 1 25%" }, minWidth: 0 }}>
-          <GradientStatCard
-            title="Estimated mining days left"
-            value="7 days"
-            // caption="days"
-            gradient="linear-gradient(135deg, #2196F3 0%, #21CBF3 100%)"
-            icon={<CalendarTodayIcon fontSize="small" />}
-          />
+          <EstimatedMiningDaysLeftCard days={7} />
         </Box>
 
         <Box sx={{ flex: { xs: 1, md: "1 1 25%" }, minWidth: 0 }}>
-          <GradientStatCard
-            title="Estimate monthly cost"
-            value="$ 45.60"
-            // caption="month"
-            gradient="linear-gradient(135deg, #FFB300 0%, #FFCA28 100%)"
-            icon={<ShowChartIcon fontSize="small" />}
-          />
+          <EstimatedMonthlyCostCard value={45.6} />
         </Box>
       </Box>
 

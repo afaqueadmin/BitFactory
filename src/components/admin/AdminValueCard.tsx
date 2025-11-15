@@ -2,6 +2,7 @@
 
 import React from "react";
 import { Card, CardContent, Typography, Box } from "@mui/material";
+import { formatValue } from "@/lib/helpers/formatValue";
 
 interface AdminValueCardProps {
   title: string;
@@ -9,25 +10,6 @@ interface AdminValueCardProps {
   subtitle?: string;
   type?: "currency" | "number";
 }
-
-const formatValue = (
-  value: number,
-  type: "currency" | "number" = "number",
-): string => {
-  if (type === "currency") {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 2,
-    }).format(value);
-  }
-
-  return new Intl.NumberFormat("en-US", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  }).format(value);
-};
 
 export default function AdminValueCard({
   title,
