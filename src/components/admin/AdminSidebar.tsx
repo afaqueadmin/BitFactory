@@ -73,6 +73,19 @@ const sidebarItems: SidebarItem[] = [
       },
     ],
   },
+
+  {
+    title: "Locations",
+    icon: <LocationsIcon />,
+    path: "/space",
+  },
+
+  {
+    title: "All Miners",
+    icon: <MinersIcon />,
+    path: "/machine",
+  },
+
   {
     title: "Hardware",
     icon: <HardwareIcon />,
@@ -106,26 +119,19 @@ const sidebarItems: SidebarItem[] = [
     icon: <DownloadsIcon />,
     path: "/downloads",
   },
-  {
-    title: "Locations",
-    icon: <LocationsIcon />,
-    path: "/locations",
-  },
+
   {
     title: "Pools",
     icon: <PoolsIcon />,
     path: "/pools",
   },
+
   {
     title: "Customers",
     icon: <CustomersIcon />,
     path: "/customers",
   },
-  {
-    title: "All Miners",
-    icon: <MinersIcon />,
-    path: "/miners",
-  },
+
   {
     title: "Inventory",
     icon: <InventoryIcon />,
