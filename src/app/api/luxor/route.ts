@@ -45,7 +45,7 @@ interface ProxyResponse {
  * This prevents exposing internal Luxor endpoint structure to the client
  * and allows for future abstraction/renaming without breaking clients.
  *
- * IMPORTANT: active-workers and hashrate-history require currency as a path parameter
+ * IMPORTANT: active-workers, hashrate-history, and workers require currency as a path parameter
  * (e.g., /pool/active-workers/BTC)
  *
  * How to add new endpoints:
@@ -56,6 +56,7 @@ interface ProxyResponse {
  * Supported endpoints:
  * - active-workers: Get active worker counts over time (requires currency)
  * - hashrate-history: Get hashrate and efficiency metrics (requires currency)
+ * - workers: Get detailed worker information and statistics (requires currency)
  * - workspace: Get workspace information
  */
 const endpointMap: Record<string, { path: string; requiresCurrency: boolean }> =
@@ -66,6 +67,7 @@ const endpointMap: Record<string, { path: string; requiresCurrency: boolean }> =
       requiresCurrency: true,
     },
     workspace: { path: "/workspace", requiresCurrency: false },
+    workers: { path: "/pool/workers", requiresCurrency: true },
     // ⬇️ ADD NEW ENDPOINTS HERE ⬇️
     // 'earnings': { path: '/earnings', requiresCurrency: false },
     // 'pool-stats': { path: '/pool/stats', requiresCurrency: false },
@@ -188,6 +190,9 @@ function buildQueryParams(
  *
  * Get hashrate efficiency:
  * GET /api/luxor?endpoint=hashrate-history&currency=BTC&start_date=2025-01-01
+ *
+ * Get workers data:
+ * GET /api/luxor?endpoint=workers&currency=BTC&page_number=1&page_size=10&status=ACTIVE
  *
  * Get workspace info:
  * GET /api/luxor?endpoint=workspace

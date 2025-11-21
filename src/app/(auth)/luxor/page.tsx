@@ -25,6 +25,13 @@ import {
   TextField,
   Stack,
   useTheme,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Chip,
 } from "@mui/material";
 import {
   LineChart,
@@ -47,6 +54,7 @@ import {
   ActiveWorkersResponse,
   HashrateEfficiencyResponse,
   WorkspaceResponse,
+  WorkersResponse,
 } from "@/lib/luxor";
 
 /**
@@ -65,6 +73,7 @@ interface ProxyResponse<T> {
 interface LuxorState {
   activeWorkers: ActiveWorkersResponse | null;
   hashrateEfficiency: HashrateEfficiencyResponse | null;
+  workers: WorkersResponse | null;
   workspace: WorkspaceResponse | null;
   loading: boolean;
   error: string | null;
@@ -75,6 +84,7 @@ export default function LuxorPage() {
   const [state, setState] = useState<LuxorState>({
     activeWorkers: null,
     hashrateEfficiency: null,
+    workers: null,
     workspace: null,
     loading: true,
     error: null,
@@ -152,6 +162,23 @@ export default function LuxorPage() {
         throw new Error(hashrateData.error || "Failed to fetch hashrate data");
       }
 
+      // Fetch workers list data (top 5)
+      const workersListParams = new URLSearchParams({
+        endpoint: "workers",
+        currency: filters.currency,
+        page_number: "1",
+        page_size: "5",
+      }).toString();
+
+      let workersListData: ProxyResponse<WorkersResponse> | null = null;
+      const workersListResponse = await fetch(
+        `/api/luxor?${workersListParams}`,
+      );
+
+      if (workersListResponse.ok) {
+        workersListData = await workersListResponse.json();
+      }
+
       // Fetch workspace info
       const workspaceResponse = await fetch("/api/luxor?endpoint=workspace");
 
@@ -177,6 +204,7 @@ export default function LuxorPage() {
       setState({
         activeWorkers: workersData.data || null,
         hashrateEfficiency: hashrateData.data || null,
+        workers: workersListData?.success ? workersListData.data || null : null,
         workspace: state.workspace,
         loading: false,
         error: null,
@@ -617,6 +645,93 @@ export default function LuxorPage() {
                   </Box>
                 )}
               </Stack>
+            </Paper>
+          </Box>
+        )}
+
+        {/* Workers Preview Section */}
+        {state.workers && state.workers.workers.length > 0 && (
+          <Box sx={{ mt: 4 }}>
+            <Paper sx={{ p: 3 }}>
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  mb: 2,
+                }}
+              >
+                <Typography
+                  variant="h6"
+                  sx={{
+                    fontWeight: "bold",
+                    color: "text.primary",
+                  }}
+                >
+                  Top Workers (Preview)
+                </Typography>
+                <Button href="/workers" size="small" variant="outlined">
+                  View All Workers
+                </Button>
+              </Box>
+
+              <TableContainer>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow sx={{ backgroundColor: "background.default" }}>
+                      <TableCell sx={{ fontWeight: "bold" }}>Name</TableCell>
+                      <TableCell sx={{ fontWeight: "bold" }}>Status</TableCell>
+                      <TableCell sx={{ fontWeight: "bold" }}>
+                        Hashrate
+                      </TableCell>
+                      <TableCell sx={{ fontWeight: "bold" }}>
+                        Efficiency
+                      </TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {state.workers.workers.slice(0, 5).map((worker, idx) => (
+                      <TableRow key={idx}>
+                        <TableCell>
+                          <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                            {worker.name}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Chip
+                            label={worker.status}
+                            color={
+                              worker.status === "ACTIVE" ? "success" : "error"
+                            }
+                            size="small"
+                            variant="outlined"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2">
+                            {(worker.hashrate * 1e9).toFixed(2)} GH/s
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              color:
+                                worker.efficiency > 0.95
+                                  ? theme.palette.success.main
+                                  : worker.efficiency > 0.85
+                                    ? theme.palette.warning.main
+                                    : theme.palette.error.main,
+                            }}
+                          >
+                            {(worker.efficiency * 100).toFixed(2)}%
+                          </Typography>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
             </Paper>
           </Box>
         )}

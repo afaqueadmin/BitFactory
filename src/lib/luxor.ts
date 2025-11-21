@@ -316,6 +316,67 @@ export interface WorkspaceResponse {
 }
 
 /**
+ * Workers Response
+ *
+ * Returns detailed information about workers in a mining pool.
+ *
+ * Endpoint: GET /pool/workers/{currency}
+ * Query Parameters:
+ *   - page_number: Pagination (default 1)
+ *   - page_size: Items per page (default 10)
+ *   - status: Filter by status - ACTIVE, INACTIVE
+ *   - subaccount_names: Comma-separated subaccount names
+ *   - group_id: Optional group filter
+ */
+export interface WorkersResponse {
+  currency_type:
+    | "UNSPECIFIED"
+    | "BTC"
+    | "LTC_DOGE"
+    | "SC"
+    | "ZEC"
+    | "ZEN"
+    | "LTC"
+    | "DOGE";
+  subaccounts: {
+    id: number;
+    /** A subaccount name for which to retrieve data */
+    name: string;
+  }[];
+  total_inactive: number;
+  total_active: number;
+  workers: {
+    id: string;
+    currency_type:
+      | "UNSPECIFIED"
+      | "BTC"
+      | "LTC_DOGE"
+      | "SC"
+      | "ZEC"
+      | "ZEN"
+      | "LTC"
+      | "DOGE";
+    /** A subaccount name for which to retrieve data */
+    subaccount_name: string;
+    name: string;
+    firmware: string;
+    hashrate: number;
+    efficiency: number;
+    stale_shares: number;
+    rejected_shares: number;
+    last_share_time: string;
+    status: "UNSPECIFIED" | "ACTIVE" | "INACTIVE";
+  }[];
+  pagination: {
+    page_number?: number;
+    page_size?: number;
+    item_count?: number;
+    previous_page_url?: string | null;
+    next_page_url?: string | null;
+  };
+}
+
+/**
  * Generic Luxor API Response wrapper
  *
  * Many Luxor endpoints follow this structure
@@ -353,6 +414,7 @@ export const LUXOR_ENDPOINTS = {
   "active-workers": "/pool/active-workers",
   "hashrate-efficiency": "/pool/hashrate-efficiency",
   workspace: "/workspace",
+  workers: "/pool/workers",
   // ⬇️ ADD NEW ENDPOINTS HERE ⬇️
   // Example: 'earnings': '/earnings',
   // Example: 'pool-stats': '/pool/stats',
