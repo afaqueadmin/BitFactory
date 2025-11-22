@@ -114,7 +114,7 @@ export default function MiningEarningsChart({
               tick={{ fontSize: 12, fill: theme.palette.text.secondary }}
               domain={[0, "dataMax + 2"]}
               label={{
-                value: "Amount ($)",
+                value: "BTC (₿)",
                 angle: -90,
                 position: "insideLeft",
                 style: {
@@ -161,13 +161,13 @@ export default function MiningEarningsChart({
               radius={[6, 6, 0, 0]}
               fill="url(#earningsGradient)"
             />
-            <Bar
+            {/* <Bar
               dataKey="costs"
               name="Costs"
               barSize={18}
               radius={[6, 6, 0, 0]}
               fill="url(#costsGradient)"
-            />
+            /> */}
           </BarChart>
         </ResponsiveContainer>
       </Box>

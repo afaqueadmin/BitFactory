@@ -36,15 +36,15 @@ const dummyData: ElectricityData[] = [
   {
     id: 1,
     date: "08/10/2025",
-    type: "Electricity cost",
-    consumption: "315.552 kWh",
-    amount: "- 23,67 $",
-    balance: "+ 231,99 $",
+    type: "Payment",
+    consumption: "N/A",
+    amount: "+ 231,99 $",
+    balance: "+ 487,64 $",
   },
   {
     id: 2,
     date: "07/10/2025",
-    type: "Electricity cost",
+    type: "Electricity Charges",
     consumption: "315.552 kWh",
     amount: "- 23,67 $",
     balance: "+ 255,65 $",
@@ -52,7 +52,7 @@ const dummyData: ElectricityData[] = [
   {
     id: 3,
     date: "06/10/2025",
-    type: "Electricity cost",
+    type: "Electricity Charges",
     consumption: "315.552 kWh",
     amount: "- 23,67 $",
     balance: "+ 279,32 $",
@@ -60,7 +60,7 @@ const dummyData: ElectricityData[] = [
   {
     id: 4,
     date: "05/10/2025",
-    type: "Electricity cost",
+    type: "Electricity Charges",
     consumption: "315.552 kWh",
     amount: "- 23,67 $",
     balance: "+ 302,99 $",
@@ -68,7 +68,7 @@ const dummyData: ElectricityData[] = [
   {
     id: 5,
     date: "04/10/2025",
-    type: "Electricity cost",
+    type: "Electricity Charges",
     consumption: "315.552 kWh",
     amount: "- 23,67 $",
     balance: "+ 326,65 $",
@@ -76,7 +76,7 @@ const dummyData: ElectricityData[] = [
   {
     id: 6,
     date: "03/10/2025",
-    type: "Electricity cost",
+    type: "Electricity Charges",
     consumption: "315.552 kWh",
     amount: "- 23,67 $",
     balance: "+ 350,32 $",
@@ -84,7 +84,7 @@ const dummyData: ElectricityData[] = [
   {
     id: 7,
     date: "02/10/2025",
-    type: "Electricity cost",
+    type: "Electricity Charges",
     consumption: "315.552 kWh",
     amount: "- 23,67 $",
     balance: "+ 373,98 $",
@@ -92,7 +92,7 @@ const dummyData: ElectricityData[] = [
   {
     id: 8,
     date: "01/10/2025",
-    type: "Electricity cost",
+    type: "Electricity Charges",
     consumption: "315.552 kWh",
     amount: "- 23,67 $",
     balance: "+ 397,65 $",

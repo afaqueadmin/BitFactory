@@ -104,14 +104,15 @@ export default function DashboardPage() {
               }}
             />
           </Box>
-
-          <Box sx={{ flex: 1 }}>
-            {/* Marketplace card: 50% width on desktop */}
+          {/* Marketplace card: 50% width on desktop
+              commented out, considering removal */}
+          {/* <Box sx={{ flex: 1 }}>
+            
             <MarketplaceCard
               runningCount={marketplace.runningCount}
               comingSoon={marketplace.comingSoon}
             />
-          </Box>
+          </Box> */}
         </Box>
 
         {/* 4 gradient stat cards - Full width, 25% each */}
