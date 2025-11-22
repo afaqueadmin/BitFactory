@@ -267,8 +267,9 @@ export default function TwoFactorSettings({
           <DialogTitle>Save Your Backup Codes</DialogTitle>
           <DialogContent>
             <Typography variant="body1" gutterBottom>
-              Store these backup codes in a secure place. Each code can only be
-              used once.
+              Store these 2FA backup codes in a secure place. Each code can only
+              be used once. Use these codes in case 2FA is in accessible during
+              login.
             </Typography>
             <Grid container spacing={1} sx={{ mt: 1 }}>
               {backupCodes.map((code, index) => (
