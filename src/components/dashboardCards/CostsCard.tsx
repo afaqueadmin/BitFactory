@@ -4,7 +4,7 @@ import { formatValue } from "@/lib/helpers/formatValue";
 const CostsCard = ({ value }: { value: number }) => {
   return (
     <GradientStatCard
-      title="Costs"
+      title="Daily Costs"
       value={formatValue(value, "currency")}
       // caption="yesterday"
       gradient="linear-gradient(135deg, #00BFA6 0%, #1DE9B6 100%)"
