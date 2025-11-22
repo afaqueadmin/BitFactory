@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
-      maxAge: 15 * 60, // 15 minutes
+      maxAge: 60 * 60, // 1 hour
       path: "/",
     });
 
@@ -105,28 +105,6 @@ export async function POST(req: NextRequest) {
         userAgent: req.headers.get("user-agent") || "unknown",
       },
     });
-    // // Generate tokens with role
-    // const { accessToken, refreshToken } = generateTokens(user.id, user.role);
-    //
-    //
-    // const response = NextResponse.json({ success: true, redirectUrl });
-    //
-    // // Set cookies with proper flags
-    // response.cookies.set('token', accessToken, {
-    //     httpOnly: true,
-    //     secure: process.env.NODE_ENV === 'production',
-    //     sameSite: 'strict',
-    //     maxAge: 15 * 60, // 15 minutes
-    //     path: '/',
-    // });
-    //
-    // response.cookies.set('refresh_token', refreshToken, {
-    //     httpOnly: true,
-    //     secure: process.env.NODE_ENV === 'production',
-    //     sameSite: 'strict',
-    //     maxAge: 7 * 24 * 60 * 60, // 7 days
-    //     path: '/',
-    // });
 
     return response;
   } catch (error) {
