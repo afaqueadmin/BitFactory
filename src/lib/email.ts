@@ -13,7 +13,7 @@ const transporter = nodemailer.createTransport({
 
 export const sendWelcomeEmail = async (email: string, tempPassword: string) => {
   const mailOptions = {
-    from: process.env.SMTP_FROM || "noreply@bitfactory.com",
+    from: `BitFactory ${process.env.SMTP_FROM}` || "noreply@bitfactory.com",
     to: email,
     subject: "Welcome to BitFactory - Your Account Details",
     html: `
