@@ -1,11 +1,43 @@
 "use client";
 
-import React from "react";
-import { Box, Typography, Paper, Grid } from "@mui/material";
+import React, { useEffect, useState } from "react";
+import { Box, Typography, Paper } from "@mui/material";
 import ElectricityCostTable from "@/components/ElectricityCostTable";
-import { InfoOutline } from "@mui/icons-material";
+import { formatValue } from "@/lib/helpers/formatValue";
 
 export default function WalletPage() {
+  const [pendingPayoutsInUsd, setPendingPayoutsInUsd] = useState<string | null>(
+    null,
+  );
+  const [totalEarningsInUsd, setTotalEarningsInUsd] = useState<string | null>(
+    null,
+  );
+  console.log(process.env.NODE_ENV);
+  useEffect(() => {
+    // Function to fetch wallet data
+    const fetchCurrentBtcPrice = async () => {
+      try {
+        const response = await fetch("/api/btcprice");
+
+        if (!response.ok) {
+          setTotalEarningsInUsd("Unavailable");
+          setPendingPayoutsInUsd("Unavailable");
+          return;
+        }
+
+        const data = await response.json();
+        setPendingPayoutsInUsd(formatValue(1 * data.price, "currency")); // Example conversion, replace the 1 with actual user BTC amount
+        setTotalEarningsInUsd(formatValue(2 * data.price, "currency")); // Example conversion, replace the 2 with actual user BTC amount
+        // Update state with wallet data here
+      } catch (error) {
+        console.error("Error fetching BTC data:", error);
+      }
+    };
+
+    // Call the API immediately on component mount
+    fetchCurrentBtcPrice();
+  }, []);
+
   return (
     <Box
       component="main"
@@ -37,9 +69,20 @@ export default function WalletPage() {
             }}
           >
             <Typography variant="subtitle1">Total Earnings</Typography>
-            <Typography variant="h5" fontWeight="bold">
-              ₿ 0.00
-            </Typography>
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <Typography variant="h5" fontWeight="bold">
+                ₿ 0.00
+              </Typography>
+              <Typography variant="h5" fontWeight="bold">
+                {totalEarningsInUsd}
+              </Typography>
+            </Box>
           </Paper>
         </Box>
 
@@ -54,9 +97,20 @@ export default function WalletPage() {
             }}
           >
             <Typography variant="subtitle1">Pending Payouts</Typography>
-            <Typography variant="h5" fontWeight="bold">
-              ₿ 0.00 (USD 0.00)
-            </Typography>
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <Typography variant="h5" fontWeight="bold">
+                ₿ 0.00
+              </Typography>
+              <Typography variant="h5" fontWeight="bold">
+                {pendingPayoutsInUsd}
+              </Typography>
+            </Box>
           </Paper>
         </Box>
         <Box sx={{ flex: "1 1 300px", minWidth: "300px" }}>
