@@ -66,6 +66,7 @@ export async function GET(request: NextRequest) {
         idNumber: true,
         role: true,
         twoFactorEnabled: true,
+        walletAddress: true,
       },
     });
 
@@ -91,8 +92,22 @@ export async function GET(request: NextRequest) {
 
     console.log("Profile API [GET]: Successfully fetched data");
 
+    let walletAddress = user.walletAddress;
+    if (walletAddress) {
+      const walletAddressLength = walletAddress.length;
+      walletAddress =
+        walletAddress.substring(0, 6) +
+        "..." +
+        walletAddress.substring(walletAddressLength - 4, walletAddressLength);
+    }
     return Response.json(
-      { user, recentActivities },
+      {
+        user: {
+          ...user,
+          walletAddress,
+        },
+        recentActivities,
+      },
       {
         status: 200,
         headers: {

@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { Box, Typography, Paper } from "@mui/material";
 import ElectricityCostTable from "@/components/ElectricityCostTable";
 import { formatValue } from "@/lib/helpers/formatValue";
+import { useUser } from "@/lib/hooks/useUser";
 
 export default function WalletPage() {
   const [pendingPayoutsInUsd, setPendingPayoutsInUsd] = useState<string | null>(
@@ -12,7 +13,8 @@ export default function WalletPage() {
   const [totalEarningsInUsd, setTotalEarningsInUsd] = useState<string | null>(
     null,
   );
-  console.log(process.env.NODE_ENV);
+  const { user } = useUser();
+
   useEffect(() => {
     // Function to fetch wallet data
     const fetchCurrentBtcPrice = async () => {
@@ -124,7 +126,9 @@ export default function WalletPage() {
             }}
           >
             <Typography variant="subtitle1">Wallet Address</Typography>
-            <Typography variant="h6">0x1234...abcd</Typography>
+            <Typography variant="h6">
+              {user?.walletAddress ?? <b>Not set</b>}
+            </Typography>
           </Paper>
         </Box>
       </Box>
