@@ -146,7 +146,7 @@ export default function MinersTable({
               <TableCell sx={{ fontWeight: "bold" }}>User</TableCell>
               <TableCell sx={{ fontWeight: "bold" }}>Space</TableCell>
               <TableCell sx={{ fontWeight: "bold" }} align="right">
-                Power Usage (kW)
+                Power Usage (kWh)
               </TableCell>
               <TableCell sx={{ fontWeight: "bold" }} align="right">
                 Hash Rate (TH/s)

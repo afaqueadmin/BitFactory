@@ -320,9 +320,9 @@ const response = await fetch('/api/machine', {
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
     name: 'Miner-001',
-    model: 'Antminer S21',
+    model: 'Bitmain S21 Pro',
     powerUsage: 3.5,
-    hashRate: 130,
+    hashRate: 234,
     userId: 'user123',
     spaceId: 'space456',
     status: 'ACTIVE'

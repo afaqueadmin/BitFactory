@@ -13,6 +13,11 @@ enum Role {
   CLIENT
 }
 
+enum PaymentType {
+  PAYMENT
+  ELECTRICITY_CHARGES
+}
+
 model User {
   id            String           @id @default(cuid())
   email         String           @unique
@@ -37,6 +42,7 @@ model User {
   blacklisted   TokenBlacklist[]
   activities    UserActivity[]
   miners        Miner[]
+  costPayments  CostPayment[]
 
   @@map("users")
 }
@@ -96,3 +102,27 @@ model Space {
 
   @@map("spaces")
 }
+
+model CostPayment {
+  id            String        @id @default(cuid())
+  userId        String
+  amount        Float
+  consumption   Float
+  type          PaymentType
+  createdAt     DateTime      @default(now())
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("cost_payments")
+}
+
+model ElectricityRate {
+  id            String        @id @default(cuid())
+  rate_per_kwh  Float
+  valid_from    DateTime
+  created_at    DateTime      @default(now())
+
+  @@index([valid_from])
+  @@map("electricity_rates")
+}
+

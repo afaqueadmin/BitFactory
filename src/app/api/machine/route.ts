@@ -203,7 +203,7 @@ export async function GET(
  * Request Body:
  * {
  *   name: string (required) - Miner name/identifier
- *   model: string (required) - Miner model (e.g., "Antminer S21")
+ *   model: string (required) - Miner model (e.g., "Bitmain S21 Pro")
  *   powerUsage: number (required) - Power consumption in kilowatts
  *   hashRate: number (required) - Hash rate in TH/s
  *   userId: string (required) - ID of the user who owns this miner

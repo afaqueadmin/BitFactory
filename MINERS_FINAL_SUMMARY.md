@@ -148,10 +148,10 @@ Response (200 OK):
     {
       id: "cuid123",
       name: "Miner-001",
-      model: "Antminer S21",
+      model: "Bitmain S21 Pro",
       status: "ACTIVE",
       powerUsage: 3.5,
-      hashRate: 130,
+      hashRate: 234,
       userId: "user123",
       spaceId: "space456",
       user: { id, name, email },

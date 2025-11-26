@@ -37,12 +37,91 @@ import BalanceCard from "@/components/dashboardCards/BalanceCard";
 import CostsCard from "@/components/dashboardCards/CostsCard";
 import EstimatedMonthlyCostCard from "@/components/dashboardCards/EstimatedMonthlyCostCard";
 import EstimatedMiningDaysLeftCard from "@/components/dashboardCards/EstimatedMiningDaysLeftCard";
+import { formatValue } from "@/lib/helpers/formatValue";
 
 export default function DashboardPage() {
   const { loading, error } = useUser();
   const theme = useTheme();
+  const [balance, setBalance] = React.useState<number>(0);
+  const [balanceLoading, setBalanceLoading] = React.useState(true);
+  const [dailyCost, setDailyCost] = React.useState<number>(0);
+  const [dailyCostLoading, setDailyCostLoading] = React.useState(true);
 
-  // demo/hardcoded values (page-level only)
+  const estimatedMonthlyCost = React.useMemo(() => {
+    if (dailyCostLoading) return 0;
+    return dailyCost * 30;
+  }, [dailyCost, dailyCostLoading]);
+
+  const daysLeft = React.useMemo(() => {
+    if (balanceLoading || dailyCostLoading) return 0;
+    return Number(
+      formatValue(balance / dailyCost, "number", { maximumFractionDigits: 0 }),
+    );
+  }, [balance, balanceLoading, dailyCost, dailyCostLoading]);
+
+  // Fetch balance on component mount
+  React.useEffect(() => {
+    const fetchBalance = async () => {
+      try {
+        setBalanceLoading(true);
+        const response = await fetch("/api/user/balance", {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        });
+
+        if (!response.ok) {
+          console.error("Failed to fetch balance");
+          setBalance(0);
+          return;
+        }
+
+        const data = await response.json();
+        setBalance(data.balance || 0);
+      } catch (err) {
+        console.error("Error fetching balance:", err);
+        setBalance(0);
+      } finally {
+        setBalanceLoading(false);
+      }
+    };
+
+    fetchBalance();
+  }, []);
+
+  // Fetch daily costs on component mount
+  React.useEffect(() => {
+    const fetchDailyCosts = async () => {
+      try {
+        setDailyCostLoading(true);
+        const response = await fetch("/api/miners/daily-costs", {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        });
+
+        if (!response.ok) {
+          console.error("Failed to fetch daily costs");
+          setDailyCost(0);
+          return;
+        }
+
+        const data = await response.json();
+        setDailyCost(data.totalDailyCost || 0);
+      } catch (err) {
+        console.error("Error fetching daily costs:", err);
+        setDailyCost(0);
+      } finally {
+        setDailyCostLoading(false);
+      }
+    };
+
+    fetchDailyCosts();
+  }, []);
+
+  // ...existing code...
   const hosted = {
     runningCount: 3,
     progress: 66,
@@ -126,19 +205,19 @@ export default function DashboardPage() {
           }}
         >
           <Box sx={{ flex: { xs: 1, md: "1 1 25%" }, minWidth: 0 }}>
-            <BalanceCard value={0.0} />
+            <BalanceCard value={balanceLoading ? 0 : balance} />
           </Box>
 
           <Box sx={{ flex: { xs: 1, md: "1 1 25%" }, minWidth: 0 }}>
-            <CostsCard value={12.34} />
+            <CostsCard value={dailyCostLoading ? 0 : dailyCost} />
           </Box>
 
           <Box sx={{ flex: { xs: 1, md: "1 1 25%" }, minWidth: 0 }}>
-            <EstimatedMiningDaysLeftCard days={7} />
+            <EstimatedMiningDaysLeftCard days={daysLeft} />
           </Box>
 
           <Box sx={{ flex: { xs: 1, md: "1 1 25%" }, minWidth: 0 }}>
-            <EstimatedMonthlyCostCard value={45.6} />
+            <EstimatedMonthlyCostCard value={estimatedMonthlyCost} />
           </Box>
         </Box>
 

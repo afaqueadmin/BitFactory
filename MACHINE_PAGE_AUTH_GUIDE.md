@@ -104,9 +104,9 @@ curl -X POST http://localhost:3001/api/machine \
   -H "Cookie: token=YOUR_JWT_TOKEN" \
   -d '{
     "name": "Miner-001",
-    "model": "Antminer S21",
+    "model": "Bitmain S21 Pro",
     "powerUsage": 3.5,
-    "hashRate": 130,
+    "hashRate": 234,
     "userId": "user123",
     "spaceId": "space456",
     "status": "ACTIVE"

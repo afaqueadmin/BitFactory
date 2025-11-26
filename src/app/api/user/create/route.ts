@@ -53,7 +53,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { name, email, role, sendEmail } = await request.json();
+    const { name, email, role, sendEmail, initialDeposit } =
+      await request.json();
 
     // Validate input
     if (!name || !email || !role) {
@@ -89,6 +90,18 @@ export async function POST(request: NextRequest) {
         role,
       },
     });
+
+    // If client role and initial deposit provided, create cost payment entry
+    if (role === "CLIENT" && initialDeposit && initialDeposit > 0) {
+      await prisma.costPayment.create({
+        data: {
+          userId: newUser.id,
+          amount: initialDeposit,
+          consumption: 0,
+          type: "PAYMENT",
+        },
+      });
+    }
 
     // Log the user creation activity
     await prisma.userActivity.create({

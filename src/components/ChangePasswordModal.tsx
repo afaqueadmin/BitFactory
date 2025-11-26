@@ -9,70 +9,83 @@ import {
   TextField,
   Button,
   Box,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
   IconButton,
   CircularProgress,
-  FormControlLabel,
-  Checkbox,
+  Alert,
 } from "@mui/material";
 import { Close as CloseIcon } from "@mui/icons-material";
 
-interface CreateUserModalProps {
+interface ChangePasswordModalProps {
   open: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  customerId: string | null;
 }
 
-const initialState = {
-  name: "",
-  email: "",
-  role: "CLIENT",
-  sendEmail: true,
-  initialDeposit: 0,
-};
-
-export default function CreateUserModal({
+export default function ChangePasswordModal({
   open,
   onClose,
   onSuccess,
-}: CreateUserModalProps) {
+  customerId,
+}: ChangePasswordModalProps) {
   const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState(initialState);
+  const [formData, setFormData] = useState({
+    newPassword: "",
+    confirmPassword: "",
+  });
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
   const handleClose = () => {
     onClose();
-    setFormData(initialState);
+    setFormData({ newPassword: "", confirmPassword: "" });
+    setError("");
+    setSuccess("");
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setError("");
+    setSuccess("");
+
+    // Validation
+    if (formData.newPassword !== formData.confirmPassword) {
+      setError("Passwords do not match");
+      return;
+    }
+
+    if (formData.newPassword.length < 6) {
+      setError("Password must be at least 6 characters long");
+      return;
+    }
+
+    setLoading(true);
 
     try {
-      const response = await fetch("/api/user/create", {
-        method: "POST",
+      const response = await fetch(`/api/user/${customerId}/change-password`, {
+        method: "PUT",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          newPassword: formData.newPassword,
+        }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Failed to create user");
+        throw new Error(data.error || "Failed to change password");
       }
 
-      onSuccess();
-      handleClose();
-    } catch (error) {
+      setSuccess("Password changed successfully");
+      setTimeout(() => {
+        onSuccess();
+        handleClose();
+      }, 1500);
+    } catch (err) {
       setError(
-        error instanceof Error ? error.message : "Failed to create user",
+        err instanceof Error ? err.message : "Failed to change password",
       );
     } finally {
       setLoading(false);
@@ -105,7 +118,7 @@ export default function CreateUserModal({
           alignItems: "center",
         }}
       >
-        Create New User
+        Change Customer Password
         <IconButton
           onClick={handleClose}
           sx={{
@@ -122,73 +135,39 @@ export default function CreateUserModal({
       <form onSubmit={handleSubmit}>
         <DialogContent dividers>
           <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            {error && <Alert severity="error">{error}</Alert>}
+            {success && <Alert severity="success">{success}</Alert>}
+
             <TextField
               fullWidth
-              label="Name"
-              value={formData.name}
+              label="New Password"
+              type="password"
+              value={formData.newPassword}
               onChange={(e) =>
-                setFormData((prev) => ({ ...prev, name: e.target.value }))
+                setFormData((prev) => ({
+                  ...prev,
+                  newPassword: e.target.value,
+                }))
               }
               required
             />
             <TextField
               fullWidth
-              label="Email"
-              type="email"
-              value={formData.email}
+              label="Confirm Password"
+              type="password"
+              value={formData.confirmPassword}
               onChange={(e) =>
-                setFormData((prev) => ({ ...prev, email: e.target.value }))
+                setFormData((prev) => ({
+                  ...prev,
+                  confirmPassword: e.target.value,
+                }))
               }
               required
             />
-            <FormControl fullWidth>
-              <InputLabel>Role</InputLabel>
-              <Select
-                value={formData.role}
-                label="Role"
-                onChange={(e) =>
-                  setFormData((prev) => ({ ...prev, role: e.target.value }))
-                }
-              >
-                <MenuItem value="CLIENT">Client</MenuItem>
-                <MenuItem value="ADMIN">Admin</MenuItem>
-              </Select>
-            </FormControl>
-            {formData.role === "CLIENT" && (
-              <TextField
-                fullWidth
-                label="Initial Deposit (USD)"
-                type="number"
-                inputProps={{ step: "0.01", min: "0" }}
-                value={formData.initialDeposit}
-                onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    initialDeposit: parseFloat(e.target.value) || 0,
-                  }))
-                }
-                helperText="First payment amount in USD"
-              />
-            )}
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={formData.sendEmail}
-                  onChange={(e) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      sendEmail: e.target.checked,
-                    }))
-                  }
-                />
-              }
-              label="Send welcome email to user"
-            />
-            {error && <Box sx={{ color: "error.main", mt: 1 }}>{error}</Box>}
           </Box>
         </DialogContent>
         <DialogActions sx={{ px: 3, py: 2 }}>
-          <Button onClick={handleClose} color="inherit">
+          <Button onClick={handleClose} color="inherit" disabled={loading}>
             Cancel
           </Button>
           <Button
@@ -208,7 +187,7 @@ export default function CreateUserModal({
             {loading ? (
               <CircularProgress size={24} color="inherit" />
             ) : (
-              "Create"
+              "Change Password"
             )}
           </Button>
         </DialogActions>

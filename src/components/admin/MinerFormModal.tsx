@@ -270,7 +270,7 @@ export default function MinerFormModal({
             name="model"
             value={formData.model}
             onChange={handleChange}
-            placeholder="e.g., Antminer S21"
+            placeholder="e.g., Bitmain S21 Pro"
             margin="normal"
             required
             disabled={loading || isLoading}
@@ -278,7 +278,7 @@ export default function MinerFormModal({
 
           <TextField
             fullWidth
-            label="Power Usage (kW)"
+            label="Power Usage (kWh)"
             name="powerUsage"
             type="number"
             value={formData.powerUsage}
@@ -297,7 +297,7 @@ export default function MinerFormModal({
             type="number"
             value={formData.hashRate}
             onChange={handleChange}
-            placeholder="e.g., 130"
+            placeholder="e.g., 234"
             margin="normal"
             required
             inputProps={{ min: "0.1", step: "0.1" }}

@@ -86,8 +86,8 @@ async function main() {
       name: "Whatsminer M50S",
       model: "M50S",
       status: "INACTIVE",
-      powerUsage: 3.4, // 3.4 kW
-      hashRate: 130.0, // 130 TH/s
+      powerUsage: 3.5, // 3.5 kW
+      hashRate: 234.0, // 234 TH/s
       userId: user.id,
       spaceId: space2.id,
     },

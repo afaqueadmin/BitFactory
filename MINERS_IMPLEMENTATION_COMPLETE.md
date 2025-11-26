@@ -204,9 +204,9 @@ Two additional documentation files have been created:
 // Click "Add Miner" button
 // Fill form with:
 //   - Name: "Miner-001"
-//   - Model: "Antminer S21"
+//   - Model: "Bitmain S21 Pro"
 //   - Power Usage: 3.5 kW
-//   - Hash Rate: 130 TH/s
+//   - Hash Rate: 234 TH/s
 //   - User: Select from dropdown
 //   - Space: Select from dropdown
 //   - Status: Active

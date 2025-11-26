@@ -9,71 +9,79 @@ import {
   TextField,
   Button,
   Box,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
   IconButton,
   CircularProgress,
-  FormControlLabel,
-  Checkbox,
+  Alert,
 } from "@mui/material";
 import { Close as CloseIcon } from "@mui/icons-material";
 
-interface CreateUserModalProps {
+interface AddPaymentModalProps {
   open: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  customerId: string | null;
+  customerName?: string;
 }
 
-const initialState = {
-  name: "",
-  email: "",
-  role: "CLIENT",
-  sendEmail: true,
-  initialDeposit: 0,
-};
-
-export default function CreateUserModal({
+export default function AddPaymentModal({
   open,
   onClose,
   onSuccess,
-}: CreateUserModalProps) {
+  customerId,
+  customerName,
+}: AddPaymentModalProps) {
   const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState(initialState);
+  const [amount, setAmount] = useState("");
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
   const handleClose = () => {
     onClose();
-    setFormData(initialState);
+    setAmount("");
+    setError("");
+    setSuccess("");
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setError("");
+    setSuccess("");
+
+    // Validation
+    const paymentAmount = parseFloat(amount);
+    if (!amount || isNaN(paymentAmount) || paymentAmount <= 0) {
+      setError("Please enter a valid payment amount greater than 0");
+      return;
+    }
+
+    setLoading(true);
 
     try {
-      const response = await fetch("/api/user/create", {
+      const response = await fetch("/api/cost-payments", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          userId: customerId,
+          amount: paymentAmount,
+          type: "PAYMENT",
+        }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Failed to create user");
+        throw new Error(data.error || "Failed to add payment");
       }
 
-      onSuccess();
-      handleClose();
-    } catch (error) {
-      setError(
-        error instanceof Error ? error.message : "Failed to create user",
-      );
+      setSuccess("Payment added successfully");
+      setTimeout(() => {
+        onSuccess();
+        handleClose();
+      }, 1500);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to add payment");
     } finally {
       setLoading(false);
     }
@@ -105,7 +113,7 @@ export default function CreateUserModal({
           alignItems: "center",
         }}
       >
-        Create New User
+        Add Payment
         <IconButton
           onClick={handleClose}
           sx={{
@@ -122,73 +130,32 @@ export default function CreateUserModal({
       <form onSubmit={handleSubmit}>
         <DialogContent dividers>
           <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            <TextField
-              fullWidth
-              label="Name"
-              value={formData.name}
-              onChange={(e) =>
-                setFormData((prev) => ({ ...prev, name: e.target.value }))
-              }
-              required
-            />
-            <TextField
-              fullWidth
-              label="Email"
-              type="email"
-              value={formData.email}
-              onChange={(e) =>
-                setFormData((prev) => ({ ...prev, email: e.target.value }))
-              }
-              required
-            />
-            <FormControl fullWidth>
-              <InputLabel>Role</InputLabel>
-              <Select
-                value={formData.role}
-                label="Role"
-                onChange={(e) =>
-                  setFormData((prev) => ({ ...prev, role: e.target.value }))
-                }
-              >
-                <MenuItem value="CLIENT">Client</MenuItem>
-                <MenuItem value="ADMIN">Admin</MenuItem>
-              </Select>
-            </FormControl>
-            {formData.role === "CLIENT" && (
-              <TextField
-                fullWidth
-                label="Initial Deposit (USD)"
-                type="number"
-                inputProps={{ step: "0.01", min: "0" }}
-                value={formData.initialDeposit}
-                onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    initialDeposit: parseFloat(e.target.value) || 0,
-                  }))
-                }
-                helperText="First payment amount in USD"
-              />
+            {error && <Alert severity="error">{error}</Alert>}
+            {success && <Alert severity="success">{success}</Alert>}
+
+            {customerName && (
+              <Box sx={{ mb: 1 }}>
+                <p style={{ margin: 0, fontSize: "0.9rem", color: "#666" }}>
+                  Adding payment for: <strong>{customerName}</strong>
+                </p>
+              </Box>
             )}
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={formData.sendEmail}
-                  onChange={(e) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      sendEmail: e.target.checked,
-                    }))
-                  }
-                />
-              }
-              label="Send welcome email to user"
+
+            <TextField
+              fullWidth
+              label="Payment Amount (USD)"
+              type="number"
+              inputProps={{ step: "0.01", min: "0", placeholder: "0.00" }}
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              required
+              autoFocus
+              helperText="Enter amount in USD"
             />
-            {error && <Box sx={{ color: "error.main", mt: 1 }}>{error}</Box>}
           </Box>
         </DialogContent>
         <DialogActions sx={{ px: 3, py: 2 }}>
-          <Button onClick={handleClose} color="inherit">
+          <Button onClick={handleClose} color="inherit" disabled={loading}>
             Cancel
           </Button>
           <Button
@@ -208,7 +175,7 @@ export default function CreateUserModal({
             {loading ? (
               <CircularProgress size={24} color="inherit" />
             ) : (
-              "Create"
+              "Add Payment"
             )}
           </Button>
         </DialogActions>

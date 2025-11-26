@@ -5,6 +5,6 @@ ALTER TABLE "public"."users" ADD COLUMN     "walletAddress" TEXT;
 ALTER TABLE "public"."users" ADD CONSTRAINT "walletAddress_length_check"
   CHECK (
     "walletAddress" IS NULL OR
-    (LENGTH("walletAddress") >= 26 AND LENGTH("walletAddress") <= 35)
+    (LENGTH("walletAddress") >= 26 AND LENGTH("walletAddress") <= 70)
   );
 

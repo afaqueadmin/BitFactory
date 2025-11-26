@@ -73,9 +73,9 @@ Or find the link in the sidebar navigation.
 1. Click **"Add Miner"** button
 2. Fill the form:
    - **Name**: Miner-001
-   - **Model**: Antminer S21
+   - **Model**: Bitmain S21 Pro
    - **Power Usage**: 3.5 kW
-   - **Hash Rate**: 130 TH/s
+   - **Hash Rate**: 234 TH/s
    - **User**: Select from dropdown
    - **Space**: Select from dropdown (create space first if needed)
    - **Status**: Active

@@ -16,19 +16,16 @@ import {
   Button,
   CircularProgress,
   Alert,
+  Menu,
+  MenuItem,
+  IconButton,
 } from "@mui/material";
-import { Add as AddIcon } from "@mui/icons-material";
+import { Add as AddIcon, MoreVert as MoreVertIcon } from "@mui/icons-material";
 import AdminValueCard from "@/components/admin/AdminValueCard";
 import CreateUserModal from "@/components/CreateUserModal";
-
-interface CustomerTableData {
-  id: string;
-  name: string;
-  email: string;
-  miners: number;
-  status: "active" | "inactive";
-  joinDate: string;
-}
+import EditCustomerModal from "@/components/EditCustomerModal";
+import ChangePasswordModal from "@/components/ChangePasswordModal";
+import AddPaymentModal from "@/components/AddPaymentModal";
 
 interface FetchedUser {
   id: string;
@@ -39,6 +36,8 @@ interface FetchedUser {
   country: string;
   phoneNumber: string;
   companyName: string;
+  streetAddress: string;
+  walletAddress: string;
   twoFactorEnabled: boolean;
   joinDate: string;
   miners: number;
@@ -51,9 +50,16 @@ const Grid = MuiGrid as React.ComponentType<any>;
 
 export default function CustomerOverview() {
   const [createModalOpen, setCreateModalOpen] = useState(false);
-  const [users, setUsers] = useState<CustomerTableData[]>([]);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [changePasswordModalOpen, setChangePasswordModalOpen] = useState(false);
+  const [addPaymentModalOpen, setAddPaymentModalOpen] = useState(false);
+  const [users, setUsers] = useState<FetchedUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [selectedCustomer, setSelectedCustomer] = useState<FetchedUser | null>(
+    null,
+  );
   const [customerStats, setCustomerStats] = useState({
     totalCustomers: 0,
     activeCustomers: 0,
@@ -114,6 +120,86 @@ export default function CustomerOverview() {
     fetchUsers();
   };
 
+  const handleMenuOpen = (
+    event: React.MouseEvent<HTMLButtonElement>,
+    customer: FetchedUser,
+  ) => {
+    setAnchorEl(event.currentTarget);
+    setSelectedCustomer(customer);
+  };
+
+  const handleMenuClose = () => {
+    setAnchorEl(null);
+    // setSelectedCustomer(null);
+  };
+
+  const handleEditCustomer = () => {
+    if (selectedCustomer) {
+      setEditModalOpen(true);
+    }
+    handleMenuClose();
+  };
+
+  const handleChangePassword = () => {
+    if (selectedCustomer) {
+      setChangePasswordModalOpen(true);
+    }
+    handleMenuClose();
+  };
+
+  const handleAddPayment = () => {
+    if (selectedCustomer) {
+      setAddPaymentModalOpen(true);
+    }
+    handleMenuClose();
+  };
+
+  const handleDeleteCustomer = async () => {
+    if (!selectedCustomer) return;
+
+    // Confirm deletion
+    if (
+      !window.confirm(
+        `Are you sure you want to delete customer "${selectedCustomer.name}"? This action cannot be undone.`,
+      )
+    ) {
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await fetch(`/api/user/${selectedCustomer.id}`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to delete customer");
+      }
+
+      setError(null);
+      // Refresh the customer list
+      await fetchUsers();
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to delete customer",
+      );
+    } finally {
+      setLoading(false);
+      handleMenuClose();
+    }
+  };
+
+  const handleModalClose = () => {
+    setEditModalOpen(false);
+    setChangePasswordModalOpen(false);
+    setAddPaymentModalOpen(false);
+    setSelectedCustomer(null);
+  };
+
   return (
     <Box sx={{ p: 3 }}>
       {/* Page Title with Create Button */}
@@ -164,6 +250,38 @@ export default function CustomerOverview() {
         onClose={() => setCreateModalOpen(false)}
         onSuccess={handleUserCreated}
       />
+
+      {/* Edit Customer Modal */}
+      {selectedCustomer && (
+        <EditCustomerModal
+          open={editModalOpen}
+          onClose={handleModalClose}
+          onSuccess={handleUserCreated}
+          customerId={selectedCustomer.id}
+          initialData={selectedCustomer}
+        />
+      )}
+
+      {/* Change Password Modal */}
+      {selectedCustomer && (
+        <ChangePasswordModal
+          open={changePasswordModalOpen}
+          onClose={handleModalClose}
+          onSuccess={handleUserCreated}
+          customerId={selectedCustomer.id}
+        />
+      )}
+
+      {/* Add Payment Modal */}
+      {selectedCustomer && (
+        <AddPaymentModal
+          open={addPaymentModalOpen}
+          onClose={handleModalClose}
+          onSuccess={handleUserCreated}
+          customerId={selectedCustomer.id}
+          customerName={selectedCustomer.name}
+        />
+      )}
 
       {/* Stats Cards */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
@@ -238,9 +356,11 @@ export default function CustomerOverview() {
                 <TableRow>
                   <TableCell>Customer</TableCell>
                   <TableCell>Email</TableCell>
+                  <TableCell>Wallet Address</TableCell>
                   <TableCell align="center">Miners</TableCell>
                   <TableCell align="center">Status</TableCell>
                   <TableCell>Join Date</TableCell>
+                  <TableCell align="center">Actions</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -258,6 +378,7 @@ export default function CustomerOverview() {
                       {customer.name}
                     </TableCell>
                     <TableCell>{customer.email}</TableCell>
+                    <TableCell>{customer.walletAddress ?? "Not Set"}</TableCell>
                     <TableCell align="center">{customer.miners}</TableCell>
                     <TableCell align="center">
                       <Chip
@@ -269,6 +390,14 @@ export default function CustomerOverview() {
                       />
                     </TableCell>
                     <TableCell>{customer.joinDate}</TableCell>
+                    <TableCell align="center">
+                      <IconButton
+                        size="small"
+                        onClick={(e) => handleMenuOpen(e, customer)}
+                      >
+                        <MoreVertIcon />
+                      </IconButton>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -276,6 +405,20 @@ export default function CustomerOverview() {
           </TableContainer>
         )}
       </Paper>
+
+      {/* Actions Menu */}
+      <Menu
+        anchorEl={anchorEl}
+        open={Boolean(anchorEl)}
+        onClose={handleMenuClose}
+      >
+        <MenuItem onClick={handleEditCustomer}>Edit Customer</MenuItem>
+        <MenuItem onClick={handleChangePassword}>Change Password</MenuItem>
+        <MenuItem onClick={handleAddPayment}>Add Payment</MenuItem>
+        <MenuItem onClick={handleDeleteCustomer} sx={{ color: "error.main" }}>
+          Delete Customer
+        </MenuItem>
+      </Menu>
 
       {/* Activity Chart Section */}
       <Paper

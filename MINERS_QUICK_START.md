@@ -18,7 +18,7 @@ The page displays:
   - Model
   - Owner (User)
   - Location (Space)
-  - Power Usage (kW)
+  - Power Usage (kWh)
   - Hash Rate (TH/s)
   - Status (Active/Inactive)
   - Created Date
@@ -30,7 +30,7 @@ The page displays:
 1. Click the **"Add Miner"** button in the top right
 2. Fill in the form fields:
    - **Miner Name/ID** - Unique identifier (e.g., "Miner-001")
-   - **Miner Model** - Equipment model (e.g., "Antminer S21")
+   - **Miner Model** - Equipment model (e.g., "Bitmain S21 Pro")
    - **Power Usage** - Consumption in kilowatts (must be > 0)
    - **Hash Rate** - Performance in TH/s (must be > 0)
    - **User** - Select the owner from dropdown

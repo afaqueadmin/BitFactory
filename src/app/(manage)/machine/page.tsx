@@ -304,7 +304,7 @@ export default function MachinePage() {
                 </Typography>
                 <Typography variant="h5" sx={{ fontWeight: "bold", mt: 0.5 }}>
                   {miners.reduce((sum, m) => sum + m.powerUsage, 0).toFixed(2)}{" "}
-                  kW
+                  kWh
                 </Typography>
               </Box>
             </Stack>

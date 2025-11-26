@@ -61,6 +61,8 @@ export async function GET(request: NextRequest) {
         phoneNumber: true,
         companyName: true,
         twoFactorEnabled: true,
+        streetAddress: true,
+        walletAddress: true,
         createdAt: true,
         miners: {
           select: {
@@ -87,6 +89,7 @@ export async function GET(request: NextRequest) {
       joinDate: user.createdAt.toISOString().split("T")[0],
       miners: user.miners.length,
       status: "active", // You can add logic to determine status
+      walletAddress: user.walletAddress,
     }));
 
     return NextResponse.json(
