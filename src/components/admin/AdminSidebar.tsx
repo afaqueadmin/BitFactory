@@ -73,6 +73,17 @@ const sidebarItems: SidebarItem[] = [
       },
     ],
   },
+  {
+    title: "Subaccounts",
+    icon: <CustomersIcon />,
+    path: "/groups",
+  },
+
+  {
+    title: "Customer Groups",
+    icon: <CustomersIcon />,
+    path: "/groups",
+  },
 
   {
     title: "Locations",
@@ -124,12 +135,6 @@ const sidebarItems: SidebarItem[] = [
     title: "Pools",
     icon: <PoolsIcon />,
     path: "/pools",
-  },
-
-  {
-    title: "Customers",
-    icon: <CustomersIcon />,
-    path: "/customers",
   },
 
   {
