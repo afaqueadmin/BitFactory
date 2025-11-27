@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -17,8 +17,31 @@ import {
   CircularProgress,
   FormControlLabel,
   Checkbox,
+  Alert,
+  OutlinedInput,
+  Chip,
 } from "@mui/material";
 import { Close as CloseIcon } from "@mui/icons-material";
+
+/**
+ * Response structure from /api/luxor proxy route
+ */
+interface ProxyResponse<T = Record<string, unknown>> {
+  success: boolean;
+  data?: T;
+  error?: string;
+  timestamp?: string;
+}
+
+/**
+ * Workspace group from Luxor API
+ */
+interface WorkspaceGroup {
+  id: string;
+  name: string;
+  type: string;
+  [key: string]: unknown;
+}
 
 interface CreateUserModalProps {
   open: boolean;
@@ -32,18 +55,94 @@ export default function CreateUserModal({
   onSuccess,
 }: CreateUserModalProps) {
   const [loading, setLoading] = useState(false);
+  const [fetchingGroups, setFetchingGroups] = useState(true);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     role: "CLIENT",
     sendEmail: true,
+    groupIds: [] as string[],
   });
   const [error, setError] = useState("");
+  const [groups, setGroups] = useState<WorkspaceGroup[]>([]);
+  const [groupsError, setGroupsError] = useState<string | null>(null);
+
+  /**
+   * Fetch available workspace groups when modal opens
+   */
+  useEffect(() => {
+    if (open) {
+      fetchGroups();
+    }
+  }, [open]);
+
+  /**
+   * Fetch workspace groups from Luxor API
+   * Mirrors the exact flow from the Subaccounts page
+   */
+  const fetchGroups = async () => {
+    try {
+      setFetchingGroups(true);
+      setGroupsError(null);
+
+      console.log(
+        "[CreateUserModal] Fetching workspace groups from /api/luxor",
+      );
+
+      const response = await fetch("/api/luxor?endpoint=workspace");
+
+      if (!response.ok) {
+        throw new Error(`API returned status ${response.status}`);
+      }
+
+      const data: ProxyResponse<Record<string, unknown>> =
+        await response.json();
+
+      if (!data.success) {
+        throw new Error(data.error || "Failed to fetch groups");
+      }
+
+      // Extract groups array from workspace data - same as Subaccounts page
+      const workspaceData = data.data as Record<string, unknown>;
+      let groupsList: WorkspaceGroup[] = [];
+
+      if (workspaceData && Array.isArray(workspaceData.groups)) {
+        groupsList = (
+          workspaceData.groups as Array<Record<string, unknown>>
+        ).map(
+          (group: Record<string, unknown>) =>
+            ({
+              id: String(group.id || ""),
+              name: String(group.name || ""),
+              type: String(group.type || "UNSPECIFIED"),
+            }) as WorkspaceGroup,
+        );
+      }
+
+      setGroups(groupsList);
+      console.log(`[CreateUserModal] Fetched ${groupsList.length} groups`);
+    } catch (err) {
+      const errorMsg =
+        err instanceof Error ? err.message : "Failed to fetch groups";
+      console.error("[CreateUserModal] Error fetching groups:", errorMsg);
+      setGroupsError(errorMsg);
+      setGroups([]);
+    } finally {
+      setFetchingGroups(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError("");
+
+    // Validate group selection
+    if (formData.groupIds.length === 0) {
+      setError("Please select at least one group");
+      setLoading(false);
+      return;
+    }
 
     try {
       const response = await fetch("/api/user/create", {
@@ -60,6 +159,15 @@ export default function CreateUserModal({
         throw new Error(data.error || "Failed to create user");
       }
 
+      // Log Luxor creation results if available
+      if (data.luxorSummary) {
+        console.log("[CreateUserModal] Luxor subaccount creation summary:", {
+          success: data.luxorSummary.successCount,
+          failed: data.luxorSummary.failureCount,
+          total: data.luxorSummary.totalAttempted,
+        });
+      }
+
       onSuccess();
       onClose();
       setFormData({
@@ -67,11 +175,10 @@ export default function CreateUserModal({
         email: "",
         role: "CLIENT",
         sendEmail: true,
+        groupIds: [],
       });
-    } catch (error) {
-      setError(
-        error instanceof Error ? error.message : "Failed to create user",
-      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create user");
     } finally {
       setLoading(false);
     }
@@ -152,6 +259,59 @@ export default function CreateUserModal({
                 <MenuItem value="ADMIN">Admin</MenuItem>
               </Select>
             </FormControl>
+
+            {/* Luxor Groups Multi-Select */}
+            <FormControl fullWidth>
+              <InputLabel>Luxor Groups</InputLabel>
+              <Select
+                multiple
+                value={formData.groupIds}
+                onChange={(e) => {
+                  const value =
+                    typeof e.target.value === "string"
+                      ? e.target.value.split(",")
+                      : e.target.value;
+                  setFormData((prev) => ({
+                    ...prev,
+                    groupIds: value as string[],
+                  }));
+                }}
+                input={<OutlinedInput label="Luxor Groups" />}
+                renderValue={(selected) => (
+                  <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+                    {(selected as string[]).map((groupId) => {
+                      const group = groups.find((g) => g.id === groupId);
+                      return (
+                        <Chip
+                          key={groupId}
+                          label={group?.name || groupId}
+                          size="small"
+                        />
+                      );
+                    })}
+                  </Box>
+                )}
+                disabled={fetchingGroups || groups.length === 0}
+              >
+                {fetchingGroups ? (
+                  <MenuItem disabled>
+                    <CircularProgress size={20} sx={{ mr: 1 }} />
+                    Loading groups...
+                  </MenuItem>
+                ) : groups.length > 0 ? (
+                  groups.map((group) => (
+                    <MenuItem key={group.id} value={group.id}>
+                      {group.name}
+                    </MenuItem>
+                  ))
+                ) : (
+                  <MenuItem disabled>No groups available</MenuItem>
+                )}
+              </Select>
+            </FormControl>
+
+            {groupsError && <Alert severity="warning">{groupsError}</Alert>}
+
             <FormControlLabel
               control={
                 <Checkbox
@@ -166,7 +326,8 @@ export default function CreateUserModal({
               }
               label="Send welcome email to user"
             />
-            {error && <Box sx={{ color: "error.main", mt: 1 }}>{error}</Box>}
+
+            {error && <Alert severity="error">{error}</Alert>}
           </Box>
         </DialogContent>
         <DialogActions sx={{ px: 3, py: 2 }}>
@@ -176,7 +337,7 @@ export default function CreateUserModal({
           <Button
             type="submit"
             variant="contained"
-            disabled={loading}
+            disabled={loading || fetchingGroups || groups.length === 0}
             sx={{
               px: 4,
               background: (theme) =>

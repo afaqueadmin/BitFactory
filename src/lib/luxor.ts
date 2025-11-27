@@ -209,6 +209,26 @@ export class LuxorClient {
   }
 
   /**
+   * Get workspace information including all groups
+   *
+   * @returns Workspace response with groups array
+   * @throws LuxorError on API errors
+   *
+   * @example
+   * const workspace = await client.getWorkspace();
+   * const groups = workspace.groups;
+   * const defaultGroup = groups[0]; // First group is typically the default
+   */
+  async getWorkspace(): Promise<
+    WorkspaceResponse & { groups: GetGroupResponse[] }
+  > {
+    console.log("[Luxor] Fetching workspace with groups");
+    return this.request<WorkspaceResponse & { groups: GetGroupResponse[] }>(
+      "/workspace",
+    );
+  }
+
+  /**
    * Create a new group in the workspace
    *
    * @param groupName - Name of the group to create

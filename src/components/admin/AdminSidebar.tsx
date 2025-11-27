@@ -76,7 +76,7 @@ const sidebarItems: SidebarItem[] = [
   {
     title: "Subaccounts",
     icon: <CustomersIcon />,
-    path: "/groups",
+    path: "/subaccounts",
   },
 
   {
