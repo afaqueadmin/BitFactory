@@ -1,6 +1,7 @@
+//src/components/ElectricityCostTable.tsx
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Box,
   Paper,
@@ -16,88 +17,25 @@ import {
   TextField,
   InputAdornment,
   useTheme,
+  CircularProgress,
+  Alert,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import { visuallyHidden } from "@mui/utils";
 
 interface ElectricityData {
-  id: number;
+  id: string;
   date: string;
   type: string;
   consumption: string;
   amount: string;
   balance: string;
+  rawBalance?: number;
+  rawAmount?: number;
 }
 
 type Order = "asc" | "desc";
 type OrderBy = keyof ElectricityData;
-
-const dummyData: ElectricityData[] = [
-  {
-    id: 1,
-    date: "08/10/2025",
-    type: "Payment",
-    consumption: "N/A",
-    amount: "+ 231,99 $",
-    balance: "+ 487,64 $",
-  },
-  {
-    id: 2,
-    date: "07/10/2025",
-    type: "Electricity Charges",
-    consumption: "315.552 kWh",
-    amount: "- 23,67 $",
-    balance: "+ 255,65 $",
-  },
-  {
-    id: 3,
-    date: "06/10/2025",
-    type: "Electricity Charges",
-    consumption: "315.552 kWh",
-    amount: "- 23,67 $",
-    balance: "+ 279,32 $",
-  },
-  {
-    id: 4,
-    date: "05/10/2025",
-    type: "Electricity Charges",
-    consumption: "315.552 kWh",
-    amount: "- 23,67 $",
-    balance: "+ 302,99 $",
-  },
-  {
-    id: 5,
-    date: "04/10/2025",
-    type: "Electricity Charges",
-    consumption: "315.552 kWh",
-    amount: "- 23,67 $",
-    balance: "+ 326,65 $",
-  },
-  {
-    id: 6,
-    date: "03/10/2025",
-    type: "Electricity Charges",
-    consumption: "315.552 kWh",
-    amount: "- 23,67 $",
-    balance: "+ 350,32 $",
-  },
-  {
-    id: 7,
-    date: "02/10/2025",
-    type: "Electricity Charges",
-    consumption: "315.552 kWh",
-    amount: "- 23,67 $",
-    balance: "+ 373,98 $",
-  },
-  {
-    id: 8,
-    date: "01/10/2025",
-    type: "Electricity Charges",
-    consumption: "315.552 kWh",
-    amount: "- 23,67 $",
-    balance: "+ 397,65 $",
-  },
-];
 
 interface HeadCell {
   id: OrderBy;
@@ -227,6 +165,52 @@ export default function ElectricityCostTable() {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
   const [searchTerm, setSearchTerm] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [data, setData] = useState<ElectricityData[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+
+  // Fetch cost payments data from API
+  useEffect(() => {
+    fetchCostPayments();
+  }, [page, rowsPerPage]);
+
+  const fetchCostPayments = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const response = await fetch(
+        `/api/cost-payments?page=${page}&pageSize=${rowsPerPage}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to fetch cost payments");
+      }
+
+      const result = await response.json();
+
+      if (result.success && result.data) {
+        setData(result.data);
+        setTotalCount(result.pagination.totalCount);
+      }
+    } catch (err) {
+      console.error("Error fetching cost payments:", err);
+      setError(
+        err instanceof Error ? err.message : "Failed to load cost payments",
+      );
+      setData([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleRequestSort = (
     event: React.MouseEvent<unknown>,
@@ -253,24 +237,25 @@ export default function ElectricityCostTable() {
     setPage(0); // Reset to first page when searching
   };
 
-  // Filter data based on search term
+  // Filter data based on search term (client-side)
   const filteredData = React.useMemo(() => {
-    if (!searchTerm) return dummyData;
+    if (!searchTerm) return data;
 
-    return dummyData.filter((row) =>
+    return data.filter((row) =>
       Object.values(row).some((value) =>
-        value.toString().toLowerCase().includes(searchTerm.toLowerCase()),
+        String(value).toLowerCase().includes(searchTerm.toLowerCase()),
       ),
     );
-  }, [searchTerm]);
+  }, [searchTerm, data]);
 
+  // Sort and paginate filtered data (client-side for search results)
   const visibleRows = React.useMemo(
     () =>
       stableSort(filteredData, getComparator(order, orderBy)).slice(
-        page * rowsPerPage,
-        page * rowsPerPage + rowsPerPage,
+        0,
+        rowsPerPage,
       ),
-    [order, orderBy, page, rowsPerPage, filteredData],
+    [order, orderBy, rowsPerPage, filteredData],
   );
 
   const getAmountColor = (amount: string) => {
@@ -284,7 +269,10 @@ export default function ElectricityCostTable() {
     if (balance.includes("+")) {
       return theme.palette.success.main;
     }
-    return theme.palette.error.main;
+    if (balance.includes("-")) {
+      return theme.palette.error.main;
+    }
+    return theme.palette.text.primary;
   };
 
   return (
@@ -320,6 +308,13 @@ export default function ElectricityCostTable() {
           }}
         />
       </Box>
+
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
+
       <Paper
         sx={{
           width: "100%",
@@ -328,86 +323,102 @@ export default function ElectricityCostTable() {
           boxShadow: theme.shadows[2],
         }}
       >
-        <TableContainer>
-          <Table
-            sx={{ minWidth: 750 }}
-            aria-labelledby="tableTitle"
-            size="medium"
-          >
-            <EnhancedTableHead
-              order={order}
-              orderBy={orderBy}
-              onRequestSort={handleRequestSort}
+        {loading ? (
+          <Box sx={{ display: "flex", justifyContent: "center", p: 4 }}>
+            <CircularProgress />
+          </Box>
+        ) : data.length === 0 ? (
+          <Box sx={{ p: 3, textAlign: "center" }}>
+            <Typography color="text.secondary">
+              No cost payments found
+            </Typography>
+          </Box>
+        ) : (
+          <>
+            <TableContainer>
+              <Table
+                sx={{ minWidth: 750 }}
+                aria-labelledby="tableTitle"
+                size="medium"
+              >
+                <EnhancedTableHead
+                  order={order}
+                  orderBy={orderBy}
+                  onRequestSort={handleRequestSort}
+                />
+                <TableBody>
+                  {visibleRows.map((row) => {
+                    return (
+                      <TableRow
+                        hover
+                        key={row.id}
+                        sx={{
+                          cursor: "pointer",
+                          "&:nth-of-type(odd)": {
+                            backgroundColor: theme.palette.action.hover,
+                          },
+                        }}
+                      >
+                        <TableCell component="th" scope="row" sx={{ py: 2 }}>
+                          <Typography variant="body2" fontWeight="medium">
+                            {row.date}
+                          </Typography>
+                        </TableCell>
+                        <TableCell sx={{ py: 2 }}>
+                          <Typography variant="body2">{row.type}</Typography>
+                        </TableCell>
+                        <TableCell sx={{ py: 2 }}>
+                          <Typography variant="body2">
+                            {row.consumption}
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="right" sx={{ py: 2 }}>
+                          <Typography
+                            variant="body2"
+                            fontWeight="medium"
+                            sx={{ color: getAmountColor(row.amount) }}
+                          >
+                            {row.amount}
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="right" sx={{ py: 2 }}>
+                          <Typography
+                            variant="body2"
+                            fontWeight="medium"
+                            sx={{ color: getBalanceColor(row.balance) }}
+                          >
+                            {row.balance}
+                          </Typography>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </TableContainer>
+            <TablePagination
+              rowsPerPageOptions={[5, 10, 25]}
+              component="div"
+              count={totalCount}
+              rowsPerPage={rowsPerPage}
+              page={page}
+              onPageChange={handleChangePage}
+              onRowsPerPageChange={handleChangeRowsPerPage}
+              sx={{
+                borderTop: `1px solid ${theme.palette.divider}`,
+                "& .MuiTablePagination-toolbar": {
+                  paddingLeft: 2,
+                  paddingRight: 1,
+                },
+                "& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows":
+                  {
+                    margin: 0,
+                    fontSize: "0.875rem",
+                  },
+              }}
             />
-            <TableBody>
-              {visibleRows.map((row) => {
-                return (
-                  <TableRow
-                    hover
-                    key={row.id}
-                    sx={{
-                      cursor: "pointer",
-                      "&:nth-of-type(odd)": {
-                        backgroundColor: theme.palette.action.hover,
-                      },
-                    }}
-                  >
-                    <TableCell component="th" scope="row" sx={{ py: 2 }}>
-                      <Typography variant="body2" fontWeight="medium">
-                        {row.date}
-                      </Typography>
-                    </TableCell>
-                    <TableCell sx={{ py: 2 }}>
-                      <Typography variant="body2">{row.type}</Typography>
-                    </TableCell>
-                    <TableCell sx={{ py: 2 }}>
-                      <Typography variant="body2">{row.consumption}</Typography>
-                    </TableCell>
-                    <TableCell align="right" sx={{ py: 2 }}>
-                      <Typography
-                        variant="body2"
-                        fontWeight="medium"
-                        sx={{ color: getAmountColor(row.amount) }}
-                      >
-                        {row.amount}
-                      </Typography>
-                    </TableCell>
-                    <TableCell align="right" sx={{ py: 2 }}>
-                      <Typography
-                        variant="body2"
-                        fontWeight="medium"
-                        sx={{ color: getBalanceColor(row.balance) }}
-                      >
-                        {row.balance}
-                      </Typography>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </TableContainer>
-        <TablePagination
-          rowsPerPageOptions={[5, 10, 25]}
-          component="div"
-          count={filteredData.length}
-          rowsPerPage={rowsPerPage}
-          page={page}
-          onPageChange={handleChangePage}
-          onRowsPerPageChange={handleChangeRowsPerPage}
-          sx={{
-            borderTop: `1px solid ${theme.palette.divider}`,
-            "& .MuiTablePagination-toolbar": {
-              paddingLeft: 2,
-              paddingRight: 1,
-            },
-            "& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows":
-              {
-                margin: 0,
-                fontSize: "0.875rem",
-              },
-          }}
-        />
+          </>
+        )}
       </Paper>
     </Box>
   );

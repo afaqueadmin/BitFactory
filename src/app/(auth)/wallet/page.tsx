@@ -16,7 +16,7 @@ export default function WalletPage() {
   const { user } = useUser();
 
   useEffect(() => {
-    // Function to fetch wallet data
+    // Function to fetch BTC price and calculate USD values
     const fetchCurrentBtcPrice = async () => {
       try {
         const response = await fetch("/api/btcprice");
@@ -30,7 +30,6 @@ export default function WalletPage() {
         const data = await response.json();
         setPendingPayoutsInUsd(formatValue(1 * data.price, "currency")); // Example conversion, replace the 1 with actual user BTC amount
         setTotalEarningsInUsd(formatValue(2 * data.price, "currency")); // Example conversion, replace the 2 with actual user BTC amount
-        // Update state with wallet data here
       } catch (error) {
         console.error("Error fetching BTC data:", error);
       }

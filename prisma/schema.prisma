@@ -37,6 +37,7 @@ model User {
   twoFactorEnabled Boolean      @default(false)
   twoFactorSecret String?
   twoFactorBackupCodes String[]
+  luxorSubaccountName String?
   createdAt     DateTime         @default(now())
   updatedAt     DateTime         @updatedAt
   blacklisted   TokenBlacklist[]
@@ -109,6 +110,7 @@ model CostPayment {
   amount        Float
   consumption   Float
   type          PaymentType
+  balance       Float?
   createdAt     DateTime      @default(now())
   user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 

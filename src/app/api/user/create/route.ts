@@ -150,12 +150,15 @@ export async function POST(request: NextRequest) {
     //    - groupId: <selected-group-id>
     //    - name: <subaccount-name> (uses the user's name)
     // 3. Handle errors gracefully per group (don't stop if one fails)
-    // 4. Return summary of successes/failures
+    // 4. Store the returned subaccount name in the database
+    // 5. Return summary of successes/failures
     const luxorCreationResults: {
       groupId: string;
       success: boolean;
       error?: string;
+      subaccountName?: string;
     }[] = [];
+    let createdSubaccountName: string | undefined;
 
     for (const groupId of groupIds) {
       try {
@@ -199,7 +202,12 @@ export async function POST(request: NextRequest) {
           },
         );
 
-        const luxorData: ProxyResponse = await luxorResponse.json();
+        const luxorData: ProxyResponse<{
+          id: number;
+          name: string;
+          created_at: string;
+          url: string;
+        }> = await luxorResponse.json();
 
         console.log(
           `[User Create API] Luxor API response for group ${groupId}:`,
@@ -207,6 +215,7 @@ export async function POST(request: NextRequest) {
             status: luxorResponse.status,
             success: luxorData.success,
             error: luxorData.error,
+            subaccountName: luxorData.data?.name,
           },
         );
 
@@ -222,12 +231,18 @@ export async function POST(request: NextRequest) {
             error: errorMsg,
           });
         } else {
+          const subaccountName = luxorData.data?.name;
           console.log(
-            `[User Create API] Subaccount created successfully in group ${groupId}`,
+            `[User Create API] Subaccount created successfully in group ${groupId}, name: ${subaccountName}`,
           );
+          // Store the first successful subaccount name
+          if (!createdSubaccountName && subaccountName) {
+            createdSubaccountName = subaccountName;
+          }
           luxorCreationResults.push({
             groupId,
             success: true,
+            subaccountName,
           });
         }
       } catch (groupError) {
@@ -250,6 +265,25 @@ export async function POST(request: NextRequest) {
     // Check if any subaccount creation succeeded
     const successCount = luxorCreationResults.filter((r) => r.success).length;
     const failureCount = luxorCreationResults.filter((r) => !r.success).length;
+
+    // Update user with the created subaccount name
+    if (createdSubaccountName) {
+      try {
+        await prisma.user.update({
+          where: { id: newUser.id },
+          data: { luxorSubaccountName: createdSubaccountName },
+        });
+        console.log(
+          `[User Create API] Updated user ${newUser.id} with luxorSubaccountName: ${createdSubaccountName}`,
+        );
+      } catch (updateError) {
+        console.error(
+          "[User Create API] Failed to update user with subaccount name:",
+          updateError,
+        );
+        // Don't fail user creation if this update fails
+      }
+    }
 
     // Log creation summary
     if (failureCount > 0) {

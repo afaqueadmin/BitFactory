@@ -47,6 +47,14 @@ export default function DashboardPage() {
   const [dailyCost, setDailyCost] = React.useState<number>(0);
   const [dailyCostLoading, setDailyCostLoading] = React.useState(true);
 
+  // Workers stats state
+  const [workersStats, setWorkersStats] = React.useState({
+    activeWorkers: 0,
+    inactiveWorkers: 0,
+  });
+  const [workersLoading, setWorkersLoading] = React.useState(true);
+  const [workersError, setWorkersError] = React.useState<string | null>(null);
+
   const estimatedMonthlyCost = React.useMemo(() => {
     if (dailyCostLoading) return 0;
     return dailyCost * 30;
@@ -121,16 +129,94 @@ export default function DashboardPage() {
     fetchDailyCosts();
   }, []);
 
+  // Fetch workers stats on component mount
+  React.useEffect(() => {
+    const fetchWorkersStats = async () => {
+      try {
+        setWorkersLoading(true);
+        setWorkersError(null);
+
+        const response = await fetch("/api/workers/stats", {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch workers stats");
+        }
+
+        const data = await response.json();
+
+        if (data.success) {
+          setWorkersStats({
+            activeWorkers: data.data.activeWorkers || 0,
+            inactiveWorkers: data.data.inactiveWorkers || 0,
+          });
+        } else {
+          throw new Error(data.error || "Failed to fetch workers");
+        }
+      } catch (err) {
+        console.error("Error fetching workers stats:", err);
+        setWorkersError(
+          err instanceof Error ? err.message : "Failed to fetch workers",
+        );
+        setWorkersStats({ activeWorkers: 0, inactiveWorkers: 0 });
+      } finally {
+        setWorkersLoading(false);
+      }
+    };
+
+    fetchWorkersStats();
+  }, []);
+
   // ...existing code...
   const hosted = {
-    runningCount: 3,
+    runningCount: workersStats.activeWorkers,
     progress: 66,
-    errorCount: 2,
+    errorCount: workersStats.inactiveWorkers,
   };
 
   const marketplace = {
     runningCount: 0,
     comingSoon: true,
+  };
+
+  const handleRefreshWorkers = async () => {
+    try {
+      setWorkersLoading(true);
+      setWorkersError(null);
+
+      const response = await fetch("/api/workers/stats", {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch workers stats");
+      }
+
+      const data = await response.json();
+
+      if (data.success) {
+        setWorkersStats({
+          activeWorkers: data.data.activeWorkers || 0,
+          inactiveWorkers: data.data.inactiveWorkers || 0,
+        });
+      } else {
+        throw new Error(data.error || "Failed to fetch workers");
+      }
+    } catch (err) {
+      console.error("Error refreshing workers stats:", err);
+      setWorkersError(
+        err instanceof Error ? err.message : "Failed to refresh workers",
+      );
+    } finally {
+      setWorkersLoading(false);
+    }
   };
 
   if (loading) {
@@ -177,6 +263,9 @@ export default function DashboardPage() {
               runningCount={hosted.runningCount}
               progress={hosted.progress}
               errorCount={hosted.errorCount}
+              loading={workersLoading}
+              error={workersError}
+              onRefresh={handleRefreshWorkers}
               onAddMiner={() => {
                 // stub for now, later wire to modal / route
                 console.log("ADD MINER clicked from DashboardPage");

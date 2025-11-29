@@ -30,8 +30,13 @@ import {
   Button,
   useTheme,
   SvgIcon,
+  IconButton,
+  Tooltip,
+  Alert,
+  CircularProgress,
 } from "@mui/material";
 import StorageIcon from "@mui/icons-material/Storage";
+import RefreshIcon from "@mui/icons-material/Refresh";
 import AddMinerModal from "./AddMinerModal";
 
 export interface HostedMinersCardProps {
@@ -39,6 +44,9 @@ export interface HostedMinersCardProps {
   progress: number; // 0..100
   errorCount: number;
   onAddMiner?: () => void;
+  loading?: boolean;
+  error?: string | null;
+  onRefresh?: () => void;
 }
 
 export default function HostedMinersCard({
@@ -46,9 +54,24 @@ export default function HostedMinersCard({
   progress,
   errorCount,
   onAddMiner,
+  loading = false,
+  error = null,
+  onRefresh,
 }: HostedMinersCardProps) {
   const theme = useTheme();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      if (onRefresh) {
+        await onRefresh();
+      }
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   return (
     <Card
@@ -65,81 +88,132 @@ export default function HostedMinersCard({
       <CardContent
         sx={{ display: "flex", flexDirection: "column", gap: 2, flex: 1 }}
       >
-        {/* Top: icon + title */}
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-          <SvgIcon
-            component={StorageIcon}
-            sx={{
-              fontSize: 28,
-              color: "primary.main",
-            }}
-            aria-hidden
-          />
-          <Typography variant="h6" sx={{ fontWeight: 700 }}>
-            My Factory Status
-          </Typography>
-        </Box>
-
-        {/* Header with running count and error count */}
+        {/* Top: icon + title + refresh button */}
         <Box
           sx={{
             display: "flex",
-            justifyContent: "space-between",
             alignItems: "center",
+            justifyContent: "space-between",
+            gap: 1,
           }}
         >
-          <Typography
-            variant="body2"
-            color="text.secondary"
-            sx={{ fontWeight: 600 }}
-          >
-            {runningCount} running
-          </Typography>
-          <Typography variant="body2" color="error" sx={{ fontWeight: 600 }}>
-            {errorCount} error{errorCount !== 1 ? "s" : ""}
-          </Typography>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <SvgIcon
+              component={StorageIcon}
+              sx={{
+                fontSize: 28,
+                color: "primary.main",
+              }}
+              aria-hidden
+            />
+            <Typography variant="h6" sx={{ fontWeight: 700 }}>
+              My Factory Status
+            </Typography>
+          </Box>
+          <Tooltip title="Refresh worker data">
+            <IconButton
+              onClick={handleRefresh}
+              disabled={loading || isRefreshing}
+              size="small"
+              sx={{
+                color: "primary.main",
+                "&:hover": {
+                  backgroundColor: "action.hover",
+                },
+              }}
+            >
+              {isRefreshing ? <CircularProgress size={20} /> : <RefreshIcon />}
+            </IconButton>
+          </Tooltip>
         </Box>
 
-        {/* Split progress bar - green for running, red for errors */}
-        <Box sx={{ width: "100%", mt: 1 }}>
+        {/* Error Alert */}
+        {error && (
+          <Alert severity="error" sx={{ mb: 1 }}>
+            {error}
+          </Alert>
+        )}
+
+        {/* Loading State */}
+        {loading ? (
           <Box
             sx={{
               display: "flex",
-              height: 10,
-              borderRadius: 5,
-              overflow: "hidden",
-              backgroundColor:
-                theme.palette.mode === "dark"
-                  ? "rgba(255,255,255,0.08)"
-                  : "rgba(0,0,0,0.06)",
+              justifyContent: "center",
+              alignItems: "center",
+              py: 4,
             }}
           >
-            {/* Green section for running miners */}
+            <CircularProgress />
+          </Box>
+        ) : (
+          <>
+            {/* Header with running count and error count */}
             <Box
               sx={{
-                flex: runningCount,
-                backgroundColor: "#00C853",
-                height: "100%",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
               }}
-              role="progressbar"
-              aria-valuenow={runningCount}
-              aria-label={`${runningCount} miners running`}
-            />
-            {/* Red section for errors */}
-            {errorCount > 0 && (
+            >
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{ fontWeight: 600 }}
+              >
+                {runningCount} running
+              </Typography>
+              <Typography
+                variant="body2"
+                color="error"
+                sx={{ fontWeight: 600 }}
+              >
+                {errorCount} error{errorCount !== 1 ? "s" : ""}
+              </Typography>
+            </Box>
+
+            {/* Split progress bar - green for running, red for errors */}
+            <Box sx={{ width: "100%", mt: 1 }}>
               <Box
                 sx={{
-                  flex: errorCount,
-                  backgroundColor: "#FF5252",
-                  height: "100%",
+                  display: "flex",
+                  height: 10,
+                  borderRadius: 5,
+                  overflow: "hidden",
+                  backgroundColor:
+                    theme.palette.mode === "dark"
+                      ? "rgba(255,255,255,0.08)"
+                      : "rgba(0,0,0,0.06)",
                 }}
-                role="progressbar"
-                aria-valuenow={errorCount}
-                aria-label={`${errorCount} errors`}
-              />
-            )}
-          </Box>
-        </Box>
+              >
+                {/* Green section for running miners */}
+                <Box
+                  sx={{
+                    flex: runningCount,
+                    backgroundColor: "#00C853",
+                    height: "100%",
+                  }}
+                  role="progressbar"
+                  aria-valuenow={runningCount}
+                  aria-label={`${runningCount} miners running`}
+                />
+                {/* Red section for errors */}
+                {errorCount > 0 && (
+                  <Box
+                    sx={{
+                      flex: errorCount,
+                      backgroundColor: "#FF5252",
+                      height: "100%",
+                    }}
+                    role="progressbar"
+                    aria-valuenow={errorCount}
+                    aria-label={`${errorCount} errors`}
+                  />
+                )}
+              </Box>
+            </Box>
+          </>
+        )}
 
         {/* Spacer to push controls to bottom */}
         <Box sx={{ flex: 1 }} />
