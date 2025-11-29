@@ -63,7 +63,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { name, email, role, sendEmail, groupIds } = await request.json();
+    const { name, email, role, sendEmail, groupIds, initialDeposit } =
+      await request.json();
 
     // Validate input
     if (!name || !email || !role) {
@@ -120,7 +121,28 @@ export async function POST(request: NextRequest) {
       throw new Error("Failed to create user in database");
     }
 
-    // 🚀 Step: Create Luxor subaccount(s) in selected groups
+    // If client role and initial deposit provided, create cost payment entry
+    if (role === "CLIENT" && initialDeposit && initialDeposit > 0) {
+      try {
+        await prisma.costPayment.create({
+          data: {
+            userId: newUser.id,
+            amount: initialDeposit,
+            consumption: 0,
+            type: "PAYMENT",
+          },
+        });
+        console.log(
+          `[User Create API] Created initial cost payment: ${initialDeposit} for user ${newUser.id}`,
+        );
+      } catch (paymentError) {
+        console.error(
+          "[User Create API] Failed to create cost payment:",
+          paymentError,
+        );
+        // Don't fail user creation if payment entry creation fails
+      }
+    }
     // Mirrors the exact flow from the Subaccounts page:
     // 1. Admin selects one or more groups from /api/luxor?endpoint=workspace
     // 2. For each selected group, call POST /api/luxor with:

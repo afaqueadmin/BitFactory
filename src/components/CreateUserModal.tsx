@@ -62,6 +62,7 @@ export default function CreateUserModal({
     role: "CLIENT",
     sendEmail: true,
     groupIds: [] as string[],
+    initialDeposit: 0,
   });
   const [error, setError] = useState("");
   const [groups, setGroups] = useState<WorkspaceGroup[]>([]);
@@ -176,6 +177,7 @@ export default function CreateUserModal({
         role: "CLIENT",
         sendEmail: true,
         groupIds: [],
+        initialDeposit: 0,
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create user");
@@ -259,6 +261,24 @@ export default function CreateUserModal({
                 <MenuItem value="ADMIN">Admin</MenuItem>
               </Select>
             </FormControl>
+
+            {/* Initial Deposit - Only for CLIENT role */}
+            {formData.role === "CLIENT" && (
+              <TextField
+                fullWidth
+                label="Initial Deposit ($)"
+                type="number"
+                inputProps={{ step: "0.01", min: "0" }}
+                value={formData.initialDeposit}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    initialDeposit: parseFloat(e.target.value) || 0,
+                  }))
+                }
+                helperText="Optional: Set initial balance for this client"
+              />
+            )}
 
             {/* Luxor Groups Multi-Select */}
             <FormControl fullWidth>
