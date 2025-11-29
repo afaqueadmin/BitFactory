@@ -536,32 +536,22 @@ export default function WorkersPage() {
             gap: 2,
           }}
         >
-          <GradientStatCard
-            title="Total Workers"
-            value={stats.totalWorkers}
-            type="number"
-          />
+          <GradientStatCard title="Total Workers" value={stats.totalWorkers} />
           <GradientStatCard
             title="Active Workers"
             value={stats.activeWorkers}
-            type="number"
           />
           <GradientStatCard
             title="Inactive Workers"
             value={stats.inactiveWorkers}
-            type="number"
           />
           <GradientStatCard
             title="Avg Hashrate"
-            value={stats.averageHashrate.toFixed(2)}
-            type="number"
-            subtitle="TH/s"
+            value={`${stats.averageHashrate.toFixed(2)} TH/s`}
           />
           <GradientStatCard
             title="Avg Efficiency"
-            value={stats.averageEfficiency.toFixed(2)}
-            type="number"
-            subtitle="%"
+            value={`${stats.averageEfficiency.toFixed(2)}%`}
           />
         </Box>
       </Box>
