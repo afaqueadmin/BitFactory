@@ -86,15 +86,21 @@ const sidebarItems: SidebarItem[] = [
   },
 
   {
-    title: "Locations",
-    icon: <LocationsIcon />,
-    path: "/space",
-  },
-
-  {
     title: "All Miners",
     icon: <MinersIcon />,
     path: "/machine",
+  },
+
+  {
+    title: "Luxor Workers",
+    icon: <MinersIcon />,
+    path: "/workers",
+  },
+
+  {
+    title: "Locations",
+    icon: <LocationsIcon />,
+    path: "/space",
   },
 
   {
