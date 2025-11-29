@@ -17,6 +17,7 @@ import {
 import Visibility from "@mui/icons-material/Visibility";
 import VisibilityOff from "@mui/icons-material/VisibilityOff";
 import TwoFactorVerification from "@/components/TwoFactorVerification";
+import ForgotPasswordModal from "@/components/ForgotPasswordModal";
 
 export default function Login() {
   const router = useRouter();
@@ -28,6 +29,7 @@ export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [showTwoFactor, setShowTwoFactor] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -71,8 +73,8 @@ export default function Login() {
   };
 
   const handleForgotPassword = () => {
-    // Navigate to forgot password page (create route if not existing)
-    router.push("/forgot-password");
+    // Open forgot password modal
+    setShowForgotPassword(true);
   };
 
   const handleTwoFactorVerified = (redirectUrl: string) => {
@@ -92,6 +94,12 @@ export default function Login() {
         p: 2,
       }}
     >
+      {/* Forgot Password Modal */}
+      <ForgotPasswordModal
+        open={showForgotPassword}
+        onClose={() => setShowForgotPassword(false)}
+      />
+
       {showTwoFactor ? (
         <TwoFactorVerification
           email={formData.email}

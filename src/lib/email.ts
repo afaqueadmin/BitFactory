@@ -38,3 +38,34 @@ export const sendWelcomeEmail = async (email: string, tempPassword: string) => {
     return { success: false, error };
   }
 };
+
+export const sendPasswordResetEmail = async (
+  email: string,
+  tempPassword: string,
+) => {
+  const mailOptions = {
+    from: `BitFactory ${process.env.SMTP_FROM}` || "noreply@bitfactory.com",
+    to: email,
+    subject: "Password Reset Request - BitFactory",
+    html: `
+      <h1>Password Reset</h1>
+      <p>Your password has been reset successfully. Here are your updated login credentials:</p>
+      <p><strong>URL:</strong><a href="https://my.bitfactory.ae" target="_blank"> my.bitfactory.ae</a></p>
+      <p><strong>Username:</strong> ${email}</p>
+      <p><strong>Temporary Password:</strong> ${tempPassword}</p>
+      <p>For security reasons, please change your password immediately after logging in.</p>
+      <p>If you did not request this password reset, please contact our support team immediately.</p>
+      <br>
+      <p>Best regards,</p>
+      <p>The BitFactory Team</p>
+    `,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    return { success: true };
+  } catch (error) {
+    console.error("Error sending password reset email:", error);
+    return { success: false, error };
+  }
+};
