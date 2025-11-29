@@ -1,9 +1,77 @@
-import React from "react";
+"use client";
+
+import React, { useState, useEffect } from "react";
 import AdminStatCard from "@/components/admin/AdminStatCard";
 import AdminValueCard from "@/components/admin/AdminValueCard";
-import { Box } from "@mui/material";
+import { Box, CircularProgress, Alert } from "@mui/material";
+
+interface DashboardStats {
+  miners: {
+    active: number;
+    inactive: number;
+  };
+  spaces: {
+    free: number;
+    used: number;
+  };
+  customers: {
+    active: number;
+    inactive: number;
+  };
+}
 
 export default function AdminDashboard() {
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchDashboardStats();
+  }, []);
+
+  const fetchDashboardStats = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const response = await fetch("/api/admin/dashboard");
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch dashboard statistics");
+      }
+
+      const data = await response.json();
+
+      if (!data.success) {
+        throw new Error(data.error || "Failed to fetch stats");
+      }
+
+      setStats(data.data);
+    } catch (err) {
+      console.error("Error fetching dashboard stats:", err);
+      setError(err instanceof Error ? err.message : "An error occurred");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <Box
+        sx={{
+          p: 4,
+          backgroundColor: "#f5f5f7",
+          minHeight: "calc(100vh - 64px)",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+        }}
+      >
+        <CircularProgress />
+      </Box>
+    );
+  }
+
   return (
     <>
       <Box
@@ -13,6 +81,12 @@ export default function AdminDashboard() {
           minHeight: "calc(100vh - 64px)",
         }}
       >
+        {error && (
+          <Alert severity="error" sx={{ mb: 3 }}>
+            {error}
+          </Alert>
+        )}
+
         <Box
           sx={{
             display: "grid",
@@ -31,8 +105,16 @@ export default function AdminDashboard() {
           <AdminStatCard
             title="Miners"
             stats={[
-              { label: "Active", value: 5, color: "#2196F3" },
-              { label: "Inactive", value: 5, color: "#B0BEC5" },
+              {
+                label: "Active",
+                value: stats?.miners.active ?? 0,
+                color: "#2196F3",
+              },
+              {
+                label: "Inactive",
+                value: stats?.miners.inactive ?? 0,
+                color: "#B0BEC5",
+              },
             ]}
           />
 
@@ -40,8 +122,16 @@ export default function AdminDashboard() {
           <AdminStatCard
             title="Spaces"
             stats={[
-              { label: "Free", value: 2, color: "#9C27B0" },
-              { label: "Used", value: 8, color: "#673AB7" },
+              {
+                label: "Free",
+                value: stats?.spaces.free ?? 0,
+                color: "#9C27B0",
+              },
+              {
+                label: "Used",
+                value: stats?.spaces.used ?? 0,
+                color: "#673AB7",
+              },
             ]}
           />
 
@@ -49,8 +139,16 @@ export default function AdminDashboard() {
           <AdminStatCard
             title="Customers"
             stats={[
-              { label: "Active", value: 3, color: "#EC407A" },
-              { label: "Inactive", value: 0, color: "#B0BEC5" },
+              {
+                label: "Active",
+                value: stats?.customers.active ?? 0,
+                color: "#EC407A",
+              },
+              {
+                label: "Inactive",
+                value: stats?.customers.inactive ?? 0,
+                color: "#B0BEC5",
+              },
             ]}
           />
 

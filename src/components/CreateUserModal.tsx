@@ -133,10 +133,42 @@ export default function CreateUserModal({
     }
   };
 
+  /**
+   * Validate name field - only lowercase letters, numbers, underscores, and hyphens
+   */
+  const isValidName = (name: string): boolean => {
+    const nameRegex = /^[a-z0-9_-]+$/;
+    return nameRegex.test(name);
+  };
+
+  const handleNameChange = (newName: string) => {
+    // Only allow lowercase letters, numbers, underscores, and hyphens
+    const validatedName = newName
+      .replace(/[^a-z0-9_-]/gi, "") // Remove invalid characters
+      .toLowerCase(); // Convert to lowercase
+
+    setFormData((prev) => ({ ...prev, name: validatedName }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError("");
+
+    // Validate name format
+    if (!formData.name || formData.name.trim().length === 0) {
+      setError("Name is required");
+      setLoading(false);
+      return;
+    }
+
+    if (!isValidName(formData.name)) {
+      setError(
+        "Name can only contain lowercase letters, numbers, underscores, and hyphens",
+      );
+      setLoading(false);
+      return;
+    }
 
     // Validate group selection
     if (formData.groupIds.length === 0) {
@@ -233,10 +265,11 @@ export default function CreateUserModal({
               fullWidth
               label="Name"
               value={formData.name}
-              onChange={(e) =>
-                setFormData((prev) => ({ ...prev, name: e.target.value }))
-              }
+              onChange={(e) => handleNameChange(e.target.value)}
+              placeholder="e.g., user-name_123"
+              helperText="Lowercase letters, numbers, underscores, and hyphens only"
               required
+              error={formData.name.length > 0 && !isValidName(formData.name)}
             />
             <TextField
               fullWidth
