@@ -1,4 +1,5 @@
 /**
+ * src/lib/luxor.ts
  * Luxor Mining API Client
  *
  * A secure, server-side only client for interacting with the Luxor mining API.
@@ -119,6 +120,8 @@ export class LuxorClient {
    * @template T - The expected response type
    * @param path - The API endpoint path
    * @param params - Optional query parameters
+   * @param method - HTTP method (GET, POST, PUT, DELETE)
+   * @param body - Optional request body (for POST/PUT)
    * @returns Parsed response of type T
    * @throws LuxorError on API errors
    * @throws Error on network or parsing errors
@@ -132,24 +135,45 @@ export class LuxorClient {
   async request<T = Record<string, unknown>>(
     path: string,
     params?: LuxorQueryParams,
+    method?: string,
+    body?: Record<string, unknown>,
   ): Promise<T> {
     try {
       // Build the complete URL with query parameters
       const url = this.buildUrl(path, params);
+      const httpMethod = method || "GET";
 
-      console.log(`[Luxor] Fetching: ${path}`);
+      console.log(`[Luxor] ${httpMethod} Request:`, {
+        path,
+        url,
+        method: httpMethod,
+        body,
+      });
+
+      // Build headers - only include Content-Type if there's a body
+      const headers: Record<string, string> = {
+        Authorization: this.apiKey,
+      };
+
+      if (body) {
+        headers["Content-Type"] = "application/json";
+      }
 
       // Make the request with Authorization header
       const response = await fetch(url, {
-        method: "GET",
-        headers: {
-          Authorization: this.apiKey,
-          "Content-Type": "application/json",
-        },
+        method: httpMethod,
+        headers,
+        ...(body && { body: JSON.stringify(body) }),
       });
 
       // Parse response body
       const data = await response.json();
+
+      console.log(`[Luxor] ${httpMethod} Response:`, {
+        status: response.status,
+        ok: response.ok,
+        data,
+      });
 
       // Check if the request was successful
       if (!response.ok) {
@@ -182,6 +206,208 @@ export class LuxorClient {
    */
   getSubaccountName(): string {
     return this.subaccountName;
+  }
+
+  /**
+   * Get workspace information including all groups
+   *
+   * @returns Workspace response with groups array
+   * @throws LuxorError on API errors
+   *
+   * @example
+   * const workspace = await client.getWorkspace();
+   * const groups = workspace.groups;
+   * const defaultGroup = groups[0]; // First group is typically the default
+   */
+  async getWorkspace(): Promise<
+    WorkspaceResponse & { groups: GetGroupResponse[] }
+  > {
+    console.log("[Luxor] Fetching workspace with groups");
+    return this.request<WorkspaceResponse & { groups: GetGroupResponse[] }>(
+      "/workspace",
+    );
+  }
+
+  /**
+   * Create a new group in the workspace
+   *
+   * @param groupName - Name of the group to create
+   * @returns Created group response with full details
+   * @throws LuxorError on API errors
+   *
+   * @example
+   * const group = await client.createGroup("My Mining Group");
+   */
+  async createGroup(groupName: string): Promise<CreateGroupResponse> {
+    console.log(`[Luxor] Creating group: ${groupName}`);
+    return this.request<CreateGroupResponse>(
+      "/workspace/groups",
+      undefined,
+      "POST",
+      { name: groupName },
+    );
+  }
+
+  /**
+   * Update an existing group (rename)
+   *
+   * @param groupId - UUID of the group to update
+   * @param groupName - New name for the group
+   * @returns Updated group response
+   * @throws LuxorError on API errors
+   *
+   * @example
+   * const updated = await client.updateGroup("497f6eca-6276-4993-bfeb-53cbbbba6f08", "New Name");
+   */
+  async updateGroup(
+    groupId: string,
+    groupName: string,
+  ): Promise<UpdateGroupResponse> {
+    console.log(`[Luxor] Updating group ${groupId} to: ${groupName}`);
+    // Try PATCH first (more common for partial updates), fallback to POST if needed
+    return this.request<UpdateGroupResponse>(
+      `/workspace/groups/${groupId}`,
+      undefined,
+      "PATCH",
+      { name: groupName },
+    );
+  }
+
+  /**
+   * Delete a group from the workspace
+   *
+   * @param groupId - UUID of the group to delete
+   * @returns Delete action response (may require approval)
+   * @throws LuxorError on API errors
+   *
+   * @example
+   * const action = await client.deleteGroup("497f6eca-6276-4993-bfeb-53cbbbba6f08");
+   */
+  async deleteGroup(groupId: string): Promise<DeleteGroupResponse> {
+    console.log(`[Luxor] Deleting group: ${groupId}`);
+    return this.request<DeleteGroupResponse>(
+      `/workspace/groups/${groupId}`,
+      undefined,
+      "DELETE",
+    );
+  }
+
+  /**
+   * Get details of a specific group
+   *
+   * @param groupId - UUID of the group to retrieve
+   * @returns Group details with members and subaccounts
+   * @throws LuxorError on API errors
+   *
+   * @example
+   * const group = await client.getGroup("497f6eca-6276-4993-bfeb-53cbbbba6f08");
+   */
+  async getGroup(groupId: string): Promise<GetGroupResponse> {
+    console.log(`[Luxor] Getting group: ${groupId}`);
+    return this.request<GetGroupResponse>(
+      `/workspace/groups/${groupId}`,
+      undefined,
+      "GET",
+    );
+  }
+
+  /**
+   * Get a specific subaccount in a group
+   *
+   * @param groupId - UUID of the group
+   * @param subaccountName - Name of the subaccount to retrieve
+   * @returns Subaccount details
+   * @throws LuxorError on API errors
+   *
+   * @example
+   * const subaccount = await client.getSubaccount("497f6eca-6276-4993-bfeb-53cbbbba6f08", "subaccount_1");
+   */
+  async getSubaccount(
+    groupId: string,
+    subaccountName: string,
+  ): Promise<GetSubaccountResponse> {
+    console.log(
+      `[Luxor] Getting subaccount: ${subaccountName} in group: ${groupId}`,
+    );
+    return this.request<GetSubaccountResponse>(
+      `/pool/groups/${groupId}/subaccounts/${subaccountName}`,
+      undefined,
+      "GET",
+    );
+  }
+
+  /**
+   * List all subaccounts in a group
+   *
+   * @param groupId - UUID of the group
+   * @returns Array of subaccounts in the group
+   * @throws LuxorError on API errors
+   *
+   * @example
+   * const subaccounts = await client.listSubaccounts("497f6eca-6276-4993-bfeb-53cbbbba6f08");
+   */
+  async listSubaccounts(groupId: string): Promise<ListSubaccountsResponse> {
+    console.log(`[Luxor] Listing subaccounts for group: ${groupId}`);
+    return this.request<ListSubaccountsResponse>(
+      `/pool/groups/${groupId}/subaccounts`,
+      undefined,
+      "GET",
+    );
+  }
+
+  /**
+   * Add a subaccount to a group
+   *
+   * Creates a new subaccount if it doesn't exist, or adds an existing subaccount to the group.
+   *
+   * @param groupId - UUID of the group
+   * @param subaccountName - Name of the subaccount to add
+   * @returns Added subaccount details
+   * @throws LuxorError on API errors
+   *
+   * @example
+   * const subaccount = await client.addSubaccount("497f6eca-6276-4993-bfeb-53cbbbba6f08", "subaccount_1");
+   */
+  async addSubaccount(
+    groupId: string,
+    subaccountName: string,
+  ): Promise<AddSubaccountResponse> {
+    console.log(
+      `[Luxor] Adding subaccount: ${subaccountName} to group: ${groupId}`,
+    );
+    return this.request<AddSubaccountResponse>(
+      `/pool/groups/${groupId}/subaccounts`,
+      undefined,
+      "POST",
+      { name: subaccountName },
+    );
+  }
+
+  /**
+   * Remove a subaccount from a group
+   *
+   * If the subaccount only belongs to this group, it will be deleted from the workspace entirely.
+   *
+   * @param groupId - UUID of the group
+   * @param subaccountName - Name of the subaccount to remove
+   * @returns Action response (may require approval)
+   * @throws LuxorError on API errors
+   *
+   * @example
+   * const action = await client.removeSubaccount("497f6eca-6276-4993-bfeb-53cbbbba6f08", "subaccount_1");
+   */
+  async removeSubaccount(
+    groupId: string,
+    subaccountName: string,
+  ): Promise<RemoveSubaccountResponse> {
+    console.log(
+      `[Luxor] Removing subaccount: ${subaccountName} from group: ${groupId}`,
+    );
+    return this.request<RemoveSubaccountResponse>(
+      `/pool/groups/${groupId}/subaccounts/${subaccountName}`,
+      undefined,
+      "DELETE",
+    );
   }
 }
 
@@ -389,6 +615,355 @@ export interface LuxorApiResponse<T = Record<string, unknown>> {
 }
 
 // ============================================================================
+// Workspace Group APIs - Types
+// ============================================================================
+
+/**
+ * User information in a group
+ */
+export interface GroupUser {
+  id: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+}
+
+/**
+ * Group member information
+ */
+export interface GroupMember {
+  id: string;
+  user: GroupUser;
+  /**
+   * Status of the user in the group
+   */
+  status: "UNSPECIFIED" | "ACTIVE" | "PENDING";
+  /**
+   * Role of the user in the group
+   */
+  role: "STANDARD" | "ADMIN" | "OWNER";
+}
+
+/**
+ * Subaccount information in a group
+ */
+export interface GroupSubaccount {
+  id: number;
+  /**
+   * A subaccount name for which to retrieve summary information
+   */
+  name: string;
+  created_at: string;
+  url: string;
+}
+
+/**
+ * Create Group Request
+ *
+ * Request body for creating a new group
+ *
+ * Endpoint: POST /workspace/groups
+ */
+export interface CreateGroupRequest {
+  /**
+   * Name of the group to create
+   */
+  name: string;
+}
+
+/**
+ * Create Group Response
+ *
+ * Response from creating a new group
+ *
+ * Endpoint: POST /workspace/groups
+ */
+export interface CreateGroupResponse {
+  /**
+   * Unique identifier for the group
+   */
+  id: string;
+  /**
+   * Name of the group
+   */
+  name: string;
+  /**
+   * Type of group
+   */
+  type: "UNSPECIFIED" | "POOL" | "DERIVATIVES" | "HARDWARE";
+  /**
+   * URL path to the group
+   */
+  url: string;
+  /**
+   * Members in the group
+   */
+  members: GroupMember[];
+  /**
+   * Subaccounts in the group
+   */
+  subaccounts: GroupSubaccount[];
+}
+
+/**
+ * Update Group Request
+ *
+ * Request body for updating a group (rename)
+ *
+ * Endpoint: PUT /workspace/groups/{groupId}
+ */
+export interface UpdateGroupRequest {
+  /**
+   * New name for the group
+   */
+  name: string;
+}
+
+/**
+ * Update Group Response
+ *
+ * Response from updating a group
+ *
+ * Endpoint: PUT /workspace/groups/{groupId}
+ */
+export interface UpdateGroupResponse {
+  /**
+   * Unique identifier for the group
+   */
+  id: string;
+  /**
+   * Name of the group (updated)
+   */
+  name: string;
+  /**
+   * Type of group
+   */
+  type: "UNSPECIFIED" | "POOL" | "DERIVATIVES" | "HARDWARE";
+  /**
+   * URL path to the group
+   */
+  url: string;
+  /**
+   * Members in the group
+   */
+  members: GroupMember[];
+  /**
+   * Subaccounts in the group
+   */
+  subaccounts: GroupSubaccount[];
+}
+
+/**
+ * Workspace Action - Generic action response for operations requiring approval
+ */
+export interface WorkspaceAction {
+  id: string;
+  /**
+   * Type of action created
+   */
+  actionName:
+    | "UPDATE_MEMBER_ROLE"
+    | "INVITE_MEMBER"
+    | "DISABLE_ADMIN_APPROVAL_FLOW"
+    | "UPDATE_WORKSPACE"
+    | "UPDATE_WORKSPACE_PRODUCT"
+    | "REMOVE_STANDARD_MEMBER"
+    | "REMOVE_ADMIN_MEMBER"
+    | "UPDATE_PAYMENT_SETTINGS"
+    | "ADD_PAYMENT_SETTINGS"
+    | "ADD_MEMBER_TO_WORKSPACE_PRODUCT"
+    | "CREATE_API_KEY"
+    | "CREATE_WATCHER_LINK"
+    | "ADD_REFERRAL_CODE"
+    | "DELETE_REFERRAL_CODE"
+    | "DELETE_PRODUCT_GROUP"
+    | "CREATE_SUBACCOUNT"
+    | "REMOVE_SUBACCOUNT_FROM_GROUP"
+    | "ADD_EXISTING_SUBACCOUNT_TO_GROUP"
+    | "MOVE_SUBACCOUNT_TO_GROUP"
+    | "ADD_SUBACCOUNT_ON_MULTIPLE_PRODUCTS"
+    | "REMOVE_SUBACCOUNT_ON_MULTIPLE_PRODUCTS"
+    | "LEAVE_WORKSPACE"
+    | "DERIVATIVES_CREATE_ORDERS"
+    | "DERIVATIVES_UPDATE_ORDER"
+    | "DERIVATIVES_DELETE_ORDERS"
+    | "DERIVATIVES_CANCEL_ORDERS"
+    | "ENABLE_ADMIN_APPROVAL_FLOW";
+  /**
+   * Status of the action created
+   */
+  status:
+    | "PENDING"
+    | "PROCESSING"
+    | "AWAITING_APPROVAL"
+    | "AWAITING_INVITATION_ACCEPTANCE"
+    | "COMPLETED"
+    | "EXPIRED"
+    | "FAILED"
+    | "CANCELLED";
+  initiatedAt: string;
+  initiatedBy: {
+    id: string;
+    displayName: string;
+    type: "API_KEY" | "USER";
+  } | null;
+  requiresApproval: boolean;
+  canceledBy: {
+    id: string;
+    displayName: string;
+    type: "API_KEY" | "USER";
+  } | null;
+  approvedAt: string | null;
+  rejectedAt: string | null;
+  approvedBy: {
+    id: string;
+    displayName: string;
+    type: "API_KEY" | "USER";
+  }[];
+  rejectedBy: {
+    id: string;
+    displayName: string;
+    type: "API_KEY" | "USER";
+  }[];
+  /**
+   * Action URL path where the action can be viewed, approved or rejected
+   */
+  url: string;
+  metadata?: unknown;
+}
+
+/**
+ * Delete Group Response
+ *
+ * Response from deleting a group (may require approval)
+ *
+ * Endpoint: DELETE /workspace/groups/{groupId}
+ *
+ * Extends WorkspaceAction to include action details
+ */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface DeleteGroupResponse extends WorkspaceAction {}
+
+/**
+ * Get Group Response
+ *
+ * Response from retrieving a specific group
+ *
+ * Endpoint: GET /workspace/groups/{groupId}
+ */
+export interface GetGroupResponse {
+  /**
+   * Unique identifier for the group
+   */
+  id: string;
+  /**
+   * Name of the group
+   */
+  name: string;
+  /**
+   * Type of group
+   */
+  type: "UNSPECIFIED" | "POOL" | "DERIVATIVES" | "HARDWARE";
+  /**
+   * URL path to the group
+   */
+  url: string;
+  /**
+   * Members in the group
+   */
+  members: GroupMember[];
+  /**
+   * Subaccounts in the group
+   */
+  subaccounts: GroupSubaccount[];
+}
+
+// ============================================================================
+// Workspace Subaccount APIs - Types
+// ============================================================================
+
+/**
+ * Get Subaccount Response
+ *
+ * Response from retrieving a specific subaccount in a group
+ *
+ * Endpoint: GET /pool/groups/{groupId}/subaccounts/{subaccountName}
+ */
+export interface GetSubaccountResponse {
+  /**
+   * Numeric ID of the subaccount
+   */
+  id: number;
+  /**
+   * Name of the subaccount
+   */
+  name: string;
+  /**
+   * Creation timestamp
+   */
+  created_at: string;
+  /**
+   * URL path to the subaccount
+   */
+  url: string;
+}
+
+/**
+ * List Subaccounts Response
+ *
+ * Response from retrieving all subaccounts in a group
+ *
+ * Endpoint: GET /pool/groups/{groupId}/subaccounts
+ */
+export interface ListSubaccountsResponse {
+  /**
+   * Array of subaccounts in the group
+   */
+  subaccounts: GetSubaccountResponse[];
+}
+
+/**
+ * Add Subaccount Response
+ *
+ * Response from adding a subaccount to a group.
+ * Creates a new subaccount if it doesn't exist, or adds an existing one to the group.
+ *
+ * Endpoint: POST /pool/groups/{groupId}/subaccounts
+ */
+export interface AddSubaccountResponse {
+  /**
+   * Numeric ID of the subaccount
+   */
+  id: number;
+  /**
+   * Name of the subaccount
+   */
+  name: string;
+  /**
+   * Creation timestamp
+   */
+  created_at: string;
+  /**
+   * URL path to the subaccount
+   */
+  url: string;
+}
+
+/**
+ * Remove Subaccount Response
+ *
+ * Response from removing a subaccount from a group.
+ * If the subaccount only belongs to one group, it will be removed from the workspace and deleted.
+ * This returns a WorkspaceAction that may require approval.
+ *
+ * Endpoint: DELETE /pool/groups/{groupId}/subaccounts/{subaccountName}
+ *
+ * Extends WorkspaceAction to include action details
+ */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface RemoveSubaccountResponse extends WorkspaceAction {}
+
+// ============================================================================
 // Endpoint Mapping and Documentation
 // ============================================================================
 
@@ -408,6 +983,8 @@ export interface LuxorApiResponse<T = Record<string, unknown>> {
  * Endpoint Categories:
  * - Pool: /pool/* (worker counts, hashrate, efficiency) - most require currency
  * - Workspace: /workspace (account information) - no currency needed
+ * - Workspace Groups: /workspace/groups (group management) - no currency needed
+ * - Workspace Subaccounts: /pool/groups/{groupId}/subaccounts - no currency needed
  * - Add more categories as needed
  */
 export const LUXOR_ENDPOINTS = {
@@ -415,6 +992,11 @@ export const LUXOR_ENDPOINTS = {
   "hashrate-efficiency": "/pool/hashrate-efficiency",
   workspace: "/workspace",
   workers: "/pool/workers",
+  "group-create": "/workspace/groups",
+  "group-get": "/workspace/groups",
+  "group-update": "/workspace/groups",
+  "group-delete": "/workspace/groups",
+  subaccount: "/pool/groups",
   // ⬇️ ADD NEW ENDPOINTS HERE ⬇️
   // Example: 'earnings': '/earnings',
   // Example: 'pool-stats': '/pool/stats',
