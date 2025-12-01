@@ -15,9 +15,40 @@ interface DashboardStats {
     used: number;
   };
   customers: {
+    total: number;
     active: number;
     inactive: number;
   };
+  luxor: {
+    poolAccounts: {
+      total: number;
+      active: number;
+      inactive: number;
+    };
+    workers: {
+      activeWorkers: number;
+      inactiveWorkers: number;
+      totalWorkers: number;
+    };
+    hashrate: {
+      currentHashrate: number;
+      averageHashrate: number;
+    };
+    efficiency: {
+      currentEfficiency: number;
+      averageEfficiency: number;
+    };
+    power: {
+      totalPower: number;
+      availablePower: number;
+    };
+  };
+  financial: {
+    totalCustomerBalance: number;
+    monthlyRevenue: number;
+    totalMinedRevenue: number;
+  };
+  warnings: string[];
 }
 
 export default function AdminDashboard() {
@@ -101,6 +132,8 @@ export default function AdminDashboard() {
             mx: "auto",
           }}
         >
+          {/* === LOCAL INFRASTRUCTURE STATS === */}
+
           {/* Miners Card */}
           <AdminStatCard
             title="Miners"
@@ -135,7 +168,7 @@ export default function AdminDashboard() {
             ]}
           />
 
-          {/* Customers Card */}
+          {/* Customers Card - Local DB */}
           <AdminStatCard
             title="Customers"
             stats={[
@@ -152,131 +185,173 @@ export default function AdminDashboard() {
             ]}
           />
 
-          {/* Power Card */}
+          {/* Power Card - Calculated from miners */}
           <AdminStatCard
             title="Power"
             stats={[
-              { label: "Free kW", value: 7, color: "#00C853" },
-              { label: "Used kW", value: 3, color: "#00B0FF" },
+              {
+                label: "Free kW",
+                value:
+                  (stats?.luxor.power.availablePower ?? 0) -
+                  (stats?.luxor.power.totalPower ?? 0),
+                color: "#00C853",
+              },
+              {
+                label: "Used kW",
+                value: stats?.luxor.power.totalPower ?? 0,
+                color: "#00B0FF",
+              },
             ]}
           />
 
-          {/* Monthly Revenue */}
+          {/* === LUXOR POOL STATS === */}
+
+          {/* Monthly Revenue - From Cost Payments */}
           <AdminValueCard
             title="Monthly Revenue"
-            value={45289}
+            value={stats?.financial.monthlyRevenue ?? 0}
             type="currency"
-            // subtitle="$subtitle"
           />
 
-          {/* Total Hash Rate */}
+          {/* Actual Hash Rate - Current from Luxor */}
           <AdminValueCard
             title="Actual Hash Rate"
-            value={892.5}
+            value={stats?.luxor.hashrate.currentHashrate ?? 0}
             subtitle="TH/s"
           />
 
-          {/* Average Uptime */}
-          <AdminValueCard title="Average Uptime" value={99.8} subtitle="%" />
+          {/* Average Hashrate - 7 day average */}
+          <AdminValueCard
+            title="Average Hash Rate"
+            value={stats?.luxor.hashrate.averageHashrate ?? 0}
+            subtitle="TH/s"
+          />
 
-          {/* 24H Share Efficiency */}
-          <AdminValueCard title="24H Share Efficiency" value={0} subtitle="%" />
+          {/* Current Efficiency - From Luxor */}
+          <AdminValueCard
+            title="Current Efficiency"
+            value={stats?.luxor.efficiency.currentEfficiency ?? 0}
+            subtitle="%"
+          />
+
+          {/* Average Efficiency - 7 day average */}
+          <AdminValueCard
+            title="Average Efficiency"
+            value={stats?.luxor.efficiency.averageEfficiency ?? 0}
+            subtitle="%"
+          />
 
           {/* Total Mined Revenue */}
           <AdminValueCard
             title="Total Mined Revenue"
-            value={111111}
+            value={stats?.financial.totalMinedRevenue ?? 0}
             subtitle="₿"
           />
-          {/* Total Mined Revenue */}
+
+          {/* === LUXOR POOL ACCOUNTS === */}
+
+          {/* Total Pool Accounts */}
           <AdminValueCard
             title="Total Pool Accounts"
-            value={3}
-            // subtitle="₿"
+            value={stats?.luxor.poolAccounts.total ?? 0}
           />
-          {/* Total Mined Revenue */}
+
+          {/* Active Pool Accounts */}
           <AdminValueCard
             title="Active Pool Accounts"
-            value={3}
-            // subtitle="₿"
+            value={stats?.luxor.poolAccounts.active ?? 0}
           />
-          {/* Total Mined Revenue */}
+
+          {/* Inactive Pool Accounts */}
           <AdminValueCard
             title="Inactive Pool Accounts"
-            value={0}
-            // subtitle="₿"
+            value={stats?.luxor.poolAccounts.inactive ?? 0}
           />
-          {/* Total Mined Revenue */}
+
+          {/* === WORKER STATISTICS FROM LUXOR === */}
+
+          {/* Active Workers */}
+          <AdminValueCard
+            title="Active Workers"
+            value={stats?.luxor.workers.activeWorkers ?? 0}
+          />
+
+          {/* Inactive Workers */}
+          <AdminValueCard
+            title="Inactive Workers"
+            value={stats?.luxor.workers.inactiveWorkers ?? 0}
+          />
+
+          {/* Total Workers */}
+          <AdminValueCard
+            title="Total Workers"
+            value={stats?.luxor.workers.totalWorkers ?? 0}
+          />
+
+          {/* === CUSTOMER FINANCIAL METRICS === */}
+
+          {/* Total Customer Balance */}
           <AdminValueCard
             title="Total Customer Balance"
-            value={1403.5}
+            value={stats?.financial.totalCustomerBalance ?? 0}
             type="currency"
           />
-          {/* Total Mined Revenue */}
+
+          {/* Total Customers Count */}
           <AdminValueCard
-            title="Total Blocked Deposit"
-            value={250000}
-            type="currency"
+            title="Total Customers"
+            value={stats?.customers.total ?? 0}
           />
-          {/* Total Mined Revenue */}
-          <AdminValueCard
-            title="Positive Customer Balance"
-            value={1525.02}
-            type="currency"
-          />
-          {/* Total Mined Revenue */}
-          <AdminValueCard
-            title="Negative Customer Balance"
-            value={121.52}
-            type="currency"
-          />
-          {/* Total Mined Revenue */}
-          <AdminValueCard
-            title="Negative Balance Customers"
-            value={1}
-            // subtitle="₿"
-          />
-          {/* Total Mined Revenue */}
-          <AdminValueCard
-            title="Customers"
-            value={3}
-            // subtitle="₿"
-          />
-          {/* Total Mined Revenue */}
-          <AdminValueCard
-            title="Open Orders"
-            value={0}
-            // subtitle="₿"
-          />
-          {/* Total Mined Revenue */}
-          <AdminValueCard title="Hosting Revenue" value={0.0} type="currency" />
-          {/* Total Mined Revenue */}
-          <AdminValueCard title="Hosting Profit" value={0.0} type="currency" />
-          {/* Total Mined Revenue */}
-          <AdminValueCard
-            title="Est Monthly Hosting Revenue"
-            value={0.0}
-            subtitle="$"
-          />
-          {/* Total Mined Revenue */}
-          <AdminValueCard
-            title="Est Monthly Hosting Profit"
-            value={0.0}
-            type="currency"
-          />
-          {/* Total Mined Revenue */}
-          <AdminValueCard
-            title="Est Yearly Hosting Revenue"
-            value={0.0}
-            type="currency"
-          />
-          {/* Total Mined Revenue */}
-          <AdminValueCard
-            title="Est Yearly Hosting Profit"
-            value={0.0}
-            type="currency"
-          />
+
+          {/* === RESERVED FOR FUTURE LUXOR ENDPOINTS === */}
+
+          {/* Open Orders - Not yet implemented */}
+          <AdminValueCard title="Open Orders" value="N/A" />
+
+          {/* Hosting Revenue - Not yet implemented */}
+          <AdminValueCard title="Hosting Revenue" value="N/A" />
+
+          {/* Hosting Profit - Not yet implemented */}
+          <AdminValueCard title="Hosting Profit" value="N/A" />
+
+          {/* Est Monthly Hosting Revenue - Not yet implemented */}
+          <AdminValueCard title="Est Monthly Hosting Revenue" value="N/A" />
+
+          {/* Est Monthly Hosting Profit - Not yet implemented */}
+          <AdminValueCard title="Est Monthly Hosting Profit" value="N/A" />
+
+          {/* Est Yearly Hosting Revenue - Not yet implemented */}
+          <AdminValueCard title="Est Yearly Hosting Revenue" value="N/A" />
+
+          {/* Est Yearly Hosting Profit - Not yet implemented */}
+          <AdminValueCard title="Est Yearly Hosting Profit" value="N/A" />
+
+          {/* Blocked Deposit - Not yet implemented */}
+          <AdminValueCard title="Total Blocked Deposit" value="N/A" />
+
+          {/* Positive Balance - Aggregated from customer payments */}
+          <AdminValueCard title="Positive Customer Balance" value="N/A" />
+
+          {/* Negative Balance - Aggregated from customer payments */}
+          <AdminValueCard title="Negative Customer Balance" value="N/A" />
+
+          {/* Negative Balance Customers Count */}
+          <AdminValueCard title="Negative Balance Customers" value="N/A" />
         </Box>
+
+        {/* === WARNINGS AND NOTES === */}
+        {stats?.warnings && stats.warnings.length > 0 && (
+          <Box sx={{ mt: 3 }}>
+            <Alert severity="warning">
+              <strong>Data Availability Notes:</strong>
+              <ul style={{ margin: "8px 0 0 0", paddingLeft: "20px" }}>
+                {stats.warnings.map((warning, idx) => (
+                  <li key={idx}>{warning}</li>
+                ))}
+              </ul>
+            </Alert>
+          </Box>
+        )}
       </Box>
     </>
   );

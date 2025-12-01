@@ -1,8 +1,13 @@
 export const formatValue = (
-  value: number,
+  value: number | string,
   type: "currency" | "number" = "number",
   options: Intl.NumberFormatOptions = {},
 ): string => {
+  // If value is a string (like "N/A"), return as-is
+  if (typeof value === "string") {
+    return value;
+  }
+
   if (type === "currency") {
     return new Intl.NumberFormat("en-US", {
       style: "currency",

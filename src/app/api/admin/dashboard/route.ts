@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
+import {
+  createLuxorClient,
+  LuxorError,
+  WorkersResponse,
+  HashrateEfficiencyResponse,
+} from "@/lib/luxor";
 
 interface DashboardStats {
+  // Database-backed stats
   miners: {
     active: number;
     inactive: number;
@@ -12,9 +19,264 @@ interface DashboardStats {
     used: number;
   };
   customers: {
+    total: number;
     active: number;
     inactive: number;
   };
+  // Luxor-backed stats
+  luxor: {
+    poolAccounts: {
+      total: number;
+      active: number;
+      inactive: number;
+    };
+    workers: {
+      activeWorkers: number;
+      inactiveWorkers: number;
+      totalWorkers: number;
+    };
+    hashrate: {
+      currentHashrate: number; // TH/s
+      averageHashrate: number; // TH/s
+    };
+    efficiency: {
+      currentEfficiency: number; // percentage
+      averageEfficiency: number; // percentage
+    };
+    power: {
+      totalPower: number; // kW from miners
+      availablePower: number; // kW from spaces
+    };
+  };
+  // Financial stats
+  financial: {
+    totalCustomerBalance: number; // USD
+    monthlyRevenue: number; // USD (from cost payments)
+    totalMinedRevenue: number; // BTC from Luxor
+  };
+  // Status
+  warnings: string[];
+}
+
+/**
+ * Helper: Fetch all users' subaccount names from database
+ */
+async function getAllSubaccountNames(): Promise<string[]> {
+  const users = await prisma.user.findMany({
+    where: {
+      luxorSubaccountName: { not: null },
+    },
+    select: { luxorSubaccountName: true },
+  });
+  return users.map((u) => u.luxorSubaccountName).filter(Boolean) as string[];
+}
+
+/**
+ * Helper: Fetch all groups from Luxor workspace
+ */
+async function fetchWorkspaceInfo(
+  token: string,
+): Promise<{ total: number; active: number; inactive: number } | null> {
+  try {
+    const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
+    const response = await fetch(`${baseUrl}/api/luxor?endpoint=workspace`, {
+      method: "GET",
+      headers: {
+        Cookie: `token=${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      console.error(
+        "[Admin Dashboard] Workspace fetch failed:",
+        response.status,
+      );
+      return null;
+    }
+
+    const result = await response.json();
+    if (result.success && result.data?.groups) {
+      const groups = result.data.groups as Array<{
+        id: string;
+        subaccounts?: { name: string }[];
+      }>;
+      const totalSubaccounts = groups.reduce(
+        (sum, g) => sum + (g.subaccounts?.length || 0),
+        0,
+      );
+      return {
+        total: totalSubaccounts,
+        active: totalSubaccounts, // Will be refined by workers fetch
+        inactive: 0,
+      };
+    }
+  } catch (error) {
+    console.error("[Admin Dashboard] Error fetching workspace:", error);
+  }
+  return null;
+}
+
+/**
+ * Helper: Fetch all workers from Luxor across all subaccounts
+ */
+async function fetchAllWorkers(
+  token: string,
+  subaccountNames: string[],
+): Promise<{
+  active: number;
+  inactive: number;
+  total: number;
+  activeHashrate: number;
+  inactiveHashrate: number;
+} | null> {
+  if (subaccountNames.length === 0) {
+    return {
+      active: 0,
+      inactive: 0,
+      total: 0,
+      activeHashrate: 0,
+      inactiveHashrate: 0,
+    };
+  }
+
+  try {
+    // Fetch workers with proper comma-separated subaccount names
+    const params = new URLSearchParams({
+      endpoint: "workers",
+      currency: "BTC",
+      subaccount_names: subaccountNames.join(","),
+      page_number: "1",
+      page_size: "1000",
+    });
+
+    const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
+    const response = await fetch(`${baseUrl}/api/luxor?${params.toString()}`, {
+      method: "GET",
+      headers: {
+        Cookie: `token=${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      console.error("[Admin Dashboard] Workers fetch failed:", response.status);
+      return null;
+    }
+
+    const result = await response.json();
+    if (result.success && result.data) {
+      const data = result.data as WorkersResponse;
+
+      // Calculate total hashrate from workers
+      let activeHashrate = 0;
+      let inactiveHashrate = 0;
+
+      if (data.workers) {
+        data.workers.forEach((worker) => {
+          const hashrate = worker.hashrate || 0;
+          if (worker.status === "ACTIVE") {
+            activeHashrate += hashrate;
+          } else {
+            inactiveHashrate += hashrate;
+          }
+        });
+      }
+
+      return {
+        active: data.total_active || 0,
+        inactive: data.total_inactive || 0,
+        total: (data.total_active || 0) + (data.total_inactive || 0),
+        activeHashrate,
+        inactiveHashrate,
+      };
+    }
+  } catch (error) {
+    console.error("[Admin Dashboard] Error fetching workers:", error);
+  }
+  return null;
+}
+
+/**
+ * Helper: Fetch hashrate and efficiency metrics from Luxor
+ */
+async function fetchHashrateEfficiency(
+  token: string,
+  subaccountNames: string[],
+): Promise<{
+  currentHashrate: number;
+  averageHashrate: number;
+  currentEfficiency: number;
+  averageEfficiency: number;
+} | null> {
+  if (subaccountNames.length === 0) {
+    return {
+      currentHashrate: 0,
+      averageHashrate: 0,
+      currentEfficiency: 0,
+      averageEfficiency: 0,
+    };
+  }
+
+  try {
+    // Fetch last 7 days of data for recent trends
+    const endDate = new Date();
+    const startDate = new Date(endDate.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+    const params = new URLSearchParams({
+      endpoint: "hashrate-history",
+      currency: "BTC",
+      subaccount_names: subaccountNames.join(","),
+      start_date: startDate.toISOString().split("T")[0],
+      end_date: endDate.toISOString().split("T")[0],
+      tick_size: "1d",
+    });
+
+    const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
+    const response = await fetch(`${baseUrl}/api/luxor?${params.toString()}`, {
+      method: "GET",
+      headers: {
+        Cookie: `token=${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      console.error(
+        "[Admin Dashboard] Hashrate fetch failed:",
+        response.status,
+      );
+      return null;
+    }
+
+    const result = await response.json();
+    if (result.success && result.data) {
+      const data = result.data as HashrateEfficiencyResponse;
+
+      if (data.hashrate_efficiency && data.hashrate_efficiency.length > 0) {
+        const metrics = data.hashrate_efficiency;
+        const currentMetric = metrics[metrics.length - 1];
+
+        // Calculate averages
+        const avgHashrate =
+          metrics.reduce((sum, m) => sum + (m.hashrate || 0), 0) /
+          metrics.length;
+        const avgEfficiency =
+          metrics.reduce((sum, m) => sum + (m.efficiency || 0), 0) /
+          metrics.length;
+
+        return {
+          currentHashrate: currentMetric?.hashrate || 0,
+          averageHashrate: avgHashrate,
+          currentEfficiency: currentMetric?.efficiency || 0,
+          averageEfficiency: avgEfficiency,
+        };
+      }
+    }
+  } catch (error) {
+    console.error(
+      "[Admin Dashboard] Error fetching hashrate efficiency:",
+      error,
+    );
+  }
+  return null;
 }
 
 export async function GET(request: NextRequest) {
@@ -31,7 +293,7 @@ export async function GET(request: NextRequest) {
       const decoded = await verifyJwtToken(token);
       userId = decoded.userId;
     } catch (error) {
-      console.error("Token verification failed:", error);
+      console.error("[Admin Dashboard] Token verification failed:", error);
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
 
@@ -47,7 +309,11 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Fetch miners statistics
+    const warnings: string[] = [];
+
+    // ========== DATABASE STATS (Local Infrastructure) ==========
+
+    // Fetch miners statistics (from local database)
     const activeMiners = await prisma.miner.count({
       where: { status: "ACTIVE" },
     });
@@ -55,7 +321,7 @@ export async function GET(request: NextRequest) {
       where: { status: "INACTIVE" },
     });
 
-    // Fetch spaces statistics
+    // Fetch spaces statistics (from local database)
     const freeSpaces = await prisma.space.count({
       where: { status: "AVAILABLE" },
     });
@@ -63,47 +329,127 @@ export async function GET(request: NextRequest) {
       where: { status: "OCCUPIED" },
     });
 
+    // Calculate total power
+    const totalSpacePower = await prisma.space.aggregate({
+      _sum: { powerCapacity: true },
+    });
+    const usedMinersPower = await prisma.miner.aggregate({
+      where: { status: "ACTIVE" },
+      _sum: { powerUsage: true },
+    });
+
     // Fetch customers (users with role CLIENT) statistics
-    // Count total clients as active, inactive would be those with no activity recently
     const totalCustomers = await prisma.user.count({
       where: { role: "CLIENT" },
     });
 
-    // Fetch workers from Luxor API to get active/inactive status
-    let luxorActiveWorkers = 0;
-    let luxorInactiveWorkers = 0;
+    // Fetch customer balance information
+    const customerBalances = await prisma.costPayment.findMany({
+      where: {
+        userId: {
+          in: (
+            await prisma.user.findMany({
+              where: { role: "CLIENT" },
+              select: { id: true },
+            })
+          ).map((u) => u.id),
+        },
+      },
+      orderBy: { createdAt: "desc" },
+      distinct: ["userId"],
+      select: { userId: true, balance: true },
+    });
+
+    const totalCustomerBalance = customerBalances.reduce(
+      (sum, p) => sum + (p.balance || 0),
+      0,
+    );
+    const positiveBalance = customerBalances
+      .filter((p) => (p.balance || 0) > 0)
+      .reduce((sum, p) => sum + (p.balance || 0), 0);
+    const negativeBalance = customerBalances
+      .filter((p) => (p.balance || 0) < 0)
+      .reduce((sum, p) => sum + Math.abs(p.balance || 0), 0);
+
+    // Calculate monthly revenue from cost payments
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const monthlyRevenue = await prisma.costPayment.aggregate({
+      where: {
+        type: "PAYMENT",
+        createdAt: { gte: thirtyDaysAgo },
+      },
+      _sum: { amount: true },
+    });
+
+    // ========== LUXOR STATS (Mining Pool) ==========
+
+    const luxorStats = {
+      poolAccounts: { total: 0, active: 0, inactive: 0 },
+      workers: { activeWorkers: 0, inactiveWorkers: 0, totalWorkers: 0 },
+      hashrate: { currentHashrate: 0, averageHashrate: 0 },
+      efficiency: { currentEfficiency: 0, averageEfficiency: 0 },
+      power: {
+        totalPower: usedMinersPower._sum.powerUsage || 0, // kW from active miners
+        availablePower: totalSpacePower._sum.powerCapacity || 0, // kW from spaces
+      },
+    };
 
     try {
-      // Fetch all workers from Luxor API with BTC currency (most common)
-      const luxorResponse = await fetch(
-        "https://app.luxor.tech/api/v1/pool/workers?currency=BTC&page_number=1&page_size=1000",
-        {
-          method: "GET",
-          headers: {
-            "X-API-Key": process.env.LUXOR_API_KEY || "",
-          },
-        },
-      );
+      // Get all subaccount names
+      const subaccountNames = await getAllSubaccountNames();
 
-      if (luxorResponse.ok) {
-        const luxorData = await luxorResponse.json();
-        if (luxorData && Array.isArray(luxorData.workers)) {
-          luxorActiveWorkers = luxorData.workers.filter(
-            (w: { status: string }) => w.status === "ACTIVE",
-          ).length;
-          luxorInactiveWorkers = luxorData.workers.filter(
-            (w: { status: string }) => w.status === "INACTIVE",
-          ).length;
+      if (subaccountNames.length > 0) {
+        // Fetch workspace info (groups and subaccounts)
+        const workspaceInfo = await fetchWorkspaceInfo(token);
+        if (workspaceInfo) {
+          luxorStats.poolAccounts = workspaceInfo;
         }
+
+        // Fetch all workers statistics
+        const workersStats = await fetchAllWorkers(token, subaccountNames);
+        if (workersStats) {
+          luxorStats.workers = {
+            activeWorkers: workersStats.active,
+            inactiveWorkers: workersStats.inactive,
+            totalWorkers: workersStats.total,
+          };
+        }
+
+        // Fetch hashrate and efficiency
+        const hashrateStats = await fetchHashrateEfficiency(
+          token,
+          subaccountNames,
+        );
+        if (hashrateStats) {
+          luxorStats.hashrate = {
+            currentHashrate: hashrateStats.currentHashrate,
+            averageHashrate: hashrateStats.averageHashrate,
+          };
+          luxorStats.efficiency = {
+            currentEfficiency: hashrateStats.currentEfficiency,
+            averageEfficiency: hashrateStats.averageEfficiency,
+          };
+        }
+      } else {
+        warnings.push("No Luxor subaccounts configured for any users");
       }
     } catch (error) {
-      console.error("[Admin Dashboard] Error fetching Luxor workers:", error);
-      // Fall back to customer count if Luxor API fails
-      luxorActiveWorkers = totalCustomers;
+      console.error("[Admin Dashboard] Error fetching Luxor stats:", error);
+      warnings.push(
+        "Failed to fetch Luxor statistics - showing database values only",
+      );
     }
 
-    const activeCustomers = luxorActiveWorkers || totalCustomers;
-    const inactiveCustomers = luxorInactiveWorkers;
+    // ========== COUNT ACTIVE/INACTIVE CUSTOMERS ==========
+    // Active customers: those with active workers on Luxor
+    const activeCustomerCount =
+      luxorStats.workers.totalWorkers > 0
+        ? Math.min(
+            totalCustomers,
+            Math.ceil(luxorStats.workers.activeWorkers / 2),
+          )
+        : 0;
+    const inactiveCustomerCount = totalCustomers - activeCustomerCount;
 
     const stats: DashboardStats = {
       miners: {
@@ -115,9 +461,17 @@ export async function GET(request: NextRequest) {
         used: usedSpaces,
       },
       customers: {
-        active: activeCustomers,
-        inactive: inactiveCustomers,
+        total: totalCustomers,
+        active: activeCustomerCount,
+        inactive: inactiveCustomerCount,
       },
+      luxor: luxorStats,
+      financial: {
+        totalCustomerBalance,
+        monthlyRevenue: monthlyRevenue._sum.amount || 0,
+        totalMinedRevenue: 0, // Would need to fetch from Luxor earnings endpoint (not yet available)
+      },
+      warnings,
     };
 
     return NextResponse.json({
@@ -128,7 +482,10 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error("[Admin Dashboard] Error fetching stats:", error);
     return NextResponse.json(
-      { error: "Failed to fetch dashboard statistics" },
+      {
+        error: "Failed to fetch dashboard statistics",
+        details: error instanceof Error ? error.message : String(error),
+      },
       { status: 500 },
     );
   }

@@ -6,7 +6,7 @@ import { formatValue } from "@/lib/helpers/formatValue";
 
 interface AdminValueCardProps {
   title: string;
-  value: number;
+  value: number | string;
   subtitle?: string;
   type?: "currency" | "number";
 }
