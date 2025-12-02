@@ -12,6 +12,7 @@ import {
   AccordionDetails,
   useTheme,
   alpha,
+  CircularProgress,
 } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 
@@ -321,7 +322,18 @@ export default function HostedMinersList() {
 
       {/* Miners List */}
       <Box sx={{ mt: 4 }}>
-        {filteredMiners.length === 0 ? (
+        {loading ? (
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              p: 6,
+            }}
+          >
+            <CircularProgress />
+          </Box>
+        ) : filteredMiners.length === 0 ? (
           <Box sx={{ p: 4, textAlign: "center" }}>
             <Typography variant="h6" color="text.secondary">
               No miners found for the selected filter.
