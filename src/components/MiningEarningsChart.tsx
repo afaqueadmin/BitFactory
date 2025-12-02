@@ -1,7 +1,7 @@
 // src/components/MiningEarningsChart.tsx
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
   BarChart,
   Bar,
@@ -12,35 +12,89 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-import { Paper, Typography, Box, useTheme } from "@mui/material";
+import {
+  Paper,
+  Typography,
+  Box,
+  useTheme,
+  CircularProgress,
+  Alert,
+} from "@mui/material";
 
-// Sample mining data
-const miningData = [
-  { date: "2024-10-01", earnings: 12.5, costs: 8.2, hashRate: 45.2 },
-  { date: "2024-10-02", earnings: 14.3, costs: 8.2, hashRate: 47.1 },
-  { date: "2024-10-03", earnings: 11.8, costs: 8.2, hashRate: 43.5 },
-  { date: "2024-10-04", earnings: 15.6, costs: 8.2, hashRate: 48.9 },
-  { date: "2024-10-05", earnings: 13.2, costs: 8.2, hashRate: 46.3 },
-  { date: "2024-10-06", earnings: 16.8, costs: 8.2, hashRate: 51.2 },
-  { date: "2024-10-07", earnings: 12.9, costs: 8.2, hashRate: 44.8 },
-];
-
-console.log("Mining data loaded:", miningData);
+interface DailyPerformanceData {
+  date: string;
+  earnings: number;
+  costs: number;
+  hashRate: number;
+}
 
 interface MiningEarningsChartProps {
   title?: string;
   height?: number;
+  days?: number;
 }
 
 export default function MiningEarningsChart({
   title = "Mining Performance",
   height = 300,
+  days = 10, // Default to 10 days as per Luxor API request
 }: MiningEarningsChartProps) {
   const theme = useTheme();
+  const [miningData, setMiningData] = useState<DailyPerformanceData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Debug: Check if data exists
-  console.log("Chart rendering with data:", miningData);
-  console.log("Chart height:", height);
+  // Fetch mining performance data
+  useEffect(() => {
+    const fetchMiningData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        console.log(
+          `[MiningEarningsChart] Fetching ${days} days of mining performance data`,
+        );
+
+        const response = await fetch(
+          `/api/mining/daily-performance?days=${days}`,
+          {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+            },
+          },
+        );
+
+        if (!response.ok) {
+          throw new Error(
+            `Failed to fetch mining data: ${response.statusText}`,
+          );
+        }
+
+        const data = await response.json();
+
+        if (data.success && Array.isArray(data.data)) {
+          console.log(
+            `[MiningEarningsChart] Fetched ${data.data.length} days of performance data`,
+          );
+          console.log("[MiningEarningsChart] Summary:", data.summary);
+          setMiningData(data.data);
+        } else {
+          throw new Error(data.error || "Failed to fetch mining data");
+        }
+      } catch (err) {
+        const errorMsg =
+          err instanceof Error ? err.message : "Failed to fetch mining data";
+        console.error("[MiningEarningsChart] Error:", errorMsg);
+        setError(errorMsg);
+        setMiningData([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchMiningData();
+  }, [days]);
 
   return (
     <Paper
@@ -72,105 +126,169 @@ export default function MiningEarningsChart({
         {title}
       </Typography>
 
-      <Box sx={{ flex: 1, width: "100%", height: height }}>
-        <ResponsiveContainer width="100%" height={height}>
-          <BarChart
-            data={miningData}
-            margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
-          >
-            <defs>
-              <linearGradient id="earningsGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#00C6FF" stopOpacity={0.9} />
-                <stop offset="95%" stopColor="#00C6FF" stopOpacity={0.3} />
-              </linearGradient>
-              <linearGradient id="costsGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#FF6B6B" stopOpacity={0.9} />
-                <stop offset="95%" stopColor="#FF6B6B" stopOpacity={0.3} />
-              </linearGradient>
-            </defs>
+      {/* Loading State */}
+      {loading && (
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            height,
+          }}
+        >
+          <CircularProgress />
+        </Box>
+      )}
 
-            <CartesianGrid
-              strokeDasharray="3 3"
-              stroke={theme.palette.mode === "dark" ? "#333" : "#f0f0f0"}
-            />
+      {/* Error State */}
+      {error && !loading && (
+        <Box sx={{ height }}>
+          <Alert severity="error">{error}</Alert>
+        </Box>
+      )}
 
-            <XAxis
-              dataKey="date"
-              tick={{ fontSize: 12, fill: theme.palette.text.secondary }}
-              tickFormatter={(value: string | number) => {
-                try {
-                  return new Date(value).toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                  });
-                } catch {
-                  return String(value);
-                }
-              }}
-              height={60}
-            />
+      {/* No Data State */}
+      {!loading && !error && miningData.length === 0 && (
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            height,
+          }}
+        >
+          <Typography color="text.secondary">
+            No mining data available yet
+          </Typography>
+        </Box>
+      )}
 
-            <YAxis
-              tick={{ fontSize: 12, fill: theme.palette.text.secondary }}
-              domain={[0, "dataMax + 2"]}
-              label={{
-                value: "BTC (₿)",
-                angle: -90,
-                position: "insideLeft",
-                style: {
-                  textAnchor: "middle",
-                  fill: theme.palette.text.secondary,
-                },
-              }}
-            />
+      {/* Chart */}
+      {!loading && !error && miningData.length > 0 && (
+        <Box sx={{ flex: 1, width: "100%", height }}>
+          <ResponsiveContainer width="100%" height={height}>
+            <BarChart
+              data={miningData}
+              margin={{ top: 20, right: 30, left: 60, bottom: 80 }}
+            >
+              <defs>
+                <linearGradient
+                  id="earningsGradient"
+                  x1="0"
+                  y1="0"
+                  x2="0"
+                  y2="1"
+                >
+                  <stop offset="5%" stopColor="#00C6FF" stopOpacity={0.9} />
+                  <stop offset="95%" stopColor="#00C6FF" stopOpacity={0.3} />
+                </linearGradient>
+                <linearGradient id="costsGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#FF6B6B" stopOpacity={0.9} />
+                  <stop offset="95%" stopColor="#FF6B6B" stopOpacity={0.3} />
+                </linearGradient>
+              </defs>
 
-            <Tooltip
-              formatter={(value: number | string, name: string) => {
-                const num = Number(value);
-                return [
-                  `$${num.toFixed(2)}`,
-                  name === "earnings" ? "Earnings" : "Costs",
-                ];
-              }}
-              labelFormatter={(value) => {
-                try {
-                  return new Date(value).toLocaleDateString("en-US", {
-                    weekday: "long",
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                  });
-                } catch {
-                  return String(value);
-                }
-              }}
-              contentStyle={{
-                backgroundColor: theme.palette.background.paper,
-                border: `1px solid ${theme.palette.divider}`,
-                borderRadius: "8px",
-                boxShadow: theme.shadows[4],
-              }}
-            />
+              <CartesianGrid
+                strokeDasharray="3 3"
+                stroke={theme.palette.mode === "dark" ? "#333" : "#f0f0f0"}
+              />
 
-            <Legend />
+              <XAxis
+                dataKey="date"
+                tick={{ fontSize: 11, fill: theme.palette.text.secondary }}
+                tickFormatter={(value: string | number) => {
+                  try {
+                    const date = new Date(value);
+                    return date.toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                    });
+                  } catch {
+                    return String(value);
+                  }
+                }}
+                angle={-45}
+                textAnchor="end"
+                height={80}
+              />
 
-            <Bar
-              dataKey="earnings"
-              name="Earnings"
-              barSize={18}
-              radius={[6, 6, 0, 0]}
-              fill="url(#earningsGradient)"
-            />
-            {/* <Bar
-              dataKey="costs"
-              name="Costs"
-              barSize={18}
-              radius={[6, 6, 0, 0]}
-              fill="url(#costsGradient)"
-            /> */}
-          </BarChart>
-        </ResponsiveContainer>
-      </Box>
+              <YAxis
+                tick={{ fontSize: 11, fill: theme.palette.text.secondary }}
+                domain={[0, (dataMax: number) => dataMax * 1.2]}
+                label={{
+                  value: "Revenue (BTC ₿)",
+                  angle: -90,
+                  position: "left",
+                  offset: 10,
+                  style: {
+                    textAnchor: "middle",
+                    fill: theme.palette.text.secondary,
+                    fontSize: 12,
+                  },
+                }}
+                tickFormatter={(value) => {
+                  if (value === 0) return "0";
+                  if (value < 0.0001) {
+                    return value.toExponential(1);
+                  }
+                  return value.toFixed(4);
+                }}
+              />
+
+              <Tooltip
+                formatter={(value: number | string, name: string) => {
+                  const num = Number(value);
+                  if (name === "earnings" || name === "Daily Revenue (Luxor)") {
+                    const btcValue = num.toFixed(8);
+                    return [`₿${btcValue}`, "Daily Revenue (from Luxor API)"];
+                  }
+                  return [
+                    `${num.toFixed(8)}`,
+                    name === "costs" ? "Costs" : name,
+                  ];
+                }}
+                labelFormatter={(value) => {
+                  try {
+                    const date = new Date(value);
+                    return date.toLocaleDateString("en-US", {
+                      weekday: "short",
+                      year: "numeric",
+                      month: "short",
+                      day: "numeric",
+                    });
+                  } catch {
+                    return String(value);
+                  }
+                }}
+                contentStyle={{
+                  backgroundColor: theme.palette.background.paper,
+                  border: `1px solid ${theme.palette.divider}`,
+                  borderRadius: "8px",
+                  boxShadow: theme.shadows[4],
+                }}
+                cursor={{ fill: "rgba(0,198,255,0.1)" }}
+              />
+
+              <Legend />
+
+              <Bar
+                dataKey="earnings"
+                name="Daily Revenue (Luxor)"
+                barSize={18}
+                radius={[6, 6, 0, 0]}
+                fill="url(#earningsGradient)"
+              />
+              {/* <Bar
+                dataKey="costs"
+                name="Costs"
+                barSize={18}
+                radius={[6, 6, 0, 0]}
+                fill="url(#costsGradient)"
+              /> */}
+            </BarChart>
+          </ResponsiveContainer>
+        </Box>
+      )}
     </Paper>
   );
 }

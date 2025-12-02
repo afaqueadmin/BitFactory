@@ -388,9 +388,7 @@ export default function SpacesPage() {
               <Table>
                 <TableHead>
                   <TableRow sx={{ backgroundColor: "background.default" }}>
-                    <TableCell sx={{ fontWeight: "bold" }}>
-                      Space Name
-                    </TableCell>
+                    <TableCell sx={{ fontWeight: "bold" }}>Pool</TableCell>
                     <TableCell sx={{ fontWeight: "bold" }}>Location</TableCell>
                     <TableCell sx={{ fontWeight: "bold" }} align="center">
                       Capacity
