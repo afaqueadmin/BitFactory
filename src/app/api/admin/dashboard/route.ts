@@ -1,12 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
-import {
-  createLuxorClient,
-  LuxorError,
-  WorkersResponse,
-  HashrateEfficiencyResponse,
-} from "@/lib/luxor";
+import { WorkersResponse, HashrateEfficiencyResponse } from "@/lib/luxor";
 
 interface DashboardStats {
   // Database-backed stats
@@ -356,20 +351,13 @@ export async function GET(request: NextRequest) {
         },
       },
       orderBy: { createdAt: "desc" },
-      distinct: ["userId"],
-      select: { userId: true, balance: true },
+      select: { userId: true, amount: true },
     });
 
     const totalCustomerBalance = customerBalances.reduce(
-      (sum, p) => sum + (p.balance || 0),
+      (sum, p) => sum + (p.amount || 0),
       0,
     );
-    const positiveBalance = customerBalances
-      .filter((p) => (p.balance || 0) > 0)
-      .reduce((sum, p) => sum + (p.balance || 0), 0);
-    const negativeBalance = customerBalances
-      .filter((p) => (p.balance || 0) < 0)
-      .reduce((sum, p) => sum + Math.abs(p.balance || 0), 0);
 
     // Calculate monthly revenue from cost payments
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
