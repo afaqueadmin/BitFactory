@@ -53,7 +53,6 @@ export async function GET(request: NextRequest) {
         amount: true,
         consumption: true,
         type: true,
-        balance: true,
         createdAt: true,
       },
     });
@@ -62,30 +61,58 @@ export async function GET(request: NextRequest) {
       `[Cost Payments GET] Retrieved ${costPayments.length} payments for userId: ${userId}`,
     );
 
+    // Fetch all payments for this user to calculate running balance
+    const allPaymentsForBalance = await prisma.costPayment.findMany({
+      where: { userId },
+      orderBy: { createdAt: "asc" },
+      select: {
+        id: true,
+        amount: true,
+        type: true,
+      },
+    });
+
+    // Create a map of payment ID to calculated balance
+    const balanceMap = new Map<string, number>();
+    let runningBalance = 0;
+
+    for (const payment of allPaymentsForBalance) {
+      if (payment.type === "PAYMENT") {
+        // Payments increase balance
+        runningBalance += payment.amount;
+      } else if (payment.type === "ELECTRICITY_CHARGES") {
+        // Electricity charges decrease balance (amount is already negative)
+        runningBalance += payment.amount;
+      }
+      balanceMap.set(payment.id, runningBalance);
+    }
+
     // Transform the data to match the ElectricityData interface
-    const formattedPayments = costPayments.map((payment) => ({
-      id: payment.id,
-      date: new Date(payment.createdAt).toLocaleDateString("en-GB"),
-      type:
-        payment.type === "PAYMENT"
-          ? "Payment"
-          : payment.type === "ELECTRICITY_CHARGES"
-            ? "Electricity Charges"
-            : payment.type,
-      consumption:
-        payment.consumption > 0
-          ? `${payment.consumption.toFixed(2)} kWh`
-          : "N/A",
-      amount:
-        (payment.type === "PAYMENT" ? "+ " : "- ") +
-        `${Math.abs(payment.amount).toFixed(2)} $`,
-      balance: payment.balance
-        ? (payment.balance >= 0 ? "+ " : "- ") +
-          `${Math.abs(payment.balance).toFixed(2)} $`
-        : "N/A",
-      rawBalance: payment.balance,
-      rawAmount: payment.amount,
-    }));
+    const formattedPayments = costPayments.map((payment) => {
+      const calculatedBalance = balanceMap.get(payment.id) ?? 0;
+      return {
+        id: payment.id,
+        date: new Date(payment.createdAt).toLocaleDateString("en-GB"),
+        type:
+          payment.type === "PAYMENT"
+            ? "Payment"
+            : payment.type === "ELECTRICITY_CHARGES"
+              ? "Electricity Charges"
+              : payment.type,
+        consumption:
+          payment.consumption > 0
+            ? `${payment.consumption.toFixed(2)} kWh`
+            : "N/A",
+        amount:
+          (payment.type === "PAYMENT" ? "+ " : "- ") +
+          `${Math.abs(payment.amount).toFixed(2)} $`,
+        balance:
+          (calculatedBalance >= 0 ? "+ " : "- ") +
+          `${Math.abs(calculatedBalance).toFixed(2)} $`,
+        rawBalance: calculatedBalance,
+        rawAmount: payment.amount,
+      };
+    });
 
     return NextResponse.json(
       {
@@ -177,7 +204,6 @@ export async function POST(request: NextRequest) {
         amount,
         type,
         consumption: 0,
-        balance: null, // Will be calculated after fetching latest balance
       },
     });
 
@@ -185,58 +211,10 @@ export async function POST(request: NextRequest) {
       `[Cost Payment] Created payment entry: ${costPayment.id} for user: ${customerId}`,
     );
 
-    // Fetch the latest previous balance for this user
-    const latestBalance = await prisma.costPayment.findFirst({
-      where: { userId: customerId },
-      orderBy: { createdAt: "desc" },
-      skip: 1, // Skip the entry we just created
-      select: { balance: true },
-    });
-
-    console.log(`[Cost Payment] Latest balance for user ${customerId}:`, {
-      previousBalance: latestBalance?.balance ?? 0,
-    });
-
-    // Calculate new balance based on payment type
-    const previousBalance = latestBalance?.balance ?? 0;
-    let newBalance = previousBalance;
-
-    if (type === "PAYMENT") {
-      // Payment increases balance
-      newBalance = previousBalance + amount;
-      console.log(
-        `[Cost Payment] Payment type - New balance: ${previousBalance} + ${amount} = ${newBalance}`,
-      );
-    } else if (type === "ELECTRICITY_CHARGES") {
-      // Electricity charges decrease balance
-      newBalance = previousBalance - amount;
-      console.log(
-        `[Cost Payment] Electricity charges type - New balance: ${previousBalance} - ${amount} = ${newBalance}`,
-      );
-    } else {
-      // For unknown types, maintain the previous balance
-      console.warn(`[Cost Payment] Unknown payment type: ${type}`);
-    }
-
-    // Update the created payment entry with the new balance
-    const updatedPayment = await prisma.costPayment.update({
-      where: { id: costPayment.id },
-      data: { balance: newBalance },
-    });
-
-    console.log(
-      `[Cost Payment] Updated payment entry with balance: ${newBalance}`,
-    );
-
     return NextResponse.json(
       {
         message: "Payment added successfully",
-        payment: updatedPayment,
-        balanceInfo: {
-          previousBalance,
-          newBalance,
-          paymentType: type,
-        },
+        payment: costPayment,
       },
       { status: 201 },
     );

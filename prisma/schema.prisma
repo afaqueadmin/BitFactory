@@ -110,7 +110,6 @@ model CostPayment {
   amount        Float
   consumption   Float
   type          PaymentType
-  balance       Float?
   createdAt     DateTime      @default(now())
   user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
