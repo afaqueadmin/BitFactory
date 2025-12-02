@@ -356,6 +356,7 @@ export default function CustomerOverview() {
                 <TableRow>
                   <TableCell>Customer</TableCell>
                   <TableCell>Email</TableCell>
+                  <TableCell>Role</TableCell>
                   <TableCell>Wallet Address</TableCell>
                   <TableCell align="center">Miners</TableCell>
                   <TableCell align="center">Status</TableCell>
@@ -378,6 +379,7 @@ export default function CustomerOverview() {
                       {customer.name}
                     </TableCell>
                     <TableCell>{customer.email}</TableCell>
+                    <TableCell>{customer.role}</TableCell>
                     <TableCell>{customer.walletAddress ?? "Not Set"}</TableCell>
                     <TableCell align="center">{customer.miners}</TableCell>
                     <TableCell align="center">
