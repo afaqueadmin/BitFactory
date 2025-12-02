@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron_deduct_daily_cost",
+      "schedule": "0 0 * * *"
+    }
+  ]
+}
