@@ -63,8 +63,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { name, email, role, sendEmail, groupIds, initialDeposit } =
-      await request.json();
+    const {
+      name,
+      email,
+      role,
+      sendEmail,
+      groupIds,
+      initialDeposit,
+      luxorSubaccountName,
+    } = await request.json();
 
     // Validate input
     if (!name || !email || !role) {
@@ -74,17 +81,29 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate groupIds - must be provided and be a non-empty array
-    if (!Array.isArray(groupIds) || groupIds.length === 0) {
-      return NextResponse.json(
-        { error: "At least one group must be selected" },
-        { status: 400 },
-      );
+    // Validate groupIds - must be provided and be a non-empty array (only for CLIENT role)
+    if (role === "CLIENT") {
+      if (!Array.isArray(groupIds) || groupIds.length === 0) {
+        return NextResponse.json(
+          { error: "At least one group must be selected for CLIENT users" },
+          { status: 400 },
+        );
+      }
+
+      if (!luxorSubaccountName || luxorSubaccountName.trim().length === 0) {
+        return NextResponse.json(
+          { error: "A Luxor subaccount must be selected for CLIENT users" },
+          { status: 400 },
+        );
+      }
     }
 
     console.log(
-      `[User Create API] Creating user "${name}" with groupIds:`,
-      groupIds,
+      `[User Create API] Creating user "${name}" with role: ${role}${
+        role === "CLIENT"
+          ? `, groupIds: ${JSON.stringify(groupIds)}, subaccount: ${luxorSubaccountName}`
+          : ""
+      }`,
     );
 
     // Check if email is already in use
@@ -143,138 +162,17 @@ export async function POST(request: NextRequest) {
         // Don't fail user creation if payment entry creation fails
       }
     }
-    // Mirrors the exact flow from the Subaccounts page:
-    // 1. Admin selects one or more groups from /api/luxor?endpoint=workspace
-    // 2. For each selected group, call POST /api/luxor with:
-    //    - endpoint: "subaccount"
-    //    - groupId: <selected-group-id>
-    //    - name: <subaccount-name> (uses the user's name)
-    // 3. Handle errors gracefully per group (don't stop if one fails)
-    // 4. Store the returned subaccount name in the database
-    // 5. Return summary of successes/failures
-    const luxorCreationResults: {
-      groupId: string;
-      success: boolean;
-      error?: string;
-      subaccountName?: string;
-    }[] = [];
-    let createdSubaccountName: string | undefined;
 
-    for (const groupId of groupIds) {
-      try {
-        console.log(
-          `[User Create API] Creating Luxor subaccount "${name}" in group: ${groupId}`,
-        );
-
-        // Validate groupId format (should be UUID-like)
-        if (
-          !groupId ||
-          typeof groupId !== "string" ||
-          groupId.trim().length === 0
-        ) {
-          console.error(
-            `[User Create API] Invalid groupId format: ${JSON.stringify(groupId)}`,
-          );
-          luxorCreationResults.push({
-            groupId: String(groupId),
-            success: false,
-            error: "Invalid group ID format",
-          });
-          continue;
-        }
-
-        // Use the same API endpoint as the Subaccounts page:
-        // POST /api/luxor with endpoint: "subaccount"
-        const luxorResponse = await fetch(
-          `${request.nextUrl.origin}/api/luxor`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              // Forward the admin's auth token to the Luxor proxy
-              Cookie: request.headers.get("cookie") || "",
-            },
-            body: JSON.stringify({
-              endpoint: "subaccount",
-              groupId,
-              name,
-            }),
-          },
-        );
-
-        const luxorData: ProxyResponse<{
-          id: number;
-          name: string;
-          created_at: string;
-          url: string;
-        }> = await luxorResponse.json();
-
-        console.log(
-          `[User Create API] Luxor API response for group ${groupId}:`,
-          {
-            status: luxorResponse.status,
-            success: luxorData.success,
-            error: luxorData.error,
-            subaccountName: luxorData.data?.name,
-          },
-        );
-
-        if (!luxorResponse.ok || !luxorData.success) {
-          const errorMsg =
-            luxorData.error || `API returned status ${luxorResponse.status}`;
-          console.warn(
-            `[User Create API] Failed to create subaccount in group ${groupId}: ${errorMsg}`,
-          );
-          luxorCreationResults.push({
-            groupId,
-            success: false,
-            error: errorMsg,
-          });
-        } else {
-          const subaccountName = luxorData.data?.name;
-          console.log(
-            `[User Create API] Subaccount created successfully in group ${groupId}, name: ${subaccountName}`,
-          );
-          // Store the first successful subaccount name
-          if (!createdSubaccountName && subaccountName) {
-            createdSubaccountName = subaccountName;
-          }
-          luxorCreationResults.push({
-            groupId,
-            success: true,
-            subaccountName,
-          });
-        }
-      } catch (groupError) {
-        const errorMsg =
-          groupError instanceof Error
-            ? groupError.message
-            : "Unknown error occurred";
-        console.error(
-          `[User Create API] Exception creating subaccount in group ${groupId}:`,
-          errorMsg,
-        );
-        luxorCreationResults.push({
-          groupId,
-          success: false,
-          error: errorMsg,
-        });
-      }
-    }
-
-    // Check if any subaccount creation succeeded
-    const successCount = luxorCreationResults.filter((r) => r.success).length;
-    const failureCount = luxorCreationResults.filter((r) => !r.success).length;
-
-    // Update user with the created subaccount name
-    if (createdSubaccountName) {
+    // For CLIENT role, assign the selected Luxor subaccount
+    // (subaccount already exists in Luxor, we're just assigning it to this user)
+    if (role === "CLIENT" && luxorSubaccountName) {
       try {
         await prisma.user.update({
           where: { id: newUser.id },
-          data: { luxorSubaccountName: createdSubaccountName },
+          data: { luxorSubaccountName: luxorSubaccountName.trim() },
         });
         console.log(
-          `[User Create API] Updated user ${newUser.id} with luxorSubaccountName: ${createdSubaccountName}`,
+          `[User Create API] Assigned luxorSubaccountName "${luxorSubaccountName}" to user ${newUser.id}`,
         );
       } catch (updateError) {
         console.error(
@@ -283,18 +181,6 @@ export async function POST(request: NextRequest) {
         );
         // Don't fail user creation if this update fails
       }
-    }
-
-    // Log creation summary
-    if (failureCount > 0) {
-      console.warn(
-        `[User Create API] Subaccount creation summary: ${successCount} succeeded, ${failureCount} failed`,
-        luxorCreationResults,
-      );
-    } else {
-      console.log(
-        `[User Create API] All subaccounts created successfully in ${successCount} group(s)`,
-      );
     }
 
     // Log the user creation activity
@@ -323,18 +209,9 @@ export async function POST(request: NextRequest) {
           name: newUser.name,
           email: newUser.email,
           role: newUser.role,
+          luxorSubaccountName: role === "CLIENT" ? luxorSubaccountName : null,
         },
         tempPassword, //@TODO: In production, this should be sent via email instead
-        luxorCreationResults,
-        luxorSummary: {
-          successCount,
-          failureCount,
-          totalAttempted: groupIds.length,
-          note:
-            failureCount > 0
-              ? "Some Luxor subaccounts failed to create. Check group configuration and group IDs."
-              : "All Luxor subaccounts created successfully",
-        },
       },
       { status: 201 },
     );
