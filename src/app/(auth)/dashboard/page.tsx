@@ -327,7 +327,11 @@ export default function DashboardPage() {
             Total overview of your Hosted Miners
           </Typography>
 
-          <MiningEarningsChart title="Daily Mining Performance" height={400} />
+          <MiningEarningsChart
+            title="Daily Mining Performance"
+            height={400}
+            days={10}
+          />
         </Box>
       </Container>
     </Box>

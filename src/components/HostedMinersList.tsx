@@ -24,8 +24,6 @@ interface MinerData {
   connectedPool: string;
   status: "Active" | "Inactive";
   hashRate?: string;
-  temperature?: string;
-  uptime?: string;
 }
 
 // Filter type
@@ -41,8 +39,6 @@ const dummyMiners: MinerData[] = [
     connectedPool: "Default",
     status: "Active",
     hashRate: "195 TH/s",
-    temperature: "72°C",
-    uptime: "15d 4h 23m",
   },
   {
     id: "2",
@@ -52,8 +48,6 @@ const dummyMiners: MinerData[] = [
     connectedPool: "Default",
     status: "Inactive",
     hashRate: "0 TH/s",
-    temperature: "N/A",
-    uptime: "0d 0h 0m",
   },
   {
     id: "3",
@@ -63,8 +57,6 @@ const dummyMiners: MinerData[] = [
     connectedPool: "Default",
     status: "Active",
     hashRate: "200 TH/s",
-    temperature: "68°C",
-    uptime: "22d 12h 45m",
   },
   {
     id: "4",
@@ -74,8 +66,6 @@ const dummyMiners: MinerData[] = [
     connectedPool: "Default",
     status: "Inactive",
     hashRate: "0 TH/s",
-    temperature: "N/A",
-    uptime: "0d 0h 0m",
   },
   {
     id: "5",
@@ -85,8 +75,6 @@ const dummyMiners: MinerData[] = [
     connectedPool: "Default",
     status: "Active",
     hashRate: "234 TH/s",
-    temperature: "70°C",
-    uptime: "8d 16h 12m",
   },
 ];
 
@@ -177,7 +165,7 @@ export default function HostedMinersList() {
             model: string;
             status: string;
             hashRate: number;
-            space?: { location: string };
+            space?: { location: string; name: string };
           }) => {
             // Get Luxor worker data if available
             const luxorWorker = luxorWorkers.get(miner.name);
@@ -188,12 +176,10 @@ export default function HostedMinersList() {
               model: miner.model,
               workerName: miner.name,
               location: miner.space?.location || "Unknown",
-              connectedPool: "Default",
+              connectedPool: miner.space?.name || "Unknown",
               // Priority: Luxor API status > Database status
               status: luxorStatus === "ACTIVE" ? "Active" : "Inactive",
               hashRate: `${luxorWorker?.hashrate || miner.hashRate} TH/s`,
-              temperature: "N/A",
-              uptime: "N/A",
             };
           },
         );
@@ -411,32 +397,6 @@ export default function HostedMinersList() {
                       </Typography>
                       <Typography variant="body1" fontWeight="500">
                         {miner.hashRate || "N/A"}
-                      </Typography>
-                    </Box>
-
-                    <Box>
-                      <Typography
-                        variant="body2"
-                        color="text.secondary"
-                        sx={{ mb: 0.5 }}
-                      >
-                        Temperature
-                      </Typography>
-                      <Typography variant="body1" fontWeight="500">
-                        {miner.temperature || "N/A"}
-                      </Typography>
-                    </Box>
-
-                    <Box>
-                      <Typography
-                        variant="body2"
-                        color="text.secondary"
-                        sx={{ mb: 0.5 }}
-                      >
-                        Uptime
-                      </Typography>
-                      <Typography variant="body1" fontWeight="500">
-                        {miner.uptime || "N/A"}
                       </Typography>
                     </Box>
 

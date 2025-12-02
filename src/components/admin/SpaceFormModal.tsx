@@ -212,7 +212,7 @@ export default function SpaceFormModal({
         <Box component="form" onSubmit={handleSubmit} sx={{ mt: 2 }}>
           <TextField
             fullWidth
-            label="Space Name"
+            label="Pool"
             name="name"
             value={formData.name}
             onChange={handleChange}
