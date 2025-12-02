@@ -35,7 +35,7 @@
 - **Street Address** - Physical address
 - **City** - City of residence
 - **Country** - Country of residence
-- **Wallet Address** - Cryptocurrency wallet (26-35 characters)
+- **Wallet Address** - Cryptocurrency wallet (26-70 characters)
 
 ## API Endpoints
 

@@ -240,7 +240,7 @@ export default function EditCustomerModal({
                   walletAddress: e.target.value,
                 }))
               }
-              helperText="Must be between 26 and 35 characters"
+              helperText="Must be between 26 and 70 characters"
             />
           </Box>
         </DialogContent>

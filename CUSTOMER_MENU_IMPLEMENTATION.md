@@ -10,7 +10,7 @@ Successfully implemented a menu-driven customer management system with Edit, Cha
 - **Features**:
   - Modal dialog for editing customer details
   - Fields include: Name, Email (disabled), Phone, Company Name, Street Address, City, Country, and Wallet Address
-  - Wallet Address field includes validation helper text (26-35 characters)
+  - Wallet Address field includes validation helper text (26-70 characters)
   - API call to update user information
   - Success notification with auto-dismiss
   - Error handling with user feedback
