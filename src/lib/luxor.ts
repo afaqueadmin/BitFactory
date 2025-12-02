@@ -409,6 +409,165 @@ export class LuxorClient {
       "DELETE",
     );
   }
+
+  /**
+   * Get payment settings for subaccounts
+   *
+   * @param currency - Mining currency (BTC, DOGE, etc.)
+   * @param params - Optional query parameters (page_number, page_size, subaccount_names, site_id)
+   * @returns Payment settings for the specified subaccounts
+   * @throws LuxorError on API errors
+   *
+   * @example
+   * const settings = await client.getPaymentSettings('BTC', {
+   *   page_number: 1,
+   *   page_size: 10
+   * });
+   */
+  async getPaymentSettings(
+    currency: string,
+    params?: Record<string, string | number>,
+  ): Promise<PaymentSettingsResponse> {
+    console.log(`[Luxor] Getting payment settings for currency: ${currency}`);
+    return this.request<PaymentSettingsResponse>(
+      `/pool/payment-settings/${currency}`,
+      params,
+      "GET",
+    );
+  }
+
+  /**
+   * Get payment settings for a specific subaccount
+   *
+   * @param currency - Mining currency (BTC, DOGE, etc.)
+   * @param subaccountName - Name of the subaccount
+   * @returns Payment settings for the subaccount
+   * @throws LuxorError on API errors
+   *
+   * @example
+   * const settings = await client.getSubaccountPaymentSettings('BTC', 'my_subaccount');
+   */
+  async getSubaccountPaymentSettings(
+    currency: string,
+    subaccountName: string,
+  ): Promise<SubaccountPaymentSettingsResponse> {
+    console.log(
+      `[Luxor] Getting payment settings for subaccount: ${subaccountName}`,
+    );
+    return this.request<SubaccountPaymentSettingsResponse>(
+      `/pool/payment-settings/${currency}/${subaccountName}`,
+      undefined,
+      "GET",
+    );
+  }
+
+  /**
+   * Create payment settings for a subaccount
+   *
+   * Creates or updates payment settings with wallet address and payment frequency.
+   *
+   * @param currency - Mining currency (BTC, DOGE, etc.)
+   * @param subaccountName - Name of the subaccount
+   * @param settings - Payment settings configuration
+   * @returns Action response that may require approval
+   * @throws LuxorError on API errors
+   *
+   * @example
+   * const action = await client.createPaymentSettings('BTC', 'my_subaccount', {
+   *   payment_frequency: 'DAILY',
+   *   day_of_week: 'MONDAY',
+   *   addresses: [{
+   *     address_id: 0,
+   *     address_name: 'wallet_1',
+   *     external_address: '1A1z7agoat3...',
+   *     revenue_allocation: 100
+   *   }]
+   * });
+   */
+  async createPaymentSettings(
+    currency: string,
+    subaccountName: string,
+    settings: PaymentSettingsRequest,
+  ): Promise<PaymentSettingsActionResponse> {
+    console.log(
+      `[Luxor] Creating payment settings for subaccount: ${subaccountName}`,
+    );
+    return this.request<PaymentSettingsActionResponse>(
+      `/pool/payment-settings/${currency}/${subaccountName}`,
+      undefined,
+      "POST",
+      settings as unknown as Record<string, unknown>,
+    );
+  }
+
+  /**
+   * Update payment settings for a subaccount
+   *
+   * Updates existing payment settings with wallet address and payment frequency.
+   *
+   * @param currency - Mining currency (BTC, DOGE, etc.)
+   * @param subaccountName - Name of the subaccount
+   * @param settings - Payment settings configuration
+   * @returns Action response that may require approval
+   * @throws LuxorError on API errors
+   *
+   * @example
+   * const action = await client.updatePaymentSettings('BTC', 'my_subaccount', {
+   *   wallet_id: 1,
+   *   payment_frequency: 'WEEKLY',
+   *   day_of_week: 'FRIDAY',
+   *   addresses: [{
+   *     address_id: 0,
+   *     address_name: 'wallet_1',
+   *     external_address: '1A1z7agoat3...',
+   *     revenue_allocation: 100
+   *   }]
+   * });
+   */
+  async updatePaymentSettings(
+    currency: string,
+    subaccountName: string,
+    settings: PaymentSettingsRequest,
+  ): Promise<PaymentSettingsActionResponse> {
+    console.log(
+      `[Luxor] Updating payment settings for subaccount: ${subaccountName}`,
+    );
+    return this.request<PaymentSettingsActionResponse>(
+      `/pool/payment-settings/${currency}/${subaccountName}`,
+      undefined,
+      "PUT",
+      settings as unknown as Record<string, unknown>,
+    );
+  }
+
+  /**
+   * Get transaction history
+   *
+   * @param currency - Mining currency (BTC, DOGE, etc.)
+   * @param params - Query parameters (start_date, end_date, transaction_type, page_number, page_size, subaccount_names, group_id)
+   * @returns Transaction history for the specified period
+   * @throws LuxorError on API errors
+   *
+   * @example
+   * const transactions = await client.getTransactions('BTC', {
+   *   start_date: '2025-01-01',
+   *   end_date: '2025-01-31',
+   *   transaction_type: 'debit',
+   *   page_number: 1,
+   *   page_size: 10
+   * });
+   */
+  async getTransactions(
+    currency: string,
+    params?: Record<string, string | number>,
+  ): Promise<TransactionsResponse> {
+    console.log(`[Luxor] Getting transactions for currency: ${currency}`);
+    return this.request<TransactionsResponse>(
+      `/pool/transactions/${currency}`,
+      params,
+      "GET",
+    );
+  }
 }
 
 /**
@@ -964,6 +1123,185 @@ export interface AddSubaccountResponse {
 export interface RemoveSubaccountResponse extends WorkspaceAction {}
 
 // ============================================================================
+// Payment APIs - Types
+// ============================================================================
+
+/**
+ * Payment address configuration
+ */
+export interface PaymentAddress {
+  address_id: number;
+  address_name: string;
+  external_address: string;
+  revenue_allocation: number;
+}
+
+/**
+ * Subaccount payment settings information
+ */
+export interface SubaccountPaymentInfo {
+  id: number;
+  name: string;
+  site?: {
+    id: string;
+    name: string;
+  } | null;
+  created_at?: string;
+  url?: string;
+}
+
+/**
+ * Payment Settings Response
+ *
+ * Response from GET /pool/payment-settings/{currency}
+ * Returns a list of payment settings for subaccounts
+ */
+export interface PaymentSettingsResponse {
+  payment_settings: {
+    currency_type: "BTC" | "LTC_DOGE" | "SC" | "ZEC" | "ZEN" | "LTC" | "DOGE";
+    subaccount: SubaccountPaymentInfo;
+    balance: number;
+    status:
+      | "UNSPECIFIED"
+      | "LOCKED"
+      | "THRESHOLD_NOT_REACHED"
+      | "THRESHOLD_REACHED"
+      | "PENDING_APPROVAL"
+      | "PROCESSING"
+      | "FROZEN"
+      | "WALLET_NOT_CREATED";
+    wallet_id: number;
+    payment_frequency: "UNSPECIFIED" | "DAILY" | "WEEKLY" | "MONTHLY";
+    day_of_week:
+      | "UNSPECIFIED"
+      | "MONDAY"
+      | "TUESDAY"
+      | "WEDNESDAY"
+      | "THURSDAY"
+      | "FRIDAY"
+      | "SATURDAY"
+      | "SUNDAY";
+    addresses: PaymentAddress[];
+    next_payout_at?: string;
+    frozen_until?: string;
+    pool_discount_rate?: number;
+  }[];
+  pagination: {
+    page_number: number;
+    page_size: number;
+    item_count: number;
+    previous_page_url: string | null;
+    next_page_url: string | null;
+  };
+}
+
+/**
+ * Subaccount Payment Settings Response
+ *
+ * Response from GET /pool/payment-settings/{currency}/{subaccountName}
+ * Returns payment settings for a specific subaccount
+ */
+export interface SubaccountPaymentSettingsResponse {
+  currency_type:
+    | "UNSPECIFIED"
+    | "BTC"
+    | "LTC_DOGE"
+    | "SC"
+    | "ZEC"
+    | "ZEN"
+    | "LTC"
+    | "DOGE";
+  subaccount: {
+    id: number;
+    name: string;
+    created_at: string;
+    url: string;
+  };
+  balance: number;
+  status:
+    | "UNSPECIFIED"
+    | "LOCKED"
+    | "THRESHOLD_NOT_REACHED"
+    | "THRESHOLD_REACHED"
+    | "PENDING_APPROVAL"
+    | "PROCESSING"
+    | "FROZEN"
+    | "WALLET_NOT_CREATED";
+  wallet_id: number;
+  payment_frequency: "UNSPECIFIED" | "DAILY" | "WEEKLY" | "MONTHLY";
+  day_of_week:
+    | "UNSPECIFIED"
+    | "MONDAY"
+    | "TUESDAY"
+    | "WEDNESDAY"
+    | "THURSDAY"
+    | "FRIDAY"
+    | "SATURDAY"
+    | "SUNDAY";
+  addresses: PaymentAddress[];
+  next_payout_at?: string;
+  frozen_until?: string;
+}
+
+/**
+ * Transaction information
+ */
+export interface Transaction {
+  currency_type: "BTC" | "LTC_DOGE" | "SC" | "ZEC" | "LTC" | "DOGE";
+  date_time: string;
+  address_name: string;
+  subaccount_name: string;
+  transaction_category: string;
+  currency_amount: number;
+  usd_equivalent: number;
+  transaction_id: string;
+  transaction_type: "debit" | "credit";
+}
+
+/**
+ * Transactions Response
+ *
+ * Response from GET /pool/transactions/{currency}
+ * Returns transaction history for subaccounts
+ */
+export interface TransactionsResponse {
+  transactions: Transaction[];
+  pagination: {
+    page_number: number;
+    page_size: number;
+    item_count: number;
+    previous_page_url: string | null;
+    next_page_url: string | null;
+  };
+}
+
+/**
+ * Create/Update Payment Settings Request
+ */
+export interface PaymentSettingsRequest {
+  payment_frequency?: "DAILY" | "WEEKLY" | "MONTHLY";
+  day_of_week?:
+    | "MONDAY"
+    | "TUESDAY"
+    | "WEDNESDAY"
+    | "THURSDAY"
+    | "FRIDAY"
+    | "SATURDAY"
+    | "SUNDAY";
+  wallet_id?: number;
+  addresses: PaymentAddress[];
+}
+
+/**
+ * Payment Settings Action Response
+ *
+ * Response from POST/PUT /pool/payment-settings/{currency}/{subaccountName}
+ * Returns a WorkspaceAction that may require approval
+ */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface PaymentSettingsActionResponse extends WorkspaceAction {}
+
+// ============================================================================
 // Endpoint Mapping and Documentation
 // ============================================================================
 
@@ -997,6 +1335,8 @@ export const LUXOR_ENDPOINTS = {
   "group-update": "/workspace/groups",
   "group-delete": "/workspace/groups",
   subaccount: "/pool/groups",
+  "payment-settings": "/pool/payment-settings",
+  transactions: "/pool/transactions",
   // ⬇️ ADD NEW ENDPOINTS HERE ⬇️
   // Example: 'earnings': '/earnings',
   // Example: 'pool-stats': '/pool/stats',

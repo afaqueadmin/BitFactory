@@ -1,42 +1,57 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Box, Typography, Paper } from "@mui/material";
+import { Box, Typography, Paper, CircularProgress } from "@mui/material";
 import ElectricityCostTable from "@/components/ElectricityCostTable";
+import TransactionHistory from "@/components/TransactionHistory";
 import { formatValue } from "@/lib/helpers/formatValue";
 import { useUser } from "@/lib/hooks/useUser";
 
+interface EarningsSummary {
+  totalEarnings: { btc: number; usd: number };
+  pendingPayouts: { btc: number; usd: number };
+  currency: string;
+  dataSource: string;
+  timestamp: string;
+  subaccountCount: number;
+}
+
 export default function WalletPage() {
-  const [pendingPayoutsInUsd, setPendingPayoutsInUsd] = useState<string | null>(
-    null,
-  );
-  const [totalEarningsInUsd, setTotalEarningsInUsd] = useState<string | null>(
-    null,
-  );
+  const [summary, setSummary] = useState<EarningsSummary | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const { user } = useUser();
 
   useEffect(() => {
-    // Function to fetch BTC price and calculate USD values
-    const fetchCurrentBtcPrice = async () => {
+    // Fetch earnings summary from API
+    const fetchEarningsSummary = async () => {
       try {
-        const response = await fetch("/api/btcprice");
+        setIsLoading(true);
+        setError(null);
+
+        const response = await fetch("/api/wallet/earnings-summary");
 
         if (!response.ok) {
-          setTotalEarningsInUsd("Unavailable");
-          setPendingPayoutsInUsd("Unavailable");
-          return;
+          throw new Error(
+            `Failed to fetch earnings summary: ${response.statusText}`,
+          );
         }
 
-        const data = await response.json();
-        setPendingPayoutsInUsd(formatValue(1 * data.price, "currency")); // Example conversion, replace the 1 with actual user BTC amount
-        setTotalEarningsInUsd(formatValue(2 * data.price, "currency")); // Example conversion, replace the 2 with actual user BTC amount
+        const data: EarningsSummary = await response.json();
+        setSummary(data);
+        console.log("[Wallet] Earnings summary loaded:", data);
       } catch (error) {
-        console.error("Error fetching BTC data:", error);
+        const errorMessage =
+          error instanceof Error ? error.message : "Unknown error";
+        console.error("[Wallet] Error fetching earnings summary:", error);
+        setError(errorMessage);
+      } finally {
+        setIsLoading(false);
       }
     };
 
     // Call the API immediately on component mount
-    fetchCurrentBtcPrice();
+    fetchEarningsSummary();
   }, []);
 
   return (
@@ -58,6 +73,22 @@ export default function WalletPage() {
         Overview of your mining earnings and transactions.
       </Typography>
 
+      {error && (
+        <Paper
+          sx={{
+            p: 2,
+            mt: 2,
+            backgroundColor: "#ffebee",
+            borderLeft: "4px solid #d32f2f",
+            color: "#d32f2f",
+          }}
+        >
+          <Typography variant="body2">
+            <strong>Error loading earnings:</strong> {error}
+          </Typography>
+        </Paper>
+      )}
+
       <Box sx={{ display: "flex", gap: 3, mt: 2, flexWrap: "wrap" }}>
         <Box sx={{ flex: "1 1 300px", minWidth: "300px" }}>
           <Paper
@@ -70,20 +101,29 @@ export default function WalletPage() {
             }}
           >
             <Typography variant="subtitle1">Total Earnings</Typography>
-            <Box
-              sx={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
-            >
-              <Typography variant="h5" fontWeight="bold">
-                ₿ 0.00
-              </Typography>
-              <Typography variant="h5" fontWeight="bold">
-                {totalEarningsInUsd}
-              </Typography>
-            </Box>
+            {isLoading ? (
+              <Box
+                sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1 }}
+              >
+                <CircularProgress size={24} sx={{ color: "white" }} />
+                <Typography variant="body2">Loading...</Typography>
+              </Box>
+            ) : (
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <Typography variant="h5" fontWeight="bold">
+                  ₿ {summary?.totalEarnings.btc.toFixed(8) ?? "0.00"}
+                </Typography>
+                <Typography variant="h5" fontWeight="bold">
+                  ${summary?.totalEarnings.usd.toFixed(2) ?? "0.00"}
+                </Typography>
+              </Box>
+            )}
           </Paper>
         </Box>
 
@@ -98,20 +138,29 @@ export default function WalletPage() {
             }}
           >
             <Typography variant="subtitle1">Pending Payouts</Typography>
-            <Box
-              sx={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
-            >
-              <Typography variant="h5" fontWeight="bold">
-                ₿ 0.00
-              </Typography>
-              <Typography variant="h5" fontWeight="bold">
-                {pendingPayoutsInUsd}
-              </Typography>
-            </Box>
+            {isLoading ? (
+              <Box
+                sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1 }}
+              >
+                <CircularProgress size={24} sx={{ color: "white" }} />
+                <Typography variant="body2">Loading...</Typography>
+              </Box>
+            ) : (
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <Typography variant="h5" fontWeight="bold">
+                  ₿ {summary?.pendingPayouts.btc.toFixed(8) ?? "0.00"}
+                </Typography>
+                <Typography variant="h5" fontWeight="bold">
+                  ${summary?.pendingPayouts.usd.toFixed(2) ?? "0.00"}
+                </Typography>
+              </Box>
+            )}
           </Paper>
         </Box>
         <Box sx={{ flex: "1 1 300px", minWidth: "300px" }}>
@@ -131,6 +180,9 @@ export default function WalletPage() {
           </Paper>
         </Box>
       </Box>
+
+      {/* Transaction History */}
+      <TransactionHistory limit={50} />
 
       {/* Electricity Cost Table */}
       <ElectricityCostTable />
