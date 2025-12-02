@@ -96,68 +96,115 @@ export default function HostedMinersList() {
   const [miners, setMiners] = useState<MinerData[]>(dummyMiners);
   const [loading, setLoading] = useState(true);
 
-  // Fetch miners from API on component mount
+  // Fetch miners from API and enrich with Luxor worker status
   useEffect(() => {
     const fetchMiners = async () => {
       try {
         setLoading(true);
-        const response = await fetch("/api/miners/user", {
+
+        // Step 1: Fetch miners from database
+        const minerResponse = await fetch("/api/miners/user", {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
           },
         });
 
-        if (!response.ok) {
+        if (!minerResponse.ok) {
           console.error("Failed to fetch miners from API");
-          // Use dummy data as fallback
           setMiners(dummyMiners);
           return;
         }
 
-        const data = await response.json();
+        const minerData = await minerResponse.json();
 
         if (
-          data.miners &&
-          Array.isArray(data.miners) &&
-          data.miners.length > 0
+          !minerData.miners ||
+          !Array.isArray(minerData.miners) ||
+          minerData.miners.length === 0
         ) {
-          // Transform API data to match MinerData interface
-          const transformedMiners: MinerData[] = data.miners.map(
-            (miner: {
-              id: string;
-              name: string;
-              model: string;
-              status: string;
-              hashRate: number;
-              space?: { location: string };
-            }) => ({
+          setMiners(dummyMiners);
+          return;
+        }
+
+        // Step 2: Fetch worker status from Luxor API
+        const luxorWorkers: Map<string, { status: string; hashrate: number }> =
+          new Map();
+        try {
+          const luxorResponse = await fetch(
+            "/api/luxor?endpoint=workers&currency=BTC&page_size=1000",
+            {
+              method: "GET",
+              headers: {
+                "Content-Type": "application/json",
+              },
+            },
+          );
+
+          if (luxorResponse.ok) {
+            const luxorData = await luxorResponse.json();
+            // Build a map of worker names to their status from Luxor
+            if (
+              luxorData.success &&
+              luxorData.data?.workers &&
+              Array.isArray(luxorData.data.workers)
+            ) {
+              luxorData.data.workers.forEach(
+                (worker: {
+                  name: string;
+                  status: string;
+                  hashrate: number;
+                }) => {
+                  luxorWorkers.set(worker.name, {
+                    status: worker.status,
+                    hashrate: worker.hashrate || 0,
+                  });
+                },
+              );
+            }
+          } else {
+            console.warn("Failed to fetch worker status from Luxor API");
+          }
+        } catch (luxorErr) {
+          console.warn("Error fetching Luxor workers:", luxorErr);
+        }
+
+        // Step 3: Transform and merge data
+        const transformedMiners: MinerData[] = minerData.miners.map(
+          (miner: {
+            id: string;
+            name: string;
+            model: string;
+            status: string;
+            hashRate: number;
+            space?: { location: string };
+          }) => {
+            // Get Luxor worker data if available
+            const luxorWorker = luxorWorkers.get(miner.name);
+            const luxorStatus = luxorWorker?.status || miner.status;
+
+            return {
               id: miner.id,
               model: miner.model,
               workerName: miner.name,
               location: miner.space?.location || "Unknown",
               connectedPool: "Default",
-              status: miner.status === "ACTIVE" ? "Active" : "Inactive",
-              hashRate: `${miner.hashRate} TH/s`,
+              // Priority: Luxor API status > Database status
+              status: luxorStatus === "ACTIVE" ? "Active" : "Inactive",
+              hashRate: `${luxorWorker?.hashrate || miner.hashRate} TH/s`,
               temperature: "N/A",
               uptime: "N/A",
-            }),
-          );
+            };
+          },
+        );
 
-          // Merge API data with dummy data
-          // const mergedMiners = [...transformedMiners, ...dummyMiners];
-          // Remove duplicates based on ID
-          const uniqueMiners = Array.from(
-            new Map(transformedMiners.map((m) => [m.id, m])).values(),
-          );
-          setMiners(uniqueMiners);
-        } else {
-          // Use dummy data if no miners from API
-          setMiners(dummyMiners);
-        }
+        // Remove duplicates based on ID
+        const uniqueMiners = Array.from(
+          new Map(transformedMiners.map((m) => [m.id, m])).values(),
+        );
+        setMiners(uniqueMiners);
       } catch (err) {
         console.error("Error fetching miners:", err);
-        // Use dummy data as fallback
         setMiners(dummyMiners);
       } finally {
         setLoading(false);
