@@ -390,11 +390,209 @@ export default function WorkersPage() {
   );
 
   /**
-   * Fetch groups on component mount
+   * Fetch groups on component mount and load all workers by default
    */
   useEffect(() => {
-    fetchGroups();
-  }, [fetchGroups]);
+    const initializeWorkers = async () => {
+      // First fetch groups
+      try {
+        console.log("[Luxor Workers] Initializing - fetching groups...");
+        const groupResponse = await fetch("/api/luxor?endpoint=workspace");
+
+        if (!groupResponse.ok) {
+          throw new Error(`API returned status ${groupResponse.status}`);
+        }
+
+        const groupData: ProxyResponse<Record<string, unknown>> =
+          await groupResponse.json();
+
+        if (!groupData.success) {
+          throw new Error(groupData.error || "Failed to fetch groups");
+        }
+
+        // Extract groups array from workspace data
+        const workspaceData = groupData.data as Record<string, unknown>;
+        let groupsList: GetGroupResponse[] = [];
+
+        if (workspaceData && Array.isArray(workspaceData.groups)) {
+          groupsList = (
+            workspaceData.groups as Array<Record<string, unknown>>
+          ).map(
+            (group: Record<string, unknown>) =>
+              ({
+                id: String(group.id || ""),
+                name: String(group.name || ""),
+                type:
+                  (group.type as
+                    | "UNSPECIFIED"
+                    | "POOL"
+                    | "DERIVATIVES"
+                    | "HARDWARE") || "UNSPECIFIED",
+                url: String(group.url || ""),
+                members: Array.isArray(group.members)
+                  ? (group.members as Array<Record<string, unknown>>)
+                  : [],
+                subaccounts: Array.isArray(group.subaccounts)
+                  ? (group.subaccounts as Array<Record<string, unknown>>)
+                  : [],
+              }) as unknown as GetGroupResponse,
+          );
+        }
+
+        console.log(
+          `[Luxor Workers] Successfully fetched ${groupsList.length} groups`,
+        );
+
+        setState((prev) => ({
+          ...prev,
+          groups: groupsList,
+          selectedGroupIds: groupsList.map((g) => g.id), // Select all groups by default
+        }));
+
+        // Now fetch all subaccounts from all groups
+        const allSubaccounts: Array<
+          GetSubaccountResponse & { _groupId: string }
+        > = [];
+
+        for (const group of groupsList) {
+          try {
+            const subResponse = await fetch(
+              `/api/luxor?endpoint=subaccount&groupId=${group.id}`,
+            );
+
+            if (!subResponse.ok) {
+              console.warn(
+                `[Luxor Workers] Error fetching subaccounts for group ${group.id}`,
+              );
+              continue;
+            }
+
+            const subData: ProxyResponse<{
+              subaccounts: GetSubaccountResponse[];
+            }> = await subResponse.json();
+
+            if (!subData.success) {
+              console.warn(
+                `[Luxor Workers] API error for group ${group.id}:`,
+                subData.error,
+              );
+              continue;
+            }
+
+            const subaccountsList =
+              (subData.data as { subaccounts: GetSubaccountResponse[] })
+                ?.subaccounts || [];
+            const subaccountsWithGroup = subaccountsList.map((sub) => ({
+              ...sub,
+              _groupId: group.id,
+            }));
+
+            allSubaccounts.push(...subaccountsWithGroup);
+          } catch (error) {
+            console.error(
+              `[Luxor Workers] Exception fetching for group ${group.id}:`,
+              error,
+            );
+          }
+        }
+
+        const allSubaccountNames = allSubaccounts.map((s) => s.name);
+
+        console.log(
+          `[Luxor Workers] Successfully fetched ${allSubaccounts.length} subaccounts`,
+        );
+
+        setState((prev) => ({
+          ...prev,
+          subaccounts: allSubaccounts,
+          selectedSubaccountNames: allSubaccountNames, // Select all subaccounts by default
+        }));
+
+        // Now fetch workers for all subaccounts
+        if (allSubaccountNames.length > 0) {
+          const subaccountNamesParam = allSubaccountNames.join(",");
+
+          const workersResponse = await fetch(
+            `/api/luxor?endpoint=workers&currency=BTC&subaccount_names=${subaccountNamesParam}&page_number=1&page_size=20&status=ACTIVE`,
+          );
+
+          if (!workersResponse.ok) {
+            throw new Error(
+              `Workers API returned status ${workersResponse.status}`,
+            );
+          }
+
+          const workersData: ProxyResponse<WorkersResponse> =
+            await workersResponse.json();
+
+          if (!workersData.success) {
+            throw new Error(workersData.error || "Failed to fetch workers");
+          }
+
+          const workersDataObj = (workersData.data as WorkersResponse) || {};
+          const workersList = workersDataObj.workers || [];
+          const totalItems = workersDataObj.pagination?.item_count || 0;
+
+          // Calculate statistics
+          const activeCount = workersList.filter(
+            (w) => w.status === "ACTIVE",
+          ).length;
+          const inactiveCount = workersList.filter(
+            (w) => w.status === "INACTIVE",
+          ).length;
+          const avgHashrate =
+            workersList.length > 0
+              ? workersList.reduce((sum, w) => sum + (w.hashrate || 0), 0) /
+                workersList.length
+              : 0;
+          const avgEfficiency =
+            workersList.length > 0
+              ? workersList.reduce((sum, w) => sum + (w.efficiency || 0), 0) /
+                workersList.length
+              : 0;
+
+          setStats({
+            totalWorkers: totalItems,
+            activeWorkers: activeCount,
+            inactiveWorkers: inactiveCount,
+            averageHashrate: avgHashrate,
+            averageEfficiency: avgEfficiency,
+          });
+
+          setState((prev) => ({
+            ...prev,
+            workers: workersList,
+            totalItems,
+            loading: false,
+            error: null,
+          }));
+
+          console.log(
+            `[Luxor Workers] Successfully fetched ${workersList.length} workers`,
+          );
+        } else {
+          setState((prev) => ({
+            ...prev,
+            workers: [],
+            totalItems: 0,
+            loading: false,
+            error: null,
+          }));
+        }
+      } catch (error) {
+        const errorMsg =
+          error instanceof Error ? error.message : "Unknown error occurred";
+        console.error("[Luxor Workers] Error initializing:", errorMsg);
+        setState((prev) => ({
+          ...prev,
+          loading: false,
+          error: errorMsg,
+        }));
+      }
+    };
+
+    initializeWorkers();
+  }, []);
 
   /**
    * Handle group selection change
