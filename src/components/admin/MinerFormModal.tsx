@@ -322,7 +322,7 @@ export default function MinerFormModal({
               </MenuItem>
               {users.map((user) => (
                 <MenuItem key={user.id} value={user.id}>
-                  {user.name || user.email}
+                  {user.name} ({user.email})
                 </MenuItem>
               ))}
             </Select>

@@ -21,6 +21,7 @@ interface User {
   id: string;
   name: string | null;
   email: string;
+  role?: string;
 }
 
 /**
@@ -109,14 +110,24 @@ export default function MachinePage() {
         const usersData: any = await usersRes.json();
         if (usersData.success && usersData.users) {
           // Transform users data to match our User interface
-          const transformedUsers: User[] = usersData.users.map(
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (user: any) => ({
+          const transformedUsers: User[] = usersData.users
+            .filter((user: User) => user.role === "CLIENT")
+            .map((user: User) => ({
               id: user.id,
               name: user.name,
               email: user.email,
-            }),
-          );
+            }))
+            .sort((a, b) => {
+              const aLowerCase = a.name.toLowerCase();
+              const bLowerCase = b.name.toLowerCase();
+              if (aLowerCase < bLowerCase) {
+                return -1;
+              }
+              if (aLowerCase > bLowerCase) {
+                return 1;
+              }
+              return 0;
+            });
           setUsers(transformedUsers);
         }
       }
