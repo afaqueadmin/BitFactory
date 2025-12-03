@@ -62,6 +62,7 @@ export default function DashboardPage() {
 
   const daysLeft = React.useMemo(() => {
     if (balanceLoading || dailyCostLoading) return 0;
+    if (dailyCost === 0) return "∞";
     return Number(
       formatValue(balance / dailyCost, "number", { maximumFractionDigits: 0 }),
     );
