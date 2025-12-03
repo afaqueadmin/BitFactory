@@ -117,9 +117,9 @@ export default function MachinePage() {
               name: user.name,
               email: user.email,
             }))
-            .sort((a, b) => {
-              const aLowerCase = a.name.toLowerCase();
-              const bLowerCase = b.name.toLowerCase();
+            .sort((a: User, b: User) => {
+              const aLowerCase = a.name!.toLowerCase();
+              const bLowerCase = b.name!.toLowerCase();
               if (aLowerCase < bLowerCase) {
                 return -1;
               }
