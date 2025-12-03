@@ -8,6 +8,7 @@ import EstimatedMonthlyCostCard from "@/components/dashboardCards/EstimatedMonth
 import EstimatedMiningDaysLeftCard from "@/components/dashboardCards/EstimatedMiningDaysLeftCard";
 import React from "react";
 import { formatValue } from "@/lib/helpers/formatValue";
+import { getDaysInCurrentMonth } from "@/lib/helpers/getDaysInCurrentMonth";
 
 export default function Miners() {
   const [balance, setBalance] = React.useState<number>(0);
@@ -25,7 +26,7 @@ export default function Miners() {
 
   const estimatedMonthlyCost = React.useMemo(() => {
     if (dailyCostLoading) return 0;
-    return dailyCost * 30;
+    return dailyCost * getDaysInCurrentMonth();
   }, [dailyCost, dailyCostLoading]);
 
   // Fetch balance on component mount

@@ -38,6 +38,7 @@ import CostsCard from "@/components/dashboardCards/CostsCard";
 import EstimatedMonthlyCostCard from "@/components/dashboardCards/EstimatedMonthlyCostCard";
 import EstimatedMiningDaysLeftCard from "@/components/dashboardCards/EstimatedMiningDaysLeftCard";
 import { formatValue } from "@/lib/helpers/formatValue";
+import { getDaysInCurrentMonth } from "@/lib/helpers/getDaysInCurrentMonth";
 
 export default function DashboardPage() {
   const { loading, error } = useUser();
@@ -57,7 +58,7 @@ export default function DashboardPage() {
 
   const estimatedMonthlyCost = React.useMemo(() => {
     if (dailyCostLoading) return 0;
-    return dailyCost * 30;
+    return dailyCost * getDaysInCurrentMonth();
   }, [dailyCost, dailyCostLoading]);
 
   const daysLeft = React.useMemo(() => {
