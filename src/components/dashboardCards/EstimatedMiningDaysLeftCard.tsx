@@ -1,7 +1,7 @@
 import GradientStatCard from "@/components/GradientStatCard";
 import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
 
-const EstimatedMiningDaysLeftCard = ({ days }: { days: number }) => {
+const EstimatedMiningDaysLeftCard = ({ days }: { days: number | string }) => {
   return (
     <GradientStatCard
       title="Estimated mining days left"
