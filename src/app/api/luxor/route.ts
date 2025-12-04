@@ -104,12 +104,12 @@ async function extractUserFromToken(request: NextRequest) {
   try {
     const decoded = await verifyJwtToken(token);
 
-    // Fetch user from database to get the name (subaccount name)
+    // Fetch user from database to get the luxorSubaccountName
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },
       select: {
         id: true,
-        name: true,
+        luxorSubaccountName: true,
         role: true,
       },
     });
@@ -121,7 +121,7 @@ async function extractUserFromToken(request: NextRequest) {
     return {
       userId: decoded.userId,
       role: decoded.role,
-      name: user.name,
+      luxorSubaccountName: user.luxorSubaccountName,
     };
   } catch (error) {
     if (error instanceof Error) {
@@ -300,14 +300,16 @@ export async function GET(
 
     // ⚠️ IMPORTANT: Add subaccount filter for security
     // Always add the user's subaccount name to filter results to their own data
-    // The user.name comes from the JWT token and is verified as authentic
+    // The user.luxorSubaccountName comes from the database and is verified as authentic
     if (
       !queryParams.subaccount_names &&
-      user.name &&
+      user.luxorSubaccountName &&
       endpoint !== "subaccount"
     ) {
-      queryParams.subaccount_names = user.name;
-      console.log(`[Luxor Proxy] Added subaccount filter: ${user.name}`);
+      queryParams.subaccount_names = user.luxorSubaccountName;
+      console.log(
+        `[Luxor Proxy] Added subaccount filter: ${user.luxorSubaccountName}`,
+      );
     }
 
     console.log("[Luxor Proxy] Built query params:", queryParams);
@@ -315,7 +317,7 @@ export async function GET(
     // ✅ STEP 4: Initialize Luxor client and make request
     let luxorClient;
     try {
-      luxorClient = createLuxorClient(user.name || user.userId);
+      luxorClient = createLuxorClient(user.luxorSubaccountName || user.userId);
     } catch (clientError) {
       const errorMsg =
         clientError instanceof Error
@@ -550,7 +552,7 @@ export async function POST(
     // ✅ STEP 4: Initialize Luxor client
     let luxorClient;
     try {
-      luxorClient = createLuxorClient(user.name || user.userId);
+      luxorClient = createLuxorClient(user.luxorSubaccountName || user.userId);
     } catch (clientError) {
       const errorMsg =
         clientError instanceof Error
@@ -744,7 +746,7 @@ export async function PUT(
     // ✅ STEP 4: Initialize Luxor client
     let luxorClient;
     try {
-      luxorClient = createLuxorClient(user.name || user.userId);
+      luxorClient = createLuxorClient(user.luxorSubaccountName || user.userId);
     } catch (clientError) {
       const errorMsg =
         clientError instanceof Error
@@ -927,7 +929,7 @@ export async function PATCH(
     // ✅ STEP 4: Initialize Luxor client
     let luxorClient;
     try {
-      luxorClient = createLuxorClient(user.name || user.userId);
+      luxorClient = createLuxorClient(user.luxorSubaccountName || user.userId);
     } catch (clientError) {
       const errorMsg =
         clientError instanceof Error
@@ -1118,7 +1120,7 @@ export async function DELETE(
     // ✅ STEP 4: Initialize Luxor client
     let luxorClient;
     try {
-      luxorClient = createLuxorClient(user.name || user.userId);
+      luxorClient = createLuxorClient(user.luxorSubaccountName || user.userId);
     } catch (clientError) {
       const errorMsg =
         clientError instanceof Error

@@ -56,6 +56,7 @@ export default function CustomerOverview() {
   const [users, setUsers] = useState<FetchedUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<FetchedUser | null>(
     null,
@@ -68,8 +69,37 @@ export default function CustomerOverview() {
   });
 
   useEffect(() => {
-    fetchUsers();
+    const initializeUsers = async () => {
+      await fetchCurrentUserRole();
+    };
+    initializeUsers();
   }, []);
+
+  useEffect(() => {
+    if (currentUserRole) {
+      fetchUsers();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUserRole]);
+
+  const fetchCurrentUserRole = async () => {
+    try {
+      const response = await fetch("/api/user/profile", {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setCurrentUserRole(data.user?.role || "ADMIN");
+      }
+    } catch (err) {
+      console.error("Error fetching current user role:", err);
+      setCurrentUserRole("ADMIN");
+    }
+  };
 
   const fetchUsers = async () => {
     try {
@@ -89,19 +119,36 @@ export default function CustomerOverview() {
       const data = await response.json();
 
       if (data.users) {
-        setUsers(data.users);
+        // Filter users based on current user's role
+        let filteredUsers = data.users;
 
-        // Calculate stats
-        const totalMiners = data.users.reduce(
+        // ADMIN can only see CLIENT users
+        if (currentUserRole === "ADMIN") {
+          filteredUsers = data.users.filter(
+            (user: FetchedUser) => user.role === "CLIENT",
+          );
+        }
+        // SUPER_ADMIN can see both CLIENT and ADMIN users
+        else if (currentUserRole === "SUPER_ADMIN") {
+          filteredUsers = data.users.filter(
+            (user: FetchedUser) =>
+              user.role === "CLIENT" || user.role === "ADMIN",
+          );
+        }
+
+        setUsers(filteredUsers);
+
+        // Calculate stats based on filtered users
+        const totalMiners = filteredUsers.reduce(
           (sum: number, user: FetchedUser) => sum + user.miners,
           0,
         );
-        const activeCount = data.users.filter(
+        const activeCount = filteredUsers.filter(
           (user: FetchedUser) => user.status === "active",
         ).length;
 
         setCustomerStats({
-          totalCustomers: data.users.length,
+          totalCustomers: filteredUsers.length,
           activeCustomers: activeCount,
           totalRevenue: 0, // Revenue calculation would depend on your business logic
           totalMiners: totalMiners,
@@ -117,6 +164,9 @@ export default function CustomerOverview() {
 
   const handleUserCreated = () => {
     // Refresh the customer list/stats
+    if (!currentUserRole) {
+      fetchCurrentUserRole();
+    }
     fetchUsers();
   };
 

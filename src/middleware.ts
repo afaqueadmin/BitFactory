@@ -21,6 +21,7 @@ const publicPaths = new Set([
 const getDefaultPathForRole = (role: string) => {
   switch (role) {
     case "ADMIN":
+    case "SUPER_ADMIN":
       return "/adminpanel";
     case "CLIENT":
       return "/dashboard";
@@ -91,8 +92,8 @@ export async function middleware(request: NextRequest) {
     // ✅ Role-based access control
     const userRole = decoded.role;
 
-    if (userRole === "ADMIN") {
-      // Prevent admin from accessing client routes
+    if (userRole === "ADMIN" || userRole === "SUPER_ADMIN") {
+      // Prevent admin/super_admin from accessing client routes
       if (isInRouteGroup(pathname, "auth") || pathname === "/dashboard") {
         return NextResponse.redirect(new URL("/adminpanel", request.url));
       }
