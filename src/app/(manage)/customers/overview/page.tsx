@@ -407,7 +407,7 @@ export default function CustomerOverview() {
                   <TableCell>Customer</TableCell>
                   <TableCell>Email</TableCell>
                   <TableCell>Role</TableCell>
-                  <TableCell>Wallet Address</TableCell>
+                  <TableCell>Company URL</TableCell>
                   <TableCell align="center">Miners</TableCell>
                   <TableCell align="center">Status</TableCell>
                   <TableCell>Join Date</TableCell>
