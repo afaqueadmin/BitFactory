@@ -28,7 +28,7 @@ interface AdminProfileFormProps {
     companyName?: string | null;
     streetAddress?: string | null;
     idNumber?: string | null;
-    walletAddress?: string | null;
+    companyUrl?: string | null;
     dateOfBirth?: string | null;
   };
 }
@@ -50,7 +50,7 @@ export default function AdminProfileForm({
       companyName: "",
       streetAddress: "",
       idNumber: "",
-      walletAddress: "",
+      companyUrl: "",
       dateOfBirth: "",
     },
   );
@@ -101,7 +101,7 @@ export default function AdminProfileForm({
           companyName: formData.companyName,
           streetAddress: formData.streetAddress,
           idNumber: formData.idNumber,
-          walletAddress: formData.walletAddress,
+          companyUrl: formData.companyUrl,
           dateOfBirth: formData.dateOfBirth,
         }),
       });
@@ -284,12 +284,14 @@ export default function AdminProfileForm({
               <Box sx={{ gridColumn: "1 / -1" }}>
                 <TextField
                   fullWidth
-                  label="Wallet Address"
-                  name="walletAddress"
-                  value={formData.walletAddress || ""}
+                  label="Company URL"
+                  name="companyUrl"
+                  value={formData.companyUrl || ""}
                   onChange={handleInputChange}
                   variant="outlined"
                   size="small"
+                  type="url"
+                  placeholder="https://example.com"
                 />
               </Box>
             </Box>

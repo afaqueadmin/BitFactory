@@ -36,8 +36,8 @@ interface FetchedUser {
   country: string;
   phoneNumber: string;
   companyName: string;
+  companyUrl: string;
   streetAddress: string;
-  walletAddress: string;
   twoFactorEnabled: boolean;
   joinDate: string;
   miners: number;
@@ -430,7 +430,7 @@ export default function CustomerOverview() {
                     </TableCell>
                     <TableCell>{customer.email}</TableCell>
                     <TableCell>{customer.role}</TableCell>
-                    <TableCell>{customer.walletAddress ?? "Not Set"}</TableCell>
+                    <TableCell>{customer.companyUrl ?? "Not Set"}</TableCell>
                     <TableCell align="center">{customer.miners}</TableCell>
                     <TableCell align="center">
                       <Chip

@@ -32,7 +32,7 @@ model User {
   streetAddress String?
   companyName   String?
   idNumber      String?
-  walletAddress String?
+  companyUrl    String?
   profileImage  String?
   profileImageId String?
   twoFactorEnabled Boolean      @default(false)

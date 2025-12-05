@@ -181,9 +181,9 @@ function buildQueryParams(
 function checkAdminAccess(
   userRole: string,
 ): NextResponse<ProxyResponse> | null {
-  if (userRole !== "ADMIN") {
+  if (userRole !== "ADMIN" && userRole !== "SUPER_ADMIN") {
     console.log(
-      `[Luxor Proxy] Authorization denied: user role "${userRole}" is not ADMIN`,
+      `[Luxor Proxy] Authorization denied: user role "${userRole}" is not ADMIN or SUPER_ADMIN`,
     );
     return NextResponse.json<ProxyResponse>(
       {

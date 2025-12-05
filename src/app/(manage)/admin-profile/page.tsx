@@ -34,9 +34,9 @@ interface AdminProfileData {
   streetAddress: string | null;
   companyName: string | null;
   idNumber: string | null;
+  companyUrl: string | null;
   profileImage: string | null;
   profileImageId: string | null;
-  walletAddress: string | null;
   twoFactorEnabled: boolean;
 }
 
@@ -382,7 +382,7 @@ export default function AdminProfile() {
                         wordBreak: "break-all",
                       }}
                     >
-                      {profileData.walletAddress || "N/A"}
+                      {profileData.companyUrl || "N/A"}
                     </Typography>
                   </Box>
                 </Grid>

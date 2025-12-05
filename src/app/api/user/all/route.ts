@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
       select: { role: true },
     });
 
-    if (user && user.role !== "ADMIN") {
+    if (user && user.role !== "ADMIN" && user.role !== "SUPER_ADMIN") {
       return NextResponse.json(
         { error: "Only administrators can view all users" },
         { status: 403 },
@@ -60,9 +60,9 @@ export async function GET(request: NextRequest) {
         country: true,
         phoneNumber: true,
         companyName: true,
+        companyUrl: true,
         twoFactorEnabled: true,
         streetAddress: true,
-        walletAddress: true,
         createdAt: true,
         miners: {
           select: {
@@ -85,11 +85,11 @@ export async function GET(request: NextRequest) {
       country: user.country || "N/A",
       phoneNumber: user.phoneNumber || "N/A",
       companyName: user.companyName || "N/A",
+      companyUrl: user.companyUrl || "N/A",
       twoFactorEnabled: user.twoFactorEnabled,
       joinDate: user.createdAt.toISOString().split("T")[0],
       miners: user.miners.length,
       status: "active", // You can add logic to determine status
-      walletAddress: user.walletAddress,
     }));
 
     return NextResponse.json(

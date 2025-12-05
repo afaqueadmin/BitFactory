@@ -29,7 +29,7 @@ interface EditCustomerModalProps {
     phoneNumber?: string;
     companyName?: string;
     streetAddress?: string;
-    walletAddress?: string;
+    companyUrl?: string;
   };
 }
 
@@ -51,7 +51,7 @@ export default function EditCustomerModal({
       phoneNumber: "",
       companyName: "",
       streetAddress: "",
-      walletAddress: "",
+      companyUrl: "",
     },
   );
   const [error, setError] = useState("");
@@ -91,7 +91,7 @@ export default function EditCustomerModal({
           phoneNumber: formData.phoneNumber,
           companyName: formData.companyName,
           streetAddress: formData.streetAddress,
-          walletAddress: formData.walletAddress,
+          companyUrl: formData.companyUrl,
         }),
       });
 
@@ -232,15 +232,16 @@ export default function EditCustomerModal({
             />
             <TextField
               fullWidth
-              label="Wallet Address"
-              value={formData.walletAddress || ""}
+              label="Company URL"
+              value={formData.companyUrl || ""}
               onChange={(e) =>
                 setFormData((prev) => ({
                   ...prev,
-                  walletAddress: e.target.value,
+                  companyUrl: e.target.value,
                 }))
               }
-              helperText="Must be between 26 and 70 characters"
+              type="url"
+              placeholder="https://example.com"
             />
           </Box>
         </DialogContent>

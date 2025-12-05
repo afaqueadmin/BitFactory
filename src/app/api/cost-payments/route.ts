@@ -160,9 +160,9 @@ export async function POST(request: NextRequest) {
       select: { role: true },
     });
 
-    if (user?.role !== "ADMIN") {
+    if (user?.role !== "ADMIN" && user?.role !== "SUPER_ADMIN") {
       return NextResponse.json(
-        { error: "Only administrators can add payments" },
+        { error: "Only administrators can manage cost payments" },
         { status: 403 },
       );
     }

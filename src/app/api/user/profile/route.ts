@@ -64,9 +64,9 @@ export async function GET(request: NextRequest) {
         profileImageId: true,
         companyName: true,
         idNumber: true,
+        companyUrl: true,
         role: true,
         twoFactorEnabled: true,
-        walletAddress: true,
       },
     });
 
@@ -92,20 +92,9 @@ export async function GET(request: NextRequest) {
 
     console.log("Profile API [GET]: Successfully fetched data");
 
-    let walletAddress = user.walletAddress;
-    if (walletAddress) {
-      const walletAddressLength = walletAddress.length;
-      walletAddress =
-        walletAddress.substring(0, 6) +
-        "..." +
-        walletAddress.substring(walletAddressLength - 4, walletAddressLength);
-    }
     return Response.json(
       {
-        user: {
-          ...user,
-          walletAddress,
-        },
+        user,
         recentActivities,
       },
       {
@@ -214,23 +203,9 @@ export async function PATCH(request: NextRequest) {
         streetAddress: data.streetAddress,
         companyName: data.companyName,
         idNumber: data.idNumber,
+        companyUrl: data.companyUrl,
         profileImage: data.profileImage,
         profileImageId: data.profileImageId,
-      },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        phoneNumber: true,
-        dateOfBirth: true,
-        country: true,
-        city: true,
-        streetAddress: true,
-        profileImage: true,
-        profileImageId: true,
-        companyName: true,
-        idNumber: true,
-        role: true,
       },
     });
 

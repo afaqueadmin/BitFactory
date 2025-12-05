@@ -297,7 +297,7 @@ export async function GET(request: NextRequest) {
       select: { role: true },
     });
 
-    if (user?.role !== "ADMIN") {
+    if (user?.role !== "ADMIN" && user?.role !== "SUPER_ADMIN") {
       return NextResponse.json(
         { error: "Only administrators can access dashboard stats" },
         { status: 403 },

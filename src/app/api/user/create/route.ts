@@ -56,9 +56,9 @@ export async function POST(request: NextRequest) {
       select: { role: true },
     });
 
-    if (user && user.role !== "ADMIN") {
+    if (user && user.role !== "ADMIN" && user.role !== "SUPER_ADMIN") {
       return NextResponse.json(
-        { error: "Only administrators can create new users" },
+        { error: "Only administrators can create users" },
         { status: 403 },
       );
     }

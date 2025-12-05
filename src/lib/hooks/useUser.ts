@@ -19,9 +19,9 @@ interface UserData {
   streetAddress: string | null;
   companyName: string | null;
   idNumber: string | null;
+  companyUrl: string | null;
   profileImage: string | null;
   profileImageId: string | null;
-  walletAddress: string | null;
 }
 
 export function useUser() {

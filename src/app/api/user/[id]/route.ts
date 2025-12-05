@@ -49,7 +49,7 @@ export async function PUT(
         streetAddress: body.streetAddress,
         city: body.city,
         country: body.country,
-        walletAddress: body.walletAddress,
+        companyUrl: body.companyUrl,
       },
     });
 
