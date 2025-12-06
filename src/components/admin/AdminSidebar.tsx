@@ -55,23 +55,24 @@ const sidebarItems: SidebarItem[] = [
   {
     title: "Customers",
     icon: <CustomersIcon />,
-    items: [
-      {
-        title: "Overview",
-        icon: <OverviewIcon />,
-        path: "/customers/overview",
-      },
-      {
-        title: "Own Revenue",
-        icon: <RevenueIcon />,
-        path: "/customers/revenue",
-      },
-      {
-        title: "Own Transactions",
-        icon: <TransactionsIcon />,
-        path: "/customers/transactions",
-      },
-    ],
+    path: "/customers/overview",
+    // items: [
+    //   {
+    //     title: "Overview",
+    //     icon: <OverviewIcon />,
+    //     path: "/customers/overview",
+    //   },
+    //   {
+    //     title: "Own Revenue",
+    //     icon: <RevenueIcon />,
+    //     path: "/customers/revenue",
+    //   },
+    //   {
+    //     title: "Own Transactions",
+    //     icon: <TransactionsIcon />,
+    //     path: "/customers/transactions",
+    //   },
+    // ],
   },
   {
     title: "Subaccounts",
