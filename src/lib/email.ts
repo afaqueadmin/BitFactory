@@ -2,6 +2,7 @@ import nodemailer from "nodemailer";
 
 // Create a transporter using SMTP
 const transporter = nodemailer.createTransport({
+  service: process.env.EMAIL_SERVICE,
   host: process.env.SMTP_HOST,
   port: parseInt(process.env.SMTP_PORT || "587"),
   secure: process.env.SMTP_SECURE === "true",
@@ -13,7 +14,7 @@ const transporter = nodemailer.createTransport({
 
 export const sendWelcomeEmail = async (email: string, tempPassword: string) => {
   const mailOptions = {
-    from: `BitFactory ${process.env.SMTP_FROM}` || "noreply@bitfactory.com",
+    from: `BitFactory <${process.env.SMTP_FROM}>` || "noreply@bitfactory.com",
     to: email,
     subject: "Welcome to BitFactory - Your Account Details",
     html: `

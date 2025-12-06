@@ -193,11 +193,14 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    if (process.env.NODE_ENV === "production" && sendEmail) {
+    const sendEmailByEnvironment = process.env.NODE_ENV === "production";
+    let emailSent = sendEmailByEnvironment;
+    if (sendEmailByEnvironment && sendEmail) {
       // Send welcome email with credentials
       const emailResult = await sendWelcomeEmail(email, tempPassword);
       if (!emailResult.success) {
         console.error("Failed to send welcome email:", emailResult.error);
+        emailSent = false;
       }
     }
 
@@ -212,6 +215,7 @@ export async function POST(request: NextRequest) {
           luxorSubaccountName: role === "CLIENT" ? luxorSubaccountName : null,
         },
         tempPassword, //@TODO: In production, this should be sent via email instead
+        emailSent,
       },
       { status: 201 },
     );
