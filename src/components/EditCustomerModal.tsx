@@ -18,7 +18,7 @@ import { Close as CloseIcon } from "@mui/icons-material";
 interface EditCustomerModalProps {
   open: boolean;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (emailSentText: string) => void;
   customerId: string | null;
   initialData?: {
     id: string;
@@ -103,7 +103,7 @@ export default function EditCustomerModal({
 
       setSuccess("Customer updated successfully");
       setTimeout(() => {
-        onSuccess();
+        onSuccess("Customer updated successfully");
         handleClose();
       }, 1500);
     } catch (err) {

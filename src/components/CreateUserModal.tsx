@@ -54,7 +54,7 @@ interface Subaccount {
 interface CreateUserModalProps {
   open: boolean;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (text: string) => void;
 }
 
 export default function CreateUserModal({
@@ -364,7 +364,13 @@ export default function CreateUserModal({
         throw new Error(data.error || "Failed to create user");
       }
 
-      onSuccess();
+      // Show appropriate snackbar based on email sent status
+      let emailSentText = "User created successfully! Welcome email sent.";
+      if (!data.emailSent) {
+        emailSentText = "Failed to send welcome email to the user.";
+      }
+
+      onSuccess(emailSentText);
       onClose();
       setFormData({
         name: "",

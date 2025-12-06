@@ -18,7 +18,7 @@ import { Close as CloseIcon } from "@mui/icons-material";
 interface ChangePasswordModalProps {
   open: boolean;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (text: string) => void;
   customerId: string | null;
 }
 
@@ -80,7 +80,7 @@ export default function ChangePasswordModal({
 
       setSuccess("Password changed successfully");
       setTimeout(() => {
-        onSuccess();
+        onSuccess("Password changed successfully");
         handleClose();
       }, 1500);
     } catch (err) {

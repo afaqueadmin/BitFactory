@@ -18,7 +18,7 @@ import { Close as CloseIcon } from "@mui/icons-material";
 interface AddPaymentModalProps {
   open: boolean;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (text: string) => void;
   customerId: string | null;
   customerName?: string;
 }
@@ -77,7 +77,7 @@ export default function AddPaymentModal({
 
       setSuccess("Payment added successfully");
       setTimeout(() => {
-        onSuccess();
+        onSuccess("Payment added successfully");
         handleClose();
       }, 1500);
     } catch (err) {

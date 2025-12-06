@@ -19,6 +19,7 @@ import {
   Menu,
   MenuItem,
   IconButton,
+  Snackbar,
 } from "@mui/material";
 import { Add as AddIcon, MoreVert as MoreVertIcon } from "@mui/icons-material";
 import AdminValueCard from "@/components/admin/AdminValueCard";
@@ -61,6 +62,7 @@ export default function CustomerOverview() {
   const [selectedCustomer, setSelectedCustomer] = useState<FetchedUser | null>(
     null,
   );
+  const [responseNotification, setResponseNotification] = useState("");
   const [customerStats, setCustomerStats] = useState({
     totalCustomers: 0,
     activeCustomers: 0,
@@ -162,7 +164,8 @@ export default function CustomerOverview() {
     }
   };
 
-  const handleUserCreated = () => {
+  const handleUserCreated = (resNotification: string) => {
+    setResponseNotification(resNotification);
     // Refresh the customer list/stats
     if (!currentUserRole) {
       fetchCurrentUserRole();
@@ -332,6 +335,25 @@ export default function CustomerOverview() {
           customerName={selectedCustomer.name}
         />
       )}
+
+      <Snackbar
+        open={Boolean(responseNotification)}
+        autoHideDuration={5000}
+        onClose={() => setResponseNotification("")}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          onClose={() => setResponseNotification("")}
+          severity={
+            responseNotification.toLowerCase().includes("failed")
+              ? "error"
+              : "success"
+          }
+          sx={{ width: "100%" }}
+        >
+          {responseNotification}
+        </Alert>
+      </Snackbar>
 
       {/* Stats Cards */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
