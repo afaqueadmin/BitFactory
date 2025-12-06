@@ -23,17 +23,28 @@ import {
   Select,
   MenuItem,
   IconButton,
+  SelectChangeEvent,
 } from "@mui/material";
 import { Close as CloseIcon } from "@mui/icons-material";
+
+/**
+ * Hardware object from API
+ */
+interface Hardware {
+  id: string;
+  model: string;
+  powerUsage: number;
+  hashRate: number | string;
+  createdAt?: string;
+  updatedAt?: string;
+}
 
 /**
  * Miner form data structure
  */
 interface MinerFormData {
   name: string;
-  model: string;
-  powerUsage: number | string;
-  hashRate: number | string;
+  hardwareId: string;
   userId: string;
   spaceId: string;
   status: "ACTIVE" | "INACTIVE";
@@ -60,14 +71,18 @@ interface Space {
 /**
  * Miner object (from API)
  */
-interface Miner extends MinerFormData {
+interface Miner {
   id: string;
-  powerUsage: number;
-  hashRate: number;
+  name: string;
+  hardwareId: string;
+  status: "ACTIVE" | "INACTIVE";
+  userId: string;
+  spaceId: string;
   createdAt: string;
   updatedAt: string;
   user?: User;
   space?: Space;
+  hardware?: Hardware;
 }
 
 interface MinerFormModalProps {
@@ -91,52 +106,93 @@ export default function MinerFormModal({
 }: MinerFormModalProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hardware, setHardware] = useState<Hardware[]>([]);
+  const [selectedHardware, setSelectedHardware] = useState<Hardware | null>(null);
+  const [hardwareLoading, setHardwareLoading] = useState(false);
   const [formData, setFormData] = useState<MinerFormData>({
     name: "",
-    model: "",
-    powerUsage: "",
-    hashRate: "",
+    hardwareId: "",
     userId: "",
     spaceId: "",
     status: "INACTIVE",
   });
 
-  // Initialize form with miner data if editing
+  /**
+   * Fetch hardware list on mount
+   */
+  useEffect(() => {
+    const fetchHardware = async () => {
+      try {
+        setHardwareLoading(true);
+        const response = await fetch("/api/hardware");
+        const data = await response.json();
+        if (data.success) {
+          setHardware(data.data || []);
+        }
+      } catch (err) {
+        console.error("Failed to fetch hardware:", err);
+      } finally {
+        setHardwareLoading(false);
+      }
+    };
+
+    if (open) {
+      fetchHardware();
+    }
+  }, [open]);
+
+  /**
+   * Initialize form data when miner is provided (edit mode) or clear it (create mode)
+   */
   useEffect(() => {
     if (miner) {
       setFormData({
         name: miner.name,
-        model: miner.model,
-        powerUsage: miner.powerUsage,
-        hashRate: miner.hashRate,
+        hardwareId: miner.hardwareId,
         userId: miner.userId,
         spaceId: miner.spaceId,
         status: miner.status,
       });
+      if (miner.hardware) {
+        setSelectedHardware(miner.hardware);
+      }
     } else {
       setFormData({
         name: "",
-        model: "",
-        powerUsage: "",
-        hashRate: "",
+        hardwareId: "",
         userId: "",
         spaceId: "",
         status: "INACTIVE",
       });
+      setSelectedHardware(null);
     }
     setError(null);
   }, [miner, open]);
 
   /**
-   * Handle form field changes
+   * Handle form input change
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const handleChange = (e: any) => {
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | SelectChangeEvent
+  ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
       [name]: value,
     }));
+  };
+
+  /**
+   * Handle hardware selection change
+   */
+  const handleHardwareChange = (e: SelectChangeEvent) => {
+    const hwId = e.target.value;
+    const selectedHw = hardware.find((hw) => hw.id === hwId);
+    setFormData((prev) => ({
+      ...prev,
+      hardwareId: hwId,
+    }));
+    setSelectedHardware(selectedHw || null);
   };
 
   /**
@@ -147,26 +203,22 @@ export default function MinerFormModal({
       setError("Miner name is required");
       return false;
     }
-    if (!formData.model.trim()) {
-      setError("Miner model is required");
+
+    if (!formData.hardwareId) {
+      setError("Hardware model is required");
       return false;
     }
-    if (!formData.powerUsage || Number(formData.powerUsage) <= 0) {
-      setError("Power usage must be a positive number");
-      return false;
-    }
-    if (!formData.hashRate || Number(formData.hashRate) <= 0) {
-      setError("Hash rate must be a positive number");
-      return false;
-    }
+
     if (!formData.userId) {
-      setError("Please select a user");
+      setError("User is required");
       return false;
     }
+
     if (!formData.spaceId) {
-      setError("Please select a space");
+      setError("Space is required");
       return false;
     }
+
     return true;
   };
 
@@ -175,13 +227,11 @@ export default function MinerFormModal({
    */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
 
-    if (!validateForm()) {
-      return;
-    }
+    if (!validateForm()) return;
 
     setLoading(true);
+    setError(null);
 
     try {
       const url = miner ? `/api/machine/${miner.id}` : "/api/machine";
@@ -193,10 +243,8 @@ export default function MinerFormModal({
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          name: formData.name.trim(),
-          model: formData.model.trim(),
-          powerUsage: Number(formData.powerUsage),
-          hashRate: Number(formData.hashRate),
+          name: formData.name,
+          hardwareId: formData.hardwareId,
           userId: formData.userId,
           spaceId: formData.spaceId,
           status: formData.status,
@@ -261,47 +309,49 @@ export default function MinerFormModal({
             placeholder="e.g., Miner-001"
             margin="normal"
             required
-            disabled={loading || isLoading}
+            disabled={loading || isLoading || hardwareLoading}
           />
+
+          <FormControl
+            fullWidth
+            margin="normal"
+            required
+            disabled={loading || isLoading || hardwareLoading}
+          >
+            <InputLabel>Hardware Model</InputLabel>
+            <Select
+              name="hardwareId"
+              value={formData.hardwareId}
+              onChange={handleHardwareChange}
+              label="Hardware Model"
+            >
+              <MenuItem value="">
+                <em>Select a hardware model</em>
+              </MenuItem>
+              {hardware.map((hw) => (
+                <MenuItem key={hw.id} value={hw.id}>
+                  {hw.model}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
 
           <TextField
             fullWidth
-            label="Miner Model"
-            name="model"
-            value={formData.model}
-            onChange={handleChange}
-            placeholder="e.g., Bitmain S21 Pro"
+            label="Power Usage (kW)"
+            value={selectedHardware?.powerUsage || "—"}
+            disabled
             margin="normal"
-            required
-            disabled={loading || isLoading}
-          />
-
-          <TextField
-            fullWidth
-            label="Power Usage (kWh)"
-            name="powerUsage"
-            type="number"
-            value={formData.powerUsage}
-            onChange={handleChange}
-            placeholder="e.g., 3.5"
-            margin="normal"
-            required
-            inputProps={{ min: "0.1", step: "0.1" }}
-            disabled={loading || isLoading}
+            inputProps={{ readOnly: true }}
           />
 
           <TextField
             fullWidth
             label="Hash Rate (TH/s)"
-            name="hashRate"
-            type="number"
-            value={formData.hashRate}
-            onChange={handleChange}
-            placeholder="e.g., 234"
+            value={selectedHardware ? parseFloat(String(selectedHardware.hashRate)).toFixed(2) : "—"}
+            disabled
             margin="normal"
-            required
-            inputProps={{ min: "0.1", step: "0.1" }}
-            disabled={loading || isLoading}
+            inputProps={{ readOnly: true }}
           />
 
           <FormControl

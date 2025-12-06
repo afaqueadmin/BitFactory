@@ -17,14 +17,23 @@ import {
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 
 // Types
+interface Hardware {
+  id: string;
+  model: string;
+  powerUsage: number;
+  hashRate: number | string;
+}
+
 interface MinerData {
   id: string;
+  name: string;
   model: string;
   workerName: string;
   location: string;
   connectedPool: string;
-  status: "Active" | "Inactive";
-  hashRate?: string;
+  status: "Active" | "Inactive" | "ACTIVE" | "INACTIVE";
+  hashRate: string;
+  hardware?: Hardware;
 }
 
 // Filter type
@@ -34,48 +43,83 @@ type FilterType = "ALL MINERS" | "ACTIVE" | "INACTIVE";
 const dummyMiners: MinerData[] = [
   {
     id: "1",
+    name: "Miner-001",
     model: "Bitmain S21 Pro",
     workerName: "test567897",
     location: "UAE 2",
     connectedPool: "Default",
     status: "Active",
     hashRate: "195 TH/s",
+    hardware: {
+      id: "hw1",
+      model: "Bitmain S21 Pro",
+      powerUsage: 3.25,
+      hashRate: 195,
+    },
   },
   {
     id: "2",
+    name: "Miner-002",
     model: "Bitmain S21 Pro",
     workerName: "test567894",
     location: "In Transport",
     connectedPool: "Default",
     status: "Inactive",
     hashRate: "0 TH/s",
+    hardware: {
+      id: "hw1",
+      model: "Bitmain S21 Pro",
+      powerUsage: 3.25,
+      hashRate: 0,
+    },
   },
   {
     id: "3",
+    name: "Miner-003",
     model: "Bitmain S21 Pro",
     workerName: "test567898",
     location: "USA 1",
     connectedPool: "Default",
     status: "Active",
-    hashRate: "200 TH/s",
+    hashRate: "195 TH/s",
+    hardware: {
+      id: "hw1",
+      model: "Bitmain S21 Pro",
+      powerUsage: 3.25,
+      hashRate: 200,
+    },
   },
   {
     id: "4",
+    name: "Miner-004",
     model: "Bitmain S21 Pro",
     workerName: "test567895",
     location: "Repair / Warehouse",
     connectedPool: "Default",
     status: "Inactive",
     hashRate: "0 TH/s",
+    hardware: {
+      id: "hw1",
+      model: "Bitmain S21 Pro",
+      powerUsage: 3.25,
+      hashRate: 0,
+    },
   },
   {
     id: "5",
+    name: "Miner-005",
     model: "Bitmain S21 Pro",
     workerName: "test567896",
     location: "UAE 1",
     connectedPool: "Default",
     status: "Active",
     hashRate: "234 TH/s",
+    hardware: {
+      id: "hw1",
+      model: "Bitmain S21 Pro",
+      powerUsage: 3.25,
+      hashRate: 234,
+    },
   },
 ];
 
@@ -163,9 +207,10 @@ export default function HostedMinersList() {
           (miner: {
             id: string;
             name: string;
-            model: string;
+            model?: string;
             status: string;
-            hashRate: number;
+            hashRate?: number;
+            hardware?: { model: string; hashRate: number | string };
             space?: { location: string; name: string };
           }) => {
             // Get Luxor worker data if available
@@ -175,15 +220,14 @@ export default function HostedMinersList() {
 
             return {
               id: miner.id,
-              model: miner.model,
+              model: miner.hardware?.model || miner.model || "Unknown",
               workerName: miner.name,
               location: miner.space?.location || "Unknown",
               connectedPool: miner.space?.name || "Unknown",
               // Priority: Luxor API status > Database status
-              // status: luxorStatus === "ACTIVE" ? "Active" : "Inactive", // @TODO: use this and remove the next line
               status:
                 luxorStatus === "ACTIVE" ? "Active" : "Deployment in Progress",
-              hashRate: `${luxorWorker?.hashrate || miner.hashRate} TH/s`,
+              hashRate: `${luxorWorker?.hashrate || miner.hardware?.hashRate || miner.hashRate || 0} TH/s`,
             };
           },
         );

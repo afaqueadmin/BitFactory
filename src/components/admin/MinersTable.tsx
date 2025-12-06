@@ -54,21 +54,30 @@ interface Space {
 }
 
 /**
+ * Hardware object from API
+ */
+interface Hardware {
+  id: string;
+  model: string;
+  powerUsage: number;
+  hashRate: number | string;
+}
+
+/**
  * Miner object from API
  */
 interface Miner {
   id: string;
   name: string;
-  model: string;
   status: "ACTIVE" | "INACTIVE";
-  powerUsage: number;
-  hashRate: number;
+  hardwareId: string;
   userId: string;
   spaceId: string;
   createdAt: string;
   updatedAt: string;
   user?: User;
   space?: Space;
+  hardware?: Hardware;
 }
 
 interface MinersTableProps {
@@ -183,7 +192,7 @@ export default function MinersTable({
                   sx={{ "&:last-child td, &:last-child th": { border: 0 } }}
                 >
                   <TableCell sx={{ fontWeight: "500" }}>{miner.name}</TableCell>
-                  <TableCell>{miner.model}</TableCell>
+                  <TableCell>{miner.hardware?.model || "—"}</TableCell>
                   <TableCell>
                     {miner.user?.name || miner.user?.email || "—"}
                   </TableCell>
@@ -202,10 +211,10 @@ export default function MinersTable({
                     )}
                   </TableCell>
                   <TableCell align="right">
-                    {miner.powerUsage.toFixed(2)}
+                    {(miner.hardware?.powerUsage || 0).toFixed(2)} kW
                   </TableCell>
                   <TableCell align="right">
-                    {miner.hashRate.toFixed(2)}
+                    {parseFloat(String(miner.hardware?.hashRate || 0)).toFixed(2)} TH/s
                   </TableCell>
                   <TableCell align="center">
                     <Chip

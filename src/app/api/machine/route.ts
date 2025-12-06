@@ -164,6 +164,14 @@ export async function GET(
             location: true,
           },
         },
+        hardware: {
+          select: {
+            id: true,
+            model: true,
+            powerUsage: true,
+            hashRate: true,
+          },
+        },
       },
       orderBy,
     });
@@ -203,9 +211,7 @@ export async function GET(
  * Request Body:
  * {
  *   name: string (required) - Miner name/identifier
- *   model: string (required) - Miner model (e.g., "Bitmain S21 Pro")
- *   powerUsage: number (required) - Power consumption in kilowatts
- *   hashRate: number (required) - Hash rate in TH/s
+ *   hardwareId: string (required) - Hardware model ID
  *   userId: string (required) - ID of the user who owns this miner
  *   spaceId: string (required) - ID of the space where miner is located
  *   status: string (optional) - ACTIVE or INACTIVE (default: INACTIVE)
@@ -218,7 +224,7 @@ export async function GET(
  * - 400: Bad request
  * - 401: Unauthorized
  * - 403: Forbidden (not admin)
- * - 404: User or Space not found
+ * - 404: User, Space, or Hardware not found
  * - 500: Server error
  */
 export async function POST(
@@ -244,23 +250,15 @@ export async function POST(
     }
 
     const body = await request.json();
-    const { name, model, powerUsage, hashRate, userId, spaceId, status } = body;
+    const { name, hardwareId, userId, spaceId, status } = body;
 
     // Validate required fields
-    if (
-      !name ||
-      !model ||
-      powerUsage === undefined ||
-      hashRate === undefined ||
-      !userId ||
-      !spaceId
-    ) {
+    if (!name || !hardwareId || !userId || !spaceId) {
       console.error("[Miners API] POST: Missing required fields");
       return NextResponse.json<ApiResponse>(
         {
           success: false,
-          error:
-            "Missing required fields: name, model, powerUsage, hashRate, userId, spaceId",
+          error: "Missing required fields: name, hardwareId, userId, spaceId",
         },
         { status: 400 },
       );
@@ -269,7 +267,7 @@ export async function POST(
     // Validate field types
     if (
       typeof name !== "string" ||
-      typeof model !== "string" ||
+      typeof hardwareId !== "string" ||
       typeof userId !== "string" ||
       typeof spaceId !== "string"
     ) {
@@ -277,30 +275,7 @@ export async function POST(
       return NextResponse.json<ApiResponse>(
         {
           success: false,
-          error: "name, model, userId, and spaceId must be strings",
-        },
-        { status: 400 },
-      );
-    }
-
-    if (typeof powerUsage !== "number" || typeof hashRate !== "number") {
-      console.error("[Miners API] POST: Invalid numeric field types");
-      return NextResponse.json<ApiResponse>(
-        {
-          success: false,
-          error: "powerUsage and hashRate must be numbers",
-        },
-        { status: 400 },
-      );
-    }
-
-    // Validate values
-    if (powerUsage <= 0 || hashRate <= 0) {
-      console.error("[Miners API] POST: Invalid field values");
-      return NextResponse.json<ApiResponse>(
-        {
-          success: false,
-          error: "powerUsage and hashRate must be greater than 0",
+          error: "name, hardwareId, userId, and spaceId must be strings",
         },
         { status: 400 },
       );
@@ -334,13 +309,25 @@ export async function POST(
       );
     }
 
+    // Verify hardware exists
+    const hardwareExists = await prisma.hardware.findUnique({
+      where: { id: hardwareId },
+      select: { id: true },
+    });
+
+    if (!hardwareExists) {
+      console.error(`[Miners API] POST: Hardware not found - ${hardwareId}`);
+      return NextResponse.json<ApiResponse>(
+        { success: false, error: "Hardware not found" },
+        { status: 404 },
+      );
+    }
+
     // Create miner
     const miner = await prisma.miner.create({
       data: {
         name: name.trim(),
-        model: model.trim(),
-        powerUsage,
-        hashRate,
+        hardwareId,
         userId,
         spaceId,
         status: status || "INACTIVE",

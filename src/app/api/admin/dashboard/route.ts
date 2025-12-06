@@ -309,7 +309,7 @@ export async function GET(request: NextRequest) {
     // ========== DATABASE STATS (Local Infrastructure) ==========
 
     // Fetch miners statistics (from local database)
-    const activeMiners = await prisma.miner.count({
+    const activeMinersCount = await prisma.miner.count({
       where: { status: "ACTIVE" },
     });
     const inactiveMiners = await prisma.miner.count({
@@ -324,14 +324,20 @@ export async function GET(request: NextRequest) {
       where: { status: "OCCUPIED" },
     });
 
-    // Calculate total power
+    // Calculate total power - fetch active miners with hardware relation
     const totalSpacePower = await prisma.space.aggregate({
       _sum: { powerCapacity: true },
     });
-    const usedMinersPower = await prisma.miner.aggregate({
+
+    const activeMiners = await prisma.miner.findMany({
       where: { status: "ACTIVE" },
-      _sum: { powerUsage: true },
+      include: { hardware: true },
     });
+
+    const usedMinersPower = activeMiners.reduce(
+      (sum, miner) => sum + (miner.hardware?.powerUsage || 0),
+      0
+    );
 
     // Fetch customers (users with role CLIENT) statistics
     const totalCustomers = await prisma.user.count({
@@ -377,7 +383,7 @@ export async function GET(request: NextRequest) {
       hashrate: { currentHashrate: 0, averageHashrate: 0 },
       efficiency: { currentEfficiency: 0, averageEfficiency: 0 },
       power: {
-        totalPower: usedMinersPower._sum.powerUsage || 0, // kW from active miners
+        totalPower: usedMinersPower, // kW from active miners
         availablePower: totalSpacePower._sum.powerCapacity || 0, // kW from spaces
       },
     };
@@ -441,7 +447,7 @@ export async function GET(request: NextRequest) {
 
     const stats: DashboardStats = {
       miners: {
-        active: activeMiners,
+        active: activeMinersCount,
         inactive: inactiveMiners,
       },
       spaces: {

@@ -75,20 +75,32 @@ model UserActivity {
   @@map("user_activities")
 }
 
+model Hardware {
+  id            String    @id @default(cuid())
+  model         String    @unique  // e.g., "Bitmain S21 Pro"
+  powerUsage    Float     // in kilowatts (e.g., 3.25)
+  hashRate      Decimal   // in TH/s (e.g., 234.5)
+  miners        Miner[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@map("hardware")
+}
+
 model Miner {
   id            String    @id @default(cuid())
   name          String
-  model         String
   status        String    @default("INACTIVE") // ACTIVE or INACTIVE
-  powerUsage    Float     // in kilowatts
-  hashRate      Float     // in TH/s
+  hardwareId    String
   userId        String
   spaceId       String
   user          User      @relation(fields: [userId], references: [id], onDelete: Restrict)
   space         Space     @relation(fields: [spaceId], references: [id])
+  hardware      Hardware  @relation(fields: [hardwareId], references: [id])
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
+  @@index([hardwareId])
   @@map("miners")
 }
 

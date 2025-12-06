@@ -34,21 +34,32 @@ interface Space {
 }
 
 /**
+ * Hardware object from API
+ */
+interface Hardware {
+  id: string;
+  model: string;
+  powerUsage: number;
+  hashRate: number | string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/**
  * Miner object from API
  */
 interface Miner {
   id: string;
   name: string;
-  model: string;
   status: "ACTIVE" | "INACTIVE";
-  powerUsage: number;
-  hashRate: number;
+  hardwareId: string;
   userId: string;
   spaceId: string;
   createdAt: string;
   updatedAt: string;
   user?: User;
   space?: Space;
+  hardware?: Hardware;
 }
 
 /**
@@ -303,7 +314,7 @@ export default function MachinePage() {
                   Total Hash Rate
                 </Typography>
                 <Typography variant="h5" sx={{ fontWeight: "bold", mt: 0.5 }}>
-                  {miners.reduce((sum, m) => sum + m.hashRate, 0).toFixed(2)}{" "}
+                  {miners.reduce((sum, m) => sum + parseFloat(String(m.hardware?.hashRate || 0)), 0).toFixed(2)}{" "}
                   TH/s
                 </Typography>
               </Box>
@@ -314,8 +325,8 @@ export default function MachinePage() {
                   Total Power Usage
                 </Typography>
                 <Typography variant="h5" sx={{ fontWeight: "bold", mt: 0.5 }}>
-                  {miners.reduce((sum, m) => sum + m.powerUsage, 0).toFixed(2)}{" "}
-                  kWh
+                  {miners.reduce((sum, m) => sum + (m.hardware?.powerUsage || 0), 0).toFixed(2)}{" "}
+                  kW
                 </Typography>
               </Box>
             </Stack>

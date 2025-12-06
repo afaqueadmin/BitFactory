@@ -139,6 +139,11 @@ export async function GET(
           select: {
             id: true,
             status: true,
+            hardware: {
+              select: {
+                powerUsage: true,
+              },
+            },
           },
         },
       },
@@ -147,27 +152,39 @@ export async function GET(
     });
 
     // Format response with calculated fields
-    const formattedSpaces = spaces.map((space) => ({
-      id: space.id,
-      name: space.name,
-      location: space.location,
-      capacity: space.capacity,
-      powerCapacity: space.powerCapacity,
-      status: space.status,
-      createdAt: space.createdAt,
-      updatedAt: space.updatedAt,
-      minerCount: space.miners.length,
-      activeMinerCount: space.miners.filter((m) => m.status === "ACTIVE")
-        .length,
-      inactiveMinerCount: space.miners.filter((m) => m.status === "INACTIVE")
-        .length,
-      capacityUsed: space.miners.length,
-      capacityPercentage: (
-        (space.miners.length / space.capacity) *
-        100
-      ).toFixed(2),
-      powerUsagePercentage: "0.00", // Would need miner power data
-    }));
+    const formattedSpaces = spaces.map((space) => {
+      // Calculate total power usage
+      const totalPowerUsage = space.miners.reduce((sum, m) => {
+        return sum + (m.hardware?.powerUsage || 0);
+      }, 0);
+      const powerUsagePercentage =
+        space.powerCapacity > 0
+          ? ((totalPowerUsage / space.powerCapacity) * 100).toFixed(2)
+          : "0.00";
+
+      return {
+        id: space.id,
+        name: space.name,
+        location: space.location,
+        capacity: space.capacity,
+        powerCapacity: space.powerCapacity,
+        status: space.status,
+        createdAt: space.createdAt,
+        updatedAt: space.updatedAt,
+        minerCount: space.miners.length,
+        activeMinerCount: space.miners.filter((m) => m.status === "ACTIVE")
+          .length,
+        inactiveMinerCount: space.miners.filter((m) => m.status === "INACTIVE")
+          .length,
+        capacityUsed: space.miners.length,
+        capacityPercentage: (
+          (space.miners.length / space.capacity) *
+          100
+        ).toFixed(2),
+        totalPowerUsage: parseFloat(totalPowerUsage.toFixed(2)),
+        powerUsagePercentage,
+      };
+    });
 
     console.log(
       `[Spaces API] GET: Successfully retrieved ${formattedSpaces.length} spaces`,

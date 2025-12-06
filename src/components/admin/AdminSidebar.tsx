@@ -106,6 +106,12 @@ const sidebarItems: SidebarItem[] = [
   },
 
   {
+    title: "Hardware Models",
+    icon: <HardwareIcon />,
+    path: "/hardware",
+  },
+
+  {
     title: "Hardware",
     icon: <HardwareIcon />,
     items: [

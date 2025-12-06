@@ -23,14 +23,15 @@ export async function GET(request: NextRequest) {
     // Get all miners for this user from database
     const miners = await prisma.miner.findMany({
       where: { userId },
-      select: {
-        id: true,
-        name: true,
-        model: true,
-        status: true,
-        powerUsage: true,
-        hashRate: true,
-        createdAt: true,
+      include: {
+        hardware: {
+          select: {
+            id: true,
+            model: true,
+            powerUsage: true,
+            hashRate: true,
+          },
+        },
         space: {
           select: {
             location: true,

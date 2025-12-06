@@ -73,9 +73,7 @@ async function verifyAdminAuth(request: NextRequest) {
  * Request Body:
  * {
  *   name?: string
- *   model?: string
- *   powerUsage?: number
- *   hashRate?: number
+ *   hardwareId?: string
  *   userId?: string
  *   spaceId?: string
  *   status?: string (ACTIVE or INACTIVE)
@@ -88,7 +86,7 @@ async function verifyAdminAuth(request: NextRequest) {
  * - 400: Bad request
  * - 401: Unauthorized
  * - 403: Forbidden (not admin)
- * - 404: Miner, user, or space not found
+ * - 404: Miner, user, space, or hardware not found
  * - 500: Server error
  */
 export async function PUT(
@@ -129,7 +127,7 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { name, model, powerUsage, hashRate, userId, spaceId, status } = body;
+    const { name, hardwareId, userId, spaceId, status } = body;
 
     // Build update data with only provided fields
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -145,34 +143,29 @@ export async function PUT(
       updateData.name = name.trim();
     }
 
-    if (model !== undefined) {
-      if (typeof model !== "string") {
+    if (hardwareId !== undefined) {
+      if (typeof hardwareId !== "string") {
         return NextResponse.json<ApiResponse>(
-          { success: false, error: "model must be a string" },
+          { success: false, error: "hardwareId must be a string" },
           { status: 400 },
         );
       }
-      updateData.model = model.trim();
-    }
 
-    if (powerUsage !== undefined) {
-      if (typeof powerUsage !== "number" || powerUsage <= 0) {
-        return NextResponse.json<ApiResponse>(
-          { success: false, error: "powerUsage must be a positive number" },
-          { status: 400 },
-        );
-      }
-      updateData.powerUsage = powerUsage;
-    }
+      // Verify hardware exists
+      const hardwareExists = await prisma.hardware.findUnique({
+        where: { id: hardwareId },
+        select: { id: true },
+      });
 
-    if (hashRate !== undefined) {
-      if (typeof hashRate !== "number" || hashRate <= 0) {
+      if (!hardwareExists) {
+        console.error(`[Miners API] PUT: Hardware not found - ${hardwareId}`);
         return NextResponse.json<ApiResponse>(
-          { success: false, error: "hashRate must be a positive number" },
-          { status: 400 },
+          { success: false, error: "Hardware not found" },
+          { status: 404 },
         );
       }
-      updateData.hashRate = hashRate;
+
+      updateData.hardwareId = hardwareId;
     }
 
     if (userId !== undefined) {
@@ -258,6 +251,14 @@ export async function PUT(
             id: true,
             name: true,
             location: true,
+          },
+        },
+        hardware: {
+          select: {
+            id: true,
+            model: true,
+            powerUsage: true,
+            hashRate: true,
           },
         },
       },

@@ -12,14 +12,13 @@ export async function GET(request: NextRequest) {
   try {
     // Get all miners for all users with their associated user IDs
     const allMiners = await prisma.miner.findMany({
-      select: {
-        id: true,
-        name: true,
-        model: true,
-        status: true,
-        powerUsage: true,
-        userId: true,
-        createdAt: true,
+      include: {
+        hardware: {
+          select: {
+            model: true,
+            powerUsage: true,
+          },
+        },
       },
       orderBy: {
         createdAt: "desc",
@@ -69,9 +68,9 @@ export async function GET(request: NextRequest) {
       userMinersMap.get(miner.userId)!.push({
         id: miner.id,
         name: miner.name,
-        model: miner.model,
+        model: miner.hardware?.model || "Unknown",
         status: miner.status,
-        powerUsage: miner.powerUsage,
+        powerUsage: miner.hardware?.powerUsage || 0,
       });
     }
 
@@ -86,6 +85,7 @@ export async function GET(request: NextRequest) {
       for (const miner of userMiners) {
         // Only count active miners for consumption
         if (miner.status !== "INACTIVE") {
+          // powerUsage is already in kW
           totalConsumption += miner.powerUsage;
           totalDailyCost += miner.powerUsage * latestRate.rate_per_kwh * 24;
         }

@@ -23,13 +23,13 @@ export async function GET(request: NextRequest) {
     // Get all miners for this user
     const miners = await prisma.miner.findMany({
       where: { userId },
-      select: {
-        id: true,
-        name: true,
-        model: true,
-        status: true,
-        powerUsage: true,
-        createdAt: true,
+      include: {
+        hardware: {
+          select: {
+            model: true,
+            powerUsage: true,
+          },
+        },
         space: {
           select: {
             location: true,
@@ -72,24 +72,25 @@ export async function GET(request: NextRequest) {
         return {
           minerId: miner.id,
           minerName: miner.name,
-          minerModel: miner.model,
+          minerModel: miner.hardware?.model || "Unknown",
           status: miner.status,
-          powerUsage: miner.powerUsage,
+          powerUsage: miner.hardware?.powerUsage || 0,
           location: miner.space?.location || "Unknown",
           ratePerKwh: latestRate.rate_per_kwh,
           dailyCost: 0,
         };
       }
 
-      // Formula: powerUsage * ratePerKwh * 24
-      const dailyCost = miner.powerUsage * latestRate.rate_per_kwh * 24;
+      // Formula: powerUsage (kW) * ratePerKwh * 24 hours
+      const powerUsageKw = miner.hardware?.powerUsage || 0;
+      const dailyCost = powerUsageKw * latestRate.rate_per_kwh * 24;
 
       return {
         minerId: miner.id,
         minerName: miner.name,
-        minerModel: miner.model,
+        minerModel: miner.hardware?.model || "Unknown",
         status: miner.status,
-        powerUsage: miner.powerUsage,
+        powerUsage: powerUsageKw,
         location: miner.space?.location || "Unknown",
         ratePerKwh: latestRate.rate_per_kwh,
         dailyCost,
