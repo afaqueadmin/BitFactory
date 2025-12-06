@@ -109,6 +109,20 @@ export async function DELETE(
       );
     }
 
+    // Check if user has any miners linked
+    const minerCount = await prisma.miner.count({
+      where: { userId: id },
+    });
+
+    if (minerCount > 0) {
+      return NextResponse.json(
+        {
+          error: `Cannot delete user with ${minerCount} linked miner(s). Please remove all miners first.`,
+        },
+        { status: 400 },
+      );
+    }
+
     // Delete user and related data
     // First, delete user activities
     await prisma.userActivity.deleteMany({

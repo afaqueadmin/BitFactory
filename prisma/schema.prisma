@@ -84,7 +84,7 @@ model Miner {
   hashRate      Float     // in TH/s
   userId        String
   spaceId       String
-  user          User      @relation(fields: [userId], references: [id])
+  user          User      @relation(fields: [userId], references: [id], onDelete: Restrict)
   space         Space     @relation(fields: [spaceId], references: [id])
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
