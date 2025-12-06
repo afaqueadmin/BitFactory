@@ -373,7 +373,7 @@ export default function AdminProfile() {
                 <Grid item xs={12}>
                   <Box>
                     <Typography variant="caption" color="textSecondary">
-                      Wallet Address
+                      Company URL
                     </Typography>
                     <Typography
                       variant="body1"
