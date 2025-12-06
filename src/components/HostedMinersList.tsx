@@ -170,7 +170,8 @@ export default function HostedMinersList() {
           }) => {
             // Get Luxor worker data if available
             const luxorWorker = luxorWorkers.get(miner.name);
-            const luxorStatus = luxorWorker?.status || miner.status;
+            // const luxorStatus = luxorWorker?.status || miner.status;
+            const luxorStatus = luxorWorker?.status;
 
             return {
               id: miner.id,
@@ -179,7 +180,9 @@ export default function HostedMinersList() {
               location: miner.space?.location || "Unknown",
               connectedPool: miner.space?.name || "Unknown",
               // Priority: Luxor API status > Database status
-              status: luxorStatus === "ACTIVE" ? "Active" : "Inactive",
+              // status: luxorStatus === "ACTIVE" ? "Active" : "Inactive", // @TODO: use this and remove the next line
+              status:
+                luxorStatus === "ACTIVE" ? "Active" : "Deployment in Progress",
               hashRate: `${luxorWorker?.hashrate || miner.hashRate} TH/s`,
             };
           },
