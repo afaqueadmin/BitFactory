@@ -32,6 +32,7 @@ interface ElectricityData {
   balance: string;
   rawBalance?: number;
   rawAmount?: number;
+  narration?: string | null;
 }
 
 type Order = "asc" | "desc";
@@ -68,6 +69,11 @@ const headCells: readonly HeadCell[] = [
     id: "balance",
     numeric: true,
     label: "Balance",
+  },
+  {
+    id: "narration",
+    numeric: false,
+    label: "Description",
   },
 ];
 
@@ -171,10 +177,6 @@ export default function ElectricityCostTable() {
   const [totalCount, setTotalCount] = useState(0);
 
   // Fetch cost payments data from API
-  useEffect(() => {
-    fetchCostPayments();
-  }, [page, rowsPerPage]);
-
   const fetchCostPayments = async () => {
     try {
       setLoading(true);
@@ -211,6 +213,11 @@ export default function ElectricityCostTable() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchCostPayments();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, rowsPerPage]);
 
   const handleRequestSort = (
     event: React.MouseEvent<unknown>,
@@ -388,6 +395,20 @@ export default function ElectricityCostTable() {
                             sx={{ color: getBalanceColor(row.balance) }}
                           >
                             {row.balance}
+                          </Typography>
+                        </TableCell>
+                        <TableCell sx={{ py: 2 }}>
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              maxWidth: 300,
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                            }}
+                            title={row.narration || undefined}
+                          >
+                            {row.narration || "-"}
                           </Typography>
                         </TableCell>
                       </TableRow>

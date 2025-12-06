@@ -17,6 +17,7 @@ enum Role {
 enum PaymentType {
   PAYMENT
   ELECTRICITY_CHARGES
+  ADJUSTMENT
 }
 
 model User {
@@ -111,6 +112,7 @@ model CostPayment {
   amount        Float
   consumption   Float
   type          PaymentType
+  narration     String?       // Only for ADJUSTMENT: reason/description (max 500 chars)
   createdAt     DateTime      @default(now())
   user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 

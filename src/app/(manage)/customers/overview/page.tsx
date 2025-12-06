@@ -27,6 +27,7 @@ import CreateUserModal from "@/components/CreateUserModal";
 import EditCustomerModal from "@/components/EditCustomerModal";
 import ChangePasswordModal from "@/components/ChangePasswordModal";
 import AddPaymentModal from "@/components/AddPaymentModal";
+import AddAdjustmentModal from "@/components/AddAdjustmentModal";
 
 interface FetchedUser {
   id: string;
@@ -54,6 +55,7 @@ export default function CustomerOverview() {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [changePasswordModalOpen, setChangePasswordModalOpen] = useState(false);
   const [addPaymentModalOpen, setAddPaymentModalOpen] = useState(false);
+  const [addAdjustmentModalOpen, setAddAdjustmentModalOpen] = useState(false);
   const [users, setUsers] = useState<FetchedUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -207,6 +209,13 @@ export default function CustomerOverview() {
     handleMenuClose();
   };
 
+  const handleCreateAdjustment = () => {
+    if (selectedCustomer) {
+      setAddAdjustmentModalOpen(true);
+    }
+    handleMenuClose();
+  };
+
   const handleDeleteCustomer = async () => {
     if (!selectedCustomer) return;
 
@@ -329,6 +338,17 @@ export default function CustomerOverview() {
       {selectedCustomer && (
         <AddPaymentModal
           open={addPaymentModalOpen}
+          onClose={handleModalClose}
+          onSuccess={handleUserCreated}
+          customerId={selectedCustomer.id}
+          customerName={selectedCustomer.name}
+        />
+      )}
+
+      {/* Add Adjustment Modal */}
+      {selectedCustomer && (
+        <AddAdjustmentModal
+          open={addAdjustmentModalOpen}
           onClose={handleModalClose}
           onSuccess={handleUserCreated}
           customerId={selectedCustomer.id}
@@ -489,6 +509,7 @@ export default function CustomerOverview() {
         <MenuItem onClick={handleEditCustomer}>Edit Customer</MenuItem>
         <MenuItem onClick={handleChangePassword}>Change Password</MenuItem>
         <MenuItem onClick={handleAddPayment}>Add Payment</MenuItem>
+        <MenuItem onClick={handleCreateAdjustment}>Create Adjustment</MenuItem>
         <MenuItem onClick={handleDeleteCustomer} sx={{ color: "error.main" }}>
           Delete Customer
         </MenuItem>

@@ -53,6 +53,7 @@ export async function GET(request: NextRequest) {
         amount: true,
         consumption: true,
         type: true,
+        narration: true,
         createdAt: true,
       },
     });
@@ -83,6 +84,9 @@ export async function GET(request: NextRequest) {
       } else if (payment.type === "ELECTRICITY_CHARGES") {
         // Electricity charges decrease balance (amount is already negative)
         runningBalance += payment.amount;
+      } else if (payment.type === "ADJUSTMENT") {
+        // Adjustments add to balance (can be positive or negative)
+        runningBalance += payment.amount;
       }
       balanceMap.set(payment.id, runningBalance);
     }
@@ -98,19 +102,25 @@ export async function GET(request: NextRequest) {
             ? "Payment"
             : payment.type === "ELECTRICITY_CHARGES"
               ? "Electricity Charges"
-              : payment.type,
+              : payment.type === "ADJUSTMENT"
+                ? "Adjustment"
+                : payment.type,
         consumption:
           payment.consumption > 0
             ? `${payment.consumption.toFixed(2)} kWh`
             : "N/A",
         amount:
-          (payment.type === "PAYMENT" ? "+ " : "- ") +
-          `${Math.abs(payment.amount).toFixed(2)} $`,
+          (payment.type === "PAYMENT" || payment.type === "ADJUSTMENT"
+            ? payment.amount >= 0
+              ? "+ "
+              : "- "
+            : "- ") + `${Math.abs(payment.amount).toFixed(2)} $`,
         balance:
           (calculatedBalance >= 0 ? "+ " : "- ") +
           `${Math.abs(calculatedBalance).toFixed(2)} $`,
         rawBalance: calculatedBalance,
         rawAmount: payment.amount,
+        narration: payment.narration || null,
       };
     });
 
@@ -167,7 +177,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { userId: customerId, amount, type } = await request.json();
+    const {
+      userId: customerId,
+      amount,
+      type,
+      narration,
+    } = await request.json();
 
     // Validate input
     if (!customerId || amount === undefined || !type) {
@@ -180,6 +195,47 @@ export async function POST(request: NextRequest) {
     if (typeof amount !== "number" || amount === 0) {
       return NextResponse.json(
         { error: "Amount must be a non-zero number" },
+        { status: 400 },
+      );
+    }
+
+    // Validate type is one of the valid PaymentType values
+    const validPaymentTypes = ["PAYMENT", "ELECTRICITY_CHARGES", "ADJUSTMENT"];
+    if (!validPaymentTypes.includes(type)) {
+      return NextResponse.json(
+        {
+          error: `Invalid payment type. Must be one of: ${validPaymentTypes.join(", ")}`,
+        },
+        { status: 400 },
+      );
+    }
+
+    // Validate narration for ADJUSTMENT type
+    if (type === "ADJUSTMENT") {
+      if (!narration || typeof narration !== "string") {
+        return NextResponse.json(
+          { error: "Narration is required for ADJUSTMENT type" },
+          { status: 400 },
+        );
+      }
+
+      if (narration.trim().length === 0) {
+        return NextResponse.json(
+          { error: "Narration cannot be empty" },
+          { status: 400 },
+        );
+      }
+
+      if (narration.length > 500) {
+        return NextResponse.json(
+          { error: "Narration must not exceed 500 characters" },
+          { status: 400 },
+        );
+      }
+    } else if (narration) {
+      // Narration should not be provided for non-ADJUSTMENT types
+      return NextResponse.json(
+        { error: "Narration is only allowed for ADJUSTMENT type" },
         { status: 400 },
       );
     }
@@ -204,6 +260,7 @@ export async function POST(request: NextRequest) {
         amount,
         type,
         consumption: 0,
+        narration: type === "ADJUSTMENT" ? narration : null,
       },
     });
 
