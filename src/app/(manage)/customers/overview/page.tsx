@@ -38,7 +38,7 @@ interface FetchedUser {
   country: string;
   phoneNumber: string;
   companyName: string;
-  companyUrl: string;
+  luxorSubaccountName: string;
   streetAddress: string;
   twoFactorEnabled: boolean;
   joinDate: string;
@@ -449,7 +449,7 @@ export default function CustomerOverview() {
                   <TableCell>Customer</TableCell>
                   <TableCell>Email</TableCell>
                   <TableCell>Role</TableCell>
-                  <TableCell>Company URL</TableCell>
+                  <TableCell>Luxor Subaccount</TableCell>
                   <TableCell align="center">Miners</TableCell>
                   <TableCell align="center">Status</TableCell>
                   <TableCell>Join Date</TableCell>
@@ -472,7 +472,9 @@ export default function CustomerOverview() {
                     </TableCell>
                     <TableCell>{customer.email}</TableCell>
                     <TableCell>{customer.role}</TableCell>
-                    <TableCell>{customer.companyUrl ?? "Not Set"}</TableCell>
+                    <TableCell>
+                      {customer.luxorSubaccountName ?? "Not Set"}
+                    </TableCell>
                     <TableCell align="center">{customer.miners}</TableCell>
                     <TableCell align="center">
                       <Chip
