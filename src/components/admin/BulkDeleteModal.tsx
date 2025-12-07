@@ -30,6 +30,7 @@ export function BulkDeleteModal({
   const handleConfirm = async () => {
     try {
       setLoading(true);
+      setError("");
       await onSubmit();
       onClose();
     } catch (err) {

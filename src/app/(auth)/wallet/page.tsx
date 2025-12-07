@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { Box, Typography, Paper, CircularProgress } from "@mui/material";
 import ElectricityCostTable from "@/components/ElectricityCostTable";
-import TransactionHistory from "@/components/TransactionHistory";
+// import TransactionHistory from "@/components/TransactionHistory"; // TODO: Enable in future
 import { formatValue } from "@/lib/helpers/formatValue";
 import { useUser } from "@/lib/hooks/useUser";
 import { LuxorPaymentSettings } from "@/lib/types/wallet";
@@ -17,13 +17,23 @@ interface EarningsSummary {
   subaccountCount: number;
 }
 
+interface Revenue24h {
+  revenue24h: { btc: number; usd: number };
+  currency: string;
+  timestamp: string;
+  dataSource: string;
+}
+
 export default function WalletPage() {
   const [summary, setSummary] = useState<EarningsSummary | null>(null);
+  const [revenue24h, setRevenue24h] = useState<Revenue24h | null>(null);
   const [walletSettings, setWalletSettings] =
     useState<LuxorPaymentSettings | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [revenue24hLoading, setRevenue24hLoading] = useState(false);
   const [walletLoading, setWalletLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [revenue24hError, setRevenue24hError] = useState<string | null>(null);
   const [walletError, setWalletError] = useState<string | null>(null);
   const { user } = useUser();
 
@@ -57,6 +67,38 @@ export default function WalletPage() {
 
     // Call the API immediately on component mount
     fetchEarningsSummary();
+  }, []);
+
+  // Fetch 24-hour revenue from API
+  useEffect(() => {
+    const fetchRevenue24h = async () => {
+      try {
+        setRevenue24hLoading(true);
+        setRevenue24hError(null);
+
+        const response = await fetch("/api/wallet/earnings-24h");
+
+        if (!response.ok) {
+          throw new Error(
+            `Failed to fetch 24h revenue: ${response.statusText}`,
+          );
+        }
+
+        const data: Revenue24h = await response.json();
+        setRevenue24h(data);
+        console.log("[Wallet] 24h revenue loaded:", data);
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : "Unknown error";
+        console.error("[Wallet] Error fetching 24h revenue:", error);
+        setRevenue24hError(errorMessage);
+      } finally {
+        setRevenue24hLoading(false);
+      }
+    };
+
+    // Call the API immediately on component mount
+    fetchRevenue24h();
   }, []);
 
   // Fetch wallet settings from Luxor API
@@ -153,8 +195,16 @@ export default function WalletPage() {
         </Paper>
       )}
 
-      <Box sx={{ display: "flex", gap: 3, mt: 2, flexWrap: "wrap" }}>
-        <Box sx={{ flex: "1 1 300px", minWidth: "300px" }}>
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
+          gap: 3,
+          mt: 2,
+        }}
+      >
+        {/* Top Row: Total Earnings & Primary Wallet Address */}
+        <Box>
           <Paper
             sx={{
               p: 3,
@@ -191,43 +241,7 @@ export default function WalletPage() {
           </Paper>
         </Box>
 
-        <Box sx={{ flex: "1 1 300px", minWidth: "300px" }}>
-          <Paper
-            sx={{
-              p: 3,
-              borderRadius: 2,
-              backgroundColor: (theme) =>
-                theme.palette.mode === "light" ? "#4caf50" : "#2e7d32",
-              color: "white",
-            }}
-          >
-            <Typography variant="subtitle1">Pending Payouts</Typography>
-            {isLoading ? (
-              <Box
-                sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1 }}
-              >
-                <CircularProgress size={24} sx={{ color: "white" }} />
-                <Typography variant="body2">Loading...</Typography>
-              </Box>
-            ) : (
-              <Box
-                sx={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                }}
-              >
-                <Typography variant="h5" fontWeight="bold">
-                  ₿ {summary?.pendingPayouts.btc.toFixed(8) ?? "0.00"}
-                </Typography>
-                <Typography variant="h5" fontWeight="bold">
-                  ${summary?.pendingPayouts.usd.toFixed(2) ?? "0.00"}
-                </Typography>
-              </Box>
-            )}
-          </Paper>
-        </Box>
-        <Box sx={{ flex: "1 1 300px", minWidth: "300px" }}>
+        <Box>
           <Paper
             sx={{
               p: 3,
@@ -264,10 +278,90 @@ export default function WalletPage() {
             )}
           </Paper>
         </Box>
+
+        {/* Bottom Row: Revenue (24 hours) & Pending Payouts */}
+        <Box>
+          <Paper
+            sx={{
+              p: 3,
+              borderRadius: 2,
+              backgroundColor: (theme) =>
+                theme.palette.mode === "light" ? "#9c27b0" : "#6a1b9a",
+              color: "white",
+            }}
+          >
+            <Typography variant="subtitle1">Revenue (24 Hours)</Typography>
+            {revenue24hLoading ? (
+              <Box
+                sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1 }}
+              >
+                <CircularProgress size={24} sx={{ color: "white" }} />
+                <Typography variant="body2">Loading...</Typography>
+              </Box>
+            ) : revenue24hError ? (
+              <Typography variant="body2" sx={{ mt: 1, fontSize: "0.9rem" }}>
+                {revenue24hError}
+              </Typography>
+            ) : (
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <Typography variant="h5" fontWeight="bold">
+                  ₿ {revenue24h?.revenue24h.btc.toFixed(8) ?? "0.00"}
+                </Typography>
+                <Typography variant="h5" fontWeight="bold">
+                  ${revenue24h?.revenue24h.usd.toFixed(2) ?? "0.00"}
+                </Typography>
+              </Box>
+            )}
+          </Paper>
+        </Box>
+
+        <Box>
+          <Paper
+            sx={{
+              p: 3,
+              borderRadius: 2,
+              backgroundColor: (theme) =>
+                theme.palette.mode === "light" ? "#4caf50" : "#2e7d32",
+              color: "white",
+            }}
+          >
+            <Typography variant="subtitle1">Pending Payouts</Typography>
+            {isLoading ? (
+              <Box
+                sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1 }}
+              >
+                <CircularProgress size={24} sx={{ color: "white" }} />
+                <Typography variant="body2">Loading...</Typography>
+              </Box>
+            ) : (
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <Typography variant="h5" fontWeight="bold">
+                  ₿ {summary?.pendingPayouts.btc.toFixed(8) ?? "0.00"}
+                </Typography>
+                <Typography variant="h5" fontWeight="bold">
+                  ${summary?.pendingPayouts.usd.toFixed(2) ?? "0.00"}
+                </Typography>
+              </Box>
+            )}
+          </Paper>
+        </Box>
       </Box>
 
       {/* Transaction History */}
-      <TransactionHistory limit={50} />
+      {/* TODO: Enable Transaction History from Luxor API in the future */}
+      {/* <TransactionHistory limit={50} /> */}
 
       {/* Electricity Cost Table */}
       <ElectricityCostTable />

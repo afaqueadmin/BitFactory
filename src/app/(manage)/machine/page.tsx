@@ -239,10 +239,10 @@ export default function MachinePage() {
    * Handle bulk edit
    */
   const handleBulkEdit = async (updates: Record<string, unknown>) => {
-    try {
-      setTableError(null);
-      const filteredMinerIds = getSortedFilteredMiners().map((m) => m.id);
+    setTableError(null);
+    const filteredMinerIds = getSortedFilteredMiners().map((m) => m.id);
 
+    try {
       const response = await fetch("/api/machine/bulk-edit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -255,18 +255,21 @@ export default function MachinePage() {
       const data: ApiResponse = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Failed to update miners");
+        const errorMsg = data.error || "Failed to update miners";
+        setTableError(errorMsg);
+        throw new Error(errorMsg);
       }
 
-      // Refresh miners list
+      // Refresh miners list and wait for completion
       await fetchData();
+      // Successfully updated and refreshed - operation complete
     } catch (err) {
       const errorMsg =
         err instanceof Error
           ? err.message
           : "An error occurred while updating miners";
       setTableError(errorMsg);
-      throw new Error(errorMsg);
+      throw err;
     }
   };
 
@@ -274,10 +277,10 @@ export default function MachinePage() {
    * Handle bulk delete
    */
   const handleBulkDelete = async () => {
-    try {
-      setTableError(null);
-      const filteredMinerIds = getSortedFilteredMiners().map((m) => m.id);
+    setTableError(null);
+    const filteredMinerIds = getSortedFilteredMiners().map((m) => m.id);
 
+    try {
       const response = await fetch("/api/machine/bulk-delete", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -289,18 +292,21 @@ export default function MachinePage() {
       const data: ApiResponse = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Failed to delete miners");
+        const errorMsg = data.error || "Failed to delete miners";
+        setTableError(errorMsg);
+        throw new Error(errorMsg);
       }
 
-      // Refresh miners list
+      // Refresh miners list and wait for completion
       await fetchData();
+      // Successfully deleted and refreshed - operation complete
     } catch (err) {
       const errorMsg =
         err instanceof Error
           ? err.message
           : "An error occurred while deleting miners";
       setTableError(errorMsg);
-      throw new Error(errorMsg);
+      throw err;
     }
   };
 
