@@ -18,6 +18,8 @@ import {
 import { Add as AddIcon } from "@mui/icons-material";
 import MinerFormModal from "@/components/admin/MinerFormModal";
 import MinersTable from "@/components/admin/MinersTable";
+import { BulkEditModal } from "@/components/admin/BulkEditModal";
+import { BulkDeleteModal } from "@/components/admin/BulkDeleteModal";
 
 /**
  * User object from API
@@ -91,6 +93,8 @@ export default function MachinePage() {
   const [selectedSpaceFilter, setSelectedSpaceFilter] = useState<string>("");
   const [selectedModelFilter, setSelectedModelFilter] = useState<string>("");
   const [selectedRateFilter, setSelectedRateFilter] = useState<string>("");
+  const [showBulkEditModal, setShowBulkEditModal] = useState(false);
+  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
 
   /**
    * Fetch all miners, users, and spaces
@@ -232,6 +236,75 @@ export default function MachinePage() {
   };
 
   /**
+   * Handle bulk edit
+   */
+  const handleBulkEdit = async (updates: Record<string, unknown>) => {
+    try {
+      setTableError(null);
+      const filteredMinerIds = getSortedFilteredMiners().map((m) => m.id);
+
+      const response = await fetch("/api/machine/bulk-edit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          minerIds: filteredMinerIds,
+          updates,
+        }),
+      });
+
+      const data: ApiResponse = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to update miners");
+      }
+
+      // Refresh miners list
+      await fetchData();
+    } catch (err) {
+      const errorMsg =
+        err instanceof Error
+          ? err.message
+          : "An error occurred while updating miners";
+      setTableError(errorMsg);
+      throw new Error(errorMsg);
+    }
+  };
+
+  /**
+   * Handle bulk delete
+   */
+  const handleBulkDelete = async () => {
+    try {
+      setTableError(null);
+      const filteredMinerIds = getSortedFilteredMiners().map((m) => m.id);
+
+      const response = await fetch("/api/machine/bulk-delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          minerIds: filteredMinerIds,
+        }),
+      });
+
+      const data: ApiResponse = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to delete miners");
+      }
+
+      // Refresh miners list
+      await fetchData();
+    } catch (err) {
+      const errorMsg =
+        err instanceof Error
+          ? err.message
+          : "An error occurred while deleting miners";
+      setTableError(errorMsg);
+      throw new Error(errorMsg);
+    }
+  };
+
+  /**
    * Handle user filter change
    */
   const handleUserFilterChange = (event: SelectChangeEvent) => {
@@ -356,15 +429,37 @@ export default function MachinePage() {
               Manage and monitor all mining machines in your system
             </Typography>
           </Box>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={handleCreate}
-            disabled={loading || formOpen}
-            size="large"
-          >
-            Add Miner
-          </Button>
+          <Stack direction="row" spacing={2}>
+            <Button
+              variant="contained"
+              color="warning"
+              onClick={() => setShowBulkEditModal(true)}
+              disabled={
+                loading || formOpen || getSortedFilteredMiners().length === 0
+              }
+            >
+              Bulk Edit
+            </Button>
+            <Button
+              variant="contained"
+              color="error"
+              onClick={() => setShowBulkDeleteModal(true)}
+              disabled={
+                loading || formOpen || getSortedFilteredMiners().length === 0
+              }
+            >
+              Bulk Delete
+            </Button>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={handleCreate}
+              disabled={loading || formOpen}
+              size="large"
+            >
+              Add Miner
+            </Button>
+          </Stack>
         </Stack>
 
         {/* Error Message */}
@@ -575,6 +670,24 @@ export default function MachinePage() {
         users={users}
         spaces={spaces}
         isLoading={loading}
+      />
+
+      {/* Bulk Edit Modal */}
+      <BulkEditModal
+        isOpen={showBulkEditModal}
+        onClose={() => setShowBulkEditModal(false)}
+        minerCount={getSortedFilteredMiners().length}
+        spaces={spaces}
+        onSubmit={handleBulkEdit}
+      />
+
+      {/* Bulk Delete Modal */}
+      <BulkDeleteModal
+        isOpen={showBulkDeleteModal}
+        onClose={() => setShowBulkDeleteModal(false)}
+        minerCount={getSortedFilteredMiners().length}
+        minersPreview={getSortedFilteredMiners().slice(0, 10)}
+        onSubmit={handleBulkDelete}
       />
     </Box>
   );
