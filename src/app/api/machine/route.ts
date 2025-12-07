@@ -155,6 +155,7 @@ export async function GET(
             id: true,
             name: true,
             email: true,
+            luxorSubaccountName: true,
           },
         },
         space: {
@@ -295,6 +296,30 @@ export async function POST(
       );
     }
 
+    // Check if miner name is unique for this user
+    const existingMinerWithName = await prisma.miner.findUnique({
+      where: {
+        name_userId: {
+          name: name.trim(),
+          userId,
+        },
+      },
+      select: { id: true },
+    });
+
+    if (existingMinerWithName) {
+      console.error(
+        `[Miners API] POST: Miner name already exists for this user - ${name}`,
+      );
+      return NextResponse.json<ApiResponse>(
+        {
+          success: false,
+          error: "A miner with this name already exists for this user",
+        },
+        { status: 409 },
+      );
+    }
+
     // Verify space exists
     const spaceExists = await prisma.space.findUnique({
       where: { id: spaceId },
@@ -354,6 +379,7 @@ export async function POST(
               id: true,
               name: true,
               email: true,
+              luxorSubaccountName: true,
             },
           },
           space: {

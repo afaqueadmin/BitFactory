@@ -101,6 +101,7 @@ model Miner {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
+  @@unique([name, userId])
   @@index([hardwareId])
   @@map("miners")
 }

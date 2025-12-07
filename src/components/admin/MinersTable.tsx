@@ -42,6 +42,7 @@ interface User {
   id: string;
   name: string | null;
   email: string;
+  luxorSubaccountName?: string | null;
 }
 
 /**
@@ -153,6 +154,7 @@ export default function MinersTable({
               <TableCell sx={{ fontWeight: "bold" }}>Name</TableCell>
               <TableCell sx={{ fontWeight: "bold" }}>Model</TableCell>
               <TableCell sx={{ fontWeight: "bold" }}>User</TableCell>
+              <TableCell sx={{ fontWeight: "bold" }}>Subaccount</TableCell>
               <TableCell sx={{ fontWeight: "bold" }}>Space</TableCell>
               <TableCell sx={{ fontWeight: "bold" }} align="right">
                 Power Usage (kWh)
@@ -172,13 +174,13 @@ export default function MinersTable({
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={9} align="center" sx={{ py: 4 }}>
+                <TableCell colSpan={10} align="center" sx={{ py: 4 }}>
                   <CircularProgress />
                 </TableCell>
               </TableRow>
             ) : memoizedRows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} align="center" sx={{ py: 4 }}>
+                <TableCell colSpan={10} align="center" sx={{ py: 4 }}>
                   <Typography color="text.secondary">
                     No miners found. Create one to get started.
                   </Typography>
@@ -195,6 +197,9 @@ export default function MinersTable({
                   <TableCell>{miner.hardware?.model || "—"}</TableCell>
                   <TableCell>
                     {miner.user?.name || miner.user?.email || "—"}
+                  </TableCell>
+                  <TableCell>
+                    {miner.user?.luxorSubaccountName || "—"}
                   </TableCell>
                   <TableCell>
                     {miner.space ? (
@@ -214,7 +219,10 @@ export default function MinersTable({
                     {(miner.hardware?.powerUsage || 0).toFixed(2)} kW
                   </TableCell>
                   <TableCell align="right">
-                    {parseFloat(String(miner.hardware?.hashRate || 0)).toFixed(2)} TH/s
+                    {parseFloat(String(miner.hardware?.hashRate || 0)).toFixed(
+                      2,
+                    )}{" "}
+                    TH/s
                   </TableCell>
                   <TableCell align="center">
                     <Chip

@@ -57,6 +57,7 @@ interface User {
   id: string;
   name: string | null;
   email: string;
+  luxorSubaccountName?: string | null;
 }
 
 /**
@@ -107,7 +108,9 @@ export default function MinerFormModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hardware, setHardware] = useState<Hardware[]>([]);
-  const [selectedHardware, setSelectedHardware] = useState<Hardware | null>(null);
+  const [selectedHardware, setSelectedHardware] = useState<Hardware | null>(
+    null,
+  );
   const [hardwareLoading, setHardwareLoading] = useState(false);
   const [formData, setFormData] = useState<MinerFormData>({
     name: "",
@@ -173,7 +176,9 @@ export default function MinerFormModal({
    * Handle form input change
    */
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | SelectChangeEvent
+    e:
+      | React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+      | SelectChangeEvent,
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
@@ -300,17 +305,29 @@ export default function MinerFormModal({
         )}
 
         <Box component="form" onSubmit={handleSubmit} sx={{ mt: 2 }}>
-          <TextField
+          <FormControl
             fullWidth
-            label="Miner Name/ID"
-            name="name"
-            value={formData.name}
-            onChange={handleChange}
-            placeholder="e.g., Miner-001"
             margin="normal"
             required
-            disabled={loading || isLoading || hardwareLoading}
-          />
+            disabled={loading || isLoading}
+          >
+            <InputLabel>User</InputLabel>
+            <Select
+              name="userId"
+              value={formData.userId}
+              onChange={handleChange}
+              label="User"
+            >
+              <MenuItem value="">
+                <em>Select a user</em>
+              </MenuItem>
+              {users.map((user) => (
+                <MenuItem key={user.id} value={user.id}>
+                  {user.name} ({user.email})
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
 
           <FormControl
             fullWidth
@@ -348,35 +365,15 @@ export default function MinerFormModal({
           <TextField
             fullWidth
             label="Hash Rate (TH/s)"
-            value={selectedHardware ? parseFloat(String(selectedHardware.hashRate)).toFixed(2) : "—"}
+            value={
+              selectedHardware
+                ? parseFloat(String(selectedHardware.hashRate)).toFixed(2)
+                : "—"
+            }
             disabled
             margin="normal"
             inputProps={{ readOnly: true }}
           />
-
-          <FormControl
-            fullWidth
-            margin="normal"
-            required
-            disabled={loading || isLoading}
-          >
-            <InputLabel>User</InputLabel>
-            <Select
-              name="userId"
-              value={formData.userId}
-              onChange={handleChange}
-              label="User"
-            >
-              <MenuItem value="">
-                <em>Select a user</em>
-              </MenuItem>
-              {users.map((user) => (
-                <MenuItem key={user.id} value={user.id}>
-                  {user.name} ({user.email})
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
 
           <FormControl
             fullWidth
@@ -401,6 +398,18 @@ export default function MinerFormModal({
               ))}
             </Select>
           </FormControl>
+
+          <TextField
+            fullWidth
+            label="Miner Name/ID"
+            name="name"
+            value={formData.name}
+            onChange={handleChange}
+            placeholder="e.g., Miner-001"
+            margin="normal"
+            required
+            disabled={loading || isLoading || hardwareLoading}
+          />
 
           <FormControl
             fullWidth

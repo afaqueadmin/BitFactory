@@ -9,6 +9,11 @@ import {
   Stack,
   Alert,
   CircularProgress,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  SelectChangeEvent,
 } from "@mui/material";
 import { Add as AddIcon } from "@mui/icons-material";
 import MinerFormModal from "@/components/admin/MinerFormModal";
@@ -22,6 +27,7 @@ interface User {
   name: string | null;
   email: string;
   role?: string;
+  luxorSubaccountName?: string | null;
 }
 
 /**
@@ -80,6 +86,9 @@ export default function MachinePage() {
   const [formOpen, setFormOpen] = useState(false);
   const [selectedMiner, setSelectedMiner] = useState<Miner | null>(null);
   const [tableError, setTableError] = useState<string | null>(null);
+  const [selectedUserFilter, setSelectedUserFilter] = useState<string>("");
+  const [selectedSpaceFilter, setSelectedSpaceFilter] = useState<string>("");
+  const [selectedModelFilter, setSelectedModelFilter] = useState<string>("");
 
   /**
    * Fetch all miners, users, and spaces
@@ -220,6 +229,78 @@ export default function MachinePage() {
     }
   };
 
+  /**
+   * Handle user filter change
+   */
+  const handleUserFilterChange = (event: SelectChangeEvent) => {
+    setSelectedUserFilter(event.target.value);
+  };
+
+  /**
+   * Handle space filter change
+   */
+  const handleSpaceFilterChange = (event: SelectChangeEvent) => {
+    setSelectedSpaceFilter(event.target.value);
+  };
+
+  /**
+   * Handle model filter change
+   */
+  const handleModelFilterChange = (event: SelectChangeEvent) => {
+    setSelectedModelFilter(event.target.value);
+  };
+
+  /**
+   * Get unique models from miners
+   */
+  const getUniqueModels = () => {
+    const models = new Set<string>();
+    miners.forEach((m) => {
+      if (m.hardware?.model) {
+        models.add(m.hardware.model);
+      }
+    });
+    return Array.from(models).sort();
+  };
+
+  /**
+   * Get sorted and filtered miners
+   */
+  const getSortedFilteredMiners = () => {
+    let filtered = miners;
+
+    // Filter by selected user
+    if (selectedUserFilter) {
+      filtered = filtered.filter((m) => m.userId === selectedUserFilter);
+    }
+
+    // Filter by selected space
+    if (selectedSpaceFilter) {
+      filtered = filtered.filter((m) => m.spaceId === selectedSpaceFilter);
+    }
+
+    // Filter by selected model
+    if (selectedModelFilter) {
+      filtered = filtered.filter(
+        (m) => m.hardware?.model === selectedModelFilter,
+      );
+    }
+
+    // Sort by user (grouped by userId, then by miner name within each user)
+    return filtered.sort((a, b) => {
+      // First sort by user ID
+      if (a.userId !== b.userId) {
+        const userA = users.find((u) => u.id === a.userId);
+        const userB = users.find((u) => u.id === b.userId);
+        const nameA = userA?.name || "";
+        const nameB = userB?.name || "";
+        return nameA.localeCompare(nameB);
+      }
+      // Then sort by miner name within same user
+      return a.name.localeCompare(b.name);
+    });
+  };
+
   return (
     <Box
       component="main"
@@ -281,6 +362,84 @@ export default function MachinePage() {
           </Box>
         ) : (
           <>
+            {/* Filter Section */}
+            <Box
+              sx={{
+                p: 2,
+                mb: 3,
+                bgcolor: "background.paper",
+                borderRadius: 1,
+                border: "1px solid",
+                borderColor: "divider",
+              }}
+            >
+              <Typography
+                variant="body2"
+                sx={{ fontWeight: "600", mb: 2, color: "text.secondary" }}
+              >
+                Filter Options
+              </Typography>
+              <Stack
+                direction={{ xs: "column", sm: "row" }}
+                spacing={2}
+                sx={{ flexWrap: "wrap" }}
+              >
+                <FormControl sx={{ minWidth: 250 }}>
+                  <InputLabel>Filter by User</InputLabel>
+                  <Select
+                    value={selectedUserFilter}
+                    onChange={handleUserFilterChange}
+                    label="Filter by User"
+                  >
+                    <MenuItem value="">
+                      <em>All Users</em>
+                    </MenuItem>
+                    {users.map((user) => (
+                      <MenuItem key={user.id} value={user.id}>
+                        {user.name} ({user.email})
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+
+                <FormControl sx={{ minWidth: 250 }}>
+                  <InputLabel>Filter by Space</InputLabel>
+                  <Select
+                    value={selectedSpaceFilter}
+                    onChange={handleSpaceFilterChange}
+                    label="Filter by Space"
+                  >
+                    <MenuItem value="">
+                      <em>All Spaces</em>
+                    </MenuItem>
+                    {spaces.map((space) => (
+                      <MenuItem key={space.id} value={space.id}>
+                        {space.name} ({space.location})
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+
+                <FormControl sx={{ minWidth: 250 }}>
+                  <InputLabel>Filter by Model</InputLabel>
+                  <Select
+                    value={selectedModelFilter}
+                    onChange={handleModelFilterChange}
+                    label="Filter by Model"
+                  >
+                    <MenuItem value="">
+                      <em>All Models</em>
+                    </MenuItem>
+                    {getUniqueModels().map((model) => (
+                      <MenuItem key={model} value={model}>
+                        {model}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Stack>
+            </Box>
+
             {/* Stats Bar */}
             <Stack
               direction={{ xs: "column", sm: "row" }}
@@ -294,7 +453,7 @@ export default function MachinePage() {
                   Total Miners
                 </Typography>
                 <Typography variant="h5" sx={{ fontWeight: "bold", mt: 0.5 }}>
-                  {miners.length}
+                  {getSortedFilteredMiners().length}
                 </Typography>
               </Box>
               <Box
@@ -304,7 +463,11 @@ export default function MachinePage() {
                   Active Miners
                 </Typography>
                 <Typography variant="h5" sx={{ fontWeight: "bold", mt: 0.5 }}>
-                  {miners.filter((m) => m.status === "ACTIVE").length}
+                  {
+                    getSortedFilteredMiners().filter(
+                      (m) => m.status === "ACTIVE",
+                    ).length
+                  }
                 </Typography>
               </Box>
               <Box
@@ -314,7 +477,13 @@ export default function MachinePage() {
                   Total Hash Rate
                 </Typography>
                 <Typography variant="h5" sx={{ fontWeight: "bold", mt: 0.5 }}>
-                  {miners.reduce((sum, m) => sum + parseFloat(String(m.hardware?.hashRate || 0)), 0).toFixed(2)}{" "}
+                  {getSortedFilteredMiners()
+                    .reduce(
+                      (sum, m) =>
+                        sum + parseFloat(String(m.hardware?.hashRate || 0)),
+                      0,
+                    )
+                    .toFixed(2)}{" "}
                   TH/s
                 </Typography>
               </Box>
@@ -325,7 +494,9 @@ export default function MachinePage() {
                   Total Power Usage
                 </Typography>
                 <Typography variant="h5" sx={{ fontWeight: "bold", mt: 0.5 }}>
-                  {miners.reduce((sum, m) => sum + (m.hardware?.powerUsage || 0), 0).toFixed(2)}{" "}
+                  {getSortedFilteredMiners()
+                    .reduce((sum, m) => sum + (m.hardware?.powerUsage || 0), 0)
+                    .toFixed(2)}{" "}
                   kW
                 </Typography>
               </Box>
@@ -333,7 +504,7 @@ export default function MachinePage() {
 
             {/* Miners Table */}
             <MinersTable
-              miners={miners}
+              miners={getSortedFilteredMiners()}
               onEdit={handleEdit}
               onDelete={handleDelete}
               isLoading={loading}

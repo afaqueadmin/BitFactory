@@ -140,7 +140,36 @@ export async function PUT(
           { status: 400 },
         );
       }
-      updateData.name = name.trim();
+
+      const trimmedName = name.trim();
+
+      // Check if new name is unique for the user (only if name is being changed)
+      if (trimmedName !== existingMiner.name) {
+        const existingMinerWithName = await prisma.miner.findUnique({
+          where: {
+            name_userId: {
+              name: trimmedName,
+              userId: existingMiner.userId,
+            },
+          },
+          select: { id: true },
+        });
+
+        if (existingMinerWithName) {
+          console.error(
+            `[Miners API] PUT: Miner name already exists for this user - ${trimmedName}`,
+          );
+          return NextResponse.json<ApiResponse>(
+            {
+              success: false,
+              error: "A miner with this name already exists for this user",
+            },
+            { status: 409 },
+          );
+        }
+      }
+
+      updateData.name = trimmedName;
     }
 
     if (hardwareId !== undefined) {
@@ -204,6 +233,36 @@ export async function PUT(
           { success: false, error: "User not found" },
           { status: 404 },
         );
+      }
+
+      // If changing to a different user, check if miner name is unique for the new user
+      if (userId !== existingMiner.userId) {
+        // Use the new name if provided, otherwise use existing name
+        const nameToCheck = updateData.name || existingMiner.name;
+
+        const existingMinerWithName = await prisma.miner.findUnique({
+          where: {
+            name_userId: {
+              name: nameToCheck,
+              userId,
+            },
+          },
+          select: { id: true },
+        });
+
+        if (existingMinerWithName) {
+          console.error(
+            `[Miners API] PUT: Miner name already exists for target user - ${nameToCheck}`,
+          );
+          return NextResponse.json<ApiResponse>(
+            {
+              success: false,
+              error:
+                "A miner with this name already exists for the target user",
+            },
+            { status: 409 },
+          );
+        }
       }
 
       updateData.userId = userId;
@@ -289,6 +348,7 @@ export async function PUT(
               id: true,
               name: true,
               email: true,
+              luxorSubaccountName: true,
             },
           },
           space: {
