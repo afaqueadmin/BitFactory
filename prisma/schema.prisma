@@ -98,12 +98,25 @@ model Miner {
   user          User      @relation(fields: [userId], references: [id], onDelete: Restrict)
   space         Space     @relation(fields: [spaceId], references: [id])
   hardware      Hardware  @relation(fields: [hardwareId], references: [id])
+  rateHistory   MinerRateHistory[]
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
   @@unique([name, userId])
   @@index([hardwareId])
   @@map("miners")
+}
+
+model MinerRateHistory {
+  id            String    @id @default(cuid())
+  minerId       String
+  rate_per_kwh  Decimal   @db.Decimal(10, 6)
+  miner         Miner     @relation(fields: [minerId], references: [id], onDelete: Cascade)
+  createdAt     DateTime  @default(now())
+
+  @@index([minerId])
+  @@index([minerId, createdAt(sort: Desc)])
+  @@map("miner_rate_history")
 }
 
 model Space {
@@ -130,17 +143,8 @@ model CostPayment {
   createdAt     DateTime      @default(now())
   user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+
   @@index([userId])
   @@map("cost_payments")
-}
-
-model ElectricityRate {
-  id            String        @id @default(cuid())
-  rate_per_kwh  Float
-  valid_from    DateTime
-  created_at    DateTime      @default(now())
-
-  @@index([valid_from])
-  @@map("electricity_rates")
 }
 

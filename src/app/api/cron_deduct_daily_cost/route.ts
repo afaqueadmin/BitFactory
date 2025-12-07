@@ -25,30 +25,6 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    // Get the latest electricity rate
-    const latestRate = await prisma.electricityRate.findFirst({
-      where: {
-        valid_from: {
-          lte: new Date(),
-        },
-      },
-      orderBy: {
-        valid_from: "desc",
-      },
-      select: {
-        id: true,
-        rate_per_kwh: true,
-        valid_from: true,
-      },
-    });
-
-    if (!latestRate) {
-      return NextResponse.json(
-        { error: "No electricity rate found" },
-        { status: 404 },
-      );
-    }
-
     // Group miners by userId and calculate costs
     const userMinersMap = new Map<
       string,
@@ -83,11 +59,28 @@ export async function GET(request: NextRequest) {
       let totalDailyCost = 0;
 
       for (const miner of userMiners) {
-        // Only count active miners for consumption
+        // Only count active miners for consumption and cost
         if (miner.status !== "INACTIVE") {
+          // Get the latest rate for this specific miner
+          const latestMinerRate = await prisma.minerRateHistory.findFirst({
+            where: { minerId: miner.id },
+            orderBy: { createdAt: "desc" },
+            select: { rate_per_kwh: true },
+          });
+
+          const ratePerKwh = latestMinerRate
+            ? Number(latestMinerRate.rate_per_kwh)
+            : 0;
+
+          if (ratePerKwh === 0) {
+            console.warn(
+              `[Cron] Warning: No rate history found for miner ${miner.id} (${miner.name}), using 0`,
+            );
+          }
+
           // powerUsage is already in kW
           totalConsumption += miner.powerUsage;
-          totalDailyCost += miner.powerUsage * latestRate.rate_per_kwh * 24;
+          totalDailyCost += miner.powerUsage * ratePerKwh * 24;
         }
       }
       totalDailyCost = Number(
@@ -116,8 +109,6 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      ratePerKwh: latestRate.rate_per_kwh,
-      rateValidFrom: latestRate.valid_from,
       totalUsersProcessed: results.length,
       results,
     });

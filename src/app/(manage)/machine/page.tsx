@@ -63,6 +63,7 @@ interface Miner {
   spaceId: string;
   createdAt: string;
   updatedAt: string;
+  rate_per_kwh?: number;
   user?: User;
   space?: Space;
   hardware?: Hardware;
@@ -89,6 +90,7 @@ export default function MachinePage() {
   const [selectedUserFilter, setSelectedUserFilter] = useState<string>("");
   const [selectedSpaceFilter, setSelectedSpaceFilter] = useState<string>("");
   const [selectedModelFilter, setSelectedModelFilter] = useState<string>("");
+  const [selectedRateFilter, setSelectedRateFilter] = useState<string>("");
 
   /**
    * Fetch all miners, users, and spaces
@@ -251,6 +253,13 @@ export default function MachinePage() {
   };
 
   /**
+   * Handle rate filter change
+   */
+  const handleRateFilterChange = (event: SelectChangeEvent) => {
+    setSelectedRateFilter(event.target.value);
+  };
+
+  /**
    * Get unique models from miners
    */
   const getUniqueModels = () => {
@@ -261,6 +270,21 @@ export default function MachinePage() {
       }
     });
     return Array.from(models).sort();
+  };
+
+  /**
+   * Get unique rates from miners
+   */
+  const getUniqueRates = () => {
+    const rates = new Set<number>();
+    miners.forEach((m) => {
+      if (m.rate_per_kwh) {
+        rates.add(Number(m.rate_per_kwh));
+      }
+    });
+    return Array.from(rates)
+      .sort((a, b) => a - b)
+      .map((rate) => rate.toString());
   };
 
   /**
@@ -283,6 +307,16 @@ export default function MachinePage() {
     if (selectedModelFilter) {
       filtered = filtered.filter(
         (m) => m.hardware?.model === selectedModelFilter,
+      );
+    }
+
+    // Filter by selected rate
+    if (selectedRateFilter) {
+      const targetRate = parseFloat(selectedRateFilter);
+      filtered = filtered.filter(
+        (m) =>
+          m.rate_per_kwh &&
+          Math.abs(Number(m.rate_per_kwh) - targetRate) < 0.0001,
       );
     }
 
@@ -433,6 +467,24 @@ export default function MachinePage() {
                     {getUniqueModels().map((model) => (
                       <MenuItem key={model} value={model}>
                         {model}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+
+                <FormControl sx={{ minWidth: 250 }}>
+                  <InputLabel>Filter by Rate</InputLabel>
+                  <Select
+                    value={selectedRateFilter}
+                    onChange={handleRateFilterChange}
+                    label="Filter by Rate"
+                  >
+                    <MenuItem value="">
+                      <em>All Rates</em>
+                    </MenuItem>
+                    {getUniqueRates().map((rate) => (
+                      <MenuItem key={rate} value={rate}>
+                        ${parseFloat(rate).toFixed(2)}
                       </MenuItem>
                     ))}
                   </Select>

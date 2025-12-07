@@ -41,61 +41,47 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    // Get the latest electricity rate
-    const latestRate = await prisma.electricityRate.findFirst({
-      where: {
-        valid_from: {
-          lte: new Date(),
-        },
-      },
-      orderBy: {
-        valid_from: "desc",
-      },
-      select: {
-        id: true,
-        rate_per_kwh: true,
-        valid_from: true,
-      },
-    });
+    // Calculate daily costs for each miner with per-miner rates
+    const minerCosts = await Promise.all(
+      miners.map(async (miner) => {
+        // Get the latest rate for this specific miner
+        const latestMinerRate = await prisma.minerRateHistory.findFirst({
+          where: { minerId: miner.id },
+          orderBy: { createdAt: "desc" },
+          select: { rate_per_kwh: true },
+        });
 
-    if (!latestRate) {
-      return NextResponse.json(
-        { error: "No electricity rate found" },
-        { status: 404 },
-      );
-    }
+        const ratePerKwh = latestMinerRate
+          ? Number(latestMinerRate.rate_per_kwh)
+          : 0;
 
-    // Calculate daily costs for each miner
-    const minerCosts = miners.map((miner) => {
-      // If miner is inactive, cost per day is 0
-      if (miner.status === "INACTIVE") {
+        if (ratePerKwh === 0 && miner.status !== "INACTIVE") {
+          console.warn(
+            `[Daily Costs] Warning: No rate history found for miner ${miner.id} (${miner.name}), using 0`,
+          );
+        }
+
+        const powerUsageKw = miner.hardware?.powerUsage || 0;
+
+        // If miner is inactive, cost per day is 0
+        let dailyCost = 0;
+        if (miner.status !== "INACTIVE") {
+          // Formula: powerUsage (kW) * ratePerKwh * 24 hours
+          dailyCost = powerUsageKw * ratePerKwh * 24;
+        }
+
         return {
           minerId: miner.id,
           minerName: miner.name,
           minerModel: miner.hardware?.model || "Unknown",
           status: miner.status,
-          powerUsage: miner.hardware?.powerUsage || 0,
+          powerUsage: powerUsageKw,
           location: miner.space?.location || "Unknown",
-          ratePerKwh: latestRate.rate_per_kwh,
-          dailyCost: 0,
+          ratePerKwh: ratePerKwh,
+          dailyCost,
         };
-      }
-
-      // Formula: powerUsage (kW) * ratePerKwh * 24 hours
-      const powerUsageKw = miner.hardware?.powerUsage || 0;
-      const dailyCost = powerUsageKw * latestRate.rate_per_kwh * 24;
-
-      return {
-        minerId: miner.id,
-        minerName: miner.name,
-        minerModel: miner.hardware?.model || "Unknown",
-        status: miner.status,
-        powerUsage: powerUsageKw,
-        location: miner.space?.location || "Unknown",
-        ratePerKwh: latestRate.rate_per_kwh,
-        dailyCost,
-      };
-    });
+      }),
+    );
 
     // Calculate total daily cost
     const totalDailyCost = minerCosts.reduce(
@@ -106,8 +92,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       userId,
       minerCount: miners.length,
-      ratePerKwh: latestRate.rate_per_kwh,
-      rateValidFrom: latestRate.valid_from,
       miners: minerCosts,
       totalDailyCost,
     });

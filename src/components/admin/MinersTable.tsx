@@ -76,6 +76,7 @@ interface Miner {
   spaceId: string;
   createdAt: string;
   updatedAt: string;
+  rate_per_kwh?: number;
   user?: User;
   space?: Space;
   hardware?: Hardware;
@@ -162,6 +163,9 @@ export default function MinersTable({
               <TableCell sx={{ fontWeight: "bold" }} align="right">
                 Hash Rate (TH/s)
               </TableCell>
+              <TableCell sx={{ fontWeight: "bold" }} align="right">
+                Rate per kWh (USD)
+              </TableCell>
               <TableCell sx={{ fontWeight: "bold" }} align="center">
                 Status
               </TableCell>
@@ -174,13 +178,13 @@ export default function MinersTable({
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={10} align="center" sx={{ py: 4 }}>
+                <TableCell colSpan={11} align="center" sx={{ py: 4 }}>
                   <CircularProgress />
                 </TableCell>
               </TableRow>
             ) : memoizedRows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} align="center" sx={{ py: 4 }}>
+                <TableCell colSpan={11} align="center" sx={{ py: 4 }}>
                   <Typography color="text.secondary">
                     No miners found. Create one to get started.
                   </Typography>
@@ -223,6 +227,15 @@ export default function MinersTable({
                       2,
                     )}{" "}
                     TH/s
+                  </TableCell>
+                  <TableCell align="right">
+                    {miner.rate_per_kwh ? (
+                      `$${Number(miner.rate_per_kwh).toFixed(2)}`
+                    ) : (
+                      <Typography variant="body2" color="text.secondary">
+                        —
+                      </Typography>
+                    )}
                   </TableCell>
                   <TableCell align="center">
                     <Chip

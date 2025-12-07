@@ -173,18 +173,37 @@ export async function GET(
             hashRate: true,
           },
         },
+        rateHistory: {
+          select: {
+            rate_per_kwh: true,
+          },
+          orderBy: {
+            createdAt: "desc",
+          },
+          take: 1,
+        },
       },
       orderBy,
     });
 
+    // Transform miners to include latest rate_per_kwh
+    const transformedMiners = miners.map((miner) => ({
+      ...miner,
+      rate_per_kwh:
+        miner.rateHistory && miner.rateHistory.length > 0
+          ? miner.rateHistory[0].rate_per_kwh
+          : undefined,
+      rateHistory: undefined, // Remove the rateHistory array from response
+    }));
+
     console.log(
-      `[Miners API] GET: Successfully retrieved ${miners.length} miners`,
+      `[Miners API] GET: Successfully retrieved ${transformedMiners.length} miners`,
     );
 
     return NextResponse.json<ApiResponse>(
       {
         success: true,
-        data: miners,
+        data: transformedMiners,
         timestamp: new Date().toISOString(),
       },
       { status: 200 },
@@ -216,6 +235,7 @@ export async function GET(
  *   userId: string (required) - ID of the user who owns this miner
  *   spaceId: string (required) - ID of the space where miner is located
  *   status: string (optional) - ACTIVE or INACTIVE (default: INACTIVE)
+ *   rate_per_kwh: number (required) - Electricity rate per kWh in USD (positive number)
  * }
  *
  * Response: Created miner object
@@ -226,6 +246,7 @@ export async function GET(
  * - 401: Unauthorized
  * - 403: Forbidden (not admin)
  * - 404: User, Space, or Hardware not found
+ * - 409: Conflict (miner name exists, no hardware quantity available)
  * - 500: Server error
  */
 export async function POST(
@@ -251,7 +272,7 @@ export async function POST(
     }
 
     const body = await request.json();
-    const { name, hardwareId, userId, spaceId, status } = body;
+    const { name, hardwareId, userId, spaceId, status, rate_per_kwh } = body;
 
     // Validate required fields
     if (!name || !hardwareId || !userId || !spaceId) {
@@ -260,6 +281,22 @@ export async function POST(
         {
           success: false,
           error: "Missing required fields: name, hardwareId, userId, spaceId",
+        },
+        { status: 400 },
+      );
+    }
+
+    // Validate rate_per_kwh is provided
+    if (
+      rate_per_kwh === null ||
+      rate_per_kwh === undefined ||
+      rate_per_kwh === ""
+    ) {
+      console.error("[Miners API] POST: rate_per_kwh is required");
+      return NextResponse.json<ApiResponse>(
+        {
+          success: false,
+          error: "rate_per_kwh is required",
         },
         { status: 400 },
       );
@@ -277,6 +314,21 @@ export async function POST(
         {
           success: false,
           error: "name, hardwareId, userId, and spaceId must be strings",
+        },
+        { status: 400 },
+      );
+    }
+
+    // Validate rate_per_kwh is a positive number
+    const ratePerKwh = Number(rate_per_kwh);
+    if (isNaN(ratePerKwh) || ratePerKwh <= 0) {
+      console.error(
+        "[Miners API] POST: Invalid rate_per_kwh - must be positive number",
+      );
+      return NextResponse.json<ApiResponse>(
+        {
+          success: false,
+          error: "rate_per_kwh must be a positive number",
         },
         { status: 400 },
       );
@@ -389,6 +441,14 @@ export async function POST(
               location: true,
             },
           },
+        },
+      });
+
+      // Create miner rate history entry
+      await tx.minerRateHistory.create({
+        data: {
+          minerId: newMiner.id,
+          rate_per_kwh: ratePerKwh,
         },
       });
 

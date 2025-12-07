@@ -48,6 +48,7 @@ interface MinerFormData {
   userId: string;
   spaceId: string;
   status: "ACTIVE" | "INACTIVE";
+  rate_per_kwh: string | number;
 }
 
 /**
@@ -79,6 +80,7 @@ interface Miner {
   status: "ACTIVE" | "INACTIVE";
   userId: string;
   spaceId: string;
+  rate_per_kwh?: number;
   createdAt: string;
   updatedAt: string;
   user?: User;
@@ -155,6 +157,7 @@ export default function MinerFormModal({
         userId: miner.userId,
         spaceId: miner.spaceId,
         status: miner.status,
+        rate_per_kwh: miner.rate_per_kwh || "",
       });
       if (miner.hardware) {
         setSelectedHardware(miner.hardware);
@@ -166,6 +169,7 @@ export default function MinerFormModal({
         userId: "",
         spaceId: "",
         status: "INACTIVE",
+        rate_per_kwh: "",
       });
       setSelectedHardware(null);
     }
@@ -224,6 +228,22 @@ export default function MinerFormModal({
       return false;
     }
 
+    // For create mode, rate_per_kwh is required
+    // For edit mode, it's optional (empty means no change)
+    if (!miner && !formData.rate_per_kwh) {
+      setError("Rate per kWh is required for new miners");
+      return false;
+    }
+
+    // If rate is provided, validate it's a positive number
+    if (formData.rate_per_kwh) {
+      const rate = Number(formData.rate_per_kwh);
+      if (isNaN(rate) || rate <= 0) {
+        setError("Rate per kWh must be a positive number");
+        return false;
+      }
+    }
+
     return true;
   };
 
@@ -242,18 +262,32 @@ export default function MinerFormModal({
       const url = miner ? `/api/machine/${miner.id}` : "/api/machine";
       const method = miner ? "PUT" : "POST";
 
+      const body: {
+        name: string;
+        hardwareId: string;
+        userId: string;
+        spaceId: string;
+        status: string;
+        rate_per_kwh?: number;
+      } = {
+        name: formData.name,
+        hardwareId: formData.hardwareId,
+        userId: formData.userId,
+        spaceId: formData.spaceId,
+        status: formData.status,
+      };
+
+      // Include rate_per_kwh if provided
+      if (formData.rate_per_kwh) {
+        body.rate_per_kwh = Number(formData.rate_per_kwh);
+      }
+
       const response = await fetch(url, {
         method,
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          name: formData.name,
-          hardwareId: formData.hardwareId,
-          userId: formData.userId,
-          spaceId: formData.spaceId,
-          status: formData.status,
-        }),
+        body: JSON.stringify(body),
       });
 
       const data = await response.json();
@@ -427,6 +461,28 @@ export default function MinerFormModal({
               <MenuItem value="ACTIVE">Active</MenuItem>
             </Select>
           </FormControl>
+
+          <TextField
+            fullWidth
+            label="Rate per kWh (USD)"
+            name="rate_per_kwh"
+            type="number"
+            value={formData.rate_per_kwh}
+            onChange={handleChange}
+            placeholder="0.12"
+            margin="normal"
+            disabled={loading || isLoading}
+            inputProps={{
+              step: 0.000001,
+              min: 0,
+              max: 999,
+            }}
+            helperText={
+              miner
+                ? "Optional: leave empty to keep current rate"
+                : "Required for cost calculation"
+            }
+          />
         </Box>
       </DialogContent>
 

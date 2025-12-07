@@ -77,6 +77,7 @@ async function verifyAdminAuth(request: NextRequest) {
  *   userId?: string
  *   spaceId?: string
  *   status?: string (ACTIVE or INACTIVE)
+ *   rate_per_kwh?: number (positive number, creates new history entry if provided and different from latest)
  * }
  *
  * Response: Updated miner object
@@ -87,6 +88,7 @@ async function verifyAdminAuth(request: NextRequest) {
  * - 401: Unauthorized
  * - 403: Forbidden (not admin)
  * - 404: Miner, user, space, or hardware not found
+ * - 409: Conflict (miner name already exists)
  * - 500: Server error
  */
 export async function PUT(
@@ -127,7 +129,26 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { name, hardwareId, userId, spaceId, status } = body;
+    const { name, hardwareId, userId, spaceId, status, rate_per_kwh } = body;
+
+    // Validate rate_per_kwh if provided
+    let ratePerKwhValue: number | null = null;
+    if (rate_per_kwh !== undefined && rate_per_kwh !== null) {
+      const rateValue = Number(rate_per_kwh);
+      if (isNaN(rateValue) || rateValue <= 0) {
+        console.error(
+          "[Miners API] PUT: Invalid rate_per_kwh - must be positive number",
+        );
+        return NextResponse.json<ApiResponse>(
+          {
+            success: false,
+            error: "rate_per_kwh must be a positive number",
+          },
+          { status: 400 },
+        );
+      }
+      ratePerKwhValue = rateValue;
+    }
 
     // Build update data with only provided fields
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -303,7 +324,7 @@ export async function PUT(
     }
 
     // If no fields to update, return error
-    if (Object.keys(updateData).length === 0) {
+    if (Object.keys(updateData).length === 0 && ratePerKwhValue === null) {
       return NextResponse.json<ApiResponse>(
         { success: false, error: "No fields to update" },
         { status: 400 },
@@ -336,6 +357,28 @@ export async function PUT(
             },
           },
         });
+      }
+
+      // Handle rate_per_kwh if provided
+      if (ratePerKwhValue !== null) {
+        // Get the latest rate for this miner
+        const latestRate = await tx.minerRateHistory.findFirst({
+          where: { minerId: id },
+          orderBy: { createdAt: "desc" },
+          select: { rate_per_kwh: true },
+        });
+
+        // Create new rate history entry only if rate is different or no history exists
+        const currentRate =
+          latestRate && parseFloat(latestRate.rate_per_kwh.toString());
+        if (!latestRate || currentRate !== ratePerKwhValue) {
+          await tx.minerRateHistory.create({
+            data: {
+              minerId: id,
+              rate_per_kwh: ratePerKwhValue,
+            },
+          });
+        }
       }
 
       // Update the miner
