@@ -120,6 +120,7 @@ export default function MinerFormModal({
     userId: "",
     spaceId: "",
     status: "INACTIVE",
+    rate_per_kwh: "",
   });
 
   /**
