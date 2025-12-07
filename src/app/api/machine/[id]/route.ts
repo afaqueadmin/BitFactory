@@ -151,10 +151,10 @@ export async function PUT(
         );
       }
 
-      // Verify hardware exists
+      // Verify hardware exists and has available quantity
       const hardwareExists = await prisma.hardware.findUnique({
         where: { id: hardwareId },
-        select: { id: true },
+        select: { id: true, quantity: true },
       });
 
       if (!hardwareExists) {
@@ -162,6 +162,23 @@ export async function PUT(
         return NextResponse.json<ApiResponse>(
           { success: false, error: "Hardware not found" },
           { status: 404 },
+        );
+      }
+
+      // If changing to a different hardware, check if new hardware has available quantity
+      if (
+        hardwareId !== existingMiner.hardwareId &&
+        hardwareExists.quantity <= 0
+      ) {
+        console.error(
+          `[Miners API] PUT: No available quantity for hardware - ${hardwareId}`,
+        );
+        return NextResponse.json<ApiResponse>(
+          {
+            success: false,
+            error: "No available hardware units of this model",
+          },
+          { status: 409 },
         );
       }
 
@@ -234,34 +251,63 @@ export async function PUT(
       );
     }
 
-    // Update miner
-    const updatedMiner = await prisma.miner.update({
-      where: { id },
-      data: updateData,
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
+    // Update miner with hardware quantity adjustments if hardware changed
+    const updatedMiner = await prisma.$transaction(async (tx) => {
+      // If hardware is being changed, adjust quantities
+      if (
+        updateData.hardwareId &&
+        updateData.hardwareId !== existingMiner.hardwareId
+      ) {
+        // Restore quantity to old hardware
+        await tx.hardware.update({
+          where: { id: existingMiner.hardwareId },
+          data: {
+            quantity: {
+              increment: 1,
+            },
+          },
+        });
+
+        // Reduce quantity from new hardware
+        await tx.hardware.update({
+          where: { id: updateData.hardwareId },
+          data: {
+            quantity: {
+              decrement: 1,
+            },
+          },
+        });
+      }
+
+      // Update the miner
+      return await tx.miner.update({
+        where: { id },
+        data: updateData,
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+          space: {
+            select: {
+              id: true,
+              name: true,
+              location: true,
+            },
+          },
+          hardware: {
+            select: {
+              id: true,
+              model: true,
+              powerUsage: true,
+              hashRate: true,
+            },
           },
         },
-        space: {
-          select: {
-            id: true,
-            name: true,
-            location: true,
-          },
-        },
-        hardware: {
-          select: {
-            id: true,
-            model: true,
-            powerUsage: true,
-            hashRate: true,
-          },
-        },
-      },
+      });
     });
 
     console.log(`[Miners API] PUT: Successfully updated miner ${id}`);
@@ -327,9 +373,10 @@ export async function DELETE(
       );
     }
 
-    // Check if miner exists
+    // Check if miner exists and get its hardware ID
     const existingMiner = await prisma.miner.findUnique({
       where: { id },
+      select: { id: true, hardwareId: true },
     });
 
     if (!existingMiner) {
@@ -340,9 +387,22 @@ export async function DELETE(
       );
     }
 
-    // Delete miner
-    await prisma.miner.delete({
-      where: { id },
+    // Delete miner and restore hardware quantity in transaction
+    await prisma.$transaction(async (tx) => {
+      // Delete the miner
+      await tx.miner.delete({
+        where: { id },
+      });
+
+      // Restore hardware quantity
+      await tx.hardware.update({
+        where: { id: existingMiner.hardwareId },
+        data: {
+          quantity: {
+            increment: 1,
+          },
+        },
+      });
     });
 
     console.log(`[Miners API] DELETE: Successfully deleted miner ${id}`);

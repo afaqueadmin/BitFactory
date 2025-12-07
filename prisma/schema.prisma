@@ -80,6 +80,7 @@ model Hardware {
   model         String    @unique  // e.g., "Bitmain S21 Pro"
   powerUsage    Float     // in kilowatts (e.g., 3.25)
   hashRate      Decimal   // in TH/s (e.g., 234.5)
+  quantity      Int       @default(1)  // number of units available
   miners        Miner[]
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt

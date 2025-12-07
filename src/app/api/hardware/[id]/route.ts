@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
 
-interface ApiResponse<T = any> {
+interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;
@@ -11,7 +11,7 @@ interface ApiResponse<T = any> {
 
 export async function GET(
   request: NextRequest,
-  context: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id } = await context.params;
@@ -19,7 +19,7 @@ export async function GET(
     if (!id) {
       return NextResponse.json<ApiResponse>(
         { success: false, error: "Hardware ID is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -30,7 +30,7 @@ export async function GET(
     if (!hardware) {
       return NextResponse.json<ApiResponse>(
         { success: false, error: "Hardware not found" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -43,14 +43,14 @@ export async function GET(
     console.error("Error fetching hardware:", error);
     return NextResponse.json<ApiResponse>(
       { success: false, error: "Failed to fetch hardware" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
 
 export async function PUT(
   request: NextRequest,
-  context: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id } = await context.params;
@@ -59,7 +59,7 @@ export async function PUT(
     if (!token) {
       return NextResponse.json<ApiResponse>(
         { success: false, error: "Unauthorized" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -72,26 +72,26 @@ export async function PUT(
       console.error("Token verification failed:", error);
       return NextResponse.json<ApiResponse>(
         { success: false, error: "Invalid token" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
-    // Check if user is admin
+    // Check if user is admin or super admin
     const user = await prisma.user.findUnique({
       where: { id: userId },
     });
 
-    if (!user || user.role !== "ADMIN") {
+    if (!user || (user.role !== "ADMIN" && user.role !== "SUPER_ADMIN")) {
       return NextResponse.json<ApiResponse>(
         { success: false, error: "Admin access required" },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
     if (!id) {
       return NextResponse.json<ApiResponse>(
         { success: false, error: "Hardware ID is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -103,26 +103,29 @@ export async function PUT(
     if (!existingHardware) {
       return NextResponse.json<ApiResponse>(
         { success: false, error: "Hardware not found" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
     const body = await request.json();
-    const { model, powerUsage, hashRate } = body;
+    const { model, powerUsage, hashRate, quantity } = body;
 
     // Validate fields if provided
     if (model !== undefined && model.trim() === "") {
       return NextResponse.json<ApiResponse>(
         { success: false, error: "Model cannot be empty" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (powerUsage !== undefined) {
       if (typeof powerUsage !== "number" || powerUsage <= 0) {
         return NextResponse.json<ApiResponse>(
-          { success: false, error: "Power usage must be a positive number (in kW)" },
-          { status: 400 }
+          {
+            success: false,
+            error: "Power usage must be a positive number (in kW)",
+          },
+          { status: 400 },
         );
       }
     }
@@ -130,8 +133,24 @@ export async function PUT(
     if (hashRate !== undefined) {
       if (typeof hashRate !== "number" || hashRate <= 0) {
         return NextResponse.json<ApiResponse>(
-          { success: false, error: "Hash rate must be a positive number (in TH/s)" },
-          { status: 400 }
+          {
+            success: false,
+            error: "Hash rate must be a positive number (in TH/s)",
+          },
+          { status: 400 },
+        );
+      }
+    }
+
+    if (quantity !== undefined) {
+      if (
+        typeof quantity !== "number" ||
+        !Number.isInteger(quantity) ||
+        quantity <= 0
+      ) {
+        return NextResponse.json<ApiResponse>(
+          { success: false, error: "Quantity must be a positive integer" },
+          { status: 400 },
         );
       }
     }
@@ -145,7 +164,7 @@ export async function PUT(
       if (duplicateModel) {
         return NextResponse.json<ApiResponse>(
           { success: false, error: "Hardware model already exists" },
-          { status: 400 }
+          { status: 400 },
         );
       }
     }
@@ -157,6 +176,7 @@ export async function PUT(
         ...(model !== undefined && { model }),
         ...(powerUsage !== undefined && { powerUsage }),
         ...(hashRate !== undefined && { hashRate }),
+        ...(quantity !== undefined && { quantity }),
       },
     });
 
@@ -169,14 +189,14 @@ export async function PUT(
     console.error("Error updating hardware:", error);
     return NextResponse.json<ApiResponse>(
       { success: false, error: "Failed to update hardware" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
 
 export async function DELETE(
   request: NextRequest,
-  context: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id } = await context.params;
@@ -185,7 +205,7 @@ export async function DELETE(
     if (!token) {
       return NextResponse.json<ApiResponse>(
         { success: false, error: "Unauthorized" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -198,26 +218,26 @@ export async function DELETE(
       console.error("Token verification failed:", error);
       return NextResponse.json<ApiResponse>(
         { success: false, error: "Invalid token" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
-    // Check if user is admin
+    // Check if user is admin or super admin
     const user = await prisma.user.findUnique({
       where: { id: userId },
     });
 
-    if (!user || user.role !== "ADMIN") {
+    if (!user || (user.role !== "ADMIN" && user.role !== "SUPER_ADMIN")) {
       return NextResponse.json<ApiResponse>(
         { success: false, error: "Admin access required" },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
     if (!id) {
       return NextResponse.json<ApiResponse>(
         { success: false, error: "Hardware ID is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -230,7 +250,7 @@ export async function DELETE(
     if (!existingHardware) {
       return NextResponse.json<ApiResponse>(
         { success: false, error: "Hardware not found" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -241,7 +261,7 @@ export async function DELETE(
           success: false,
           error: `Cannot delete hardware: ${existingHardware.miners.length} miner(s) still using this hardware`,
         },
-        { status: 409 }
+        { status: 409 },
       );
     }
 
@@ -259,7 +279,7 @@ export async function DELETE(
     console.error("Error deleting hardware:", error);
     return NextResponse.json<ApiResponse>(
       { success: false, error: "Failed to delete hardware" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

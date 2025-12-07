@@ -30,7 +30,7 @@ export async function PUT(
       select: { role: true },
     });
 
-    if (user?.role !== "ADMIN") {
+    if (user?.role !== "ADMIN" && user?.role !== "SUPER_ADMIN") {
       return NextResponse.json(
         { error: "Only administrators can update users" },
         { status: 403 },
@@ -94,7 +94,7 @@ export async function DELETE(
       select: { role: true },
     });
 
-    if (user?.role !== "ADMIN") {
+    if (user?.role !== "ADMIN" && user?.role !== "SUPER_ADMIN") {
       return NextResponse.json(
         { error: "Only administrators can delete users" },
         { status: 403 },

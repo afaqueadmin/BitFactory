@@ -312,7 +312,7 @@ export async function POST(
     // Verify hardware exists
     const hardwareExists = await prisma.hardware.findUnique({
       where: { id: hardwareId },
-      select: { id: true },
+      select: { id: true, quantity: true },
     });
 
     if (!hardwareExists) {
@@ -323,31 +323,60 @@ export async function POST(
       );
     }
 
-    // Create miner
-    const miner = await prisma.miner.create({
-      data: {
-        name: name.trim(),
-        hardwareId,
-        userId,
-        spaceId,
-        status: status || "INACTIVE",
-      },
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
+    // Check if hardware has available quantity
+    if (hardwareExists.quantity <= 0) {
+      console.error(
+        `[Miners API] POST: No available quantity for hardware - ${hardwareId}`,
+      );
+      return NextResponse.json<ApiResponse>(
+        {
+          success: false,
+          error: "No available hardware units of this model",
+        },
+        { status: 409 },
+      );
+    }
+
+    // Create miner and reduce hardware quantity in transaction
+    const miner = await prisma.$transaction(async (tx) => {
+      // Create the miner
+      const newMiner = await tx.miner.create({
+        data: {
+          name: name.trim(),
+          hardwareId,
+          userId,
+          spaceId,
+          status: status || "INACTIVE",
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+          space: {
+            select: {
+              id: true,
+              name: true,
+              location: true,
+            },
           },
         },
-        space: {
-          select: {
-            id: true,
-            name: true,
-            location: true,
+      });
+
+      // Reduce hardware quantity
+      await tx.hardware.update({
+        where: { id: hardwareId },
+        data: {
+          quantity: {
+            decrement: 1,
           },
         },
-      },
+      });
+
+      return newMiner;
     });
 
     console.log(`[Miners API] POST: Created miner with id ${miner.id}`);

@@ -29,13 +29,13 @@ import {
   Add as AddIcon,
   Warning as WarningIcon,
 } from "@mui/icons-material";
-import DashboardHeader from "@/components/DashboardHeader";
 
 interface Hardware {
   id: string;
   model: string;
   powerUsage: number;
   hashRate: number | string;
+  quantity: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -44,9 +44,10 @@ interface FormData {
   model: string;
   powerUsage: string | number;
   hashRate: string | number;
+  quantity: string | number;
 }
 
-interface ApiResponse<T = any> {
+interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;
@@ -66,6 +67,7 @@ export default function HardwarePage() {
     model: "",
     powerUsage: "",
     hashRate: "",
+    quantity: 1,
   });
 
   /**
@@ -128,6 +130,12 @@ export default function HardwarePage() {
       return false;
     }
 
+    const qty = parseInt(String(formData.quantity));
+    if (isNaN(qty) || qty <= 0) {
+      setFormError("Quantity must be a positive number");
+      return false;
+    }
+
     return true;
   };
 
@@ -140,6 +148,7 @@ export default function HardwarePage() {
       model: "",
       powerUsage: "",
       hashRate: "",
+      quantity: 1,
     });
     setFormError(null);
     setOpenForm(true);
@@ -154,6 +163,7 @@ export default function HardwarePage() {
       model: hw.model,
       powerUsage: hw.powerUsage,
       hashRate: hw.hashRate,
+      quantity: hw.quantity,
     });
     setFormError(null);
     setOpenForm(true);
@@ -167,9 +177,7 @@ export default function HardwarePage() {
 
     setSaving(true);
     try {
-      const url = editingId
-        ? `/api/hardware/${editingId}`
-        : "/api/hardware";
+      const url = editingId ? `/api/hardware/${editingId}` : "/api/hardware";
       const method = editingId ? "PUT" : "POST";
 
       const response = await fetch(url, {
@@ -179,6 +187,7 @@ export default function HardwarePage() {
           model: formData.model.trim(),
           powerUsage: parseFloat(String(formData.powerUsage)),
           hashRate: parseFloat(String(formData.hashRate)),
+          quantity: parseInt(String(formData.quantity)),
         }),
       });
 
@@ -186,8 +195,7 @@ export default function HardwarePage() {
 
       if (!response.ok) {
         throw new Error(
-          data.error ||
-            `Failed to ${editingId ? "update" : "create"} hardware`
+          data.error || `Failed to ${editingId ? "update" : "create"} hardware`,
         );
       }
 
@@ -196,6 +204,7 @@ export default function HardwarePage() {
         model: "",
         powerUsage: "",
         hashRate: "",
+        quantity: 1,
       });
       await fetchHardware();
     } catch (err) {
@@ -296,8 +305,10 @@ export default function HardwarePage() {
           <Typography variant="h4" sx={{ mt: 1 }}>
             {hardware.length > 0
               ? (
-                  hardware.reduce((sum, hw) => sum + hw.powerUsage, 0) /
-                  hardware.length
+                  hardware.reduce(
+                    (sum, hw) => sum + hw.powerUsage * hw.quantity,
+                    0,
+                  ) / hardware.reduce((sum, hw) => sum + hw.quantity, 0)
                 ).toFixed(2)
               : "0.00"}{" "}
             kW
@@ -312,9 +323,10 @@ export default function HardwarePage() {
             {hardware.length > 0
               ? (
                   hardware.reduce(
-                    (sum, hw) => sum + parseFloat(String(hw.hashRate)),
-                    0
-                  ) / hardware.length
+                    (sum, hw) =>
+                      sum + parseFloat(String(hw.hashRate)) * hw.quantity,
+                    0,
+                  ) / hardware.reduce((sum, hw) => sum + hw.quantity, 0)
                 ).toFixed(2)
               : "0.00"}{" "}
             TH/s
@@ -332,6 +344,9 @@ export default function HardwarePage() {
               </TableCell>
               <TableCell sx={{ fontWeight: "bold" }} align="right">
                 Hash Rate (TH/s)
+              </TableCell>
+              <TableCell sx={{ fontWeight: "bold" }} align="center">
+                Quantity
               </TableCell>
               <TableCell sx={{ fontWeight: "bold" }}>Created</TableCell>
               <TableCell sx={{ fontWeight: "bold" }} align="center">
@@ -368,6 +383,14 @@ export default function HardwarePage() {
                   <TableCell align="right">
                     {parseFloat(String(hw.hashRate)).toFixed(2)}
                   </TableCell>
+                  <TableCell align="center">
+                    <Chip
+                      label={`${hw.quantity} unit${hw.quantity !== 1 ? "s" : ""}`}
+                      size="small"
+                      color={hw.quantity > 0 ? "success" : "default"}
+                      variant="outlined"
+                    />
+                  </TableCell>
                   <TableCell>{formatDate(hw.createdAt)}</TableCell>
                   <TableCell align="center">
                     <Stack direction="row" spacing={1} justifyContent="center">
@@ -399,7 +422,12 @@ export default function HardwarePage() {
       </TableContainer>
 
       {/* Add/Edit Form Dialog */}
-      <Dialog open={openForm} onClose={() => !saving && setOpenForm(false)} maxWidth="sm" fullWidth>
+      <Dialog
+        open={openForm}
+        onClose={() => !saving && setOpenForm(false)}
+        maxWidth="sm"
+        fullWidth
+      >
         <DialogTitle>
           {editingId ? "Edit Hardware" : "Create New Hardware"}
         </DialogTitle>
@@ -446,6 +474,20 @@ export default function HardwarePage() {
             margin="normal"
             inputProps={{ min: "0.1", step: "0.1" }}
             disabled={saving}
+          />
+
+          <TextField
+            fullWidth
+            label="Quantity"
+            name="quantity"
+            type="number"
+            value={formData.quantity}
+            onChange={handleFormChange}
+            placeholder="e.g., 5"
+            margin="normal"
+            inputProps={{ min: "1", step: "1" }}
+            disabled={saving}
+            helperText="Number of units available"
           />
         </DialogContent>
 
