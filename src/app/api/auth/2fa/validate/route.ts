@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import speakeasy from "speakeasy";
 import { prisma } from "@/lib/prisma";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
-import generateTokens from "@/lib/helpers/generateTokens";
+import { generateTokens } from "@/lib/jwt";
 
 export async function POST(req: NextRequest) {
   try {
@@ -35,29 +35,16 @@ export async function POST(req: NextRequest) {
     }
 
     // Generate tokens with role
-    const { accessToken, refreshToken } = generateTokens(user.id, user.role);
+    const { accessToken, refreshToken } = await generateTokens(
+      user.id,
+      user.role,
+    );
 
     // Determine redirect URL based on role
     const redirectUrl = user.role === "ADMIN" ? "/adminpanel" : "/dashboard";
 
+    // Create response WITHOUT cookies yet
     const response = NextResponse.json({ success: true, redirectUrl });
-
-    // Set cookies with proper flags
-    response.cookies.set("token", accessToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: 60 * 60, // 1 hour
-      path: "/",
-    });
-
-    response.cookies.set("refresh_token", refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: 7 * 24 * 60 * 60, // 7 days
-      path: "/",
-    });
 
     // First check if it's a backup code
     if (user.twoFactorBackupCodes?.includes(token)) {
@@ -79,6 +66,23 @@ export async function POST(req: NextRequest) {
           ipAddress: req.headers.get("x-forwarded-for") || "unknown",
           userAgent: req.headers.get("user-agent") || "unknown",
         },
+      });
+
+      // Backup code verified successfully, now set cookies
+      response.cookies.set("token", accessToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        maxAge: 60 * 60, // 1 hour
+        path: "/",
+      });
+
+      response.cookies.set("refresh_token", refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        maxAge: 7 * 24 * 60 * 60, // 7 days
+        path: "/",
       });
 
       return response;
@@ -104,6 +108,23 @@ export async function POST(req: NextRequest) {
         ipAddress: req.headers.get("x-forwarded-for") || "unknown",
         userAgent: req.headers.get("user-agent") || "unknown",
       },
+    });
+
+    // TOTP verified successfully, now set cookies
+    response.cookies.set("token", accessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 60 * 60, // 1 hour
+      path: "/",
+    });
+
+    response.cookies.set("refresh_token", refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 7 * 24 * 60 * 60, // 7 days
+      path: "/",
     });
 
     return response;

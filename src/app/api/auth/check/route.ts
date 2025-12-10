@@ -1,19 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { verifyJwtToken, signJwtToken } from "@/lib/jwt";
+import { verifyJwtToken, generateTokens } from "@/lib/jwt";
 
 // Runtime config
 export const runtime = "nodejs";
-
-// Config options
-const generateTokens = async (userId: string, role: string) => {
-  const accessToken = await signJwtToken({ userId, role });
-  const refreshToken = await signJwtToken(
-    { userId, role, type: "refresh" },
-    "7d",
-  );
-  return { accessToken, refreshToken };
-};
 
 export async function GET(request: NextRequest) {
   try {
