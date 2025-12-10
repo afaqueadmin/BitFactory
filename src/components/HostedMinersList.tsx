@@ -31,13 +31,22 @@ interface MinerData {
   workerName: string;
   location: string;
   connectedPool: string;
-  status: "Active" | "Inactive" | "ACTIVE" | "INACTIVE";
+  status:
+    | "Active"
+    | "Inactive"
+    | "Deployment in Progress"
+    | "AUTO"
+    | "DEPLOYMENT_IN_PROGRESS";
   hashRate: string;
   hardware?: Hardware;
 }
 
 // Filter type
-type FilterType = "ALL MINERS" | "ACTIVE" | "INACTIVE";
+type FilterType =
+  | "ALL MINERS"
+  | "ACTIVE"
+  | "INACTIVE"
+  | "DEPLOYMENT_IN_PROGRESS";
 
 // Dummy data for miners
 const dummyMiners: MinerData[] = [
@@ -213,9 +222,21 @@ export default function HostedMinersList() {
             hardware?: { model: string; hashRate: number | string };
             space?: { location: string; name: string };
           }) => {
-            // Get Luxor worker data if available
+            // Check if miner is in deployment
+            if (miner.status === "DEPLOYMENT_IN_PROGRESS") {
+              return {
+                id: miner.id,
+                model: miner.hardware?.model || miner.model || "Unknown",
+                workerName: miner.name,
+                location: miner.space?.location || "Unknown",
+                connectedPool: miner.space?.name || "Unknown",
+                status: "Deployment in Progress",
+                hashRate: `0 TH/s`,
+              };
+            }
+
+            // For AUTO status, fetch from Luxor API
             const luxorWorker = luxorWorkers.get(miner.name);
-            // const luxorStatus = luxorWorker?.status || miner.status;
             const luxorStatus = luxorWorker?.status;
 
             return {
@@ -224,9 +245,8 @@ export default function HostedMinersList() {
               workerName: miner.name,
               location: miner.space?.location || "Unknown",
               connectedPool: miner.space?.name || "Unknown",
-              // Priority: Luxor API status > Database status
-              status:
-                luxorStatus === "ACTIVE" ? "Active" : "Deployment in Progress",
+              // Priority: Luxor API status > fallback to Inactive
+              status: luxorStatus === "ACTIVE" ? "Active" : "Inactive",
               hashRate: `${luxorWorker?.hashrate || miner.hardware?.hashRate || miner.hashRate || 0} TH/s`,
             };
           },
@@ -253,6 +273,8 @@ export default function HostedMinersList() {
     if (activeFilter === "ALL MINERS") return true;
     if (activeFilter === "ACTIVE") return miner.status === "Active";
     if (activeFilter === "INACTIVE") return miner.status === "Inactive";
+    if (activeFilter === "DEPLOYMENT_IN_PROGRESS")
+      return miner.status === "Deployment in Progress";
     return true;
   });
 
@@ -260,25 +282,33 @@ export default function HostedMinersList() {
   const allCount = miners.length;
   const activeCount = miners.filter((m) => m.status === "Active").length;
   const inactiveCount = miners.filter((m) => m.status === "Inactive").length;
+  const deploymentCount = miners.filter(
+    (m) => m.status === "Deployment in Progress",
+  ).length;
 
   const handleFilterChange = (filter: FilterType) => {
     setActiveFilter(filter);
   };
 
   const getStatusChip = (status: MinerData["status"]) => {
+    let bgColor = alpha(theme.palette.error.main, 0.1);
+    let textColor = theme.palette.error.main;
+
+    if (status === "Active") {
+      bgColor = alpha(theme.palette.success.main, 0.1);
+      textColor = theme.palette.success.main;
+    } else if (status === "Deployment in Progress") {
+      bgColor = alpha(theme.palette.warning.main, 0.1);
+      textColor = theme.palette.warning.main;
+    }
+
     return (
       <Chip
         label={status}
         size="small"
         sx={{
-          backgroundColor:
-            status === "Active"
-              ? alpha(theme.palette.success.main, 0.1)
-              : alpha(theme.palette.error.main, 0.1),
-          color:
-            status === "Active"
-              ? theme.palette.success.main
-              : theme.palette.error.main,
+          backgroundColor: bgColor,
+          color: textColor,
           fontWeight: 500,
           minWidth: "70px",
         }}
@@ -363,6 +393,30 @@ export default function HostedMinersList() {
             }}
           >
             INACTIVE ({inactiveCount})
+          </Button>
+          <Button
+            variant={
+              activeFilter === "DEPLOYMENT_IN_PROGRESS"
+                ? "contained"
+                : "contained"
+            }
+            onClick={() => handleFilterChange("DEPLOYMENT_IN_PROGRESS")}
+            size="small"
+            sx={{
+              minWidth: "160px",
+              textTransform: "none",
+              fontWeight: 500,
+              backgroundColor:
+                activeFilter === "DEPLOYMENT_IN_PROGRESS"
+                  ? theme.palette.primary.main
+                  : theme.palette.primary.main,
+              color: "white",
+              "&:hover": {
+                backgroundColor: theme.palette.primary.dark,
+              },
+            }}
+          >
+            DEPLOYMENT IN PROGRESS ({deploymentCount})
           </Button>
         </Stack>
       </Box>

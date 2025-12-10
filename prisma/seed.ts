@@ -61,7 +61,7 @@ async function main() {
     data: {
       name: "Antminer S19 XP",
       model: "S19 XP",
-      status: "ACTIVE",
+      status: "AUTO",
       powerUsage: 3.1, // 3.1 kW
       hashRate: 140.0, // 140 TH/s
       userId: user.id,
@@ -73,7 +73,7 @@ async function main() {
     data: {
       name: "Antminer S19j Pro",
       model: "S19j Pro",
-      status: "ACTIVE",
+      status: "AUTO",
       powerUsage: 3.0, // 3.0 kW
       hashRate: 110.0, // 110 TH/s
       userId: user.id,
@@ -85,7 +85,7 @@ async function main() {
     data: {
       name: "Whatsminer M50S",
       model: "M50S",
-      status: "INACTIVE",
+      status: "DEPLOYMENT_IN_PROGRESS",
       powerUsage: 3.5, // 3.5 kW
       hashRate: 234.0, // 234 TH/s
       userId: user.id,

@@ -172,10 +172,11 @@ export async function GET(
         createdAt: space.createdAt,
         updatedAt: space.updatedAt,
         minerCount: space.miners.length,
-        activeMinerCount: space.miners.filter((m) => m.status === "ACTIVE")
+        activeMinerCount: space.miners.filter((m) => m.status === "AUTO")
           .length,
-        inactiveMinerCount: space.miners.filter((m) => m.status === "INACTIVE")
-          .length,
+        inactiveMinerCount: space.miners.filter(
+          (m) => m.status === "DEPLOYMENT_IN_PROGRESS",
+        ).length,
         capacityUsed: space.miners.length,
         capacityPercentage: (
           (space.miners.length / space.capacity) *
@@ -342,7 +343,7 @@ export async function POST(
         data: {
           ...space,
           minerCount: space.miners.length,
-          activeMinerCount: space.miners.filter((m) => m.status === "ACTIVE")
+          activeMinerCount: space.miners.filter((m) => m.status === "AUTO")
             .length,
         },
         timestamp: new Date().toISOString(),

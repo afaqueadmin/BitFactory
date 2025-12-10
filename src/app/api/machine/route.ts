@@ -73,7 +73,7 @@ async function verifyAdminAuth(request: NextRequest) {
  * Retrieve all miners with their associated user and space details
  *
  * Query Parameters:
- * - status: Filter by status (ACTIVE, INACTIVE)
+ * - status: Filter by status (AUTO, DEPLOYMENT_IN_PROGRESS)
  * - spaceId: Filter by space ID
  * - userId: Filter by user ID
  * - sortBy: Sort field (name, model, status, hashRate, powerUsage, createdAt) - default: createdAt
@@ -234,7 +234,7 @@ export async function GET(
  *   hardwareId: string (required) - Hardware model ID
  *   userId: string (required) - ID of the user who owns this miner
  *   spaceId: string (required) - ID of the space where miner is located
- *   status: string (optional) - ACTIVE or INACTIVE (default: INACTIVE)
+ *   status: string (optional) - AUTO or DEPLOYMENT_IN_PROGRESS (default: DEPLOYMENT_IN_PROGRESS)
  *   rate_per_kwh: number (required) - Electricity rate per kWh in USD (positive number)
  * }
  *
@@ -423,7 +423,7 @@ export async function POST(
           hardwareId,
           userId,
           spaceId,
-          status: status || "INACTIVE",
+          status: status || "DEPLOYMENT_IN_PROGRESS",
         },
         include: {
           user: {

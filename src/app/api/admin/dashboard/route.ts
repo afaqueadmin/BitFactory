@@ -170,7 +170,7 @@ async function fetchAllWorkers(
           const hashrate = worker.hashrate || 0;
           if (worker.status === "ACTIVE") {
             activeHashrate += hashrate;
-          } else {
+          } else if (worker.status === "INACTIVE") {
             inactiveHashrate += hashrate;
           }
         });
@@ -310,10 +310,10 @@ export async function GET(request: NextRequest) {
 
     // Fetch miners statistics (from local database)
     const activeMinersCount = await prisma.miner.count({
-      where: { status: "ACTIVE" },
+      where: { status: "AUTO" },
     });
     const inactiveMiners = await prisma.miner.count({
-      where: { status: "INACTIVE" },
+      where: { status: "DEPLOYMENT_IN_PROGRESS" },
     });
 
     // Fetch spaces statistics (from local database)
@@ -330,13 +330,13 @@ export async function GET(request: NextRequest) {
     });
 
     const activeMiners = await prisma.miner.findMany({
-      where: { status: "ACTIVE" },
+      where: { status: "AUTO" },
       include: { hardware: true },
     });
 
     const usedMinersPower = activeMiners.reduce(
       (sum, miner) => sum + (miner.hardware?.powerUsage || 0),
-      0
+      0,
     );
 
     // Fetch customers (users with role CLIENT) statistics

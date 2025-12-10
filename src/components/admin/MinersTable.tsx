@@ -70,7 +70,7 @@ interface Hardware {
 interface Miner {
   id: string;
   name: string;
-  status: "ACTIVE" | "INACTIVE";
+  status: "AUTO" | "DEPLOYMENT_IN_PROGRESS";
   hardwareId: string;
   userId: string;
   spaceId: string;
@@ -130,9 +130,9 @@ export default function MinersTable({
    * Get status color based on value
    */
   const getStatusColor = (
-    status: "ACTIVE" | "INACTIVE",
+    status: "AUTO" | "DEPLOYMENT_IN_PROGRESS",
   ): "success" | "default" => {
-    return status === "ACTIVE" ? "success" : "default";
+    return status === "AUTO" ? "success" : "default";
   };
 
   const memoizedRows = useMemo(() => miners, [miners]);

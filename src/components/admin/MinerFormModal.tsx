@@ -47,7 +47,7 @@ interface MinerFormData {
   hardwareId: string;
   userId: string;
   spaceId: string;
-  status: "ACTIVE" | "INACTIVE";
+  status: "AUTO" | "DEPLOYMENT_IN_PROGRESS";
   rate_per_kwh: string | number;
 }
 
@@ -77,7 +77,7 @@ interface Miner {
   id: string;
   name: string;
   hardwareId: string;
-  status: "ACTIVE" | "INACTIVE";
+  status: "AUTO" | "DEPLOYMENT_IN_PROGRESS";
   userId: string;
   spaceId: string;
   rate_per_kwh?: number;
@@ -119,7 +119,7 @@ export default function MinerFormModal({
     hardwareId: "",
     userId: "",
     spaceId: "",
-    status: "INACTIVE",
+    status: "DEPLOYMENT_IN_PROGRESS",
     rate_per_kwh: "",
   });
 
@@ -169,7 +169,7 @@ export default function MinerFormModal({
         hardwareId: "",
         userId: "",
         spaceId: "",
-        status: "INACTIVE",
+        status: "DEPLOYMENT_IN_PROGRESS",
         rate_per_kwh: "",
       });
       setSelectedHardware(null);
@@ -458,8 +458,10 @@ export default function MinerFormModal({
               onChange={handleChange}
               label="Status"
             >
-              <MenuItem value="INACTIVE">Inactive</MenuItem>
-              <MenuItem value="ACTIVE">Active</MenuItem>
+              <MenuItem value="DEPLOYMENT_IN_PROGRESS">
+                Deployment in Progress
+              </MenuItem>
+              <MenuItem value="AUTO">Auto</MenuItem>
             </Select>
           </FormControl>
 

@@ -76,7 +76,7 @@ async function verifyAdminAuth(request: NextRequest) {
  *   hardwareId?: string
  *   userId?: string
  *   spaceId?: string
- *   status?: string (ACTIVE or INACTIVE)
+ *   status?: string (AUTO or DEPLOYMENT_IN_PROGRESS)
  *   rate_per_kwh?: number (positive number, creates new history entry if provided and different from latest)
  * }
  *
@@ -314,9 +314,12 @@ export async function PUT(
     }
 
     if (status !== undefined) {
-      if (!["ACTIVE", "INACTIVE"].includes(status)) {
+      if (!["AUTO", "DEPLOYMENT_IN_PROGRESS"].includes(status)) {
         return NextResponse.json<ApiResponse>(
-          { success: false, error: "status must be ACTIVE or INACTIVE" },
+          {
+            success: false,
+            error: "status must be AUTO or DEPLOYMENT_IN_PROGRESS",
+          },
           { status: 400 },
         );
       }

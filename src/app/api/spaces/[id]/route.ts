@@ -214,7 +214,7 @@ export async function PUT(
           ...updatedSpace,
           minerCount: updatedSpace.miners.length,
           activeMinerCount: updatedSpace.miners.filter(
-            (m) => m.status === "ACTIVE",
+            (m) => m.status === "AUTO",
           ).length,
           capacityUsed: updatedSpace.miners.length,
           capacityPercentage: (

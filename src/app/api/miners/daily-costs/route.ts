@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
           ? Number(latestMinerRate.rate_per_kwh)
           : 0;
 
-        if (ratePerKwh === 0 && miner.status !== "INACTIVE") {
+        if (ratePerKwh === 0 && miner.status === "DEPLOYMENT_IN_PROGRESS") {
           console.warn(
             `[Daily Costs] Warning: No rate history found for miner ${miner.id} (${miner.name}), using 0`,
           );
@@ -63,9 +63,9 @@ export async function GET(request: NextRequest) {
 
         const powerUsageKw = miner.hardware?.powerUsage || 0;
 
-        // If miner is inactive, cost per day is 0
+        // If miner is in deployment, cost per day is 0
         let dailyCost = 0;
-        if (miner.status !== "INACTIVE") {
+        if (miner.status === "AUTO") {
           // Formula: powerUsage (kW) * ratePerKwh * 24 hours
           dailyCost = powerUsageKw * ratePerKwh * 24;
         }

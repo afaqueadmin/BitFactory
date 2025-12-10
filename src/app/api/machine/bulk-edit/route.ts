@@ -8,7 +8,7 @@ interface BulkEditRequest {
   updates: {
     spaceId?: string;
     rate_per_kwh?: number | string;
-    status?: "ACTIVE" | "INACTIVE";
+    status?: "AUTO" | "DEPLOYMENT_IN_PROGRESS";
   };
 }
 
@@ -106,11 +106,11 @@ export async function POST(
 
     // Validate status if provided
     if (updates.status !== undefined) {
-      if (!["ACTIVE", "INACTIVE"].includes(updates.status)) {
+      if (!["AUTO", "DEPLOYMENT_IN_PROGRESS"].includes(updates.status)) {
         return NextResponse.json(
           {
             success: false,
-            error: "status must be ACTIVE or INACTIVE",
+            error: "status must be AUTO or DEPLOYMENT_IN_PROGRESS",
           },
           { status: 400 },
         );
@@ -152,87 +152,81 @@ export async function POST(
       }
     }
 
-    // Process bulk update in transaction
-    const result = await prisma.$transaction(async (tx) => {
-      const updateData: Record<string, unknown> = {};
+    // Process bulk update
+    const updateData: Record<string, unknown> = {};
 
-      // Add fields to update
-      if (updates.spaceId !== undefined) {
-        updateData.spaceId = updates.spaceId;
-      }
-      if (updates.status !== undefined) {
-        updateData.status = updates.status;
-      }
+    // Add fields to update
+    if (updates.spaceId !== undefined) {
+      updateData.spaceId = updates.spaceId;
+    }
+    if (updates.status !== undefined) {
+      updateData.status = updates.status;
+    }
 
-      // Update all miners
-      await tx.miner.updateMany({
-        where: { id: { in: minerIds } },
-        data: updateData,
-      });
+    // Update all miners
+    await prisma.miner.updateMany({
+      where: { id: { in: minerIds } },
+      data: updateData,
+    });
 
-      // Handle rate history updates
-      if (updates.rate_per_kwh !== undefined) {
-        const rateDecimal = new Decimal(
-          Number(updates.rate_per_kwh).toFixed(6),
-        );
+    // Handle rate history updates
+    if (updates.rate_per_kwh !== undefined) {
+      const rateDecimal = new Decimal(Number(updates.rate_per_kwh).toFixed(6));
 
-        for (const minerId of minerIds) {
-          // Get latest rate for this miner
-          const latestRate = await tx.minerRateHistory.findFirst({
-            where: { minerId },
-            orderBy: { createdAt: "desc" },
-            select: { rate_per_kwh: true },
+      for (const minerId of minerIds) {
+        // Get latest rate for this miner
+        const latestRate = await prisma.minerRateHistory.findFirst({
+          where: { minerId },
+          orderBy: { createdAt: "desc" },
+          select: { rate_per_kwh: true },
+        });
+
+        // Only create new history entry if rate differs
+        if (!latestRate || !latestRate.rate_per_kwh.equals(rateDecimal)) {
+          await prisma.minerRateHistory.create({
+            data: {
+              minerId,
+              rate_per_kwh: rateDecimal,
+            },
           });
-
-          // Only create new history entry if rate differs
-          if (!latestRate || !latestRate.rate_per_kwh.equals(rateDecimal)) {
-            await tx.minerRateHistory.create({
-              data: {
-                minerId,
-                rate_per_kwh: rateDecimal,
-              },
-            });
-          }
         }
       }
+    }
 
-      // Fetch updated miners
-      const updatedMiners = await tx.miner.findMany({
-        where: { id: { in: minerIds } },
-        include: {
-          hardware: { select: { model: true } },
-          space: { select: { name: true } },
-          rateHistory: {
-            orderBy: { createdAt: "desc" },
-            take: 1,
-            select: { rate_per_kwh: true },
-          },
+    // Fetch updated miners
+    const updatedMiners = await prisma.miner.findMany({
+      where: { id: { in: minerIds } },
+      include: {
+        hardware: { select: { model: true } },
+        space: { select: { name: true } },
+        rateHistory: {
+          orderBy: { createdAt: "desc" },
+          take: 1,
+          select: { rate_per_kwh: true },
         },
-        orderBy: { createdAt: "desc" },
-      });
-
-      // Transform for response
-      const transformedMiners = updatedMiners.map((miner) => ({
-        id: miner.id,
-        name: miner.name,
-        hardwareName: miner.hardware.model,
-        spaceName: miner.space.name,
-        status: miner.status,
-        rate_per_kwh: miner.rateHistory[0]?.rate_per_kwh
-          ? Number(miner.rateHistory[0].rate_per_kwh)
-          : null,
-        createdAt: miner.createdAt,
-      }));
-
-      return {
-        updatedCount: updatedMiners.length,
-        miners: transformedMiners,
-      };
+      },
+      orderBy: { createdAt: "desc" },
     });
+
+    // Transform for response
+    const transformedMiners = updatedMiners.map((miner) => ({
+      id: miner.id,
+      name: miner.name,
+      hardwareName: miner.hardware.model,
+      spaceName: miner.space.name,
+      status: miner.status,
+      rate_per_kwh: miner.rateHistory[0]?.rate_per_kwh
+        ? Number(miner.rateHistory[0].rate_per_kwh)
+        : null,
+      createdAt: miner.createdAt,
+    }));
 
     return NextResponse.json({
       success: true,
-      data: result,
+      data: {
+        updatedCount: updatedMiners.length,
+        miners: transformedMiners,
+      },
     });
   } catch (error) {
     console.error("Bulk edit error:", error);

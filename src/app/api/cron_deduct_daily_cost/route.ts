@@ -59,8 +59,8 @@ export async function GET(request: NextRequest) {
       let totalDailyCost = 0;
 
       for (const miner of userMiners) {
-        // Only count active miners for consumption and cost
-        if (miner.status !== "INACTIVE") {
+        // Only count AUTO miners for consumption and cost
+        if (miner.status === "AUTO") {
           // Get the latest rate for this specific miner
           const latestMinerRate = await prisma.minerRateHistory.findFirst({
             where: { minerId: miner.id },

@@ -91,7 +91,7 @@ model Hardware {
 model Miner {
   id            String    @id @default(cuid())
   name          String
-  status        String    @default("INACTIVE") // ACTIVE or INACTIVE
+  status        String    @default("DEPLOYMENT_IN_PROGRESS") // AUTO or DEPLOYMENT_IN_PROGRESS
   hardwareId    String
   userId        String
   spaceId       String

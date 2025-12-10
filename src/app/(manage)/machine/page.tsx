@@ -59,7 +59,7 @@ interface Hardware {
 interface Miner {
   id: string;
   name: string;
-  status: "ACTIVE" | "INACTIVE";
+  status: "AUTO" | "DEPLOYMENT_IN_PROGRESS";
   hardwareId: string;
   userId: string;
   spaceId: string;
@@ -617,9 +617,8 @@ export default function MachinePage() {
                 </Typography>
                 <Typography variant="h5" sx={{ fontWeight: "bold", mt: 0.5 }}>
                   {
-                    getSortedFilteredMiners().filter(
-                      (m) => m.status === "ACTIVE",
-                    ).length
+                    getSortedFilteredMiners().filter((m) => m.status === "AUTO")
+                      .length
                   }
                 </Typography>
               </Box>
