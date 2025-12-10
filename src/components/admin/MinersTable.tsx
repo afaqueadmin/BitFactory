@@ -3,6 +3,7 @@
  *
  * Displays a list of miners with CRUD action buttons.
  * Integrates with MUI DataGrid for efficient data rendering.
+ * Supports sorting by all miner fields with visual indicators.
  */
 
 "use client";
@@ -28,12 +29,26 @@ import {
   TableRow,
   CircularProgress,
   Alert,
+  FormControl,
+  Select,
+  MenuItem,
+  SelectChangeEvent,
 } from "@mui/material";
 import {
   Edit as EditIcon,
   Delete as DeleteIcon,
   Warning as WarningIcon,
+  ArrowUpward as ArrowUpwardIcon,
+  ArrowDownward as ArrowDownwardIcon,
 } from "@mui/icons-material";
+import {
+  sortMiners,
+  toggleSortDirection,
+  getSortFieldLabel,
+  getAllSortFields,
+  type SortConfig,
+  type MinerSortField,
+} from "@/lib/utils/sortMiners";
 
 /**
  * User object from API
@@ -99,6 +114,10 @@ export default function MinersTable({
 }: MinersTableProps) {
   const [deleteConfirm, setDeleteConfirm] = React.useState<string | null>(null);
   const [deleting, setDeleting] = React.useState(false);
+  const [sortConfig, setSortConfig] = React.useState<SortConfig>({
+    field: "name",
+    direction: "asc",
+  });
 
   /**
    * Handle delete confirmation
@@ -112,6 +131,40 @@ export default function MinersTable({
       setDeleteConfirm(null);
     } finally {
       setDeleting(false);
+    }
+  };
+
+  /**
+   * Handle sort field change
+   */
+  const handleSortFieldChange = (event: SelectChangeEvent<MinerSortField>) => {
+    const newField = event.target.value as MinerSortField;
+    setSortConfig({ field: newField, direction: "asc" });
+  };
+
+  /**
+   * Handle sort direction toggle
+   */
+  const handleSortDirectionToggle = () => {
+    setSortConfig({
+      ...sortConfig,
+      direction: toggleSortDirection(sortConfig.direction),
+    });
+  };
+
+  /**
+   * Handle header cell click to sort
+   */
+  const handleHeaderClick = (field: MinerSortField) => {
+    if (sortConfig.field === field) {
+      // Same field clicked - toggle direction
+      setSortConfig({
+        ...sortConfig,
+        direction: toggleSortDirection(sortConfig.direction),
+      });
+    } else {
+      // New field clicked - sort ascending
+      setSortConfig({ field, direction: "asc" });
     }
   };
 
@@ -135,7 +188,13 @@ export default function MinersTable({
     return status === "AUTO" ? "success" : "default";
   };
 
-  const memoizedRows = useMemo(() => miners, [miners]);
+  /**
+   * Memoized sorted rows
+   */
+  const memoizedRows = useMemo(
+    () => sortMiners(miners, sortConfig),
+    [miners, sortConfig],
+  );
 
   return (
     <Box>
@@ -145,31 +204,311 @@ export default function MinersTable({
         </Alert>
       )}
 
+      {/* Sort Controls */}
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          mb: 2,
+          flexWrap: "wrap",
+          gap: 2,
+        }}
+      >
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: 1,
+            flexWrap: "wrap",
+          }}
+        >
+          <Typography
+            variant="body2"
+            sx={{ fontWeight: "600", whiteSpace: "nowrap" }}
+          >
+            Sort by:
+          </Typography>
+          <FormControl sx={{ minWidth: 180 }}>
+            <Select
+              value={sortConfig.field}
+              onChange={handleSortFieldChange}
+              size="small"
+            >
+              {getAllSortFields().map((field) => (
+                <MenuItem key={field} value={field}>
+                  {getSortFieldLabel(field)}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <Button
+            size="small"
+            onClick={handleSortDirectionToggle}
+            startIcon={
+              sortConfig.direction === "asc" ? (
+                <ArrowUpwardIcon fontSize="small" />
+              ) : (
+                <ArrowDownwardIcon fontSize="small" />
+              )
+            }
+            variant="outlined"
+            sx={{ textTransform: "capitalize", whiteSpace: "nowrap" }}
+          >
+            {sortConfig.direction === "asc" ? "Asc" : "Desc"}
+          </Button>
+        </Box>
+      </Box>
+
       <TableContainer
         component={Paper}
-        sx={{ backgroundColor: "background.paper" }}
+        sx={{
+          backgroundColor: "background.paper",
+          overflowX: "auto",
+          overflowY: "visible",
+          width: "100%",
+          maxWidth: "100%",
+        }}
       >
-        <Table sx={{ minWidth: 650 }} aria-label="miners table">
+        <Table
+          sx={{
+            minWidth: "900px",
+            tableLayout: "auto",
+            "& th": {
+              whiteSpace: "nowrap",
+              padding: "12px 8px",
+              fontSize: "0.875rem",
+            },
+            "& td": {
+              padding: "12px 8px",
+              fontSize: "0.875rem",
+            },
+          }}
+          aria-label="miners table"
+        >
           <TableHead sx={{ backgroundColor: "action.hover" }}>
             <TableRow>
-              <TableCell sx={{ fontWeight: "bold" }}>Name</TableCell>
-              <TableCell sx={{ fontWeight: "bold" }}>Model</TableCell>
-              <TableCell sx={{ fontWeight: "bold" }}>User</TableCell>
-              <TableCell sx={{ fontWeight: "bold" }}>Subaccount</TableCell>
+              <TableCell
+                sx={{
+                  fontWeight: "bold",
+                  cursor: "pointer",
+                  userSelect: "none",
+                  "&:hover": { backgroundColor: "action.selected" },
+                  whiteSpace: "nowrap",
+                }}
+                onClick={() => handleHeaderClick("name")}
+              >
+                Name{" "}
+                {sortConfig.field === "name" &&
+                  (sortConfig.direction === "asc" ? (
+                    <ArrowUpwardIcon
+                      fontSize="small"
+                      sx={{ verticalAlign: "middle", ml: 0.5 }}
+                    />
+                  ) : (
+                    <ArrowDownwardIcon
+                      fontSize="small"
+                      sx={{ verticalAlign: "middle", ml: 0.5 }}
+                    />
+                  ))}
+              </TableCell>
+              <TableCell
+                sx={{
+                  fontWeight: "bold",
+                  cursor: "pointer",
+                  userSelect: "none",
+                  "&:hover": { backgroundColor: "action.selected" },
+                  whiteSpace: "nowrap",
+                }}
+                onClick={() => handleHeaderClick("model")}
+              >
+                Model{" "}
+                {sortConfig.field === "model" &&
+                  (sortConfig.direction === "asc" ? (
+                    <ArrowUpwardIcon
+                      fontSize="small"
+                      sx={{ verticalAlign: "middle", ml: 0.5 }}
+                    />
+                  ) : (
+                    <ArrowDownwardIcon
+                      fontSize="small"
+                      sx={{ verticalAlign: "middle", ml: 0.5 }}
+                    />
+                  ))}
+              </TableCell>
+              <TableCell
+                sx={{
+                  fontWeight: "bold",
+                  cursor: "pointer",
+                  userSelect: "none",
+                  "&:hover": { backgroundColor: "action.selected" },
+                  whiteSpace: "nowrap",
+                }}
+                onClick={() => handleHeaderClick("user")}
+              >
+                User{" "}
+                {sortConfig.field === "user" &&
+                  (sortConfig.direction === "asc" ? (
+                    <ArrowUpwardIcon
+                      fontSize="small"
+                      sx={{ verticalAlign: "middle", ml: 0.5 }}
+                    />
+                  ) : (
+                    <ArrowDownwardIcon
+                      fontSize="small"
+                      sx={{ verticalAlign: "middle", ml: 0.5 }}
+                    />
+                  ))}
+              </TableCell>
+              <TableCell
+                sx={{
+                  fontWeight: "bold",
+                  cursor: "pointer",
+                  userSelect: "none",
+                  "&:hover": { backgroundColor: "action.selected" },
+                  whiteSpace: "nowrap",
+                }}
+                onClick={() => handleHeaderClick("subaccount")}
+              >
+                Subaccount{" "}
+                {sortConfig.field === "subaccount" &&
+                  (sortConfig.direction === "asc" ? (
+                    <ArrowUpwardIcon
+                      fontSize="small"
+                      sx={{ verticalAlign: "middle", ml: 0.5 }}
+                    />
+                  ) : (
+                    <ArrowDownwardIcon
+                      fontSize="small"
+                      sx={{ verticalAlign: "middle", ml: 0.5 }}
+                    />
+                  ))}
+              </TableCell>
               <TableCell sx={{ fontWeight: "bold" }}>Space</TableCell>
-              <TableCell sx={{ fontWeight: "bold" }} align="right">
-                Power Usage (kWh)
+              <TableCell
+                sx={{
+                  fontWeight: "bold",
+                  cursor: "pointer",
+                  userSelect: "none",
+                  "&:hover": { backgroundColor: "action.selected" },
+                  whiteSpace: "nowrap",
+                }}
+                align="right"
+                onClick={() => handleHeaderClick("powerUsage")}
+              >
+                Power (kW){" "}
+                {sortConfig.field === "powerUsage" &&
+                  (sortConfig.direction === "asc" ? (
+                    <ArrowUpwardIcon
+                      fontSize="small"
+                      sx={{ verticalAlign: "middle", ml: 0.5 }}
+                    />
+                  ) : (
+                    <ArrowDownwardIcon
+                      fontSize="small"
+                      sx={{ verticalAlign: "middle", ml: 0.5 }}
+                    />
+                  ))}
               </TableCell>
-              <TableCell sx={{ fontWeight: "bold" }} align="right">
-                Hash Rate (TH/s)
+              <TableCell
+                sx={{
+                  fontWeight: "bold",
+                  cursor: "pointer",
+                  userSelect: "none",
+                  "&:hover": { backgroundColor: "action.selected" },
+                  whiteSpace: "nowrap",
+                }}
+                align="right"
+                onClick={() => handleHeaderClick("hashRate")}
+              >
+                Hash Rate (TH/s){" "}
+                {sortConfig.field === "hashRate" &&
+                  (sortConfig.direction === "asc" ? (
+                    <ArrowUpwardIcon
+                      fontSize="small"
+                      sx={{ verticalAlign: "middle", ml: 0.5 }}
+                    />
+                  ) : (
+                    <ArrowDownwardIcon
+                      fontSize="small"
+                      sx={{ verticalAlign: "middle", ml: 0.5 }}
+                    />
+                  ))}
               </TableCell>
-              <TableCell sx={{ fontWeight: "bold" }} align="right">
-                Rate per kWh (USD)
+              <TableCell
+                sx={{
+                  fontWeight: "bold",
+                  cursor: "pointer",
+                  userSelect: "none",
+                  "&:hover": { backgroundColor: "action.selected" },
+                  whiteSpace: "nowrap",
+                }}
+                align="right"
+                onClick={() => handleHeaderClick("ratePerKwh")}
+              >
+                Rate (USD){" "}
+                {sortConfig.field === "ratePerKwh" &&
+                  (sortConfig.direction === "asc" ? (
+                    <ArrowUpwardIcon
+                      fontSize="small"
+                      sx={{ verticalAlign: "middle", ml: 0.5 }}
+                    />
+                  ) : (
+                    <ArrowDownwardIcon
+                      fontSize="small"
+                      sx={{ verticalAlign: "middle", ml: 0.5 }}
+                    />
+                  ))}
               </TableCell>
-              <TableCell sx={{ fontWeight: "bold" }} align="center">
-                Status
+              <TableCell
+                sx={{
+                  fontWeight: "bold",
+                  cursor: "pointer",
+                  userSelect: "none",
+                  "&:hover": { backgroundColor: "action.selected" },
+                  whiteSpace: "nowrap",
+                }}
+                align="center"
+                onClick={() => handleHeaderClick("status")}
+              >
+                Status{" "}
+                {sortConfig.field === "status" &&
+                  (sortConfig.direction === "asc" ? (
+                    <ArrowUpwardIcon
+                      fontSize="small"
+                      sx={{ verticalAlign: "middle", ml: 0.5 }}
+                    />
+                  ) : (
+                    <ArrowDownwardIcon
+                      fontSize="small"
+                      sx={{ verticalAlign: "middle", ml: 0.5 }}
+                    />
+                  ))}
               </TableCell>
-              <TableCell sx={{ fontWeight: "bold" }}>Created</TableCell>
+              <TableCell
+                sx={{
+                  fontWeight: "bold",
+                  cursor: "pointer",
+                  userSelect: "none",
+                  "&:hover": { backgroundColor: "action.selected" },
+                  whiteSpace: "nowrap",
+                }}
+                onClick={() => handleHeaderClick("createdAt")}
+              >
+                Created{" "}
+                {sortConfig.field === "createdAt" &&
+                  (sortConfig.direction === "asc" ? (
+                    <ArrowUpwardIcon
+                      fontSize="small"
+                      sx={{ verticalAlign: "middle", ml: 0.5 }}
+                    />
+                  ) : (
+                    <ArrowDownwardIcon
+                      fontSize="small"
+                      sx={{ verticalAlign: "middle", ml: 0.5 }}
+                    />
+                  ))}
+              </TableCell>
               <TableCell sx={{ fontWeight: "bold" }} align="center">
                 Actions
               </TableCell>
