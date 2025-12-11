@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Box,
   Grid as MuiGrid,
@@ -20,8 +20,24 @@ import {
   MenuItem,
   IconButton,
   Snackbar,
+  FormControl,
+  Select,
+  SelectChangeEvent,
 } from "@mui/material";
-import { Add as AddIcon, MoreVert as MoreVertIcon } from "@mui/icons-material";
+import {
+  Add as AddIcon,
+  MoreVert as MoreVertIcon,
+  ArrowUpward as ArrowUpwardIcon,
+  ArrowDownward as ArrowDownwardIcon,
+} from "@mui/icons-material";
+import {
+  sortCustomers,
+  toggleSortDirection,
+  getSortFieldLabel,
+  getAllSortFields,
+  type SortConfig,
+  type CustomerSortField,
+} from "@/lib/utils/sortCustomers";
 import AdminValueCard from "@/components/admin/AdminValueCard";
 import CreateUserModal from "@/components/CreateUserModal";
 import EditCustomerModal from "@/components/EditCustomerModal";
@@ -65,6 +81,10 @@ export default function CustomerOverview() {
     null,
   );
   const [responseNotification, setResponseNotification] = useState("");
+  const [sortConfig, setSortConfig] = useState<SortConfig>({
+    field: "name",
+    direction: "asc",
+  });
   const [customerStats, setCustomerStats] = useState({
     totalCustomers: 0,
     activeCustomers: 0,
@@ -174,6 +194,50 @@ export default function CustomerOverview() {
     }
     fetchUsers();
   };
+
+  /**
+   * Handle sort field change from dropdown
+   */
+  const handleSortFieldChange = (
+    event: SelectChangeEvent<CustomerSortField>,
+  ) => {
+    const newField = event.target.value as CustomerSortField;
+    setSortConfig({ field: newField, direction: "asc" });
+  };
+
+  /**
+   * Handle sort direction toggle
+   */
+  const handleSortDirectionToggle = () => {
+    setSortConfig({
+      ...sortConfig,
+      direction: toggleSortDirection(sortConfig.direction),
+    });
+  };
+
+  /**
+   * Handle header cell click to sort
+   */
+  const handleHeaderClick = (field: CustomerSortField) => {
+    if (sortConfig.field === field) {
+      // Same field clicked - toggle direction
+      setSortConfig({
+        ...sortConfig,
+        direction: toggleSortDirection(sortConfig.direction),
+      });
+    } else {
+      // New field clicked - sort ascending
+      setSortConfig({ field, direction: "asc" });
+    }
+  };
+
+  /**
+   * Memoized sorted customers
+   */
+  const sortedUsers = useMemo(
+    () => sortCustomers(users, sortConfig),
+    [users, sortConfig],
+  );
 
   const handleMenuOpen = (
     event: React.MouseEvent<HTMLButtonElement>,
@@ -442,63 +506,276 @@ export default function CustomerOverview() {
             No customers found
           </Typography>
         ) : (
-          <TableContainer>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Customer</TableCell>
-                  <TableCell>Email</TableCell>
-                  <TableCell>Role</TableCell>
-                  <TableCell>Luxor Subaccount</TableCell>
-                  <TableCell align="center">Miners</TableCell>
-                  <TableCell align="center">Status</TableCell>
-                  <TableCell>Join Date</TableCell>
-                  <TableCell align="center">Actions</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {users.map((customer) => (
-                  <TableRow
-                    key={customer.id}
-                    sx={{
-                      "&:last-child td, &:last-child th": { border: 0 },
-                      "&:hover": {
-                        backgroundColor: "action.hover",
-                      },
-                    }}
+          <>
+            {/* Sort Controls */}
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "flex-start",
+                alignItems: "center",
+                mb: 2,
+                flexWrap: "wrap",
+                gap: 2,
+              }}
+            >
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <Typography variant="body2" sx={{ fontWeight: "600" }}>
+                  Sort by:
+                </Typography>
+                <FormControl sx={{ minWidth: 200 }}>
+                  <Select
+                    value={sortConfig.field}
+                    onChange={handleSortFieldChange}
+                    size="small"
                   >
-                    <TableCell component="th" scope="row">
-                      {customer.name}
+                    {getAllSortFields().map((field) => (
+                      <MenuItem key={field} value={field}>
+                        {getSortFieldLabel(field)}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                <Button
+                  size="small"
+                  onClick={handleSortDirectionToggle}
+                  startIcon={
+                    sortConfig.direction === "asc" ? (
+                      <ArrowUpwardIcon fontSize="small" />
+                    ) : (
+                      <ArrowDownwardIcon fontSize="small" />
+                    )
+                  }
+                  variant="outlined"
+                  sx={{ textTransform: "capitalize" }}
+                >
+                  {sortConfig.direction === "asc" ? "Asc" : "Desc"}
+                </Button>
+              </Box>
+            </Box>
+
+            <TableContainer>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell
+                      sx={{
+                        fontWeight: "bold",
+                        cursor: "pointer",
+                        userSelect: "none",
+                        "&:hover": { backgroundColor: "action.selected" },
+                        whiteSpace: "nowrap",
+                      }}
+                      onClick={() => handleHeaderClick("name")}
+                    >
+                      Customer{" "}
+                      {sortConfig.field === "name" &&
+                        (sortConfig.direction === "asc" ? (
+                          <ArrowUpwardIcon
+                            fontSize="small"
+                            sx={{ verticalAlign: "middle", ml: 0.5 }}
+                          />
+                        ) : (
+                          <ArrowDownwardIcon
+                            fontSize="small"
+                            sx={{ verticalAlign: "middle", ml: 0.5 }}
+                          />
+                        ))}
                     </TableCell>
-                    <TableCell>{customer.email}</TableCell>
-                    <TableCell>{customer.role}</TableCell>
-                    <TableCell>
-                      {customer.luxorSubaccountName ?? "Not Set"}
+                    <TableCell
+                      sx={{
+                        fontWeight: "bold",
+                        cursor: "pointer",
+                        userSelect: "none",
+                        "&:hover": { backgroundColor: "action.selected" },
+                        whiteSpace: "nowrap",
+                      }}
+                      onClick={() => handleHeaderClick("email")}
+                    >
+                      Email{" "}
+                      {sortConfig.field === "email" &&
+                        (sortConfig.direction === "asc" ? (
+                          <ArrowUpwardIcon
+                            fontSize="small"
+                            sx={{ verticalAlign: "middle", ml: 0.5 }}
+                          />
+                        ) : (
+                          <ArrowDownwardIcon
+                            fontSize="small"
+                            sx={{ verticalAlign: "middle", ml: 0.5 }}
+                          />
+                        ))}
                     </TableCell>
-                    <TableCell align="center">{customer.miners}</TableCell>
-                    <TableCell align="center">
-                      <Chip
-                        label={customer.status}
-                        color={
-                          customer.status === "active" ? "success" : "default"
-                        }
-                        size="small"
-                      />
+                    <TableCell
+                      sx={{
+                        fontWeight: "bold",
+                        cursor: "pointer",
+                        userSelect: "none",
+                        "&:hover": { backgroundColor: "action.selected" },
+                        whiteSpace: "nowrap",
+                      }}
+                      onClick={() => handleHeaderClick("role")}
+                    >
+                      Role{" "}
+                      {sortConfig.field === "role" &&
+                        (sortConfig.direction === "asc" ? (
+                          <ArrowUpwardIcon
+                            fontSize="small"
+                            sx={{ verticalAlign: "middle", ml: 0.5 }}
+                          />
+                        ) : (
+                          <ArrowDownwardIcon
+                            fontSize="small"
+                            sx={{ verticalAlign: "middle", ml: 0.5 }}
+                          />
+                        ))}
                     </TableCell>
-                    <TableCell>{customer.joinDate}</TableCell>
-                    <TableCell align="center">
-                      <IconButton
-                        size="small"
-                        onClick={(e) => handleMenuOpen(e, customer)}
-                      >
-                        <MoreVertIcon />
-                      </IconButton>
+                    <TableCell
+                      sx={{
+                        fontWeight: "bold",
+                        cursor: "pointer",
+                        userSelect: "none",
+                        "&:hover": { backgroundColor: "action.selected" },
+                        whiteSpace: "nowrap",
+                      }}
+                      onClick={() => handleHeaderClick("luxorSubaccount")}
+                    >
+                      Luxor Subaccount{" "}
+                      {sortConfig.field === "luxorSubaccount" &&
+                        (sortConfig.direction === "asc" ? (
+                          <ArrowUpwardIcon
+                            fontSize="small"
+                            sx={{ verticalAlign: "middle", ml: 0.5 }}
+                          />
+                        ) : (
+                          <ArrowDownwardIcon
+                            fontSize="small"
+                            sx={{ verticalAlign: "middle", ml: 0.5 }}
+                          />
+                        ))}
+                    </TableCell>
+                    <TableCell
+                      sx={{
+                        fontWeight: "bold",
+                        cursor: "pointer",
+                        userSelect: "none",
+                        "&:hover": { backgroundColor: "action.selected" },
+                        whiteSpace: "nowrap",
+                      }}
+                      align="center"
+                      onClick={() => handleHeaderClick("miners")}
+                    >
+                      Miners{" "}
+                      {sortConfig.field === "miners" &&
+                        (sortConfig.direction === "asc" ? (
+                          <ArrowUpwardIcon
+                            fontSize="small"
+                            sx={{ verticalAlign: "middle", ml: 0.5 }}
+                          />
+                        ) : (
+                          <ArrowDownwardIcon
+                            fontSize="small"
+                            sx={{ verticalAlign: "middle", ml: 0.5 }}
+                          />
+                        ))}
+                    </TableCell>
+                    <TableCell
+                      sx={{
+                        fontWeight: "bold",
+                        cursor: "pointer",
+                        userSelect: "none",
+                        "&:hover": { backgroundColor: "action.selected" },
+                        whiteSpace: "nowrap",
+                      }}
+                      align="center"
+                      onClick={() => handleHeaderClick("status")}
+                    >
+                      Status{" "}
+                      {sortConfig.field === "status" &&
+                        (sortConfig.direction === "asc" ? (
+                          <ArrowUpwardIcon
+                            fontSize="small"
+                            sx={{ verticalAlign: "middle", ml: 0.5 }}
+                          />
+                        ) : (
+                          <ArrowDownwardIcon
+                            fontSize="small"
+                            sx={{ verticalAlign: "middle", ml: 0.5 }}
+                          />
+                        ))}
+                    </TableCell>
+                    <TableCell
+                      sx={{
+                        fontWeight: "bold",
+                        cursor: "pointer",
+                        userSelect: "none",
+                        "&:hover": { backgroundColor: "action.selected" },
+                        whiteSpace: "nowrap",
+                      }}
+                      onClick={() => handleHeaderClick("joinDate")}
+                    >
+                      Join Date{" "}
+                      {sortConfig.field === "joinDate" &&
+                        (sortConfig.direction === "asc" ? (
+                          <ArrowUpwardIcon
+                            fontSize="small"
+                            sx={{ verticalAlign: "middle", ml: 0.5 }}
+                          />
+                        ) : (
+                          <ArrowDownwardIcon
+                            fontSize="small"
+                            sx={{ verticalAlign: "middle", ml: 0.5 }}
+                          />
+                        ))}
+                    </TableCell>
+                    <TableCell align="center" sx={{ fontWeight: "bold" }}>
+                      Actions
                     </TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
+                </TableHead>
+                <TableBody>
+                  {sortedUsers.map((customer) => (
+                    <TableRow
+                      key={customer.id}
+                      sx={{
+                        "&:last-child td, &:last-child th": { border: 0 },
+                        "&:hover": {
+                          backgroundColor: "action.hover",
+                        },
+                      }}
+                    >
+                      <TableCell component="th" scope="row">
+                        {customer.name}
+                      </TableCell>
+                      <TableCell>{customer.email}</TableCell>
+                      <TableCell>{customer.role}</TableCell>
+                      <TableCell>
+                        {customer.luxorSubaccountName ?? "Not Set"}
+                      </TableCell>
+                      <TableCell align="center">{customer.miners}</TableCell>
+                      <TableCell align="center">
+                        <Chip
+                          label={customer.status}
+                          color={
+                            customer.status === "active" ? "success" : "default"
+                          }
+                          size="small"
+                        />
+                      </TableCell>
+                      <TableCell>{customer.joinDate}</TableCell>
+                      <TableCell align="center">
+                        <IconButton
+                          size="small"
+                          onClick={(e) => handleMenuOpen(e, customer)}
+                        >
+                          <MoreVertIcon />
+                        </IconButton>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </>
         )}
       </Paper>
 
