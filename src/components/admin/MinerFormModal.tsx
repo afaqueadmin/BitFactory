@@ -34,6 +34,7 @@ interface Hardware {
   id: string;
   model: string;
   powerUsage: number;
+  quantity: number;
   hashRate: number | string;
   createdAt?: string;
   updatedAt?: string;
@@ -380,11 +381,13 @@ export default function MinerFormModal({
               <MenuItem value="">
                 <em>Select a hardware model</em>
               </MenuItem>
-              {hardware.map((hw) => (
-                <MenuItem key={hw.id} value={hw.id}>
-                  {hw.model}
-                </MenuItem>
-              ))}
+              {hardware
+                .filter((hw) => hw.quantity > 0)
+                .map((hw) => (
+                  <MenuItem key={hw.id} value={hw.id}>
+                    {hw.model}
+                  </MenuItem>
+                ))}
             </Select>
           </FormControl>
 

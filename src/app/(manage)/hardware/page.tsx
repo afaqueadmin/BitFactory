@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useMemo } from "react";
 import {
   Box,
   Button,
@@ -253,6 +253,25 @@ export default function HardwarePage() {
     });
   };
 
+  const [averagePowerUsage, averageHashRate] = useMemo(() => {
+    const baseValues = ["0.00 kW", "0.00 TH/s"];
+    if (hardware.length === 0) return baseValues;
+    const denominator = hardware.reduce((sum, hw) => sum + hw.quantity, 0);
+    if (denominator === 0) return baseValues;
+    const avgPowerUsage = (
+      hardware.reduce((sum, hw) => sum + hw.powerUsage * hw.quantity, 0) /
+      denominator
+    ).toFixed(2);
+    const avgHashRate = (
+      hardware.reduce(
+        (sum, hw) => sum + parseFloat(String(hw.hashRate)) * hw.quantity,
+        0,
+      ) / denominator
+    ).toFixed(2);
+
+    return [`${avgPowerUsage} kW`, `${avgHashRate} TH/s`];
+  }, [hardware]);
+
   return (
     <Box sx={{ p: 3 }}>
       <Box sx={{ mb: 4 }}>
@@ -303,15 +322,7 @@ export default function HardwarePage() {
             Average Power Usage
           </Typography>
           <Typography variant="h4" sx={{ mt: 1 }}>
-            {hardware.length > 0
-              ? (
-                  hardware.reduce(
-                    (sum, hw) => sum + hw.powerUsage * hw.quantity,
-                    0,
-                  ) / hardware.reduce((sum, hw) => sum + hw.quantity, 0)
-                ).toFixed(2)
-              : "0.00"}{" "}
-            kW
+            {averagePowerUsage}
           </Typography>
         </Paper>
 
@@ -320,16 +331,7 @@ export default function HardwarePage() {
             Average Hash Rate
           </Typography>
           <Typography variant="h4" sx={{ mt: 1 }}>
-            {hardware.length > 0
-              ? (
-                  hardware.reduce(
-                    (sum, hw) =>
-                      sum + parseFloat(String(hw.hashRate)) * hw.quantity,
-                    0,
-                  ) / hardware.reduce((sum, hw) => sum + hw.quantity, 0)
-                ).toFixed(2)
-              : "0.00"}{" "}
-            TH/s
+            {averageHashRate}
           </Typography>
         </Paper>
       </Box>
