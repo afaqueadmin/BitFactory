@@ -1,16 +1,18 @@
 /**
  * src/app/(manage)/subaccounts/page.tsx
- * Luxor Workspace Subaccounts Management Page
+ * Luxor Workspace Subaccounts Management Page (V2 API)
  *
- * Admin page for managing Luxor subaccounts within workspace groups with full CRUD operations:
- * - Select a group from dropdown
- * - View all subaccounts in the selected group
- * - Add new subaccounts to a group
- * - Remove subaccounts from a group
+ * Admin page for managing Luxor subaccounts within workspace sites with full CRUD operations:
+ * - Select a site from dropdown
+ * - View all subaccounts in the selected site
+ * - Add new subaccounts to a site
+ * - Remove subaccounts from a site
  * - Real-time status and feedback
  *
  * This page uses the secure /api/luxor proxy route to handle all subaccount operations
  * with server-side authentication and ADMIN-only authorization.
+ *
+ * NOTE: This replaces the V1 Groups API. Sites are the new organizational unit in V2.
  */
 
 "use client";
@@ -50,8 +52,19 @@ import {
   Close as CloseIcon,
 } from "@mui/icons-material";
 import StorageIcon from "@mui/icons-material/Storage";
+import LocationOnIcon from "@mui/icons-material/LocationOn";
 import GradientStatCard from "@/components/GradientStatCard";
-import { GetGroupResponse, GetSubaccountResponse } from "@/lib/luxor";
+import { Subaccount } from "@/lib/luxor";
+
+// ============================================================================
+// CONSTANTS
+// ============================================================================
+
+/**
+ * Fixed site ID for subaccount operations
+ * TODO: Replace with dynamic site selection once authorization is resolved
+ */
+const FIXED_SITE_ID = "2a3e8c01-2bbb-41e3-b6d1-a2926bfecce5";
 
 /**
  * Response structure from the /api/luxor proxy route
@@ -67,7 +80,7 @@ interface ProxyResponse<T = Record<string, unknown>> {
  * Subaccount list response from GET endpoint
  */
 interface SubaccountListData {
-  subaccounts: GetSubaccountResponse[];
+  subaccounts: Subaccount[];
 }
 
 /**
@@ -81,9 +94,7 @@ interface SubaccountFormData {
  * Component state for managing subaccounts
  */
 interface SubaccountsState {
-  groups: GetGroupResponse[];
-  subaccounts: GetSubaccountResponse[];
-  selectedGroupIds: string[]; // Changed to array for multi-select
+  subaccounts: Subaccount[];
   loading: boolean;
   error: string | null;
 }
@@ -94,7 +105,7 @@ interface SubaccountsState {
 interface DialogState {
   open: boolean;
   mode: "add" | "delete";
-  selectedSubaccount: GetSubaccountResponse | null;
+  selectedSubaccount: Subaccount | null;
   formData: SubaccountFormData;
   submitting: boolean;
   message: string | null;
@@ -114,9 +125,7 @@ const initialDialogState: DialogState = {
 
 export default function SubaccountsPage() {
   const [state, setState] = useState<SubaccountsState>({
-    groups: [],
     subaccounts: [],
-    selectedGroupIds: [], // Changed to array
     loading: true,
     error: null,
   });
@@ -125,76 +134,57 @@ export default function SubaccountsPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   /**
-   * Fetch all workspace groups
+   * Fetch all subaccounts across all sites
    *
-   * This is called on component mount to populate the group dropdown.
+   * This is called on component mount to populate the subaccounts table.
+   * Fetches all subaccounts via pagination (site_id is optional):
+   * GET /pool/subaccounts?page_number=1&page_size=10
+   *
+   * The response includes site information for each subaccount.
    */
-  const fetchGroups = useCallback(async () => {
+  const fetchSubaccounts = useCallback(async () => {
     try {
       setState((prev) => ({ ...prev, error: null }));
 
-      console.log("[Luxor Subaccounts] Fetching workspace groups...");
+      console.log(
+        "[Luxor Subaccounts] Fetching all subaccounts (without site_id filter)",
+      );
 
-      const response = await fetch("/api/luxor?endpoint=workspace");
+      const response = await fetch(`/api/luxor?endpoint=subaccounts`);
 
       if (!response.ok) {
         throw new Error(`API returned status ${response.status}`);
       }
 
-      const data: ProxyResponse<Record<string, unknown>> =
-        await response.json();
+      const data: ProxyResponse<SubaccountListData> = await response.json();
 
       if (!data.success) {
-        throw new Error(data.error || "Failed to fetch groups");
+        throw new Error(data.error || "Failed to fetch subaccounts");
       }
 
-      // Extract groups array from workspace data
-      const workspaceData = data.data as Record<string, unknown>;
-      let groupsList: GetGroupResponse[] = [];
+      const subaccountsList =
+        (data.data as SubaccountListData)?.subaccounts || [];
 
-      console.log("[Luxor Subaccounts] Workspace data:", workspaceData);
-
-      if (workspaceData && Array.isArray(workspaceData.groups)) {
-        groupsList = (
-          workspaceData.groups as Array<Record<string, unknown>>
-        ).map(
-          (group: Record<string, unknown>) =>
-            ({
-              id: String(group.id || ""),
-              name: String(group.name || ""),
-              type:
-                (group.type as
-                  | "UNSPECIFIED"
-                  | "POOL"
-                  | "DERIVATIVES"
-                  | "HARDWARE") || "UNSPECIFIED",
-              url: String(group.url || ""),
-              members: Array.isArray(group.members)
-                ? (group.members as Array<Record<string, unknown>>)
-                : [],
-              subaccounts: Array.isArray(group.subaccounts)
-                ? (group.subaccounts as Array<Record<string, unknown>>)
-                : [],
-            }) as unknown as GetGroupResponse,
-        );
-
-        console.log("[Luxor Subaccounts] Parsed groups:", groupsList);
-      }
+      console.log("[Luxor Subaccounts] Response data:", data.data);
+      console.log("[Luxor Subaccounts] Parsed subaccounts:", subaccountsList);
 
       setState((prev) => ({
         ...prev,
-        groups: groupsList,
+        subaccounts: subaccountsList,
         loading: false,
         error: null,
       }));
 
       console.log(
-        `[Luxor Subaccounts] Successfully fetched ${groupsList.length} groups`,
+        `[Luxor Subaccounts] Successfully fetched ${subaccountsList.length} subaccounts`,
       );
     } catch (error) {
       const errorMsg =
         error instanceof Error ? error.message : "Unknown error occurred";
-      console.error("[Luxor Subaccounts] Error fetching groups:", errorMsg);
+      console.error(
+        "[Luxor Subaccounts] Error fetching subaccounts:",
+        errorMsg,
+      );
       setState((prev) => ({
         ...prev,
         loading: false,
@@ -204,152 +194,17 @@ export default function SubaccountsPage() {
   }, []);
 
   /**
-   * Fetch subaccounts for the selected groups
-   *
-   * This is called when groups are selected or when subaccounts are updated.
-   * Supports single or multiple group selection.
-   */
-  const fetchSubaccounts = useCallback(
-    async (groupIds: string[]) => {
-      if (!groupIds || groupIds.length === 0) {
-        setState((prev) => ({
-          ...prev,
-          subaccounts: [],
-          error: null,
-        }));
-        return;
-      }
-
-      try {
-        setState((prev) => ({ ...prev, error: null }));
-
-        console.log(
-          "[Luxor Subaccounts] Fetching subaccounts for groups:",
-          groupIds,
-        );
-
-        // Fetch subaccounts for all selected groups
-        const allSubaccounts: Array<
-          GetSubaccountResponse & { _groupId: string; _groupName: string }
-        > = [];
-        let hasErrors = false;
-        let lastError: string | null = null;
-
-        for (const groupId of groupIds) {
-          try {
-            const response = await fetch(
-              `/api/luxor?endpoint=subaccount&groupId=${groupId}`,
-            );
-
-            if (!response.ok) {
-              hasErrors = true;
-              lastError = `Group error: API returned status ${response.status}`;
-              console.warn(
-                `[Luxor Subaccounts] Error fetching for group ${groupId}:`,
-                lastError,
-              );
-              continue; // Skip this group, continue with others
-            }
-
-            const data: ProxyResponse<SubaccountListData> =
-              await response.json();
-
-            if (!data.success) {
-              hasErrors = true;
-              lastError = data.error || "Failed to fetch subaccounts";
-              console.warn(
-                `[Luxor Subaccounts] API error for group ${groupId}:`,
-                lastError,
-              );
-              continue;
-            }
-
-            const subaccountsList =
-              (data.data as SubaccountListData)?.subaccounts || [];
-
-            // Add group context to each subaccount
-            const groupName =
-              state.groups.find((g) => g.id === groupId)?.name || groupId;
-            const subaccountsWithGroup = subaccountsList.map((sub) => ({
-              ...sub,
-              _groupId: groupId,
-              _groupName: groupName,
-            }));
-
-            allSubaccounts.push(...subaccountsWithGroup);
-          } catch (error) {
-            hasErrors = true;
-            lastError =
-              error instanceof Error ? error.message : "Unknown error";
-            console.error(
-              `[Luxor Subaccounts] Exception fetching for group ${groupId}:`,
-              lastError,
-            );
-          }
-        }
-
-        setState((prev) => ({
-          ...prev,
-          subaccounts: allSubaccounts as Array<
-            GetSubaccountResponse & { _groupId: string; _groupName: string }
-          >,
-          error: hasErrors && lastError ? `Partial error: ${lastError}` : null,
-        }));
-
-        console.log(
-          `[Luxor Subaccounts] Successfully fetched ${allSubaccounts.length} subaccounts from ${groupIds.length} groups`,
-        );
-      } catch (error) {
-        const errorMsg =
-          error instanceof Error ? error.message : "Unknown error occurred";
-        console.error(
-          "[Luxor Subaccounts] Error fetching subaccounts:",
-          errorMsg,
-        );
-        setState((prev) => ({
-          ...prev,
-          subaccounts: [],
-          error: errorMsg,
-        }));
-      }
-    },
-    [state.groups],
-  );
-
-  /**
-   * Fetch groups on component mount
+   * Fetch subaccounts on component mount
    */
   useEffect(() => {
-    fetchGroups();
-  }, [fetchGroups]);
-
-  /**
-   * Handle group selection change (multi-select)
-   */
-  const handleGroupChange = (groupIds: string | string[]) => {
-    let selectedIds = Array.isArray(groupIds) ? groupIds : [groupIds];
-
-    // Handle "All Groups" option
-    if (selectedIds.includes("__all__")) {
-      selectedIds = state.groups.map((g) => g.id);
-    } else {
-      selectedIds = selectedIds.filter((id) => id !== "__all__");
-    }
-
-    console.log("[Luxor Subaccounts] Groups selected:", selectedIds);
-    setState((prev) => ({
-      ...prev,
-      selectedGroupIds: selectedIds,
-      subaccounts: [],
-    }));
-    fetchSubaccounts(selectedIds);
-  };
+    fetchSubaccounts();
+  }, [fetchSubaccounts]);
 
   /**
    * Handle add subaccount form submission
    *
    * Sends a POST request to /api/luxor with the new subaccount name
-   * When multiple groups are selected, adds to the first group only
+   * Uses the fixed FIXED_SITE_ID for all operations
    */
   const handleAddSubaccount = async () => {
     if (!dialog.formData.name.trim()) {
@@ -360,35 +215,26 @@ export default function SubaccountsPage() {
       return;
     }
 
-    if (!state.selectedGroupIds || state.selectedGroupIds.length === 0) {
-      setDialog((prev) => ({
-        ...prev,
-        message: "Please select at least one group first",
-      }));
-      return;
-    }
-
     setDialog((prev) => ({ ...prev, submitting: true, message: null }));
 
     try {
-      const targetGroupId = state.selectedGroupIds[0]; // Add to first selected group
       console.log(
         "[Luxor Subaccounts] Adding subaccount:",
         dialog.formData.name,
-        "to group:",
-        targetGroupId,
+        "to site:",
+        FIXED_SITE_ID,
       );
 
       const response = await fetch("/api/luxor", {
         method: "POST",
         body: JSON.stringify({
           endpoint: "subaccount",
-          groupId: targetGroupId,
+          site_id: FIXED_SITE_ID,
           name: dialog.formData.name,
         }),
       });
 
-      const data: ProxyResponse<GetSubaccountResponse> = await response.json();
+      const data: ProxyResponse<Subaccount> = await response.json();
 
       console.log("[Luxor Subaccounts] Add response:", {
         status: response.status,
@@ -403,10 +249,8 @@ export default function SubaccountsPage() {
 
       console.log("[Luxor Subaccounts] Subaccount added successfully");
 
-      // Refresh the subaccounts list for all selected groups
-      if (state.selectedGroupIds.length > 0) {
-        await fetchSubaccounts(state.selectedGroupIds);
-      }
+      // Refresh the subaccounts list
+      await fetchSubaccounts();
 
       // Close dialog
       setDialog(initialDialogState);
@@ -426,6 +270,7 @@ export default function SubaccountsPage() {
    * Handle delete subaccount confirmation
    *
    * Sends a DELETE request to /api/luxor with the subaccount details
+   * Uses the fixed FIXED_SITE_ID for the operation
    */
   const handleDeleteSubaccount = async () => {
     if (!dialog.selectedSubaccount) {
@@ -436,36 +281,21 @@ export default function SubaccountsPage() {
       return;
     }
 
-    // Find which group this subaccount belongs to (from the _groupId property)
-    const subAcctWithGroup = state.subaccounts.find(
-      (s: GetSubaccountResponse & { _groupId?: string }) =>
-        s.id === dialog.selectedSubaccount?.id &&
-        (s as GetSubaccountResponse & { _groupId: string })._groupId,
-    ) as GetSubaccountResponse & { _groupId?: string };
-    const groupId =
-      (subAcctWithGroup as GetSubaccountResponse & { _groupId?: string })
-        ?._groupId || state.selectedGroupIds[0];
-
-    if (!groupId) {
-      setDialog((prev) => ({
-        ...prev,
-        message: "No group associated with this subaccount",
-      }));
-      return;
-    }
-
     setDialog((prev) => ({ ...prev, submitting: true, message: null }));
 
     try {
       const subaccountName = dialog.selectedSubaccount.name;
+      const subaccountId = dialog.selectedSubaccount.id;
 
       console.log("[Luxor Subaccounts] DELETE REQUEST:");
-      console.log("  Group ID:", groupId);
+      console.log("  Site ID:", FIXED_SITE_ID);
+      console.log("  Subaccount ID:", subaccountId);
       console.log("  Subaccount Name:", subaccountName);
 
       const requestBody = {
         endpoint: "subaccount",
-        groupId: groupId,
+        site_id: FIXED_SITE_ID,
+        subaccount_id: subaccountId,
         name: subaccountName,
       };
 
@@ -494,10 +324,8 @@ export default function SubaccountsPage() {
 
       console.log("[Luxor Subaccounts] Subaccount deleted successfully");
 
-      // Refresh the subaccounts list for all selected groups
-      if (state.selectedGroupIds.length > 0) {
-        await fetchSubaccounts(state.selectedGroupIds);
-      }
+      // Refresh the subaccounts list
+      await fetchSubaccounts();
 
       // Close dialog
       setDialog(initialDialogState);
@@ -527,7 +355,7 @@ export default function SubaccountsPage() {
   /**
    * Open delete confirmation dialog
    */
-  const openDeleteDialog = (subaccount: GetSubaccountResponse) => {
+  const openDeleteDialog = (subaccount: Subaccount) => {
     setDialog({
       open: true,
       mode: "delete",
@@ -564,9 +392,7 @@ export default function SubaccountsPage() {
    */
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    if (state.selectedGroupIds.length > 0) {
-      await fetchSubaccounts(state.selectedGroupIds);
-    }
+    await fetchSubaccounts();
     setIsRefreshing(false);
   };
 
@@ -616,7 +442,7 @@ export default function SubaccountsPage() {
               Luxor Workspace Subaccounts
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-              Manage subaccounts within your Luxor mining groups
+              View all subaccounts across all workspace sites
             </Typography>
           </Box>
           <Stack direction="row" spacing={1}>
@@ -624,7 +450,7 @@ export default function SubaccountsPage() {
               variant="outlined"
               startIcon={<RefreshIcon />}
               onClick={handleRefresh}
-              disabled={isRefreshing || state.selectedGroupIds.length === 0}
+              disabled={isRefreshing}
             >
               {isRefreshing ? "Refreshing..." : "Refresh"}
             </Button>
@@ -632,7 +458,6 @@ export default function SubaccountsPage() {
               variant="contained"
               startIcon={<AddIcon />}
               onClick={openAddDialog}
-              disabled={state.selectedGroupIds.length === 0}
             >
               Add Subaccount
             </Button>
@@ -649,35 +474,8 @@ export default function SubaccountsPage() {
           </Alert>
         )}
 
-        {/* Group Selection - Multi-Select */}
-        <Paper sx={{ p: 3, mb: 4 }}>
-          <FormControl fullWidth>
-            <InputLabel id="group-select-label">Select Groups</InputLabel>
-            <Select
-              labelId="group-select-label"
-              id="group-select"
-              multiple
-              value={state.selectedGroupIds}
-              label="Select Groups"
-              onChange={(e) => {
-                const value = e.target.value;
-                handleGroupChange(typeof value === "string" ? [value] : value);
-              }}
-            >
-              <MenuItem value="__all__">
-                <strong>All Groups</strong>
-              </MenuItem>
-              {state.groups.map((group) => (
-                <MenuItem key={group.id} value={group.id}>
-                  {group.name} ({group.subaccounts.length} subaccounts)
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        </Paper>
-
         {/* Stat Cards */}
-        {state.selectedGroupIds.length > 0 && (
+        {state.subaccounts.length > 0 && (
           <Box
             sx={{
               display: "grid",
@@ -698,27 +496,15 @@ export default function SubaccountsPage() {
                 icon={<StorageIcon fontSize="small" />}
               />
             </Box>
-
-            <Box>
-              <GradientStatCard
-                title="Groups Selected"
-                value={String(state.selectedGroupIds.length)}
-                gradient="linear-gradient(135deg, #FFB300 0%, #FFCA28 100%)"
-                icon={<StorageIcon fontSize="small" />}
-              />
-            </Box>
           </Box>
         )}
 
         {/* Subaccounts Table */}
-        {state.selectedGroupIds.length > 0 && state.subaccounts.length > 0 ? (
+        {state.subaccounts.length > 0 ? (
           <TableContainer component={Paper} sx={{ mb: 4 }}>
             <Table>
               <TableHead>
                 <TableRow sx={{ backgroundColor: "background.default" }}>
-                  {state.selectedGroupIds.length > 1 && (
-                    <TableCell sx={{ fontWeight: "bold" }}>Group</TableCell>
-                  )}
                   <TableCell sx={{ fontWeight: "bold" }}>
                     Subaccount Name
                   </TableCell>
@@ -730,89 +516,55 @@ export default function SubaccountsPage() {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {state.subaccounts.map((subaccount) => {
-                  const sub = subaccount as GetSubaccountResponse & {
-                    _groupId: string;
-                    _groupName: string;
-                  };
-                  return (
-                    <TableRow
-                      key={`${sub._groupId}-${sub.id}`}
-                      sx={{
-                        "&:hover": {
-                          backgroundColor: "background.default",
-                        },
-                      }}
-                    >
-                      {state.selectedGroupIds.length > 1 && (
-                        <TableCell>
-                          <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                            {sub._groupName}
-                          </Typography>
-                        </TableCell>
-                      )}
-                      <TableCell>
-                        <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                          {sub.name}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Typography
-                          variant="caption"
-                          sx={{ fontFamily: "monospace" }}
-                        >
-                          {sub.id}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2">
-                          {new Date(sub.created_at).toLocaleDateString()}
-                        </Typography>
-                      </TableCell>
-                      <TableCell align="right">
-                        <Stack
-                          direction="row"
-                          spacing={1}
-                          justifyContent="flex-end"
-                        >
-                          <Tooltip title="Delete Subaccount">
-                            <IconButton
-                              size="small"
-                              onClick={() =>
-                                openDeleteDialog(
-                                  subaccount as GetSubaccountResponse,
-                                )
-                              }
-                              color="error"
-                            >
-                              <DeleteIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                        </Stack>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
+                {state.subaccounts.map((subaccount) => (
+                  <TableRow
+                    key={subaccount.id}
+                    sx={{
+                      "&:hover": {
+                        backgroundColor: "background.default",
+                      },
+                    }}
+                  >
+                    <TableCell>
+                      <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                        {subaccount.name}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography
+                        variant="caption"
+                        sx={{ fontFamily: "monospace" }}
+                      >
+                        {subaccount.id}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2">
+                        {new Date(subaccount.created_at).toLocaleDateString()}
+                      </Typography>
+                    </TableCell>
+                    <TableCell align="right">
+                      <Stack
+                        direction="row"
+                        spacing={1}
+                        justifyContent="flex-end"
+                      >
+                        <Tooltip title="Delete Subaccount">
+                          <IconButton
+                            size="small"
+                            onClick={() => openDeleteDialog(subaccount)}
+                            color="error"
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </Stack>
+                    </TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
           </TableContainer>
-        ) : state.selectedGroupIds.length > 0 ? (
-          <Paper sx={{ p: 4, textAlign: "center", mb: 4 }}>
-            <StorageIcon
-              sx={{
-                fontSize: 64,
-                color: "text.secondary",
-                mb: 2,
-                opacity: 0.5,
-              }}
-            />
-            <Typography variant="h6" color="text.secondary">
-              No subaccounts in selected groups
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-              Click &quot;Add Subaccount&quot; to get started
-            </Typography>
-          </Paper>
         ) : (
           <Paper sx={{ p: 4, textAlign: "center", mb: 4 }}>
             <StorageIcon
@@ -824,10 +576,10 @@ export default function SubaccountsPage() {
               }}
             />
             <Typography variant="h6" color="text.secondary">
-              Select one or more groups to manage subaccounts
+              No subaccounts available
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-              Use the dropdown above to select groups
+              Click &quot;Add Subaccount&quot; to create one
             </Typography>
           </Paper>
         )}
@@ -894,8 +646,7 @@ export default function SubaccountsPage() {
                   </Typography>
                 </Paper>
                 <Alert severity="warning" sx={{ mt: 2 }}>
-                  If this subaccount only belongs to this group, it will be
-                  deleted from the workspace entirely.
+                  This subaccount will be deleted from the workspace entirely.
                 </Alert>
               </Box>
             ) : (

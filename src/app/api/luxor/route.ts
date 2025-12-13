@@ -1,8 +1,8 @@
 /**
  * src/app/api/luxor/route.ts
- * Luxor API Proxy Route
+ * Luxor API V2 Proxy Route
  *
- * A secure Next.js server-side proxy for the Luxor mining API.
+ * A secure Next.js server-side proxy for the Luxor mining API V2.
  *
  * This route:
  * 1. Verifies the user is authenticated (from JWT token)
@@ -16,7 +16,7 @@
  *
  * Usage from client:
  * ```typescript
- * const response = await fetch('/api/luxor?endpoint=active-workers&currency=BTC&start_date=2025-01-01');
+ * const response = await fetch('/api/luxor?endpoint=workers&currency=BTC&start_date=2025-01-01');
  * const { success, data, error } = await response.json();
  * ```
  */
@@ -41,47 +41,97 @@ interface ProxyResponse<T = Record<string, unknown>> {
 }
 
 /**
- * Maps user-facing endpoint names to actual Luxor API paths
+ * Maps user-facing endpoint names to actual Luxor API handler methods
  *
  * This prevents exposing internal Luxor endpoint structure to the client
  * and allows for future abstraction/renaming without breaking clients.
  *
- * IMPORTANT: active-workers, hashrate-history, and workers require currency as a path parameter
- * (e.g., /pool/active-workers/BTC)
- *
- * How to add new endpoints:
- * 1. Add mapping here (e.g., 'earnings': '/earnings')
- * 2. Add the response interface to luxor.ts
- * 3. Update documentation
- *
- * Supported endpoints:
- * - active-workers: Get active worker counts over time (requires currency)
- * - hashrate-history: Get hashrate and efficiency metrics (requires currency)
- * - workers: Get detailed worker information and statistics (requires currency)
- * - workspace: Get workspace information
- * - group: Workspace group operations (create, update, delete, get via operation param)
- * - subaccount: Workspace subaccount operations (ADMIN only) (list, get, add, remove)
+ * V2 API Endpoints:
+ * - Workspace & Sites: workspace, sites, site
+ * - Subaccounts: subaccounts, subaccount
+ * - Payments: payment-settings, transactions
+ * - Workers: workers
+ * - Analytics: revenue, active-workers, hashrate-efficiency, workers-hashrate-efficiency, pool-hashrate, dev-fee
  */
 const endpointMap: Record<
   string,
-  { path: string; requiresCurrency: boolean; adminOnly?: boolean }
+  {
+    method: "GET" | "POST" | "PUT" | "DELETE";
+    requiresCurrency?: boolean;
+    adminOnly?: boolean;
+    description: string;
+  }
 > = {
-  "active-workers": { path: "/pool/active-workers", requiresCurrency: true },
-  "hashrate-history": {
-    path: "/pool/hashrate-efficiency",
-    requiresCurrency: true,
+  // Workspace & Sites
+  workspace: {
+    method: "GET",
+    description: "Get workspace with sites list",
   },
-  workspace: { path: "/workspace", requiresCurrency: false },
-  workers: { path: "/pool/workers", requiresCurrency: true },
-  group: { path: "/workspace/groups", requiresCurrency: false },
+  sites: {
+    method: "GET",
+    description: "List all sites in workspace",
+  },
+  site: {
+    method: "GET",
+    description: "Get single site by ID",
+  },
+
+  // Subaccounts
+  subaccounts: {
+    method: "GET",
+    description: "List subaccounts",
+  },
   subaccount: {
-    path: "/pool/groups",
-    requiresCurrency: false,
-    adminOnly: true,
+    method: "GET",
+    description: "Get single subaccount",
   },
-  // ⬇️ ADD NEW ENDPOINTS HERE ⬇️
-  // 'earnings': { path: '/earnings', requiresCurrency: false },
-  // 'pool-stats': { path: '/pool/stats', requiresCurrency: false },
+
+  // Payments
+  "payment-settings": {
+    method: "GET",
+    description: "Get payment settings for currency",
+  },
+  transactions: {
+    method: "GET",
+    requiresCurrency: true,
+    description: "Get transactions",
+  },
+
+  // Workers & Analytics
+  workers: {
+    method: "GET",
+    requiresCurrency: true,
+    description: "Get workers list",
+  },
+  revenue: {
+    method: "GET",
+    requiresCurrency: true,
+    description: "Get revenue data",
+  },
+  "active-workers": {
+    method: "GET",
+    requiresCurrency: true,
+    description: "Get active workers history",
+  },
+  "hashrate-efficiency": {
+    method: "GET",
+    requiresCurrency: true,
+    description: "Get hashrate efficiency history",
+  },
+  "workers-hashrate-efficiency": {
+    method: "GET",
+    requiresCurrency: true,
+    description: "Get workers hashrate efficiency history",
+  },
+  "pool-hashrate": {
+    method: "GET",
+    requiresCurrency: true,
+    description: "Get pool hashrate",
+  },
+  "dev-fee": {
+    method: "GET",
+    description: "Get dev fee data",
+  },
 };
 
 /**
@@ -91,7 +141,7 @@ const endpointMap: Record<
  * to get the subaccount name.
  *
  * @param request - NextRequest object
- * @returns Object with userId, role, and name if valid
+ * @returns Object with userId, role, and luxorSubaccountName if valid
  * @throws Error if token is invalid or user not found
  */
 async function extractUserFromToken(request: NextRequest) {
@@ -183,7 +233,7 @@ function checkAdminAccess(
 ): NextResponse<ProxyResponse> | null {
   if (userRole !== "ADMIN" && userRole !== "SUPER_ADMIN") {
     console.log(
-      `[Luxor Proxy] Authorization denied: user role "${userRole}" is not ADMIN or SUPER_ADMIN`,
+      `[Luxor Proxy V2] Authorization denied: user role "${userRole}" is not ADMIN or SUPER_ADMIN`,
     );
     return NextResponse.json<ProxyResponse>(
       {
@@ -199,17 +249,18 @@ function checkAdminAccess(
 /**
  * GET /api/luxor
  *
- * Proxies requests to the Luxor mining API with server-side authentication.
+ * Proxies GET requests to the Luxor V2 API with server-side authentication.
  *
  * Query Parameters:
  * - endpoint (required): One of the mapped endpoint names
- * - currency: Mining currency (BTC, LTC, etc.)
+ * - currency: Mining currency (BTC, LTC, etc.) - required for some endpoints
+ * - site_id: Filter by site UUID
+ * - subaccount_names: Comma-separated subaccount names
  * - start_date: ISO date string
  * - end_date: ISO date string
  * - tick_size: Granularity (5m, 1h, 1d, 1w, 1M)
  * - page_number: Pagination
  * - page_size: Pagination
- * - subaccount_names: Comma-separated subaccount names
  * - Any other Luxor API parameter
  *
  * Response Format:
@@ -224,38 +275,40 @@ function checkAdminAccess(
  * - 200: Success
  * - 400: Bad request (missing endpoint, invalid parameters)
  * - 401: Unauthorized (invalid/missing token)
+ * - 403: Forbidden (insufficient permissions)
+ * - 404: Endpoint not found
  * - 500: Server error
  *
  * Examples:
  *
- * Get active workers for BTC:
- * GET /api/luxor?endpoint=active-workers&currency=BTC&start_date=2025-01-01&end_date=2025-01-31&tick_size=1d
- *
- * Get hashrate efficiency:
- * GET /api/luxor?endpoint=hashrate-history&currency=BTC&start_date=2025-01-01
- *
- * Get workers data:
- * GET /api/luxor?endpoint=workers&currency=BTC&page_number=1&page_size=10&status=ACTIVE
- *
- * Get workspace info:
+ * Get workspace with sites:
  * GET /api/luxor?endpoint=workspace
+ *
+ * Get workers for BTC:
+ * GET /api/luxor?endpoint=workers&currency=BTC&page_number=1&page_size=10
+ *
+ * Get active workers with filters:
+ * GET /api/luxor?endpoint=active-workers&currency=BTC&site_id=UUID&start_date=2025-01-01&tick_size=1d
+ *
+ * Get payment settings:
+ * GET /api/luxor?endpoint=payment-settings&currency=BTC&subaccount_names=my_subaccount
  */
 export async function GET(
   request: NextRequest,
 ): Promise<NextResponse<ProxyResponse<Record<string, unknown>>>> {
   try {
     // ✅ STEP 1: Authenticate the user
-    console.log("[Luxor Proxy] Authenticating user...");
+    console.log("[Luxor Proxy V2] GET: Authenticating user...");
     let user;
     try {
       user = await extractUserFromToken(request);
-      console.log(`[Luxor Proxy] User authenticated: ${user.userId}`);
+      console.log(`[Luxor Proxy V2] GET: User authenticated: ${user.userId}`);
     } catch (authError) {
       const errorMsg =
         authError instanceof Error
           ? authError.message
           : "Authentication failed";
-      console.error(`[Luxor Proxy] ${errorMsg}`);
+      console.error(`[Luxor Proxy V2] GET: ${errorMsg}`);
       return NextResponse.json<ProxyResponse>(
         { success: false, error: errorMsg },
         { status: 401 },
@@ -266,7 +319,7 @@ export async function GET(
     const { searchParams } = request.nextUrl;
     const endpoint = searchParams.get("endpoint");
 
-    console.log(`[Luxor Proxy] Requested endpoint: ${endpoint}`);
+    console.log(`[Luxor Proxy V2] GET: Requested endpoint: ${endpoint}`);
 
     if (!endpoint) {
       return NextResponse.json<ProxyResponse>(
@@ -285,36 +338,17 @@ export async function GET(
       );
     }
 
-    // ✅ STEP 2.5: Check admin access for protected endpoints
     const endpointConfig = endpointMap[endpoint];
-    if (endpointConfig.adminOnly) {
-      const authError = checkAdminAccess(user.role);
-      if (authError) {
-        return authError;
-      }
-    }
 
     // ✅ STEP 3: Build query parameters
     const queryParams = buildQueryParams(searchParams);
-    const currency = queryParams.currency as string | undefined;
+    const currency = searchParams.get("currency");
+    const siteId = searchParams.get("site_id");
+    const subaccountName = searchParams.get("subaccount_name");
 
-    // ⚠️ IMPORTANT: Add subaccount filter for security
-    // Always add the user's subaccount name to filter results to their own data
-    // The user.luxorSubaccountName comes from the database and is verified as authentic
-    if (
-      !queryParams.subaccount_names &&
-      user.luxorSubaccountName &&
-      endpoint !== "subaccount"
-    ) {
-      queryParams.subaccount_names = user.luxorSubaccountName;
-      console.log(
-        `[Luxor Proxy] Added subaccount filter: ${user.luxorSubaccountName}`,
-      );
-    }
+    console.log("[Luxor Proxy V2] GET: Built query params:", queryParams);
 
-    console.log("[Luxor Proxy] Built query params:", queryParams);
-
-    // ✅ STEP 4: Initialize Luxor client and make request
+    // ✅ STEP 4: Initialize Luxor client
     let luxorClient;
     try {
       luxorClient = createLuxorClient(user.luxorSubaccountName || user.userId);
@@ -323,7 +357,7 @@ export async function GET(
         clientError instanceof Error
           ? clientError.message
           : "Failed to initialize Luxor client";
-      console.error(`[Luxor Proxy] ${errorMsg}`);
+      console.error(`[Luxor Proxy V2] GET: ${errorMsg}`);
       return NextResponse.json<ProxyResponse>(
         {
           success: false,
@@ -333,88 +367,375 @@ export async function GET(
       );
     }
 
-    // Make the request to Luxor API
+    // ✅ STEP 5: Route to appropriate client method
     let data;
     try {
-      // Handle subaccount-specific logic with dedicated methods
-      if (endpoint === "subaccount") {
-        const groupId = searchParams.get("groupId");
-        const subaccountName = searchParams.get("name");
+      switch (endpoint) {
+        // Workspace & Sites
+        case "workspace":
+          console.log("[Luxor Proxy V2] GET: Getting workspace");
+          data = await luxorClient.getWorkspace();
+          break;
 
-        if (!groupId) {
-          return NextResponse.json<ProxyResponse>(
-            { success: false, error: "Group ID is required" },
-            { status: 400 },
-          );
-        }
+        case "sites":
+          console.log("[Luxor Proxy V2] GET: Listing sites");
+          data = await luxorClient.listSites();
+          break;
 
-        console.log(
-          `[Luxor Proxy] Subaccount request - groupId: ${groupId}, name: ${subaccountName}`,
-        );
-
-        // Use dedicated client methods for subaccounts
-        if (subaccountName) {
-          // Get specific subaccount
-          console.log(
-            `[Luxor Proxy] Getting specific subaccount: ${subaccountName} in group: ${groupId}`,
-          );
-          data = await luxorClient.getSubaccount(groupId, subaccountName);
-        } else {
-          // List all subaccounts for the group by fetching the group
-          // (Luxor API doesn't have a dedicated list endpoint, subaccounts come with group data)
-          console.log(
-            `[Luxor Proxy] Listing subaccounts for group: ${groupId}`,
-          );
-          try {
-            const group = await luxorClient.getGroup(groupId);
-            data = {
-              subaccounts: group.subaccounts || [],
-            };
-          } catch (groupError) {
-            // If group is not accessible (403), return empty subaccounts
-            if (
-              groupError instanceof LuxorError &&
-              groupError.statusCode === 403
-            ) {
-              console.warn(
-                `[Luxor Proxy] Access denied to group ${groupId}, returning empty subaccounts`,
-              );
-              data = {
-                subaccounts: [],
-              };
-            } else {
-              // Re-throw other errors
-              throw groupError;
-            }
-          }
-        }
-      } else {
-        // Handle other endpoints with generic request method
-        let luxorEndpoint = endpointConfig.path;
-        const queryParamsToUse = queryParams;
-
-        if (endpointConfig.requiresCurrency) {
-          if (!currency) {
+        case "site":
+          if (!siteId) {
             return NextResponse.json<ProxyResponse>(
               {
                 success: false,
-                error: `Endpoint "${endpoint}" requires a currency parameter`,
+                error: "site_id parameter is required for site endpoint",
               },
               { status: 400 },
             );
           }
-          luxorEndpoint = `${endpointConfig.path}/${currency}`;
-        }
+          console.log(`[Luxor Proxy V2] GET: Getting site ${siteId}`);
+          data = await luxorClient.getSite(siteId);
+          break;
 
-        console.log(`[Luxor Proxy] Calling Luxor endpoint: ${luxorEndpoint}`);
-        data = await luxorClient.request(luxorEndpoint, queryParamsToUse);
+        // Subaccounts
+        case "subaccounts":
+          // Fetch all subaccounts across all sites (site_id is optional parameter)
+          // Endpoint: GET /pool/subaccounts?page_number=1&page_size=10
+          console.log(
+            "[Luxor Proxy V2] GET: Listing all subaccounts (without site_id filter)",
+          );
+          try {
+            // Fetch all subaccounts by paginating through results
+            let allSubaccounts: import("@/lib/luxor").Subaccount[] = [];
+            let pageNumber = 1;
+            const pageSize = 100; // Fetch 100 items per page
+            const luxorToken = process.env.LUXOR_API_KEY;
+
+            if (!luxorToken) {
+              throw new Error("LUXOR_API_KEY is not configured");
+            }
+
+            console.log(
+              "[Luxor Proxy V2] Authorization header verified (using LUXOR_API_KEY)",
+            );
+
+            let hasMore = true;
+            while (hasMore) {
+              console.log(
+                `[Luxor Proxy V2] Fetching page ${pageNumber} (page_size: ${pageSize})`,
+              );
+
+              // Build URL without site_id (fetch all subaccounts)
+              const url = new URL(
+                `https://app.luxor.tech/api/v2/pool/subaccounts`,
+              );
+              url.searchParams.append("page_number", String(pageNumber));
+              url.searchParams.append("page_size", String(pageSize));
+
+              console.log(`[Luxor Proxy V2] Requesting URL: ${url.toString()}`);
+
+              // Get current page
+              const response = await fetch(url.toString(), {
+                headers: {
+                  authorization: `Bearer ${luxorToken}`,
+                },
+              });
+
+              if (!response.ok) {
+                throw new Error(
+                  `Luxor API returned ${response.status}: ${response.statusText}`,
+                );
+              }
+
+              const pageData = (await response.json()) as {
+                subaccounts: import("@/lib/luxor").Subaccount[];
+                pagination?: { next_page_url?: string | null };
+              };
+
+              allSubaccounts = allSubaccounts.concat(pageData.subaccounts);
+              console.log(
+                `[Luxor Proxy V2] Page ${pageNumber}: ${pageData.subaccounts.length} items`,
+              );
+
+              // Check if there are more pages
+              hasMore = !!pageData.pagination?.next_page_url;
+              pageNumber++;
+            }
+
+            console.log(
+              `[Luxor Proxy V2] Total subaccounts fetched: ${allSubaccounts.length}`,
+            );
+            data = {
+              subaccounts: allSubaccounts,
+            };
+          } catch (error) {
+            const errorMsg =
+              error instanceof Error ? error.message : String(error);
+            console.warn(
+              `[Luxor Proxy V2] Could not fetch subaccounts: ${errorMsg}`,
+            );
+            data = {
+              subaccounts: [],
+            };
+          }
+          break;
+
+        case "subaccount":
+          if (!subaccountName) {
+            return NextResponse.json<ProxyResponse>(
+              {
+                success: false,
+                error:
+                  "subaccount_name parameter is required for subaccount endpoint",
+              },
+              { status: 400 },
+            );
+          }
+          console.log(
+            `[Luxor Proxy V2] GET: Getting subaccount ${subaccountName}`,
+          );
+          data = await luxorClient.getSubaccount(subaccountName);
+          break;
+
+        // Payments
+        case "payment-settings":
+          if (!currency) {
+            return NextResponse.json<ProxyResponse>(
+              {
+                success: false,
+                error:
+                  "currency parameter is required for payment-settings endpoint",
+              },
+              { status: 400 },
+            );
+          }
+          console.log(
+            `[Luxor Proxy V2] GET: Getting payment settings for ${currency}`,
+          );
+          data = await luxorClient.getPaymentSettings(currency, {
+            subaccount_names: searchParams.get("subaccount_names") || undefined,
+            site_id: siteId || undefined,
+            page_number: searchParams.get("page_number")
+              ? parseInt(searchParams.get("page_number")!)
+              : undefined,
+            page_size: searchParams.get("page_size")
+              ? parseInt(searchParams.get("page_size")!)
+              : undefined,
+          });
+          break;
+
+        case "transactions":
+          if (!currency) {
+            return NextResponse.json<ProxyResponse>(
+              {
+                success: false,
+                error:
+                  "currency parameter is required for transactions endpoint",
+              },
+              { status: 400 },
+            );
+          }
+          console.log(
+            `[Luxor Proxy V2] GET: Getting transactions for ${currency}`,
+          );
+          data = await luxorClient.getTransactions(currency, {
+            subaccount_names: searchParams.get("subaccount_names") || undefined,
+            site_id: siteId || undefined,
+            start_date: searchParams.get("start_date") || undefined,
+            end_date: searchParams.get("end_date") || undefined,
+            transaction_type: searchParams.get("transaction_type") || undefined,
+            page_number: searchParams.get("page_number")
+              ? parseInt(searchParams.get("page_number")!)
+              : undefined,
+            page_size: searchParams.get("page_size")
+              ? parseInt(searchParams.get("page_size")!)
+              : undefined,
+          });
+          break;
+
+        // Workers & Analytics
+        case "workers":
+          if (!currency) {
+            return NextResponse.json<ProxyResponse>(
+              {
+                success: false,
+                error: "currency parameter is required for workers endpoint",
+              },
+              { status: 400 },
+            );
+          }
+          console.log(`[Luxor Proxy V2] GET: Getting workers for ${currency}`);
+          data = await luxorClient.getWorkers(currency, {
+            subaccount_names: searchParams.get("subaccount_names") || undefined,
+            site_id: siteId || undefined,
+            status: searchParams.get("status") || undefined,
+            page_number: searchParams.get("page_number")
+              ? parseInt(searchParams.get("page_number")!)
+              : undefined,
+            page_size: searchParams.get("page_size")
+              ? parseInt(searchParams.get("page_size")!)
+              : undefined,
+          });
+          break;
+
+        case "revenue":
+          if (!currency) {
+            return NextResponse.json<ProxyResponse>(
+              {
+                success: false,
+                error: "currency parameter is required for revenue endpoint",
+              },
+              { status: 400 },
+            );
+          }
+          console.log(`[Luxor Proxy V2] GET: Getting revenue for ${currency}`);
+          data = await luxorClient.getRevenue(currency, {
+            subaccount_names: searchParams.get("subaccount_names") || undefined,
+            site_id: siteId || undefined,
+            start_date: searchParams.get("start_date") || undefined,
+            end_date: searchParams.get("end_date") || undefined,
+          });
+          break;
+
+        case "active-workers":
+          if (!currency) {
+            return NextResponse.json<ProxyResponse>(
+              {
+                success: false,
+                error:
+                  "currency parameter is required for active-workers endpoint",
+              },
+              { status: 400 },
+            );
+          }
+          console.log(
+            `[Luxor Proxy V2] GET: Getting active workers for ${currency}`,
+          );
+          data = await luxorClient.getActiveWorkers(currency, {
+            subaccount_names: searchParams.get("subaccount_names") || undefined,
+            site_id: siteId || undefined,
+            start_date: searchParams.get("start_date") || undefined,
+            end_date: searchParams.get("end_date") || undefined,
+            tick_size: searchParams.get("tick_size") || undefined,
+            page_number: searchParams.get("page_number")
+              ? parseInt(searchParams.get("page_number")!)
+              : undefined,
+            page_size: searchParams.get("page_size")
+              ? parseInt(searchParams.get("page_size")!)
+              : undefined,
+          });
+          break;
+
+        case "hashrate-efficiency":
+          if (!currency) {
+            return NextResponse.json<ProxyResponse>(
+              {
+                success: false,
+                error:
+                  "currency parameter is required for hashrate-efficiency endpoint",
+              },
+              { status: 400 },
+            );
+          }
+          console.log(
+            `[Luxor Proxy V2] GET: Getting hashrate efficiency for ${currency}`,
+          );
+          data = await luxorClient.getHashrateEfficiency(currency, {
+            subaccount_names: searchParams.get("subaccount_names") || undefined,
+            site_id: siteId || undefined,
+            start_date: searchParams.get("start_date") || undefined,
+            end_date: searchParams.get("end_date") || undefined,
+            tick_size: searchParams.get("tick_size") || undefined,
+            page_number: searchParams.get("page_number")
+              ? parseInt(searchParams.get("page_number")!)
+              : undefined,
+            page_size: searchParams.get("page_size")
+              ? parseInt(searchParams.get("page_size")!)
+              : undefined,
+          });
+          break;
+
+        case "workers-hashrate-efficiency":
+          if (!currency || !subaccountName) {
+            return NextResponse.json<ProxyResponse>(
+              {
+                success: false,
+                error:
+                  "currency and subaccount_name parameters are required for workers-hashrate-efficiency endpoint",
+              },
+              { status: 400 },
+            );
+          }
+          console.log(
+            `[Luxor Proxy V2] GET: Getting workers hashrate efficiency for ${currency}/${subaccountName}`,
+          );
+          data = await luxorClient.getWorkersHashrateEfficiency(
+            currency,
+            subaccountName,
+            {
+              worker_names: searchParams.get("worker_names") || undefined,
+              tick_size: searchParams.get("tick_size") || undefined,
+              start_date: searchParams.get("start_date") || undefined,
+              end_date: searchParams.get("end_date") || undefined,
+              page_number: searchParams.get("page_number")
+                ? parseInt(searchParams.get("page_number")!)
+                : undefined,
+              page_size: searchParams.get("page_size")
+                ? parseInt(searchParams.get("page_size")!)
+                : undefined,
+            },
+          );
+          break;
+
+        case "pool-hashrate":
+          if (!currency) {
+            return NextResponse.json<ProxyResponse>(
+              {
+                success: false,
+                error:
+                  "currency parameter is required for pool-hashrate endpoint",
+              },
+              { status: 400 },
+            );
+          }
+          console.log(
+            `[Luxor Proxy V2] GET: Getting pool hashrate for ${currency}`,
+          );
+          data = await luxorClient.getPoolHashrate(currency);
+          break;
+
+        case "dev-fee":
+          console.log("[Luxor Proxy V2] GET: Getting dev fee data");
+          data = await luxorClient.getDevFee({
+            subaccount_names: searchParams.get("subaccount_names") || undefined,
+            site_id: siteId || undefined,
+            start_date: searchParams.get("start_date") || undefined,
+            end_date: searchParams.get("end_date") || undefined,
+            page_number: searchParams.get("page_number")
+              ? parseInt(searchParams.get("page_number")!)
+              : undefined,
+            page_size: searchParams.get("page_size")
+              ? parseInt(searchParams.get("page_size")!)
+              : undefined,
+          });
+          break;
+
+        default:
+          return NextResponse.json<ProxyResponse>(
+            {
+              success: false,
+              error: `Endpoint handler not implemented: ${endpoint}`,
+            },
+            { status: 501 },
+          );
       }
 
-      console.log(`[Luxor Proxy] Successfully retrieved data from Luxor API`);
+      console.log(
+        `[Luxor Proxy V2] GET: Successfully retrieved data from Luxor API`,
+      );
     } catch (luxorError) {
       if (luxorError instanceof LuxorError) {
         console.error(
-          `[Luxor Proxy] Luxor API error (${luxorError.statusCode}): ${luxorError.message}`,
+          `[Luxor Proxy V2] GET: Luxor API error (${luxorError.statusCode}): ${luxorError.message}`,
         );
         return NextResponse.json<ProxyResponse>(
           {
@@ -427,7 +748,7 @@ export async function GET(
 
       const errorMsg =
         luxorError instanceof Error ? luxorError.message : "Unknown error";
-      console.error(`[Luxor Proxy] Error: ${errorMsg}`);
+      console.error(`[Luxor Proxy V2] GET: Error: ${errorMsg}`);
       return NextResponse.json<ProxyResponse>(
         {
           success: false,
@@ -437,7 +758,7 @@ export async function GET(
       );
     }
 
-    // ✅ STEP 5: Return successful response
+    // ✅ STEP 6: Return successful response
     return NextResponse.json<ProxyResponse<Record<string, unknown>>>(
       {
         success: true,
@@ -449,780 +770,9 @@ export async function GET(
   } catch (error) {
     const errorMsg =
       error instanceof Error ? error.message : "Internal server error";
-    console.error(`[Luxor Proxy] Unhandled error: ${errorMsg}`);
+    console.error(`[Luxor Proxy V2] GET: Unhandled error: ${errorMsg}`);
 
     return NextResponse.json<ProxyResponse>(
-      {
-        success: false,
-        error: errorMsg,
-      },
-      { status: 500 },
-    );
-  }
-}
-
-/**
- * POST /api/luxor
- *
- * Creates a new workspace group via the Luxor API.
- *
- * Request Body:
- * {
- *   endpoint: "group",
- *   name: string  // Group name
- * }
- *
- * Response Format:
- * {
- *   success: boolean,
- *   data?: CreateGroupResponse,
- *   error?: string,
- *   timestamp?: string
- * }
- *
- * Example:
- * POST /api/luxor
- * Content-Type: application/json
- * { "endpoint": "group", "name": "My New Group" }
- */
-export async function POST(
-  request: NextRequest,
-): Promise<NextResponse<ProxyResponse<Record<string, unknown>>>> {
-  try {
-    // ✅ STEP 1: Authenticate the user
-    console.log("[Luxor Proxy] POST: Authenticating user...");
-    let user;
-    try {
-      user = await extractUserFromToken(request);
-      console.log(`[Luxor Proxy] POST: User authenticated: ${user.userId}`);
-    } catch (authError) {
-      const errorMsg =
-        authError instanceof Error
-          ? authError.message
-          : "Authentication failed";
-      console.error(`[Luxor Proxy] POST: ${errorMsg}`);
-      return NextResponse.json<ProxyResponse>(
-        { success: false, error: errorMsg },
-        { status: 401 },
-      );
-    }
-
-    // ✅ STEP 2: Parse request body
-    let body: Record<string, unknown>;
-    try {
-      body = await request.json();
-    } catch {
-      return NextResponse.json<ProxyResponse>(
-        { success: false, error: "Invalid JSON in request body" },
-        { status: 400 },
-      );
-    }
-
-    // ✅ STEP 3: Validate endpoint parameter
-    const endpoint = body.endpoint as string | undefined;
-
-    console.log(`[Luxor Proxy] POST: Requested endpoint: ${endpoint}`);
-
-    if (!endpoint) {
-      return NextResponse.json<ProxyResponse>(
-        { success: false, error: "Endpoint parameter is required" },
-        { status: 400 },
-      );
-    }
-
-    if (!(endpoint in endpointMap)) {
-      return NextResponse.json<ProxyResponse>(
-        {
-          success: false,
-          error: `Unsupported endpoint: "${endpoint}". Supported endpoints: ${Object.keys(endpointMap).join(", ")}`,
-        },
-        { status: 400 },
-      );
-    }
-
-    // ✅ STEP 3.5: Check admin access for protected endpoints
-    const endpointConfig = endpointMap[endpoint];
-    if (endpointConfig.adminOnly) {
-      const authError = checkAdminAccess(user.role);
-      if (authError) {
-        return authError;
-      }
-    }
-
-    // ✅ STEP 4: Initialize Luxor client
-    let luxorClient;
-    try {
-      luxorClient = createLuxorClient(user.luxorSubaccountName || user.userId);
-    } catch (clientError) {
-      const errorMsg =
-        clientError instanceof Error
-          ? clientError.message
-          : "Failed to initialize Luxor client";
-      console.error(`[Luxor Proxy] POST: ${errorMsg}`);
-      return NextResponse.json<ProxyResponse>(
-        {
-          success: false,
-          error: "Service configuration error. Please contact support.",
-        },
-        { status: 500 },
-      );
-    }
-
-    // ✅ STEP 5: Handle endpoint-specific logic
-    let data;
-    try {
-      if (endpoint === "group") {
-        const groupName = body.name as string | undefined;
-        if (!groupName || !groupName.trim()) {
-          return NextResponse.json<ProxyResponse>(
-            { success: false, error: "Group name is required" },
-            { status: 400 },
-          );
-        }
-
-        console.log(`[Luxor Proxy] POST: Creating group: ${groupName}`);
-        data = await luxorClient.createGroup(groupName);
-      } else if (endpoint === "subaccount") {
-        const groupId = body.groupId as string | undefined;
-        const subaccountName = body.name as string | undefined;
-
-        if (!groupId || !groupId.trim()) {
-          return NextResponse.json<ProxyResponse>(
-            { success: false, error: "Group ID is required" },
-            { status: 400 },
-          );
-        }
-
-        if (!subaccountName || !subaccountName.trim()) {
-          return NextResponse.json<ProxyResponse>(
-            { success: false, error: "Subaccount name is required" },
-            { status: 400 },
-          );
-        }
-
-        console.log(
-          `[Luxor Proxy] POST: Adding subaccount: ${subaccountName} to group: ${groupId}`,
-        );
-        data = await luxorClient.addSubaccount(groupId, subaccountName);
-      } else {
-        return NextResponse.json<ProxyResponse>(
-          {
-            success: false,
-            error: `Endpoint "${endpoint}" does not support POST requests`,
-          },
-          { status: 405 },
-        );
-      }
-    } catch (luxorError) {
-      if (luxorError instanceof LuxorError) {
-        console.error(
-          `[Luxor Proxy] POST: Luxor API error (${luxorError.statusCode}): ${luxorError.message}`,
-        );
-        return NextResponse.json<ProxyResponse>(
-          {
-            success: false,
-            error: luxorError.message,
-          },
-          { status: luxorError.statusCode },
-        );
-      }
-
-      const errorMsg =
-        luxorError instanceof Error ? luxorError.message : "Unknown error";
-      console.error(`[Luxor Proxy] POST: Error: ${errorMsg}`);
-      return NextResponse.json<ProxyResponse>(
-        {
-          success: false,
-          error: errorMsg,
-        },
-        { status: 500 },
-      );
-    }
-
-    // ✅ STEP 6: Return successful response
-    return NextResponse.json<ProxyResponse<Record<string, unknown>>>(
-      {
-        success: true,
-        data: data as unknown as Record<string, unknown>,
-        timestamp: new Date().toISOString(),
-      },
-      { status: 201 },
-    );
-  } catch (error) {
-    const errorMsg =
-      error instanceof Error ? error.message : "Internal server error";
-    console.error(`[Luxor Proxy] POST: Unhandled error: ${errorMsg}`);
-
-    return NextResponse.json<ProxyResponse>(
-      {
-        success: false,
-        error: errorMsg,
-      },
-      { status: 500 },
-    );
-  }
-}
-
-/**
- * PUT /api/luxor
- *
- * Updates a workspace group via the Luxor API.
- *
- * Request Body:
- * {
- *   endpoint: "group",
- *   id: string,      // Group ID to update
- *   name: string     // New group name
- * }
- *
- * Response Format:
- * {
- *   success: boolean,
- *   data?: UpdateGroupResponse,
- *   error?: string,
- *   timestamp?: string
- * }
- *
- * Example:
- * PUT /api/luxor
- * Content-Type: application/json
- * { "endpoint": "group", "id": "123", "name": "Updated Group Name" }
- */
-export async function PUT(
-  request: NextRequest,
-): Promise<NextResponse<ProxyResponse<Record<string, unknown>>>> {
-  try {
-    // ✅ STEP 1: Authenticate the user
-    console.log("[Luxor Proxy] PUT: Authenticating user...");
-    let user;
-    try {
-      user = await extractUserFromToken(request);
-      console.log(`[Luxor Proxy] PUT: User authenticated: ${user.userId}`);
-    } catch (authError) {
-      const errorMsg =
-        authError instanceof Error
-          ? authError.message
-          : "Authentication failed";
-      console.error(`[Luxor Proxy] PUT: ${errorMsg}`);
-      return NextResponse.json<ProxyResponse>(
-        { success: false, error: errorMsg },
-        { status: 401 },
-      );
-    }
-
-    // ✅ STEP 2: Parse request body
-    let body: Record<string, unknown>;
-    try {
-      body = await request.json();
-    } catch {
-      return NextResponse.json<ProxyResponse>(
-        { success: false, error: "Invalid JSON in request body" },
-        { status: 400 },
-      );
-    }
-
-    // ✅ STEP 3: Validate endpoint parameter
-    const endpoint = body.endpoint as string | undefined;
-
-    console.log(`[Luxor Proxy] PUT: Requested endpoint: ${endpoint}`);
-
-    if (!endpoint) {
-      return NextResponse.json<ProxyResponse>(
-        { success: false, error: "Endpoint parameter is required" },
-        { status: 400 },
-      );
-    }
-
-    if (!(endpoint in endpointMap)) {
-      return NextResponse.json<ProxyResponse>(
-        {
-          success: false,
-          error: `Unsupported endpoint: "${endpoint}". Supported endpoints: ${Object.keys(endpointMap).join(", ")}`,
-        },
-        { status: 400 },
-      );
-    }
-
-    // ✅ STEP 4: Initialize Luxor client
-    let luxorClient;
-    try {
-      luxorClient = createLuxorClient(user.luxorSubaccountName || user.userId);
-    } catch (clientError) {
-      const errorMsg =
-        clientError instanceof Error
-          ? clientError.message
-          : "Failed to initialize Luxor client";
-      console.error(`[Luxor Proxy] PUT: ${errorMsg}`);
-      return NextResponse.json<ProxyResponse>(
-        {
-          success: false,
-          error: "Service configuration error. Please contact support.",
-        },
-        { status: 500 },
-      );
-    }
-
-    // ✅ STEP 5: Handle endpoint-specific logic
-    let data;
-    try {
-      if (endpoint === "group") {
-        const groupId = body.id as string | undefined;
-        const groupName = body.name as string | undefined;
-
-        if (!groupId || !groupId.trim()) {
-          return NextResponse.json<ProxyResponse>(
-            { success: false, error: "Group ID is required" },
-            { status: 400 },
-          );
-        }
-
-        if (!groupName || !groupName.trim()) {
-          return NextResponse.json<ProxyResponse>(
-            { success: false, error: "Group name is required" },
-            { status: 400 },
-          );
-        }
-
-        console.log(
-          `[Luxor Proxy] PUT: Updating group ${groupId} with name: ${groupName}`,
-        );
-        data = await luxorClient.updateGroup(groupId, groupName);
-      } else {
-        return NextResponse.json<ProxyResponse>(
-          {
-            success: false,
-            error: `Endpoint "${endpoint}" does not support PUT requests`,
-          },
-          { status: 405 },
-        );
-      }
-    } catch (luxorError) {
-      if (luxorError instanceof LuxorError) {
-        console.error(
-          `[Luxor Proxy] PUT: Luxor API error (${luxorError.statusCode}): ${luxorError.message}`,
-        );
-        return NextResponse.json<ProxyResponse>(
-          {
-            success: false,
-            error: luxorError.message,
-          },
-          { status: luxorError.statusCode },
-        );
-      }
-
-      const errorMsg =
-        luxorError instanceof Error ? luxorError.message : "Unknown error";
-      console.error(`[Luxor Proxy] PUT: Error: ${errorMsg}`);
-      return NextResponse.json<ProxyResponse>(
-        {
-          success: false,
-          error: errorMsg,
-        },
-        { status: 500 },
-      );
-    }
-
-    // ✅ STEP 6: Return successful response
-    return NextResponse.json<ProxyResponse<Record<string, unknown>>>(
-      {
-        success: true,
-        data: data as unknown as Record<string, unknown>,
-        timestamp: new Date().toISOString(),
-      },
-      { status: 200 },
-    );
-  } catch (error) {
-    const errorMsg =
-      error instanceof Error ? error.message : "Internal server error";
-    console.error(`[Luxor Proxy] PUT: Unhandled error: ${errorMsg}`);
-
-    return NextResponse.json<ProxyResponse<Record<string, unknown>>>(
-      {
-        success: false,
-        error: errorMsg,
-      },
-      { status: 500 },
-    );
-  }
-}
-
-/**
- * PATCH /api/luxor
- *
- * Updates a workspace group via the Luxor API (alternative to PUT).
- *
- * Request Body:
- * {
- *   endpoint: "group",
- *   id: string,      // Group ID to update
- *   name: string     // New group name
- * }
- *
- * Response Format:
- * {
- *   success: boolean,
- *   data?: UpdateGroupResponse,
- *   error?: string,
- *   timestamp?: string
- * }
- *
- * Example:
- * PATCH /api/luxor
- * Content-Type: application/json
- * { "endpoint": "group", "id": "123", "name": "Updated Group Name" }
- */
-export async function PATCH(
-  request: NextRequest,
-): Promise<NextResponse<ProxyResponse<Record<string, unknown>>>> {
-  try {
-    // ✅ STEP 1: Authenticate the user
-    console.log("[Luxor Proxy] PATCH: Authenticating user...");
-    let user;
-    try {
-      user = await extractUserFromToken(request);
-      console.log(`[Luxor Proxy] PATCH: User authenticated: ${user.userId}`);
-    } catch (authError) {
-      const errorMsg =
-        authError instanceof Error
-          ? authError.message
-          : "Authentication failed";
-      console.error(`[Luxor Proxy] PATCH: ${errorMsg}`);
-      return NextResponse.json<ProxyResponse>(
-        { success: false, error: errorMsg },
-        { status: 401 },
-      );
-    }
-
-    // ✅ STEP 2: Parse request body
-    let body: Record<string, unknown>;
-    try {
-      body = await request.json();
-    } catch {
-      return NextResponse.json<ProxyResponse>(
-        { success: false, error: "Invalid JSON in request body" },
-        { status: 400 },
-      );
-    }
-
-    // ✅ STEP 3: Validate endpoint parameter
-    const endpoint = body.endpoint as string | undefined;
-
-    console.log(`[Luxor Proxy] PATCH: Requested endpoint: ${endpoint}`);
-
-    if (!endpoint) {
-      return NextResponse.json<ProxyResponse>(
-        { success: false, error: "Endpoint parameter is required" },
-        { status: 400 },
-      );
-    }
-
-    if (!(endpoint in endpointMap)) {
-      return NextResponse.json<ProxyResponse>(
-        {
-          success: false,
-          error: `Unsupported endpoint: "${endpoint}". Supported endpoints: ${Object.keys(endpointMap).join(", ")}`,
-        },
-        { status: 400 },
-      );
-    }
-
-    // ✅ STEP 4: Initialize Luxor client
-    let luxorClient;
-    try {
-      luxorClient = createLuxorClient(user.luxorSubaccountName || user.userId);
-    } catch (clientError) {
-      const errorMsg =
-        clientError instanceof Error
-          ? clientError.message
-          : "Failed to initialize Luxor client";
-      console.error(`[Luxor Proxy] PATCH: ${errorMsg}`);
-      return NextResponse.json<ProxyResponse>(
-        {
-          success: false,
-          error: "Service configuration error. Please contact support.",
-        },
-        { status: 500 },
-      );
-    }
-
-    // ✅ STEP 5: Handle endpoint-specific logic
-    let data;
-    try {
-      if (endpoint === "group") {
-        const groupId = body.id as string | undefined;
-        const groupName = body.name as string | undefined;
-
-        if (!groupId || !groupId.trim()) {
-          return NextResponse.json<ProxyResponse>(
-            { success: false, error: "Group ID is required" },
-            { status: 400 },
-          );
-        }
-
-        if (!groupName || !groupName.trim()) {
-          return NextResponse.json<ProxyResponse>(
-            { success: false, error: "Group name is required" },
-            { status: 400 },
-          );
-        }
-
-        console.log(
-          `[Luxor Proxy] PATCH: Updating group ${groupId} with name: ${groupName}`,
-        );
-        data = await luxorClient.updateGroup(groupId, groupName);
-      } else {
-        return NextResponse.json<ProxyResponse>(
-          {
-            success: false,
-            error: `Endpoint "${endpoint}" does not support PATCH requests`,
-          },
-          { status: 405 },
-        );
-      }
-    } catch (luxorError) {
-      if (luxorError instanceof LuxorError) {
-        console.error(
-          `[Luxor Proxy] PATCH: Luxor API error (${luxorError.statusCode}): ${luxorError.message}`,
-        );
-        return NextResponse.json<ProxyResponse>(
-          {
-            success: false,
-            error: luxorError.message,
-          },
-          { status: luxorError.statusCode },
-        );
-      }
-
-      const errorMsg =
-        luxorError instanceof Error ? luxorError.message : "Unknown error";
-      console.error(`[Luxor Proxy] PATCH: Error: ${errorMsg}`);
-      return NextResponse.json<ProxyResponse>(
-        {
-          success: false,
-          error: errorMsg,
-        },
-        { status: 500 },
-      );
-    }
-
-    // ✅ STEP 6: Return successful response
-    return NextResponse.json<ProxyResponse<Record<string, unknown>>>(
-      {
-        success: true,
-        data: data as unknown as Record<string, unknown>,
-        timestamp: new Date().toISOString(),
-      },
-      { status: 200 },
-    );
-  } catch (error) {
-    const errorMsg =
-      error instanceof Error ? error.message : "Internal server error";
-    console.error(`[Luxor Proxy] PATCH: Unhandled error: ${errorMsg}`);
-
-    return NextResponse.json<ProxyResponse<Record<string, unknown>>>(
-      {
-        success: false,
-        error: errorMsg,
-      },
-      { status: 500 },
-    );
-  }
-}
-
-/**
- * DELETE /api/luxor
- *
- * Deletes a workspace group via the Luxor API.
- *
- * Request Body:
- * {
- *   endpoint: "group",
- *   id: string  // Group ID to delete
- * }
- *
- * Response Format:
- * {
- *   success: boolean,
- *   data?: DeleteGroupResponse,
- *   error?: string,
- *   timestamp?: string
- * }
- *
- * Example:
- * DELETE /api/luxor
- * Content-Type: application/json
- * { "endpoint": "group", "id": "123" }
- */
-export async function DELETE(
-  request: NextRequest,
-): Promise<NextResponse<ProxyResponse<Record<string, unknown>>>> {
-  try {
-    // ✅ STEP 1: Authenticate the user
-    console.log("[Luxor Proxy] DELETE: Authenticating user...");
-    let user;
-    try {
-      user = await extractUserFromToken(request);
-      console.log(`[Luxor Proxy] DELETE: User authenticated: ${user.userId}`);
-    } catch (authError) {
-      const errorMsg =
-        authError instanceof Error
-          ? authError.message
-          : "Authentication failed";
-      console.error(`[Luxor Proxy] DELETE: ${errorMsg}`);
-      return NextResponse.json<ProxyResponse>(
-        { success: false, error: errorMsg },
-        { status: 401 },
-      );
-    }
-
-    // ✅ STEP 2: Parse request body
-    let body: Record<string, unknown>;
-    try {
-      body = await request.json();
-    } catch {
-      return NextResponse.json<ProxyResponse>(
-        { success: false, error: "Invalid JSON in request body" },
-        { status: 400 },
-      );
-    }
-
-    // ✅ STEP 3: Validate endpoint parameter
-    const endpoint = body.endpoint as string | undefined;
-
-    console.log(`[Luxor Proxy] DELETE: Requested endpoint: ${endpoint}`);
-
-    if (!endpoint) {
-      return NextResponse.json<ProxyResponse>(
-        { success: false, error: "Endpoint parameter is required" },
-        { status: 400 },
-      );
-    }
-
-    if (!(endpoint in endpointMap)) {
-      return NextResponse.json<ProxyResponse>(
-        {
-          success: false,
-          error: `Unsupported endpoint: "${endpoint}". Supported endpoints: ${Object.keys(endpointMap).join(", ")}`,
-        },
-        { status: 400 },
-      );
-    }
-
-    // ✅ STEP 3.5: Check admin access for protected endpoints
-    const endpointConfig = endpointMap[endpoint];
-    if (endpointConfig.adminOnly) {
-      const authError = checkAdminAccess(user.role);
-      if (authError) {
-        return authError;
-      }
-    }
-
-    // ✅ STEP 4: Initialize Luxor client
-    let luxorClient;
-    try {
-      luxorClient = createLuxorClient(user.luxorSubaccountName || user.userId);
-    } catch (clientError) {
-      const errorMsg =
-        clientError instanceof Error
-          ? clientError.message
-          : "Failed to initialize Luxor client";
-      console.error(`[Luxor Proxy] DELETE: ${errorMsg}`);
-      return NextResponse.json<ProxyResponse>(
-        {
-          success: false,
-          error: "Service configuration error. Please contact support.",
-        },
-        { status: 500 },
-      );
-    }
-
-    // ✅ STEP 5: Handle endpoint-specific logic
-    let data;
-    try {
-      if (endpoint === "group") {
-        const groupId = body.id as string | undefined;
-
-        if (!groupId || !groupId.trim()) {
-          return NextResponse.json<ProxyResponse>(
-            { success: false, error: "Group ID is required" },
-            { status: 400 },
-          );
-        }
-
-        console.log(`[Luxor Proxy] DELETE: Deleting group: ${groupId}`);
-        data = await luxorClient.deleteGroup(groupId);
-      } else if (endpoint === "subaccount") {
-        const groupId = body.groupId as string | undefined;
-        const subaccountName = body.name as string | undefined;
-
-        if (!groupId || !groupId.trim()) {
-          return NextResponse.json<ProxyResponse>(
-            { success: false, error: "Group ID is required" },
-            { status: 400 },
-          );
-        }
-
-        if (!subaccountName || !subaccountName.trim()) {
-          return NextResponse.json<ProxyResponse>(
-            { success: false, error: "Subaccount name is required" },
-            { status: 400 },
-          );
-        }
-
-        console.log(
-          `[Luxor Proxy] DELETE: Removing subaccount: ${subaccountName} from group: ${groupId}`,
-        );
-        data = await luxorClient.removeSubaccount(groupId, subaccountName);
-      } else {
-        return NextResponse.json<ProxyResponse>(
-          {
-            success: false,
-            error: `Endpoint "${endpoint}" does not support DELETE requests`,
-          },
-          { status: 405 },
-        );
-      }
-    } catch (luxorError) {
-      if (luxorError instanceof LuxorError) {
-        console.error(
-          `[Luxor Proxy] DELETE: Luxor API error (${luxorError.statusCode}): ${luxorError.message}`,
-        );
-        return NextResponse.json<ProxyResponse>(
-          {
-            success: false,
-            error: luxorError.message,
-          },
-          { status: luxorError.statusCode },
-        );
-      }
-
-      const errorMsg =
-        luxorError instanceof Error ? luxorError.message : "Unknown error";
-      console.error(`[Luxor Proxy] DELETE: Error: ${errorMsg}`);
-      return NextResponse.json<ProxyResponse>(
-        {
-          success: false,
-          error: errorMsg,
-        },
-        { status: 500 },
-      );
-    }
-
-    // ✅ STEP 6: Return successful response
-    return NextResponse.json<ProxyResponse<Record<string, unknown>>>(
-      {
-        success: true,
-        data: data as unknown as Record<string, unknown>,
-        timestamp: new Date().toISOString(),
-      },
-      { status: 200 },
-    );
-  } catch (error) {
-    const errorMsg =
-      error instanceof Error ? error.message : "Internal server error";
-    console.error(`[Luxor Proxy] DELETE: Unhandled error: ${errorMsg}`);
-
-    return NextResponse.json<ProxyResponse<Record<string, unknown>>>(
       {
         success: false,
         error: errorMsg,
@@ -1234,8 +784,6 @@ export async function DELETE(
 
 /**
  * OPTIONS handler for CORS preflight requests
- *
- * Allows the client to make cross-origin requests if needed.
  */
 export async function OPTIONS(): Promise<NextResponse> {
   return NextResponse.json(
