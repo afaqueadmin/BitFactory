@@ -11,7 +11,7 @@ import {
   MenuItem,
   CircularProgress,
 } from "@mui/material";
-import SettingsIcon from "@mui/icons-material/Settings";
+// import SettingsIcon from "@mui/icons-material/Settings";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -35,25 +35,25 @@ const StyledIconButton = styled(IconButton)(({ theme }) => ({
 export default function AdminHeader() {
   const router = useRouter();
   const { logout } = useAuth();
-  const [settingsAnchorEl, setSettingsAnchorEl] = useState<null | HTMLElement>(
-    null,
-  );
+  // const [settingsAnchorEl, setSettingsAnchorEl] = useState<null | HTMLElement>(
+  //   null,
+  // );
   const [accountAnchorEl, setAccountAnchorEl] = useState<null | HTMLElement>(
     null,
   );
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const { darkMode, toggleDarkMode } = useTheme();
 
-  const handleSettingsClick = (event: React.MouseEvent<HTMLElement>) => {
-    setSettingsAnchorEl(event.currentTarget);
-  };
+  // const handleSettingsClick = (event: React.MouseEvent<HTMLElement>) => {
+  //   setSettingsAnchorEl(event.currentTarget);
+  // };
 
   const handleAccountClick = (event: React.MouseEvent<HTMLElement>) => {
     setAccountAnchorEl(event.currentTarget);
   };
 
   const handleClose = () => {
-    setSettingsAnchorEl(null);
+    // setSettingsAnchorEl(null);
     setAccountAnchorEl(null);
   };
 
@@ -101,36 +101,36 @@ export default function AdminHeader() {
             {darkMode ? <LightModeIcon /> : <DarkModeIcon />}
           </StyledIconButton>
 
-          <StyledIconButton
-            size="large"
-            aria-label="settings"
-            color="inherit"
-            onClick={handleSettingsClick}
-          >
-            <SettingsIcon />
-          </StyledIconButton>
-          <Menu
-            anchorEl={settingsAnchorEl}
-            open={Boolean(settingsAnchorEl)}
-            onClose={handleClose}
-          >
-            <MenuItem
-              onClick={() => {
-                router.push("/adminpanel/settings");
-                handleClose();
-              }}
-            >
-              General Settings
-            </MenuItem>
-            <MenuItem
-              onClick={() => {
-                router.push("/adminpanel/security");
-                handleClose();
-              }}
-            >
-              Security Settings
-            </MenuItem>
-          </Menu>
+          {/*<StyledIconButton*/}
+          {/*  size="large"*/}
+          {/*  aria-label="settings"*/}
+          {/*  color="inherit"*/}
+          {/*  onClick={handleSettingsClick}*/}
+          {/*>*/}
+          {/*  <SettingsIcon />*/}
+          {/*</StyledIconButton>*/}
+          {/*<Menu*/}
+          {/*  anchorEl={settingsAnchorEl}*/}
+          {/*  open={Boolean(settingsAnchorEl)}*/}
+          {/*  onClose={handleClose}*/}
+          {/*>*/}
+          {/*  <MenuItem*/}
+          {/*    onClick={() => {*/}
+          {/*      router.push("/adminpanel/settings");*/}
+          {/*      handleClose();*/}
+          {/*    }}*/}
+          {/*  >*/}
+          {/*    General Settings*/}
+          {/*  </MenuItem>*/}
+          {/*  <MenuItem*/}
+          {/*    onClick={() => {*/}
+          {/*      router.push("/adminpanel/security");*/}
+          {/*      handleClose();*/}
+          {/*    }}*/}
+          {/*  >*/}
+          {/*    Security Settings*/}
+          {/*  </MenuItem>*/}
+          {/*</Menu>*/}
 
           <StyledIconButton
             size="large"
@@ -151,7 +151,24 @@ export default function AdminHeader() {
                 handleClose();
               }}
             >
-              Profile
+              Account Settings
+            </MenuItem>
+            <MenuItem
+              onClick={() => {
+                router.push("/security-settings");
+                handleClose();
+              }}
+            >
+              Security Settings
+            </MenuItem>
+
+            <MenuItem
+              onClick={() => {
+                router.push("/adminpanel/settings");
+                handleClose();
+              }}
+            >
+              General Settings
             </MenuItem>
             <MenuItem
               onClick={handleLogout}

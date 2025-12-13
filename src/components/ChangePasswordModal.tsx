@@ -118,7 +118,7 @@ export default function ChangePasswordModal({
           alignItems: "center",
         }}
       >
-        Change Customer Password
+        Change Password
         <IconButton
           onClick={handleClose}
           sx={{

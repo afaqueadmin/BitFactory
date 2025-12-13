@@ -211,6 +211,13 @@ export default function AppBarComponent() {
             Account Settings
           </MenuItem>
           <MenuItem
+            component={Link}
+            href="/security-settings"
+            onClick={handleClose}
+          >
+            Security Settings
+          </MenuItem>
+          <MenuItem
             onClick={handleLogout}
             disabled={isLoggingOut}
             sx={{

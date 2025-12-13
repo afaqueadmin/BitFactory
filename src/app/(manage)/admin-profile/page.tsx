@@ -20,8 +20,6 @@ import {
 import { PhotoCamera } from "@mui/icons-material";
 import { useTheme } from "@mui/material/styles";
 import AdminProfileForm from "@/components/AdminProfileForm";
-import ChangePasswordModal from "@/components/ChangePasswordModal";
-import TwoFactorSettings from "@/components/TwoFactorSettings";
 
 interface AdminProfileData {
   id?: string;
@@ -37,7 +35,6 @@ interface AdminProfileData {
   companyUrl: string | null;
   profileImage: string | null;
   profileImageId: string | null;
-  twoFactorEnabled: boolean;
 }
 
 interface UserActivity {
@@ -58,7 +55,6 @@ export default function AdminProfile() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
-  const [changePasswordModalOpen, setChangePasswordModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -161,7 +157,6 @@ export default function AdminProfile() {
 
   const handleModalClose = () => {
     setEditModalOpen(false);
-    setChangePasswordModalOpen(false);
   };
 
   const handleProfileUpdated = () => {
@@ -413,60 +408,6 @@ export default function AdminProfile() {
         </Grid>
       </Paper>
 
-      {/* Password Settings Section */}
-      <Paper
-        elevation={3}
-        sx={{
-          p: { xs: 2, sm: 4 },
-          mb: 4,
-          borderRadius: 2,
-          background: (theme) =>
-            theme.palette.mode === "dark"
-              ? "linear-gradient(145deg, rgba(40,40,40,0.9), rgba(30,30,30,0.9))"
-              : "linear-gradient(145deg, rgba(255,255,255,0.9), rgba(250,250,250,0.9))",
-          backdropFilter: "blur(10px)",
-          border: (theme) => `1px solid ${theme.palette.divider}`,
-        }}
-      >
-        <Typography
-          variant="h6"
-          fontWeight="medium"
-          gutterBottom
-          sx={{
-            color: (theme) =>
-              theme.palette.mode === "dark" ? "primary.light" : "primary.dark",
-            mb: 3,
-          }}
-        >
-          Password Settings
-        </Typography>
-
-        <Button
-          variant="contained"
-          onClick={() => setChangePasswordModalOpen(true)}
-          sx={{
-            px: 4,
-            py: 1,
-            background: (theme) =>
-              `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.primary.dark})`,
-            boxShadow: (theme) => `0 4px 20px ${theme.palette.primary.main}40`,
-            "&:hover": {
-              background: (theme) =>
-                `linear-gradient(45deg, ${theme.palette.primary.dark}, ${theme.palette.primary.main})`,
-              boxShadow: (theme) =>
-                `0 6px 25px ${theme.palette.primary.main}60`,
-            },
-          }}
-        >
-          Change Password
-        </Button>
-      </Paper>
-
-      {/* Two Factor Authentication Section */}
-      <Box sx={{ mt: 4 }}>
-        <TwoFactorSettings twoFactorEnabled={profileData.twoFactorEnabled} />
-      </Box>
-
       {/* Recent Activity Section */}
       <Typography
         variant="h5"
@@ -648,14 +589,6 @@ export default function AdminProfile() {
         onClose={handleModalClose}
         onSuccess={handleProfileUpdated}
         initialData={profileData}
-      />
-
-      {/* Change Password Modal */}
-      <ChangePasswordModal
-        open={changePasswordModalOpen}
-        onClose={handleModalClose}
-        onSuccess={handleProfileUpdated}
-        customerId={profileData.id || ""}
       />
     </Box>
   );
