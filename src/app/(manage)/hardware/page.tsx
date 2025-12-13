@@ -4,7 +4,6 @@ import React, { useState, useCallback, useEffect, useMemo } from "react";
 import {
   Box,
   Button,
-  Stack,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -22,13 +21,27 @@ import {
   IconButton,
   CircularProgress,
   Chip,
+  Menu,
+  MenuItem,
 } from "@mui/material";
 import {
   Edit as EditIcon,
   Delete as DeleteIcon,
   Add as AddIcon,
   Warning as WarningIcon,
+  MoreVert as MoreVertIcon,
 } from "@mui/icons-material";
+
+interface ProcurementHistoryEntry {
+  id: string;
+  quantity: number;
+  createdAt: string;
+  createdBy: {
+    id: string;
+    name: string | null;
+    email: string;
+  };
+}
 
 interface Hardware {
   id: string;
@@ -38,13 +51,13 @@ interface Hardware {
   quantity: number;
   createdAt: string;
   updatedAt: string;
+  procurementHistory?: ProcurementHistoryEntry[];
 }
 
 interface FormData {
   model: string;
   powerUsage: string | number;
   hashRate: string | number;
-  quantity: string | number;
 }
 
 interface ApiResponse<T = unknown> {
@@ -63,11 +76,24 @@ export default function HardwarePage() {
   const [deleting, setDeleting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [selectedHardwareId, setSelectedHardwareId] = useState<string | null>(
+    null,
+  );
+  const [procurementOpen, setProcurementOpen] = useState(false);
+  const [procurementQuantity, setProcurementQuantity] = useState<string>("1");
+  const [procurementError, setProcurementError] = useState<string | null>(null);
+  const [procuringHardwareId, setProcuringHardwareId] = useState<string | null>(
+    null,
+  );
+  const [procuring, setProcuring] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [selectedHardwareForHistory, setSelectedHardwareForHistory] =
+    useState<Hardware | null>(null);
   const [formData, setFormData] = useState<FormData>({
     model: "",
     powerUsage: "",
     hashRate: "",
-    quantity: 1,
   });
 
   /**
@@ -108,6 +134,123 @@ export default function HardwarePage() {
   };
 
   /**
+   * Handle menu open
+   */
+  const handleMenuOpen = (
+    event: React.MouseEvent<HTMLElement>,
+    hardwareId: string,
+  ) => {
+    setAnchorEl(event.currentTarget);
+    setSelectedHardwareId(hardwareId);
+  };
+
+  /**
+   * Handle menu close
+   */
+  const handleMenuClose = () => {
+    setAnchorEl(null);
+    setSelectedHardwareId(null);
+  };
+
+  /**
+   * Handle open procurement modal
+   */
+  const handleOpenProcurement = (hardwareId: string) => {
+    handleMenuClose();
+    setProcuringHardwareId(hardwareId);
+    setProcurementQuantity("1");
+    setProcurementError(null);
+    setProcurementOpen(true);
+  };
+
+  /**
+   * Handle close procurement modal
+   */
+  const handleCloseProcurement = () => {
+    if (!procuring) {
+      setProcurementOpen(false);
+      setProcuringHardwareId(null);
+      setProcurementQuantity("1");
+      setProcurementError(null);
+    }
+  };
+
+  /**
+   * Handle procure hardware submit
+   */
+  const handleProcureSubmit = async () => {
+    setProcurementError(null);
+
+    const qty = parseInt(procurementQuantity);
+    if (isNaN(qty) || qty < 1) {
+      setProcurementError("Quantity must be at least 1");
+      return;
+    }
+
+    if (!procuringHardwareId) {
+      setProcurementError("Hardware ID is missing");
+      return;
+    }
+
+    setProcuring(true);
+    try {
+      const response = await fetch("/api/hardware/procure", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          hardwareId: procuringHardwareId,
+          quantity: qty,
+        }),
+      });
+
+      const data: ApiResponse = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to procure hardware");
+      }
+
+      handleCloseProcurement();
+      await fetchHardware();
+    } catch (err) {
+      setProcurementError(
+        err instanceof Error ? err.message : "An error occurred",
+      );
+    } finally {
+      setProcuring(false);
+    }
+  };
+
+  /**
+   * Handle open procurement history modal
+   */
+  const handleOpenHistory = (hw: Hardware) => {
+    handleMenuClose();
+    setSelectedHardwareForHistory(hw);
+    setHistoryOpen(true);
+  };
+
+  /**
+   * Handle close procurement history modal
+   */
+  const handleCloseHistory = () => {
+    setHistoryOpen(false);
+    setSelectedHardwareForHistory(null);
+  };
+
+  /**
+   * Format date and time to readable string
+   */
+  const formatDateTime = (dateString: string): string => {
+    return new Date(dateString).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  /**
    * Validate form data
    */
   const validateForm = (): boolean => {
@@ -130,12 +273,6 @@ export default function HardwarePage() {
       return false;
     }
 
-    const qty = parseInt(String(formData.quantity));
-    if (isNaN(qty) || qty <= 0) {
-      setFormError("Quantity must be a positive number");
-      return false;
-    }
-
     return true;
   };
 
@@ -148,7 +285,6 @@ export default function HardwarePage() {
       model: "",
       powerUsage: "",
       hashRate: "",
-      quantity: 1,
     });
     setFormError(null);
     setOpenForm(true);
@@ -158,12 +294,12 @@ export default function HardwarePage() {
    * Handle edit hardware
    */
   const handleEdit = (hw: Hardware) => {
+    handleMenuClose();
     setEditingId(hw.id);
     setFormData({
       model: hw.model,
       powerUsage: hw.powerUsage,
       hashRate: hw.hashRate,
-      quantity: hw.quantity,
     });
     setFormError(null);
     setOpenForm(true);
@@ -187,7 +323,7 @@ export default function HardwarePage() {
           model: formData.model.trim(),
           powerUsage: parseFloat(String(formData.powerUsage)),
           hashRate: parseFloat(String(formData.hashRate)),
-          quantity: parseInt(String(formData.quantity)),
+          ...(editingId ? {} : { quantity: 0 }), // Set quantity to 0 only for new hardware
         }),
       });
 
@@ -204,7 +340,6 @@ export default function HardwarePage() {
         model: "",
         powerUsage: "",
         hashRate: "",
-        quantity: 1,
       });
       await fetchHardware();
     } catch (err) {
@@ -395,26 +530,44 @@ export default function HardwarePage() {
                   </TableCell>
                   <TableCell>{formatDate(hw.createdAt)}</TableCell>
                   <TableCell align="center">
-                    <Stack direction="row" spacing={1} justifyContent="center">
-                      <IconButton
-                        size="small"
-                        color="primary"
-                        onClick={() => handleEdit(hw)}
-                        disabled={loading}
-                        title="Edit hardware"
+                    <IconButton
+                      size="small"
+                      onClick={(e) => handleMenuOpen(e, hw.id)}
+                      disabled={loading}
+                      title="Actions"
+                    >
+                      <MoreVertIcon fontSize="small" />
+                    </IconButton>
+                    <Menu
+                      anchorEl={anchorEl}
+                      open={anchorEl !== null && selectedHardwareId === hw.id}
+                      onClose={handleMenuClose}
+                    >
+                      <MenuItem onClick={() => handleEdit(hw)}>
+                        <EditIcon fontSize="small" sx={{ mr: 1 }} />
+                        Edit
+                      </MenuItem>
+                      <MenuItem onClick={() => handleOpenProcurement(hw.id)}>
+                        <Typography fontSize="small">
+                          📦 Procure Hardware
+                        </Typography>
+                      </MenuItem>
+                      <MenuItem onClick={() => handleOpenHistory(hw)}>
+                        <Typography fontSize="small">
+                          📋 Show Procurement History
+                        </Typography>
+                      </MenuItem>
+                      <MenuItem
+                        onClick={() => {
+                          handleMenuClose();
+                          setDeleteConfirm(hw.id);
+                        }}
+                        sx={{ color: "error.main" }}
                       >
-                        <EditIcon fontSize="small" />
-                      </IconButton>
-                      <IconButton
-                        size="small"
-                        color="error"
-                        onClick={() => setDeleteConfirm(hw.id)}
-                        disabled={loading}
-                        title="Delete hardware"
-                      >
-                        <DeleteIcon fontSize="small" />
-                      </IconButton>
-                    </Stack>
+                        <DeleteIcon fontSize="small" sx={{ mr: 1 }} />
+                        Delete
+                      </MenuItem>
+                    </Menu>
                   </TableCell>
                 </TableRow>
               ))
@@ -477,20 +630,6 @@ export default function HardwarePage() {
             inputProps={{ min: "0.1", step: "0.1" }}
             disabled={saving}
           />
-
-          <TextField
-            fullWidth
-            label="Quantity"
-            name="quantity"
-            type="number"
-            value={formData.quantity}
-            onChange={handleFormChange}
-            placeholder="e.g., 5"
-            margin="normal"
-            inputProps={{ min: "1", step: "1" }}
-            disabled={saving}
-            helperText="Number of units available"
-          />
         </DialogContent>
 
         <DialogActions>
@@ -545,6 +684,116 @@ export default function HardwarePage() {
             startIcon={deleting && <CircularProgress size={20} />}
           >
             {deleting ? "Deleting..." : "Delete"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Procurement Modal */}
+      <Dialog
+        open={procurementOpen}
+        onClose={handleCloseProcurement}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Procure Hardware</DialogTitle>
+        <DialogContent sx={{ pt: 2 }}>
+          {procurementError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {procurementError}
+            </Alert>
+          )}
+
+          <TextField
+            fullWidth
+            label="Quantity"
+            type="number"
+            value={procurementQuantity}
+            onChange={(e) => setProcurementQuantity(e.target.value)}
+            inputProps={{ min: "1", step: "1" }}
+            disabled={procuring}
+            helperText="Number of units to procure"
+            margin="normal"
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={handleCloseProcurement}
+            disabled={procuring}
+            color="inherit"
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleProcureSubmit}
+            variant="contained"
+            disabled={procuring}
+            startIcon={procuring && <CircularProgress size={20} />}
+          >
+            {procuring ? "Adding..." : "Add"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Procurement History Modal */}
+      <Dialog
+        open={historyOpen}
+        onClose={handleCloseHistory}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          Procurement History - {selectedHardwareForHistory?.model}
+        </DialogTitle>
+        <DialogContent sx={{ pt: 2 }}>
+          {!selectedHardwareForHistory?.procurementHistory ||
+          selectedHardwareForHistory.procurementHistory.length === 0 ? (
+            <Typography
+              color="text.secondary"
+              sx={{ textAlign: "center", py: 4 }}
+            >
+              No procurement history available for this hardware.
+            </Typography>
+          ) : (
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              {selectedHardwareForHistory.procurementHistory.map((entry) => (
+                <Box
+                  key={entry.id}
+                  sx={{
+                    p: 2,
+                    border: "1px solid",
+                    borderColor: "divider",
+                    borderRadius: 1,
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "flex-start",
+                  }}
+                >
+                  <Box sx={{ flex: 1 }}>
+                    <Typography variant="body2" sx={{ fontWeight: "600" }}>
+                      Quantity: {entry.quantity} unit
+                      {entry.quantity !== 1 ? "s" : ""}
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{ mt: 0.5 }}
+                    >
+                      By: {entry.createdBy.name || entry.createdBy.email}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ textAlign: "right" }}>
+                    <Typography variant="caption" color="text.secondary">
+                      {formatDateTime(entry.createdAt)}
+                    </Typography>
+                  </Box>
+                </Box>
+              ))}
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseHistory} color="primary">
+            Close
           </Button>
         </DialogActions>
       </Dialog>

@@ -12,6 +12,25 @@ interface ApiResponse<T = unknown> {
 export async function GET() {
   try {
     const hardware = await prisma.hardware.findMany({
+      include: {
+        procurementHistory: {
+          select: {
+            id: true,
+            quantity: true,
+            createdAt: true,
+            createdBy: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              },
+            },
+          },
+          orderBy: {
+            createdAt: "desc",
+          },
+        },
+      },
       orderBy: {
         createdAt: "desc",
       },

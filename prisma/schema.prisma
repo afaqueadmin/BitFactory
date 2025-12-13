@@ -48,6 +48,7 @@ model User {
   costPayments  CostPayment[]
   ownedMinerHistory MinerOwnershipHistory[] @relation("owner")
   createdMinerHistory MinerOwnershipHistory[] @relation("createdBy")
+  hardwareProcurementHistory HardwareProcurementHistory[]
 
   @@map("users")
 }
@@ -84,6 +85,7 @@ model Hardware {
   hashRate      Decimal   // in TH/s (e.g., 234.5)
   quantity      Int       @default(1)  // number of units available
   miners        Miner[]
+  procurementHistory HardwareProcurementHistory[]
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -165,5 +167,19 @@ model MinerOwnershipHistory {
   @@index([ownerId])
   @@index([createdById])
   @@map("miner_ownership_history")
+}
+
+model HardwareProcurementHistory {
+  id            String    @id @default(cuid())
+  hardwareId    String
+  quantity      Int
+  createdById   String
+  hardware      Hardware  @relation(fields: [hardwareId], references: [id], onDelete: Cascade)
+  createdBy     User      @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  createdAt     DateTime  @default(now())
+
+  @@index([hardwareId])
+  @@index([createdById])
+  @@map("hardware_procurement_history")
 }
 
