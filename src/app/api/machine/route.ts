@@ -176,11 +176,11 @@ export async function GET(
         rateHistory: {
           select: {
             rate_per_kwh: true,
+            createdAt: true,
           },
           orderBy: {
             createdAt: "desc",
           },
-          take: 1,
         },
       },
       orderBy,
@@ -193,7 +193,6 @@ export async function GET(
         miner.rateHistory && miner.rateHistory.length > 0
           ? miner.rateHistory[0].rate_per_kwh
           : undefined,
-      rateHistory: undefined, // Remove the rateHistory array from response
     }));
 
     console.log(

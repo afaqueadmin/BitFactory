@@ -77,6 +77,10 @@ interface Miner {
   user?: User;
   space?: Space;
   hardware?: Hardware;
+  rateHistory?: Array<{
+    rate_per_kwh: number;
+    createdAt: string;
+  }>;
 }
 
 /**

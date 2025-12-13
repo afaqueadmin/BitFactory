@@ -585,7 +585,7 @@ export default function MachinePage() {
                     </MenuItem>
                     {getUniqueRates().map((rate) => (
                       <MenuItem key={rate} value={rate}>
-                        ${parseFloat(rate).toFixed(2)}
+                        ${parseFloat(rate).toFixed(3)}
                       </MenuItem>
                     ))}
                   </Select>

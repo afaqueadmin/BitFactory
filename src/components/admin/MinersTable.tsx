@@ -13,7 +13,6 @@ import {
   Box,
   Button,
   IconButton,
-  Stack,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -33,6 +32,7 @@ import {
   Select,
   MenuItem,
   SelectChangeEvent,
+  Menu,
 } from "@mui/material";
 import {
   Edit as EditIcon,
@@ -40,6 +40,7 @@ import {
   Warning as WarningIcon,
   ArrowUpward as ArrowUpwardIcon,
   ArrowDownward as ArrowDownwardIcon,
+  MoreVert as MoreVertIcon,
 } from "@mui/icons-material";
 import {
   sortMiners,
@@ -95,6 +96,10 @@ interface Miner {
   user?: User;
   space?: Space;
   hardware?: Hardware;
+  rateHistory?: Array<{
+    rate_per_kwh: number;
+    createdAt: string;
+  }>;
 }
 
 interface MinersTableProps {
@@ -118,6 +123,11 @@ export default function MinersTable({
     field: "name",
     direction: "asc",
   });
+  const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
+  const [selectedMinerId, setSelectedMinerId] = React.useState<string | null>(
+    null,
+  );
+  const [rateHistoryOpen, setRateHistoryOpen] = React.useState(false);
 
   /**
    * Handle delete confirmation
@@ -150,6 +160,50 @@ export default function MinersTable({
       ...sortConfig,
       direction: toggleSortDirection(sortConfig.direction),
     });
+  };
+
+  /**
+   * Handle menu open
+   */
+  const handleMenuOpen = (
+    event: React.MouseEvent<HTMLElement>,
+    minerId: string,
+  ) => {
+    setAnchorEl(event.currentTarget);
+    setSelectedMinerId(minerId);
+  };
+
+  /**
+   * Handle menu close
+   */
+  const handleMenuClose = () => {
+    setAnchorEl(null);
+    setSelectedMinerId(null);
+  };
+
+  /**
+   * Handle edit miner
+   */
+  const handleEdit = (miner: Miner) => {
+    handleMenuClose();
+    onEdit(miner);
+  };
+
+  /**
+   * Handle delete miner
+   */
+  const handleDelete = (minerId: string) => {
+    handleMenuClose();
+    setDeleteConfirm(minerId);
+  };
+
+  /**
+   * Handle view rate history
+   */
+  const handleViewRateHistory = (minerId: string) => {
+    handleMenuClose();
+    setSelectedMinerId(minerId);
+    setRateHistoryOpen(true);
   };
 
   /**
@@ -569,7 +623,7 @@ export default function MinersTable({
                   </TableCell>
                   <TableCell align="right">
                     {miner.rate_per_kwh ? (
-                      `$${Number(miner.rate_per_kwh).toFixed(2)}`
+                      `$${Number(miner.rate_per_kwh).toFixed(3)}`
                     ) : (
                       <Typography variant="body2" color="text.secondary">
                         —
@@ -586,31 +640,36 @@ export default function MinersTable({
                   </TableCell>
                   <TableCell>{formatDate(miner.createdAt)}</TableCell>
                   <TableCell align="center">
-                    <Stack
-                      direction="row"
-                      spacing={1}
-                      justifyContent="center"
-                      sx={{ py: 1 }}
+                    <IconButton
+                      size="small"
+                      onClick={(e) => handleMenuOpen(e, miner.id)}
+                      disabled={isLoading}
+                      title="Actions"
                     >
-                      <IconButton
-                        size="small"
-                        color="primary"
-                        onClick={() => onEdit(miner)}
-                        disabled={isLoading}
-                        title="Edit miner"
+                      <MoreVertIcon fontSize="small" />
+                    </IconButton>
+                    <Menu
+                      anchorEl={anchorEl}
+                      open={anchorEl !== null && selectedMinerId === miner.id}
+                      onClose={handleMenuClose}
+                    >
+                      <MenuItem onClick={() => handleEdit(miner)}>
+                        <EditIcon fontSize="small" sx={{ mr: 1 }} />
+                        Edit
+                      </MenuItem>
+                      <MenuItem onClick={() => handleViewRateHistory(miner.id)}>
+                        <Typography fontSize="small">
+                          📈 See Rate History
+                        </Typography>
+                      </MenuItem>
+                      <MenuItem
+                        onClick={() => handleDelete(miner.id)}
+                        sx={{ color: "error.main" }}
                       >
-                        <EditIcon fontSize="small" />
-                      </IconButton>
-                      <IconButton
-                        size="small"
-                        color="error"
-                        onClick={() => setDeleteConfirm(miner.id)}
-                        disabled={isLoading}
-                        title="Delete miner"
-                      >
-                        <DeleteIcon fontSize="small" />
-                      </IconButton>
-                    </Stack>
+                        <DeleteIcon fontSize="small" sx={{ mr: 1 }} />
+                        Delete
+                      </MenuItem>
+                    </Menu>
                   </TableCell>
                 </TableRow>
               ))
@@ -652,6 +711,70 @@ export default function MinersTable({
             startIcon={deleting && <CircularProgress size={20} />}
           >
             {deleting ? "Deleting..." : "Delete"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Rate History Modal */}
+      <Dialog
+        open={rateHistoryOpen}
+        onClose={() => setRateHistoryOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Miner Rate History</DialogTitle>
+        <DialogContent sx={{ pt: 2 }}>
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            {memoizedRows.find((m) => m.id === selectedMinerId)?.rateHistory &&
+            (memoizedRows.find((m) => m.id === selectedMinerId)?.rateHistory
+              ?.length ?? 0) > 0 ? (
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                {memoizedRows
+                  .find((m) => m.id === selectedMinerId)
+                  ?.rateHistory?.map((history, index: number) => (
+                    <Box
+                      key={index}
+                      sx={{
+                        p: 1.5,
+                        border: "1px solid",
+                        borderColor: "divider",
+                        borderRadius: 1,
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                      }}
+                    >
+                      <Box>
+                        <Typography variant="body2" sx={{ fontWeight: "600" }}>
+                          ${Number(history.rate_per_kwh)}/kWh
+                        </Typography>
+                      </Box>
+                      <Typography variant="caption" color="text.secondary">
+                        {new Date(history.createdAt).toLocaleDateString(
+                          "en-CA",
+                        )}{" "}
+                        {new Date(history.createdAt).toLocaleTimeString(
+                          "en-US",
+                          { hour: "2-digit", minute: "2-digit", hour12: false },
+                        )}
+                      </Typography>
+                    </Box>
+                  ))}
+              </Box>
+            ) : (
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{ textAlign: "center", py: 2 }}
+              >
+                No rate history available for this miner.
+              </Typography>
+            )}
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setRateHistoryOpen(false)} color="primary">
+            Close
           </Button>
         </DialogActions>
       </Dialog>
