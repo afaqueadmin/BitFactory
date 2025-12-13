@@ -46,6 +46,8 @@ model User {
   activities    UserActivity[]
   miners        Miner[]
   costPayments  CostPayment[]
+  ownedMinerHistory MinerOwnershipHistory[] @relation("owner")
+  createdMinerHistory MinerOwnershipHistory[] @relation("createdBy")
 
   @@map("users")
 }
@@ -99,6 +101,7 @@ model Miner {
   space         Space     @relation(fields: [spaceId], references: [id])
   hardware      Hardware  @relation(fields: [hardwareId], references: [id])
   rateHistory   MinerRateHistory[]
+  ownershipHistory MinerOwnershipHistory[]
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -146,5 +149,21 @@ model CostPayment {
 
   @@index([userId])
   @@map("cost_payments")
+}
+
+model MinerOwnershipHistory {
+  id            String    @id @default(cuid())
+  minerId       String?
+  ownerId       String
+  createdById   String
+  miner         Miner?    @relation(fields: [minerId], references: [id], onDelete: Cascade)
+  owner         User      @relation("owner", fields: [ownerId], references: [id], onDelete: Cascade)
+  createdBy     User      @relation("createdBy", fields: [createdById], references: [id], onDelete: Cascade)
+  createdAt     DateTime  @default(now())
+
+  @@index([minerId])
+  @@index([ownerId])
+  @@index([createdById])
+  @@map("miner_ownership_history")
 }
 

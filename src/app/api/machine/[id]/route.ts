@@ -384,6 +384,23 @@ export async function PUT(
         }
       }
 
+      // Handle miner reassignment (userId change)
+      if (updateData.userId && updateData.userId !== existingMiner.userId) {
+        // Get authenticated user ID from token
+        const token = request.cookies.get("token")?.value;
+        const decoded = await verifyJwtToken(token!);
+        const authenticatedUserId = decoded.userId;
+
+        // Create ownership history entry for reassignment
+        await tx.minerOwnershipHistory.create({
+          data: {
+            minerId: id,
+            ownerId: updateData.userId,
+            createdById: authenticatedUserId,
+          },
+        });
+      }
+
       // Update the miner
       return await tx.miner.update({
         where: { id },

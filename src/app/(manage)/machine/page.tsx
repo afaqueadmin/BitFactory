@@ -48,6 +48,7 @@ interface Hardware {
   id: string;
   model: string;
   powerUsage: number;
+  quantity: number;
   hashRate: number | string;
   createdAt?: string;
   updatedAt?: string;
@@ -69,6 +70,21 @@ interface Miner {
   user?: User;
   space?: Space;
   hardware?: Hardware;
+  ownershipHistory?: Array<{
+    id: string;
+    minerId?: string;
+    owner: {
+      id: string;
+      name: string | null;
+      email: string;
+    };
+    createdBy: {
+      id: string;
+      name: string | null;
+      email: string;
+    };
+    createdAt: string;
+  }>;
 }
 
 /**

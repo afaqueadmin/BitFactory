@@ -77,7 +77,10 @@ interface Hardware {
   id: string;
   model: string;
   powerUsage: number;
+  quantity: number;
   hashRate: number | string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 /**
@@ -98,6 +101,21 @@ interface Miner {
   hardware?: Hardware;
   rateHistory?: Array<{
     rate_per_kwh: number;
+    createdAt: string;
+  }>;
+  ownershipHistory?: Array<{
+    id: string;
+    minerId?: string;
+    owner: {
+      id: string;
+      name: string | null;
+      email: string;
+    };
+    createdBy: {
+      id: string;
+      name: string | null;
+      email: string;
+    };
     createdAt: string;
   }>;
 }
@@ -659,7 +677,7 @@ export default function MinersTable({
                       </MenuItem>
                       <MenuItem onClick={() => handleViewRateHistory(miner.id)}>
                         <Typography fontSize="small">
-                          📈 See Rate History
+                          📈 See Miner History
                         </Typography>
                       </MenuItem>
                       <MenuItem
@@ -715,23 +733,38 @@ export default function MinersTable({
         </DialogActions>
       </Dialog>
 
-      {/* Rate History Modal */}
+      {/* Activity History Modal */}
       <Dialog
         open={rateHistoryOpen}
         onClose={() => setRateHistoryOpen(false)}
         maxWidth="sm"
         fullWidth
       >
-        <DialogTitle>Miner Rate History</DialogTitle>
+        <DialogTitle>Miner Activity History</DialogTitle>
         <DialogContent sx={{ pt: 2 }}>
           <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            {memoizedRows.find((m) => m.id === selectedMinerId)?.rateHistory &&
-            (memoizedRows.find((m) => m.id === selectedMinerId)?.rateHistory
-              ?.length ?? 0) > 0 ? (
-              <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                {memoizedRows
-                  .find((m) => m.id === selectedMinerId)
-                  ?.rateHistory?.map((history, index: number) => (
+            {(() => {
+              const miner = memoizedRows.find((m) => m.id === selectedMinerId);
+              const rateHistory = miner?.rateHistory || [];
+              const ownershipHistory = miner?.ownershipHistory || [];
+
+              // Combine both histories
+              const combinedHistory = [
+                ...rateHistory.map((h) => ({
+                  type: "rate",
+                  createdAt: new Date(h.createdAt),
+                  data: h,
+                })),
+                ...ownershipHistory.map((h) => ({
+                  type: "ownership",
+                  createdAt: new Date(h.createdAt),
+                  data: h,
+                })),
+              ].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+
+              return combinedHistory && combinedHistory.length > 0 ? (
+                <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                  {combinedHistory.map((activity, index: number) => (
                     <Box
                       key={index}
                       sx={{
@@ -740,36 +773,146 @@ export default function MinersTable({
                         borderColor: "divider",
                         borderRadius: 1,
                         display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
+                        flexDirection: "column",
+                        gap: 0.5,
                       }}
                     >
-                      <Box>
-                        <Typography variant="body2" sx={{ fontWeight: "600" }}>
-                          ${Number(history.rate_per_kwh)}/kWh
-                        </Typography>
-                      </Box>
-                      <Typography variant="caption" color="text.secondary">
-                        {new Date(history.createdAt).toLocaleDateString(
-                          "en-CA",
-                        )}{" "}
-                        {new Date(history.createdAt).toLocaleTimeString(
-                          "en-US",
-                          { hour: "2-digit", minute: "2-digit", hour12: false },
-                        )}
-                      </Typography>
+                      {activity.type === "rate" ? (
+                        <>
+                          <Box
+                            sx={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                            }}
+                          >
+                            <Typography
+                              variant="body2"
+                              sx={{ fontWeight: "600" }}
+                            >
+                              Rate Update: $
+                              {Number(
+                                (activity.data as { rate_per_kwh: number })
+                                  .rate_per_kwh,
+                              ).toFixed(3)}
+                              /kWh
+                            </Typography>
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                            >
+                              {activity.createdAt.toLocaleDateString("en-CA")}{" "}
+                              {activity.createdAt.toLocaleTimeString("en-US", {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                                hour12: false,
+                              })}
+                            </Typography>
+                          </Box>
+                        </>
+                      ) : (
+                        <>
+                          <Typography
+                            variant="body2"
+                            sx={{ fontWeight: "600", color: "info.main" }}
+                          >
+                            Ownership Transfer
+                          </Typography>
+                          <Box
+                            sx={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "flex-start",
+                            }}
+                          >
+                            <Box sx={{ display: "flex", gap: 2, flex: 1 }}>
+                              <Box sx={{ flex: 1, minWidth: "150px" }}>
+                                <Typography
+                                  variant="caption"
+                                  color="text.secondary"
+                                >
+                                  New Owner
+                                </Typography>
+                                <Typography variant="body2">
+                                  {(
+                                    activity.data as {
+                                      owner: {
+                                        name: string | null;
+                                        email: string;
+                                      };
+                                    }
+                                  ).owner?.name ||
+                                    (
+                                      activity.data as {
+                                        owner: {
+                                          name: string | null;
+                                          email: string;
+                                        };
+                                      }
+                                    ).owner?.email ||
+                                    "—"}
+                                </Typography>
+                              </Box>
+                              <Box sx={{ flex: 1, minWidth: "150px" }}>
+                                <Typography
+                                  variant="caption"
+                                  color="text.secondary"
+                                >
+                                  Changed By
+                                </Typography>
+                                <Typography variant="body2">
+                                  {(
+                                    activity.data as {
+                                      createdBy: {
+                                        name: string | null;
+                                        email: string;
+                                      };
+                                    }
+                                  ).createdBy?.name ||
+                                    (
+                                      activity.data as {
+                                        createdBy: {
+                                          name: string | null;
+                                          email: string;
+                                        };
+                                      }
+                                    ).createdBy?.email ||
+                                    "—"}
+                                </Typography>
+                              </Box>
+                            </Box>
+                            <Box sx={{ minWidth: "150px", textAlign: "right" }}>
+                              <Typography
+                                variant="caption"
+                                color="text.secondary"
+                              >
+                                {activity.createdAt.toLocaleDateString("en-CA")}{" "}
+                                {activity.createdAt.toLocaleTimeString(
+                                  "en-US",
+                                  {
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                    hour12: false,
+                                  },
+                                )}
+                              </Typography>
+                            </Box>
+                          </Box>
+                        </>
+                      )}
                     </Box>
                   ))}
-              </Box>
-            ) : (
-              <Typography
-                variant="body2"
-                color="text.secondary"
-                sx={{ textAlign: "center", py: 2 }}
-              >
-                No rate history available for this miner.
-              </Typography>
-            )}
+                </Box>
+              ) : (
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ textAlign: "center", py: 2 }}
+                >
+                  No activity history available for this miner.
+                </Typography>
+              );
+            })()}
           </Box>
         </DialogContent>
         <DialogActions>

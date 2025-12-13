@@ -21,6 +21,7 @@ interface Hardware {
   id: string;
   model: string;
   powerUsage: number;
+  quantity: number;
   hashRate: number | string;
 }
 
@@ -64,6 +65,7 @@ const dummyMiners: MinerData[] = [
       model: "Bitmain S21 Pro",
       powerUsage: 3.25,
       hashRate: 195,
+      quantity: 0,
     },
   },
   {
@@ -80,6 +82,7 @@ const dummyMiners: MinerData[] = [
       model: "Bitmain S21 Pro",
       powerUsage: 3.25,
       hashRate: 0,
+      quantity: 0,
     },
   },
   {
@@ -96,6 +99,7 @@ const dummyMiners: MinerData[] = [
       model: "Bitmain S21 Pro",
       powerUsage: 3.25,
       hashRate: 200,
+      quantity: 0,
     },
   },
   {
@@ -112,6 +116,7 @@ const dummyMiners: MinerData[] = [
       model: "Bitmain S21 Pro",
       powerUsage: 3.25,
       hashRate: 0,
+      quantity: 0,
     },
   },
   {
@@ -128,6 +133,7 @@ const dummyMiners: MinerData[] = [
       model: "Bitmain S21 Pro",
       powerUsage: 3.25,
       hashRate: 234,
+      quantity: 0,
     },
   },
 ];

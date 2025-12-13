@@ -182,6 +182,30 @@ export async function GET(
             createdAt: "desc",
           },
         },
+        ownershipHistory: {
+          select: {
+            id: true,
+            minerId: true,
+            owner: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              },
+            },
+            createdBy: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              },
+            },
+            createdAt: true,
+          },
+          orderBy: {
+            createdAt: "desc",
+          },
+        },
       },
       orderBy,
     });
@@ -413,6 +437,11 @@ export async function POST(
       );
     }
 
+    // Get authenticated user ID from token
+    const token = request.cookies.get("token")?.value;
+    const decoded = await verifyJwtToken(token!);
+    const authenticatedUserId = decoded.userId;
+
     // Create miner and reduce hardware quantity in transaction
     const miner = await prisma.$transaction(async (tx) => {
       // Create the miner
@@ -448,6 +477,15 @@ export async function POST(
         data: {
           minerId: newMiner.id,
           rate_per_kwh: ratePerKwh,
+        },
+      });
+
+      // Create miner ownership history entry
+      await tx.minerOwnershipHistory.create({
+        data: {
+          minerId: newMiner.id,
+          ownerId: userId,
+          createdById: authenticatedUserId,
         },
       });
 

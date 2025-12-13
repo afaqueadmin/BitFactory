@@ -58,6 +58,7 @@ interface Hardware {
   id: string;
   model: string;
   powerUsage: number;
+  quantity: number;
   hashRate: number | string;
 }
 
@@ -79,6 +80,21 @@ interface Miner {
   hardware?: Hardware;
   rateHistory?: Array<{
     rate_per_kwh: number;
+    createdAt: string;
+  }>;
+  ownershipHistory?: Array<{
+    id: string;
+    minerId?: string;
+    owner: {
+      id: string;
+      name: string | null;
+      email: string;
+    };
+    createdBy: {
+      id: string;
+      name: string | null;
+      email: string;
+    };
     createdAt: string;
   }>;
 }
