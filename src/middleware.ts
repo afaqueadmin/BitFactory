@@ -17,6 +17,32 @@ const publicPaths = new Set([
   "/favicon.svg",
 ]);
 
+const securePaths = {
+  CLIENT: new Set<string>([
+    "/account-settings",
+    "/clientworkers",
+    "/dashboard",
+    "/luxor",
+    "/miners",
+    "/security-setting",
+    "/wallet",
+    // Add client-specific public paths if any
+  ]),
+  ADMIN: new Set<string>([
+    "/admin-profile",
+    "/adminpanel",
+    "/customers/overview",
+    "/groups",
+    "/hardware",
+    "/machine",
+    "/security-settings",
+    "/space",
+    "/subaccounts",
+    "/workers",
+    // Add admin-specific public paths if any
+  ]),
+}; // Add admin-specific public paths if any
+
 // Role-based default redirects
 const getDefaultPathForRole = (role: string) => {
   switch (role) {
@@ -31,8 +57,8 @@ const getDefaultPathForRole = (role: string) => {
 };
 
 // Check if a path is inside a route group folder like (auth) or (manage)
-const isInRouteGroup = (pathname: string, group: string) => {
-  return pathname.startsWith(`/${group}`) || pathname.includes(`/(${group})`);
+const isInRouteGroup = (pathname: string, role: "CLIENT" | "ADMIN") => {
+  return securePaths[role].has(pathname);
 };
 
 export async function middleware(request: NextRequest) {
@@ -93,15 +119,16 @@ export async function middleware(request: NextRequest) {
     const userRole = decoded.role;
 
     if (userRole === "ADMIN" || userRole === "SUPER_ADMIN") {
+      const role = "ADMIN"; // Don't distinguish between ADMIN and SUPER_ADMIN for route access
       // Prevent admin/super_admin from accessing client routes
-      if (isInRouteGroup(pathname, "auth") || pathname === "/dashboard") {
+      if (!isInRouteGroup(pathname, role)) {
         return NextResponse.redirect(new URL("/adminpanel", request.url));
       }
     }
 
     if (userRole === "CLIENT") {
       // Prevent client from accessing admin routes
-      if (isInRouteGroup(pathname, "manage") || pathname === "/adminpanel") {
+      if (!isInRouteGroup(pathname, userRole)) {
         return NextResponse.redirect(new URL("/dashboard", request.url));
       }
     }
