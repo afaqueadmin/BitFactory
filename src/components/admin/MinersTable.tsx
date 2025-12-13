@@ -841,16 +841,19 @@ export default function MinersTable({
                                         email: string;
                                       };
                                     }
-                                  ).owner?.name ||
-                                    (
-                                      activity.data as {
-                                        owner: {
-                                          name: string | null;
-                                          email: string;
-                                        };
-                                      }
-                                    ).owner?.email ||
-                                    "—"}
+                                  ).owner?.name || "—"}
+                                </Typography>
+                                <Typography variant="body2">
+                                  (
+                                  {(
+                                    activity.data as {
+                                      owner: {
+                                        name: string | null;
+                                        email: string;
+                                      };
+                                    }
+                                  ).owner?.email || "—"}
+                                  )
                                 </Typography>
                               </Box>
                               <Box sx={{ flex: 1, minWidth: "150px" }}>
@@ -878,6 +881,18 @@ export default function MinersTable({
                                       }
                                     ).createdBy?.email ||
                                     "—"}
+                                </Typography>
+                                <Typography variant="body2">
+                                  (
+                                  {(
+                                    activity.data as {
+                                      createdBy: {
+                                        name: string | null;
+                                        email: string;
+                                      };
+                                    }
+                                  ).createdBy?.email || "—"}
+                                  )
                                 </Typography>
                               </Box>
                             </Box>
