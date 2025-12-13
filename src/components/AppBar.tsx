@@ -212,7 +212,7 @@ export default function AppBarComponent() {
           </MenuItem>
           <MenuItem
             component={Link}
-            href="/security-settings"
+            href="/security-setting"
             onClick={handleClose}
           >
             Security Settings
