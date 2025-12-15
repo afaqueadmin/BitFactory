@@ -1,5 +1,5 @@
 "use client";
-
+//src/app/(manage)/adminpanel/page.tsx
 import React, { useState, useEffect } from "react";
 import AdminStatCard from "@/components/admin/AdminStatCard";
 import AdminValueCard from "@/components/admin/AdminValueCard";

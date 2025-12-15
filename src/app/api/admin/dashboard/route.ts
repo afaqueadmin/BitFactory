@@ -54,27 +54,21 @@ interface DashboardStats {
 }
 
 /**
- * Helper: Fetch all users' subaccount names from database
+ * Helper: Fetch all ACCESSIBLE subaccount names from Luxor API
+ * This ensures we only use subaccounts the current user has permission to access
+ *
+ * Previously: Fetched from database (luxor_subaccount_name field)
+ * Problem: Database might have stale/inaccessible subaccounts
+ * Solution: Fetch from Luxor API which returns only accessible ones
  */
-async function getAllSubaccountNames(): Promise<string[]> {
-  const users = await prisma.user.findMany({
-    where: {
-      luxorSubaccountName: { not: null },
-    },
-    select: { luxorSubaccountName: true },
-  });
-  return users.map((u) => u.luxorSubaccountName).filter(Boolean) as string[];
-}
-
-/**
- * Helper: Fetch all groups from Luxor workspace
- */
-async function fetchWorkspaceInfo(
-  token: string,
-): Promise<{ total: number; active: number; inactive: number } | null> {
+async function getAllSubaccountNames(token: string): Promise<string[]> {
   try {
     const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
-    const response = await fetch(`${baseUrl}/api/luxor?endpoint=workspace`, {
+    console.log(
+      "[Admin Dashboard] Fetching accessible subaccounts from Luxor API...",
+    );
+
+    const response = await fetch(`${baseUrl}/api/luxor?endpoint=subaccounts`, {
       method: "GET",
       headers: {
         Cookie: `token=${token}`,
@@ -83,22 +77,74 @@ async function fetchWorkspaceInfo(
 
     if (!response.ok) {
       console.error(
-        "[Admin Dashboard] Workspace fetch failed:",
+        "[Admin Dashboard] Subaccounts fetch failed:",
+        response.status,
+      );
+      return [];
+    }
+
+    const result = await response.json();
+    console.log(
+      "[Admin Dashboard] Luxor subaccounts response:",
+      JSON.stringify(result, null, 2),
+    );
+
+    if (result.success && result.data?.subaccounts) {
+      const subaccounts = result.data.subaccounts as Array<{
+        id: number;
+        name: string;
+      }>;
+      const subaccountNames = subaccounts.map((s) => s.name);
+      console.log(
+        `[Admin Dashboard] Accessible subaccounts (${subaccountNames.length} total):`,
+        subaccountNames,
+      );
+      return subaccountNames;
+    }
+
+    console.log("[Admin Dashboard] No subaccounts found in response");
+    return [];
+  } catch (error) {
+    console.error(
+      "[Admin Dashboard] Error fetching subaccounts from Luxor:",
+      error,
+    );
+    return [];
+  }
+}
+
+/**
+ * Helper: Fetch all subaccounts from Luxor (V2 API)
+ * V2 API: GET /pool/subaccounts?page_number=1&page_size=10
+ * Returns all subaccounts across all sites
+ */
+async function fetchSubaccountStats(
+  token: string,
+): Promise<{ total: number; active: number; inactive: number } | null> {
+  try {
+    const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
+    const response = await fetch(`${baseUrl}/api/luxor?endpoint=subaccounts`, {
+      method: "GET",
+      headers: {
+        Cookie: `token=${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      console.error(
+        "[Admin Dashboard] Subaccounts fetch failed:",
         response.status,
       );
       return null;
     }
 
     const result = await response.json();
-    if (result.success && result.data?.groups) {
-      const groups = result.data.groups as Array<{
-        id: string;
-        subaccounts?: { name: string }[];
+    if (result.success && result.data?.subaccounts) {
+      const subaccounts = result.data.subaccounts as Array<{
+        id: number;
+        name: string;
       }>;
-      const totalSubaccounts = groups.reduce(
-        (sum, g) => sum + (g.subaccounts?.length || 0),
-        0,
-      );
+      const totalSubaccounts = subaccounts.length;
       return {
         total: totalSubaccounts,
         active: totalSubaccounts, // Will be refined by workers fetch
@@ -106,7 +152,7 @@ async function fetchWorkspaceInfo(
       };
     }
   } catch (error) {
-    console.error("[Admin Dashboard] Error fetching workspace:", error);
+    console.error("[Admin Dashboard] Error fetching subaccounts:", error);
   }
   return null;
 }
@@ -135,7 +181,7 @@ async function fetchAllWorkers(
   }
 
   try {
-    // Fetch workers with proper comma-separated subaccount names
+    // Fetch workers with proper comma-separated subaccount names (no site_id)
     const params = new URLSearchParams({
       endpoint: "workers",
       currency: "BTC",
@@ -191,7 +237,8 @@ async function fetchAllWorkers(
 }
 
 /**
- * Helper: Fetch hashrate and efficiency metrics from Luxor
+ * Helper: Fetch hashrate and efficiency metrics from Luxor (V2 API)
+ * V2 API: GET /pool/hashrate-efficiency/{currency}?subaccount_names=...&start_date=...&tick_size=1d
  */
 async function fetchHashrateEfficiency(
   token: string,
@@ -217,12 +264,14 @@ async function fetchHashrateEfficiency(
     const startDate = new Date(endDate.getTime() - 7 * 24 * 60 * 60 * 1000);
 
     const params = new URLSearchParams({
-      endpoint: "hashrate-history",
+      endpoint: "hashrate-efficiency",
       currency: "BTC",
       subaccount_names: subaccountNames.join(","),
       start_date: startDate.toISOString().split("T")[0],
       end_date: endDate.toISOString().split("T")[0],
       tick_size: "1d",
+      page_number: "1",
+      page_size: "1000",
     });
 
     const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
@@ -235,7 +284,7 @@ async function fetchHashrateEfficiency(
 
     if (!response.ok) {
       console.error(
-        "[Admin Dashboard] Hashrate fetch failed:",
+        "[Admin Dashboard] Hashrate efficiency fetch failed:",
         response.status,
       );
       return null;
@@ -251,14 +300,25 @@ async function fetchHashrateEfficiency(
 
         // Calculate averages
         const avgHashrate =
-          metrics.reduce((sum, m) => sum + (m.hashrate || 0), 0) /
-          metrics.length;
+          metrics.reduce((sum, m) => {
+            const hashrate =
+              typeof m.hashrate === "string"
+                ? parseFloat(m.hashrate)
+                : m.hashrate || 0;
+            return sum + hashrate;
+          }, 0) / metrics.length;
         const avgEfficiency =
           metrics.reduce((sum, m) => sum + (m.efficiency || 0), 0) /
           metrics.length;
 
+        // Parse current hashrate (may be string in response)
+        const currentHashrate =
+          typeof currentMetric?.hashrate === "string"
+            ? parseFloat(currentMetric.hashrate)
+            : currentMetric?.hashrate || 0;
+
         return {
-          currentHashrate: currentMetric?.hashrate || 0,
+          currentHashrate,
           averageHashrate: avgHashrate,
           currentEfficiency: currentMetric?.efficiency || 0,
           averageEfficiency: avgEfficiency,
@@ -389,14 +449,14 @@ export async function GET(request: NextRequest) {
     };
 
     try {
-      // Get all subaccount names
-      const subaccountNames = await getAllSubaccountNames();
+      // Get all ACCESSIBLE subaccount names from Luxor
+      const subaccountNames = await getAllSubaccountNames(token);
 
       if (subaccountNames.length > 0) {
-        // Fetch workspace info (groups and subaccounts)
-        const workspaceInfo = await fetchWorkspaceInfo(token);
-        if (workspaceInfo) {
-          luxorStats.poolAccounts = workspaceInfo;
+        // Fetch subaccount statistics from V2 API
+        const subaccountStats = await fetchSubaccountStats(token);
+        if (subaccountStats) {
+          luxorStats.poolAccounts = subaccountStats;
         }
 
         // Fetch all workers statistics

@@ -179,15 +179,15 @@ export default function HostedMinersList() {
         const luxorWorkers: Map<string, { status: string; hashrate: number }> =
           new Map();
         try {
-          const luxorResponse = await fetch(
-            "/api/luxor?endpoint=workers&currency=BTC&page_size=1000",
-            {
-              method: "GET",
-              headers: {
-                "Content-Type": "application/json",
-              },
+          const luxorUrl =
+            "/api/luxor?endpoint=workers&currency=BTC&page_size=1000";
+
+          const luxorResponse = await fetch(luxorUrl, {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
             },
-          );
+          });
 
           if (luxorResponse.ok) {
             const luxorData = await luxorResponse.json();

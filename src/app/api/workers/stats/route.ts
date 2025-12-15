@@ -90,7 +90,7 @@ export async function GET(request: NextRequest) {
         {
           success: false,
           error: error.message,
-          details: error.details,
+          details: error.errorDetails,
         },
         { status: error.statusCode },
       );

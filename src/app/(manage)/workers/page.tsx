@@ -1,8 +1,9 @@
 /**
  * src/app/(manage)/workers/page.tsx
- * Luxor Workers Management Page
+ * Luxor Workers Management Page (V2 API)
  *
  * Admin page for viewing Luxor workers across multiple subaccounts:
+ * - Fetch all subaccounts from workspace (V2 API)
  * - Select one or more subaccounts via multi-select dropdown
  * - View all workers from selected subaccounts in a single table
  * - Display worker details (name, hashrate, efficiency, status)
@@ -11,6 +12,8 @@
  *
  * This page uses the secure /api/luxor proxy route to fetch worker data
  * with server-side authentication and authorization.
+ *
+ * NOTE: Migrated from V1 Groups API to V2 Sites API
  */
 
 "use client";
@@ -44,11 +47,7 @@ import {
 import { Refresh as RefreshIcon } from "@mui/icons-material";
 import BuildIcon from "@mui/icons-material/Build";
 import GradientStatCard from "@/components/GradientStatCard";
-import {
-  GetGroupResponse,
-  GetSubaccountResponse,
-  WorkersResponse,
-} from "@/lib/luxor";
+import { Subaccount, WorkersResponse } from "@/lib/luxor";
 
 /**
  * Response structure from the /api/luxor proxy route
@@ -61,13 +60,18 @@ interface ProxyResponse<T = Record<string, unknown>> {
 }
 
 /**
+ * Subaccount list response from GET endpoint
+ */
+interface SubaccountListData {
+  subaccounts: Subaccount[];
+}
+
+/**
  * Component state for managing workers
  */
 interface WorkersState {
-  groups: GetGroupResponse[];
-  subaccounts: GetSubaccountResponse[];
+  subaccounts: Subaccount[];
   workers: WorkersResponse["workers"];
-  selectedGroupIds: string[];
   selectedSubaccountNames: string[];
   currentPage: number;
   pageSize: number;
@@ -90,10 +94,8 @@ interface WorkerStats {
 
 export default function WorkersPage() {
   const [state, setState] = useState<WorkersState>({
-    groups: [],
     subaccounts: [],
     workers: [],
-    selectedGroupIds: [],
     selectedSubaccountNames: [],
     currentPage: 1,
     pageSize: 20,
@@ -114,165 +116,43 @@ export default function WorkersPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   /**
-   * Fetch all workspace groups on component mount
+   * Fetch all subaccounts from workspace
    *
-   * Mirrors the same logic as the Subaccounts page
+   * Uses V2 API endpoint: GET /pool/subaccounts?page_number=1&page_size=10
+   * Fetches all subaccounts across all sites (no site_id filter)
    */
-  const fetchGroups = useCallback(async () => {
+  const fetchSubaccounts = useCallback(async () => {
     try {
       setState((prev) => ({ ...prev, error: null }));
 
-      console.log("[Luxor Workers] Fetching workspace groups...");
+      console.log("[Luxor Workers] Fetching all subaccounts...");
 
-      const response = await fetch("/api/luxor?endpoint=workspace");
+      const response = await fetch("/api/luxor?endpoint=subaccounts");
 
       if (!response.ok) {
         throw new Error(`API returned status ${response.status}`);
       }
 
-      const data: ProxyResponse<Record<string, unknown>> =
-        await response.json();
+      const data: ProxyResponse<SubaccountListData> = await response.json();
 
       if (!data.success) {
-        throw new Error(data.error || "Failed to fetch groups");
+        throw new Error(data.error || "Failed to fetch subaccounts");
       }
 
-      // Extract groups array from workspace data
-      const workspaceData = data.data as Record<string, unknown>;
-      let groupsList: GetGroupResponse[] = [];
+      const subaccountsList =
+        (data.data as SubaccountListData)?.subaccounts || [];
 
-      if (workspaceData && Array.isArray(workspaceData.groups)) {
-        groupsList = (
-          workspaceData.groups as Array<Record<string, unknown>>
-        ).map(
-          (group: Record<string, unknown>) =>
-            ({
-              id: String(group.id || ""),
-              name: String(group.name || ""),
-              type:
-                (group.type as
-                  | "UNSPECIFIED"
-                  | "POOL"
-                  | "DERIVATIVES"
-                  | "HARDWARE") || "UNSPECIFIED",
-              url: String(group.url || ""),
-              members: Array.isArray(group.members)
-                ? (group.members as Array<Record<string, unknown>>)
-                : [],
-              subaccounts: Array.isArray(group.subaccounts)
-                ? (group.subaccounts as Array<Record<string, unknown>>)
-                : [],
-            }) as unknown as GetGroupResponse,
-        );
-      }
+      console.log("[Luxor Workers] Response data:", data.data);
+      console.log("[Luxor Workers] Parsed subaccounts:", subaccountsList);
 
       setState((prev) => ({
         ...prev,
-        groups: groupsList,
-        loading: false,
+        subaccounts: subaccountsList,
         error: null,
       }));
 
       console.log(
-        `[Luxor Workers] Successfully fetched ${groupsList.length} groups`,
-      );
-    } catch (error) {
-      const errorMsg =
-        error instanceof Error ? error.message : "Unknown error occurred";
-      console.error("[Luxor Workers] Error fetching groups:", errorMsg);
-      setState((prev) => ({
-        ...prev,
-        loading: false,
-        error: errorMsg,
-      }));
-    }
-  }, []);
-
-  /**
-   * Fetch subaccounts for selected groups
-   *
-   * Called when group selection changes
-   */
-  const fetchSubaccounts = useCallback(async (groupIds: string[]) => {
-    if (!groupIds || groupIds.length === 0) {
-      setState((prev) => ({
-        ...prev,
-        subaccounts: [],
-        selectedSubaccountNames: [],
-        workers: [],
-        error: null,
-      }));
-      return;
-    }
-
-    try {
-      setState((prev) => ({ ...prev, error: null }));
-
-      console.log("[Luxor Workers] Fetching subaccounts for groups:", groupIds);
-
-      const allSubaccounts: Array<
-        GetSubaccountResponse & { _groupId: string }
-      > = [];
-      let hasErrors = false;
-      let lastError: string | null = null;
-
-      // Fetch subaccounts from each group
-      for (const groupId of groupIds) {
-        try {
-          const response = await fetch(
-            `/api/luxor?endpoint=subaccount&groupId=${groupId}`,
-          );
-
-          if (!response.ok) {
-            hasErrors = true;
-            lastError = `Group error: API returned status ${response.status}`;
-            console.warn(
-              `[Luxor Workers] Error fetching for group ${groupId}:`,
-              lastError,
-            );
-            continue;
-          }
-
-          const data: ProxyResponse<{ subaccounts: GetSubaccountResponse[] }> =
-            await response.json();
-
-          if (!data.success) {
-            hasErrors = true;
-            lastError = data.error || "Failed to fetch subaccounts";
-            console.warn(
-              `[Luxor Workers] API error for group ${groupId}:`,
-              lastError,
-            );
-            continue;
-          }
-
-          const subaccountsList =
-            (data.data as { subaccounts: GetSubaccountResponse[] })
-              ?.subaccounts || [];
-          const subaccountsWithGroup = subaccountsList.map((sub) => ({
-            ...sub,
-            _groupId: groupId,
-          }));
-
-          allSubaccounts.push(...subaccountsWithGroup);
-        } catch (error) {
-          hasErrors = true;
-          lastError = error instanceof Error ? error.message : "Unknown error";
-          console.error(
-            `[Luxor Workers] Exception fetching for group ${groupId}:`,
-            lastError,
-          );
-        }
-      }
-
-      setState((prev) => ({
-        ...prev,
-        subaccounts: allSubaccounts,
-        error: hasErrors && lastError ? `Partial error: ${lastError}` : null,
-      }));
-
-      console.log(
-        `[Luxor Workers] Successfully fetched ${allSubaccounts.length} subaccounts`,
+        `[Luxor Workers] Successfully fetched ${subaccountsList.length} subaccounts`,
       );
     } catch (error) {
       const errorMsg =
@@ -280,7 +160,6 @@ export default function WorkersPage() {
       console.error("[Luxor Workers] Error fetching subaccounts:", errorMsg);
       setState((prev) => ({
         ...prev,
-        subaccounts: [],
         error: errorMsg,
       }));
     }
@@ -289,6 +168,7 @@ export default function WorkersPage() {
   /**
    * Fetch workers for selected subaccounts
    *
+   * Uses V2 API endpoint: GET /pool/workers/{currency}?subaccount_names=...
    * Called when subaccount selection changes or pagination changes
    */
   const fetchWorkers = useCallback(
@@ -306,6 +186,13 @@ export default function WorkersPage() {
           currentPage: 1,
           error: null,
         }));
+        setStats({
+          totalWorkers: 0,
+          activeWorkers: 0,
+          inactiveWorkers: 0,
+          averageHashrate: 0,
+          averageEfficiency: 0,
+        });
         return;
       }
 
@@ -317,11 +204,11 @@ export default function WorkersPage() {
           subaccountNames,
         );
 
-        // Build query string with multiple subaccount names
+        // Build query string with multiple subaccount names (no spaces in format)
         const subaccountNamesParam = subaccountNames.join(",");
 
         const response = await fetch(
-          `/api/luxor?endpoint=workers&currency=${currency}&subaccount_names=${subaccountNamesParam}&page_number=${pageNumber}&page_size=${pageSize}&status=ACTIVE`,
+          `/api/luxor?endpoint=workers&currency=${currency}&subaccount_names=${subaccountNamesParam}&page_number=${pageNumber}&page_size=${pageSize}`,
         );
 
         if (!response.ok) {
@@ -390,136 +277,50 @@ export default function WorkersPage() {
   );
 
   /**
-   * Fetch groups on component mount and load all workers by default
+   * Fetch subaccounts on component mount
    */
   useEffect(() => {
     const initializeWorkers = async () => {
-      // First fetch groups
       try {
-        console.log("[Luxor Workers] Initializing - fetching groups...");
-        const groupResponse = await fetch("/api/luxor?endpoint=workspace");
+        console.log("[Luxor Workers] Initializing - fetching subaccounts...");
 
-        if (!groupResponse.ok) {
-          throw new Error(`API returned status ${groupResponse.status}`);
+        // Fetch all subaccounts
+        const response = await fetch("/api/luxor?endpoint=subaccounts");
+
+        if (!response.ok) {
+          throw new Error(`API returned status ${response.status}`);
         }
 
-        const groupData: ProxyResponse<Record<string, unknown>> =
-          await groupResponse.json();
+        const data: ProxyResponse<SubaccountListData> = await response.json();
 
-        if (!groupData.success) {
-          throw new Error(groupData.error || "Failed to fetch groups");
+        if (!data.success) {
+          throw new Error(data.error || "Failed to fetch subaccounts");
         }
 
-        // Extract groups array from workspace data
-        const workspaceData = groupData.data as Record<string, unknown>;
-        let groupsList: GetGroupResponse[] = [];
-
-        if (workspaceData && Array.isArray(workspaceData.groups)) {
-          groupsList = (
-            workspaceData.groups as Array<Record<string, unknown>>
-          ).map(
-            (group: Record<string, unknown>) =>
-              ({
-                id: String(group.id || ""),
-                name: String(group.name || ""),
-                type:
-                  (group.type as
-                    | "UNSPECIFIED"
-                    | "POOL"
-                    | "DERIVATIVES"
-                    | "HARDWARE") || "UNSPECIFIED",
-                url: String(group.url || ""),
-                members: Array.isArray(group.members)
-                  ? (group.members as Array<Record<string, unknown>>)
-                  : [],
-                subaccounts: Array.isArray(group.subaccounts)
-                  ? (group.subaccounts as Array<Record<string, unknown>>)
-                  : [],
-              }) as unknown as GetGroupResponse,
-          );
-        }
+        const subaccountsList =
+          (data.data as SubaccountListData)?.subaccounts || [];
 
         console.log(
-          `[Luxor Workers] Successfully fetched ${groupsList.length} groups`,
+          `[Luxor Workers] Successfully fetched ${subaccountsList.length} subaccounts`,
         );
 
         setState((prev) => ({
           ...prev,
-          groups: groupsList,
-          selectedGroupIds: groupsList.map((g) => g.id), // Select all groups by default
+          subaccounts: subaccountsList,
+          selectedSubaccountNames: subaccountsList.map((s) => s.name), // Select all by default
         }));
 
-        // Now fetch all subaccounts from all groups
-        const allSubaccounts: Array<
-          GetSubaccountResponse & { _groupId: string }
-        > = [];
-
-        for (const group of groupsList) {
-          try {
-            const subResponse = await fetch(
-              `/api/luxor?endpoint=subaccount&groupId=${group.id}`,
-            );
-
-            if (!subResponse.ok) {
-              console.warn(
-                `[Luxor Workers] Error fetching subaccounts for group ${group.id}`,
-              );
-              continue;
-            }
-
-            const subData: ProxyResponse<{
-              subaccounts: GetSubaccountResponse[];
-            }> = await subResponse.json();
-
-            if (!subData.success) {
-              console.warn(
-                `[Luxor Workers] API error for group ${group.id}:`,
-                subData.error,
-              );
-              continue;
-            }
-
-            const subaccountsList =
-              (subData.data as { subaccounts: GetSubaccountResponse[] })
-                ?.subaccounts || [];
-            const subaccountsWithGroup = subaccountsList.map((sub) => ({
-              ...sub,
-              _groupId: group.id,
-            }));
-
-            allSubaccounts.push(...subaccountsWithGroup);
-          } catch (error) {
-            console.error(
-              `[Luxor Workers] Exception fetching for group ${group.id}:`,
-              error,
-            );
-          }
-        }
-
-        const allSubaccountNames = allSubaccounts.map((s) => s.name);
-
-        console.log(
-          `[Luxor Workers] Successfully fetched ${allSubaccounts.length} subaccounts`,
-        );
-
-        setState((prev) => ({
-          ...prev,
-          subaccounts: allSubaccounts,
-          selectedSubaccountNames: allSubaccountNames, // Select all subaccounts by default
-        }));
-
-        // Now fetch workers for all subaccounts
-        if (allSubaccountNames.length > 0) {
-          const subaccountNamesParam = allSubaccountNames.join(",");
+        // Fetch workers for all subaccounts (no spaces in format)
+        if (subaccountsList.length > 0) {
+          const subaccountNames = subaccountsList.map((s) => s.name);
+          const subaccountNamesParam = subaccountNames.join(",");
 
           const workersResponse = await fetch(
-            `/api/luxor?endpoint=workers&currency=BTC&subaccount_names=${subaccountNamesParam}&page_number=1&page_size=20&status=ACTIVE`,
+            `/api/luxor?endpoint=workers&currency=BTC&subaccount_names=${subaccountNamesParam}&page_number=1&page_size=20`,
           );
 
           if (!workersResponse.ok) {
-            throw new Error(
-              `Workers API returned status ${workersResponse.status}`,
-            );
+            throw new Error(`API returned status ${workersResponse.status}`);
           }
 
           const workersData: ProxyResponse<WorkersResponse> =
@@ -595,21 +396,6 @@ export default function WorkersPage() {
   }, []);
 
   /**
-   * Handle group selection change
-   */
-  const handleGroupChange = (groupIds: string | string[]) => {
-    const selectedIds = Array.isArray(groupIds) ? groupIds : [groupIds];
-
-    setState((prev) => ({
-      ...prev,
-      selectedGroupIds: selectedIds,
-      currentPage: 1, // Reset to first page
-    }));
-
-    fetchSubaccounts(selectedIds);
-  };
-
-  /**
    * Handle subaccount selection change
    */
   const handleSubaccountChange = (subaccountNames: string | string[]) => {
@@ -679,6 +465,21 @@ export default function WorkersPage() {
 
   const totalPages = Math.ceil(state.totalItems / state.pageSize);
 
+  if (state.loading) {
+    return (
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          minHeight: "100vh",
+        }}
+      >
+        <CircularProgress />
+      </Box>
+    );
+  }
+
   return (
     <Box sx={{ p: 3 }}>
       {/* Page Title */}
@@ -734,14 +535,17 @@ export default function WorkersPage() {
             gap: 2,
           }}
         >
-          <GradientStatCard title="Total Workers" value={stats.totalWorkers} />
+          <GradientStatCard
+            title="Total Workers"
+            value={String(stats.totalWorkers)}
+          />
           <GradientStatCard
             title="Active Workers"
-            value={stats.activeWorkers}
+            value={String(stats.activeWorkers)}
           />
           <GradientStatCard
             title="Inactive Workers"
-            value={stats.inactiveWorkers}
+            value={String(stats.inactiveWorkers)}
           />
           <GradientStatCard
             title="Avg Hashrate"
@@ -774,33 +578,9 @@ export default function WorkersPage() {
         </Typography>
 
         <Stack spacing={2}>
-          {/* Groups Multi-Select */}
-          <FormControl fullWidth>
-            <InputLabel>Groups</InputLabel>
-            <Select
-              multiple
-              value={state.selectedGroupIds}
-              onChange={(e) =>
-                handleGroupChange(
-                  typeof e.target.value === "string"
-                    ? e.target.value.split(",")
-                    : e.target.value,
-                )
-              }
-              input={<OutlinedInput label="Groups" />}
-              disabled={state.groups.length === 0 || state.loading}
-            >
-              {state.groups.map((group) => (
-                <MenuItem key={group.id} value={group.id}>
-                  {group.name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-
           {/* Subaccounts Multi-Select */}
           <FormControl fullWidth>
-            <InputLabel>Subaccounts</InputLabel>
+            <InputLabel>Select Subaccounts</InputLabel>
             <Select
               multiple
               value={state.selectedSubaccountNames}
@@ -811,14 +591,10 @@ export default function WorkersPage() {
                     : e.target.value,
                 )
               }
-              input={<OutlinedInput label="Subaccounts" />}
-              disabled={
-                state.subaccounts.length === 0 ||
-                state.selectedGroupIds.length === 0
-              }
+              input={<OutlinedInput label="Select Subaccounts" />}
             >
               {state.subaccounts.map((subaccount) => (
-                <MenuItem key={subaccount.id} value={subaccount.name}>
+                <MenuItem key={subaccount.name} value={subaccount.name}>
                   {subaccount.name}
                 </MenuItem>
               ))}
@@ -827,10 +603,10 @@ export default function WorkersPage() {
 
           {/* Currency Select */}
           <FormControl fullWidth>
-            <InputLabel>Currency</InputLabel>
+            <InputLabel>Mining Currency</InputLabel>
             <Select
               value={state.currency}
-              label="Currency"
+              label="Mining Currency"
               onChange={(e) =>
                 handleCurrencyChange(e as React.ChangeEvent<{ value: unknown }>)
               }
@@ -840,7 +616,7 @@ export default function WorkersPage() {
               <MenuItem value="DOGE">Dogecoin (DOGE)</MenuItem>
               <MenuItem value="ZEC">Zcash (ZEC)</MenuItem>
               <MenuItem value="ZEN">Horizen (ZEN)</MenuItem>
-              <MenuItem value="LTC_DOGE">LTC/DOGE</MenuItem>
+              <MenuItem value="LTC_DOGE">LTC+DOGE</MenuItem>
               <MenuItem value="SC">Siacoin (SC)</MenuItem>
             </Select>
           </FormControl>
@@ -871,80 +647,102 @@ export default function WorkersPage() {
             Workers
           </Typography>
 
-          {state.loading ? (
-            <Box sx={{ display: "flex", justifyContent: "center", p: 3 }}>
-              <CircularProgress />
+          {state.selectedSubaccountNames.length === 0 ? (
+            <Box sx={{ textAlign: "center", py: 4 }}>
+              <BuildIcon
+                sx={{
+                  fontSize: 64,
+                  color: "text.secondary",
+                  mb: 2,
+                  opacity: 0.5,
+                }}
+              />
+              <Typography color="text.secondary">
+                Please select at least one subaccount to view workers
+              </Typography>
             </Box>
-          ) : state.selectedSubaccountNames.length === 0 ? (
-            <Typography color="text.secondary" sx={{ p: 2 }}>
-              Select at least one subaccount to view workers
-            </Typography>
           ) : state.workers.length === 0 ? (
-            <Typography color="text.secondary" sx={{ p: 2 }}>
-              No workers found
-            </Typography>
+            <Box sx={{ textAlign: "center", py: 4 }}>
+              <BuildIcon
+                sx={{
+                  fontSize: 64,
+                  color: "text.secondary",
+                  mb: 2,
+                  opacity: 0.5,
+                }}
+              />
+              <Typography color="text.secondary">
+                No workers found for the selected subaccounts
+              </Typography>
+            </Box>
           ) : (
             <>
               <TableContainer>
                 <Table>
                   <TableHead>
-                    <TableRow>
-                      <TableCell>Worker Name</TableCell>
-                      <TableCell>Subaccount</TableCell>
-                      <TableCell>Firmware</TableCell>
-                      <TableCell align="right">Hashrate (TH/s)</TableCell>
-                      <TableCell align="right">Efficiency (%)</TableCell>
-                      <TableCell align="right">Stale Shares</TableCell>
-                      <TableCell align="right">Rejected Shares</TableCell>
-                      <TableCell>Last Share</TableCell>
-                      <TableCell align="center">Status</TableCell>
+                    <TableRow sx={{ backgroundColor: "background.default" }}>
+                      <TableCell sx={{ fontWeight: "bold" }}>
+                        Worker Name
+                      </TableCell>
+                      <TableCell sx={{ fontWeight: "bold" }}>
+                        Subaccount
+                      </TableCell>
+                      <TableCell sx={{ fontWeight: "bold" }}>
+                        Hashrate (TH/s)
+                      </TableCell>
+                      <TableCell sx={{ fontWeight: "bold" }}>
+                        Efficiency (%)
+                      </TableCell>
+                      <TableCell sx={{ fontWeight: "bold" }}>Status</TableCell>
+                      <TableCell sx={{ fontWeight: "bold" }}>
+                        Last Share
+                      </TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
                     {state.workers.map((worker) => (
                       <TableRow
-                        key={worker.id}
+                        key={`${worker.subaccount_name}-${worker.name}`}
                         sx={{
-                          "&:last-child td, &:last-child th": { border: 0 },
                           "&:hover": {
-                            backgroundColor: "action.hover",
+                            backgroundColor: "background.default",
                           },
                         }}
                       >
-                        <TableCell component="th" scope="row">
-                          {worker.name}
-                        </TableCell>
-                        <TableCell>{worker.subaccount_name}</TableCell>
-                        <TableCell>{worker.firmware}</TableCell>
-                        <TableCell align="right">
-                          {worker.hashrate?.toFixed(2) || "N/A"}
-                        </TableCell>
-                        <TableCell align="right">
-                          {worker.efficiency?.toFixed(2) || "N/A"}
-                        </TableCell>
-                        <TableCell align="right">
-                          {worker.stale_shares || 0}
-                        </TableCell>
-                        <TableCell align="right">
-                          {worker.rejected_shares || 0}
+                        <TableCell>
+                          <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                            {worker.name}
+                          </Typography>
                         </TableCell>
                         <TableCell>
-                          {worker.last_share_time
-                            ? new Date(worker.last_share_time).toLocaleString()
-                            : "Never"}
+                          <Typography variant="body2">
+                            {worker.subaccount_name}
+                          </Typography>
                         </TableCell>
-                        <TableCell align="center">
+                        <TableCell>
+                          <Typography variant="body2">
+                            {worker.hashrate.toFixed(2)}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2">
+                            {worker.efficiency.toFixed(2)}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
                           <Chip
                             label={worker.status}
                             color={
-                              worker.status === "ACTIVE"
-                                ? "success"
-                                : worker.status === "INACTIVE"
-                                  ? "warning"
-                                  : "default"
+                              worker.status === "ACTIVE" ? "success" : "default"
                             }
+                            variant="outlined"
                             size="small"
                           />
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="caption">
+                            {new Date(worker.last_share_time).toLocaleString()}
+                          </Typography>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -959,9 +757,6 @@ export default function WorkersPage() {
                     display: "flex",
                     justifyContent: "center",
                     mt: 3,
-                    pt: 2,
-                    borderTop: "1px solid",
-                    borderColor: "divider",
                   }}
                 >
                   <Pagination

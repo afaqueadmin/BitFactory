@@ -68,7 +68,6 @@ export async function POST(request: NextRequest) {
       email,
       role,
       sendEmail,
-      groupIds,
       initialDeposit,
       luxorSubaccountName,
     } = await request.json();
@@ -81,15 +80,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate groupIds - must be provided and be a non-empty array (only for CLIENT role)
+    // Validate luxorSubaccountName only for CLIENT role (V2 API: no groups, direct subaccount)
     if (role === "CLIENT") {
-      if (!Array.isArray(groupIds) || groupIds.length === 0) {
-        return NextResponse.json(
-          { error: "At least one group must be selected for CLIENT users" },
-          { status: 400 },
-        );
-      }
-
       if (!luxorSubaccountName || luxorSubaccountName.trim().length === 0) {
         return NextResponse.json(
           { error: "A Luxor subaccount must be selected for CLIENT users" },
@@ -100,9 +92,7 @@ export async function POST(request: NextRequest) {
 
     console.log(
       `[User Create API] Creating user "${name}" with role: ${role}${
-        role === "CLIENT"
-          ? `, groupIds: ${JSON.stringify(groupIds)}, subaccount: ${luxorSubaccountName}`
-          : ""
+        role === "CLIENT" ? `, subaccount: ${luxorSubaccountName}` : ""
       }`,
     );
 

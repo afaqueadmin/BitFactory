@@ -254,14 +254,18 @@ function checkAdminAccess(
  * Query Parameters:
  * - endpoint (required): One of the mapped endpoint names
  * - currency: Mining currency (BTC, LTC, etc.) - required for some endpoints
- * - site_id: Filter by site UUID
- * - subaccount_names: Comma-separated subaccount names
+ * - subaccount_names: Comma-separated subaccount names (use this for pool/workers endpoints)
+ * - site_id: Site UUID (only for workspace/site endpoints, NOT for pool endpoints)
  * - start_date: ISO date string
  * - end_date: ISO date string
  * - tick_size: Granularity (5m, 1h, 1d, 1w, 1M)
  * - page_number: Pagination
  * - page_size: Pagination
  * - Any other Luxor API parameter
+ *
+ * ⚠️  IMPORTANT: Use EITHER subaccount_names OR site_id, not both
+ * For pool endpoints (workers, hashrate-efficiency, revenue, etc): use subaccount_names
+ * For workspace endpoints (workspace, sites, site): site_id may be used if needed
  *
  * Response Format:
  * {
@@ -284,11 +288,11 @@ function checkAdminAccess(
  * Get workspace with sites:
  * GET /api/luxor?endpoint=workspace
  *
- * Get workers for BTC:
- * GET /api/luxor?endpoint=workers&currency=BTC&page_number=1&page_size=10
+ * Get workers for BTC (with subaccount_names):
+ * GET /api/luxor?endpoint=workers&currency=BTC&subaccount_names=subaccount1,subaccount2&page_number=1&page_size=10
  *
- * Get active workers with filters:
- * GET /api/luxor?endpoint=active-workers&currency=BTC&site_id=UUID&start_date=2025-01-01&tick_size=1d
+ * Get active workers with filters (with subaccount_names):
+ * GET /api/luxor?endpoint=active-workers&currency=BTC&subaccount_names=subaccount1&start_date=2025-01-01&tick_size=1d
  *
  * Get payment settings:
  * GET /api/luxor?endpoint=payment-settings&currency=BTC&subaccount_names=my_subaccount
@@ -451,9 +455,14 @@ export async function GET(
                 pagination?: { next_page_url?: string | null };
               };
 
+              console.log(
+                `[Luxor Proxy V2] Page ${pageNumber} response:`,
+                JSON.stringify(pageData, null, 2),
+              );
+
               allSubaccounts = allSubaccounts.concat(pageData.subaccounts);
               console.log(
-                `[Luxor Proxy V2] Page ${pageNumber}: ${pageData.subaccounts.length} items`,
+                `[Luxor Proxy V2] Page ${pageNumber}: ${pageData.subaccounts.length} items, Total so far: ${allSubaccounts.length}`,
               );
 
               // Check if there are more pages
@@ -463,6 +472,10 @@ export async function GET(
 
             console.log(
               `[Luxor Proxy V2] Total subaccounts fetched: ${allSubaccounts.length}`,
+            );
+            console.log(
+              `[Luxor Proxy V2] All subaccount names:`,
+              allSubaccounts.map((s) => s.name),
             );
             data = {
               subaccounts: allSubaccounts,

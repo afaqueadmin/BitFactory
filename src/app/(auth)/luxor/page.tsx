@@ -53,7 +53,7 @@ import GradientStatCard from "@/components/GradientStatCard";
 import {
   ActiveWorkersResponse,
   HashrateEfficiencyResponse,
-  WorkspaceResponse,
+  Workspace,
   WorkersResponse,
 } from "@/lib/luxor";
 
@@ -74,7 +74,7 @@ interface LuxorState {
   activeWorkers: ActiveWorkersResponse | null;
   hashrateEfficiency: HashrateEfficiencyResponse | null;
   workers: WorkersResponse | null;
-  workspace: WorkspaceResponse | null;
+  workspace: Workspace | null;
   loading: boolean;
   error: string | null;
 }
@@ -113,14 +113,16 @@ export default function LuxorPage() {
     try {
       setState((prev) => ({ ...prev, error: null }));
 
-      // Build query string from filters
-      const queryString = new URLSearchParams({
+      // Build query string from filters (subaccount_names only, no site_id)
+      const params = new URLSearchParams({
         endpoint: "active-workers",
         currency: filters.currency,
         start_date: filters.start_date,
         end_date: filters.end_date,
         tick_size: filters.tick_size,
-      }).toString();
+      });
+
+      const queryString = params.toString();
 
       console.log("[Luxor Dashboard] Fetching data with filters:", filters);
 
@@ -140,14 +142,16 @@ export default function LuxorPage() {
         );
       }
 
-      // Fetch hashrate efficiency data
-      const hashrateParams = new URLSearchParams({
-        endpoint: "hashrate-history",
+      // Fetch hashrate efficiency data (subaccount_names only, no site_id)
+      const hashrateQueryParams = new URLSearchParams({
+        endpoint: "hashrate-efficiency",
         currency: filters.currency,
         start_date: filters.start_date,
         end_date: filters.end_date,
         tick_size: filters.tick_size,
-      }).toString();
+      });
+
+      const hashrateParams = hashrateQueryParams.toString();
 
       const hashrateResponse = await fetch(`/api/luxor?${hashrateParams}`);
 
@@ -162,13 +166,15 @@ export default function LuxorPage() {
         throw new Error(hashrateData.error || "Failed to fetch hashrate data");
       }
 
-      // Fetch workers list data (top 5)
-      const workersListParams = new URLSearchParams({
+      // Fetch workers list data (top 5, subaccount_names only, no site_id)
+      const workersListQueryParams = new URLSearchParams({
         endpoint: "workers",
         currency: filters.currency,
         page_number: "1",
         page_size: "5",
-      }).toString();
+      });
+
+      const workersListParams = workersListQueryParams.toString();
 
       let workersListData: ProxyResponse<WorkersResponse> | null = null;
       const workersListResponse = await fetch(
@@ -179,8 +185,8 @@ export default function LuxorPage() {
         workersListData = await workersListResponse.json();
       }
 
-      // Fetch workspace info
-      const workspaceResponse = await fetch("/api/luxor?endpoint=workspace");
+      // Fetch workspace info (V2 API: sites endpoint)
+      const workspaceResponse = await fetch("/api/luxor?endpoint=sites");
 
       if (!workspaceResponse.ok) {
         console.warn(
@@ -188,15 +194,18 @@ export default function LuxorPage() {
           workspaceResponse.status,
         );
       } else {
-        const workspaceData: ProxyResponse<WorkspaceResponse> =
+        const workspaceData: ProxyResponse<{ sites: Workspace[] }> =
           await workspaceResponse.json();
 
         if (!workspaceData.success) {
           console.warn("Failed to fetch workspace data:", workspaceData.error);
         } else {
+          // Store the first site as workspace context
+          const firstSite =
+            (workspaceData.data?.sites as Workspace[] | undefined)?.[0] || null;
           setState((prev) => ({
             ...prev,
-            workspace: workspaceData.data || null,
+            workspace: firstSite,
           }));
         }
       }

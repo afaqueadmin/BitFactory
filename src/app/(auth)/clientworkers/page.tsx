@@ -90,13 +90,15 @@ export default function WorkersPage() {
       setState((prev) => ({ ...prev, error: null }));
 
       // Build query string from filters
-      const queryString = new URLSearchParams({
+      const params = new URLSearchParams({
         endpoint: "workers",
         currency: filters.currency,
         status: filters.status,
         page_number: filters.page_number,
         page_size: filters.page_size,
-      }).toString();
+      });
+
+      const queryString = params.toString();
 
       console.log("[Workers Page] Fetching data with filters:", filters);
 

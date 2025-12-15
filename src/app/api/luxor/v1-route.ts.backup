@@ -358,7 +358,7 @@ export async function GET(
           console.log(
             `[Luxor Proxy] Getting specific subaccount: ${subaccountName} in group: ${groupId}`,
           );
-          data = await luxorClient.getSubaccount(groupId, subaccountName);
+          data = await luxorClient.getSubaccount(subaccountName);
         } else {
           // List all subaccounts for the group by fetching the group
           // (Luxor API doesn't have a dedicated list endpoint, subaccounts come with group data)

@@ -34,16 +34,6 @@ interface ProxyResponse<T = Record<string, unknown>> {
   timestamp?: string;
 }
 
-/**
- * Workspace group from Luxor API
- */
-interface WorkspaceGroup {
-  id: string;
-  name: string;
-  type: string;
-  [key: string]: unknown;
-}
-
 interface Subaccount {
   id: number;
   name: string;
@@ -63,22 +53,18 @@ export default function CreateUserModal({
   onSuccess,
 }: CreateUserModalProps) {
   const [loading, setLoading] = useState(false);
-  const [fetchingGroups, setFetchingGroups] = useState(true);
-  const [fetchingSubaccounts, setFetchingSubaccounts] = useState(false);
+  const [fetchingSubaccounts, setFetchingSubaccounts] = useState(true);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     role: "CLIENT",
     sendEmail: true,
-    groupIds: [] as string[],
     luxorSubaccountName: "",
     initialDeposit: 0,
   });
   const [error, setError] = useState("");
   const [emailError, setEmailError] = useState("");
   const [checkingEmail, setCheckingEmail] = useState(false);
-  const [groups, setGroups] = useState<WorkspaceGroup[]>([]);
-  const [groupsError, setGroupsError] = useState<string | null>(null);
   const [subaccounts, setSubaccounts] = useState<Subaccount[]>([]);
   const [subaccountsError, setSubaccountsError] = useState<string | null>(null);
 
@@ -120,40 +106,27 @@ export default function CreateUserModal({
   };
 
   /**
-   * Fetch workspace groups when modal opens
+   * Fetch subaccounts when modal opens
    */
   useEffect(() => {
     if (open) {
-      fetchGroups();
+      fetchSubaccounts();
     }
   }, [open]);
 
   /**
-   * Fetch subaccounts when selected groups change
+   * Fetch subaccounts from V2 Luxor API
+   * Called when modal opens
    */
-  useEffect(() => {
-    if (formData.groupIds.length > 0) {
-      fetchSubaccounts();
-    } else {
-      setSubaccounts([]);
-      setFormData((prev) => ({ ...prev, luxorSubaccountName: "" }));
-    }
-  }, [formData.groupIds]);
-
-  /**
-   * Fetch workspace groups from Luxor API
-   * Mirrors the exact flow from the Subaccounts page
-   */
-  const fetchGroups = async () => {
+  const fetchSubaccounts = async () => {
     try {
-      setFetchingGroups(true);
-      setGroupsError(null);
+      setFetchingSubaccounts(true);
+      setSubaccountsError(null);
+      setSubaccounts([]);
 
-      console.log(
-        "[CreateUserModal] Fetching workspace groups from /api/luxor",
-      );
+      console.log("[CreateUserModal] Fetching subaccounts from V2 Luxor API");
 
-      const response = await fetch("/api/luxor?endpoint=workspace");
+      const response = await fetch("/api/luxor?endpoint=subaccounts");
 
       if (!response.ok) {
         throw new Error(`API returned status ${response.status}`);
@@ -163,146 +136,30 @@ export default function CreateUserModal({
         await response.json();
 
       if (!data.success) {
-        throw new Error(data.error || "Failed to fetch groups");
+        throw new Error(data.error || "Failed to fetch subaccounts");
       }
 
-      // Extract groups array from workspace data - same as Subaccounts page
-      const workspaceData = data.data as Record<string, unknown>;
-      let groupsList: WorkspaceGroup[] = [];
+      // Extract subaccounts array from response
+      const responseData = data.data as Record<string, unknown>;
+      let subaccountsList: Subaccount[] = [];
 
-      if (workspaceData && Array.isArray(workspaceData.groups)) {
-        groupsList = (
-          workspaceData.groups as Array<Record<string, unknown>>
+      if (responseData && Array.isArray(responseData.subaccounts)) {
+        subaccountsList = (
+          responseData.subaccounts as Array<Record<string, unknown>>
         ).map(
-          (group: Record<string, unknown>) =>
+          (sub: Record<string, unknown>) =>
             ({
-              id: String(group.id || ""),
-              name: String(group.name || ""),
-              type: String(group.type || "UNSPECIFIED"),
-            }) as WorkspaceGroup,
+              id: Number(sub.id || 0),
+              name: String(sub.name || ""),
+              created_at: String(sub.created_at || ""),
+              url: String(sub.url || ""),
+            }) as Subaccount,
         );
       }
 
-      setGroups(groupsList);
-      console.log(`[CreateUserModal] Fetched ${groupsList.length} groups`);
-    } catch (err) {
-      const errorMsg =
-        err instanceof Error ? err.message : "Failed to fetch groups";
-      console.error("[CreateUserModal] Error fetching groups:", errorMsg);
-      setGroupsError(errorMsg);
-      setGroups([]);
-    } finally {
-      setFetchingGroups(false);
-    }
-  };
-
-  /**
-   * Fetch subaccounts from Luxor API for selected groups
-   * Filters out subaccounts that are already assigned to other users in the database
-   */
-  const fetchSubaccounts = async () => {
-    try {
-      setFetchingSubaccounts(true);
-      setSubaccountsError(null);
-      setSubaccounts([]);
-
+      setSubaccounts(subaccountsList);
       console.log(
-        "[CreateUserModal] Fetching subaccounts for groups:",
-        formData.groupIds,
-      );
-
-      // Step 1: Fetch all existing luxor subaccount names from database
-      let existingSubaccounts: string[] = [];
-      try {
-        const dbResponse = await fetch("/api/user/subaccounts/existing", {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-          },
-        });
-
-        if (dbResponse.ok) {
-          const dbData = await dbResponse.json();
-          existingSubaccounts = dbData.subaccounts || [];
-          console.log(
-            "[CreateUserModal] Existing subaccounts in DB:",
-            existingSubaccounts,
-          );
-        } else {
-          console.warn(
-            "[CreateUserModal] Failed to fetch existing subaccounts from DB",
-          );
-        }
-      } catch (err) {
-        console.warn(
-          "[CreateUserModal] Error fetching existing subaccounts:",
-          err,
-        );
-      }
-
-      // Step 2: Fetch subaccounts for each selected group from Luxor API
-      const allSubaccounts: Subaccount[] = [];
-
-      for (const groupId of formData.groupIds) {
-        try {
-          const response = await fetch(
-            `/api/luxor?endpoint=subaccount&groupId=${groupId}`,
-          );
-
-          if (!response.ok) {
-            console.warn(
-              `[CreateUserModal] Failed to fetch subaccounts for group ${groupId}: status ${response.status}`,
-            );
-            continue;
-          }
-
-          const data: ProxyResponse<Record<string, unknown>> =
-            await response.json();
-
-          if (!data.success) {
-            console.warn(
-              `[CreateUserModal] API error for group ${groupId}:`,
-              data.error,
-            );
-            continue;
-          }
-
-          // Extract subaccounts array
-          const subaccountsData = data.data as Record<string, unknown>;
-          if (subaccountsData && Array.isArray(subaccountsData.subaccounts)) {
-            const groupSubaccounts = (
-              subaccountsData.subaccounts as Array<Record<string, unknown>>
-            ).map(
-              (sub: Record<string, unknown>) =>
-                ({
-                  id: Number(sub.id || 0),
-                  name: String(sub.name || ""),
-                  created_at: String(sub.created_at || ""),
-                  url: String(sub.url || ""),
-                }) as Subaccount,
-            );
-            allSubaccounts.push(...groupSubaccounts);
-          }
-        } catch (err) {
-          console.warn(
-            `[CreateUserModal] Error fetching group ${groupId}:`,
-            err,
-          );
-        }
-      }
-
-      // Step 3: Remove duplicates and filter out already assigned subaccounts
-      const uniqueSubaccounts = Array.from(
-        new Map(allSubaccounts.map((s) => [s.name, s])).values(),
-      );
-
-      const availableSubaccounts = uniqueSubaccounts.filter(
-        (sub) => !existingSubaccounts.includes(sub.name),
-      );
-
-      setSubaccounts(availableSubaccounts);
-      console.log(
-        `[CreateUserModal] Available subaccounts: ${availableSubaccounts.length}/${uniqueSubaccounts.length} (${uniqueSubaccounts.length - availableSubaccounts.length} already assigned)`,
+        `[CreateUserModal] Fetched ${subaccountsList.length} subaccounts`,
       );
     } catch (err) {
       const errorMsg =
@@ -334,14 +191,8 @@ export default function CreateUserModal({
       return;
     }
 
-    // Validate group selection and subaccount selection only for CLIENT role
+    // Validate subaccount selection only for CLIENT role
     if (formData.role === "CLIENT") {
-      if (formData.groupIds.length === 0) {
-        setError("Please select at least one group");
-        setLoading(false);
-        return;
-      }
-
       if (!formData.luxorSubaccountName) {
         setError("Please select a Luxor subaccount");
         setLoading(false);
@@ -377,7 +228,6 @@ export default function CreateUserModal({
         email: "",
         role: "CLIENT",
         sendEmail: true,
-        groupIds: [],
         luxorSubaccountName: "",
         initialDeposit: 0,
       });
@@ -511,66 +361,11 @@ export default function CreateUserModal({
               />
             )}
 
-            {/* Luxor Groups and Subaccount - Only for CLIENT role */}
+            {/* Luxor Subaccount - Only for CLIENT role */}
             {formData.role === "CLIENT" && (
               <>
-                {/* Luxor Groups Multi-Select */}
-                <FormControl fullWidth>
-                  <InputLabel>Luxor Groups</InputLabel>
-                  <Select
-                    multiple
-                    value={formData.groupIds}
-                    onChange={(e) => {
-                      const value =
-                        typeof e.target.value === "string"
-                          ? e.target.value.split(",")
-                          : e.target.value;
-                      setFormData((prev) => ({
-                        ...prev,
-                        groupIds: value as string[],
-                      }));
-                    }}
-                    input={<OutlinedInput label="Luxor Groups" />}
-                    renderValue={(selected) => (
-                      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
-                        {(selected as string[]).map((groupId) => {
-                          const group = groups.find((g) => g.id === groupId);
-                          return (
-                            <Chip
-                              key={groupId}
-                              label={group?.name || groupId}
-                              size="small"
-                            />
-                          );
-                        })}
-                      </Box>
-                    )}
-                    disabled={fetchingGroups || groups.length === 0}
-                  >
-                    {fetchingGroups ? (
-                      <MenuItem disabled>
-                        <CircularProgress size={20} sx={{ mr: 1 }} />
-                        Loading groups...
-                      </MenuItem>
-                    ) : groups.length > 0 ? (
-                      groups.map((group) => (
-                        <MenuItem key={group.id} value={group.id}>
-                          {group.name}
-                        </MenuItem>
-                      ))
-                    ) : (
-                      <MenuItem disabled>No groups available</MenuItem>
-                    )}
-                  </Select>
-                </FormControl>
-
-                {groupsError && <Alert severity="warning">{groupsError}</Alert>}
-
                 {/* Luxor Subaccount Single-Select */}
-                <FormControl
-                  fullWidth
-                  disabled={formData.groupIds.length === 0}
-                >
+                <FormControl fullWidth>
                   <InputLabel>Luxor Subaccount</InputLabel>
                   <Select
                     value={formData.luxorSubaccountName}
@@ -594,22 +389,9 @@ export default function CreateUserModal({
                         </MenuItem>
                       ))
                     ) : (
-                      <MenuItem disabled>
-                        {formData.groupIds.length === 0
-                          ? "Select groups first"
-                          : "No subaccounts available"}
-                      </MenuItem>
+                      <MenuItem disabled>No subaccounts available</MenuItem>
                     )}
                   </Select>
-                  {formData.groupIds.length === 0 && (
-                    <Typography
-                      variant="caption"
-                      color="text.secondary"
-                      sx={{ mt: 0.5 }}
-                    >
-                      Select at least one group to see subaccounts
-                    </Typography>
-                  )}
                 </FormControl>
 
                 {subaccountsError && (
@@ -646,9 +428,7 @@ export default function CreateUserModal({
             disabled={
               loading ||
               (formData.role === "CLIENT" &&
-                (fetchingGroups ||
-                  fetchingSubaccounts ||
-                  groups.length === 0 ||
+                (fetchingSubaccounts ||
                   subaccounts.length === 0 ||
                   !formData.luxorSubaccountName))
             }

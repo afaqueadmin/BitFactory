@@ -1,0 +1,412 @@
+{
+  "metadata": {
+    "generated": "2025-12-15",
+    "title": "Luxor API V2 Call Reference",
+    "total_files": 9,
+    "total_locations": 20,
+    "status": "V2 Compliant"
+  },
+  "api_endpoints": {
+    "workspace_and_sites": {
+      "list_sites": {
+        "endpoint": "sites",
+        "method": "GET",
+        "format": "/api/luxor?endpoint=sites",
+        "query_params": {
+          "endpoint": "sites"
+        },
+        "files": [
+          {
+            "path": "src/app/(manage)/groups/page.tsx",
+            "line": 139
+          },
+          {
+            "path": "src/app/(auth)/luxor/page.tsx",
+            "line": 183
+          }
+        ]
+      },
+      "create_site": {
+        "endpoint": "site",
+        "method": "POST",
+        "format": "/api/luxor",
+        "body": {
+          "endpoint": "site",
+          "name": "string",
+          "country": "string",
+          "energy": {
+            "base_load_kw": "number",
+            "max_load_kw": "number",
+            "settlement_point_id": "string"
+          }
+        },
+        "files": [
+          {
+            "path": "src/app/(manage)/groups/page.tsx",
+            "line": 251
+          }
+        ]
+      },
+      "update_site": {
+        "endpoint": "site",
+        "method": "PUT",
+        "format": "/api/luxor",
+        "body": {
+          "endpoint": "site",
+          "site_id": "uuid",
+          "name": "string",
+          "country": "string",
+          "energy": {
+            "base_load_kw": "number",
+            "max_load_kw": "number",
+            "settlement_point_id": "string"
+          }
+        },
+        "files": [
+          {
+            "path": "src/app/(manage)/groups/page.tsx",
+            "line": 326
+          }
+        ]
+      },
+      "delete_site": {
+        "endpoint": "site",
+        "method": "DELETE",
+        "format": "/api/luxor",
+        "body": {
+          "endpoint": "site",
+          "site_id": "uuid"
+        },
+        "files": [
+          {
+            "path": "src/app/(manage)/groups/page.tsx",
+            "line": 394
+          }
+        ]
+      }
+    },
+    "subaccounts": {
+      "list_subaccounts": {
+        "endpoint": "subaccounts",
+        "method": "GET",
+        "format": "/api/luxor?endpoint=subaccounts",
+        "query_params": {
+          "endpoint": "subaccounts"
+        },
+        "pagination": {
+          "auto_paginate": true,
+          "page_size": 100
+        },
+        "files": [
+          {
+            "path": "src/app/(manage)/workers/page.tsx",
+            "lines": [130, 288]
+          },
+          {
+            "path": "src/app/(manage)/subaccounts/page.tsx",
+            "line": 153
+          },
+          {
+            "path": "src/components/CreateUserModal.tsx",
+            "line": 131
+          },
+          {
+            "path": "src/app/api/admin/dashboard/route.ts",
+            "line": 79
+          }
+        ]
+      },
+      "create_subaccount": {
+        "endpoint": "subaccount",
+        "method": "POST",
+        "format": "/api/luxor",
+        "body": {
+          "endpoint": "subaccount",
+          "site_id": "uuid",
+          "name": "string"
+        },
+        "files": [
+          {
+            "path": "src/app/(manage)/subaccounts/page.tsx",
+            "line": 228
+          }
+        ]
+      },
+      "delete_subaccount": {
+        "endpoint": "subaccount",
+        "method": "DELETE",
+        "format": "/api/luxor",
+        "body": {
+          "endpoint": "subaccount",
+          "site_id": "uuid",
+          "subaccount_id": "number",
+          "name": "string"
+        },
+        "files": [
+          {
+            "path": "src/app/(manage)/subaccounts/page.tsx",
+            "line": 304
+          }
+        ]
+      }
+    },
+    "workers": {
+      "list_workers": {
+        "endpoint": "workers",
+        "method": "GET",
+        "format": "/api/luxor?endpoint=workers&currency=BTC&subaccount_names=name1,name2&page_number=1&page_size=20",
+        "query_params": {
+          "endpoint": "workers",
+          "currency": "BTC (required)",
+          "subaccount_names": "string (optional, comma-separated)",
+          "site_id": "uuid (optional)",
+          "status": "string (optional)",
+          "page_number": "integer (optional, default: 1)",
+          "page_size": "integer (optional)"
+        },
+        "pagination": {
+          "supports_page_number": true,
+          "supports_page_size": true
+        },
+        "files": [
+          {
+            "path": "src/app/(manage)/workers/page.tsx",
+            "lines": [211, 319]
+          },
+          {
+            "path": "src/components/HostedMinersList.tsx",
+            "line": 183,
+            "note": "page_size=1000"
+          },
+          {
+            "path": "src/app/api/admin/dashboard/route.ts",
+            "line": 150,
+            "note": "server-side call, page_size=1000"
+          }
+        ]
+      }
+    },
+    "analytics": {
+      "hashrate_efficiency": {
+        "endpoint": "hashrate-efficiency",
+        "method": "GET",
+        "format": "/api/luxor?endpoint=hashrate-efficiency&currency=BTC&start_date=2025-01-01&end_date=2025-01-08&tick_size=1d",
+        "query_params": {
+          "endpoint": "hashrate-efficiency",
+          "currency": "BTC (required)",
+          "subaccount_names": "string (optional, comma-separated)",
+          "site_id": "uuid (optional)",
+          "start_date": "YYYY-MM-DD (optional)",
+          "end_date": "YYYY-MM-DD (optional)",
+          "tick_size": "5m|1h|1d|1w|1M (optional, default: varies)",
+          "page_number": "integer (optional)",
+          "page_size": "integer (optional)"
+        },
+        "date_format": "YYYY-MM-DD",
+        "date_range_example": {
+          "description": "Last 7 days",
+          "calculation": "endDate - 7*24*60*60*1000"
+        },
+        "files": [
+          {
+            "path": "src/app/api/admin/dashboard/route.ts",
+            "line": 200,
+            "note": "tick_size=1d, page_size=1000"
+          }
+        ]
+      }
+    },
+    "payments": {
+      "payment_settings": {
+        "endpoint": "payment-settings",
+        "method": "GET",
+        "format": "/api/luxor?endpoint=payment-settings&currency=BTC",
+        "query_params": {
+          "endpoint": "payment-settings",
+          "currency": "BTC (required)",
+          "subaccount_names": "string (optional)",
+          "site_id": "uuid (optional)",
+          "page_number": "integer (optional)",
+          "page_size": "integer (optional)"
+        },
+        "files": [
+          {
+            "path": "src/app/api/wallet/earnings-summary/route.ts",
+            "line": 65
+          }
+        ]
+      },
+      "transactions": {
+        "endpoint": "transactions",
+        "method": "GET",
+        "format": "/api/luxor?endpoint=transactions&currency=BTC&transaction_type=credit&start_date=YYYY-MM-DD&end_date=YYYY-MM-DD",
+        "query_params": {
+          "endpoint": "transactions",
+          "currency": "BTC (required)",
+          "transaction_type": "credit|debit|fee (optional)",
+          "subaccount_names": "string (optional)",
+          "site_id": "uuid (optional)",
+          "start_date": "YYYY-MM-DD (optional)",
+          "end_date": "YYYY-MM-DD (optional)",
+          "page_number": "integer (optional)",
+          "page_size": "integer (optional)"
+        },
+        "date_format": "YYYY-MM-DD",
+        "pagination": {
+          "supports_pagination": true,
+          "has_next_page_url": true
+        },
+        "files": [
+          {
+            "path": "src/app/api/wallet/earnings-24h/route.ts",
+            "line": 73,
+            "date_range": "last 24 hours"
+          },
+          {
+            "path": "src/app/api/wallet/earnings-summary/route.ts",
+            "line": 118,
+            "date_range": "all-time (2020-01-01 to today)"
+          }
+        ]
+      }
+    }
+  },
+  "date_formats": {
+    "standard": "YYYY-MM-DD",
+    "iso_full": "YYYY-MM-DDTHH:mm:ss.sssZ",
+    "calculation_method": "new Date().toISOString().split('T')[0]",
+    "examples": {
+      "date_only": "2025-12-15",
+      "last_24_hours": {
+        "start": "subtract 24*60*60*1000 milliseconds from Date.now()",
+        "end": "Date.now()"
+      },
+      "last_7_days": {
+        "start": "subtract 7*24*60*60*1000 milliseconds from Date.now()",
+        "end": "Date.now()"
+      }
+    }
+  },
+  "pagination": {
+    "parameters": {
+      "page_number": "integer starting from 1",
+      "page_size": "integer, typical range 10-1000"
+    },
+    "response_fields": [
+      "pagination.item_count",
+      "pagination.next_page_url"
+    ],
+    "auto_pagination": {
+      "subaccounts": {
+        "enabled": true,
+        "page_size": 100,
+        "note": "Proxy automatically fetches all pages and aggregates results"
+      }
+    }
+  },
+  "http_status_codes": {
+    "200": "Success",
+    "400": "Bad request (missing endpoint, invalid parameters)",
+    "401": "Unauthorized (invalid/missing token)",
+    "403": "Forbidden (insufficient permissions)",
+    "404": "Endpoint not found",
+    "500": "Server error",
+    "501": "Not implemented"
+  },
+  "response_format": {
+    "structure": {
+      "success": "boolean",
+      "data": "endpoint-specific data",
+      "error": "string (if failed)",
+      "timestamp": "ISO timestamp (optional)"
+    },
+    "example": {
+      "success": true,
+      "data": {
+        "workers": []
+      },
+      "timestamp": "2025-12-15T10:30:00.000Z"
+    }
+  },
+  "files_by_location": {
+    "api_routes": {
+      "src/app/api/luxor/route.ts": {
+        "type": "Proxy Handler",
+        "methods": ["GET", "POST", "PUT", "DELETE"],
+        "endpoints": ["workspace", "sites", "site", "subaccounts", "subaccount", "payment-settings", "transactions", "workers", "revenue", "active-workers", "hashrate-efficiency", "workers-hashrate-efficiency", "pool-hashrate", "dev-fee"]
+      },
+      "src/app/api/wallet/earnings-24h/route.ts": {
+        "type": "Business Logic",
+        "calls": ["transactions"],
+        "uses_luxor_client": true
+      },
+      "src/app/api/wallet/earnings-summary/route.ts": {
+        "type": "Business Logic",
+        "calls": ["payment-settings", "transactions"],
+        "uses_luxor_client": true
+      },
+      "src/app/api/admin/dashboard/route.ts": {
+        "type": "Business Logic",
+        "calls": ["subaccounts", "workers", "hashrate-efficiency"],
+        "uses_proxy": true
+      }
+    },
+    "manage_pages": {
+      "src/app/(manage)/groups/page.tsx": {
+        "endpoints": ["sites", "site"],
+        "methods": ["GET", "POST", "PUT", "DELETE"],
+        "lines": [139, 251, 326, 394]
+      },
+      "src/app/(manage)/workers/page.tsx": {
+        "endpoints": ["subaccounts", "workers"],
+        "methods": ["GET"],
+        "lines": [130, 211, 288, 319]
+      },
+      "src/app/(manage)/subaccounts/page.tsx": {
+        "endpoints": ["subaccounts", "subaccount"],
+        "methods": ["GET", "POST", "DELETE"],
+        "lines": [153, 228, 304]
+      }
+    },
+    "auth_pages": {
+      "src/app/(auth)/luxor/page.tsx": {
+        "endpoints": ["sites"],
+        "methods": ["GET"],
+        "lines": [183]
+      }
+    },
+    "components": {
+      "src/components/CreateUserModal.tsx": {
+        "endpoints": ["subaccounts"],
+        "methods": ["GET"],
+        "lines": [131]
+      },
+      "src/components/HostedMinersList.tsx": {
+        "endpoints": ["workers"],
+        "methods": ["GET"],
+        "lines": [183]
+      }
+    }
+  },
+  "v2_compliance": {
+    "status": "COMPLIANT",
+    "verified_patterns": [
+      "GET /api/luxor?endpoint=sites",
+      "GET /api/luxor?endpoint=workers&currency=BTC&page_number=1&page_size=20",
+      "GET /api/luxor?endpoint=subaccounts",
+      "GET /api/luxor?endpoint=hashrate-efficiency&currency=BTC&start_date=YYYY-MM-DD&tick_size=1d",
+      "GET /api/luxor?endpoint=transactions&currency=BTC&transaction_type=credit",
+      "GET /api/luxor?endpoint=payment-settings&currency=BTC",
+      "POST /api/luxor with endpoint=site",
+      "PUT /api/luxor with endpoint=site",
+      "DELETE /api/luxor with endpoint=site",
+      "POST /api/luxor with endpoint=subaccount",
+      "DELETE /api/luxor with endpoint=subaccount"
+    ],
+    "environment_variables": [
+      "LUXOR_API_KEY",
+      "LUXOR_SITE_ID (optional)",
+      "NEXTAUTH_URL"
+    ]
+  }
+}
