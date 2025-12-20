@@ -60,20 +60,25 @@ interface DashboardStats {
  * Previously: Fetched from database (luxor_subaccount_name field)
  * Problem: Database might have stale/inaccessible subaccounts
  * Solution: Fetch from Luxor API which returns only accessible ones
+ *
+ * NOTE: This function must be called from within the GET handler to pass the request
+ * context properly. Server-side internal fetches with manually set cookies don't work
+ * reliably on production.
  */
-async function getAllSubaccountNames(token: string): Promise<string[]> {
+async function getAllSubaccountNames(request: NextRequest): Promise<string[]> {
   try {
-    const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
     console.log(
       "[Admin Dashboard] Fetching accessible subaccounts from Luxor API...",
     );
 
-    const response = await fetch(`${baseUrl}/api/luxor?endpoint=subaccounts`, {
+    // Create a new request to /api/luxor that preserves the original request's cookies
+    const url = new URL("/api/luxor?endpoint=subaccounts", request.url);
+    const luxorRequest = new NextRequest(url, {
       method: "GET",
-      headers: {
-        Cookie: `token=${token}`,
-      },
+      headers: request.headers, // Pass original headers including cookies
     });
+
+    const response = await fetch(luxorRequest);
 
     if (!response.ok) {
       console.error(
@@ -119,16 +124,16 @@ async function getAllSubaccountNames(token: string): Promise<string[]> {
  * Returns all subaccounts across all sites
  */
 async function fetchSubaccountStats(
-  token: string,
+  request: NextRequest,
 ): Promise<{ total: number; active: number; inactive: number } | null> {
   try {
-    const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
-    const response = await fetch(`${baseUrl}/api/luxor?endpoint=subaccounts`, {
+    const url = new URL("/api/luxor?endpoint=subaccounts", request.url);
+    const luxorRequest = new NextRequest(url, {
       method: "GET",
-      headers: {
-        Cookie: `token=${token}`,
-      },
+      headers: request.headers,
     });
+
+    const response = await fetch(luxorRequest);
 
     if (!response.ok) {
       console.error(
@@ -161,7 +166,7 @@ async function fetchSubaccountStats(
  * Helper: Fetch all workers from Luxor across all subaccounts
  */
 async function fetchAllWorkers(
-  token: string,
+  request: NextRequest,
   subaccountNames: string[],
 ): Promise<{
   active: number;
@@ -181,22 +186,20 @@ async function fetchAllWorkers(
   }
 
   try {
-    // Fetch workers with proper comma-separated subaccount names (no site_id)
-    const params = new URLSearchParams({
-      endpoint: "workers",
-      currency: "BTC",
-      subaccount_names: subaccountNames.join(","),
-      page_number: "1",
-      page_size: "1000",
+    // Build URL with proper query parameters
+    const url = new URL("/api/luxor", request.url);
+    url.searchParams.set("endpoint", "workers");
+    url.searchParams.set("currency", "BTC");
+    url.searchParams.set("subaccount_names", subaccountNames.join(","));
+    url.searchParams.set("page_number", "1");
+    url.searchParams.set("page_size", "1000");
+
+    const luxorRequest = new NextRequest(url, {
+      method: "GET",
+      headers: request.headers,
     });
 
-    const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
-    const response = await fetch(`${baseUrl}/api/luxor?${params.toString()}`, {
-      method: "GET",
-      headers: {
-        Cookie: `token=${token}`,
-      },
-    });
+    const response = await fetch(luxorRequest);
 
     if (!response.ok) {
       console.error("[Admin Dashboard] Workers fetch failed:", response.status);
@@ -241,7 +244,7 @@ async function fetchAllWorkers(
  * V2 API: GET /pool/hashrate-efficiency/{currency}?subaccount_names=...&start_date=...&tick_size=1d
  */
 async function fetchHashrateEfficiency(
-  token: string,
+  request: NextRequest,
   subaccountNames: string[],
 ): Promise<{
   currentHashrate: number;
@@ -263,24 +266,22 @@ async function fetchHashrateEfficiency(
     const endDate = new Date();
     const startDate = new Date(endDate.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-    const params = new URLSearchParams({
-      endpoint: "hashrate-efficiency",
-      currency: "BTC",
-      subaccount_names: subaccountNames.join(","),
-      start_date: startDate.toISOString().split("T")[0],
-      end_date: endDate.toISOString().split("T")[0],
-      tick_size: "1d",
-      page_number: "1",
-      page_size: "1000",
+    const url = new URL("/api/luxor", request.url);
+    url.searchParams.set("endpoint", "hashrate-efficiency");
+    url.searchParams.set("currency", "BTC");
+    url.searchParams.set("subaccount_names", subaccountNames.join(","));
+    url.searchParams.set("start_date", startDate.toISOString().split("T")[0]);
+    url.searchParams.set("end_date", endDate.toISOString().split("T")[0]);
+    url.searchParams.set("tick_size", "1d");
+    url.searchParams.set("page_number", "1");
+    url.searchParams.set("page_size", "1000");
+
+    const luxorRequest = new NextRequest(url, {
+      method: "GET",
+      headers: request.headers,
     });
 
-    const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
-    const response = await fetch(`${baseUrl}/api/luxor?${params.toString()}`, {
-      method: "GET",
-      headers: {
-        Cookie: `token=${token}`,
-      },
-    });
+    const response = await fetch(luxorRequest);
 
     if (!response.ok) {
       console.error(
@@ -450,17 +451,17 @@ export async function GET(request: NextRequest) {
 
     try {
       // Get all ACCESSIBLE subaccount names from Luxor
-      const subaccountNames = await getAllSubaccountNames(token);
+      const subaccountNames = await getAllSubaccountNames(request);
 
       if (subaccountNames.length > 0) {
         // Fetch subaccount statistics from V2 API
-        const subaccountStats = await fetchSubaccountStats(token);
+        const subaccountStats = await fetchSubaccountStats(request);
         if (subaccountStats) {
           luxorStats.poolAccounts = subaccountStats;
         }
 
         // Fetch all workers statistics
-        const workersStats = await fetchAllWorkers(token, subaccountNames);
+        const workersStats = await fetchAllWorkers(request, subaccountNames);
         if (workersStats) {
           luxorStats.workers = {
             activeWorkers: workersStats.active,
@@ -471,7 +472,7 @@ export async function GET(request: NextRequest) {
 
         // Fetch hashrate and efficiency
         const hashrateStats = await fetchHashrateEfficiency(
-          token,
+          request,
           subaccountNames,
         );
         if (hashrateStats) {
