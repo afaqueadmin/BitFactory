@@ -31,6 +31,7 @@ import {
   Warning as WarningIcon,
   MoreVert as MoreVertIcon,
 } from "@mui/icons-material";
+import { useUser } from "@/lib/hooks/useUser";
 
 interface ProcurementHistoryEntry {
   id: string;
@@ -67,6 +68,7 @@ interface ApiResponse<T = unknown> {
 }
 
 export default function HardwarePage() {
+  const { user } = useUser();
   const [hardware, setHardware] = useState<Hardware[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -175,17 +177,31 @@ export default function HardwarePage() {
     }
   };
 
-  /**
-   * Handle procure hardware submit
-   */
-  const handleProcureSubmit = async () => {
-    setProcurementError(null);
+  const handleProcurementDelete = () => {
+    const qty = parseInt(procurementQuantity);
 
+    if (user?.role !== "SUPER_ADMIN" && (isNaN(qty) || qty < 1)) {
+      setProcurementError("Delete is unauthorized for this user");
+      return;
+    }
+
+    handleProcureSubmit(-qty); // Negative quantity for deletion
+  };
+  const handleProcurementAdd = () => {
     const qty = parseInt(procurementQuantity);
     if (isNaN(qty) || qty < 1) {
       setProcurementError("Quantity must be at least 1");
       return;
     }
+
+    handleProcureSubmit(qty);
+  };
+
+  /**
+   * Handle procure hardware submit
+   */
+  const handleProcureSubmit = async (qty: number) => {
+    setProcurementError(null);
 
     if (!procuringHardwareId) {
       setProcurementError("Hardware ID is missing");
@@ -323,7 +339,7 @@ export default function HardwarePage() {
           model: formData.model.trim(),
           powerUsage: parseFloat(String(formData.powerUsage)),
           hashRate: parseFloat(String(formData.hashRate)),
-          ...(editingId ? {} : { quantity: 0 }), // Set quantity to 0 only for new hardware
+          ...(editingId ? {} : { quantity: 1 }), // Set quantity to 0 only for new hardware
         }),
       });
 
@@ -723,8 +739,19 @@ export default function HardwarePage() {
           >
             Cancel
           </Button>
+          {user && user.role === "SUPER_ADMIN" && (
+            <Button
+              onClick={handleProcurementDelete}
+              variant="contained"
+              color="error"
+              disabled={procuring}
+              startIcon={procuring && <CircularProgress size={20} />}
+            >
+              {procuring ? "Deleting..." : "Delete"}
+            </Button>
+          )}
           <Button
-            onClick={handleProcureSubmit}
+            onClick={handleProcurementAdd}
             variant="contained"
             disabled={procuring}
             startIcon={procuring && <CircularProgress size={20} />}
@@ -772,6 +799,7 @@ export default function HardwarePage() {
                     <Typography variant="body2" sx={{ fontWeight: "600" }}>
                       Quantity: {entry.quantity} unit
                       {entry.quantity !== 1 ? "s" : ""}
+                      &nbsp;{entry.quantity < 0 && "(removed)"}
                     </Typography>
                     <Typography
                       variant="caption"

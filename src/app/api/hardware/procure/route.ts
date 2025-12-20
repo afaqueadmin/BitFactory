@@ -35,9 +35,11 @@ export async function POST(
     }
 
     let userId: string;
+    let userRole: string;
     try {
       const decoded = await verifyJwtToken(token);
       userId = decoded.userId;
+      userRole = decoded.role;
     } catch {
       return NextResponse.json<ApiResponse>(
         { success: false, error: "Invalid token" },
@@ -57,7 +59,7 @@ export async function POST(
     }
 
     const qty = parseInt(String(quantity));
-    if (isNaN(qty) || qty < 1) {
+    if (userRole !== "SUPER_ADMIN" && (isNaN(qty) || qty < 1)) {
       return NextResponse.json<ApiResponse>(
         { success: false, error: "Quantity must be at least 1" },
         { status: 400 },
