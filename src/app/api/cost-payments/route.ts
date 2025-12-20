@@ -12,9 +12,11 @@ export async function GET(request: NextRequest) {
 
     // Verify token and extract user ID
     let userId: string;
+    let userRole: string;
     try {
       const decoded = await verifyJwtToken(token);
       userId = decoded.userId;
+      userRole = decoded.role;
     } catch (error) {
       console.error("[Cost Payments GET] Token verification failed:", error);
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
@@ -24,7 +26,16 @@ export async function GET(request: NextRequest) {
     const url = new URL(request.url);
     const page = parseInt(url.searchParams.get("page") || "0", 10);
     const pageSize = parseInt(url.searchParams.get("pageSize") || "10", 10);
-
+    const customerId = url.searchParams.get("customerId");
+    if (customerId) {
+      if (userRole !== "ADMIN" && userRole !== "SUPER_ADMIN") {
+        return NextResponse.json(
+          { error: "Only administrators can search by customerId" },
+          { status: 403 },
+        );
+      }
+      userId = customerId;
+    }
     // Validate pagination parameters
     if (page < 0 || pageSize < 1 || pageSize > 100) {
       return NextResponse.json(

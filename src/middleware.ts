@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, URLPattern } from "next/server";
 import type { NextRequest } from "next/server";
 import { JwtPayload, verifyJwtToken } from "@/lib/jwt";
 
@@ -43,6 +43,11 @@ const securePaths = {
   ]),
 }; // Add admin-specific public paths if any
 
+const dynamicPatternsPaths = {
+  CLIENT: [],
+  ADMIN: [new URLPattern({ pathname: "/customers/:id*" })],
+};
+
 // Role-based default redirects
 const getDefaultPathForRole = (role: string) => {
   switch (role) {
@@ -58,7 +63,10 @@ const getDefaultPathForRole = (role: string) => {
 
 // Check if a path is inside a route group folder like (auth) or (manage)
 const isInRouteGroup = (pathname: string, role: "CLIENT" | "ADMIN") => {
-  return securePaths[role].has(pathname);
+  return (
+    securePaths[role].has(pathname) ||
+    dynamicPatternsPaths[role].some((p) => p.test({ pathname }))
+  );
 };
 
 export async function middleware(request: NextRequest) {

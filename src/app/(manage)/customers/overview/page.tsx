@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
+import Link from "next/link";
 import {
   Box,
   Grid as MuiGrid,
@@ -22,7 +23,6 @@ import {
   Snackbar,
   // FormControl,
   // Select,
-  SelectChangeEvent,
   TextField,
 } from "@mui/material";
 import {
@@ -854,7 +854,27 @@ export default function CustomerOverview() {
                       }}
                     >
                       <TableCell component="th" scope="row">
-                        {customer.name}
+                        <Link
+                          href={`/customers/${customer.id}`}
+                          style={{
+                            textDecoration: "none",
+                            color: "inherit",
+                          }}
+                        >
+                          <Typography
+                            component="span"
+                            sx={{
+                              color: "primary.main",
+                              fontWeight: 500,
+                              cursor: "pointer",
+                              "&:hover": {
+                                textDecoration: "underline",
+                              },
+                            }}
+                          >
+                            {customer.name}
+                          </Typography>
+                        </Link>
                       </TableCell>
                       <TableCell>{customer.email}</TableCell>
                       <TableCell>{customer.role}</TableCell>

@@ -1,4 +1,4 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
 
@@ -32,9 +32,11 @@ export async function GET(request: NextRequest) {
     }
 
     let userId: string;
+    let userRole: string;
     try {
       const decoded = await verifyJwtToken(token);
       userId = decoded.userId;
+      userRole = decoded.role;
       console.log("Profile API [GET]: Token verified, userId:", userId);
     } catch (error) {
       console.error("Profile API [GET]: Token verification failed:", error);
@@ -47,6 +49,18 @@ export async function GET(request: NextRequest) {
           },
         },
       );
+    }
+
+    const { searchParams } = new URL(request.url);
+    const customerId = searchParams.get("customerId");
+    if (customerId) {
+      if (userRole !== "ADMIN" && userRole !== "SUPER_ADMIN") {
+        return NextResponse.json(
+          { error: "Only administrators can search by customerId" },
+          { status: 403 },
+        );
+      }
+      userId = customerId;
     }
 
     const user = await prisma.user.findUnique({

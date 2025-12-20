@@ -164,7 +164,13 @@ function EnhancedTableHead(props: EnhancedTableHeadProps) {
   );
 }
 
-export default function ElectricityCostTable() {
+interface ElectricityCostTableProps {
+  customerId?: string;
+}
+
+export default function ElectricityCostTable({
+  customerId,
+}: ElectricityCostTableProps) {
   const theme = useTheme();
   const [order, setOrder] = useState<Order>("desc");
   const [orderBy, setOrderBy] = useState<OrderBy>("date");
@@ -182,15 +188,16 @@ export default function ElectricityCostTable() {
       setLoading(true);
       setError(null);
 
-      const response = await fetch(
-        `/api/cost-payments?page=${page}&pageSize=${rowsPerPage}`,
-        {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-          },
+      const url = customerId
+        ? `/api/cost-payments?page=${page}&pageSize=${rowsPerPage}&customerId=${customerId}`
+        : `/api/cost-payments?page=${page}&pageSize=${rowsPerPage}`;
+
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
         },
-      );
+      });
 
       if (!response.ok) {
         const errorData = await response.json();

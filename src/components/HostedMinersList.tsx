@@ -138,7 +138,13 @@ const dummyMiners: MinerData[] = [
   },
 ];
 
-export default function HostedMinersList() {
+interface HostedMinersListProps {
+  customerId?: string;
+}
+
+export default function HostedMinersList({
+  customerId,
+}: HostedMinersListProps) {
   const theme = useTheme();
   const [activeFilter, setActiveFilter] = useState<FilterType>("ALL MINERS");
   const [miners, setMiners] = useState<MinerData[]>(dummyMiners);
@@ -151,7 +157,11 @@ export default function HostedMinersList() {
         setLoading(true);
 
         // Step 1: Fetch miners from database
-        const minerResponse = await fetch("/api/miners/user", {
+        const minerUrl = customerId
+          ? `/api/miners/user?customerId=${customerId}`
+          : "/api/miners/user";
+
+        const minerResponse = await fetch(minerUrl, {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
@@ -272,7 +282,7 @@ export default function HostedMinersList() {
     };
 
     fetchMiners();
-  }, []);
+  }, [customerId]);
 
   // Filter miners based on active filter
   const filteredMiners = miners.filter((miner) => {

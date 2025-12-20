@@ -38,7 +38,20 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const userId = decoded.userId;
+    let userId = decoded.userId;
+    const userRole = decoded.role;
+    const url = new URL(request.url);
+    const customerId = url.searchParams.get("customerId");
+    if (customerId) {
+      if (userRole !== "ADMIN" && userRole !== "SUPER_ADMIN") {
+        return NextResponse.json(
+          { error: "Only administrators can search by customerId" },
+          { status: 403 },
+        );
+      }
+      userId = customerId;
+    }
+
     console.log(`[Earnings Summary API] Fetching data for user: ${userId}`);
 
     // Get user's subaccount name from database

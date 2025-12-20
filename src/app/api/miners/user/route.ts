@@ -12,12 +12,25 @@ export async function GET(request: NextRequest) {
 
     // Verify token and get user ID
     let userId: string;
+    let userRole: string;
     try {
       const decoded = await verifyJwtToken(token);
       userId = decoded.userId;
+      userRole = decoded.role;
     } catch (error) {
       console.error("Token verification failed:", error);
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
+    }
+    const url = new URL(request.url);
+    const customerId = url.searchParams.get("customerId");
+    if (customerId) {
+      if (userRole !== "ADMIN" && userRole !== "SUPER_ADMIN") {
+        return NextResponse.json(
+          { error: "Only administrators can search by customerId" },
+          { status: 403 },
+        );
+      }
+      userId = customerId;
     }
 
     // Get all miners for this user from database
