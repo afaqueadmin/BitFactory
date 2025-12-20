@@ -499,7 +499,7 @@ export default function HardwarePage() {
                 Hash Rate (TH/s)
               </TableCell>
               <TableCell sx={{ fontWeight: "bold" }} align="center">
-                Quantity
+                Available Quantity
               </TableCell>
               <TableCell sx={{ fontWeight: "bold" }}>Created</TableCell>
               <TableCell sx={{ fontWeight: "bold" }} align="center">
