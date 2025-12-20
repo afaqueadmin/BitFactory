@@ -43,6 +43,8 @@ import {
   MenuItem,
   Pagination,
   OutlinedInput,
+  Checkbox,
+  ListItemText,
 } from "@mui/material";
 import { Refresh as RefreshIcon } from "@mui/icons-material";
 import BuildIcon from "@mui/icons-material/Build";
@@ -178,7 +180,15 @@ export default function WorkersPage() {
       pageSize: number,
       currency: string,
     ) => {
-      if (!subaccountNames || subaccountNames.length === 0) {
+      // Validate input: filter empty strings and ensure we have valid subaccounts
+      const validNames = subaccountNames.filter(
+        (name) => name && name.trim().length > 0,
+      );
+
+      if (!validNames || validNames.length === 0) {
+        console.log(
+          "[Luxor Workers] No valid subaccounts selected, clearing workers",
+        );
         setState((prev) => ({
           ...prev,
           workers: [],
@@ -201,11 +211,11 @@ export default function WorkersPage() {
 
         console.log(
           "[Luxor Workers] Fetching workers for subaccounts:",
-          subaccountNames,
+          validNames,
         );
 
-        // Build query string with multiple subaccount names (no spaces in format)
-        const subaccountNamesParam = subaccountNames.join(",");
+        // Build query string with validated subaccount names (no spaces, no trailing commas)
+        const subaccountNamesParam = validNames.join(",");
 
         const response = await fetch(
           `/api/luxor?endpoint=workers&currency=${currency}&subaccount_names=${subaccountNamesParam}&page_number=${pageNumber}&page_size=${pageSize}`,
@@ -399,17 +409,42 @@ export default function WorkersPage() {
    * Handle subaccount selection change
    */
   const handleSubaccountChange = (subaccountNames: string | string[]) => {
-    const selectedNames = Array.isArray(subaccountNames)
+    // Convert to array and filter out empty strings
+    let selectedNames = Array.isArray(subaccountNames)
       ? subaccountNames
       : [subaccountNames];
 
+    // Remove empty strings that might result from split operations
+    selectedNames = selectedNames.filter(
+      (name) => name && name.trim().length > 0,
+    );
+
+    // Update state with validated names
     setState((prev) => ({
       ...prev,
       selectedSubaccountNames: selectedNames,
       currentPage: 1, // Reset to first page
     }));
 
-    fetchWorkers(selectedNames, 1, state.pageSize, state.currency);
+    // Only fetch if we have valid subaccounts selected
+    if (selectedNames.length > 0) {
+      fetchWorkers(selectedNames, 1, state.pageSize, state.currency);
+    } else {
+      // Clear workers if no subaccounts selected
+      setState((prev) => ({
+        ...prev,
+        workers: [],
+        totalItems: 0,
+        error: null,
+      }));
+      setStats({
+        totalWorkers: 0,
+        activeWorkers: 0,
+        inactiveWorkers: 0,
+        averageHashrate: 0,
+        averageEfficiency: 0,
+      });
+    }
   };
 
   /**
@@ -578,7 +613,7 @@ export default function WorkersPage() {
         </Typography>
 
         <Stack spacing={2}>
-          {/* Subaccounts Multi-Select */}
+          {/* Subaccounts Multi-Select with Checkboxes */}
           <FormControl fullWidth>
             <InputLabel>Select Subaccounts</InputLabel>
             <Select
@@ -592,10 +627,50 @@ export default function WorkersPage() {
                 )
               }
               input={<OutlinedInput label="Select Subaccounts" />}
+              renderValue={(selected) =>
+                `${(selected as string[]).length} subaccount(s) selected`
+              }
             >
+              {/* Select All Option */}
+              <MenuItem disableRipple>
+                <Checkbox
+                  checked={
+                    state.subaccounts.length > 0 &&
+                    state.selectedSubaccountNames.length ===
+                      state.subaccounts.length
+                  }
+                  indeterminate={
+                    state.selectedSubaccountNames.length > 0 &&
+                    state.selectedSubaccountNames.length <
+                      state.subaccounts.length
+                  }
+                  onChange={() => {
+                    // If all are selected or partially selected, deselect all
+                    if (state.selectedSubaccountNames.length > 0) {
+                      handleSubaccountChange([]);
+                    } else {
+                      // If none selected, select all
+                      const allNames = state.subaccounts
+                        .map((s) => s.name)
+                        .filter((name) => name && name.trim().length > 0);
+                      if (allNames.length > 0) {
+                        handleSubaccountChange(allNames);
+                      }
+                    }
+                  }}
+                />
+                <ListItemText primary="Select All" />
+              </MenuItem>
+
+              {/* Individual Subaccounts */}
               {state.subaccounts.map((subaccount) => (
                 <MenuItem key={subaccount.name} value={subaccount.name}>
-                  {subaccount.name}
+                  <Checkbox
+                    checked={state.selectedSubaccountNames.includes(
+                      subaccount.name,
+                    )}
+                  />
+                  <ListItemText primary={subaccount.name} />
                 </MenuItem>
               ))}
             </Select>
