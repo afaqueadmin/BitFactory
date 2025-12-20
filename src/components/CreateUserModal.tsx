@@ -116,6 +116,7 @@ export default function CreateUserModal({
 
   /**
    * Fetch subaccounts from V2 Luxor API
+   * Filter out subaccounts already assigned to users in the database
    * Called when modal opens
    */
   const fetchSubaccounts = async () => {
@@ -124,27 +125,30 @@ export default function CreateUserModal({
       setSubaccountsError(null);
       setSubaccounts([]);
 
-      console.log("[CreateUserModal] Fetching subaccounts from V2 Luxor API");
+      console.log(
+        "[CreateUserModal] Fetching subaccounts from V2 Luxor API and filtering assigned ones",
+      );
 
-      const response = await fetch("/api/luxor?endpoint=subaccounts");
+      // Fetch all subaccounts from Luxor
+      const luxorResponse = await fetch("/api/luxor?endpoint=subaccounts");
 
-      if (!response.ok) {
-        throw new Error(`API returned status ${response.status}`);
+      if (!luxorResponse.ok) {
+        throw new Error(`Luxor API returned status ${luxorResponse.status}`);
       }
 
-      const data: ProxyResponse<Record<string, unknown>> =
-        await response.json();
+      const luxorData: ProxyResponse<Record<string, unknown>> =
+        await luxorResponse.json();
 
-      if (!data.success) {
-        throw new Error(data.error || "Failed to fetch subaccounts");
+      if (!luxorData.success) {
+        throw new Error(luxorData.error || "Failed to fetch subaccounts");
       }
 
       // Extract subaccounts array from response
-      const responseData = data.data as Record<string, unknown>;
-      let subaccountsList: Subaccount[] = [];
+      const responseData = luxorData.data as Record<string, unknown>;
+      let luxorSubaccountsList: Subaccount[] = [];
 
       if (responseData && Array.isArray(responseData.subaccounts)) {
-        subaccountsList = (
+        luxorSubaccountsList = (
           responseData.subaccounts as Array<Record<string, unknown>>
         ).map(
           (sub: Record<string, unknown>) =>
@@ -157,10 +161,39 @@ export default function CreateUserModal({
         );
       }
 
-      setSubaccounts(subaccountsList);
       console.log(
-        `[CreateUserModal] Fetched ${subaccountsList.length} subaccounts`,
+        `[CreateUserModal] Fetched ${luxorSubaccountsList.length} subaccounts from Luxor`,
       );
+
+      // Fetch assigned subaccounts from database
+      console.log("[CreateUserModal] Fetching already-assigned subaccounts...");
+      const dbResponse = await fetch("/api/user/subaccounts/existing");
+
+      let assignedSubaccountNames: string[] = [];
+      if (dbResponse.ok) {
+        const dbData = await dbResponse.json();
+        if (dbData.success && Array.isArray(dbData.data)) {
+          assignedSubaccountNames = dbData.data.map(
+            (item: { luxorSubaccountName: string }) => item.luxorSubaccountName,
+          );
+        }
+      }
+
+      console.log(
+        `[CreateUserModal] Found ${assignedSubaccountNames.length} already-assigned subaccounts:`,
+        assignedSubaccountNames,
+      );
+
+      // Filter out assigned subaccounts
+      const unassignedSubaccounts = luxorSubaccountsList.filter(
+        (sub) => !assignedSubaccountNames.includes(sub.name),
+      );
+
+      console.log(
+        `[CreateUserModal] Filtered to ${unassignedSubaccounts.length} unassigned subaccounts`,
+      );
+
+      setSubaccounts(unassignedSubaccounts);
     } catch (err) {
       const errorMsg =
         err instanceof Error ? err.message : "Failed to fetch subaccounts";

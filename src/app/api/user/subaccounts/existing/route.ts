@@ -47,7 +47,9 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      subaccounts: existingSubaccounts,
+      data: existingSubaccounts.map((name) => ({
+        luxorSubaccountName: name,
+      })),
       count: existingSubaccounts.length,
     });
   } catch (error) {
