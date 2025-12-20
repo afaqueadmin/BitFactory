@@ -110,8 +110,9 @@ export interface Subaccount {
   id: number;
   name: string;
   site: SubaccountSite;
-  created_at: string;
-  url: string;
+  // Note: created_at and url are NOT returned by Luxor V2 API despite being in the spec
+  created_at?: string; // Optional - may not be provided by API
+  url?: string; // Optional - may not be provided by API
 }
 
 export interface SubaccountsResponse {

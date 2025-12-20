@@ -165,9 +165,6 @@ export default function SubaccountsPage() {
       const subaccountsList =
         (data.data as SubaccountListData)?.subaccounts || [];
 
-      console.log("[Luxor Subaccounts] Response data:", data.data);
-      console.log("[Luxor Subaccounts] Parsed subaccounts:", subaccountsList);
-
       setState((prev) => ({
         ...prev,
         subaccounts: subaccountsList,
@@ -509,59 +506,61 @@ export default function SubaccountsPage() {
                     Subaccount Name
                   </TableCell>
                   <TableCell sx={{ fontWeight: "bold" }}>ID</TableCell>
-                  <TableCell sx={{ fontWeight: "bold" }}>Created At</TableCell>
+                  <TableCell sx={{ fontWeight: "bold" }}>Site</TableCell>
                   <TableCell sx={{ fontWeight: "bold" }} align="right">
                     Actions
                   </TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {state.subaccounts.map((subaccount) => (
-                  <TableRow
-                    key={subaccount.id}
-                    sx={{
-                      "&:hover": {
-                        backgroundColor: "background.default",
-                      },
-                    }}
-                  >
-                    <TableCell>
-                      <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                        {subaccount.name}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography
-                        variant="caption"
-                        sx={{ fontFamily: "monospace" }}
-                      >
-                        {subaccount.id}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2">
-                        {new Date(subaccount.created_at).toLocaleDateString()}
-                      </Typography>
-                    </TableCell>
-                    <TableCell align="right">
-                      <Stack
-                        direction="row"
-                        spacing={1}
-                        justifyContent="flex-end"
-                      >
-                        <Tooltip title="Delete Subaccount">
-                          <IconButton
-                            size="small"
-                            onClick={() => openDeleteDialog(subaccount)}
-                            color="error"
-                          >
-                            <DeleteIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      </Stack>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {state.subaccounts.map((subaccount) => {
+                  return (
+                    <TableRow
+                      key={subaccount.id}
+                      sx={{
+                        "&:hover": {
+                          backgroundColor: "background.default",
+                        },
+                      }}
+                    >
+                      <TableCell>
+                        <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                          {subaccount.name}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography
+                          variant="caption"
+                          sx={{ fontFamily: "monospace" }}
+                        >
+                          {subaccount.id}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2">
+                          {subaccount.site.name}
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="right">
+                        <Stack
+                          direction="row"
+                          spacing={1}
+                          justifyContent="flex-end"
+                        >
+                          <Tooltip title="Delete Subaccount">
+                            <IconButton
+                              size="small"
+                              onClick={() => openDeleteDialog(subaccount)}
+                              color="error"
+                            >
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        </Stack>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </TableContainer>
@@ -635,14 +634,10 @@ export default function SubaccountsPage() {
                     color="text.secondary"
                     sx={{ mt: 2 }}
                   >
-                    Created At
+                    Site
                   </Typography>
                   <Typography variant="body2">
-                    {dialog.selectedSubaccount?.created_at
-                      ? new Date(
-                          dialog.selectedSubaccount.created_at,
-                        ).toLocaleString()
-                      : "N/A"}
+                    {dialog.selectedSubaccount?.site?.name || "N/A"}
                   </Typography>
                 </Paper>
                 <Alert severity="warning" sx={{ mt: 2 }}>
