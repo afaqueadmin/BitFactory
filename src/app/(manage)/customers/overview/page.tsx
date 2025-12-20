@@ -20,9 +20,10 @@ import {
   MenuItem,
   IconButton,
   Snackbar,
-  FormControl,
-  Select,
+  // FormControl,
+  // Select,
   SelectChangeEvent,
+  TextField,
 } from "@mui/material";
 import {
   Add as AddIcon,
@@ -33,8 +34,8 @@ import {
 import {
   sortCustomers,
   toggleSortDirection,
-  getSortFieldLabel,
-  getAllSortFields,
+  // getSortFieldLabel,
+  // getAllSortFields,
   type SortConfig,
   type CustomerSortField,
 } from "@/lib/utils/sortCustomers";
@@ -60,6 +61,16 @@ interface FetchedUser {
   joinDate: string;
   miners: number;
   status: "active" | "inactive";
+}
+
+interface FilterColumns {
+  name: string;
+  email: string;
+  role: string;
+  luxorSubaccountName: string;
+  miners: string;
+  status: string;
+  joinDate: string;
 }
 
 // Create a Grid component that includes the 'item' prop
@@ -195,25 +206,25 @@ export default function CustomerOverview() {
     fetchUsers();
   };
 
-  /**
-   * Handle sort field change from dropdown
-   */
-  const handleSortFieldChange = (
-    event: SelectChangeEvent<CustomerSortField>,
-  ) => {
-    const newField = event.target.value as CustomerSortField;
-    setSortConfig({ field: newField, direction: "asc" });
-  };
+  // /**
+  //  * Handle sort field change from dropdown
+  //  */
+  // const handleSortFieldChange = (
+  //   event: SelectChangeEvent<CustomerSortField>,
+  // ) => {
+  //   const newField = event.target.value as CustomerSortField;
+  //   setSortConfig({ field: newField, direction: "asc" });
+  // };
 
   /**
    * Handle sort direction toggle
    */
-  const handleSortDirectionToggle = () => {
-    setSortConfig({
-      ...sortConfig,
-      direction: toggleSortDirection(sortConfig.direction),
-    });
-  };
+  // const handleSortDirectionToggle = () => {
+  //   setSortConfig({
+  //     ...sortConfig,
+  //     direction: toggleSortDirection(sortConfig.direction),
+  //   });
+  // };
 
   /**
    * Handle header cell click to sort
@@ -231,12 +242,37 @@ export default function CustomerOverview() {
     }
   };
 
+  const [filters, setFilters] = useState<FilterColumns>({
+    name: "",
+    email: "",
+    role: "",
+    luxorSubaccountName: "",
+    miners: "",
+    status: "",
+    joinDate: "",
+  });
+
+  const handleFilterChange = (column: keyof FilterColumns, value: string) => {
+    setFilters((prev) => ({ ...prev, [column]: value }));
+  };
+
+  const filteredRows = useMemo(
+    () =>
+      users.filter((row) =>
+        (Object.keys(filters) as Array<keyof FilterColumns>).every((column) => {
+          const searchValue = filters[column].toLowerCase();
+          return row[column].toString().toLowerCase().includes(searchValue);
+        }),
+      ),
+    [filters, users],
+  );
+
   /**
    * Memoized sorted customers
    */
   const sortedUsers = useMemo(
-    () => sortCustomers(users, sortConfig),
-    [users, sortConfig],
+    () => sortCustomers(filteredRows, sortConfig),
+    [filteredRows, sortConfig],
   );
 
   const handleMenuOpen = (
@@ -508,50 +544,50 @@ export default function CustomerOverview() {
         ) : (
           <>
             {/* Sort Controls */}
-            <Box
-              sx={{
-                display: "flex",
-                justifyContent: "flex-start",
-                alignItems: "center",
-                mb: 2,
-                flexWrap: "wrap",
-                gap: 2,
-              }}
-            >
-              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                <Typography variant="body2" sx={{ fontWeight: "600" }}>
-                  Sort by:
-                </Typography>
-                <FormControl sx={{ minWidth: 200 }}>
-                  <Select
-                    value={sortConfig.field}
-                    onChange={handleSortFieldChange}
-                    size="small"
-                  >
-                    {getAllSortFields().map((field) => (
-                      <MenuItem key={field} value={field}>
-                        {getSortFieldLabel(field)}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-                <Button
-                  size="small"
-                  onClick={handleSortDirectionToggle}
-                  startIcon={
-                    sortConfig.direction === "asc" ? (
-                      <ArrowUpwardIcon fontSize="small" />
-                    ) : (
-                      <ArrowDownwardIcon fontSize="small" />
-                    )
-                  }
-                  variant="outlined"
-                  sx={{ textTransform: "capitalize" }}
-                >
-                  {sortConfig.direction === "asc" ? "Asc" : "Desc"}
-                </Button>
-              </Box>
-            </Box>
+            {/*<Box*/}
+            {/*  sx={{*/}
+            {/*    display: "flex",*/}
+            {/*    justifyContent: "flex-start",*/}
+            {/*    alignItems: "center",*/}
+            {/*    mb: 2,*/}
+            {/*    flexWrap: "wrap",*/}
+            {/*    gap: 2,*/}
+            {/*  }}*/}
+            {/*>*/}
+            {/*  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>*/}
+            {/*    <Typography variant="body2" sx={{ fontWeight: "600" }}>*/}
+            {/*      Sort by:*/}
+            {/*    </Typography>*/}
+            {/*    <FormControl sx={{ minWidth: 200 }}>*/}
+            {/*      <Select*/}
+            {/*        value={sortConfig.field}*/}
+            {/*        onChange={handleSortFieldChange}*/}
+            {/*        size="small"*/}
+            {/*      >*/}
+            {/*        {getAllSortFields().map((field) => (*/}
+            {/*          <MenuItem key={field} value={field}>*/}
+            {/*            {getSortFieldLabel(field)}*/}
+            {/*          </MenuItem>*/}
+            {/*        ))}*/}
+            {/*      </Select>*/}
+            {/*    </FormControl>*/}
+            {/*    <Button*/}
+            {/*      size="small"*/}
+            {/*      onClick={handleSortDirectionToggle}*/}
+            {/*      startIcon={*/}
+            {/*        sortConfig.direction === "asc" ? (*/}
+            {/*          <ArrowUpwardIcon fontSize="small" />*/}
+            {/*        ) : (*/}
+            {/*          <ArrowDownwardIcon fontSize="small" />*/}
+            {/*        )*/}
+            {/*      }*/}
+            {/*      variant="outlined"*/}
+            {/*      sx={{ textTransform: "capitalize" }}*/}
+            {/*    >*/}
+            {/*      {sortConfig.direction === "asc" ? "Asc" : "Desc"}*/}
+            {/*    </Button>*/}
+            {/*  </Box>*/}
+            {/*</Box>*/}
 
             <TableContainer>
               <Table>
@@ -730,6 +766,80 @@ export default function CustomerOverview() {
                     <TableCell align="center" sx={{ fontWeight: "bold" }}>
                       Actions
                     </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    {(Object.keys(filters) as Array<keyof FilterColumns>).map(
+                      (column) => (
+                        <TableCell key={column}>
+                          <TextField
+                            // placeholder={column}
+                            size="small"
+                            value={filters[column]}
+                            onChange={(e) =>
+                              handleFilterChange(column, e.target.value)
+                            }
+                          />
+                        </TableCell>
+                      ),
+                    )}
+                    {/*<TableCell>*/}
+                    {/*    <TextField*/}
+                    {/*        // placeholder="Search name"*/}
+                    {/*        size="small"*/}
+                    {/*        value={filters.name}*/}
+                    {/*        onChange={e => handleFilterChange("name", e.target.value)}*/}
+                    {/*    />*/}
+                    {/*</TableCell>*/}
+
+                    {/*<TableCell>*/}
+                    {/*    <TextField*/}
+                    {/*        // placeholder="Search email"*/}
+                    {/*        size="small"*/}
+                    {/*        value={filters.email}*/}
+                    {/*        onChange={e => handleFilterChange("email", e.target.value)}*/}
+                    {/*    />*/}
+                    {/*</TableCell>*/}
+
+                    {/*<TableCell>*/}
+                    {/*    <TextField*/}
+                    {/*        // placeholder="Search role"*/}
+                    {/*        size="small"*/}
+                    {/*        value={filters.role}*/}
+                    {/*        onChange={e => handleFilterChange("role", e.target.value)}*/}
+                    {/*    />*/}
+                    {/*</TableCell>*/}
+                    {/*<TableCell>*/}
+                    {/*    <TextField*/}
+                    {/*        // placeholder="Search Luxor Subaccount"*/}
+                    {/*        size="small"*/}
+                    {/*        value={filters.luxorSubaccountName}*/}
+                    {/*        onChange={e => handleFilterChange("luxorSubaccountName", e.target.value)}*/}
+                    {/*    />*/}
+                    {/*</TableCell>*/}
+                    {/*<TableCell>*/}
+                    {/*    <TextField*/}
+                    {/*        // placeholder="Search role"*/}
+                    {/*        size="small"*/}
+                    {/*        value={filters.miners}*/}
+                    {/*        onChange={e => handleFilterChange("miners", e.target.value)}*/}
+                    {/*    />*/}
+                    {/*</TableCell>*/}
+                    {/*<TableCell>*/}
+                    {/*    <TextField*/}
+                    {/*        // placeholder="Search role"*/}
+                    {/*        size="small"*/}
+                    {/*        value={filters.status}*/}
+                    {/*        onChange={e => handleFilterChange("status", e.target.value)}*/}
+                    {/*    />*/}
+                    {/*</TableCell>*/}
+                    {/*<TableCell>*/}
+                    {/*    <TextField*/}
+                    {/*        // placeholder="Search role"*/}
+                    {/*        size="small"*/}
+                    {/*        value={filters.joinDate}*/}
+                    {/*        onChange={e => handleFilterChange("joinDate", e.target.value)}*/}
+                    {/*    />*/}
+                    {/*</TableCell>*/}
                   </TableRow>
                 </TableHead>
                 <TableBody>
