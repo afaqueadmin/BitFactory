@@ -52,6 +52,10 @@ export async function PUT(
         companyUrl: body.companyUrl,
         email:
           user.role === "SUPER_ADMIN" && body.email ? body.email : undefined,
+        luxorSubaccountName:
+          body.luxorSubaccountName !== undefined
+            ? body.luxorSubaccountName
+            : undefined,
       },
     });
 

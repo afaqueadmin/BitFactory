@@ -12,6 +12,10 @@ import {
   IconButton,
   CircularProgress,
   Alert,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
 } from "@mui/material";
 import { Close as CloseIcon } from "@mui/icons-material";
 import { useUser } from "@/lib/hooks/useUser";
@@ -31,6 +35,7 @@ interface EditCustomerModalProps {
     companyName?: string;
     streetAddress?: string;
     companyUrl?: string;
+    luxorSubaccountName?: string;
   };
 }
 
@@ -43,6 +48,10 @@ export default function EditCustomerModal({
 }: EditCustomerModalProps) {
   const { user } = useUser();
   const [loading, setLoading] = useState(false);
+  const [fetchingSubaccounts, setFetchingSubaccounts] = useState(false);
+  const [subaccounts, setSubaccounts] = useState<
+    Array<{ name: string; id: number }>
+  >([]);
   const [formData, setFormData] = useState(
     initialData || {
       id: "",
@@ -54,6 +63,7 @@ export default function EditCustomerModal({
       companyName: "",
       streetAddress: "",
       companyUrl: "",
+      luxorSubaccountName: "",
     },
   );
   const [error, setError] = useState("");
@@ -64,8 +74,105 @@ export default function EditCustomerModal({
       setFormData(initialData);
       setError("");
       setSuccess("");
+      fetchSubaccounts();
     }
   }, [initialData, open]);
+
+  const fetchSubaccounts = async () => {
+    try {
+      setFetchingSubaccounts(true);
+      setSubaccounts([]);
+
+      console.log(
+        "[EditCustomerModal] Fetching subaccounts from V2 Luxor API and filtering assigned ones",
+      );
+
+      // Fetch all subaccounts from Luxor
+      const luxorResponse = await fetch("/api/luxor?endpoint=subaccounts");
+
+      if (!luxorResponse.ok) {
+        throw new Error(`Luxor API returned status ${luxorResponse.status}`);
+      }
+
+      const luxorData: Record<string, unknown> = await luxorResponse.json();
+
+      if (!(luxorData as Record<string, unknown>).success) {
+        const errorMessage = (luxorData as Record<string, unknown>).error;
+        throw new Error(
+          typeof errorMessage === "string"
+            ? errorMessage
+            : "Failed to fetch subaccounts",
+        );
+      }
+
+      // Extract subaccounts array from response
+      const responseData = (luxorData as Record<string, unknown>).data as
+        | Record<string, unknown>
+        | undefined;
+      let luxorSubaccountsList: Array<{ name: string; id: number }> = [];
+
+      if (responseData && Array.isArray(responseData.subaccounts)) {
+        luxorSubaccountsList = (
+          responseData.subaccounts as Array<Record<string, unknown>>
+        ).map((sub: Record<string, unknown>) => ({
+          id: Number(sub.id || 0),
+          name: String(sub.name || ""),
+        }));
+      }
+
+      console.log(
+        `[EditCustomerModal] Fetched ${luxorSubaccountsList.length} subaccounts from Luxor`,
+      );
+
+      // Fetch assigned subaccounts from database
+      console.log(
+        "[EditCustomerModal] Fetching already-assigned subaccounts...",
+      );
+      const dbResponse = await fetch("/api/user/subaccounts/existing");
+
+      let assignedSubaccountNames: string[] = [];
+      if (dbResponse.ok) {
+        const dbData: Record<string, unknown> = await dbResponse.json();
+        if (
+          (dbData as Record<string, unknown>).success &&
+          Array.isArray((dbData as Record<string, unknown>).data)
+        ) {
+          assignedSubaccountNames = (
+            (dbData as Record<string, unknown>).data as Array<{
+              luxorSubaccountName: string;
+            }>
+          ).map((item: { luxorSubaccountName: string }) =>
+            item.luxorSubaccountName === formData.luxorSubaccountName
+              ? "" // Exclude current user's assigned subaccount
+              : item.luxorSubaccountName,
+          );
+        }
+      }
+
+      console.log(
+        `[EditCustomerModal] Found ${assignedSubaccountNames.length} already-assigned subaccounts:`,
+        assignedSubaccountNames,
+      );
+
+      // Filter out assigned subaccounts (except current user's)
+      const unassignedSubaccounts = luxorSubaccountsList.filter(
+        (sub) => !assignedSubaccountNames.includes(sub.name),
+      );
+
+      console.log(
+        `[EditCustomerModal] Filtered to ${unassignedSubaccounts.length} unassigned subaccounts`,
+      );
+
+      setSubaccounts(unassignedSubaccounts);
+    } catch (err) {
+      console.error("[EditCustomerModal] Error fetching subaccounts:", err);
+      setError(
+        err instanceof Error ? err.message : "Failed to fetch subaccounts",
+      );
+    } finally {
+      setFetchingSubaccounts(false);
+    }
+  };
 
   const handleClose = () => {
     onClose();
@@ -94,6 +201,7 @@ export default function EditCustomerModal({
           companyName: formData.companyName,
           streetAddress: formData.streetAddress,
           companyUrl: formData.companyUrl,
+          luxorSubaccountName: formData.luxorSubaccountName || null,
         }),
       });
 
@@ -245,6 +353,27 @@ export default function EditCustomerModal({
               type="url"
               placeholder="https://example.com"
             />
+            <FormControl fullWidth disabled={fetchingSubaccounts}>
+              <InputLabel>Luxor Subaccount</InputLabel>
+              <Select
+                value={formData.luxorSubaccountName || ""}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    luxorSubaccountName:
+                      e.target.value === "N/A" ? "" : e.target.value,
+                  }))
+                }
+                label="Luxor Subaccount"
+              >
+                <MenuItem value="N/A">N/A (Unassigned)</MenuItem>
+                {subaccounts.map((sub) => (
+                  <MenuItem key={sub.id} value={sub.name}>
+                    {sub.name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
           </Box>
         </DialogContent>
         <DialogActions sx={{ px: 3, py: 2 }}>
