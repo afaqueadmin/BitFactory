@@ -50,6 +50,8 @@ export async function PUT(
         city: body.city,
         country: body.country,
         companyUrl: body.companyUrl,
+        email:
+          user.role === "SUPER_ADMIN" && body.email ? body.email : undefined,
       },
     });
 

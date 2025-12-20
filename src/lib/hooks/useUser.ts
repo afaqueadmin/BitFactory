@@ -22,6 +22,7 @@ interface UserData {
   companyUrl: string | null;
   profileImage: string | null;
   profileImageId: string | null;
+  role: "ADMIN" | "SUPER_ADMIN" | "CLIENT";
 }
 
 export function useUser() {

@@ -14,6 +14,7 @@ import {
   Alert,
 } from "@mui/material";
 import { Close as CloseIcon } from "@mui/icons-material";
+import { useUser } from "@/lib/hooks/useUser";
 
 interface EditCustomerModalProps {
   open: boolean;
@@ -40,6 +41,7 @@ export default function EditCustomerModal({
   customerId,
   initialData,
 }: EditCustomerModalProps) {
+  const { user } = useUser();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState(
     initialData || {
@@ -179,7 +181,7 @@ export default function EditCustomerModal({
                 setFormData((prev) => ({ ...prev, email: e.target.value }))
               }
               required
-              disabled
+              disabled={user ? user.role !== "SUPER_ADMIN" : true}
             />
             <TextField
               fullWidth
