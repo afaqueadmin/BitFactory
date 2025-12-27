@@ -6,6 +6,14 @@ import { generateTokens } from "@/lib/jwt";
 // Add runtime config for Node.js runtime
 export const runtime = "nodejs";
 
+// Helper function to normalize email by removing dots from the username (local part)
+function normalizeEmailUsername(email: string): string {
+  const [localPart, domain] = email.split("@");
+  if (!domain) return email;
+  const normalizedLocalPart = localPart.replace(/\./g, "");
+  return `${normalizedLocalPart}@${domain}`.toLowerCase();
+}
+
 export async function POST(request: NextRequest) {
   try {
     let body;
@@ -44,9 +52,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Find user in database
-    const user = await prisma.user.findUnique({
-      where: { email },
+    // Find all users and match by normalizing their stored email usernames
+    const allUsers = await prisma.user.findMany({
       select: {
         id: true,
         email: true,
@@ -56,6 +63,12 @@ export async function POST(request: NextRequest) {
         twoFactorEnabled: true,
       },
     });
+
+    // Find user by comparing normalized email usernames
+    const normalizedUsername = normalizeEmailUsername(email);
+    const user = allUsers.find(
+      (u) => normalizeEmailUsername(u.email) === normalizedUsername,
+    );
 
     if (!user) {
       return NextResponse.json(
