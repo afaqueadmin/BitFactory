@@ -14,7 +14,8 @@ const transporter = nodemailer.createTransport({
 
 export const sendWelcomeEmail = async (email: string, tempPassword: string) => {
   const mailOptions = {
-    from: `BitFactory <${process.env.SMTP_FROM}>` || "noreply@bitfactory.com",
+    from:
+      `BitFactory Admin <${process.env.SMTP_FROM}>` || "noreply@bitfactory.com",
     to: email,
     subject: "Welcome to BitFactory - Your Account Details",
     html: `
@@ -45,7 +46,8 @@ export const sendPasswordResetEmail = async (
   tempPassword: string,
 ) => {
   const mailOptions = {
-    from: `BitFactory ${process.env.SMTP_FROM}` || "noreply@bitfactory.com",
+    from:
+      `BitFactory Admin <${process.env.SMTP_FROM}>` || "noreply@bitfactory.com",
     to: email,
     subject: "Password Reset Request - BitFactory",
     html: `
