@@ -183,3 +183,42 @@ model HardwareProcurementHistory {
   @@map("hardware_procurement_history")
 }
 
+// ============================================================================
+// GROUP MANAGEMENT MODELS
+// ============================================================================
+
+model Group {
+  id              String   @id @default(cuid())
+  name            String   @db.VarChar(255)
+  description     String?  @db.Text
+  isActive        Boolean  @default(true)
+  
+  // Relationships
+  subaccounts     GroupSubaccount[]
+  
+  // Audit Trail
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  createdBy       String   // Admin/Super Admin user ID
+  
+  @@index([isActive])
+  @@map("groups")
+}
+
+model GroupSubaccount {
+  id              String   @id @default(cuid())
+  groupId         String
+  subaccountName  String   @unique  // Ensures one subaccount in ONE group only
+  
+  // Relationship
+  group           Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  
+  // Audit Trail
+  addedAt         DateTime @default(now())
+  addedBy         String   // Admin/Super Admin user ID
+  
+  @@index([groupId])
+  @@index([subaccountName])
+  @@map("group_subaccounts")
+}
+
