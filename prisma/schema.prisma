@@ -49,6 +49,7 @@ model User {
   ownedMinerHistory MinerOwnershipHistory[] @relation("owner")
   createdMinerHistory MinerOwnershipHistory[] @relation("createdBy")
   hardwareProcurementHistory HardwareProcurementHistory[]
+  createdGroups Group[]
 
   @@map("users")
 }
@@ -195,6 +196,7 @@ model Group {
   
   // Relationships
   subaccounts     GroupSubaccount[]
+  creator         User     @relation(fields: [createdBy], references: [id], onDelete: Restrict)
   
   // Audit Trail
   createdAt       DateTime @default(now())

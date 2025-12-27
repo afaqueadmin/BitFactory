@@ -1,18 +1,17 @@
 /**
  * src/app/(manage)/groups/page.tsx
- * Luxor Workspace Sites Management Page (V2 API)
+ * Subaccount Groups Management Page
  *
- * Admin page for managing Luxor workspace sites with full CRUD operations:
- * - Create new sites
- * - Update existing sites
- * - Delete sites
- * - View site details (energy, subaccounts)
+ * Admin page for managing internal subaccount groups with full CRUD operations:
+ * - Create new groups
+ * - Update existing groups
+ * - Delete groups
+ * - View group details (name, description, subaccount count)
+ * - Manage group membership
  * - Real-time status and feedback
  *
- * This page uses the secure /api/luxor proxy route to handle all site operations
- * with server-side authentication and authorization.
- *
- * NOTE: This replaces the V1 Groups API. Sites are the new organizational unit in V2.
+ * Groups allow organizing subaccounts hierarchically since Luxor V2 deprecated
+ * the Groups API. Each group can contain multiple subaccounts.
  */
 
 "use client";
@@ -50,36 +49,52 @@ import {
   Close as CloseIcon,
 } from "@mui/icons-material";
 import GroupIcon from "@mui/icons-material/Group";
-import LocationOnIcon from "@mui/icons-material/LocationOn";
-import { Site, Subaccount } from "@/lib/luxor";
 import GradientStatCard from "@/components/GradientStatCard";
 
 /**
- * Response structure from the /api/luxor proxy route
+ * Group type matching database schema
  */
-interface ProxyResponse<T = Record<string, unknown>> {
+interface Group {
+  id: string;
+  name: string;
+  description?: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string;
+  creator?: {
+    id: string;
+    name: string;
+    email: string;
+  };
+  _count?: {
+    subaccounts: number;
+  };
+}
+
+/**
+ * Response structure from API routes
+ */
+interface ApiResponse<T = Record<string, unknown>> {
   success: boolean;
   data?: T;
   error?: string;
-  timestamp?: string;
+  message?: string;
 }
 
 /**
- * Form data structure for site operations
+ * Form data structure for group operations
  */
-interface SiteFormData {
+interface GroupFormData {
   name: string;
-  country: string;
-  base_load_kw: number;
-  max_load_kw: number;
-  settlement_point_id: string;
+  description: string;
 }
 
 /**
- * Component state for managing sites
+ * Component state for managing groups
  */
-interface SitesState {
-  sites: Site[];
+interface GroupsState {
+  groups: Group[];
   loading: boolean;
   error: string | null;
 }
@@ -90,8 +105,8 @@ interface SitesState {
 interface DialogState {
   open: boolean;
   mode: "create" | "edit" | "delete";
-  selectedSite: Site | null;
-  formData: SiteFormData;
+  selectedGroup: Group | null;
+  formData: GroupFormData;
   submitting: boolean;
   message: string | null;
 }
@@ -102,21 +117,18 @@ interface DialogState {
 const initialDialogState: DialogState = {
   open: false,
   mode: "create",
-  selectedSite: null,
+  selectedGroup: null,
   formData: {
     name: "",
-    country: "",
-    base_load_kw: 0,
-    max_load_kw: 0,
-    settlement_point_id: "",
+    description: "",
   },
   submitting: false,
   message: null,
 };
 
-export default function LuxorSitesPage() {
-  const [state, setState] = useState<SitesState>({
-    sites: [],
+export default function GroupsPage() {
+  const [state, setState] = useState<GroupsState>({
+    groups: [],
     loading: true,
     error: null,
   });
@@ -125,63 +137,44 @@ export default function LuxorSitesPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   /**
-   * Fetch all workspace sites
+   * Fetch all groups
    *
-   * This function fetches all sites available in the workspace.
+   * This function fetches all groups available in the system.
    * Called on component mount and when refreshing or after CRUD operations complete.
    */
-  const fetchSites = useCallback(async () => {
+  const fetchGroups = useCallback(async () => {
     try {
       setState((prev) => ({ ...prev, error: null }));
 
-      console.log("[Luxor Sites] Fetching workspace sites...");
+      console.log("[Groups] Fetching all groups...");
 
-      const response = await fetch("/api/luxor?endpoint=sites");
+      const response = await fetch("/api/groups");
 
       if (!response.ok) {
         throw new Error(`API returned status ${response.status}`);
       }
 
-      const data: ProxyResponse<Record<string, unknown>> =
-        await response.json();
+      const data: ApiResponse<Group[]> = await response.json();
 
       if (!data.success) {
-        throw new Error(data.error || "Failed to fetch sites");
+        throw new Error(data.error || "Failed to fetch groups");
       }
 
-      // In V2, the sites endpoint returns an array directly or wrapped in 'sites'
-      const responseData = data.data as
-        | Record<string, unknown>
-        | Array<unknown>;
-      let sitesList: Site[] = [];
+      const groupsList = Array.isArray(data.data) ? data.data : [];
 
-      console.log("[Luxor Sites] Response data:", responseData);
-
-      if (Array.isArray(responseData)) {
-        sitesList = responseData as Site[];
-      } else if (
-        responseData &&
-        typeof responseData === "object" &&
-        Array.isArray(responseData.sites)
-      ) {
-        sitesList = responseData.sites as Site[];
-      }
-
-      console.log("[Luxor Sites] Parsed sites:", sitesList);
+      console.log("[Groups] Parsed groups:", groupsList);
 
       setState({
-        sites: sitesList,
+        groups: groupsList,
         loading: false,
         error: null,
       });
 
-      console.log(
-        `[Luxor Sites] Successfully fetched ${sitesList.length} sites`,
-      );
+      console.log(`[Groups] Successfully fetched ${groupsList.length} groups`);
     } catch (error) {
       const errorMsg =
         error instanceof Error ? error.message : "Unknown error occurred";
-      console.error("[Luxor Sites] Error fetching sites:", errorMsg);
+      console.error("[Groups] Error fetching groups:", errorMsg);
       setState((prev) => ({
         ...prev,
         loading: false,
@@ -191,54 +184,22 @@ export default function LuxorSitesPage() {
   }, []);
 
   /**
-   * Fetch sites on component mount
+   * Fetch groups on component mount
    */
   useEffect(() => {
-    fetchSites();
-  }, [fetchSites]);
+    fetchGroups();
+  }, [fetchGroups]);
 
   /**
-   * Handle create site form submission
+   * Handle create group form submission
    *
-   * Sends a POST request to /api/luxor with the new site data
+   * Sends a POST request to /api/groups with the new group data
    */
-  const handleCreateSite = async () => {
+  const handleCreateGroup = async () => {
     if (!dialog.formData.name.trim()) {
       setDialog((prev) => ({
         ...prev,
-        message: "Site name is required",
-      }));
-      return;
-    }
-
-    if (!dialog.formData.country.trim()) {
-      setDialog((prev) => ({
-        ...prev,
-        message: "Country is required",
-      }));
-      return;
-    }
-
-    if (dialog.formData.base_load_kw <= 0) {
-      setDialog((prev) => ({
-        ...prev,
-        message: "Base load must be greater than 0",
-      }));
-      return;
-    }
-
-    if (dialog.formData.max_load_kw <= 0) {
-      setDialog((prev) => ({
-        ...prev,
-        message: "Max load must be greater than 0",
-      }));
-      return;
-    }
-
-    if (!dialog.formData.settlement_point_id.trim()) {
-      setDialog((prev) => ({
-        ...prev,
-        message: "Settlement point ID is required",
+        message: "Group name is required",
       }));
       return;
     }
@@ -246,46 +207,41 @@ export default function LuxorSitesPage() {
     setDialog((prev) => ({ ...prev, submitting: true, message: null }));
 
     try {
-      console.log("[Luxor Sites] Creating site:", dialog.formData.name);
+      console.log("[Groups] Creating group:", dialog.formData.name);
 
-      const response = await fetch("/api/luxor", {
+      const response = await fetch("/api/groups", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          endpoint: "site",
-          name: dialog.formData.name,
-          country: dialog.formData.country,
-          energy: {
-            base_load_kw: dialog.formData.base_load_kw,
-            max_load_kw: dialog.formData.max_load_kw,
-            settlement_point_id: dialog.formData.settlement_point_id,
-          },
+          name: dialog.formData.name.trim(),
+          description: dialog.formData.description.trim(),
         }),
       });
 
-      const data: ProxyResponse<Site> = await response.json();
+      const data: ApiResponse<Group> = await response.json();
 
-      console.log("[Luxor Sites] Create response:", {
+      console.log("[Groups] Create response:", {
         status: response.status,
         data,
       });
 
       if (!response.ok || !data.success) {
         const errorMsg = data.error || `API returned status ${response.status}`;
-        console.error("[Luxor Sites] Error creating site:", errorMsg);
+        console.error("[Groups] Error creating group:", errorMsg);
         throw new Error(errorMsg);
       }
 
-      console.log("[Luxor Sites] Site created successfully");
+      console.log("[Groups] Group created successfully");
 
-      // Refresh the sites list
-      await fetchSites();
+      // Refresh the groups list
+      await fetchGroups();
 
       // Close dialog
       setDialog(initialDialogState);
     } catch (error) {
       const errorMsg =
         error instanceof Error ? error.message : "Unknown error occurred";
-      console.error("[Luxor Sites] Error creating site:", errorMsg);
+      console.error("[Groups] Error creating group:", errorMsg);
       setDialog((prev) => ({
         ...prev,
         submitting: false,
@@ -295,15 +251,15 @@ export default function LuxorSitesPage() {
   };
 
   /**
-   * Handle update site form submission
+   * Handle update group form submission
    *
-   * Sends a PUT request to /api/luxor with the updated site data
+   * Sends a PUT request to /api/groups/[id] with the updated group data
    */
-  const handleUpdateSite = async () => {
-    if (!dialog.selectedSite) {
+  const handleUpdateGroup = async () => {
+    if (!dialog.selectedGroup) {
       setDialog((prev) => ({
         ...prev,
-        message: "No site selected",
+        message: "No group selected",
       }));
       return;
     }
@@ -311,7 +267,7 @@ export default function LuxorSitesPage() {
     if (!dialog.formData.name.trim()) {
       setDialog((prev) => ({
         ...prev,
-        message: "Site name is required",
+        message: "Group name is required",
       }));
       return;
     }
@@ -319,49 +275,43 @@ export default function LuxorSitesPage() {
     setDialog((prev) => ({ ...prev, submitting: true, message: null }));
 
     try {
-      const siteId = dialog.selectedSite.id;
+      const groupId = dialog.selectedGroup.id;
 
-      console.log("[Luxor Sites] Updating site:", siteId);
+      console.log("[Groups] Updating group:", groupId);
 
-      const response = await fetch("/api/luxor", {
+      const response = await fetch(`/api/groups/${groupId}`, {
         method: "PUT",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          endpoint: "site",
-          site_id: siteId,
-          name: dialog.formData.name,
-          country: dialog.formData.country,
-          energy: {
-            base_load_kw: dialog.formData.base_load_kw,
-            max_load_kw: dialog.formData.max_load_kw,
-            settlement_point_id: dialog.formData.settlement_point_id,
-          },
+          name: dialog.formData.name.trim(),
+          description: dialog.formData.description.trim(),
         }),
       });
 
-      const data: ProxyResponse<Site> = await response.json();
+      const data: ApiResponse<Group> = await response.json();
 
-      console.log("[Luxor Sites] Update response:", {
+      console.log("[Groups] Update response:", {
         status: response.status,
         data,
       });
 
       if (!response.ok || !data.success) {
         const errorMsg = data.error || `API returned status ${response.status}`;
-        console.error("[Luxor Sites] Error updating site:", errorMsg);
+        console.error("[Groups] Error updating group:", errorMsg);
         throw new Error(errorMsg);
       }
 
-      console.log("[Luxor Sites] Site updated successfully");
+      console.log("[Groups] Group updated successfully");
 
-      // Refresh the sites list
-      await fetchSites();
+      // Refresh the groups list
+      await fetchGroups();
 
       // Close dialog
       setDialog(initialDialogState);
     } catch (error) {
       const errorMsg =
         error instanceof Error ? error.message : "Unknown error occurred";
-      console.error("[Luxor Sites] Error updating site:", errorMsg);
+      console.error("[Groups] Error updating group:", errorMsg);
       setDialog((prev) => ({
         ...prev,
         submitting: false,
@@ -371,15 +321,15 @@ export default function LuxorSitesPage() {
   };
 
   /**
-   * Handle delete site confirmation
+   * Handle delete group confirmation
    *
-   * Sends a DELETE request to /api/luxor with the site ID
+   * Sends a DELETE request to /api/groups/[id]
    */
-  const handleDeleteSite = async () => {
-    if (!dialog.selectedSite) {
+  const handleDeleteGroup = async () => {
+    if (!dialog.selectedGroup) {
       setDialog((prev) => ({
         ...prev,
-        message: "No site selected",
+        message: "No group selected",
       }));
       return;
     }
@@ -387,43 +337,38 @@ export default function LuxorSitesPage() {
     setDialog((prev) => ({ ...prev, submitting: true, message: null }));
 
     try {
-      const siteId = dialog.selectedSite.id;
+      const groupId = dialog.selectedGroup.id;
 
-      console.log("[Luxor Sites] Deleting site:", siteId);
+      console.log("[Groups] Deleting group:", groupId);
 
-      const response = await fetch("/api/luxor", {
+      const response = await fetch(`/api/groups/${groupId}`, {
         method: "DELETE",
-        body: JSON.stringify({
-          endpoint: "site",
-          site_id: siteId,
-        }),
       });
 
-      const data: ProxyResponse<Record<string, unknown>> =
-        await response.json();
+      const data: ApiResponse = await response.json();
 
-      console.log("[Luxor Sites] Delete response:", {
+      console.log("[Groups] Delete response:", {
         status: response.status,
         data,
       });
 
       if (!response.ok || !data.success) {
         const errorMsg = data.error || `API returned status ${response.status}`;
-        console.error("[Luxor Sites] Error deleting site:", errorMsg);
+        console.error("[Groups] Error deleting group:", errorMsg);
         throw new Error(errorMsg);
       }
 
-      console.log("[Luxor Sites] Site deleted successfully");
+      console.log("[Groups] Group deleted successfully");
 
-      // Refresh the sites list
-      await fetchSites();
+      // Refresh the groups list
+      await fetchGroups();
 
       // Close dialog
       setDialog(initialDialogState);
     } catch (error) {
       const errorMsg =
         error instanceof Error ? error.message : "Unknown error occurred";
-      console.error("[Luxor Sites] Error deleting site:", errorMsg);
+      console.error("[Groups] Error deleting group:", errorMsg);
       setDialog((prev) => ({
         ...prev,
         submitting: false,
@@ -433,7 +378,7 @@ export default function LuxorSitesPage() {
   };
 
   /**
-   * Open create site dialog
+   * Open create group dialog
    */
   const openCreateDialog = () => {
     setDialog({
@@ -444,19 +389,16 @@ export default function LuxorSitesPage() {
   };
 
   /**
-   * Open edit site dialog
+   * Open edit group dialog
    */
-  const openEditDialog = (site: Site) => {
+  const openEditDialog = (group: Group) => {
     setDialog({
       open: true,
       mode: "edit",
-      selectedSite: site,
+      selectedGroup: group,
       formData: {
-        name: site.name,
-        country: site.country || "",
-        base_load_kw: site.energy?.base_load_kw || 0,
-        max_load_kw: site.energy?.max_load_kw || 0,
-        settlement_point_id: site.energy?.settlement_point_id || "",
+        name: group.name,
+        description: group.description || "",
       },
       submitting: false,
       message: null,
@@ -466,17 +408,14 @@ export default function LuxorSitesPage() {
   /**
    * Open delete confirmation dialog
    */
-  const openDeleteDialog = (site: Site) => {
+  const openDeleteDialog = (group: Group) => {
     setDialog({
       open: true,
       mode: "delete",
-      selectedSite: site,
+      selectedGroup: group,
       formData: {
         name: "",
-        country: "",
-        base_load_kw: 0,
-        max_load_kw: 0,
-        settlement_point_id: "",
+        description: "",
       },
       submitting: false,
       message: null,
@@ -496,13 +435,13 @@ export default function LuxorSitesPage() {
   const handleDialogSubmit = () => {
     switch (dialog.mode) {
       case "create":
-        handleCreateSite();
+        handleCreateGroup();
         break;
       case "edit":
-        handleUpdateSite();
+        handleUpdateGroup();
         break;
       case "delete":
-        handleDeleteSite();
+        handleDeleteGroup();
         break;
     }
   };
@@ -512,7 +451,7 @@ export default function LuxorSitesPage() {
    */
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await fetchSites();
+    await fetchGroups();
     setIsRefreshing(false);
   };
 
@@ -534,6 +473,11 @@ export default function LuxorSitesPage() {
       </Box>
     );
   }
+
+  const totalSubaccounts = state.groups.reduce(
+    (sum, g) => sum + (g._count?.subaccounts ?? 0),
+    0,
+  );
 
   return (
     <Box
@@ -559,10 +503,10 @@ export default function LuxorSitesPage() {
                 color: "text.primary",
               }}
             >
-              Luxor Workspace Sites
+              Subaccount Groups
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-              Manage your Luxor mining workspace sites and subaccounts
+              Organize your subaccounts into groups for better management
             </Typography>
           </Box>
           <Stack direction="row" spacing={1}>
@@ -579,7 +523,7 @@ export default function LuxorSitesPage() {
               startIcon={<AddIcon />}
               onClick={openCreateDialog}
             >
-              Create Site
+              Create Group
             </Button>
           </Stack>
         </Box>
@@ -588,7 +532,7 @@ export default function LuxorSitesPage() {
         {state.error && (
           <Alert severity="error" sx={{ mb: 3 }}>
             <Typography variant="subtitle2" sx={{ fontWeight: "bold" }}>
-              Error Loading Sites
+              Error Loading Groups
             </Typography>
             <Typography variant="body2">{state.error}</Typography>
           </Alert>
@@ -601,7 +545,7 @@ export default function LuxorSitesPage() {
             gridTemplateColumns: {
               xs: "1fr",
               sm: "1fr 1fr",
-              md: "repeat(3, 1fr)",
+              md: "repeat(2, 1fr)",
             },
             gap: 3,
             mb: 4,
@@ -609,63 +553,47 @@ export default function LuxorSitesPage() {
         >
           <Box>
             <GradientStatCard
-              title="Total Sites"
-              value={String(state.sites.length)}
-              gradient="linear-gradient(135deg, #00C6FF 0%, #0072FF 100%)"
-              icon={<LocationOnIcon fontSize="small" />}
+              title="Total Groups"
+              value={String(state.groups.length)}
+              gradient="linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
+              icon={<GroupIcon fontSize="small" />}
             />
           </Box>
 
           <Box>
             <GradientStatCard
               title="Total Subaccounts"
-              value={String(
-                state.sites.reduce(
-                  (sum, s) => sum + (s.pool?.subaccounts?.length ?? 0),
-                  0,
-                ),
-              )}
-              gradient="linear-gradient(135deg, #FFB300 0%, #FFCA28 100%)"
-              icon={<GroupIcon fontSize="small" />}
-            />
-          </Box>
-
-          <Box>
-            <GradientStatCard
-              title="Power Market"
-              value={String(
-                new Set(state.sites.map((s) => s.energy?.power_market)).size ||
-                  0,
-              )}
-              gradient="linear-gradient(135deg, #00BFA6 0%, #1DE9B6 100%)"
+              value={String(totalSubaccounts)}
+              gradient="linear-gradient(135deg, #f093fb 0%, #f5576c 100%)"
               icon={<GroupIcon fontSize="small" />}
             />
           </Box>
         </Box>
 
-        {/* Sites Table */}
-        {state.sites.length > 0 ? (
+        {/* Groups Table */}
+        {state.groups.length > 0 ? (
           <TableContainer component={Paper} sx={{ mb: 4 }}>
             <Table>
               <TableHead>
                 <TableRow sx={{ backgroundColor: "background.default" }}>
-                  <TableCell sx={{ fontWeight: "bold" }}>Site Name</TableCell>
-                  <TableCell sx={{ fontWeight: "bold" }}>Country</TableCell>
-                  <TableCell sx={{ fontWeight: "bold" }}>
-                    Power Market
+                  <TableCell sx={{ fontWeight: "bold" }}>Name</TableCell>
+                  <TableCell sx={{ fontWeight: "bold" }}>Description</TableCell>
+                  <TableCell sx={{ fontWeight: "bold" }} align="center">
+                    Status
                   </TableCell>
                   <TableCell sx={{ fontWeight: "bold" }} align="right">
                     Subaccounts
                   </TableCell>
+                  <TableCell sx={{ fontWeight: "bold" }}>Created By</TableCell>
                   <TableCell sx={{ fontWeight: "bold" }} align="right">
                     Actions
                   </TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {state.sites.map((site) => (
+                {state.groups.map((group) => (
                   <TableRow
-                    key={site.id}
+                    key={group.id}
                     sx={{
                       "&:hover": {
                         backgroundColor: "background.default",
@@ -674,32 +602,37 @@ export default function LuxorSitesPage() {
                   >
                     <TableCell>
                       <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                        {site.name}
+                        {group.name}
                       </Typography>
                       <Typography
                         variant="caption"
                         color="text.secondary"
-                        sx={{ fontFamily: "monospace" }}
+                        sx={{ fontFamily: "monospace", fontSize: "0.7rem" }}
                       >
-                        {site.id}
+                        {group.id}
                       </Typography>
                     </TableCell>
                     <TableCell>
-                      <Typography variant="body2">
-                        {site.country || "N/A"}
+                      <Typography variant="body2" color="text.secondary">
+                        {group.description || "-"}
                       </Typography>
                     </TableCell>
-                    <TableCell>
+                    <TableCell align="center">
                       <Chip
-                        label={site.energy?.power_market || "Unknown"}
+                        label={group.isActive ? "Active" : "Inactive"}
+                        color={group.isActive ? "success" : "default"}
                         variant="outlined"
                         size="small"
-                        color="primary"
                       />
                     </TableCell>
                     <TableCell align="right">
                       <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                        {site.pool?.subaccounts?.length ?? 0}
+                        {group._count?.subaccounts ?? 0}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="caption">
+                        {group.creator?.name || group.createdBy}
                       </Typography>
                     </TableCell>
                     <TableCell align="right">
@@ -708,19 +641,19 @@ export default function LuxorSitesPage() {
                         spacing={1}
                         justifyContent="flex-end"
                       >
-                        <Tooltip title="Edit Site">
+                        <Tooltip title="Edit Group">
                           <IconButton
                             size="small"
-                            onClick={() => openEditDialog(site)}
+                            onClick={() => openEditDialog(group)}
                             color="primary"
                           >
                             <EditIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
-                        <Tooltip title="Delete Site">
+                        <Tooltip title="Delete Group">
                           <IconButton
                             size="small"
-                            onClick={() => openDeleteDialog(site)}
+                            onClick={() => openDeleteDialog(group)}
                             color="error"
                           >
                             <DeleteIcon fontSize="small" />
@@ -735,7 +668,7 @@ export default function LuxorSitesPage() {
           </TableContainer>
         ) : (
           <Paper sx={{ p: 4, textAlign: "center", mb: 4 }}>
-            <LocationOnIcon
+            <GroupIcon
               sx={{
                 fontSize: 64,
                 color: "text.secondary",
@@ -744,10 +677,10 @@ export default function LuxorSitesPage() {
               }}
             />
             <Typography variant="h6" color="text.secondary">
-              No sites available
+              No groups created yet
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-              Click &quot;Create Site&quot; to get started
+              Click &quot;Create Group&quot; to organize your subaccounts
             </Typography>
           </Paper>
         )}
@@ -766,13 +699,13 @@ export default function LuxorSitesPage() {
               alignItems: "center",
             }}
           >
-            <Typography variant="h6">
+            <Box>
               {dialog.mode === "create"
-                ? "Create New Site"
+                ? "Create New Group"
                 : dialog.mode === "edit"
-                  ? "Edit Site"
-                  : "Delete Site"}
-            </Typography>
+                  ? "Edit Group"
+                  : "Delete Group"}
+            </Box>
             <IconButton onClick={closeDialog} size="small">
               <CloseIcon />
             </IconButton>
@@ -795,43 +728,51 @@ export default function LuxorSitesPage() {
             {dialog.mode === "delete" ? (
               <Box>
                 <Typography variant="body1" sx={{ mb: 2 }}>
-                  Are you sure you want to delete this site?
+                  Are you sure you want to delete this group?
                 </Typography>
                 <Paper sx={{ p: 2, backgroundColor: "background.default" }}>
                   <Typography variant="body2" color="text.secondary">
-                    Site Name
+                    Group Name
                   </Typography>
                   <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                    {dialog.selectedSite?.name}
+                    {dialog.selectedGroup?.name}
                   </Typography>
-                  {dialog.selectedSite?.id && (
+                  {dialog.selectedGroup?.description && (
                     <>
                       <Typography
                         variant="body2"
                         color="text.secondary"
                         sx={{ mt: 2 }}
                       >
-                        Site ID
+                        Description
                       </Typography>
-                      <Typography
-                        variant="body2"
-                        sx={{ fontFamily: "monospace", fontSize: "0.75rem" }}
-                      >
-                        {dialog.selectedSite.id}
+                      <Typography variant="body2">
+                        {dialog.selectedGroup.description}
                       </Typography>
                     </>
                   )}
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ mt: 2 }}
+                  >
+                    Subaccounts
+                  </Typography>
+                  <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                    {dialog.selectedGroup?._count?.subaccounts ?? 0}
+                  </Typography>
                 </Paper>
                 <Alert severity="warning" sx={{ mt: 2 }}>
-                  This action cannot be undone.
+                  This action cannot be undone. Associated subaccounts will not
+                  be deleted, only removed from the group.
                 </Alert>
               </Box>
             ) : (
               <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
                 <TextField
                   fullWidth
-                  label="Site Name"
-                  placeholder="Enter site name"
+                  label="Group Name"
+                  placeholder="Enter group name"
                   value={dialog.formData.name}
                   onChange={(e) =>
                     setDialog((prev) => ({
@@ -850,76 +791,17 @@ export default function LuxorSitesPage() {
 
                 <TextField
                   fullWidth
-                  label="Country"
-                  placeholder="Enter country (e.g., USA, CA, MX)"
-                  value={dialog.formData.country}
+                  label="Description"
+                  placeholder="Enter group description (optional)"
+                  multiline
+                  rows={3}
+                  value={dialog.formData.description}
                   onChange={(e) =>
                     setDialog((prev) => ({
                       ...prev,
                       formData: {
                         ...prev.formData,
-                        country: e.target.value,
-                      },
-                      message: null,
-                    }))
-                  }
-                  disabled={dialog.submitting}
-                  variant="outlined"
-                />
-
-                <TextField
-                  fullWidth
-                  label="Base Load (kW)"
-                  placeholder="Enter base load power"
-                  type="number"
-                  inputProps={{ step: "0.01", min: "0" }}
-                  value={dialog.formData.base_load_kw}
-                  onChange={(e) =>
-                    setDialog((prev) => ({
-                      ...prev,
-                      formData: {
-                        ...prev.formData,
-                        base_load_kw: parseFloat(e.target.value) || 0,
-                      },
-                      message: null,
-                    }))
-                  }
-                  disabled={dialog.submitting}
-                  variant="outlined"
-                />
-
-                <TextField
-                  fullWidth
-                  label="Max Load (kW)"
-                  placeholder="Enter maximum load power"
-                  type="number"
-                  inputProps={{ step: "0.01", min: "0" }}
-                  value={dialog.formData.max_load_kw}
-                  onChange={(e) =>
-                    setDialog((prev) => ({
-                      ...prev,
-                      formData: {
-                        ...prev.formData,
-                        max_load_kw: parseFloat(e.target.value) || 0,
-                      },
-                      message: null,
-                    }))
-                  }
-                  disabled={dialog.submitting}
-                  variant="outlined"
-                />
-
-                <TextField
-                  fullWidth
-                  label="Settlement Point ID"
-                  placeholder="Enter settlement point ID (UUID)"
-                  value={dialog.formData.settlement_point_id}
-                  onChange={(e) =>
-                    setDialog((prev) => ({
-                      ...prev,
-                      formData: {
-                        ...prev.formData,
-                        settlement_point_id: e.target.value,
+                        description: e.target.value,
                       },
                       message: null,
                     }))

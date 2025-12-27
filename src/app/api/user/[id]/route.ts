@@ -39,6 +39,12 @@ export async function PUT(
 
     const body = await request.json();
 
+    // First get the current user to check if they have a luxor subaccount
+    const currentUser = await prisma.user.findUnique({
+      where: { id },
+      select: { luxorSubaccountName: true, role: true },
+    });
+
     // Update user with provided fields
     const updatedUser = await prisma.user.update({
       where: { id },
@@ -58,6 +64,48 @@ export async function PUT(
             : undefined,
       },
     });
+
+    // Handle group assignment via GroupSubaccount
+    // If groupId provided and user is CLIENT with a luxor subaccount
+    const subaccountName =
+      body.luxorSubaccountName !== undefined
+        ? body.luxorSubaccountName
+        : currentUser?.luxorSubaccountName;
+
+    if (body.groupId && subaccountName && currentUser?.role === "CLIENT") {
+      try {
+        // First, remove subaccount from any existing groups
+        await prisma.groupSubaccount.deleteMany({
+          where: {
+            subaccountName: subaccountName.trim(),
+          },
+        });
+
+        // Then add to the new group (only if groupId is not null/empty)
+        if (body.groupId && body.groupId.trim().length > 0) {
+          await prisma.groupSubaccount.create({
+            data: {
+              groupId: body.groupId,
+              subaccountName: subaccountName.trim(),
+              addedBy: userId, // Admin who made the update
+            },
+          });
+          console.log(
+            `[User Update API] Assigned subaccount "${subaccountName}" to group "${body.groupId}" for user ${id}`,
+          );
+        } else {
+          console.log(
+            `[User Update API] Removed subaccount "${subaccountName}" from all groups for user ${id}`,
+          );
+        }
+      } catch (groupError) {
+        console.error(
+          "[User Update API] Failed to update group assignment:",
+          groupError,
+        );
+        // Log error but don't fail the user update
+      }
+    }
 
     return NextResponse.json({
       message: "User updated successfully",

@@ -41,6 +41,13 @@ interface Subaccount {
   url: string;
 }
 
+interface Group {
+  id: string;
+  name: string;
+  description?: string;
+  isActive: boolean;
+}
+
 interface CreateUserModalProps {
   open: boolean;
   onClose: () => void;
@@ -54,12 +61,14 @@ export default function CreateUserModal({
 }: CreateUserModalProps) {
   const [loading, setLoading] = useState(false);
   const [fetchingSubaccounts, setFetchingSubaccounts] = useState(true);
+  const [fetchingGroups, setFetchingGroups] = useState(true);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     role: "CLIENT",
     sendEmail: true,
     luxorSubaccountName: "",
+    groupId: "",
     initialDeposit: 0,
   });
   const [error, setError] = useState("");
@@ -67,6 +76,8 @@ export default function CreateUserModal({
   const [checkingEmail, setCheckingEmail] = useState(false);
   const [subaccounts, setSubaccounts] = useState<Subaccount[]>([]);
   const [subaccountsError, setSubaccountsError] = useState<string | null>(null);
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [groupsError, setGroupsError] = useState<string | null>(null);
 
   /**
    * Check if email already exists in database
@@ -106,11 +117,12 @@ export default function CreateUserModal({
   };
 
   /**
-   * Fetch subaccounts when modal opens
+   * Fetch subaccounts and groups when modal opens
    */
   useEffect(() => {
     if (open) {
       fetchSubaccounts();
+      fetchGroups();
     }
   }, [open]);
 
@@ -205,6 +217,46 @@ export default function CreateUserModal({
     }
   };
 
+  /**
+   * Fetch groups from API
+   */
+  const fetchGroups = async () => {
+    try {
+      setFetchingGroups(true);
+      setGroupsError(null);
+      setGroups([]);
+
+      console.log("[CreateUserModal] Fetching groups from API");
+
+      const response = await fetch("/api/groups");
+
+      if (!response.ok) {
+        throw new Error(`API returned status ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (!data.success) {
+        throw new Error(data.error || "Failed to fetch groups");
+      }
+
+      const groupsList = Array.isArray(data.data) ? data.data : [];
+      console.log(`[CreateUserModal] Fetched ${groupsList.length} groups`);
+
+      // Filter only active groups
+      const activeGroups = groupsList.filter((group: Group) => group.isActive);
+      setGroups(activeGroups);
+    } catch (err) {
+      const errorMsg =
+        err instanceof Error ? err.message : "Failed to fetch groups";
+      console.error("[CreateUserModal] Error fetching groups:", errorMsg);
+      setGroupsError(errorMsg);
+      setGroups([]);
+    } finally {
+      setFetchingGroups(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -262,6 +314,7 @@ export default function CreateUserModal({
         role: "CLIENT",
         sendEmail: true,
         luxorSubaccountName: "",
+        groupId: "",
         initialDeposit: 0,
       });
       setEmailError("");
@@ -430,6 +483,39 @@ export default function CreateUserModal({
                 {subaccountsError && (
                   <Alert severity="warning">{subaccountsError}</Alert>
                 )}
+
+                {/* Group Selection - Only for CLIENT role */}
+                <FormControl fullWidth disabled={fetchingGroups}>
+                  <InputLabel>Group (Optional)</InputLabel>
+                  <Select
+                    value={formData.groupId}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        groupId: e.target.value,
+                      }))
+                    }
+                    label="Group (Optional)"
+                  >
+                    <MenuItem value="">No Group</MenuItem>
+                    {fetchingGroups ? (
+                      <MenuItem disabled>
+                        <CircularProgress size={20} sx={{ mr: 1 }} />
+                        Loading groups...
+                      </MenuItem>
+                    ) : groups.length > 0 ? (
+                      groups.map((group) => (
+                        <MenuItem key={group.id} value={group.id}>
+                          {group.name}
+                        </MenuItem>
+                      ))
+                    ) : (
+                      <MenuItem disabled>No groups available</MenuItem>
+                    )}
+                  </Select>
+                </FormControl>
+
+                {groupsError && <Alert severity="warning">{groupsError}</Alert>}
               </>
             )}
 
