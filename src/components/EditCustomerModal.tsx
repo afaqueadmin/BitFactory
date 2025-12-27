@@ -20,6 +20,13 @@ import {
 import { Close as CloseIcon } from "@mui/icons-material";
 import { useUser } from "@/lib/hooks/useUser";
 
+interface Group {
+  id: string;
+  name: string;
+  description?: string;
+  isActive: boolean;
+}
+
 interface EditCustomerModalProps {
   open: boolean;
   onClose: () => void;
@@ -36,6 +43,7 @@ interface EditCustomerModalProps {
     streetAddress?: string;
     companyUrl?: string;
     luxorSubaccountName?: string;
+    groupId?: string;
   };
 }
 
@@ -49,9 +57,11 @@ export default function EditCustomerModal({
   const { user } = useUser();
   const [loading, setLoading] = useState(false);
   const [fetchingSubaccounts, setFetchingSubaccounts] = useState(false);
+  const [fetchingGroups, setFetchingGroups] = useState(false);
   const [subaccounts, setSubaccounts] = useState<
     Array<{ name: string; id: number }>
   >([]);
+  const [groups, setGroups] = useState<Group[]>([]);
   const [formData, setFormData] = useState(
     initialData || {
       id: "",
@@ -64,6 +74,7 @@ export default function EditCustomerModal({
       streetAddress: "",
       companyUrl: "",
       luxorSubaccountName: "",
+      groupId: "",
     },
   );
   const [error, setError] = useState("");
@@ -75,6 +86,7 @@ export default function EditCustomerModal({
       setError("");
       setSuccess("");
       fetchSubaccounts();
+      fetchGroups();
     }
   }, [initialData, open]);
 
@@ -174,6 +186,41 @@ export default function EditCustomerModal({
     }
   };
 
+  /**
+   * Fetch groups from API
+   */
+  const fetchGroups = async () => {
+    try {
+      setFetchingGroups(true);
+
+      console.log("[EditCustomerModal] Fetching groups from API");
+
+      const response = await fetch("/api/groups");
+
+      if (!response.ok) {
+        throw new Error(`API returned status ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (!data.success) {
+        throw new Error(data.error || "Failed to fetch groups");
+      }
+
+      const groupsList = Array.isArray(data.data) ? data.data : [];
+      console.log(`[EditCustomerModal] Fetched ${groupsList.length} groups`);
+
+      // Filter only active groups
+      const activeGroups = groupsList.filter((group: Group) => group.isActive);
+      setGroups(activeGroups);
+    } catch (err) {
+      console.error("[EditCustomerModal] Error fetching groups:", err);
+      // Don't set error for groups, just fail silently
+    } finally {
+      setFetchingGroups(false);
+    }
+  };
+
   const handleClose = () => {
     onClose();
     setError("");
@@ -202,6 +249,7 @@ export default function EditCustomerModal({
           streetAddress: formData.streetAddress,
           companyUrl: formData.companyUrl,
           luxorSubaccountName: formData.luxorSubaccountName || null,
+          groupId: formData.groupId || null,
         }),
       });
 
@@ -370,6 +418,26 @@ export default function EditCustomerModal({
                 {subaccounts.map((sub) => (
                   <MenuItem key={sub.id} value={sub.name}>
                     {sub.name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <FormControl fullWidth disabled={fetchingGroups}>
+              <InputLabel>Group (Optional)</InputLabel>
+              <Select
+                value={formData.groupId || ""}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    groupId: e.target.value,
+                  }))
+                }
+                label="Group (Optional)"
+              >
+                <MenuItem value="">No Group</MenuItem>
+                {groups.map((group) => (
+                  <MenuItem key={group.id} value={group.id}>
+                    {group.name}
                   </MenuItem>
                 ))}
               </Select>

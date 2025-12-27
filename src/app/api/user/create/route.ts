@@ -70,6 +70,7 @@ export async function POST(request: NextRequest) {
       sendEmail,
       initialDeposit,
       luxorSubaccountName,
+      groupId,
     } = await request.json();
 
     // Validate input
@@ -170,6 +171,28 @@ export async function POST(request: NextRequest) {
           updateError,
         );
         // Don't fail user creation if this update fails
+      }
+    }
+
+    // If groupId provided, create GroupSubaccount entry to link subaccount to group
+    if (role === "CLIENT" && groupId && luxorSubaccountName) {
+      try {
+        await prisma.groupSubaccount.create({
+          data: {
+            groupId: groupId,
+            subaccountName: luxorSubaccountName.trim(),
+            addedBy: userId, // Admin who added the user
+          },
+        });
+        console.log(
+          `[User Create API] Added subaccount "${luxorSubaccountName}" to group "${groupId}" for user ${newUser.id}`,
+        );
+      } catch (groupError) {
+        console.error(
+          "[User Create API] Failed to add subaccount to group:",
+          groupError,
+        );
+        // Don't fail user creation if group assignment fails
       }
     }
 
