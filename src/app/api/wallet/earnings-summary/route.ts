@@ -85,18 +85,16 @@ export async function GET(request: NextRequest) {
     console.log(
       `[Earnings Summary API] Fetching payment settings for ${user.luxorSubaccountName}`,
     );
-    const paymentSettings = await client.getPaymentSettings("BTC");
+    // Use the single subaccount API since we're dealing with one user's subaccount
+    const paymentSettings = await client.getSubaccountPaymentSettings(
+      "BTC",
+      user.luxorSubaccountName,
+    );
 
     // Calculate total pending payouts
-    let totalPendingBtc = 0;
-    const subaccountCount = paymentSettings.payment_settings.length;
-
-    for (const setting of paymentSettings.payment_settings) {
-      console.log(
-        `[Earnings Summary API] Subaccount ${setting.subaccount.name} - Balance: ${setting.balance} BTC, Status: ${setting.status}`,
-      );
-      totalPendingBtc += setting.balance;
-    }
+    // Single subaccount API returns the balance directly
+    const totalPendingBtc = paymentSettings.balance;
+    const subaccountCount = 1; // Single subaccount
 
     // Fetch transactions to calculate total earnings (all credits)
     console.log(
