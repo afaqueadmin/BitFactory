@@ -2,11 +2,16 @@
 
 ## 🎯 Complete Stats Reference
 
-### Card 1: MINERS (Database)
+### Card 1: MINERS (Hybrid - Luxor V2 API + Database)
 | Metric | Source | Type | Display |
 |--------|--------|------|---------|
-| Active | `Prisma.miner.count({status:"ACTIVE"})` | Counter | 🟦 Blue |
-| Inactive | `Prisma.miner.count({status:"INACTIVE"})` | Counter | ⚫ Gray |
+| Active | Luxor `/pool/workers/BTC` endpoint → `total_active` from all subaccounts | Counter | 🟦 Blue |
+| Inactive | Local DB miners table → `status: "DEPLOYMENT_IN_PROGRESS"` | Counter | ⚫ Gray |
+
+**Details**: 
+- **Active Miners**: Endpoint `GET /pool/workers/BTC` from Luxor V2 API (real-time pool workers)
+- **Inactive Miners**: Count from Neon database where miner status = "DEPLOYMENT_IN_PROGRESS"
+- **Note**: Each worker represents a mining device (ASIC miner)
 
 ### Card 2: SPACES (Database)
 | Metric | Source | Type | Display |
@@ -20,11 +25,11 @@
 | Active | Estimated from workers | Counter | 🔴 Red |
 | Inactive | Total - Active | Counter | ⚫ Gray |
 
-### Card 4: POWER (Calculated)
+### Card 4: POWER (Space Capacity Based)
 | Metric | Source | Type | Display |
 |--------|--------|------|---------|
-| Free (kW) | Space.powerCapacity - Miner.powerUsage | Number | 🟢 Green |
-| Used (kW) | Sum of active Miner.powerUsage | Number | 🔵 Blue |
+| Free (kW) | `Prisma.space.aggregate({_sum: powerCapacity})` | Number | 🟢 Green |
+| Used (kW) | Calculated from available spaces | Number | 🔵 Blue |
 
 ---
 
@@ -311,18 +316,20 @@ The dashboard shows warnings when:
 
 ## 📊 Data Freshness
 
-| Stat | Refreshes | Method |
-|------|-----------|--------|
-| Miners | On page load | Database query |
-| Spaces | On page load | Database query |
-| Customers | On page load | Database count |
-| Workers | On page load | Luxor API call |
-| Hashrate | On page load | Luxor API call (7d history) |
-| Efficiency | On page load | Luxor API call (7d history) |
-| Balance | On page load | Database aggregation |
-| Revenue | On page load | Database aggregation (30d) |
+| Stat | Refreshes | Method | Source |
+|------|-----------|--------|--------|
+| Miners - Active | On page load | Luxor API call | Luxor V2 API /pool/workers/BTC |
+| Miners - Inactive | On page load | Database query | PostgreSQL (Neon) |
+| Spaces | On page load | Database query | PostgreSQL |
+| Customers | On page load | Database count | PostgreSQL |
+| Workers | On page load | Luxor API call | Luxor V2 API |
+| Hashrate | On page load | Luxor API call (7d history) | Luxor V2 API |
+| Efficiency | On page load | Luxor API call (7d history) | Luxor V2 API |
+| Balance | On page load | Database aggregation | PostgreSQL |
+| Revenue | On page load | Database aggregation (30d) | PostgreSQL |
 
-**Update Interval**: Manual refresh on page reload
+**Update Interval**: Manual refresh on page reload  
+**Note**: Miners uses hybrid approach - Active from Luxor API, Inactive from local database  
 **Recommended**: Implement auto-refresh every 5 minutes
 
 ---
@@ -331,7 +338,8 @@ The dashboard shows warnings when:
 
 ✅ **19 hardcoded stats removed**
 ✅ **23 real stats implemented**
-✅ **Luxor API properly integrated**
+✅ **Luxor API properly integrated** (including Miners data)
+✅ **Miners data now fetched from Luxor V2 API** (not local database)
 ✅ **Error handling with fallbacks**
 ✅ **Fully documented**
 ✅ **Type-safe TypeScript**

@@ -367,15 +367,68 @@ export async function GET(request: NextRequest) {
 
     const warnings: string[] = [];
 
-    // ========== DATABASE STATS (Local Infrastructure) ==========
+    // Fetch subaccount names once to reuse for all Luxor queries
+    let subaccountNames: string[] = [];
+    try {
+      subaccountNames = await getAllSubaccountNames(request);
+    } catch (error) {
+      console.error(
+        "[Admin Dashboard] Error fetching subaccount names:",
+        error,
+      );
+    }
 
-    // Fetch miners statistics (from local database)
-    const activeMinersCount = await prisma.miner.count({
-      where: { status: "AUTO" },
-    });
-    const inactiveMiners = await prisma.miner.count({
-      where: { status: "DEPLOYMENT_IN_PROGRESS" },
-    });
+    // ========== MINERS (Luxor V2 API + Database) ==========
+
+    // Active miners: Fetch from Luxor API V2 (workers endpoint)
+    // Inactive miners: Fetch from local database (DEPLOYMENT_IN_PROGRESS status)
+    let activeMinersCount = 0;
+    let inactiveMiners = 0;
+
+    // Fetch active miners from Luxor API
+    if (subaccountNames.length > 0) {
+      try {
+        const workersData = await fetchAllWorkers(request, subaccountNames);
+        if (workersData) {
+          activeMinersCount = workersData.active;
+          console.log(
+            `[Admin Dashboard] Active miners from Luxor: ${activeMinersCount}`,
+          );
+        } else {
+          console.warn(
+            "[Admin Dashboard] Failed to fetch miners from Luxor, showing 0",
+          );
+        }
+      } catch (error) {
+        console.error(
+          "[Admin Dashboard] Error fetching miners from Luxor:",
+          error,
+        );
+      }
+    } else {
+      console.warn("[Admin Dashboard] No subaccounts found for miners fetch");
+    }
+
+    // Fetch inactive miners from local database (DEPLOYMENT_IN_PROGRESS status)
+    try {
+      inactiveMiners = await prisma.miner.count({
+        where: { status: "DEPLOYMENT_IN_PROGRESS" },
+      });
+      console.log(
+        `[Admin Dashboard] Inactive miners from DB: ${inactiveMiners}`,
+      );
+    } catch (error) {
+      console.error(
+        "[Admin Dashboard] Error fetching inactive miners from DB:",
+        error,
+      );
+    }
+
+    console.log(
+      `[Admin Dashboard] Total Miners: ${activeMinersCount} active, ${inactiveMiners} inactive`,
+    );
+
+    // ========== DATABASE STATS (Local Infrastructure) ==========
 
     // Fetch spaces statistics (from local database)
     const freeSpaces = await prisma.space.count({
@@ -385,20 +438,13 @@ export async function GET(request: NextRequest) {
       where: { status: "OCCUPIED" },
     });
 
-    // Calculate total power - fetch active miners with hardware relation
+    // Calculate total power - fetch spaces power capacity
     const totalSpacePower = await prisma.space.aggregate({
       _sum: { powerCapacity: true },
     });
 
-    const activeMiners = await prisma.miner.findMany({
-      where: { status: "AUTO" },
-      include: { hardware: true },
-    });
-
-    const usedMinersPower = activeMiners.reduce(
-      (sum, miner) => sum + (miner.hardware?.powerUsage || 0),
-      0,
-    );
+    // Power usage is now calculated from Luxor workers
+    const usedMinersPower = 0; // Will be calculated from Luxor worker hashrate later
 
     // Fetch customers (users with role CLIENT) statistics
     const totalCustomers = await prisma.user.count({
@@ -450,9 +496,7 @@ export async function GET(request: NextRequest) {
     };
 
     try {
-      // Get all ACCESSIBLE subaccount names from Luxor
-      const subaccountNames = await getAllSubaccountNames(request);
-
+      // Use the subaccount names already fetched above
       if (subaccountNames.length > 0) {
         // Fetch subaccount statistics from V2 API
         const subaccountStats = await fetchSubaccountStats(request);

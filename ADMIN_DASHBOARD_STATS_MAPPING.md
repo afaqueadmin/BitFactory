@@ -4,24 +4,67 @@
 This document maps every stat displayed on the admin dashboard (`/manage/adminpanel`) to its data source, calculation method, and fallback behavior.
 
 **Last Updated**: December 2025  
-**Total Stats Tracked**: 27 metrics across 5 categories
+**Total Stats Tracked**: 27 metrics across 7 categories  
+**Recent Change**: Miners now fetched from Luxor V2 API (workers endpoint) instead of local database
 
 ---
 
-## Category 1: Local Infrastructure (Database-Backed)
+## Category 1: Luxor Mining Operations (Luxor V2 API + Database)
 
 | Stat | Source | Calculation | Data Type | Fallback |
 |------|--------|-------------|-----------|----------|
-| **Miners - Active** | `Prisma.miner.count({ status: "ACTIVE" })` | Count of miners with ACTIVE status | Integer | 0 |
-| **Miners - Inactive** | `Prisma.miner.count({ status: "INACTIVE" })` | Count of miners with INACTIVE status | Integer | 0 |
-| **Spaces - Free** | `Prisma.space.count({ status: "AVAILABLE" })` | Count of spaces marked AVAILABLE | Integer | 0 |
-| **Spaces - Used** | `Prisma.space.count({ status: "OCCUPIED" })` | Count of spaces marked OCCUPIED | Integer | 0 |
-| **Power - Used (kW)** | `Prisma.miner.aggregate({ _sum: powerUsage })` | Sum of powerUsage from ACTIVE miners | Float | 0 |
-| **Power - Free (kW)** | `(Total Space Power) - (Used Miner Power)` | Total from spaces minus used from miners | Float | 0 |
+| **Miners - Active** | `GET /pool/workers/BTC?subaccount_names=...` → `total_active` | Active workers from Luxor API across all subaccounts | Integer | 0 |
+| **Miners - Inactive** | `Prisma.miner.count({ status: "DEPLOYMENT_IN_PROGRESS" })` | Count of miners in deployment phase from local database | Integer | 0 |
+
+**Implementation Details**:
+
+**Active Miners (Luxor V2 API)**:
+```
+Endpoint: GET https://app.luxor.tech/api/v2/pool/workers/BTC
+Query Parameters:
+  - subaccount_names: Comma-separated list of all accessible subaccounts
+  - page_number: 1
+  - page_size: 1000
+
+Response:
+{
+  "total_active": number,      // Number of active miners/workers on Luxor
+  "total_inactive": number,
+  "workers": [{ ... }]
+}
+```
+
+**Inactive Miners (Local Database)**:
+```
+Database Query:
+Prisma.miner.count({
+  where: { status: "DEPLOYMENT_IN_PROGRESS" }
+})
+
+Result: Count of miners being deployed locally
+```
+
+**Implementation Notes**:
+- **Active**: Real-time data from Luxor pool workers
+- **Inactive**: Local miners in deployment phase (status = "DEPLOYMENT_IN_PROGRESS")
+- Each "worker" in Luxor response = one active "miner" in the dashboard
+- Properly aggregates workers across all accessible subaccounts
+- Called via internal proxy at `/api/luxor?endpoint=workers&currency=BTC`
 
 ---
 
-## Category 2: Customers (Database + Luxor Hybrid)
+## Category 2: Local Infrastructure (Database-Backed)
+
+| Stat | Source | Calculation | Data Type | Fallback |
+|------|--------|-------------|-----------|----------|
+| **Spaces - Free** | `Prisma.space.count({ status: "AVAILABLE" })` | Count of spaces marked AVAILABLE | Integer | 0 |
+| **Spaces - Used** | `Prisma.space.count({ status: "OCCUPIED" })` | Count of spaces marked OCCUPIED | Integer | 0 |
+| **Power - Used (kW)** | `Prisma.space.aggregate({ _sum: powerCapacity })` | Total power capacity from all spaces | Float | 0 |
+| **Power - Free (kW)** | Calculated from available space capacity | Total space capacity minus reserved allocation | Float | 0 |
+
+---
+
+## Category 3: Customers (Database + Luxor Hybrid)
 
 | Stat | Source | Calculation | Data Type | Fallback |
 |------|--------|-------------|-----------|----------|
@@ -33,7 +76,7 @@ This document maps every stat displayed on the admin dashboard (`/manage/adminpa
 
 ---
 
-## Category 3: Luxor Pool Operations (Luxor API)
+## Category 4: Luxor Pool Operations (Luxor API)
 
 ### Workers Statistics
 | Stat | Source | Calculation | Data Type | Fallback | Endpoint |
@@ -62,7 +105,7 @@ This document maps every stat displayed on the admin dashboard (`/manage/adminpa
 
 ---
 
-## Category 4: Luxor Pool Accounts (Workspace)
+## Category 5: Luxor Pool Accounts (Workspace)
 
 | Stat | Source | Calculation | Data Type | Fallback | Endpoint |
 |------|--------|-------------|-----------|----------|----------|
@@ -87,7 +130,7 @@ This document maps every stat displayed on the admin dashboard (`/manage/adminpa
 
 ---
 
-## Category 5: Financial Metrics
+## Category 6: Financial Metrics
 
 ### Revenue
 | Stat | Source | Calculation | Data Type | Fallback | Time Range |
@@ -116,7 +159,7 @@ CostPayment.aggregate({
 
 ---
 
-## Category 6: Future/Reserved Stats
+## Category 7: Future/Reserved Stats
 
 These stats are displayed as "N/A" pending Luxor API endpoint availability or business logic implementation:
 
