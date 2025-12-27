@@ -42,101 +42,15 @@ interface MinerData {
   hardware?: Hardware;
 }
 
+// Filter values
+const FILTER_VALUES = [
+  "ALL MINERS",
+  "ACTIVE",
+  "INACTIVE",
+  "DEPLOYMENT IN PROGRESS",
+] as const;
 // Filter type
-type FilterType =
-  | "ALL MINERS"
-  | "ACTIVE"
-  | "INACTIVE"
-  | "DEPLOYMENT_IN_PROGRESS";
-
-// Dummy data for miners
-const dummyMiners: MinerData[] = [
-  {
-    id: "1",
-    name: "Miner-001",
-    model: "Bitmain S21 Pro",
-    workerName: "test567897",
-    location: "UAE 2",
-    connectedPool: "Default",
-    status: "Active",
-    hashRate: "195 TH/s",
-    hardware: {
-      id: "hw1",
-      model: "Bitmain S21 Pro",
-      powerUsage: 3.25,
-      hashRate: 195,
-      quantity: 0,
-    },
-  },
-  {
-    id: "2",
-    name: "Miner-002",
-    model: "Bitmain S21 Pro",
-    workerName: "test567894",
-    location: "In Transport",
-    connectedPool: "Default",
-    status: "Inactive",
-    hashRate: "0 TH/s",
-    hardware: {
-      id: "hw1",
-      model: "Bitmain S21 Pro",
-      powerUsage: 3.25,
-      hashRate: 0,
-      quantity: 0,
-    },
-  },
-  {
-    id: "3",
-    name: "Miner-003",
-    model: "Bitmain S21 Pro",
-    workerName: "test567898",
-    location: "USA 1",
-    connectedPool: "Default",
-    status: "Active",
-    hashRate: "195 TH/s",
-    hardware: {
-      id: "hw1",
-      model: "Bitmain S21 Pro",
-      powerUsage: 3.25,
-      hashRate: 200,
-      quantity: 0,
-    },
-  },
-  {
-    id: "4",
-    name: "Miner-004",
-    model: "Bitmain S21 Pro",
-    workerName: "test567895",
-    location: "Repair / Warehouse",
-    connectedPool: "Default",
-    status: "Inactive",
-    hashRate: "0 TH/s",
-    hardware: {
-      id: "hw1",
-      model: "Bitmain S21 Pro",
-      powerUsage: 3.25,
-      hashRate: 0,
-      quantity: 0,
-    },
-  },
-  {
-    id: "5",
-    name: "Miner-005",
-    model: "Bitmain S21 Pro",
-    workerName: "test567896",
-    location: "UAE 1",
-    connectedPool: "Default",
-    status: "Active",
-    hashRate: "234 TH/s",
-    hardware: {
-      id: "hw1",
-      model: "Bitmain S21 Pro",
-      powerUsage: 3.25,
-      hashRate: 234,
-      quantity: 0,
-    },
-  },
-];
+export type FilterType = (typeof FILTER_VALUES)[number];
 
 interface HostedMinersListProps {
   customerId?: string;
@@ -147,7 +61,7 @@ export default function HostedMinersList({
 }: HostedMinersListProps) {
   const theme = useTheme();
   const [activeFilter, setActiveFilter] = useState<FilterType>("ALL MINERS");
-  const [miners, setMiners] = useState<MinerData[]>(dummyMiners);
+  const [miners, setMiners] = useState<MinerData[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Fetch miners from API and enrich with Luxor worker status
@@ -170,7 +84,7 @@ export default function HostedMinersList({
 
         if (!minerResponse.ok) {
           console.error("Failed to fetch miners from API");
-          setMiners(dummyMiners);
+          setMiners([]);
           return;
         }
 
@@ -181,7 +95,7 @@ export default function HostedMinersList({
           !Array.isArray(minerData.miners) ||
           minerData.miners.length === 0
         ) {
-          setMiners(dummyMiners);
+          setMiners([]);
           return;
         }
 
@@ -275,7 +189,7 @@ export default function HostedMinersList({
         setMiners(uniqueMiners);
       } catch (err) {
         console.error("Error fetching miners:", err);
-        setMiners(dummyMiners);
+        setMiners([]);
       } finally {
         setLoading(false);
       }
@@ -289,7 +203,7 @@ export default function HostedMinersList({
     if (activeFilter === "ALL MINERS") return true;
     if (activeFilter === "ACTIVE") return miner.status === "Active";
     if (activeFilter === "INACTIVE") return miner.status === "Inactive";
-    if (activeFilter === "DEPLOYMENT_IN_PROGRESS")
+    if (activeFilter === "DEPLOYMENT IN PROGRESS")
       return miner.status === "Deployment in Progress";
     return true;
   });
@@ -302,9 +216,11 @@ export default function HostedMinersList({
     (m) => m.status === "Deployment in Progress",
   ).length;
 
-  const handleFilterChange = (filter: FilterType) => {
-    setActiveFilter(filter);
-  };
+  const filterCounts = [allCount, activeCount, inactiveCount, deploymentCount];
+  const filterValuesWithCounts = FILTER_VALUES.map((value, index) => ({
+    value,
+    count: filterCounts[index],
+  }));
 
   const getStatusChip = (status: MinerData["status"]) => {
     let bgColor = alpha(theme.palette.error.main, 0.1);
@@ -353,87 +269,26 @@ export default function HostedMinersList({
 
         {/* Filter Buttons */}
         <Stack direction="row" spacing={1}>
-          <Button
-            variant={activeFilter === "ALL MINERS" ? "contained" : "outlined"}
-            onClick={() => handleFilterChange("ALL MINERS")}
-            size="small"
-            sx={{
-              minWidth: "100px",
-              textTransform: "none",
-              fontWeight: 500,
-              ...(activeFilter === "ALL MINERS" && {
-                backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                color: theme.palette.primary.main,
-                borderColor: theme.palette.primary.main,
-              }),
-            }}
-          >
-            ALL MINERS ({allCount})
-          </Button>
-          <Button
-            variant={activeFilter === "ACTIVE" ? "contained" : "contained"}
-            onClick={() => handleFilterChange("ACTIVE")}
-            size="small"
-            sx={{
-              minWidth: "80px",
-              textTransform: "none",
-              fontWeight: 500,
-              backgroundColor:
-                activeFilter === "ACTIVE"
-                  ? theme.palette.primary.main
-                  : theme.palette.primary.main,
-              color: "white",
-              "&:hover": {
-                backgroundColor: theme.palette.primary.dark,
-              },
-            }}
-          >
-            ACTIVE ({activeCount})
-          </Button>
-          <Button
-            variant={activeFilter === "INACTIVE" ? "contained" : "contained"}
-            onClick={() => handleFilterChange("INACTIVE")}
-            size="small"
-            sx={{
-              minWidth: "80px",
-              textTransform: "none",
-              fontWeight: 500,
-              backgroundColor:
-                activeFilter === "INACTIVE"
-                  ? theme.palette.primary.main
-                  : theme.palette.primary.main,
-              color: "white",
-              "&:hover": {
-                backgroundColor: theme.palette.primary.dark,
-              },
-            }}
-          >
-            INACTIVE ({inactiveCount})
-          </Button>
-          <Button
-            variant={
-              activeFilter === "DEPLOYMENT_IN_PROGRESS"
-                ? "contained"
-                : "contained"
-            }
-            onClick={() => handleFilterChange("DEPLOYMENT_IN_PROGRESS")}
-            size="small"
-            sx={{
-              minWidth: "160px",
-              textTransform: "none",
-              fontWeight: 500,
-              backgroundColor:
-                activeFilter === "DEPLOYMENT_IN_PROGRESS"
-                  ? theme.palette.primary.main
-                  : theme.palette.primary.main,
-              color: "white",
-              "&:hover": {
-                backgroundColor: theme.palette.primary.dark,
-              },
-            }}
-          >
-            DEPLOYMENT IN PROGRESS ({deploymentCount})
-          </Button>
+          {filterValuesWithCounts.map(({ value, count }) => (
+            <Button
+              key={value}
+              variant={"contained"}
+              onClick={() => setActiveFilter(value)}
+              size="small"
+              sx={{
+                minWidth: "100px",
+                textTransform: "none",
+                fontWeight: 500,
+                ...(activeFilter === value && {
+                  backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                  color: theme.palette.primary.main,
+                  borderColor: theme.palette.primary.main,
+                }),
+              }}
+            >
+              {value} ({count})
+            </Button>
+          ))}
         </Stack>
       </Box>
 
