@@ -86,7 +86,8 @@ export default function EditCustomerModal({
       setError("");
       setSuccess("");
       fetchSubaccounts();
-      fetchGroups();
+      // Pass the subaccount name directly to avoid stale state issues
+      fetchGroups(initialData.luxorSubaccountName || "");
     }
   }, [initialData, open]);
 
@@ -189,7 +190,7 @@ export default function EditCustomerModal({
   /**
    * Fetch groups from API
    */
-  const fetchGroups = async () => {
+  const fetchGroups = async (subaccountName: string = "") => {
     try {
       setFetchingGroups(true);
 
@@ -213,11 +214,84 @@ export default function EditCustomerModal({
       // Filter only active groups
       const activeGroups = groupsList.filter((group: Group) => group.isActive);
       setGroups(activeGroups);
+
+      // Load current group for this user's subaccount (if available)
+      if (subaccountName) {
+        await loadCurrentGroupForSubaccount(subaccountName, activeGroups);
+      }
     } catch (err) {
       console.error("[EditCustomerModal] Error fetching groups:", err);
       // Don't set error for groups, just fail silently
     } finally {
       setFetchingGroups(false);
+    }
+  };
+
+  /**
+   * Load the current group assignment for a subaccount
+   */
+  const loadCurrentGroupForSubaccount = async (
+    subaccountName: string,
+    activeGroupsList: Group[],
+  ) => {
+    try {
+      console.log(
+        `[EditCustomerModal] Looking for group assignment for subaccount: ${subaccountName}`,
+      );
+
+      // Query each group to find which one has this subaccount
+      for (const group of activeGroupsList) {
+        try {
+          const response = await fetch(`/api/groups/${group.id}`);
+
+          if (!response.ok) continue;
+
+          const data = await response.json();
+
+          if (
+            data.success &&
+            data.data &&
+            Array.isArray(data.data.subaccounts)
+          ) {
+            const hasSubaccount = (
+              data.data.subaccounts as Array<{ subaccountName: string }>
+            ).some((sub) => sub.subaccountName === subaccountName);
+
+            if (hasSubaccount) {
+              console.log(
+                `[EditCustomerModal] Found subaccount "${subaccountName}" in group "${group.name}" (${group.id})`,
+              );
+
+              // Set the groupId to this group
+              setFormData((prev) => ({
+                ...prev,
+                groupId: group.id,
+              }));
+              return;
+            }
+          }
+        } catch (err) {
+          console.error(
+            `[EditCustomerModal] Error checking group ${group.id}:`,
+            err,
+          );
+          continue;
+        }
+      }
+
+      console.log(
+        `[EditCustomerModal] No group found for subaccount "${subaccountName}"`,
+      );
+      // Subaccount is not in any group, keep groupId as empty
+      setFormData((prev) => ({
+        ...prev,
+        groupId: "",
+      }));
+    } catch (err) {
+      console.error(
+        "[EditCustomerModal] Error loading current group for subaccount:",
+        err,
+      );
     }
   };
 
