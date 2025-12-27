@@ -208,7 +208,7 @@ export default function AdminDashboard() {
 
           {/* Monthly Revenue - From Cost Payments */}
           <AdminValueCard
-            title="Monthly Revenue"
+            title="Monthly Revenue (30 days)"
             value={stats?.financial.monthlyRevenue ?? 0}
             type="currency"
           />

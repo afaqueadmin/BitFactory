@@ -430,7 +430,7 @@ export async function GET(request: NextRequest) {
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const monthlyRevenue = await prisma.costPayment.aggregate({
       where: {
-        type: "PAYMENT",
+        type: "ELECTRICITY_CHARGES",
         createdAt: { gte: thirtyDaysAgo },
       },
       _sum: { amount: true },
@@ -523,7 +523,9 @@ export async function GET(request: NextRequest) {
       luxor: luxorStats,
       financial: {
         totalCustomerBalance,
-        monthlyRevenue: monthlyRevenue._sum.amount || 0,
+        monthlyRevenue: monthlyRevenue._sum.amount
+          ? monthlyRevenue._sum.amount * -1
+          : 0, // Multiply by -1 to show revenue as positive
         totalMinedRevenue: 0, // Would need to fetch from Luxor earnings endpoint (not yet available)
       },
       warnings,
