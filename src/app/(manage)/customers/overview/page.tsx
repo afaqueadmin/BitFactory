@@ -359,6 +359,7 @@ export default function CustomerOverview() {
     setEditModalOpen(false);
     setChangePasswordModalOpen(false);
     setAddPaymentModalOpen(false);
+    setAddAdjustmentModalOpen(false);
     setSelectedCustomer(null);
   };
 
