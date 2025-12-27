@@ -2,17 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { generateTokens } from "@/lib/jwt";
+import normalizeEmailUsername from "@/lib/helpers/normailizeEmailUsername";
 
 // Add runtime config for Node.js runtime
 export const runtime = "nodejs";
-
-// Helper function to normalize email by removing dots from the username (local part)
-function normalizeEmailUsername(email: string): string {
-  const [localPart, domain] = email.split("@");
-  if (!domain) return email;
-  const normalizedLocalPart = localPart.replace(/\./g, "");
-  return `${normalizedLocalPart}@${domain}`.toLowerCase();
-}
 
 export async function POST(request: NextRequest) {
   try {

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { hash } from "bcrypt";
 import { sendPasswordResetEmail } from "@/lib/email";
+import normalizeEmailUsername from "@/lib/helpers/normailizeEmailUsername";
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,11 +17,16 @@ export async function POST(request: NextRequest) {
       `[Password Reset API] Password reset requested for email: ${email}`,
     );
 
-    // Check if user exists
-    const user = await prisma.user.findUnique({
-      where: { email },
-      select: { id: true, email: true, name: true },
+    // Find all users and match by normalizing their stored email usernames
+    const allUsers = await prisma.user.findMany({
+      select: { id: true, email: true },
     });
+
+    // Find user by comparing normalized email usernames
+    const normalizedUsername = normalizeEmailUsername(email);
+    const user = allUsers.find(
+      (u) => normalizeEmailUsername(u.email) === normalizedUsername,
+    );
 
     if (!user) {
       // For security, don't reveal if email exists or not
