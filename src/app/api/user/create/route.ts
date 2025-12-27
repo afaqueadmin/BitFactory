@@ -3,6 +3,7 @@ import { hash } from "bcrypt";
 import { NextRequest, NextResponse } from "next/server";
 import { verifyJwtToken } from "@/lib/jwt";
 import { sendWelcomeEmail } from "@/lib/email";
+import normalizeEmailUsername from "@/lib/helpers/normailizeEmailUsername";
 
 /**
  * Response structure from /api/luxor proxy route
@@ -98,10 +99,16 @@ export async function POST(request: NextRequest) {
     );
 
     // Check if email is already in use
-    const existingUser = await prisma.user.findUnique({
-      where: { email },
-      select: { role: true },
+    // Find all users and match by normalizing their stored email usernames
+    const allUsers = await prisma.user.findMany({
+      select: { id: true, email: true },
     });
+
+    // Find user by comparing normalized email usernames
+    const normalizedUsername = normalizeEmailUsername(email);
+    const existingUser = allUsers.find(
+      (u) => normalizeEmailUsername(u.email) === normalizedUsername,
+    );
 
     if (existingUser) {
       return NextResponse.json(
