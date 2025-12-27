@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
+import normalizeEmailUsername from "@/lib/helpers/normailizeEmailUsername";
 
 /**
  * GET /api/user/check-email?email=test@example.com
@@ -19,11 +20,16 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Check if user with this email exists
-    const existingUser = await prisma.user.findUnique({
-      where: { email },
+    // Find all users and match by normalizing their stored email usernames
+    const allUsers = await prisma.user.findMany({
       select: { id: true, email: true },
     });
+
+    // Find user by comparing normalized email usernames
+    const normalizedUsername = normalizeEmailUsername(email);
+    const existingUser = allUsers.find(
+      (u) => normalizeEmailUsername(u.email) === normalizedUsername,
+    );
 
     if (existingUser) {
       console.log(`[Check Email API] Email found in database: ${email}`);
