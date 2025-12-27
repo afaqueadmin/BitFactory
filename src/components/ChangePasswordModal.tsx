@@ -13,7 +13,11 @@ import {
   CircularProgress,
   Alert,
 } from "@mui/material";
-import { Close as CloseIcon } from "@mui/icons-material";
+import {
+  Close as CloseIcon,
+  Visibility,
+  VisibilityOff,
+} from "@mui/icons-material";
 
 interface ChangePasswordModalProps {
   open: boolean;
@@ -29,6 +33,7 @@ export default function ChangePasswordModal({
   customerId,
 }: ChangePasswordModalProps) {
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     newPassword: "",
     confirmPassword: "",
@@ -141,7 +146,7 @@ export default function ChangePasswordModal({
             <TextField
               fullWidth
               label="New Password"
-              type="password"
+              type={showPassword ? "text" : "password"}
               value={formData.newPassword}
               onChange={(e) =>
                 setFormData((prev) => ({
@@ -149,12 +154,28 @@ export default function ChangePasswordModal({
                   newPassword: e.target.value,
                 }))
               }
+              InputProps={{
+                endAdornment: (
+                  <IconButton
+                    onClick={() => setShowPassword(!showPassword)}
+                    edge="end"
+                    sx={{
+                      color: (theme) => theme.palette.action.active,
+                      "&:hover": {
+                        backgroundColor: "transparent",
+                      },
+                    }}
+                  >
+                    {showPassword ? <VisibilityOff /> : <Visibility />}
+                  </IconButton>
+                ),
+              }}
               required
             />
             <TextField
               fullWidth
               label="Confirm Password"
-              type="password"
+              type={showPassword ? "text" : "password"}
               value={formData.confirmPassword}
               onChange={(e) =>
                 setFormData((prev) => ({
