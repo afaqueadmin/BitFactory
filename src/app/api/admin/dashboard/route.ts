@@ -8,6 +8,7 @@ interface DashboardStats {
   miners: {
     active: number;
     inactive: number;
+    actionRequired: number;
   };
   spaces: {
     free: number;
@@ -190,9 +191,9 @@ async function fetchAllWorkers(
     const url = new URL("/api/luxor", request.url);
     url.searchParams.set("endpoint", "workers");
     url.searchParams.set("currency", "BTC");
-    url.searchParams.set("subaccount_names", subaccountNames.join(","));
     url.searchParams.set("page_number", "1");
     url.searchParams.set("page_size", "1000");
+    url.searchParams.set("site_id", process.env.LUXOR_FIXED_SITE_ID || "");
 
     const luxorRequest = new NextRequest(url, {
       method: "GET",
@@ -269,12 +270,13 @@ async function fetchHashrateEfficiency(
     const url = new URL("/api/luxor", request.url);
     url.searchParams.set("endpoint", "hashrate-efficiency");
     url.searchParams.set("currency", "BTC");
-    url.searchParams.set("subaccount_names", subaccountNames.join(","));
+    // url.searchParams.set("subaccount_names", subaccountNames.join(","));
     url.searchParams.set("start_date", startDate.toISOString().split("T")[0]);
     url.searchParams.set("end_date", endDate.toISOString().split("T")[0]);
     url.searchParams.set("tick_size", "1d");
     url.searchParams.set("page_number", "1");
     url.searchParams.set("page_size", "1000");
+    url.searchParams.set("site_id", process.env.FIXED_LUXOR_SITE_ID || "");
 
     const luxorRequest = new NextRequest(url, {
       method: "GET",
@@ -309,8 +311,9 @@ async function fetchHashrateEfficiency(
             return sum + hashrate;
           }, 0) / metrics.length;
         const avgEfficiency =
-          metrics.reduce((sum, m) => sum + (m.efficiency || 0), 0) /
-          metrics.length;
+          (metrics.reduce((sum, m) => sum + (m.efficiency || 0), 0) /
+            metrics.length) *
+          100;
 
         // Parse current hashrate (may be string in response)
         const currentHashrate =
@@ -321,7 +324,9 @@ async function fetchHashrateEfficiency(
         return {
           currentHashrate,
           averageHashrate: avgHashrate,
-          currentEfficiency: currentMetric?.efficiency || 0,
+          currentEfficiency: currentMetric?.efficiency
+            ? currentMetric.efficiency * 100
+            : 0,
           averageEfficiency: avgEfficiency,
         };
       }
@@ -384,6 +389,7 @@ export async function GET(request: NextRequest) {
     // Inactive miners: Fetch from local database (DEPLOYMENT_IN_PROGRESS status)
     let activeMinersCount = 0;
     let inactiveMiners = 0;
+    let actionRequiredMiners = 0;
 
     // Fetch active miners from Luxor API
     if (subaccountNames.length > 0) {
@@ -424,8 +430,25 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Fetch all miners from local database (AUTO status)
+    try {
+      const allLocalActiveMiners = await prisma.miner.count({
+        where: { status: "AUTO" },
+      });
+      console.log(
+        `[Admin Dashboard] Inactive miners from DB: ${inactiveMiners}`,
+      );
+
+      actionRequiredMiners = activeMinersCount - allLocalActiveMiners;
+    } catch (error) {
+      console.error(
+        "[Admin Dashboard] Error fetching allMiners miners from DB:",
+        error,
+      );
+    }
+
     console.log(
-      `[Admin Dashboard] Total Miners: ${activeMinersCount} active, ${inactiveMiners} inactive`,
+      `[Admin Dashboard] Total Miners: ${activeMinersCount} active, ${inactiveMiners} inactive, ${actionRequiredMiners} action required`,
     );
 
     // ========== DATABASE STATS (Local Infrastructure) ==========
@@ -554,6 +577,7 @@ export async function GET(request: NextRequest) {
       miners: {
         active: activeMinersCount,
         inactive: inactiveMiners,
+        actionRequired: actionRequiredMiners,
       },
       spaces: {
         free: freeSpaces,

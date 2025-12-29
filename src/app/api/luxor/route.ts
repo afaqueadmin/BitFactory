@@ -347,7 +347,8 @@ export async function GET(
     // ✅ STEP 3: Build query parameters
     const queryParams = buildQueryParams(searchParams);
     const currency = searchParams.get("currency");
-    const siteId = searchParams.get("site_id");
+    const siteId =
+      searchParams.get("site_id") || process.env.LUXOR_FIXED_SITE_ID;
     const subaccountName = searchParams.get("subaccount_name");
 
     console.log("[Luxor Proxy V2] GET: Built query params:", queryParams);
@@ -579,7 +580,7 @@ export async function GET(
           console.log(`[Luxor Proxy V2] GET: Getting workers for ${currency}`);
           data = await luxorClient.getWorkers(currency, {
             subaccount_names: searchParams.get("subaccount_names") || undefined,
-            site_id: siteId || process.env.LUXOR_FIXED_SITE_ID,
+            site_id: siteId,
             status: searchParams.get("status") || undefined,
             page_number: searchParams.get("page_number")
               ? parseInt(searchParams.get("page_number")!)

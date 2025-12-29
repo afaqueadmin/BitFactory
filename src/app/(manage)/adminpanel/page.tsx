@@ -9,6 +9,7 @@ interface DashboardStats {
   miners: {
     active: number;
     inactive: number;
+    actionRequired: number;
   };
   spaces: {
     free: number;
@@ -147,6 +148,11 @@ export default function AdminDashboard() {
                 label: "Inactive",
                 value: stats?.miners.inactive ?? 0,
                 color: "#B0BEC5",
+              },
+              {
+                label: "Action Required",
+                value: stats?.miners.actionRequired ?? 0,
+                color: "#FF5722",
               },
             ]}
           />
