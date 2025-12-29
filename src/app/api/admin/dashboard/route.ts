@@ -470,8 +470,11 @@ export async function GET(request: NextRequest) {
     const usedMinersPower = 0; // Will be calculated from Luxor worker hashrate later
 
     // Fetch customers (users with role CLIENT) statistics
-    const totalCustomers = await prisma.user.count({
+    const totalCustomers = await prisma.user.findMany({
       where: { role: "CLIENT" },
+      include: {
+        miners: true,
+      },
     });
 
     // Fetch customer balance information
@@ -564,14 +567,11 @@ export async function GET(request: NextRequest) {
 
     // ========== COUNT ACTIVE/INACTIVE CUSTOMERS ==========
     // Active customers: those with active workers on Luxor
-    const activeCustomerCount =
-      luxorStats.workers.totalWorkers > 0
-        ? Math.min(
-            totalCustomers,
-            Math.ceil(luxorStats.workers.activeWorkers / 2),
-          )
-        : 0;
-    const inactiveCustomerCount = totalCustomers - activeCustomerCount;
+    const activeCustomerCount = totalCustomers.filter(
+      (customer) =>
+        customer.miners.filter((miner) => miner.status === "AUTO").length > 0,
+    ).length;
+    const inactiveCustomerCount = totalCustomers.length - activeCustomerCount;
 
     const stats: DashboardStats = {
       miners: {
@@ -584,7 +584,7 @@ export async function GET(request: NextRequest) {
         used: usedSpaces,
       },
       customers: {
-        total: totalCustomers,
+        total: totalCustomers.length,
         active: activeCustomerCount,
         inactive: inactiveCustomerCount,
       },
