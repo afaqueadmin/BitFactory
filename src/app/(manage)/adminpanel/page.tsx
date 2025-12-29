@@ -150,7 +150,7 @@ export default function AdminDashboard() {
                 color: "#B0BEC5",
               },
               {
-                label: "Action Required",
+                label: "Review",
                 value: stats?.miners.actionRequired ?? 0,
                 color: "#FF5722",
               },

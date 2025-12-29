@@ -242,6 +242,7 @@ export default function WorkersPage() {
         const inactiveCount = workersList.filter(
           (w) => w.status === "INACTIVE",
         ).length;
+        // @TODO: These should not be calculated client-side in the long term
         const avgHashrate =
           workersList.length > 0
             ? workersList.reduce((sum, w) => sum + (w.hashrate || 0), 0) /
@@ -588,7 +589,7 @@ export default function WorkersPage() {
           />
           <GradientStatCard
             title="Avg Efficiency"
-            value={`${stats.averageEfficiency.toFixed(2)}%`}
+            value={`${stats.averageEfficiency}%`}
           />
         </Box>
       </Box>
