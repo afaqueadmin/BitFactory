@@ -218,7 +218,7 @@ export default function WorkersPage() {
         const subaccountNamesParam = validNames.join(",");
 
         const response = await fetch(
-          `/api/luxor?endpoint=workers&currency=${currency}&subaccount_names=${subaccountNamesParam}&page_number=${pageNumber}&page_size=${pageSize}`,
+          `/api/luxor?endpoint=workers&currency=${currency}&page_number=${pageNumber}&page_size=${pageSize}`,
         );
 
         if (!response.ok) {
@@ -326,7 +326,7 @@ export default function WorkersPage() {
           const subaccountNamesParam = subaccountNames.join(",");
 
           const workersResponse = await fetch(
-            `/api/luxor?endpoint=workers&currency=BTC&subaccount_names=${subaccountNamesParam}&page_number=1&page_size=20`,
+            `/api/luxor?endpoint=workers&currency=BTC&page_number=1&page_size=20`,
           );
 
           if (!workersResponse.ok) {
