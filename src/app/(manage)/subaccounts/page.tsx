@@ -64,7 +64,7 @@ import { Subaccount } from "@/lib/luxor";
  * Fixed site ID for subaccount operations
  * TODO: Replace with dynamic site selection once authorization is resolved
  */
-const FIXED_SITE_ID = "2a3e8c01-2bbb-41e3-b6d1-a2926bfecce5";
+const FIXED_SITE_ID = process.env.LUXOR_FIXED_SITE_ID;
 
 /**
  * Response structure from the /api/luxor proxy route
