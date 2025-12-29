@@ -241,6 +241,62 @@ async function fetchAllWorkers(
 }
 
 /**
+ * Helper: Fetch total revenue from Luxor across all subaccounts
+ */
+async function fetchTotalRevenue(
+  request: NextRequest,
+  subaccountNames: string[],
+): Promise<{
+  revenue: number;
+} | null> {
+  if (subaccountNames.length === 0) {
+    return {
+      revenue: 0,
+    };
+  }
+
+  try {
+    const today = new Intl.DateTimeFormat("en-CA").format(new Date()); // 'YYYY-MM-DD' format
+
+    // Build URL with proper query parameters
+    const url = new URL("/api/luxor", request.url);
+    url.searchParams.set("endpoint", "revenue");
+    url.searchParams.set("currency", "BTC");
+    url.searchParams.set("start_date", "2025-01-01");
+    url.searchParams.set("end_date", today);
+    url.searchParams.set("site_id", process.env.LUXOR_FIXED_SITE_ID || "");
+
+    const luxorRequest = new NextRequest(url, {
+      method: "GET",
+      headers: request.headers,
+    });
+
+    const response = await fetch(luxorRequest);
+
+    if (!response.ok) {
+      console.error("[Admin Dashboard] Revenue fetch failed:", response.status);
+      return null;
+    }
+
+    const result = await response.json();
+    if (result.success && result.data) {
+      const data = result.data; /*as WorkersResponse*/
+      const revenueArray = data.revenue as Array<{
+        date_time: string;
+        revenue: { revenue: number };
+      }>;
+
+      return {
+        revenue: revenueArray[0].revenue.revenue,
+      };
+    }
+  } catch (error) {
+    console.error("[Admin Dashboard] Error fetching workers:", error);
+  }
+  return null;
+}
+
+/**
  * Helper: Fetch hashrate and efficiency metrics from Luxor (V2 API)
  * V2 API: GET /pool/hashrate-efficiency/{currency}?subaccount_names=...&start_date=...&tick_size=1d
  */
@@ -573,6 +629,8 @@ export async function GET(request: NextRequest) {
     ).length;
     const inactiveCustomerCount = totalCustomers.length - activeCustomerCount;
 
+    const revenueStats = await fetchTotalRevenue(request, subaccountNames);
+    console.log("revenueStats:", revenueStats);
     const stats: DashboardStats = {
       miners: {
         active: activeMinersCount,
@@ -594,7 +652,7 @@ export async function GET(request: NextRequest) {
         monthlyRevenue: monthlyRevenue._sum.amount
           ? monthlyRevenue._sum.amount * -1
           : 0, // Multiply by -1 to show revenue as positive
-        totalMinedRevenue: 0, // Would need to fetch from Luxor earnings endpoint (not yet available)
+        totalMinedRevenue: revenueStats?.revenue || 0,
       },
       warnings,
     };

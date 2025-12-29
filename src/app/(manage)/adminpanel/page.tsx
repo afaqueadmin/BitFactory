@@ -252,6 +252,7 @@ export default function AdminDashboard() {
             title="Total Mined Revenue"
             value={stats?.financial.totalMinedRevenue ?? 0}
             subtitle="₿"
+            type="BTC"
           />
 
           {/* === LUXOR POOL ACCOUNTS === */}

@@ -8,7 +8,7 @@ interface AdminValueCardProps {
   title: string;
   value: number | string;
   subtitle?: string;
-  type?: "currency" | "number";
+  type?: "currency" | "BTC" | "number";
 }
 
 export default function AdminValueCard({

@@ -1,6 +1,6 @@
 export const formatValue = (
   value: number | string,
-  type: "currency" | "number" = "number",
+  type: "currency" | "BTC" | "number" = "number",
   options: Intl.NumberFormatOptions = {},
 ): string => {
   // If value is a string (like "N/A"), return as-is
@@ -14,6 +14,13 @@ export const formatValue = (
       currency: "USD",
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
+      ...options,
+    }).format(value);
+  }
+  if (type === "BTC") {
+    return new Intl.NumberFormat("en-US", {
+      minimumFractionDigits: 8,
+      maximumFractionDigits: 8,
       ...options,
     }).format(value);
   }
