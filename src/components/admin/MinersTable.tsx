@@ -631,7 +631,7 @@ export default function MinersTable({
                     )}
                   </TableCell>
                   <TableCell align="right">
-                    {(miner.hardware?.powerUsage || 0).toFixed(2)} kW
+                    {miner.hardware?.powerUsage || 0} kW
                   </TableCell>
                   <TableCell align="right">
                     {parseFloat(String(miner.hardware?.hashRate || 0)).toFixed(

@@ -79,8 +79,8 @@ export async function GET(request: NextRequest) {
           }
 
           // powerUsage is already in kW
-          totalConsumption += miner.powerUsage;
-          totalDailyCost += miner.powerUsage * ratePerKwh * 24;
+          totalConsumption += miner.powerUsage * 24; // kWh consumed per day
+          totalDailyCost += miner.powerUsage * ratePerKwh * 24; // daily cost
         }
       }
       totalDailyCost = Number(
