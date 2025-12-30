@@ -257,13 +257,13 @@ async function fetchTotalRevenue(
 
   try {
     const today = new Intl.DateTimeFormat("en-CA").format(new Date()); // 'YYYY-MM-DD' format
-    console.log("today:", today);
+
     // Build URL with proper query parameters
     const url = new URL("/api/luxor", request.url);
     url.searchParams.set("endpoint", "revenue");
     url.searchParams.set("currency", "BTC");
     url.searchParams.set("start_date", "2025-01-01");
-    url.searchParams.set("end_date", "2025-12-30");
+    url.searchParams.set("end_date", today);
     url.searchParams.set("site_id", process.env.LUXOR_FIXED_SITE_ID || "");
 
     const luxorRequest = new NextRequest(url, {
@@ -285,7 +285,6 @@ async function fetchTotalRevenue(
         date_time: string;
         revenue: { revenue: number };
       }>;
-      console.log(revenueArray);
       return {
         revenue: revenueArray.reduce(
           (sum, dailyRevenueItem) => sum + dailyRevenueItem.revenue.revenue,
