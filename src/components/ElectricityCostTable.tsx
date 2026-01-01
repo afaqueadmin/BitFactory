@@ -78,10 +78,45 @@ const headCells: readonly HeadCell[] = [
 ];
 
 function descendingComparator<T>(a: T, b: T, orderBy: keyof T) {
-  if (b[orderBy] < a[orderBy]) {
+  const aVal = a[orderBy];
+  const bVal = b[orderBy];
+
+  // Handle date comparison - check if ordering by date column
+  if (orderBy === "date") {
+    // Parse dates in DD/MM/YYYY format
+    const parseDate = (dateStr: string): Date => {
+      const [day, month, year] = String(dateStr).split("/").map(Number);
+      return new Date(year, month - 1, day);
+    };
+
+    try {
+      const aDate = parseDate(String(aVal));
+      const bDate = parseDate(String(bVal));
+
+      if (bDate < aDate) {
+        return -1;
+      }
+      if (bDate > aDate) {
+        return 1;
+      }
+      return 0;
+    } catch {
+      // Fallback to string comparison if parsing fails
+      if (bVal < aVal) {
+        return -1;
+      }
+      if (bVal > aVal) {
+        return 1;
+      }
+      return 0;
+    }
+  }
+
+  // Default comparison for other columns
+  if (bVal < aVal) {
     return -1;
   }
-  if (b[orderBy] > a[orderBy]) {
+  if (bVal > aVal) {
     return 1;
   }
   return 0;
