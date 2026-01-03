@@ -380,8 +380,8 @@ async function fetchHashrateEfficiency(
             : currentMetric?.hashrate || 0;
 
         return {
-          currentHashrate,
-          averageHashrate: avgHashrate,
+          currentHashrate: currentHashrate / 1000000000000, // Convert from H/s to TH/s
+          averageHashrate: avgHashrate / 1000000000000, // Convert from H/s to TH/s
           currentEfficiency: currentMetric?.efficiency
             ? currentMetric.efficiency * 100
             : 0,
