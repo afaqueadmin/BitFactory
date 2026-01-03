@@ -111,8 +111,16 @@ export async function POST(
       }
 
       // Delete all miners (CASCADE deletes rate history)
-      await tx.miner.deleteMany({
+      // await tx.miner.deleteMany({
+      //   where: { id: { in: minerIds } },
+      // });
+
+      // Soft-Delete all miners (Do not delete rate history)
+      await tx.miner.updateMany({
         where: { id: { in: minerIds } },
+        data: {
+          isDeleted: true,
+        },
       });
 
       // Restore hardware quantities

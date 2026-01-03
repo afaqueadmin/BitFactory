@@ -67,6 +67,7 @@ interface Miner {
   createdAt: string;
   updatedAt: string;
   rate_per_kwh?: number;
+  isDeleted: boolean;
   user?: User;
   space?: Space;
   hardware?: Hardware;
@@ -111,6 +112,7 @@ export default function MachinePage() {
   const [selectedRateFilter, setSelectedRateFilter] = useState<string>("");
   const [showBulkEditModal, setShowBulkEditModal] = useState(false);
   const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
+  const [showDeleted, setShowDeleted] = useState(false);
 
   /**
    * Fetch all miners, users, and spaces
@@ -120,8 +122,12 @@ export default function MachinePage() {
     setError(null);
 
     try {
+      const minerUrl = new URL("/api/machine", window.location.origin);
+      if (showDeleted) {
+        minerUrl.searchParams.append("isDeleted", "true");
+      }
       const [minersRes, spacesRes, usersRes] = await Promise.all([
-        fetch("/api/machine"),
+        fetch(minerUrl),
         fetch("/api/spaces"),
         fetch("/api/user/all"),
       ]);
@@ -189,7 +195,7 @@ export default function MachinePage() {
    */
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [showDeleted]);
 
   /**
    * Handle create new miner
@@ -677,6 +683,8 @@ export default function MachinePage() {
               onDelete={handleDelete}
               isLoading={loading}
               error={tableError}
+              showDeleted={showDeleted}
+              setShowDeleted={setShowDeleted}
             />
           </>
         )}

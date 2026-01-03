@@ -115,10 +115,11 @@ export async function GET(
     const userId = searchParams.get("userId");
     const sortBy = searchParams.get("sortBy") || "createdAt";
     const order = searchParams.get("order") || "desc";
+    const includeDeleted = searchParams.get("isDeleted") === "true";
 
     // Build where clause for filtering
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const where: any = {};
+    const where: any = includeDeleted ? {} : { isDeleted: false };
     if (status) {
       where.status = status;
     }

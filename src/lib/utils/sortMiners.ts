@@ -74,6 +74,7 @@ interface Miner {
   spaceId: string;
   createdAt: string;
   updatedAt: string;
+  isDeleted: boolean;
   rate_per_kwh?: number;
   user?: User;
   space?: Space;

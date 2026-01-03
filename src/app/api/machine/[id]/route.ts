@@ -513,8 +513,16 @@ export async function DELETE(
     // Delete miner and restore hardware quantity in transaction
     await prisma.$transaction(async (tx) => {
       // Delete the miner
-      await tx.miner.delete({
+      // await tx.miner.delete({
+      //   where: { id },
+      // });
+
+      // Soft delete hardware by setting isDeleted to true
+      await prisma.miner.update({
         where: { id },
+        data: {
+          isDeleted: true,
+        },
       });
 
       // Restore hardware quantity

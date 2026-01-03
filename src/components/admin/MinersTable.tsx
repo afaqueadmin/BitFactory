@@ -8,7 +8,7 @@
 
 "use client";
 
-import React, { useMemo } from "react";
+import React, { Dispatch, SetStateAction, useMemo } from "react";
 import {
   Box,
   Button,
@@ -33,6 +33,8 @@ import {
   MenuItem,
   SelectChangeEvent,
   Menu,
+  FormControlLabel,
+  Checkbox,
 } from "@mui/material";
 import {
   Edit as EditIcon,
@@ -95,6 +97,7 @@ interface Miner {
   spaceId: string;
   createdAt: string;
   updatedAt: string;
+  isDeleted: boolean;
   rate_per_kwh?: number;
   user?: User;
   space?: Space;
@@ -126,6 +129,8 @@ interface MinersTableProps {
   onDelete: (minerId: string) => void;
   isLoading?: boolean;
   error?: string | null;
+  showDeleted: boolean;
+  setShowDeleted: Dispatch<SetStateAction<boolean>>;
 }
 
 export default function MinersTable({
@@ -134,6 +139,8 @@ export default function MinersTable({
   onDelete,
   isLoading = false,
   error = null,
+  showDeleted,
+  setShowDeleted,
 }: MinersTableProps) {
   const [deleteConfirm, setDeleteConfirm] = React.useState<string | null>(null);
   const [deleting, setDeleting] = React.useState(false);
@@ -330,6 +337,15 @@ export default function MinersTable({
             {sortConfig.direction === "asc" ? "Asc" : "Desc"}
           </Button>
         </Box>
+        <FormControlLabel
+          control={
+            <Checkbox
+              checked={showDeleted}
+              onChange={(e) => setShowDeleted(e.target.checked)}
+            />
+          }
+          label="Show Deleted"
+        />
       </Box>
 
       <TableContainer
@@ -681,6 +697,7 @@ export default function MinersTable({
                         </Typography>
                       </MenuItem>
                       <MenuItem
+                        disabled={miner.isDeleted}
                         onClick={() => handleDelete(miner.id)}
                         sx={{ color: "error.main" }}
                       >
