@@ -248,7 +248,7 @@ export default function MiningEarningsChart({
                   const num = Number(value);
                   if (name === "earnings" || name === "Daily Revenue (Luxor)") {
                     const btcValue = num.toFixed(8);
-                    return [`₿${btcValue}`, "Daily Revenue (from Luxor API)"];
+                    return [`₿${btcValue}`, "Daily Revenue"];
                   }
                   return [
                     `${num.toFixed(8)}`,
