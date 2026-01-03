@@ -239,7 +239,7 @@ export default function AdminDashboard() {
           {/* Hashprice - From Pool Stats */}
           <AdminValueCard
             title="Hashprice"
-            value={stats?.luxor.hashprice ?? "0"}
+            value={stats?.luxor.hashprice ?? 0}
             subtitle="BTC/PH/s/Day"
           />
 

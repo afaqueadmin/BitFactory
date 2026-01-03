@@ -38,7 +38,7 @@ interface DashboardStats {
     hashrate_5m: number; // TH/s (5 minute average)
     hashrate_24h: number; // TH/s (24 hour average)
     uptime_24h: number; // percentage (0-100)
-    hashprice: string; // satoshis per TH/s
+    hashprice: number; // formatted hashprice value
     power: {
       totalPower: number; // kW from miners
       availablePower: number; // kW from spaces
@@ -356,7 +356,7 @@ async function fetchSummary(
       hashrate_5m: 0,
       hashrate_24h: 0,
       uptime_24h: 0,
-      hashprice: "0",
+      hashprice: 0,
     };
   }
 
@@ -407,7 +407,7 @@ async function fetchSummary(
         hashrate_5m: (parseFloat(data.hashrate_5m) || 0) / 1000000000000000, // Convert from H/s to PH/s
         hashrate_24h: (parseFloat(data.hashrate_24h) || 0) / 1000000000000000, // Convert from H/s to PH/s
         uptime_24h: (data.uptime_24h || 0) * 100, // Convert to percentage (0-100)
-        hashprice: String((hashpriceValue as number).toFixed(5)), // Format to 5 decimal places
+        hashprice: Math.round((hashpriceValue as number) * 100000) / 100000, // Format to 5 decimal places
       };
     }
   } catch (error) {
