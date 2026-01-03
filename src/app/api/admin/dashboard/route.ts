@@ -38,7 +38,6 @@ interface DashboardStats {
     hashrate_5m: number; // TH/s (5 minute average)
     hashrate_24h: number; // TH/s (24 hour average)
     uptime_24h: number; // percentage (0-100)
-    hashprice: number; // formatted hashprice value
     power: {
       totalPower: number; // kW from miners
       availablePower: number; // kW from spaces
@@ -341,7 +340,6 @@ async function fetchSummary(
   hashrate_5m: number;
   hashrate_24h: number;
   uptime_24h: number;
-  hashprice: number;
 } | null> {
   console.log(
     "[Admin Dashboard] fetchSummary called with subaccountNames:",
@@ -356,7 +354,6 @@ async function fetchSummary(
       hashrate_5m: 0,
       hashrate_24h: 0,
       uptime_24h: 0,
-      hashprice: 0,
     };
   }
 
@@ -389,9 +386,6 @@ async function fetchSummary(
     if (result.success && result.data) {
       const data = result.data as SummaryResponse;
 
-      // Extract hashprice from array
-      const hashpriceValue = data.hashprice?.[0]?.value || 0;
-
       console.log(
         "[Admin Dashboard] Parsed summary - hashrate_5m:",
         data.hashrate_5m,
@@ -399,15 +393,12 @@ async function fetchSummary(
         data.hashrate_24h,
         "uptime_24h:",
         data.uptime_24h,
-        "hashprice:",
-        hashpriceValue,
       );
 
       return {
         hashrate_5m: (parseFloat(data.hashrate_5m) || 0) / 1000000000000000, // Convert from H/s to PH/s
         hashrate_24h: (parseFloat(data.hashrate_24h) || 0) / 1000000000000000, // Convert from H/s to PH/s
         uptime_24h: (data.uptime_24h || 0) * 100, // Convert to percentage (0-100)
-        hashprice: Math.round((hashpriceValue as number) * 100000) / 100000, // Format to 5 decimal places
       };
     }
   } catch (error) {
@@ -578,7 +569,6 @@ export async function GET(request: NextRequest) {
       hashrate_5m: 0,
       hashrate_24h: 0,
       uptime_24h: 0,
-      hashprice: 0,
       power: {
         totalPower: usedMinersPower, // kW from active miners
         availablePower: totalSpacePower._sum.powerCapacity || 0, // kW from spaces
@@ -604,13 +594,12 @@ export async function GET(request: NextRequest) {
           };
         }
 
-        // Fetch summary data (includes hashrate, uptime, efficiency, hashprice)
+        // Fetch summary data (includes hashrate, uptime)
         const summaryData = await fetchSummary(request, subaccountNames);
         if (summaryData) {
           luxorStats.hashrate_5m = summaryData.hashrate_5m;
           luxorStats.hashrate_24h = summaryData.hashrate_24h;
           luxorStats.uptime_24h = summaryData.uptime_24h;
-          luxorStats.hashprice = summaryData.hashprice;
         }
       } else {
         warnings.push("No Luxor subaccounts configured for any users");

@@ -34,7 +34,6 @@ interface DashboardStats {
     hashrate_5m: number;
     hashrate_24h: number;
     uptime_24h: number;
-    hashprice: string;
     power: {
       totalPower: number;
       availablePower: number;
@@ -232,15 +231,7 @@ export default function AdminDashboard() {
           {/* Uptime 24h - From Luxor */}
           <AdminValueCard
             title="Uptime (24 hours)"
-            value={stats?.luxor.uptime_24h ?? 0}
-            subtitle="%"
-          />
-
-          {/* Hashprice - From Pool Stats */}
-          <AdminValueCard
-            title="Hashprice"
-            value={stats?.luxor.hashprice ?? 0}
-            subtitle="BTC/PH/s/Day"
+            value={`${stats?.luxor.uptime_24h ?? 0}%`}
           />
 
           {/* Total Mined Revenue */}
