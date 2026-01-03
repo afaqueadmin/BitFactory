@@ -1,33 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyJwtToken } from "@/lib/jwt";
 import { prisma } from "@/lib/prisma";
-import { createLuxorClient } from "@/lib/luxor";
+import { createLuxorClient, RevenueResponse, RevenueData } from "@/lib/luxor";
 
 interface DailyPerformanceData {
   date: string;
   earnings: number;
   costs: number;
   hashRate: number;
-}
-
-interface LuxorRevenueItem {
-  timestamp?: string;
-  date?: string;
-  btc_revenue?: number;
-  revenue?: number;
-  estimated_earnings?: number;
-}
-
-interface LuxorRevenueResponse {
-  currency_type?: string;
-  start_date?: string;
-  end_date?: string;
-  subaccounts?: Array<{
-    name: string;
-    display_name?: string;
-  }>;
-  revenue?: LuxorRevenueItem[];
-  [key: string]: unknown;
 }
 
 /**
@@ -117,25 +97,27 @@ export async function GET(request: NextRequest) {
 
     // Fetch revenue data from Luxor /pool/revenue/BTC endpoint
     // Returns daily revenue breakdown for the user's subaccount
-    const revenueResponse = await luxorClient.request<LuxorRevenueResponse>(
-      "/pool/revenue/BTC",
-      {
-        subaccount_names: subaccountName,
-        start_date: startDateStr,
-        end_date: endDateStr,
-      },
-    );
+    // Using getRevenue method for better error handling
+    const revenueResponse = await luxorClient.getRevenue("BTC", {
+      subaccount_names: subaccountName,
+      start_date: startDateStr,
+      end_date: endDateStr,
+    });
 
     console.log(
       `[Mining Performance API] Received Luxor revenue response with keys:`,
       Object.keys(revenueResponse).slice(0, 5),
     );
+    console.log(
+      `[Mining Performance API] Full response:`,
+      JSON.stringify(revenueResponse).substring(0, 500),
+    );
 
     // Transform Luxor response into chart data format
-    // Response structure: { revenue: [ { timestamp/date, btc_revenue/revenue }, ... ] }
+    // Response structure: { revenue: [ { date_time, revenue: { revenue: number } }, ... ] }
     const performanceData: DailyPerformanceData[] = [];
 
-    // Handle both array and object response formats from Luxor
+    // Luxor API returns revenue as an array of objects with date_time and revenue data
     if (revenueResponse && Array.isArray(revenueResponse.revenue)) {
       console.log(
         `[Mining Performance API] Processing ${revenueResponse.revenue.length} revenue items from Luxor`,
@@ -143,23 +125,27 @@ export async function GET(request: NextRequest) {
 
       for (const item of revenueResponse.revenue) {
         if (item && typeof item === "object") {
-          // Extract date from timestamp or date field
+          // Extract date from date_time (format: YYYY-MM-DDTHH:mm:ss or similar)
           const dateStr =
-            item.date ||
-            (item.timestamp
-              ? new Date(item.timestamp).toISOString().split("T")[0]
-              : null);
+            item.date_time && typeof item.date_time === "string"
+              ? item.date_time.split("T")[0] // Extract YYYY-MM-DD from ISO datetime
+              : null;
 
           if (!dateStr) {
             console.warn(
-              "[Mining Performance API] Skipping item without date:",
+              "[Mining Performance API] Skipping item without valid date_time:",
               item,
             );
             continue;
           }
 
-          // Extract BTC revenue from various possible field names
-          const btcRevenue = Number(item.btc_revenue || item.revenue || 0) || 0;
+          // Extract BTC revenue from the revenue field
+          // Luxor returns: revenue: { currency_type: "BTC", revenue_type: "pool", revenue: number }
+          let btcRevenue = 0;
+          if (item.revenue && typeof item.revenue === "object") {
+            const revenueObj = item.revenue as Record<string, unknown>;
+            btcRevenue = Number(revenueObj.revenue || 0) || 0;
+          }
 
           performanceData.push({
             date: dateStr,
@@ -169,44 +155,15 @@ export async function GET(request: NextRequest) {
           });
         }
       }
-    } else if (revenueResponse && typeof revenueResponse === "object") {
-      // Fallback: try to parse as date-keyed object
-      const allDates = Object.keys(revenueResponse)
-        .filter(
-          (key) =>
-            key !== "currency_type" &&
-            key !== "start_date" &&
-            key !== "end_date" &&
-            key !== "subaccounts" &&
-            key !== "revenue",
-        )
-        .sort();
-      const recentDates = allDates.slice(-days);
 
       console.log(
-        `[Mining Performance API] Processing ${recentDates.length} dates from Luxor (fallback mode)`,
+        `[Mining Performance API] Parsed ${performanceData.length} daily performance records from Luxor`,
       );
-
-      for (const dateStr of recentDates) {
-        const dailyRevenue = (revenueResponse as Record<string, unknown>)[
-          dateStr
-        ];
-
-        if (dailyRevenue && typeof dailyRevenue === "object") {
-          const dailyRevenueObj = dailyRevenue as Record<string, unknown>;
-          const btcRevenue =
-            Number(
-              dailyRevenueObj.btc_revenue || dailyRevenueObj.revenue || 0,
-            ) || 0;
-
-          performanceData.push({
-            date: dateStr,
-            earnings: btcRevenue,
-            costs: 0,
-            hashRate: 0,
-          });
-        }
-      }
+    } else {
+      console.warn(
+        "[Mining Performance API] Revenue response does not have expected array format:",
+        typeof revenueResponse.revenue,
+      );
     }
 
     // Sort by date to ensure chronological order

@@ -65,13 +65,21 @@ export default function MiningEarningsChart({
           },
         );
 
+        console.log(
+          `[MiningEarningsChart] API Response Status: ${response.status} ${response.statusText}`,
+        );
+
         if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          console.error(`[MiningEarningsChart] API Error Response:`, errorData);
           throw new Error(
-            `Failed to fetch mining data: ${response.statusText}`,
+            errorData.error ||
+              `Failed to fetch mining data: ${response.statusText}`,
           );
         }
 
         const data = await response.json();
+        console.log(`[MiningEarningsChart] Raw API Response:`, data);
 
         if (data.success && Array.isArray(data.data)) {
           console.log(
