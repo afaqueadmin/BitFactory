@@ -14,6 +14,11 @@ import { ArrowBack as ArrowBackIcon } from "@mui/icons-material";
 import ElectricityCostTable from "@/components/ElectricityCostTable";
 import HostedMinersList from "@/components/HostedMinersList";
 import BalanceCard from "@/components/dashboardCards/BalanceCard";
+import CostsCard from "@/components/dashboardCards/CostsCard";
+import EstimatedMiningDaysLeftCard from "@/components/dashboardCards/EstimatedMiningDaysLeftCard";
+import EstimatedMonthlyCostCard from "@/components/dashboardCards/EstimatedMonthlyCostCard";
+import { getDaysInCurrentMonth } from "@/lib/helpers/getDaysInCurrentMonth";
+import { formatValue } from "@/lib/helpers/formatValue";
 
 interface CustomerDetails {
   id: string;
@@ -107,9 +112,24 @@ export default function CustomerDetailPage() {
   const [customerError, setCustomerError] = useState<string | null>(null);
   const [balance, setBalance] = React.useState<number>(0);
   const [balanceLoading, setBalanceLoading] = React.useState(true);
+  const [dailyCost, setDailyCost] = React.useState<number>(0);
+  const [dailyCostLoading, setDailyCostLoading] = React.useState(true);
   const [summary, setSummary] = useState<EarningsSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  const estimatedMonthlyCost = React.useMemo(() => {
+    if (dailyCostLoading) return 0;
+    return dailyCost * getDaysInCurrentMonth();
+  }, [dailyCost, dailyCostLoading]);
+
+  const daysLeft = React.useMemo(() => {
+    if (balanceLoading || dailyCostLoading) return 0;
+    if (dailyCost === 0) return "∞";
+    return Number(
+      formatValue(balance / dailyCost, "number", { maximumFractionDigits: 0 }),
+    );
+  }, [balance, balanceLoading, dailyCost, dailyCostLoading]);
 
   // Fetch customer details
   useEffect(() => {
@@ -157,6 +177,42 @@ export default function CustomerDetailPage() {
 
     if (customerId) {
       fetchCustomer();
+    }
+  }, [customerId]);
+
+  // Fetch daily costs on component mount
+  React.useEffect(() => {
+    const fetchDailyCosts = async () => {
+      try {
+        setDailyCostLoading(true);
+        const response = await fetch(
+          `/api/miners/daily-costs?customerId=${customerId}`,
+          {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+            },
+          },
+        );
+
+        if (!response.ok) {
+          console.error("Failed to fetch daily costs");
+          setDailyCost(0);
+          return;
+        }
+
+        const data = await response.json();
+        setDailyCost(data.totalDailyCost || 0);
+      } catch (err) {
+        console.error("Error fetching daily costs:", err);
+        setDailyCost(0);
+      } finally {
+        setDailyCostLoading(false);
+      }
+    };
+
+    if (customerId) {
+      fetchDailyCosts();
     }
   }, [customerId]);
 
@@ -303,7 +359,9 @@ export default function CustomerDetailPage() {
               mb: 4,
             }}
           >
-            <BalanceCard value={balanceLoading ? 0 : balance} />
+            <Box sx={{ flex: { xs: 1, md: "1 1 25%" }, minWidth: 0 }}>
+              <BalanceCard value={balanceLoading ? 0 : balance} />
+            </Box>
             <Box>
               <Paper
                 sx={{
@@ -402,6 +460,18 @@ export default function CustomerDetailPage() {
                   </Box>
                 )}
               </Paper>
+            </Box>
+
+            <Box sx={{ flex: { xs: 1, md: "1 1 25%" }, minWidth: 0 }}>
+              <CostsCard value={dailyCostLoading ? 0 : dailyCost} />
+            </Box>
+
+            <Box sx={{ flex: { xs: 1, md: "1 1 25%" }, minWidth: 0 }}>
+              <EstimatedMiningDaysLeftCard days={daysLeft} />
+            </Box>
+
+            <Box sx={{ flex: { xs: 1, md: "1 1 25%" }, minWidth: 0 }}>
+              <EstimatedMonthlyCostCard value={estimatedMonthlyCost} />
             </Box>
           </Box>
 
