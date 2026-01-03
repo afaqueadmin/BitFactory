@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
-import { WorkersResponse, HashrateEfficiencyResponse } from "@/lib/luxor";
+import {
+  WorkersResponse,
+  HashrateEfficiencyResponse,
+  SummaryResponse,
+} from "@/lib/luxor";
 
 interface DashboardStats {
   // Database-backed stats
@@ -31,14 +35,10 @@ interface DashboardStats {
       inactiveWorkers: number;
       totalWorkers: number;
     };
-    hashrate: {
-      currentHashrate: number; // TH/s
-      averageHashrate: number; // TH/s
-    };
-    efficiency: {
-      currentEfficiency: number; // percentage
-      averageEfficiency: number; // percentage
-    };
+    hashrate_5m: number; // TH/s (5 minute average)
+    hashrate_24h: number; // TH/s (24 hour average)
+    uptime_24h: number; // percentage (0-100)
+    hashprice: string; // satoshis per TH/s
     power: {
       totalPower: number; // kW from miners
       availablePower: number; // kW from spaces
@@ -102,17 +102,48 @@ async function getAllSubaccountNames(request: NextRequest): Promise<string[]> {
       }>;
       const subaccountNames = subaccounts.map((s) => s.name);
       console.log(
-        `[Admin Dashboard] Accessible subaccounts (${subaccountNames.length} total):`,
+        `[Admin Dashboard] Accessible subaccounts from Luxor (${subaccountNames.length} total):`,
         subaccountNames,
       );
       return subaccountNames;
     }
 
-    console.log("[Admin Dashboard] No subaccounts found in response");
-    return [];
+    console.log(
+      "[Admin Dashboard] No subaccounts found in Luxor API response, falling back to database",
+    );
+
+    // FALLBACK: Get subaccounts from database if Luxor API returns empty
+    try {
+      const usersWithSubaccounts = await prisma.user.findMany({
+        where: {
+          luxorSubaccountName: {
+            not: null,
+          },
+        },
+        select: {
+          luxorSubaccountName: true,
+        },
+      });
+
+      const dbSubaccountNames = usersWithSubaccounts
+        .map((u) => u.luxorSubaccountName)
+        .filter((name): name is string => name !== null);
+
+      console.log(
+        `[Admin Dashboard] Fallback: Found ${dbSubaccountNames.length} subaccounts in database:`,
+        dbSubaccountNames,
+      );
+      return dbSubaccountNames;
+    } catch (dbError) {
+      console.error(
+        "[Admin Dashboard] Error fetching subaccounts from database:",
+        dbError,
+      );
+      return [];
+    }
   } catch (error) {
     console.error(
-      "[Admin Dashboard] Error fetching subaccounts from Luxor:",
+      "[Admin Dashboard] Error fetching subaccounts from Luxor API:",
       error,
     );
     return [];
@@ -299,42 +330,43 @@ async function fetchTotalRevenue(
 }
 
 /**
- * Helper: Fetch hashrate and efficiency metrics from Luxor (V2 API)
- * V2 API: GET /pool/hashrate-efficiency/{currency}?subaccount_names=...&start_date=...&tick_size=1d
+ * Helper: Fetch summary statistics from Luxor V2 API
+ * V2 API: GET /pool/summary/{currency}?subaccount_names=...
+ * Returns: subaccount-specific hashrate, uptime, efficiency, hashprice
  */
-async function fetchHashrateEfficiency(
+async function fetchSummary(
   request: NextRequest,
   subaccountNames: string[],
 ): Promise<{
-  currentHashrate: number;
-  averageHashrate: number;
-  currentEfficiency: number;
-  averageEfficiency: number;
+  hashrate_5m: number;
+  hashrate_24h: number;
+  uptime_24h: number;
+  hashprice: number;
 } | null> {
+  console.log(
+    "[Admin Dashboard] fetchSummary called with subaccountNames:",
+    subaccountNames,
+  );
+
   if (subaccountNames.length === 0) {
+    console.warn(
+      "[Admin Dashboard] No subaccount names provided to fetchSummary",
+    );
     return {
-      currentHashrate: 0,
-      averageHashrate: 0,
-      currentEfficiency: 0,
-      averageEfficiency: 0,
+      hashrate_5m: 0,
+      hashrate_24h: 0,
+      uptime_24h: 0,
+      hashprice: 0,
     };
   }
 
   try {
-    // Fetch last 7 days of data for recent trends
-    const endDate = new Date();
-    const startDate = new Date(endDate.getTime() - 7 * 24 * 60 * 60 * 1000);
-
     const url = new URL("/api/luxor", request.url);
-    url.searchParams.set("endpoint", "hashrate-efficiency");
+    url.searchParams.set("endpoint", "summary");
     url.searchParams.set("currency", "BTC");
-    // url.searchParams.set("subaccount_names", subaccountNames.join(","));
-    url.searchParams.set("start_date", startDate.toISOString().split("T")[0]);
-    url.searchParams.set("end_date", endDate.toISOString().split("T")[0]);
-    url.searchParams.set("tick_size", "1d");
-    url.searchParams.set("page_number", "1");
-    url.searchParams.set("page_size", "1000");
-    url.searchParams.set("site_id", process.env.FIXED_LUXOR_SITE_ID || "");
+    url.searchParams.set("subaccount_names", subaccountNames.join(","));
+
+    console.log("[Admin Dashboard] fetchSummary URL:", url.toString());
 
     const luxorRequest = new NextRequest(url, {
       method: "GET",
@@ -344,56 +376,42 @@ async function fetchHashrateEfficiency(
     const response = await fetch(luxorRequest);
 
     if (!response.ok) {
-      console.error(
-        "[Admin Dashboard] Hashrate efficiency fetch failed:",
-        response.status,
-      );
+      console.error("[Admin Dashboard] Summary fetch failed:", response.status);
       return null;
     }
 
     const result = await response.json();
+    console.log(
+      "[Admin Dashboard] Summary raw response:",
+      JSON.stringify(result.data, null, 2),
+    );
+
     if (result.success && result.data) {
-      const data = result.data as HashrateEfficiencyResponse;
+      const data = result.data as SummaryResponse;
 
-      if (data.hashrate_efficiency && data.hashrate_efficiency.length > 0) {
-        const metrics = data.hashrate_efficiency;
-        const currentMetric = metrics[metrics.length - 1];
+      // Extract hashprice from array
+      const hashpriceValue = data.hashprice?.[0]?.value || 0;
 
-        // Calculate averages
-        const avgHashrate =
-          metrics.reduce((sum, m) => {
-            const hashrate =
-              typeof m.hashrate === "string"
-                ? parseFloat(m.hashrate)
-                : m.hashrate || 0;
-            return sum + hashrate;
-          }, 0) / metrics.length;
-        const avgEfficiency =
-          (metrics.reduce((sum, m) => sum + (m.efficiency || 0), 0) /
-            metrics.length) *
-          100;
+      console.log(
+        "[Admin Dashboard] Parsed summary - hashrate_5m:",
+        data.hashrate_5m,
+        "hashrate_24h:",
+        data.hashrate_24h,
+        "uptime_24h:",
+        data.uptime_24h,
+        "hashprice:",
+        hashpriceValue,
+      );
 
-        // Parse current hashrate (may be string in response)
-        const currentHashrate =
-          typeof currentMetric?.hashrate === "string"
-            ? parseFloat(currentMetric.hashrate)
-            : currentMetric?.hashrate || 0;
-
-        return {
-          currentHashrate: currentHashrate / 1000000000000, // Convert from H/s to TH/s
-          averageHashrate: avgHashrate / 1000000000000, // Convert from H/s to TH/s
-          currentEfficiency: currentMetric?.efficiency
-            ? currentMetric.efficiency * 100
-            : 0,
-          averageEfficiency: avgEfficiency,
-        };
-      }
+      return {
+        hashrate_5m: (parseFloat(data.hashrate_5m) || 0) / 1000000000000000, // Convert from H/s to PH/s
+        hashrate_24h: (parseFloat(data.hashrate_24h) || 0) / 1000000000000000, // Convert from H/s to PH/s
+        uptime_24h: (data.uptime_24h || 0) * 100, // Convert to percentage (0-100)
+        hashprice: hashpriceValue.toFixed(5), // Format to 5 decimal places
+      };
     }
   } catch (error) {
-    console.error(
-      "[Admin Dashboard] Error fetching hashrate efficiency:",
-      error,
-    );
+    console.error("[Admin Dashboard] Error fetching summary:", error);
   }
   return null;
 }
@@ -557,8 +575,10 @@ export async function GET(request: NextRequest) {
     const luxorStats = {
       poolAccounts: { total: 0, active: 0, inactive: 0 },
       workers: { activeWorkers: 0, inactiveWorkers: 0, totalWorkers: 0 },
-      hashrate: { currentHashrate: 0, averageHashrate: 0 },
-      efficiency: { currentEfficiency: 0, averageEfficiency: 0 },
+      hashrate_5m: 0,
+      hashrate_24h: 0,
+      uptime_24h: 0,
+      hashprice: "0",
       power: {
         totalPower: usedMinersPower, // kW from active miners
         availablePower: totalSpacePower._sum.powerCapacity || 0, // kW from spaces
@@ -584,20 +604,13 @@ export async function GET(request: NextRequest) {
           };
         }
 
-        // Fetch hashrate and efficiency
-        const hashrateStats = await fetchHashrateEfficiency(
-          request,
-          subaccountNames,
-        );
-        if (hashrateStats) {
-          luxorStats.hashrate = {
-            currentHashrate: hashrateStats.currentHashrate,
-            averageHashrate: hashrateStats.averageHashrate,
-          };
-          luxorStats.efficiency = {
-            currentEfficiency: hashrateStats.currentEfficiency,
-            averageEfficiency: hashrateStats.averageEfficiency,
-          };
+        // Fetch summary data (includes hashrate, uptime, efficiency, hashprice)
+        const summaryData = await fetchSummary(request, subaccountNames);
+        if (summaryData) {
+          luxorStats.hashrate_5m = summaryData.hashrate_5m;
+          luxorStats.hashrate_24h = summaryData.hashrate_24h;
+          luxorStats.uptime_24h = summaryData.uptime_24h;
+          luxorStats.hashprice = summaryData.hashprice.toString();
         }
       } else {
         warnings.push("No Luxor subaccounts configured for any users");

@@ -31,14 +31,10 @@ interface DashboardStats {
       inactiveWorkers: number;
       totalWorkers: number;
     };
-    hashrate: {
-      currentHashrate: number;
-      averageHashrate: number;
-    };
-    efficiency: {
-      currentEfficiency: number;
-      averageEfficiency: number;
-    };
+    hashrate_5m: number;
+    hashrate_24h: number;
+    uptime_24h: number;
+    hashprice: string;
     power: {
       totalPower: number;
       availablePower: number;
@@ -219,32 +215,32 @@ export default function AdminDashboard() {
             type="currency"
           />
 
-          {/* Actual Hash Rate - Current from Luxor */}
+          {/* Hashrate 5 min - Current from Luxor */}
           <AdminValueCard
-            title="Actual Hash Rate"
-            value={stats?.luxor.hashrate.currentHashrate ?? 0}
-            subtitle="TH/s"
+            title="Hashrate (5 min)"
+            value={stats?.luxor.hashrate_5m ?? 0}
+            subtitle="PH/s"
           />
 
-          {/* Average Hashrate - 7 day average */}
+          {/* Hashrate 24h - 24 hour average */}
           <AdminValueCard
-            title="Average Hash Rate"
-            value={stats?.luxor.hashrate.averageHashrate ?? 0}
-            subtitle="TH/s"
+            title="Hashrate (24 hours)"
+            value={stats?.luxor.hashrate_24h ?? 0}
+            subtitle="PH/s"
           />
 
-          {/* Current Efficiency - From Luxor */}
+          {/* Uptime 24h - From Luxor */}
           <AdminValueCard
-            title="Current Efficiency"
-            value={stats?.luxor.efficiency.currentEfficiency ?? 0}
+            title="Uptime (24 hours)"
+            value={stats?.luxor.uptime_24h ?? 0}
             subtitle="%"
           />
 
-          {/* Average Efficiency - 7 day average */}
+          {/* Hashprice - From Pool Stats */}
           <AdminValueCard
-            title="Average Efficiency"
-            value={stats?.luxor.efficiency.averageEfficiency ?? 0}
-            subtitle="%"
+            title="Hashprice"
+            value={stats?.luxor.hashprice ?? "0"}
+            subtitle="BTC/PH/s/Day"
           />
 
           {/* Total Mined Revenue */}

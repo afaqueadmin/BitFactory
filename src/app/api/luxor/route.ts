@@ -51,7 +51,7 @@ interface ProxyResponse<T = Record<string, unknown>> {
  * - Subaccounts: subaccounts, subaccount
  * - Payments: payment-settings, transactions
  * - Workers: workers
- * - Analytics: revenue, active-workers, hashrate-efficiency, workers-hashrate-efficiency, pool-hashrate, dev-fee
+ * - Analytics: revenue, active-workers, hashrate-efficiency, workers-hashrate-efficiency, pool-hashrate, uptime, pool-stats, dev-fee
  */
 const endpointMap: Record<
   string,
@@ -127,6 +127,22 @@ const endpointMap: Record<
     method: "GET",
     requiresCurrency: true,
     description: "Get pool hashrate",
+  },
+  uptime: {
+    method: "GET",
+    requiresCurrency: true,
+    description: "Get uptime data",
+  },
+  "pool-stats": {
+    method: "GET",
+    requiresCurrency: true,
+    description: "Get pool stats including hashprice",
+  },
+  summary: {
+    method: "GET",
+    requiresCurrency: true,
+    description:
+      "Get summary statistics for subaccounts (hashrate, uptime, efficiency, hashprice)",
   },
   "dev-fee": {
     method: "GET",
@@ -715,6 +731,68 @@ export async function GET(
             `[Luxor Proxy V2] GET: Getting pool hashrate for ${currency}`,
           );
           data = await luxorClient.getPoolHashrate(currency);
+          break;
+
+        case "uptime":
+          if (!currency) {
+            return NextResponse.json<ProxyResponse>(
+              {
+                success: false,
+                error: "currency parameter is required for uptime endpoint",
+              },
+              { status: 400 },
+            );
+          }
+          console.log(`[Luxor Proxy V2] GET: Getting uptime for ${currency}`);
+          data = await luxorClient.getUptime(currency, {
+            subaccount_names: searchParams.get("subaccount_names") || undefined,
+            site_id: siteId || undefined,
+            start_date: searchParams.get("start_date") || undefined,
+            end_date: searchParams.get("end_date") || undefined,
+            tick_size: searchParams.get("tick_size") || undefined,
+            page_number: searchParams.get("page_number")
+              ? parseInt(searchParams.get("page_number")!)
+              : undefined,
+            page_size: searchParams.get("page_size")
+              ? parseInt(searchParams.get("page_size")!)
+              : undefined,
+          });
+          break;
+
+        case "pool-stats":
+          if (!currency) {
+            return NextResponse.json<ProxyResponse>(
+              {
+                success: false,
+                error: "currency parameter is required for pool-stats endpoint",
+              },
+              { status: 400 },
+            );
+          }
+          console.log(
+            `[Luxor Proxy V2] GET: Getting pool stats for ${currency}`,
+          );
+          data = await luxorClient.getPoolStats(currency);
+          break;
+
+        case "summary":
+          if (!currency) {
+            return NextResponse.json<ProxyResponse>(
+              {
+                success: false,
+                error: "currency parameter is required for summary endpoint",
+              },
+              { status: 400 },
+            );
+          }
+          console.log(`[Luxor Proxy V2] GET: Getting summary for ${currency}`);
+          // NOTE: Luxor API requires exactly ONE of subaccount_names or site_id, not both
+          // Prefer subaccount_names if provided, otherwise use site_id
+          const subaccountNamesParam = searchParams.get("subaccount_names");
+          data = await luxorClient.getSummary(currency, {
+            subaccount_names: subaccountNamesParam || undefined,
+            site_id: subaccountNamesParam ? undefined : siteId || undefined,
+          });
           break;
 
         case "dev-fee":
