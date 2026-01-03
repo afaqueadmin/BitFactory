@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from "react";
 import {
   Box,
   Button,
@@ -6,23 +6,32 @@ import {
   Typography,
   Alert,
   Paper,
-} from '@mui/material';
+} from "@mui/material";
 
 interface TwoFactorVerificationProps {
   email: string;
   onVerified: (redirectUrl: string) => void;
 }
 
-export default function TwoFactorVerification({ email, onVerified }: TwoFactorVerificationProps) {
-  const [token, setToken] = useState('');
-  const [error, setError] = useState('');
+export default function TwoFactorVerification({
+  email,
+  onVerified,
+}: TwoFactorVerificationProps) {
+  const [token, setToken] = useState("");
+  const [error, setError] = useState("");
+  const textFieldRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    // Focus on TextField when component mounts
+    textFieldRef.current?.focus();
+  }, []);
 
   const handleVerify = async () => {
     try {
-      const response = await fetch('/api/auth/2fa/validate', {
-        method: 'POST',
+      const response = await fetch("/api/auth/2fa/validate", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({ email, token }),
       });
@@ -34,8 +43,8 @@ export default function TwoFactorVerification({ email, onVerified }: TwoFactorVe
       }
 
       onVerified(data.redirectUrl);
-    } catch (error) {
-      setError('Failed to verify 2FA token');
+    } catch {
+      setError("Failed to verify 2FA token");
     }
   };
 
@@ -53,21 +62,24 @@ export default function TwoFactorVerification({ email, onVerified }: TwoFactorVe
         )}
 
         <Typography variant="body1" gutterBottom>
-          Enter the verification code from your authenticator app or use a backup code:
+          Enter the verification code from your authenticator app or use a
+          backup code:
         </Typography>
 
         <Box sx={{ mt: 2 }}>
           <TextField
+            inputRef={textFieldRef}
             label="Verification Code"
             value={token}
             onChange={(e) => setToken(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && token) {
+                handleVerify();
+              }
+            }}
             sx={{ mr: 2 }}
           />
-          <Button
-            variant="contained"
-            onClick={handleVerify}
-            disabled={!token}
-          >
+          <Button variant="contained" onClick={handleVerify} disabled={!token}>
             Verify
           </Button>
         </Box>
