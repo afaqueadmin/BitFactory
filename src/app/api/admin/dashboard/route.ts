@@ -407,7 +407,7 @@ async function fetchSummary(
         hashrate_5m: (parseFloat(data.hashrate_5m) || 0) / 1000000000000000, // Convert from H/s to PH/s
         hashrate_24h: (parseFloat(data.hashrate_24h) || 0) / 1000000000000000, // Convert from H/s to PH/s
         uptime_24h: (data.uptime_24h || 0) * 100, // Convert to percentage (0-100)
-        hashprice: hashpriceValue.toFixed(5), // Format to 5 decimal places
+        hashprice: String((hashpriceValue as number).toFixed(5)), // Format to 5 decimal places
       };
     }
   } catch (error) {
