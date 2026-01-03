@@ -367,7 +367,7 @@ export default function WorkersPage() {
             totalWorkers: totalItems,
             activeWorkers: activeCount,
             inactiveWorkers: inactiveCount,
-            averageHashrate: avgHashrate,
+            averageHashrate: avgHashrate / 1000000000000, // Convert from H/s to TH/s,
             averageEfficiency: avgEfficiency,
           });
 
@@ -589,7 +589,7 @@ export default function WorkersPage() {
           />
           <GradientStatCard
             title="Avg Efficiency"
-            value={`${stats.averageEfficiency}%`}
+            value={`${stats.averageEfficiency * 100}%`}
           />
         </Box>
       </Box>
@@ -797,12 +797,12 @@ export default function WorkersPage() {
                         </TableCell>
                         <TableCell>
                           <Typography variant="body2">
-                            {worker.hashrate.toFixed(2)}
+                            {(worker.hashrate / 1000000000000).toFixed(2)}
                           </Typography>
                         </TableCell>
                         <TableCell>
                           <Typography variant="body2">
-                            {worker.efficiency.toFixed(2)}
+                            {(worker.efficiency * 100).toFixed(2)}
                           </Typography>
                         </TableCell>
                         <TableCell>
