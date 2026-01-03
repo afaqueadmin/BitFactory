@@ -348,6 +348,88 @@ export interface PoolHashrateResponse {
 }
 
 // ============================================================================
+// INTERFACE: Uptime
+// ============================================================================
+
+export interface UptimePoint {
+  date_time: string;
+  uptime: number;
+}
+
+export interface UptimeResponse {
+  currency_type: string;
+  start_date: string;
+  end_date: string;
+  tick_size: string;
+  subaccounts: Subaccount[];
+  uptime: UptimePoint[];
+  pagination: Pagination;
+}
+
+export interface UptimeParams {
+  subaccount_names?: string;
+  site_id?: string;
+  start_date?: string;
+  end_date?: string;
+  tick_size?: string;
+  page_number?: number;
+  page_size?: number;
+}
+
+// ============================================================================
+// INTERFACE: Pool Stats
+// ============================================================================
+
+export interface PoolStatsResponse {
+  currency_type: string;
+  hashrate_5m: string;
+  hashrate_1h: string;
+  hashrate_24h: string;
+  active_workers_5m: string;
+  hashprice: string;
+  minimum_payment_threshold: string;
+}
+
+// ============================================================================
+// INTERFACE: Summary (Subaccount-Specific Stats)
+// ============================================================================
+
+export interface RevenueSummary {
+  currency_type: "BTC" | "LTC_DOGE" | "SC" | "ZEC" | "LTC" | "DOGE";
+  revenue_type: "MINING" | "REFERRAL" | "LUXOS_REBATE";
+  revenue: number;
+}
+
+export interface HashpriceSummary {
+  currency_type: "BTC" | "LTC_DOGE" | "SC" | "ZEC" | "LTC" | "DOGE";
+  value: number;
+}
+
+export interface BalanceSummary {
+  currency_type: "BTC" | "LTC_DOGE" | "SC" | "ZEC" | "LTC" | "DOGE";
+  revenue: number;
+}
+
+export interface SummaryResponse {
+  currency_type: "BTC" | "LTC_DOGE" | "SC" | "ZEC" | "LTC" | "DOGE";
+  subaccounts: Subaccount[];
+  hashrate_5m: string;
+  hashrate_24h: string;
+  efficiency_5m: number;
+  uptime_24h: number;
+  active_miners: number;
+  revenue_24h: RevenueSummary[];
+  revenue_all_time: RevenueSummary[];
+  hashprice: HashpriceSummary[];
+  balance: BalanceSummary[];
+}
+
+export interface SummaryParams {
+  subaccount_names?: string;
+  site_id?: string;
+}
+
+// ============================================================================
 // INTERFACE: Dev Fee
 // ============================================================================
 
@@ -867,6 +949,71 @@ export class LuxorClient {
       const response = await this.client.get<PoolHashrateResponse>(
         `/pool/pool-hashrate/${currency}`,
       );
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * Get uptime data
+   * GET /pool/uptime/:currency
+   */
+  async getUptime(
+    currency: string,
+    params?: UptimeParams,
+  ): Promise<UptimeResponse> {
+    try {
+      const queryParams = this.buildQueryString(params);
+      const url = `/pool/uptime/${currency}${queryParams ? "?" + queryParams : ""}`;
+
+      console.log(`[LuxorClient] GET ${url} - User: ${this.userIdentifier}`);
+      const response = await this.client.get<UptimeResponse>(url);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * Get pool stats (includes hashprice)
+   * GET /pool/pool-stats/:currency
+   */
+  async getPoolStats(currency: string): Promise<PoolStatsResponse> {
+    try {
+      console.log(
+        `[LuxorClient] GET /pool/pool-stats/${currency} - User: ${this.userIdentifier}`,
+      );
+      const response = await this.client.get<PoolStatsResponse>(
+        `/pool/pool-stats/${currency}`,
+      );
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * Get summary statistics for subaccounts
+   * GET /pool/summary/:currency
+   *
+   * Returns aggregated statistics for specified subaccounts including:
+   * - Subaccount-specific hashrate (5m, 24h)
+   * - Subaccount-specific uptime (24h)
+   * - Subaccount-specific efficiency
+   * - Hashprice for the pool
+   * - Revenue and balance information
+   */
+  async getSummary(
+    currency: string,
+    params?: SummaryParams,
+  ): Promise<SummaryResponse> {
+    try {
+      const queryParams = this.buildQueryString(params);
+      const url = `/pool/summary/${currency}${queryParams ? "?" + queryParams : ""}`;
+
+      console.log(`[LuxorClient] GET ${url} - User: ${this.userIdentifier}`);
+      const response = await this.client.get<SummaryResponse>(url);
       return response.data;
     } catch (error) {
       throw error;
