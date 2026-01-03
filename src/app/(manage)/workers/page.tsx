@@ -100,7 +100,7 @@ export default function WorkersPage() {
     workers: [],
     selectedSubaccountNames: [],
     currentPage: 1,
-    pageSize: 1000,
+    pageSize: 200,
     totalItems: 0,
     loading: true,
     error: null,
@@ -116,6 +116,10 @@ export default function WorkersPage() {
   });
 
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // UI-only pagination for table display (show 20 rows per page)
+  const [tableCurrentPage, setTableCurrentPage] = useState(1);
+  const tableRowsPerPage = 20;
 
   /**
    * Fetch all subaccounts from workspace
@@ -327,7 +331,7 @@ export default function WorkersPage() {
           const subaccountNamesParam = subaccountNames.join(",");
 
           const workersResponse = await fetch(
-            `/api/luxor?endpoint=workers&currency=BTC&page_number=1&page_size=1000`,
+            `/api/luxor?endpoint=workers&currency=BTC&page_number=1&page_size=200`,
           );
 
           if (!workersResponse.ok) {
@@ -753,96 +757,202 @@ export default function WorkersPage() {
             </Box>
           ) : (
             <>
-              <TableContainer>
-                <Table>
+              <TableContainer
+                sx={{
+                  borderRadius: 1,
+                  border: (theme) => `1px solid ${theme.palette.divider}`,
+                  overflow: "hidden",
+                }}
+              >
+                <Table
+                  sx={{
+                    "& .MuiTableCell-head": {
+                      backgroundColor: (theme) =>
+                        theme.palette.mode === "dark"
+                          ? "rgba(33, 150, 243, 0.15)"
+                          : "rgba(33, 150, 243, 0.08)",
+                      borderBottom: (theme) =>
+                        `2px solid ${theme.palette.primary.main}`,
+                      fontWeight: 700,
+                      fontSize: "0.875rem",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.5px",
+                      color: (theme) => theme.palette.primary.main,
+                      padding: "16px 12px",
+                    },
+                    "& .MuiTableCell-body": {
+                      padding: "14px 12px",
+                      borderBottom: (theme) =>
+                        `1px solid ${theme.palette.divider}`,
+                    },
+                    "& .MuiTableRow-root:hover": {
+                      backgroundColor: (theme) =>
+                        theme.palette.mode === "dark"
+                          ? "rgba(33, 150, 243, 0.08)"
+                          : "rgba(33, 150, 243, 0.04)",
+                      transition: "background-color 0.2s ease-in-out",
+                    },
+                    "& .MuiTableRow-root:last-child .MuiTableCell-body": {
+                      borderBottom: "none",
+                    },
+                  }}
+                >
                   <TableHead>
-                    <TableRow sx={{ backgroundColor: "background.default" }}>
-                      <TableCell sx={{ fontWeight: "bold" }}>
-                        Worker Name
-                      </TableCell>
-                      <TableCell sx={{ fontWeight: "bold" }}>
-                        Subaccount
-                      </TableCell>
-                      <TableCell sx={{ fontWeight: "bold" }}>
-                        Hashrate (TH/s)
-                      </TableCell>
-                      <TableCell sx={{ fontWeight: "bold" }}>
-                        Efficiency (%)
-                      </TableCell>
-                      <TableCell sx={{ fontWeight: "bold" }}>Status</TableCell>
-                      <TableCell sx={{ fontWeight: "bold" }}>
-                        Last Share
-                      </TableCell>
+                    <TableRow>
+                      <TableCell>Worker Name</TableCell>
+                      <TableCell>Subaccount</TableCell>
+                      <TableCell align="right">Hashrate (TH/s)</TableCell>
+                      <TableCell align="right">Efficiency (%)</TableCell>
+                      <TableCell align="center">Status</TableCell>
+                      <TableCell>Last Share</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {state.workers.map((worker) => (
-                      <TableRow
-                        key={`${worker.subaccount_name}-${worker.name}`}
-                        sx={{
-                          "&:hover": {
-                            backgroundColor: "background.default",
-                          },
-                        }}
-                      >
-                        <TableCell>
-                          <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                            {worker.name}
-                          </Typography>
-                        </TableCell>
-                        <TableCell>
-                          <Typography variant="body2">
-                            {worker.subaccount_name}
-                          </Typography>
-                        </TableCell>
-                        <TableCell>
-                          <Typography variant="body2">
-                            {(worker.hashrate / 1000000000000).toFixed(2)}
-                          </Typography>
-                        </TableCell>
-                        <TableCell>
-                          <Typography variant="body2">
-                            {(worker.efficiency * 100).toFixed(2)}
-                          </Typography>
-                        </TableCell>
-                        <TableCell>
-                          <Chip
-                            label={worker.status}
-                            color={
-                              worker.status === "ACTIVE" ? "success" : "default"
-                            }
-                            variant="outlined"
-                            size="small"
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Typography variant="caption">
-                            {new Date(worker.last_share_time).toLocaleString()}
-                          </Typography>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {state.workers
+                      .slice(
+                        (tableCurrentPage - 1) * tableRowsPerPage,
+                        tableCurrentPage * tableRowsPerPage,
+                      )
+                      .map((worker, idx) => (
+                        <TableRow
+                          key={`${worker.subaccount_name}-${worker.name}`}
+                          sx={{
+                            backgroundColor:
+                              idx % 2 === 0
+                                ? "transparent"
+                                : (theme) =>
+                                    theme.palette.mode === "dark"
+                                      ? "rgba(255, 255, 255, 0.02)"
+                                      : "rgba(0, 0, 0, 0.01)",
+                          }}
+                        >
+                          <TableCell>
+                            <Typography
+                              variant="body2"
+                              sx={{
+                                fontWeight: 600,
+                                color: (theme) => theme.palette.primary.main,
+                              }}
+                            >
+                              {worker.name}
+                            </Typography>
+                          </TableCell>
+                          <TableCell>
+                            <Typography
+                              variant="body2"
+                              sx={{
+                                color: "text.secondary",
+                              }}
+                            >
+                              {worker.subaccount_name}
+                            </Typography>
+                          </TableCell>
+                          <TableCell align="right">
+                            <Typography
+                              variant="body2"
+                              sx={{
+                                fontWeight: 500,
+                                fontFamily: "monospace",
+                                color: (theme) => theme.palette.info.main,
+                              }}
+                            >
+                              {(worker.hashrate / 1000000000000).toFixed(2)}
+                            </Typography>
+                          </TableCell>
+                          <TableCell align="right">
+                            <Typography
+                              variant="body2"
+                              sx={{
+                                fontWeight: 500,
+                                fontFamily: "monospace",
+                                color:
+                                  worker.efficiency * 100 >= 85
+                                    ? (theme) => theme.palette.success.main
+                                    : worker.efficiency * 100 >= 75
+                                      ? (theme) => theme.palette.warning.main
+                                      : (theme) => theme.palette.error.main,
+                              }}
+                            >
+                              {(worker.efficiency * 100).toFixed(2)}
+                            </Typography>
+                          </TableCell>
+                          <TableCell align="center">
+                            <Chip
+                              label={worker.status}
+                              color={
+                                worker.status === "ACTIVE"
+                                  ? "success"
+                                  : "default"
+                              }
+                              variant={
+                                worker.status === "ACTIVE"
+                                  ? "filled"
+                                  : "outlined"
+                              }
+                              size="small"
+                              sx={{
+                                fontWeight: 600,
+                              }}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Typography
+                              variant="caption"
+                              sx={{
+                                color: "text.secondary",
+                                display: "block",
+                              }}
+                            >
+                              {new Date(
+                                worker.last_share_time,
+                              ).toLocaleString()}
+                            </Typography>
+                          </TableCell>
+                        </TableRow>
+                      ))}
                   </TableBody>
                 </Table>
               </TableContainer>
 
-              {/* Pagination */}
-              {totalPages > 1 && (
+              {/* Pagination Controls */}
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  mt: 2,
+                  px: 2,
+                  py: 1.5,
+                  backgroundColor: (theme) =>
+                    theme.palette.mode === "dark"
+                      ? "rgba(33, 150, 243, 0.05)"
+                      : "rgba(33, 150, 243, 0.03)",
+                  borderRadius: "0 0 4px 4px",
+                }}
+              >
+                <Typography variant="caption" color="text.secondary">
+                  Showing {Math.min(state.workers.length, tableRowsPerPage)} of{" "}
+                  {state.workers.length} workers
+                </Typography>
+
                 <Box
                   sx={{
                     display: "flex",
-                    justifyContent: "center",
-                    mt: 3,
+                    alignItems: "center",
+                    gap: 1,
                   }}
                 >
                   <Pagination
-                    count={totalPages}
-                    page={state.currentPage}
-                    onChange={handlePageChange}
+                    count={Math.ceil(state.workers.length / tableRowsPerPage)}
+                    page={tableCurrentPage}
+                    onChange={(_, page) => setTableCurrentPage(page)}
                     color="primary"
+                    size="small"
+                    showFirstButton
+                    showLastButton
                   />
                 </Box>
-              )}
+              </Box>
             </>
           )}
         </Box>
