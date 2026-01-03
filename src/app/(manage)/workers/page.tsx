@@ -589,7 +589,7 @@ export default function WorkersPage() {
           />
           <GradientStatCard
             title="Avg Efficiency"
-            value={`${stats.averageEfficiency * 100}%`}
+            value={`${(stats.averageEfficiency * 100).toFixed(2)}%`}
           />
         </Box>
       </Box>
