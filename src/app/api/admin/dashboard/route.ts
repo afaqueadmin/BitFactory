@@ -356,7 +356,7 @@ async function fetchSummary(
       hashrate_5m: 0,
       hashrate_24h: 0,
       uptime_24h: 0,
-      hashprice: 0,
+      hashprice: "0",
     };
   }
 
