@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
 
     // Get all miners for this user from database
     const miners = await prisma.miner.findMany({
-      where: { userId },
+      where: { userId, isDeleted: false },
       include: {
         hardware: {
           select: {

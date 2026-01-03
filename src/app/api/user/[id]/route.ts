@@ -165,7 +165,7 @@ export async function DELETE(
 
     // Check if user has any miners linked
     const minerCount = await prisma.miner.count({
-      where: { userId: id },
+      where: { userId: id, isDeleted: false },
     });
 
     if (minerCount > 0) {

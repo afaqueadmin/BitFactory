@@ -494,7 +494,7 @@ export async function GET(request: NextRequest) {
     // Fetch inactive miners from local database (DEPLOYMENT_IN_PROGRESS status)
     try {
       inactiveMiners = await prisma.miner.count({
-        where: { status: "DEPLOYMENT_IN_PROGRESS" },
+        where: { status: "DEPLOYMENT_IN_PROGRESS", isDeleted: false },
       });
       console.log(
         `[Admin Dashboard] Inactive miners from DB: ${inactiveMiners}`,
@@ -509,7 +509,7 @@ export async function GET(request: NextRequest) {
     // Fetch all miners from local database (AUTO status)
     try {
       const allLocalActiveMiners = await prisma.miner.count({
-        where: { status: "AUTO" },
+        where: { status: "AUTO", isDeleted: false },
       });
       console.log(
         `[Admin Dashboard] Inactive miners from DB: ${inactiveMiners}`,
@@ -578,7 +578,7 @@ export async function GET(request: NextRequest) {
       hashrate_5m: 0,
       hashrate_24h: 0,
       uptime_24h: 0,
-      hashprice: "0",
+      hashprice: 0,
       power: {
         totalPower: usedMinersPower, // kW from active miners
         availablePower: totalSpacePower._sum.powerCapacity || 0, // kW from spaces
@@ -610,7 +610,7 @@ export async function GET(request: NextRequest) {
           luxorStats.hashrate_5m = summaryData.hashrate_5m;
           luxorStats.hashrate_24h = summaryData.hashrate_24h;
           luxorStats.uptime_24h = summaryData.uptime_24h;
-          luxorStats.hashprice = summaryData.hashprice.toString();
+          luxorStats.hashprice = summaryData.hashprice;
         }
       } else {
         warnings.push("No Luxor subaccounts configured for any users");
