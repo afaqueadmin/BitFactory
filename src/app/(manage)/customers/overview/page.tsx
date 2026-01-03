@@ -185,7 +185,7 @@ export default function CustomerOverview() {
         setCustomerStats({
           totalCustomers: filteredUsers.length,
           activeCustomers: activeCount,
-          totalRevenue: 0, // Revenue calculation would depend on your business logic
+          totalRevenue: data.totalRevenue, // Revenue calculation would depend on your business logic
           totalMiners: totalMiners,
         });
       }

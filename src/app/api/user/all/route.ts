@@ -92,10 +92,20 @@ export async function GET(request: NextRequest) {
       status: "active", // You can add logic to determine status
     }));
 
+    const totalRevenue = await prisma.costPayment.aggregate({
+      where: {
+        type: "PAYMENT",
+      },
+      _sum: {
+        amount: true,
+      },
+    });
+
     return NextResponse.json(
       {
         success: true,
         users: transformedUsers,
+        totalRevenue: totalRevenue._sum.amount,
       },
       {
         status: 200,
