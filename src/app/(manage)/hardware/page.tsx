@@ -23,6 +23,8 @@ import {
   Chip,
   Menu,
   MenuItem,
+  Checkbox,
+  FormControlLabel,
 } from "@mui/material";
 import {
   Edit as EditIcon,
@@ -53,6 +55,7 @@ interface Hardware {
   createdAt: string;
   updatedAt: string;
   procurementHistory?: ProcurementHistoryEntry[];
+  isDeleted: boolean;
 }
 
 interface FormData {
@@ -92,6 +95,7 @@ export default function HardwarePage() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [selectedHardwareForHistory, setSelectedHardwareForHistory] =
     useState<Hardware | null>(null);
+  const [showDeleted, setShowDeleted] = useState(false);
   const [formData, setFormData] = useState<FormData>({
     model: "",
     powerUsage: "",
@@ -105,7 +109,11 @@ export default function HardwarePage() {
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch("/api/hardware");
+      const url = new URL("/api/hardware", window.location.origin);
+      if (showDeleted) {
+        url.searchParams.append("isDeleted", "true");
+      }
+      const response = await fetch(url.toString());
       const data: ApiResponse<Hardware[]> = await response.json();
 
       if (!data.success) {
@@ -118,7 +126,7 @@ export default function HardwarePage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [showDeleted]);
 
   useEffect(() => {
     fetchHardware();
@@ -487,6 +495,15 @@ export default function HardwarePage() {
         </Paper>
       </Box>
 
+      <FormControlLabel
+        control={
+          <Checkbox
+            checked={showDeleted}
+            onChange={(e) => setShowDeleted(e.target.checked)}
+          />
+        }
+        label="Show Deleted"
+      />
       <TableContainer component={Paper}>
         <Table>
           <TableHead sx={{ backgroundColor: "action.hover" }}>
@@ -574,6 +591,7 @@ export default function HardwarePage() {
                         </Typography>
                       </MenuItem>
                       <MenuItem
+                        disabled={hw.isDeleted}
                         onClick={() => {
                           handleMenuClose();
                           setDeleteConfirm(hw.id);

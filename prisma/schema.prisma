@@ -40,6 +40,7 @@ model User {
   twoFactorSecret String?
   twoFactorBackupCodes String[]
   luxorSubaccountName String?
+  isDeleted     Boolean         @default(false)
   createdAt     DateTime         @default(now())
   updatedAt     DateTime         @updatedAt
   blacklisted   TokenBlacklist[]
@@ -51,6 +52,7 @@ model User {
   hardwareProcurementHistory HardwareProcurementHistory[]
   createdGroups Group[]
 
+  @@index([isDeleted])
   @@map("users")
 }
 
@@ -85,11 +87,13 @@ model Hardware {
   powerUsage    Float     // in kilowatts (e.g., 3.25)
   hashRate      Decimal   // in TH/s (e.g., 234.5)
   quantity      Int       @default(1)  // number of units available
+  isDeleted     Boolean   @default(false)
   miners        Miner[]
   procurementHistory HardwareProcurementHistory[]
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
+  @@index([isDeleted])
   @@map("hardware")
 }
 
@@ -100,6 +104,7 @@ model Miner {
   hardwareId    String
   userId        String
   spaceId       String
+  isDeleted     Boolean   @default(false)
   user          User      @relation(fields: [userId], references: [id], onDelete: Restrict)
   space         Space     @relation(fields: [spaceId], references: [id])
   hardware      Hardware  @relation(fields: [hardwareId], references: [id])
@@ -110,6 +115,7 @@ model Miner {
 
   @@unique([name, userId])
   @@index([hardwareId])
+  @@index([isDeleted])
   @@map("miners")
 }
 

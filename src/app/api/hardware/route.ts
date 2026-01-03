@@ -9,7 +9,9 @@ interface ApiResponse<T = unknown> {
   timestamp?: string;
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+  const includeDeleted = searchParams.get("isDeleted") === "true";
   try {
     const hardware = await prisma.hardware.findMany({
       include: {
@@ -34,6 +36,7 @@ export async function GET() {
       orderBy: {
         createdAt: "desc",
       },
+      where: includeDeleted ? {} : { isDeleted: false },
     });
 
     return NextResponse.json<ApiResponse>({

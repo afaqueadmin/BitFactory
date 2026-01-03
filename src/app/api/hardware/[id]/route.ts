@@ -266,8 +266,16 @@ export async function DELETE(
     }
 
     // Delete hardware
-    await prisma.hardware.delete({
+    // await prisma.hardware.delete({
+    //   where: { id },
+    // });
+
+    // Soft delete hardware by setting isDeleted to true
+    await prisma.hardware.update({
       where: { id },
+      data: {
+        isDeleted: true,
+      },
     });
 
     return NextResponse.json<ApiResponse>({
