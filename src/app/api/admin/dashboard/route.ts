@@ -536,31 +536,17 @@ export async function GET(request: NextRequest) {
     });
 
     // Fetch customer balance information
-    const customerBalances = await prisma.costPayment.findMany({
-      where: {
-        userId: {
-          in: (
-            await prisma.user.findMany({
-              where: { role: "CLIENT" },
-              select: { id: true },
-            })
-          ).map((u) => u.id),
-        },
+    const totalCustomerBalance = await prisma.costPayment.aggregate({
+      _sum: {
+        amount: true,
       },
-      orderBy: { createdAt: "desc" },
-      select: { userId: true, amount: true },
     });
-
-    const totalCustomerBalance = customerBalances.reduce(
-      (sum, p) => sum + (p.amount || 0),
-      0,
-    );
 
     // Calculate monthly revenue from cost payments
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const monthlyRevenue = await prisma.costPayment.aggregate({
       where: {
-        type: "ELECTRICITY_CHARGES",
+        type: { in: ["ELECTRICITY_CHARGES", "ADJUSTMENT"] },
         createdAt: { gte: thirtyDaysAgo },
       },
       _sum: { amount: true },
@@ -650,7 +636,7 @@ export async function GET(request: NextRequest) {
       },
       luxor: luxorStats,
       financial: {
-        totalCustomerBalance,
+        totalCustomerBalance: totalCustomerBalance._sum.amount || 0,
         monthlyRevenue: monthlyRevenue._sum.amount
           ? monthlyRevenue._sum.amount * -1
           : 0, // Multiply by -1 to show revenue as positive

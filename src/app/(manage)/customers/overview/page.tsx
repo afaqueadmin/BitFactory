@@ -494,7 +494,7 @@ export default function CustomerOverview() {
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
           <AdminValueCard
-            title="Total Revenue"
+            title="Total Prepaid Balance Added"
             value={customerStats.totalRevenue}
             type="currency"
             subtitle="USD"
