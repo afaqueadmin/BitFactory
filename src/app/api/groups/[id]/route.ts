@@ -109,12 +109,84 @@ export async function GET(
       );
     }
 
+    // Get all users with their luxor subaccount names
+    const allUsers = await prisma.user.findMany({
+      where: {
+        isDeleted: false,
+        luxorSubaccountName: { not: null },
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        luxorSubaccountName: true,
+        miners: {
+          where: { isDeleted: false },
+          select: { id: true },
+        },
+      },
+    });
+
+    // Map subaccounts in group with user details
+    const subaccounts = group.subaccounts.map((groupSub) => {
+      const user = allUsers.find(
+        (u) => u.luxorSubaccountName === groupSub.subaccountName,
+      );
+      return {
+        id: groupSub.id,
+        subaccountName: groupSub.subaccountName,
+        addedAt: groupSub.addedAt.toISOString(),
+        user: {
+          id: user?.id || "",
+          name: user?.name || "Unknown",
+          email: user?.email || "unknown@example.com",
+          role: user?.role || "CLIENT",
+          luxorSubaccountName:
+            user?.luxorSubaccountName || groupSub.subaccountName,
+        },
+        minerCount: user?.miners.length || 0,
+      };
+    });
+
+    // Get available subaccounts (users not in this group yet)
+    const subaccountNamesInGroup = group.subaccounts.map(
+      (s) => s.subaccountName,
+    );
+    const availableSubaccounts = allUsers
+      .filter(
+        (u) => !subaccountNamesInGroup.includes(u.luxorSubaccountName || ""),
+      )
+      .map((user) => ({
+        id: user.id,
+        subaccountName: user.luxorSubaccountName || "",
+        addedAt: new Date().toISOString(),
+        user: {
+          id: user.id,
+          name: user.name || "Unknown",
+          email: user.email || "unknown@example.com",
+          role: user.role,
+          luxorSubaccountName: user.luxorSubaccountName || "",
+        },
+        minerCount: user.miners.length,
+      }));
+
     console.log("[Groups API] GET[id] - Retrieved group:", id);
 
     return NextResponse.json(
       {
         success: true,
-        data: group,
+        data: {
+          group: {
+            id: group.id,
+            name: group.name,
+            description: group.description,
+            isActive: group.isActive,
+            createdAt: group.createdAt.toISOString(),
+          },
+          subaccounts,
+          availableSubaccounts,
+        },
       } as ApiResponse,
       { status: 200 },
     );
