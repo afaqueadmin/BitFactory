@@ -45,7 +45,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
     // 1. Extract currency from query (default: BTC)
     const currency = request.nextUrl.searchParams.get("currency") || "BTC";
-    console.log(`[Wallet API] GET /wallet/settings?currency=${currency}`);
+    const customerId = request.nextUrl.searchParams.get("customerId");
+    console.log(
+      `[Wallet API] GET /wallet/settings?currency=${currency}${customerId ? `&customerId=${customerId}` : ""}`,
+    );
 
     // 2. Verify authentication
     const token = request.cookies.get("token")?.value;
@@ -68,9 +71,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     }
 
     let userId: string;
+    let userRole: string;
     try {
       const decoded = await verifyJwtToken(token);
       userId = decoded.userId;
+      userRole = decoded.role;
     } catch (error) {
       console.error("[Wallet API] Token verification failed:", error);
       return NextResponse.json(
@@ -86,6 +91,34 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
             "Cache-Control": "no-store, no-cache, must-revalidate",
           },
         },
+      );
+    }
+
+    // 2.5. Handle customerId parameter (admin only)
+    if (customerId) {
+      if (userRole !== "ADMIN" && userRole !== "SUPER_ADMIN") {
+        console.warn(
+          `[Wallet API] Non-admin user ${userId} attempted to access customerId ${customerId}`,
+        );
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "Only administrators can access other users' wallet settings",
+            code: "FORBIDDEN",
+            timestamp: new Date().toISOString(),
+          } as WalletErrorResponse,
+          {
+            status: 403,
+            headers: {
+              "Cache-Control": "no-store, no-cache, must-revalidate",
+            },
+          },
+        );
+      }
+      userId = customerId;
+      console.log(
+        `[Wallet API] Admin ${userRole} accessing wallet settings for user: ${customerId}`,
       );
     }
 
