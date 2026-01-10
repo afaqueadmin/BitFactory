@@ -1,6 +1,7 @@
 "use client";
 //src/app/(manage)/adminpanel/page.tsx
-import React, { useState, useEffect } from "react";
+import React from "react";
+import { useQuery } from "@tanstack/react-query";
 import AdminStatCard from "@/components/admin/AdminStatCard";
 import AdminValueCard from "@/components/admin/AdminValueCard";
 import { Box, CircularProgress, Alert } from "@mui/material";
@@ -48,19 +49,13 @@ interface DashboardStats {
 }
 
 export default function AdminDashboard() {
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetchDashboardStats();
-  }, []);
-
-  const fetchDashboardStats = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
+  const {
+    data: stats,
+    isLoading: loading,
+    error,
+  } = useQuery<DashboardStats>({
+    queryKey: ["adminDashboard"],
+    queryFn: async () => {
       const response = await fetch("/api/admin/dashboard");
 
       if (!response.ok) {
@@ -73,14 +68,11 @@ export default function AdminDashboard() {
         throw new Error(data.error || "Failed to fetch stats");
       }
 
-      setStats(data.data);
-    } catch (err) {
-      console.error("Error fetching dashboard stats:", err);
-      setError(err instanceof Error ? err.message : "An error occurred");
-    } finally {
-      setLoading(false);
-    }
-  };
+      return data.data;
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    retry: 2,
+  });
 
   if (loading) {
     return (
@@ -110,7 +102,7 @@ export default function AdminDashboard() {
       >
         {error && (
           <Alert severity="error" sx={{ mb: 3 }}>
-            {error}
+            {error?.message || "An error occurred"}
           </Alert>
         )}
 
@@ -339,7 +331,7 @@ export default function AdminDashboard() {
             <Alert severity="warning">
               <strong>Data Availability Notes:</strong>
               <ul style={{ margin: "8px 0 0 0", paddingLeft: "20px" }}>
-                {stats.warnings.map((warning, idx) => (
+                {stats.warnings.map((warning: string, idx: number) => (
                   <li key={idx}>{warning}</li>
                 ))}
               </ul>
