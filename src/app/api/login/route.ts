@@ -55,6 +55,7 @@ export async function POST(request: NextRequest) {
         role: true,
         twoFactorEnabled: true,
       },
+      where: { isDeleted: false },
     });
 
     // Find user by comparing normalized email usernames
