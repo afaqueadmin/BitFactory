@@ -61,6 +61,7 @@ interface Space {
   updatedAt: string;
   minerCount?: number;
   activeMinerCount?: number;
+  inactiveMinerCount?: number;
   capacityUsed?: number;
   capacityPercentage?: string;
   powerUsagePercentage?: string;
@@ -467,6 +468,13 @@ export default function SpacesPage() {
                             sx={{ display: "block" }}
                           >
                             {space.activeMinerCount || 0} active
+                          </Typography>
+                          <Typography
+                            variant="caption"
+                            color="text.secondary"
+                            sx={{ display: "block" }}
+                          >
+                            {space.inactiveMinerCount || 0} inactive
                           </Typography>
                         </Box>
                       </TableCell>
