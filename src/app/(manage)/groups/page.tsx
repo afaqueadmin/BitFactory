@@ -17,6 +17,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import {
   Box,
   Container,
@@ -127,6 +128,7 @@ const initialDialogState: DialogState = {
 };
 
 export default function GroupsPage() {
+  const router = useRouter();
   const [state, setState] = useState<GroupsState>({
     groups: [],
     loading: true,
@@ -135,6 +137,13 @@ export default function GroupsPage() {
 
   const [dialog, setDialog] = useState<DialogState>(initialDialogState);
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  /**
+   * Navigate to group details page
+   */
+  const handleViewGroup = (groupId: string) => {
+    router.push(`/groups/${groupId}`);
+  };
 
   /**
    * Fetch all groups
@@ -601,7 +610,16 @@ export default function GroupsPage() {
                     }}
                   >
                     <TableCell>
-                      <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          fontWeight: 500,
+                          cursor: "pointer",
+                          color: "primary.main",
+                          "&:hover": { textDecoration: "underline" },
+                        }}
+                        onClick={() => handleViewGroup(group.id)}
+                      >
                         {group.name}
                       </Typography>
                       <Typography

@@ -45,7 +45,10 @@ const securePaths = {
 
 const dynamicPatternsPaths = {
   CLIENT: [],
-  ADMIN: [new URLPattern({ pathname: "/customers/:id*" })],
+  ADMIN: [
+    new URLPattern({ pathname: "/customers/:id*" }),
+    new URLPattern({ pathname: "/groups/:id*" }),
+  ],
 };
 
 // Role-based default redirects
