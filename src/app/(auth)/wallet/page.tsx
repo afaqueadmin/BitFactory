@@ -160,6 +160,15 @@ export default function WalletPage() {
     return primary.external_address;
   };
 
+  const toProperCase = (text: string): string => {
+    if (!text) return "";
+    return text
+      .toLowerCase()
+      .split("_")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
+  };
+
   return (
     <Box
       component="main"
@@ -354,6 +363,94 @@ export default function WalletPage() {
                   ${summary?.pendingPayouts.usd.toFixed(2) ?? "0.00"}
                 </Typography>
               </Box>
+            )}
+          </Paper>
+        </Box>
+
+        {/* Third Row: Payment Frequency & Next Payout */}
+        <Box>
+          <Paper
+            sx={{
+              p: 3,
+              borderRadius: 2,
+              backgroundColor: (theme) =>
+                theme.palette.mode === "light" ? "#ff6f00" : "#e65100",
+              color: "white",
+            }}
+          >
+            <Typography variant="subtitle1">Payment Frequency</Typography>
+            {walletLoading ? (
+              <Box
+                sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1 }}
+              >
+                <CircularProgress size={24} sx={{ color: "white" }} />
+                <Typography variant="body2">Loading...</Typography>
+              </Box>
+            ) : walletError ? (
+              <Typography variant="body2" sx={{ mt: 1 }}>
+                Unable to load
+              </Typography>
+            ) : (
+              <Typography variant="h5" fontWeight="bold" sx={{ mt: 1 }}>
+                {walletSettings?.payment_frequency
+                  ? toProperCase(walletSettings.payment_frequency)
+                  : "Not set"}
+              </Typography>
+            )}
+            {walletSettings?.day_of_week && (
+              <Typography variant="body2" sx={{ mt: 1, opacity: 0.9 }}>
+                Every {toProperCase(walletSettings.day_of_week)}
+              </Typography>
+            )}
+          </Paper>
+        </Box>
+
+        <Box>
+          <Paper
+            sx={{
+              p: 3,
+              borderRadius: 2,
+              backgroundColor: (theme) =>
+                theme.palette.mode === "light" ? "#00796b" : "#004d40",
+              color: "white",
+            }}
+          >
+            <Typography variant="subtitle1">Next Payout</Typography>
+            {walletLoading ? (
+              <Box
+                sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1 }}
+              >
+                <CircularProgress size={24} sx={{ color: "white" }} />
+                <Typography variant="body2">Loading...</Typography>
+              </Box>
+            ) : walletError ? (
+              <Typography variant="body2" sx={{ mt: 1 }}>
+                Unable to load
+              </Typography>
+            ) : walletSettings?.next_payout_at ? (
+              <Box sx={{ mt: 1 }}>
+                <Typography variant="h6" fontWeight="bold">
+                  {new Date(walletSettings.next_payout_at).toLocaleDateString(
+                    "en-US",
+                    {
+                      weekday: "short",
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    },
+                  )}
+                </Typography>
+                <Typography variant="body2" sx={{ mt: 0.5, opacity: 0.9 }}>
+                  {new Date(walletSettings.next_payout_at).toLocaleTimeString(
+                    "en-US",
+                    { hour: "2-digit", minute: "2-digit" },
+                  )}
+                </Typography>
+              </Box>
+            ) : (
+              <Typography variant="h6" fontWeight="bold" sx={{ mt: 1 }}>
+                Not scheduled
+              </Typography>
             )}
           </Paper>
         </Box>
