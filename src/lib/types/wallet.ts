@@ -55,6 +55,7 @@ export interface WalletErrorResponse {
   error: string;
   code:
     | "UNAUTHORIZED"
+    | "FORBIDDEN"
     | "USER_NOT_FOUND"
     | "NO_LUXOR_CONFIG"
     | "LUXOR_FORBIDDEN"

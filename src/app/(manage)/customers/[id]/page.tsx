@@ -19,6 +19,7 @@ import EstimatedMiningDaysLeftCard from "@/components/dashboardCards/EstimatedMi
 import EstimatedMonthlyCostCard from "@/components/dashboardCards/EstimatedMonthlyCostCard";
 import { getDaysInCurrentMonth } from "@/lib/helpers/getDaysInCurrentMonth";
 import { formatValue } from "@/lib/helpers/formatValue";
+import { LuxorPaymentSettings } from "@/lib/types/wallet";
 
 interface CustomerDetails {
   id: string;
@@ -118,6 +119,10 @@ export default function CustomerDetailPage() {
   const [summary, setSummary] = useState<EarningsSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [walletSettings, setWalletSettings] =
+    useState<LuxorPaymentSettings | null>(null);
+  const [walletLoading, setWalletLoading] = useState(false);
+  const [walletError, setWalletError] = useState<string | null>(null);
 
   const estimatedMonthlyCost = React.useMemo(() => {
     if (dailyCostLoading) return 0;
@@ -131,6 +136,15 @@ export default function CustomerDetailPage() {
       formatValue(balance / dailyCost, "number", { maximumFractionDigits: 0 }),
     );
   }, [balance, balanceLoading, dailyCost, dailyCostLoading]);
+
+  const toProperCase = (text: string): string => {
+    if (!text) return "";
+    return text
+      .toLowerCase()
+      .split("_")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
+  };
 
   // Fetch customer details
   useEffect(() => {
@@ -286,6 +300,55 @@ export default function CustomerDetailPage() {
     // Call the API immediately on component mount
     if (customerId) {
       fetchEarningsSummary();
+    }
+  }, [customerId]);
+
+  // Fetch wallet settings from Luxor API
+  useEffect(() => {
+    const fetchWalletSettings = async () => {
+      try {
+        setWalletLoading(true);
+        setWalletError(null);
+
+        const response = await fetch(
+          `/api/wallet/settings?currency=BTC&customerId=${customerId}`,
+          {
+            credentials: "include",
+            headers: {
+              "Cache-Control": "no-cache",
+            },
+          },
+        );
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(
+            errorData.error ||
+              `Failed to fetch wallet settings: ${response.statusText}`,
+          );
+        }
+
+        const data = await response.json();
+        if (data.success && data.data) {
+          setWalletSettings(data.data);
+          console.log("[Wallet] Settings loaded from Luxor:", data.data);
+        } else {
+          throw new Error(
+            data.error || "Invalid response from wallet settings endpoint",
+          );
+        }
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : "Unknown error";
+        console.error("[Wallet] Error fetching wallet settings:", error);
+        setWalletError(errorMessage);
+      } finally {
+        setWalletLoading(false);
+      }
+    };
+
+    if (customerId) {
+      fetchWalletSettings();
     }
   }, [customerId]);
 
@@ -485,6 +548,115 @@ export default function CustomerDetailPage() {
 
             <Box sx={{ flex: { xs: 1, md: "1 1 25%" }, minWidth: 0 }}>
               <EstimatedMonthlyCostCard value={estimatedMonthlyCost} />
+            </Box>
+
+            <Box sx={{ flex: { xs: 1, md: "1 1 25%" }, minWidth: 0 }}>
+              <Paper
+                sx={{
+                  p: 3,
+                  borderRadius: 2,
+                  backgroundColor: "#ff6f00",
+                  color: "white",
+                  height: "100%",
+                  display: "flex",
+                  flexDirection: "column",
+                }}
+              >
+                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                  Payment Frequency
+                </Typography>
+                {walletLoading ? (
+                  <Box
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 1,
+                      mt: 1,
+                    }}
+                  >
+                    <CircularProgress size={24} sx={{ color: "white" }} />
+                    <Typography variant="body2">Loading...</Typography>
+                  </Box>
+                ) : walletError ? (
+                  <Typography variant="body2" sx={{ mt: 1 }}>
+                    Unable to load
+                  </Typography>
+                ) : (
+                  <Box sx={{ mt: 1 }}>
+                    <Typography variant="h5" fontWeight="bold">
+                      {walletSettings?.payment_frequency
+                        ? toProperCase(walletSettings.payment_frequency)
+                        : "Not set"}
+                    </Typography>
+                    {walletSettings?.day_of_week && (
+                      <Typography variant="body2" sx={{ mt: 1, opacity: 0.9 }}>
+                        Every {toProperCase(walletSettings.day_of_week)}
+                      </Typography>
+                    )}
+                  </Box>
+                )}
+              </Paper>
+            </Box>
+
+            <Box sx={{ flex: { xs: 1, md: "1 1 25%" }, minWidth: 0 }}>
+              <Paper
+                sx={{
+                  p: 3,
+                  borderRadius: 2,
+                  backgroundColor: "#00796b",
+                  color: "white",
+                  height: "100%",
+                  display: "flex",
+                  flexDirection: "column",
+                }}
+              >
+                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                  Next Payout
+                </Typography>
+                {walletLoading ? (
+                  <Box
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 1,
+                      mt: 1,
+                    }}
+                  >
+                    <CircularProgress size={24} sx={{ color: "white" }} />
+                    <Typography variant="body2">Loading...</Typography>
+                  </Box>
+                ) : walletError ? (
+                  <Typography variant="body2" sx={{ mt: 1 }}>
+                    Unable to load
+                  </Typography>
+                ) : walletSettings?.next_payout_at ? (
+                  <Box sx={{ mt: 1 }}>
+                    <Typography variant="h6" fontWeight="bold">
+                      {new Date(
+                        walletSettings.next_payout_at,
+                      ).toLocaleDateString("en-US", {
+                        weekday: "short",
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
+                    </Typography>
+                    <Typography variant="body2" sx={{ mt: 0.5, opacity: 0.9 }}>
+                      {new Date(
+                        walletSettings.next_payout_at,
+                      ).toLocaleTimeString("en-US", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        second: "2-digit",
+                      })}
+                    </Typography>
+                  </Box>
+                ) : (
+                  <Typography variant="h6" fontWeight="bold" sx={{ mt: 1 }}>
+                    Not scheduled
+                  </Typography>
+                )}
+              </Paper>
             </Box>
           </Box>
 
