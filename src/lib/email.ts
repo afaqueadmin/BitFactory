@@ -72,3 +72,29 @@ export const sendPasswordResetEmail = async (
     return { success: false, error };
   }
 };
+
+export const sendCronRunSuccessfulEmail = async (userCount: number) => {
+  const date = new Date();
+  const mailOptions = {
+    from:
+      `BitFactory Admin <${process.env.SMTP_FROM}>` || "noreply@bitfactory.com",
+    to: process.env.SMTP_USER,
+    subject: "Cron run successfully - BitFactory",
+    html: `
+      <h1>Cron</h1>
+      <p>Cost deduction cron run successfully for ${userCount} users.</p>
+      <p>Cron ran at ${date}.</p>
+      <br>
+      <p>Best regards,</p>
+      <p>The BitFactory Team</p>
+    `,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    return { success: true };
+  } catch (error) {
+    console.error("Error sending cron success email:", error);
+    return { success: false, error };
+  }
+};

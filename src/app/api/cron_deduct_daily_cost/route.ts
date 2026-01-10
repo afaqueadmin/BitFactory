@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { sendCronRunSuccessfulEmail } from "@/lib/email";
 
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get("authorization");
@@ -107,11 +108,16 @@ export async function GET(request: NextRequest) {
         });
       }
     }
+    const totalUsersProcessed = results.length;
+
+    // Send success email summary
+    const emailResult = await sendCronRunSuccessfulEmail(totalUsersProcessed);
 
     return NextResponse.json({
       success: true,
-      totalUsersProcessed: results.length,
+      totalUsersProcessed,
       results,
+      emailSent: emailResult.success,
     });
   } catch (error) {
     console.error("Error processing daily costs:", error);
