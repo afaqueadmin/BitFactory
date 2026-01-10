@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import {
   Box,
@@ -97,10 +98,6 @@ export default function CustomerOverview() {
   const [addPaymentModalOpen, setAddPaymentModalOpen] = useState(false);
   const [addAdjustmentModalOpen, setAddAdjustmentModalOpen] = useState(false);
   const [showDeleted, setShowDeleted] = useState(false);
-  const [users, setUsers] = useState<FetchedUser[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<FetchedUser | null>(
     null,
@@ -116,26 +113,11 @@ export default function CustomerOverview() {
     totalRevenue: 0,
     totalMiners: 0,
   });
-  const [chartData, setChartData] = useState<
-    Array<{ date: string; count: number }>
-  >([]);
 
-  useEffect(() => {
-    const initializeUsers = async () => {
-      await fetchCurrentUserRole();
-    };
-    initializeUsers();
-  }, []);
-
-  useEffect(() => {
-    if (currentUserRole) {
-      fetchUsers();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentUserRole, showDeleted]);
-
-  const fetchCurrentUserRole = async () => {
-    try {
+  // Fetch current user profile
+  const { data: profileData, isLoading: profileLoading } = useQuery({
+    queryKey: ["userProfile"],
+    queryFn: async () => {
       const response = await fetch("/api/user/profile", {
         method: "GET",
         headers: {
@@ -143,53 +125,30 @@ export default function CustomerOverview() {
         },
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        setCurrentUserRole(data.user?.role || "ADMIN");
+      if (!response.ok) {
+        throw new Error("Failed to fetch user profile");
       }
-    } catch (err) {
-      console.error("Error fetching current user role:", err);
-      setCurrentUserRole("ADMIN");
-    }
-  };
 
-  /**
-   * Aggregate customer data by creation date for chart
-   */
-  const aggregateCustomersByDate = (customers: FetchedUser[]) => {
-    const dateMap = new Map<string, number>();
+      return response.json();
+    },
+  });
 
-    // Sort by createdAt and count cumulative customers
-    const sortedCustomers = [...customers].sort(
-      (a, b) => new Date(a.joinDate).getTime() - new Date(b.joinDate).getTime(),
-    );
+  const currentUserRole = profileData?.user?.role || "ADMIN";
 
-    let cumulativeCount = 0;
-    sortedCustomers.forEach((customer) => {
-      const date = new Date(customer.joinDate).toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-      });
-
-      cumulativeCount += 1;
-      dateMap.set(date, cumulativeCount);
-    });
-
-    // Convert to array and sort by date
-    return Array.from(dateMap, ([date, count]) => ({ date, count })).sort(
-      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
-    );
-  };
-
-  const fetchUsers = async () => {
-    try {
-      setLoading(true);
-      setError(null);
+  // Fetch all users
+  const {
+    data: usersData,
+    isLoading: usersLoading,
+    error: usersError,
+    refetch: refetchUsers,
+  } = useQuery({
+    queryKey: ["userAll", showDeleted],
+    queryFn: async () => {
       const url = new URL("/api/user/all", window.location.origin);
       if (showDeleted) {
         url.searchParams.append("isDeleted", "true");
       }
+
       const response = await fetch(url.toString());
 
       if (!response.ok) {
@@ -198,61 +157,97 @@ export default function CustomerOverview() {
 
       const data = await response.json();
 
-      if (data.users) {
-        // Filter users based on current user's role
-        let filteredUsers = data.users;
+      if (!data.users) {
+        throw new Error("No users data returned");
+      }
 
-        // ADMIN can only see CLIENT users
-        if (currentUserRole === "ADMIN") {
-          filteredUsers = data.users.filter(
-            (user: FetchedUser) => user.role === "CLIENT",
-          );
-        }
-        // SUPER_ADMIN can see both CLIENT and ADMIN users
-        else if (currentUserRole === "SUPER_ADMIN") {
-          filteredUsers = data.users.filter(
-            (user: FetchedUser) =>
-              user.role === "CLIENT" || user.role === "ADMIN",
-          );
-        }
+      return data;
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
 
-        setUsers(filteredUsers);
+  const loading = profileLoading || usersLoading;
+  const error = usersError
+    ? "Failed to load customers. Please try again."
+    : null;
 
-        // Calculate stats based on filtered users
-        const totalMiners = filteredUsers.reduce(
-          (sum: number, user: FetchedUser) => sum + user.miners,
-          0,
-        );
-        const activeCount = filteredUsers.filter(
-          (user: FetchedUser) => user.status === "active",
-        ).length;
+  // Process users and generate chart data
+  const { users, chartData } = useMemo(() => {
+    if (!usersData?.users || !currentUserRole) {
+      return { users: [], chartData: [] };
+    }
 
-        setCustomerStats({
-          totalCustomers: filteredUsers.length,
-          activeCustomers: activeCount,
-          totalRevenue: data.totalRevenue, // Revenue calculation would depend on your business logic
-          totalMiners: totalMiners,
+    let filteredUsers = usersData.users;
+
+    // ADMIN can only see CLIENT users
+    if (currentUserRole === "ADMIN") {
+      filteredUsers = usersData.users.filter(
+        (user: FetchedUser) => user.role === "CLIENT",
+      );
+    }
+    // SUPER_ADMIN can see both CLIENT and ADMIN users
+    else if (currentUserRole === "SUPER_ADMIN") {
+      filteredUsers = usersData.users.filter(
+        (user: FetchedUser) => user.role === "CLIENT" || user.role === "ADMIN",
+      );
+    }
+
+    // Calculate stats
+    const totalMiners = filteredUsers.reduce(
+      (sum: number, user: FetchedUser) => sum + user.miners,
+      0,
+    );
+    const activeCount = filteredUsers.filter(
+      (user: FetchedUser) => user.status === "active",
+    ).length;
+
+    setCustomerStats({
+      totalCustomers: filteredUsers.length,
+      activeCustomers: activeCount,
+      totalRevenue: usersData.totalRevenue || 0,
+      totalMiners: totalMiners,
+    });
+
+    /**
+     * Aggregate customer data by creation date for chart
+     */
+    const aggregateCustomersByDate = (customers: FetchedUser[]) => {
+      const dateMap = new Map<string, number>();
+
+      // Sort by createdAt and count cumulative customers
+      const sortedCustomers = [...customers].sort(
+        (a, b) =>
+          new Date(a.joinDate).getTime() - new Date(b.joinDate).getTime(),
+      );
+
+      let cumulativeCount = 0;
+      sortedCustomers.forEach((customer) => {
+        const date = new Date(customer.joinDate).toLocaleDateString("en-US", {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
         });
 
-        // Generate chart data from customer creation dates
-        const growthData = aggregateCustomersByDate(filteredUsers);
-        setChartData(growthData);
-      }
-    } catch (err) {
-      console.error("Error fetching users:", err);
-      setError("Failed to load customers. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
+        cumulativeCount += 1;
+        dateMap.set(date, cumulativeCount);
+      });
+
+      // Convert to array and sort by date
+      return Array.from(dateMap, ([date, count]) => ({ date, count })).sort(
+        (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
+      );
+    };
+
+    // Generate chart data
+    const chartData = aggregateCustomersByDate(filteredUsers);
+
+    return { users: filteredUsers, chartData };
+  }, [usersData, currentUserRole]);
 
   const handleUserCreated = (resNotification: string) => {
     setResponseNotification(resNotification);
     // Refresh the customer list/stats
-    if (!currentUserRole) {
-      fetchCurrentUserRole();
-    }
-    fetchUsers();
+    refetchUsers();
   };
 
   // /**
@@ -307,7 +302,7 @@ export default function CustomerOverview() {
 
   const filteredRows = useMemo(
     () =>
-      users.filter((row) =>
+      users.filter((row: FetchedUser) =>
         (Object.keys(filters) as Array<keyof FilterColumns>).every((column) => {
           const searchValue = filters[column].toLowerCase();
           return row[column].toString().toLowerCase().includes(searchValue);
@@ -377,7 +372,6 @@ export default function CustomerOverview() {
       return;
     }
 
-    setLoading(true);
     try {
       const response = await fetch(`/api/user/${selectedCustomer.id}`, {
         method: "DELETE",
@@ -391,16 +385,14 @@ export default function CustomerOverview() {
         throw new Error(data.error || "Failed to delete customer");
       }
 
-      setError(null);
+      setResponseNotification("Customer deleted successfully");
+      handleMenuClose();
       // Refresh the customer list
-      await fetchUsers();
+      await refetchUsers();
     } catch (err) {
-      setError(
+      setResponseNotification(
         err instanceof Error ? err.message : "Failed to delete customer",
       );
-    } finally {
-      setLoading(false);
-      handleMenuClose();
     }
   };
 
