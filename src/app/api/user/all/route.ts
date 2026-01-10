@@ -97,7 +97,7 @@ export async function GET(request: NextRequest) {
       twoFactorEnabled: user.twoFactorEnabled,
       joinDate: user.createdAt.toISOString().split("T")[0],
       miners: user.miners.length,
-      status: "active", // You can add logic to determine status
+      status: user.isDeleted ? "deleted" : "active", // You can add logic to determine status
       isDeleted: user.isDeleted,
     }));
 

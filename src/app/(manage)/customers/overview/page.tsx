@@ -886,7 +886,9 @@ export default function CustomerOverview() {
                           <Typography
                             component="span"
                             sx={{
-                              color: "primary.main",
+                              color: customer.isDeleted
+                                ? "#d32f2f"
+                                : "primary.main",
                               fontWeight: 500,
                               cursor: "pointer",
                               "&:hover": {
