@@ -214,6 +214,27 @@ export default function AdminDashboard() {
             type="currency"
           />
 
+          {/* Total Customer Balance, from our database */}
+          <AdminValueCard
+            title="Total Customer Balance"
+            value={stats?.financial.totalCustomerBalance ?? 0}
+            type="currency"
+          />
+
+          {/* Total Mined Revenue */}
+          <AdminValueCard
+            title="Total Mined Revenue"
+            value={stats?.financial.totalMinedRevenue ?? 0}
+            subtitle="₿"
+            type="BTC"
+          />
+
+          {/* Uptime 24h - From Luxor */}
+          <AdminValueCard
+            title="Uptime (24 hours)"
+            value={`${(stats?.luxor.uptime_24h ?? 0).toFixed(4)}%`}
+          />
+
           {/* Hashrate 5 min - Current from Luxor */}
           <AdminValueCard
             title="Hashrate (5 min)"
@@ -226,20 +247,6 @@ export default function AdminDashboard() {
             title="Hashrate (24 hours)"
             value={stats?.luxor.hashrate_24h ?? 0}
             subtitle="PH/s"
-          />
-
-          {/* Uptime 24h - From Luxor */}
-          <AdminValueCard
-            title="Uptime (24 hours)"
-            value={`${(stats?.luxor.uptime_24h ?? 0).toFixed(4)}%`}
-          />
-
-          {/* Total Mined Revenue */}
-          <AdminValueCard
-            title="Total Mined Revenue"
-            value={stats?.financial.totalMinedRevenue ?? 0}
-            subtitle="₿"
-            type="BTC"
           />
 
           {/* === LUXOR POOL ACCOUNTS === */}
@@ -283,13 +290,6 @@ export default function AdminDashboard() {
           />
 
           {/* === CUSTOMER FINANCIAL METRICS === */}
-
-          {/* Total Customer Balance */}
-          <AdminValueCard
-            title="Total Customer Balance"
-            value={stats?.financial.totalCustomerBalance ?? 0}
-            type="currency"
-          />
 
           {/* Total Customers Count */}
           <AdminValueCard
