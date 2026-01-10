@@ -24,6 +24,8 @@ import {
   // FormControl,
   // Select,
   TextField,
+  Checkbox,
+  FormControlLabel,
 } from "@mui/material";
 import {
   Add as AddIcon,
@@ -58,6 +60,7 @@ interface FetchedUser {
   luxorSubaccountName: string;
   streetAddress: string;
   twoFactorEnabled: boolean;
+  isDeleted: boolean;
   joinDate: string;
   miners: number;
   status: "active" | "inactive";
@@ -83,6 +86,7 @@ export default function CustomerOverview() {
   const [changePasswordModalOpen, setChangePasswordModalOpen] = useState(false);
   const [addPaymentModalOpen, setAddPaymentModalOpen] = useState(false);
   const [addAdjustmentModalOpen, setAddAdjustmentModalOpen] = useState(false);
+  const [showDeleted, setShowDeleted] = useState(false);
   const [users, setUsers] = useState<FetchedUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -115,7 +119,7 @@ export default function CustomerOverview() {
       fetchUsers();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentUserRole]);
+  }, [currentUserRole, showDeleted]);
 
   const fetchCurrentUserRole = async () => {
     try {
@@ -140,12 +144,11 @@ export default function CustomerOverview() {
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch("/api/user/all", {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
+      const url = new URL("/api/user/all", window.location.origin);
+      if (showDeleted) {
+        url.searchParams.append("isDeleted", "true");
+      }
+      const response = await fetch(url.toString());
 
       if (!response.ok) {
         throw new Error("Failed to fetch users");
@@ -524,9 +527,27 @@ export default function CustomerOverview() {
           border: (theme) => `1px solid ${theme.palette.divider}`,
         }}
       >
-        <Typography variant="h6" sx={{ mb: 3, fontWeight: "medium" }}>
-          Recent Customers
-        </Typography>
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            mb: 3,
+          }}
+        >
+          <Typography variant="h6" sx={{ fontWeight: "medium" }}>
+            Recent Customers
+          </Typography>
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={showDeleted}
+                onChange={(e) => setShowDeleted(e.target.checked)}
+              />
+            }
+            label="Show Deleted"
+          />
+        </Box>
 
         {error && (
           <Alert severity="error" sx={{ mb: 2 }}>
@@ -920,7 +941,11 @@ export default function CustomerOverview() {
         <MenuItem onClick={handleChangePassword}>Change Password</MenuItem>
         <MenuItem onClick={handleAddPayment}>Add Payment</MenuItem>
         <MenuItem onClick={handleCreateAdjustment}>Create Adjustment</MenuItem>
-        <MenuItem onClick={handleDeleteCustomer} sx={{ color: "error.main" }}>
+        <MenuItem
+          onClick={handleDeleteCustomer}
+          sx={{ color: "error.main" }}
+          disabled={selectedCustomer ? selectedCustomer.isDeleted : true}
+        >
           Delete Customer
         </MenuItem>
       </Menu>

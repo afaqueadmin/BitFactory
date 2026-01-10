@@ -48,6 +48,12 @@ export async function GET(request: NextRequest) {
         { status: 403 },
       );
     }
+    const { searchParams } = request.nextUrl;
+    const includeDeleted = searchParams.get("isDeleted") === "true";
+
+    // Build where clause for filtering
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const where: any = includeDeleted ? {} : { isDeleted: false };
 
     // Fetch all users (excluding passwords)
     const users = await prisma.user.findMany({
@@ -64,12 +70,14 @@ export async function GET(request: NextRequest) {
         twoFactorEnabled: true,
         streetAddress: true,
         createdAt: true,
+        isDeleted: true,
         miners: {
           select: {
             id: true,
           },
         },
       },
+      where,
       orderBy: {
         createdAt: "desc",
       },
@@ -90,6 +98,7 @@ export async function GET(request: NextRequest) {
       joinDate: user.createdAt.toISOString().split("T")[0],
       miners: user.miners.length,
       status: "active", // You can add logic to determine status
+      isDeleted: user.isDeleted,
     }));
 
     const totalRevenue = await prisma.costPayment.aggregate({

@@ -177,30 +177,37 @@ export async function DELETE(
       );
     }
 
-    // Delete user and related data
-    // First, delete user activities
-    await prisma.userActivity.deleteMany({
-      where: { userId: id },
-    });
+    // No Hard delete for now - just mark as deleted
+    // // Delete user and related data
+    // // First, delete user activities
+    // await prisma.userActivity.deleteMany({
+    //   where: { userId: id },
+    // });
+    //
+    // // Delete token blacklist entries
+    // await prisma.tokenBlacklist.deleteMany({
+    //   where: { userId: id },
+    // });
+    //
+    // // Delete miners associated with the user
+    // await prisma.miner.deleteMany({
+    //   where: { userId: id },
+    // });
+    //
+    // // Delete cost payments associated with the user
+    // await prisma.costPayment.deleteMany({
+    //   where: { userId: id },
+    // });
 
-    // Delete token blacklist entries
-    await prisma.tokenBlacklist.deleteMany({
-      where: { userId: id },
-    });
+    // // Finally, delete the user
+    // await prisma.user.delete({
+    //   where: { id },
+    // });
 
-    // Delete miners associated with the user
-    await prisma.miner.deleteMany({
-      where: { userId: id },
-    });
-
-    // Delete cost payments associated with the user
-    await prisma.costPayment.deleteMany({
-      where: { userId: id },
-    });
-
-    // Finally, delete the user
-    await prisma.user.delete({
+    // Soft delete user by setting isDeleted to true
+    await prisma.user.update({
       where: { id },
+      data: { isDeleted: true },
     });
 
     return NextResponse.json({

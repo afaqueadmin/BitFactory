@@ -81,6 +81,7 @@ export async function GET(request: NextRequest) {
         companyUrl: true,
         role: true,
         twoFactorEnabled: true,
+        isDeleted: true,
       },
     });
 

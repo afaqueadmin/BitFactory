@@ -33,6 +33,7 @@ interface CustomerDetails {
   streetAddress: string;
   twoFactorEnabled: boolean;
   joinDate: string;
+  isDeleted: boolean;
   miners: number;
   status: "active" | "inactive";
 }
@@ -164,6 +165,7 @@ export default function CustomerDetailPage() {
           joinDate: user.joinDate || "",
           miners: user.miners || 0,
           status: user.status || "active",
+          isDeleted: user.isDeleted,
         });
       } catch (error) {
         const errorMessage =
@@ -320,9 +322,20 @@ export default function CustomerDetailPage() {
         <>
           {/* Customer Header */}
           <Box sx={{ mb: 3 }}>
-            <Typography variant="h4" fontWeight="bold" gutterBottom>
-              {customer.name}
-            </Typography>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              <Typography variant="h4" fontWeight="bold">
+                {customer.name}
+              </Typography>
+              {customer.isDeleted && (
+                <Typography
+                  variant="h4"
+                  fontWeight="bold"
+                  sx={{ color: "#d32f2f" }}
+                >
+                  (Deleted)
+                </Typography>
+              )}
+            </Box>
             <Typography variant="body1" color="text.secondary" gutterBottom>
               {customer.email} • {customer.role}
             </Typography>

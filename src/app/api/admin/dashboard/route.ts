@@ -538,7 +538,7 @@ export async function GET(request: NextRequest) {
 
     // Fetch customers (users with role CLIENT) statistics
     const totalCustomers = await prisma.user.findMany({
-      where: { role: "CLIENT" },
+      where: { role: "CLIENT", isDeleted: false },
       include: {
         miners: true,
       },

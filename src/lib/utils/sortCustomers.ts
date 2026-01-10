@@ -45,6 +45,7 @@ interface Customer {
   luxorSubaccountName: string;
   streetAddress: string;
   twoFactorEnabled: boolean;
+  isDeleted: boolean;
   joinDate: string;
   miners: number;
   status: "active" | "inactive";
