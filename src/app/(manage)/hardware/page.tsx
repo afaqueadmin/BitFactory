@@ -548,7 +548,7 @@ export default function HardwarePage() {
                 >
                   <TableCell sx={{ fontWeight: "500" }}>{hw.model}</TableCell>
                   <TableCell align="right">
-                    {parseFloat(String(hw.powerUsage)).toFixed(2)}
+                    {parseFloat(String(hw.powerUsage)).toFixed(3)}
                   </TableCell>
                   <TableCell align="right">
                     {parseFloat(String(hw.hashRate)).toFixed(2)}
