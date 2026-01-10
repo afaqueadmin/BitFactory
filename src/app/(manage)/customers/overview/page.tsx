@@ -34,6 +34,16 @@ import {
   ArrowDownward as ArrowDownwardIcon,
 } from "@mui/icons-material";
 import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
+import {
   sortCustomers,
   toggleSortDirection,
   // getSortFieldLabel,
@@ -106,6 +116,9 @@ export default function CustomerOverview() {
     totalRevenue: 0,
     totalMiners: 0,
   });
+  const [chartData, setChartData] = useState<
+    Array<{ date: string; count: number }>
+  >([]);
 
   useEffect(() => {
     const initializeUsers = async () => {
@@ -138,6 +151,35 @@ export default function CustomerOverview() {
       console.error("Error fetching current user role:", err);
       setCurrentUserRole("ADMIN");
     }
+  };
+
+  /**
+   * Aggregate customer data by creation date for chart
+   */
+  const aggregateCustomersByDate = (customers: FetchedUser[]) => {
+    const dateMap = new Map<string, number>();
+
+    // Sort by createdAt and count cumulative customers
+    const sortedCustomers = [...customers].sort(
+      (a, b) => new Date(a.joinDate).getTime() - new Date(b.joinDate).getTime(),
+    );
+
+    let cumulativeCount = 0;
+    sortedCustomers.forEach((customer) => {
+      const date = new Date(customer.joinDate).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      });
+
+      cumulativeCount += 1;
+      dateMap.set(date, cumulativeCount);
+    });
+
+    // Convert to array and sort by date
+    return Array.from(dateMap, ([date, count]) => ({ date, count })).sort(
+      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
+    );
   };
 
   const fetchUsers = async () => {
@@ -191,6 +233,10 @@ export default function CustomerOverview() {
           totalRevenue: data.totalRevenue, // Revenue calculation would depend on your business logic
           totalMiners: totalMiners,
         });
+
+        // Generate chart data from customer creation dates
+        const growthData = aggregateCustomersByDate(filteredUsers);
+        setChartData(growthData);
       }
     } catch (err) {
       console.error("Error fetching users:", err);
@@ -969,19 +1015,53 @@ export default function CustomerOverview() {
         <Typography variant="h6" sx={{ mb: 3, fontWeight: "medium" }}>
           Customer Growth
         </Typography>
-        {/* Placeholder for chart - you can add a chart library of your choice */}
-        <Box
-          sx={{
-            height: 300,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <Typography color="text.secondary">
-            Customer growth chart will be displayed here
-          </Typography>
-        </Box>
+        {chartData.length === 0 ? (
+          <Box
+            sx={{
+              height: 300,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Typography color="text.secondary">
+              No customer data available for chart
+            </Typography>
+          </Box>
+        ) : (
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart
+              data={chartData}
+              margin={{ top: 5, right: 30, left: 0, bottom: 5 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis
+                dataKey="date"
+                angle={-45}
+                textAnchor="end"
+                height={80}
+                interval={
+                  chartData.length > 10 ? Math.floor(chartData.length / 10) : 0
+                }
+              />
+              <YAxis />
+              <Tooltip
+                formatter={(value) => `${value} customers`}
+                labelFormatter={(label) => `Date: ${label}`}
+              />
+              <Legend />
+              <Line
+                type="monotone"
+                dataKey="count"
+                stroke="#1976d2"
+                dot={false}
+                name="Total Customers"
+                strokeWidth={2}
+                isAnimationActive={true}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        )}
       </Paper>
     </Box>
   );
