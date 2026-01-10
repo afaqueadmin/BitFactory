@@ -265,19 +265,19 @@ export default function AdminDashboard() {
 
           {/* Total Workers */}
           <AdminValueCard
-            title="Total Workers"
+            title="Total Workers (Luxor)"
             value={stats?.luxor.workers.totalWorkers ?? 0}
           />
 
           {/* Active Workers */}
           <AdminValueCard
-            title="Active Workers"
+            title="Active Workers (Luxor)"
             value={stats?.luxor.workers.activeWorkers ?? 0}
           />
 
           {/* Inactive Workers */}
           <AdminValueCard
-            title="Inactive Workers"
+            title="Inactive Workers (Luxor)"
             value={stats?.luxor.workers.inactiveWorkers ?? 0}
           />
 
