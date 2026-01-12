@@ -29,6 +29,7 @@ import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay"
 interface PricingConfig {
   id: string;
   userId: string;
+  customerName: string;
   defaultUnitPrice: number;
   effectiveFrom: Date;
   effectiveTo: Date | null;
@@ -77,15 +78,15 @@ export default function PricingPage() {
       <Box sx={{ mb: 3 }}>
         <h1 style={{ margin: 0 }}>Pricing Configuration</h1>
         <p style={{ margin: "8px 0 0 0", color: "#666" }}>
-          Manage customer-specific unit pricing and discounts
+          Manage customer-specific unit pricing
         </p>
       </Box>
 
       <Paper sx={{ mb: 3, p: 3, backgroundColor: "#e8f4f8" }}>
         <h3 style={{ margin: "0 0 12px 0" }}>About Pricing</h3>
         <p style={{ margin: 0, color: "#666" }}>
-          Define unit prices for different service types and apply
-          customer-specific discounts. Changes take effect on the next invoice.
+          Define unit prices for different customers. Changes take effect on the
+          next invoice.
         </p>
       </Paper>
 
@@ -94,10 +95,9 @@ export default function PricingPage() {
           <TableHead sx={{ backgroundColor: "#f5f5f5" }}>
             <TableRow>
               <TableCell sx={{ fontWeight: "bold" }}>Customer</TableCell>
-              <TableCell sx={{ fontWeight: "bold" }}>Base Unit Price</TableCell>
-              <TableCell sx={{ fontWeight: "bold" }}>Discount (%)</TableCell>
-              <TableCell sx={{ fontWeight: "bold" }}>Effective Rate</TableCell>
-              <TableCell sx={{ fontWeight: "bold" }}>Currency</TableCell>
+              <TableCell sx={{ fontWeight: "bold" }}>
+                Unit Price (USD)
+              </TableCell>
               <TableCell sx={{ fontWeight: "bold" }}>Effective From</TableCell>
               <TableCell sx={{ fontWeight: "bold" }}>Actions</TableCell>
             </TableRow>
@@ -109,17 +109,8 @@ export default function PricingPage() {
                   {pricing.customerName}
                 </TableCell>
                 <TableCell>
-                  <CurrencyDisplay value={pricing.unitPrice} />
+                  <CurrencyDisplay value={pricing.defaultUnitPrice} />
                 </TableCell>
-                <TableCell>{pricing.discountPercentage}%</TableCell>
-                <TableCell>
-                  <CurrencyDisplay
-                    value={
-                      pricing.unitPrice * (1 - pricing.discountPercentage / 100)
-                    }
-                  />
-                </TableCell>
-                <TableCell>{pricing.currency}</TableCell>
                 <TableCell>
                   {new Date(pricing.effectiveFrom).toLocaleDateString()}
                 </TableCell>
@@ -151,35 +142,39 @@ export default function PricingPage() {
             <Stack spacing={2}>
               <TextField
                 label="Customer Name"
-                value={editValues.customerName || ""}
+                value={selectedPricing.customerName || ""}
                 disabled
                 fullWidth
               />
               <TextField
-                label="Unit Price"
+                label="Unit Price (USD)"
                 type="number"
-                value={editValues.unitPrice || ""}
+                value={editValues.defaultUnitPrice || ""}
                 onChange={(e) =>
                   setEditValues({
                     ...editValues,
-                    unitPrice: parseFloat(e.target.value),
+                    defaultUnitPrice: parseFloat(e.target.value),
                   })
                 }
                 fullWidth
                 inputProps={{ step: "0.01" }}
               />
               <TextField
-                label="Discount (%)"
-                type="number"
-                value={editValues.discountPercentage || ""}
+                label="Effective From"
+                type="date"
+                value={
+                  editValues.effectiveFrom instanceof Date
+                    ? editValues.effectiveFrom.toISOString().split("T")[0]
+                    : ""
+                }
                 onChange={(e) =>
                   setEditValues({
                     ...editValues,
-                    discountPercentage: parseFloat(e.target.value),
+                    effectiveFrom: new Date(e.target.value),
                   })
                 }
                 fullWidth
-                inputProps={{ min: "0", max: "100", step: "0.01" }}
+                InputLabelProps={{ shrink: true }}
               />
             </Stack>
           )}

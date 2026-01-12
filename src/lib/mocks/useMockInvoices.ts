@@ -468,6 +468,7 @@ export function useMockRecurringInvoices() {
 interface CustomerPricingConfigDisplay {
   id: string;
   userId: string;
+  customerName: string;
   defaultUnitPrice: number;
   effectiveFrom: Date;
   effectiveTo: Date | null;
@@ -486,13 +487,16 @@ export function useMockCustomerPricingConfigs() {
         setLoading(true);
         // Simulate API delay
         await new Promise((resolve) => setTimeout(resolve, 500));
-        const data = generateMockPricingConfigs(8).map((pc) => ({
-          ...pc,
-          unitPrice: pc.defaultUnitPrice,
-          discountPercentage: Math.random() * 15,
-          customerName: `Customer ${pc.userId.slice(0, 8)}`,
-          currency: "USD",
-        }));
+        const data = generateMockPricingConfigs(8).map(
+          (pc): CustomerPricingConfigDisplay => ({
+            id: pc.id,
+            userId: pc.userId,
+            defaultUnitPrice: pc.defaultUnitPrice,
+            effectiveFrom: pc.effectiveFrom,
+            effectiveTo: pc.effectiveTo,
+            customerName: `Customer ${pc.userId.slice(0, 8)}`,
+          }),
+        );
         setPricingConfigs(data);
         setError(null);
       } catch (err) {
