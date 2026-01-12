@@ -232,6 +232,13 @@ export function useMockInvoiceDetail(
 
 interface UseMockCustomerInvoicesReturn {
   invoices: Invoice[];
+  customer: { id: string; name: string } | null;
+  totals: {
+    totalAmount: number;
+    totalPaid: number;
+    totalOutstanding: number;
+    invoiceCount: number;
+  };
   summary: {
     totalInvoiced: number;
     totalPaid: number;
@@ -252,6 +259,9 @@ export function useMockCustomerInvoices(
   customerId: string,
 ): UseMockCustomerInvoicesReturn {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [customer, setCustomer] = useState<{ id: string; name: string } | null>(
+    null,
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -263,6 +273,12 @@ export function useMockCustomerInvoices(
 
         // Simulate API delay
         await new Promise((resolve) => setTimeout(resolve, 400));
+
+        // Set customer info
+        setCustomer({
+          id: customerId,
+          name: `Customer ${customerId.slice(0, 8)}`,
+        });
 
         // Generate invoices for this customer
         const mockInvoices = generateMockInvoices(8);
@@ -300,9 +316,18 @@ export function useMockCustomerInvoices(
     invoiceCount: invoices.length,
   };
 
+  const totals = {
+    totalAmount: summary.totalInvoiced,
+    totalPaid: summary.totalPaid,
+    totalOutstanding: summary.totalOutstanding,
+    invoiceCount: summary.invoiceCount,
+  };
+
   return {
     invoices,
+    customer,
     summary,
+    totals,
     loading,
     error,
   };
@@ -366,5 +391,123 @@ function buildDashboardResponse(
       active: recurringInvoices.filter((ri) => ri.isActive).length,
       inactive: recurringInvoices.filter((ri) => !ri.isActive).length,
     },
+  };
+}
+
+/**
+ * Hook: Fetch all recurring invoices
+ *
+ * Usage:
+ * const { recurringInvoices, loading, error } = useMockRecurringInvoices();
+ */
+interface RecurringInvoiceWithDisplay {
+  id: string;
+  userId: string;
+  dayOfMonth: number;
+  unitPrice: number | null;
+  startDate: Date;
+  endDate: Date | null;
+  isActive: boolean;
+  name: string;
+  customerName: string;
+  amount: number;
+  nextInvoiceDate: Date;
+}
+
+export function useMockRecurringInvoices() {
+  const [recurringInvoices, setRecurringInvoices] = useState<
+    RecurringInvoiceWithDisplay[]
+  >([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        // Simulate API delay
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        const data = generateMockRecurringInvoices(8).map(
+          (ri): RecurringInvoiceWithDisplay => ({
+            ...ri,
+            name: `Recurring Invoice - ${ri.dayOfMonth}th`,
+            customerName: `Customer ${ri.userId.slice(0, 8)}`,
+            amount: ri.unitPrice || 100,
+            nextInvoiceDate: new Date(
+              new Date().getFullYear(),
+              new Date().getMonth(),
+              ri.dayOfMonth,
+            ),
+          }),
+        );
+        setRecurringInvoices(data);
+        setError(null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load data");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, []);
+
+  return {
+    recurringInvoices,
+    loading,
+    error,
+  };
+}
+
+/**
+ * Hook: Fetch customer pricing configurations
+ *
+ * Usage:
+ * const { pricingConfigs, loading, error } = useMockCustomerPricingConfigs();
+ */
+interface CustomerPricingConfigDisplay {
+  id: string;
+  userId: string;
+  defaultUnitPrice: number;
+  effectiveFrom: Date;
+  effectiveTo: Date | null;
+}
+
+export function useMockCustomerPricingConfigs() {
+  const [pricingConfigs, setPricingConfigs] = useState<
+    CustomerPricingConfigDisplay[]
+  >([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        // Simulate API delay
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        const data = generateMockPricingConfigs(8).map((pc) => ({
+          ...pc,
+          unitPrice: pc.defaultUnitPrice,
+          discountPercentage: Math.random() * 15,
+          customerName: `Customer ${pc.userId.slice(0, 8)}`,
+          currency: "USD",
+        }));
+        setPricingConfigs(data);
+        setError(null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load data");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, []);
+
+  return {
+    pricingConfigs,
+    loading,
+    error,
   };
 }

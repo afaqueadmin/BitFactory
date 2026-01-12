@@ -31,6 +31,7 @@ const securePaths = {
   ADMIN: new Set<string>([
     "/admin-profile",
     "/adminpanel",
+    "/accounting",
     "/customers/overview",
     "/groups",
     "/hardware",
@@ -46,6 +47,7 @@ const securePaths = {
 const dynamicPatternsPaths = {
   CLIENT: [],
   ADMIN: [
+    new URLPattern({ pathname: "/accounting/:path*" }),
     new URLPattern({ pathname: "/customers/:id*" }),
     new URLPattern({ pathname: "/groups/:id*" }),
   ],

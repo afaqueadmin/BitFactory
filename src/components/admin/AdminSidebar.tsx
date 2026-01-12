@@ -29,7 +29,7 @@ import {
   ShoppingCart as ECommerceIcon,
   PriceCheck as HostingPricesIcon,
   Bolt as ConsumptionIcon,
-  Payment as TransactionsIcon,
+  Assignment as AccountingIcon,
   ChevronLeft,
   ChevronRight,
 } from "@mui/icons-material";
@@ -109,6 +109,38 @@ const sidebarItems: SidebarItem[] = [
     title: "Hardware Models",
     icon: <HardwareIcon />,
     path: "/hardware",
+  },
+
+  {
+    title: "Accounting",
+    icon: <AccountingIcon />,
+    items: [
+      {
+        title: "Dashboard",
+        icon: <DashboardIcon />,
+        path: "/accounting",
+      },
+      {
+        title: "Invoices",
+        icon: <InvoicesIcon />,
+        path: "/accounting/invoices",
+      },
+      {
+        title: "Recurring Invoices",
+        icon: <RevenueIcon />,
+        path: "/accounting/recurring",
+      },
+      {
+        title: "Statements",
+        icon: <OverviewIcon />,
+        path: "/accounting/statements",
+      },
+      {
+        title: "Pricing",
+        icon: <HostingPricesIcon />,
+        path: "/accounting/pricing",
+      },
+    ],
   },
 
   {
