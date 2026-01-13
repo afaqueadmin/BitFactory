@@ -115,24 +115,29 @@ class InMemoryCache implements ICacheBackend {
 class RedisCache implements ICacheBackend {
   // TODO: Implement Redis adapter
   // For now, constructor will throw if Redis is selected without implementation
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   constructor(_ttlSeconds: number = 600) {
     throw new Error(
       "Redis cache backend not yet implemented. Use CACHE_BACKEND=memory",
     );
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   get(_key: string): unknown | null {
     throw new Error("Not implemented");
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   set(_key: string, _data: unknown, _ttlSeconds?: number): void {
     throw new Error("Not implemented");
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   invalidate(_key: string): void {
     throw new Error("Not implemented");
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   invalidatePattern(_pattern: RegExp): void {
     throw new Error("Not implemented");
   }

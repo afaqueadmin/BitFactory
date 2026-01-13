@@ -84,7 +84,7 @@ export default function TwoFactorSettings({
       setQrCode(data.qrCode);
       setSecret(data.secret);
       setSetupMode(true);
-    } catch (error) {
+    } catch {
       setError("Failed to start 2FA setup");
     }
   };
@@ -111,7 +111,7 @@ export default function TwoFactorSettings({
       setToken("");
       setIsTwoFactorEnabled(true);
       setSuccessMessage("Two-factor authentication enabled successfully.");
-    } catch (error) {
+    } catch {
       setError("Failed to verify 2FA token");
     }
   };
@@ -141,7 +141,7 @@ export default function TwoFactorSettings({
       setIsTwoFactorEnabled(false);
       setError("");
       setSuccessMessage("Two-factor authentication disabled successfully.");
-    } catch (error) {
+    } catch {
       setError("Failed to disable 2FA");
     }
   };

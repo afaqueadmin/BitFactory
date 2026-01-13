@@ -13,13 +13,9 @@ const getJwtSecretKey = () => {
 
 export async function verifyJwtToken(token: string): Promise<JwtPayload> {
   try {
-    const { payload, protectedHeader } = await jwtVerify(
-      token,
-      getJwtSecretKey(),
-      {
-        algorithms: ["HS256"], // Explicitly expect HS256
-      },
-    );
+    const { payload } = await jwtVerify(token, getJwtSecretKey(), {
+      algorithms: ["HS256"], // Explicitly expect HS256
+    });
 
     // Optional: debug
     // console.log('Decoded header:', protectedHeader);

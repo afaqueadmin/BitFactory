@@ -8,49 +8,47 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum Role {
-  ADMIN
-  CLIENT
-  SUPER_ADMIN
-}
-
-enum PaymentType {
-  PAYMENT
-  ELECTRICITY_CHARGES
-  ADJUSTMENT
-}
-
 model User {
-  id            String           @id @default(cuid())
-  email         String           @unique
-  name          String?
-  password      String
-  role          Role            @default(CLIENT)
-  city          String?
-  country       String?
-  dateOfBirth   DateTime?
-  phoneNumber   String?
-  streetAddress String?
-  companyName   String?
-  idNumber      String?
-  companyUrl    String?
-  profileImage  String?
-  profileImageId String?
-  twoFactorEnabled Boolean      @default(false)
-  twoFactorSecret String?
-  twoFactorBackupCodes String[]
-  luxorSubaccountName String?
-  isDeleted     Boolean         @default(false)
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
-  blacklisted   TokenBlacklist[]
-  activities    UserActivity[]
-  miners        Miner[]
-  costPayments  CostPayment[]
-  ownedMinerHistory MinerOwnershipHistory[] @relation("owner")
-  createdMinerHistory MinerOwnershipHistory[] @relation("createdBy")
+  id                         String                       @id @default(cuid())
+  email                      String                       @unique
+  name                       String?
+  password                   String
+  createdAt                  DateTime                     @default(now())
+  updatedAt                  DateTime                     @updatedAt
+  companyName                String?
+  profileImage               String?
+  profileImageId             String?
+  city                       String?
+  country                    String?
+  dateOfBirth                DateTime?
+  phoneNumber                String?
+  streetAddress              String?
+  twoFactorEnabled           Boolean                      @default(false)
+  twoFactorSecret            String?
+  twoFactorBackupCodes       String[]
+  role                       Role                         @default(CLIENT)
+  idNumber                   String?
+  luxorSubaccountName        String?
+  companyUrl                 String?
+  isDeleted                  Boolean                      @default(false)
+  auditLogs                  AuditLog[]                   @relation("auditLogs")
+  costPayments               CostPayment[]
+  pricingCreated             CustomerPricingConfig[]      @relation("pricingConfigsCreated")
+  pricingUpdated             CustomerPricingConfig[]      @relation("pricingConfigsUpdated")
+  pricingConfigs             CustomerPricingConfig[]      @relation("pricingConfigs")
+  createdGroups              Group[]
   hardwareProcurementHistory HardwareProcurementHistory[]
-  createdGroups Group[]
+  invoicesCreated            Invoice[]                    @relation("invoicesCreated")
+  invoicesUpdated            Invoice[]                    @relation("invoicesUpdated")
+  invoices                   Invoice[]                    @relation("invoices")
+  createdMinerHistory        MinerOwnershipHistory[]      @relation("createdBy")
+  ownedMinerHistory          MinerOwnershipHistory[]      @relation("owner")
+  miners                     Miner[]
+  recurringCreated           RecurringInvoice[]           @relation("recurringInvoicesCreated")
+  recurringUpdated           RecurringInvoice[]           @relation("recurringInvoicesUpdated")
+  recurringInvoices          RecurringInvoice[]           @relation("recurringInvoices")
+  blacklisted                TokenBlacklist[]
+  activities                 UserActivity[]
 
   @@index([isDeleted])
   @@map("users")
@@ -82,36 +80,36 @@ model UserActivity {
 }
 
 model Hardware {
-  id            String    @id @default(cuid())
-  model         String    @unique  // e.g., "Bitmain S21 Pro"
-  powerUsage    Float     // in kilowatts (e.g., 3.25)
-  hashRate      Decimal   // in TH/s (e.g., 234.5)
-  quantity      Int       @default(1)  // number of units available
-  isDeleted     Boolean   @default(false)
-  miners        Miner[]
+  id                 String                       @id @default(cuid())
+  model              String                       @unique
+  powerUsage         Float
+  hashRate           Decimal
+  createdAt          DateTime                     @default(now())
+  updatedAt          DateTime                     @updatedAt
+  quantity           Int                          @default(1)
+  isDeleted          Boolean                      @default(false)
   procurementHistory HardwareProcurementHistory[]
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  miners             Miner[]
 
   @@index([isDeleted])
   @@map("hardware")
 }
 
 model Miner {
-  id            String    @id @default(cuid())
-  name          String
-  status        String    @default("DEPLOYMENT_IN_PROGRESS") // AUTO or DEPLOYMENT_IN_PROGRESS
-  hardwareId    String
-  userId        String
-  spaceId       String
-  isDeleted     Boolean   @default(false)
-  user          User      @relation(fields: [userId], references: [id], onDelete: Restrict)
-  space         Space     @relation(fields: [spaceId], references: [id])
-  hardware      Hardware  @relation(fields: [hardwareId], references: [id])
-  rateHistory   MinerRateHistory[]
+  id               String                  @id @default(cuid())
+  name             String
+  status           String                  @default("DEPLOYMENT_IN_PROGRESS")
+  userId           String
+  spaceId          String
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+  hardwareId       String
+  isDeleted        Boolean                 @default(false)
   ownershipHistory MinerOwnershipHistory[]
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  rateHistory      MinerRateHistory[]
+  hardware         Hardware                @relation(fields: [hardwareId], references: [id])
+  space            Space                   @relation(fields: [spaceId], references: [id])
+  user             User                    @relation(fields: [userId], references: [id])
 
   @@unique([name, userId])
   @@index([hardwareId])
@@ -120,11 +118,11 @@ model Miner {
 }
 
 model MinerRateHistory {
-  id            String    @id @default(cuid())
-  minerId       String
-  rate_per_kwh  Decimal   @db.Decimal(10, 6)
-  miner         Miner     @relation(fields: [minerId], references: [id], onDelete: Cascade)
-  createdAt     DateTime  @default(now())
+  id           String   @id @default(cuid())
+  minerId      String
+  rate_per_kwh Decimal  @db.Decimal(10, 6)
+  createdAt    DateTime @default(now())
+  miner        Miner    @relation(fields: [minerId], references: [id], onDelete: Cascade)
 
   @@index([minerId])
   @@index([minerId, createdAt(sort: Desc)])
@@ -132,43 +130,43 @@ model MinerRateHistory {
 }
 
 model Space {
-  id            String    @id @default(cuid())
+  id            String   @id @default(cuid())
   name          String
   location      String
-  capacity      Int       // Total number of mining spots
-  powerCapacity Float     // Total power capacity in kilowatts
-  status        String    @default("AVAILABLE") // AVAILABLE or OCCUPIED
+  capacity      Int
+  powerCapacity Float
+  status        String   @default("AVAILABLE")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
   miners        Miner[]
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
 
   @@map("spaces")
 }
 
 model CostPayment {
-  id            String        @id @default(cuid())
-  userId        String
-  amount        Float
-  consumption   Float
-  type          PaymentType
-  narration     String?       // Only for ADJUSTMENT: reason/description (max 500 chars)
-  createdAt     DateTime      @default(now())
-  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-
+  id              String           @id @default(cuid())
+  userId          String
+  amount          Float
+  consumption     Float
+  type            PaymentType
+  createdAt       DateTime         @default(now())
+  narration       String?
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  invoicePayments InvoicePayment[] @relation("invoicePayments")
 
   @@index([userId])
   @@map("cost_payments")
 }
 
 model MinerOwnershipHistory {
-  id            String    @id @default(cuid())
-  minerId       String?
-  ownerId       String
-  createdById   String
-  miner         Miner?    @relation(fields: [minerId], references: [id], onDelete: Cascade)
-  owner         User      @relation("owner", fields: [ownerId], references: [id], onDelete: Cascade)
-  createdBy     User      @relation("createdBy", fields: [createdById], references: [id], onDelete: Cascade)
-  createdAt     DateTime  @default(now())
+  id          String   @id @default(cuid())
+  ownerId     String
+  createdById String
+  createdAt   DateTime @default(now())
+  minerId     String?
+  createdBy   User     @relation("createdBy", fields: [createdById], references: [id], onDelete: Cascade)
+  miner       Miner?   @relation(fields: [minerId], references: [id], onDelete: Cascade)
+  owner       User     @relation("owner", fields: [ownerId], references: [id], onDelete: Cascade)
 
   @@index([minerId])
   @@index([ownerId])
@@ -177,56 +175,237 @@ model MinerOwnershipHistory {
 }
 
 model HardwareProcurementHistory {
-  id            String    @id @default(cuid())
-  hardwareId    String
-  quantity      Int
-  createdById   String
-  hardware      Hardware  @relation(fields: [hardwareId], references: [id], onDelete: Cascade)
-  createdBy     User      @relation(fields: [createdById], references: [id], onDelete: Cascade)
-  createdAt     DateTime  @default(now())
+  id          String   @id @default(cuid())
+  hardwareId  String
+  quantity    Int
+  createdById String
+  createdAt   DateTime @default(now())
+  createdBy   User     @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  hardware    Hardware @relation(fields: [hardwareId], references: [id], onDelete: Cascade)
 
   @@index([hardwareId])
   @@index([createdById])
   @@map("hardware_procurement_history")
 }
 
-// ============================================================================
-// GROUP MANAGEMENT MODELS
-// ============================================================================
-
 model Group {
-  id              String   @id @default(cuid())
-  name            String   @db.VarChar(255)
-  description     String?  @db.Text
-  isActive        Boolean  @default(true)
-  
-  // Relationships
-  subaccounts     GroupSubaccount[]
-  creator         User     @relation(fields: [createdBy], references: [id], onDelete: Restrict)
-  
-  // Audit Trail
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  createdBy       String   // Admin/Super Admin user ID
-  
+  id          String            @id @default(cuid())
+  name        String            @db.VarChar(255)
+  description String?
+  isActive    Boolean           @default(true)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  createdBy   String
+  subaccounts GroupSubaccount[]
+  creator     User              @relation(fields: [createdBy], references: [id])
+
   @@index([isActive])
   @@map("groups")
 }
 
 model GroupSubaccount {
-  id              String   @id @default(cuid())
-  groupId         String
-  subaccountName  String   @unique  // Ensures one subaccount in ONE group only
-  
-  // Relationship
-  group           Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  
-  // Audit Trail
-  addedAt         DateTime @default(now())
-  addedBy         String   // Admin/Super Admin user ID
-  
+  id             String   @id @default(cuid())
+  groupId        String
+  subaccountName String   @unique
+  addedAt        DateTime @default(now())
+  addedBy        String
+  group          Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
   @@index([groupId])
   @@index([subaccountName])
   @@map("group_subaccounts")
 }
 
+model Invoice {
+  id                   String                @id @default(cuid())
+  invoiceNumber        String                @unique
+  userId               String
+  totalMiners          Int
+  unitPrice            Decimal               @db.Decimal(10, 2)
+  totalAmount          Decimal               @db.Decimal(12, 2)
+  status               InvoiceStatus
+  invoiceGeneratedDate DateTime
+  issuedDate           DateTime?
+  dueDate              DateTime
+  paidDate             DateTime?
+  createdBy            String
+  updatedBy            String?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  notifications        InvoiceNotification[] @relation("invoiceNotifications")
+  payments             InvoicePayment[]      @relation("invoicePayments")
+  createdByUser        User                  @relation("invoicesCreated", fields: [createdBy], references: [id])
+  updatedByUser        User?                 @relation("invoicesUpdated", fields: [updatedBy], references: [id])
+  user                 User                  @relation("invoices", fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([status])
+  @@index([dueDate])
+  @@index([createdAt])
+  @@index([invoiceNumber])
+  @@map("invoices")
+}
+
+model RecurringInvoice {
+  id                String    @id @default(cuid())
+  userId            String
+  dayOfMonth        Int
+  unitPrice         Decimal?  @db.Decimal(10, 2)
+  startDate         DateTime
+  endDate           DateTime?
+  isActive          Boolean   @default(true)
+  lastGeneratedDate DateTime?
+  createdBy         String
+  updatedBy         String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  createdByUser     User      @relation("recurringInvoicesCreated", fields: [createdBy], references: [id])
+  updatedByUser     User?     @relation("recurringInvoicesUpdated", fields: [updatedBy], references: [id])
+  user              User      @relation("recurringInvoices", fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([isActive])
+  @@index([dayOfMonth])
+  @@index([startDate])
+  @@map("recurring_invoices")
+}
+
+model CustomerPricingConfig {
+  id               String    @id @default(cuid())
+  userId           String
+  defaultUnitPrice Decimal   @db.Decimal(10, 2)
+  effectiveFrom    DateTime
+  effectiveTo      DateTime?
+  createdBy        String
+  updatedBy        String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  createdByUser    User      @relation("pricingConfigsCreated", fields: [createdBy], references: [id])
+  updatedByUser    User?     @relation("pricingConfigsUpdated", fields: [updatedBy], references: [id])
+  user             User      @relation("pricingConfigs", fields: [userId], references: [id])
+
+  @@unique([userId, effectiveFrom])
+  @@index([userId])
+  @@index([effectiveFrom])
+  @@index([effectiveTo])
+  @@map("customer_pricing_config")
+}
+
+model InvoicePayment {
+  id            String      @id @default(cuid())
+  invoiceId     String
+  costPaymentId String
+  amountPaid    Decimal     @db.Decimal(12, 2)
+  paidDate      DateTime
+  createdAt     DateTime    @default(now())
+  costPayment   CostPayment @relation("invoicePayments", fields: [costPaymentId], references: [id])
+  invoice       Invoice     @relation("invoicePayments", fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@unique([invoiceId, costPaymentId])
+  @@index([invoiceId])
+  @@index([costPaymentId])
+  @@map("invoice_payments")
+}
+
+model AuditLog {
+  id          String      @id @default(cuid())
+  action      AuditAction
+  entityType  String
+  entityId    String
+  userId      String
+  changes     Json?
+  description String
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime    @default(now())
+  user        User        @relation("auditLogs", fields: [userId], references: [id])
+
+  @@index([entityId])
+  @@index([entityType])
+  @@index([userId])
+  @@index([createdAt])
+  @@index([action])
+  @@map("audit_logs")
+}
+
+model InvoiceNotification {
+  id               String             @id @default(cuid())
+  invoiceId        String
+  notificationType NotificationType
+  sentTo           String
+  sentAt           DateTime
+  isRead           Boolean            @default(false)
+  openedAt         DateTime?
+  status           NotificationStatus
+  failureReason    String?
+  retryCount       Int                @default(0)
+  nextRetryAt      DateTime?
+  createdAt        DateTime           @default(now())
+  invoice          Invoice            @relation("invoiceNotifications", fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+  @@index([status])
+  @@index([sentTo])
+  @@index([createdAt])
+  @@index([sentAt])
+  @@map("invoice_notifications")
+}
+
+enum Role {
+  ADMIN
+  CLIENT
+  SUPER_ADMIN
+}
+
+enum PaymentType {
+  PAYMENT
+  ELECTRICITY_CHARGES
+  ADJUSTMENT
+}
+
+enum InvoiceStatus {
+  DRAFT
+  ISSUED
+  OVERDUE
+  PAID
+  CANCELLED
+  REFUNDED
+}
+
+enum AuditAction {
+  INVOICE_CREATED
+  INVOICE_UPDATED
+  INVOICE_ISSUED
+  INVOICE_SENT_TO_CUSTOMER
+  INVOICE_CANCELLED
+  PAYMENT_ADDED
+  PAYMENT_REMOVED
+  PAYMENT_REFUNDED
+  RECURRING_INVOICE_CREATED
+  RECURRING_INVOICE_UPDATED
+  RECURRING_INVOICE_DELETED
+  RECURRING_INVOICE_PAUSED
+  RECURRING_INVOICE_RESUMED
+  PRICING_CONFIG_CREATED
+  PRICING_CONFIG_UPDATED
+  PRICING_CONFIG_ARCHIVED
+  EMAIL_SENT
+  EMAIL_FAILED
+  EMAIL_RETRY
+}
+
+enum NotificationType {
+  INVOICE_ISSUED
+  PAYMENT_REMINDER
+  OVERDUE_REMINDER
+  PAYMENT_RECEIVED
+  INVOICE_VIEWED
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+  BOUNCED
+  UNSUBSCRIBED
+}

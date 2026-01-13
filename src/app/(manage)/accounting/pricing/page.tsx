@@ -78,15 +78,15 @@ export default function PricingPage() {
       <Box sx={{ mb: 3 }}>
         <h1 style={{ margin: 0 }}>Pricing Configuration</h1>
         <p style={{ margin: "8px 0 0 0", color: "#666" }}>
-          Manage customer-specific unit pricing
+          Manage customer-specific unit pricing and discounts
         </p>
       </Box>
 
       <Paper sx={{ mb: 3, p: 3, backgroundColor: "#e8f4f8" }}>
         <h3 style={{ margin: "0 0 12px 0" }}>About Pricing</h3>
         <p style={{ margin: 0, color: "#666" }}>
-          Define unit prices for different customers. Changes take effect on the
-          next invoice.
+          Define unit prices for different service types and apply
+          customer-specific discounts. Changes take effect on the next invoice.
         </p>
       </Paper>
 
