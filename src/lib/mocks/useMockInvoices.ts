@@ -309,9 +309,7 @@ export function useMockCustomerInvoices(
       .filter((inv) => inv.status === InvoiceStatus.PAID)
       .reduce((sum, inv) => sum + inv.totalAmount, 0),
     totalOutstanding: invoices
-      .filter((inv) =>
-        [InvoiceStatus.ISSUED, InvoiceStatus.OVERDUE].includes(inv.status),
-      )
+      .filter((inv) => inv.status === "ISSUED" || inv.status === "OVERDUE")
       .reduce((sum, inv) => sum + inv.totalAmount, 0),
     invoiceCount: invoices.length,
   };

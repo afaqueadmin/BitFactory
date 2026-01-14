@@ -21,35 +21,33 @@ import {
 import { useState } from "react";
 import Link from "next/link";
 import AddIcon from "@mui/icons-material/Add";
-import { useMockInvoicesPage } from "@/lib/mocks/useMockInvoices";
+import { useInvoices } from "@/lib/hooks/useInvoices";
 import { StatusBadge } from "@/components/accounting/common/StatusBadge";
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
 import { DateDisplay } from "@/components/accounting/common/DateDisplay";
-import { InvoiceStatus } from "@/lib/types/invoice";
+import { InvoiceStatus } from "@/generated/prisma";
 
 export default function InvoicesPage() {
-  const [page, setPage] = useState(0);
+  const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [statusFilter, setStatusFilter] = useState<InvoiceStatus | "">("");
 
-  const { invoices, total, loading, error } = useMockInvoicesPage(
+  const { invoices, total, loading, error } = useInvoices(
     page,
     pageSize,
+    undefined,
+    statusFilter || undefined,
   );
 
-  const filteredInvoices = statusFilter
-    ? invoices.filter((inv) => inv.status === statusFilter)
-    : invoices;
-
   const handleChangePage = (event: unknown, newPage: number) => {
-    setPage(newPage);
+    setPage(newPage + 1);
   };
 
   const handleChangeRowsPerPage = (
     event: React.ChangeEvent<HTMLInputElement>,
   ) => {
     setPageSize(parseInt(event.target.value, 10));
-    setPage(0);
+    setPage(1);
   };
 
   if (loading) {
@@ -125,7 +123,7 @@ export default function InvoicesPage() {
             </TableRow>
           </TableHead>
           <TableBody>
-            {filteredInvoices.map((invoice) => (
+            {invoices.map((invoice) => (
               <TableRow key={invoice.id} hover>
                 <TableCell>
                   <Link
@@ -135,7 +133,10 @@ export default function InvoicesPage() {
                     {invoice.invoiceNumber}
                   </Link>
                 </TableCell>
-                <TableCell>{`Customer ${invoice.userId.slice(0, 8)}`}</TableCell>
+                <TableCell>
+                  {invoice.user?.name ||
+                    `Customer ${invoice.userId.slice(0, 8)}`}
+                </TableCell>
                 <TableCell>
                   <CurrencyDisplay value={invoice.totalAmount} />
                 </TableCell>
@@ -161,7 +162,7 @@ export default function InvoicesPage() {
           component="div"
           count={total}
           rowsPerPage={pageSize}
-          page={page}
+          page={page - 1}
           onPageChange={handleChangePage}
           onRowsPerPageChange={handleChangeRowsPerPage}
         />

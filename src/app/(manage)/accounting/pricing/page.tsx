@@ -23,27 +23,23 @@ import {
 import { useState } from "react";
 import EditIcon from "@mui/icons-material/Edit";
 import SaveIcon from "@mui/icons-material/Save";
-import { useMockCustomerPricingConfigs } from "@/lib/mocks/useMockInvoices";
+import {
+  usePricingConfigs,
+  PricingConfigWithDetails,
+} from "@/lib/hooks/usePricingConfigs";
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
 
-interface PricingConfig {
-  id: string;
-  userId: string;
-  customerName: string;
-  defaultUnitPrice: number;
-  effectiveFrom: Date;
-  effectiveTo: Date | null;
-}
-
 export default function PricingPage() {
-  const { pricingConfigs, loading, error } = useMockCustomerPricingConfigs();
+  const [page, setPage] = useState(1);
+  const { pricingConfigs, loading, error } = usePricingConfigs(page);
   const [openDialog, setOpenDialog] = useState(false);
-  const [selectedPricing, setSelectedPricing] = useState<PricingConfig | null>(
-    null,
-  );
-  const [editValues, setEditValues] = useState<Partial<PricingConfig>>({});
+  const [selectedPricing, setSelectedPricing] =
+    useState<PricingConfigWithDetails | null>(null);
+  const [editValues, setEditValues] = useState<
+    Partial<PricingConfigWithDetails>
+  >({});
 
-  const handleEditClick = (pricing: PricingConfig) => {
+  const handleEditClick = (pricing: PricingConfigWithDetails) => {
     setSelectedPricing(pricing);
     setEditValues({ ...pricing });
     setOpenDialog(true);
@@ -106,7 +102,8 @@ export default function PricingPage() {
             {pricingConfigs.map((pricing) => (
               <TableRow key={pricing.id} hover>
                 <TableCell sx={{ fontWeight: "bold" }}>
-                  {pricing.customerName}
+                  {pricing.user?.name ||
+                    `Customer ${pricing.userId.slice(0, 8)}`}
                 </TableCell>
                 <TableCell>
                   <CurrencyDisplay value={pricing.defaultUnitPrice} />
@@ -142,7 +139,11 @@ export default function PricingPage() {
             <Stack spacing={2}>
               <TextField
                 label="Customer Name"
-                value={selectedPricing.customerName || ""}
+                value={
+                  selectedPricing.user?.name ||
+                  `Customer ${selectedPricing.userId.slice(0, 8)}` ||
+                  ""
+                }
                 disabled
                 fullWidth
               />
@@ -153,7 +154,8 @@ export default function PricingPage() {
                 onChange={(e) =>
                   setEditValues({
                     ...editValues,
-                    defaultUnitPrice: parseFloat(e.target.value),
+                    defaultUnitPrice: e.target
+                      .value as unknown as PricingConfigWithDetails["defaultUnitPrice"],
                   })
                 }
                 fullWidth

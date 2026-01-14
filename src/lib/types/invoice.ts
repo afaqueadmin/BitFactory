@@ -5,17 +5,13 @@
  * Used by both UI (mock data) and API (real data) to ensure consistency.
  */
 
+import { InvoiceStatus } from "@/generated/prisma";
+
+export { InvoiceStatus } from "@/generated/prisma";
+
 // ============================================================================
 // ENUMS
 // ============================================================================
-
-export enum InvoiceStatus {
-  DRAFT = "DRAFT", // Created but not issued
-  ISSUED = "ISSUED", // Sent to customer
-  OVERDUE = "OVERDUE", // Past due date
-  PAID = "PAID", // Payment received
-  CANCELLED = "CANCELLED", // Voided/cancelled
-}
 
 export enum RecurringFrequency {
   MONTHLY = "MONTHLY",
@@ -30,15 +26,23 @@ export enum NotificationType {
 export enum AuditAction {
   INVOICE_CREATED = "INVOICE_CREATED",
   INVOICE_UPDATED = "INVOICE_UPDATED",
-  INVOICE_SENT = "INVOICE_SENT",
+  INVOICE_ISSUED = "INVOICE_ISSUED",
+  INVOICE_SENT_TO_CUSTOMER = "INVOICE_SENT_TO_CUSTOMER",
   INVOICE_CANCELLED = "INVOICE_CANCELLED",
   PAYMENT_ADDED = "PAYMENT_ADDED",
-  PAYMENT_RECEIVED = "PAYMENT_RECEIVED",
+  PAYMENT_REMOVED = "PAYMENT_REMOVED",
+  PAYMENT_REFUNDED = "PAYMENT_REFUNDED",
   RECURRING_INVOICE_CREATED = "RECURRING_INVOICE_CREATED",
   RECURRING_INVOICE_UPDATED = "RECURRING_INVOICE_UPDATED",
   RECURRING_INVOICE_DELETED = "RECURRING_INVOICE_DELETED",
+  RECURRING_INVOICE_PAUSED = "RECURRING_INVOICE_PAUSED",
+  RECURRING_INVOICE_RESUMED = "RECURRING_INVOICE_RESUMED",
   PRICING_CONFIG_CREATED = "PRICING_CONFIG_CREATED",
   PRICING_CONFIG_UPDATED = "PRICING_CONFIG_UPDATED",
+  PRICING_CONFIG_ARCHIVED = "PRICING_CONFIG_ARCHIVED",
+  EMAIL_SENT = "EMAIL_SENT",
+  EMAIL_FAILED = "EMAIL_FAILED",
+  EMAIL_RETRY = "EMAIL_RETRY",
 }
 
 export enum NotificationStatus {

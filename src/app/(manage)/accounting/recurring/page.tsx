@@ -15,19 +15,34 @@ import {
   Alert,
   Stack,
   Checkbox,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  MenuItem,
 } from "@mui/material";
 import { useState } from "react";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
-import { useMockRecurringInvoices } from "@/lib/mocks/useMockInvoices";
+import { useRecurringInvoices } from "@/lib/hooks/useRecurringInvoices";
 import { StatusBadge } from "@/components/accounting/common/StatusBadge";
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
 import { DateDisplay } from "@/components/accounting/common/DateDisplay";
 
 export default function RecurringInvoicesPage() {
-  const { recurringInvoices, loading, error } = useMockRecurringInvoices();
+  const [page, setPage] = useState(1);
+  const { recurringInvoices, loading, error } = useRecurringInvoices(page);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [openDialog, setOpenDialog] = useState(false);
+  const [formData, setFormData] = useState({
+    customerId: "",
+    dayOfMonth: 1,
+    unitPrice: 190,
+    startDate: new Date().toISOString().split("T")[0],
+    endDate: "",
+  });
 
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.checked) {
@@ -41,6 +56,71 @@ export default function RecurringInvoicesPage() {
     setSelectedIds((prev) =>
       prev.includes(id) ? prev.filter((rid) => rid !== id) : [...prev, id],
     );
+  };
+
+  const handleOpenDialog = () => {
+    setFormData({
+      customerId: "",
+      dayOfMonth: 1,
+      unitPrice: 190,
+      startDate: new Date().toISOString().split("T")[0],
+      endDate: "",
+    });
+    setOpenDialog(true);
+  };
+
+  const handleCloseDialog = () => {
+    setOpenDialog(false);
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    const numValue =
+      name === "dayOfMonth" || name === "unitPrice"
+        ? parseFloat(value) || 0
+        : value;
+
+    setFormData({
+      ...formData,
+      [name]: numValue,
+    });
+  };
+
+  const handleSubmit = async () => {
+    try {
+      if (!formData.customerId) {
+        alert("Customer ID is required");
+        return;
+      }
+      if (formData.dayOfMonth < 1 || formData.dayOfMonth > 31) {
+        alert("Day of month must be between 1 and 31");
+        return;
+      }
+
+      const response = await fetch("/api/accounting/recurring-invoices", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: formData.customerId,
+          dayOfMonth: formData.dayOfMonth,
+          unitPrice: formData.unitPrice || null,
+          startDate: formData.startDate,
+          endDate: formData.endDate || null,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to create recurring invoice");
+      }
+
+      setOpenDialog(false);
+      window.location.reload(); // Refresh to show new data
+    } catch (err) {
+      alert(
+        err instanceof Error ? err.message : "Error creating recurring invoice",
+      );
+    }
   };
 
   if (loading) {
@@ -77,7 +157,11 @@ export default function RecurringInvoicesPage() {
             Manage monthly billing templates
           </p>
         </Box>
-        <Button variant="contained" startIcon={<AddIcon />}>
+        <Button
+          variant="contained"
+          startIcon={<AddIcon />}
+          onClick={handleOpenDialog}
+        >
           Create New
         </Button>
       </Box>
@@ -123,17 +207,21 @@ export default function RecurringInvoicesPage() {
                   />
                 </TableCell>
                 <TableCell sx={{ fontWeight: "bold" }}>
-                  {recurring.customerName}
+                  {recurring.user?.name ||
+                    `Customer ${recurring.userId.slice(0, 8)}`}
                 </TableCell>
                 <TableCell>
-                  <CurrencyDisplay value={recurring.amount} />
+                  <CurrencyDisplay value={recurring.unitPrice || 0} />
                 </TableCell>
                 <TableCell>{recurring.dayOfMonth}th</TableCell>
                 <TableCell>
                   <DateDisplay date={recurring.startDate} format="date" />
                 </TableCell>
                 <TableCell>
-                  <DateDisplay date={recurring.nextInvoiceDate} format="date" />
+                  <DateDisplay
+                    date={recurring.lastGeneratedDate || recurring.startDate}
+                    format="date"
+                  />
                 </TableCell>
                 <TableCell>
                   <Box sx={{ display: "flex", gap: 1 }}>
@@ -177,6 +265,71 @@ export default function RecurringInvoicesPage() {
           </Button>
         </Paper>
       )}
+
+      <Dialog
+        open={openDialog}
+        onClose={handleCloseDialog}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Create Recurring Invoice</DialogTitle>
+        <DialogContent sx={{ pt: 3 }}>
+          <Stack spacing={2}>
+            <TextField
+              label="Customer ID"
+              value={formData.customerId}
+              onChange={handleInputChange}
+              name="customerId"
+              fullWidth
+              required
+            />
+            <TextField
+              label="Day of Month (1-31)"
+              type="number"
+              value={formData.dayOfMonth}
+              onChange={handleInputChange}
+              name="dayOfMonth"
+              inputProps={{ min: 1, max: 31 }}
+              fullWidth
+              required
+            />
+            <TextField
+              label="Unit Price (USD)"
+              type="number"
+              value={formData.unitPrice}
+              onChange={handleInputChange}
+              name="unitPrice"
+              inputProps={{ step: "0.01" }}
+              fullWidth
+            />
+            <TextField
+              label="Start Date"
+              type="date"
+              value={formData.startDate}
+              onChange={handleInputChange}
+              name="startDate"
+              InputLabelProps={{ shrink: true }}
+              fullWidth
+              required
+            />
+            <TextField
+              label="End Date (Optional)"
+              type="date"
+              value={formData.endDate}
+              onChange={handleInputChange}
+              name="endDate"
+              InputLabelProps={{ shrink: true }}
+              fullWidth
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDialog}>Cancel</Button>
+          <Button onClick={handleSubmit} variant="contained">
+            Create
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 }

@@ -11,30 +11,70 @@ import {
   Alert,
   MenuItem,
 } from "@mui/material";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import SaveIcon from "@mui/icons-material/Save";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import Link from "next/link";
-import { InvoiceStatus } from "@/lib/types/invoice";
+import { InvoiceStatus } from "@/generated/prisma";
+import {
+  useCreateInvoice,
+  useCustomers,
+  useCustomerMiners,
+} from "@/lib/hooks/useInvoices";
 
 export default function CreateInvoicePage() {
   const router = useRouter();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    create: createInvoice,
+    loading: createLoading,
+    error: createError,
+  } = useCreateInvoice();
+  const { customers, loading: customersLoading } = useCustomers();
+
   const [formData, setFormData] = useState({
     customerId: "",
-    customerName: "",
-    invoiceNumber: "",
-    totalMiners: 1,
+    totalMiners: 0,
     unitPrice: 0,
     totalAmount: 0,
     dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
       .toISOString()
       .split("T")[0],
-    description: "",
     status: InvoiceStatus.DRAFT,
   });
+
+  // Fetch miners only when customerId changes
+  const { miners, loading: minersLoading } = useCustomerMiners(
+    formData.customerId || undefined,
+  );
+
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // When customer changes, auto-populate total miners from all their active miners
+  useEffect(() => {
+    if (formData.customerId && miners.length > 0) {
+      // Each miner counts as 1, so totalMiners = number of miners
+      setFormData((prev) => ({
+        ...prev,
+        totalMiners: miners.length,
+      }));
+    } else if (!formData.customerId) {
+      setFormData((prev) => ({
+        ...prev,
+        totalMiners: 0,
+      }));
+    }
+  }, [formData.customerId, miners]);
+
+  const handleCustomerChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      customerId: value,
+      totalMiners: 0,
+    }));
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -70,18 +110,21 @@ export default function CreateInvoicePage() {
       setError(null);
 
       // Validate form
-      if (!formData.customerId || !formData.customerName) {
-        throw new Error("Customer information is required");
+      if (!formData.customerId) {
+        throw new Error("Customer is required");
       }
       if (formData.totalMiners <= 0 || formData.unitPrice <= 0) {
         throw new Error("Miners count and unit price must be greater than 0");
       }
 
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      // In Phase 4, this would call: POST /api/accounting/invoices
-      console.log("Creating invoice:", formData);
+      // Call API to create invoice
+      await createInvoice({
+        customerId: formData.customerId,
+        totalMiners: formData.totalMiners,
+        unitPrice: formData.unitPrice,
+        dueDate: formData.dueDate,
+        status: formData.status,
+      });
 
       // Redirect to invoices list
       router.push("/accounting/invoices");
@@ -111,6 +154,11 @@ export default function CreateInvoicePage() {
           {error}
         </Alert>
       )}
+      {createError && (
+        <Alert severity="error" sx={{ mb: 3 }}>
+          {createError}
+        </Alert>
+      )}
 
       <Paper sx={{ p: 4 }}>
         <form onSubmit={handleSubmit}>
@@ -122,23 +170,29 @@ export default function CreateInvoicePage() {
               </h3>
               <Stack spacing={2}>
                 <TextField
-                  label="Customer ID"
+                  select
+                  label="Select Customer"
                   name="customerId"
                   value={formData.customerId}
-                  onChange={handleInputChange}
+                  onChange={handleCustomerChange}
                   fullWidth
-                  placeholder="e.g., cust-123"
+                  helperText="Select a customer with their subaccount (shown as: Name (Subaccount))"
+                  disabled={customersLoading}
                   required
-                />
-                <TextField
-                  label="Customer Name"
-                  name="customerName"
-                  value={formData.customerName}
-                  onChange={handleInputChange}
-                  fullWidth
-                  placeholder="e.g., Acme Corporation"
-                  required
-                />
+                >
+                  <MenuItem value="">-- Select a Customer --</MenuItem>
+                  {customers.map((customer) => (
+                    <MenuItem key={customer.id} value={customer.id}>
+                      {customer.displayName}
+                    </MenuItem>
+                  ))}
+                </TextField>
+                {customersLoading && (
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                    <CircularProgress size={20} />
+                    <span>Loading customers...</span>
+                  </Box>
+                )}
               </Stack>
             </Box>
 
@@ -149,22 +203,23 @@ export default function CreateInvoicePage() {
               </h3>
               <Stack spacing={2}>
                 <TextField
-                  label="Invoice Number"
-                  name="invoiceNumber"
-                  value={formData.invoiceNumber}
-                  onChange={handleInputChange}
-                  fullWidth
-                  placeholder="Auto-generated: YYYYMMDDSR"
-                  disabled
-                />
-                <TextField
                   label="Number of Miners"
                   name="totalMiners"
                   type="number"
                   value={formData.totalMiners}
                   onChange={handleInputChange}
                   fullWidth
-                  inputProps={{ min: 1, step: 1 }}
+                  inputProps={{ min: 0, step: 1 }}
+                  helperText={
+                    !formData.customerId
+                      ? "Select a customer first to auto-load their miners"
+                      : minersLoading
+                        ? "Loading miners (status=AUTO) for selected customer..."
+                        : miners.length > 0
+                          ? `Auto-loaded: ${miners.length} miner(s) with status=AUTO`
+                          : "No miners with status=AUTO found for this customer"
+                  }
+                  disabled={minersLoading || !formData.customerId}
                   required
                 />
                 <TextField
@@ -175,19 +230,18 @@ export default function CreateInvoicePage() {
                   onChange={handleInputChange}
                   fullWidth
                   inputProps={{ min: 0, step: 0.01 }}
+                  helperText="Price per miner unit (total = miners × unit price)"
                   required
                 />
-                <TextField
-                  label="Total Amount (USD)"
-                  value={formData.totalAmount.toFixed(2)}
-                  fullWidth
-                  disabled
-                  variant="outlined"
-                />
+                <Box sx={{ p: 2, backgroundColor: "#f5f5f5", borderRadius: 1 }}>
+                  <strong>
+                    Total Amount: ${(formData.totalAmount || 0).toFixed(2)}
+                  </strong>
+                </Box>
               </Stack>
             </Box>
 
-            {/* Additional Information */}
+            {/* Due Date */}
             <Box>
               <h3 style={{ marginTop: 0, marginBottom: 16 }}>
                 Additional Information
@@ -201,17 +255,8 @@ export default function CreateInvoicePage() {
                   onChange={handleInputChange}
                   fullWidth
                   InputLabelProps={{ shrink: true }}
+                  helperText="When payment is due (defaults to 30 days from today)"
                   required
-                />
-                <TextField
-                  label="Description"
-                  name="description"
-                  value={formData.description}
-                  onChange={handleInputChange}
-                  fullWidth
-                  multiline
-                  rows={4}
-                  placeholder="Invoice description or notes..."
                 />
                 <TextField
                   select
@@ -220,6 +265,7 @@ export default function CreateInvoicePage() {
                   value={formData.status}
                   onChange={handleSelectChange}
                   fullWidth
+                  helperText="Draft: Not sent yet | Issued: Sent to customer"
                 >
                   <MenuItem value={InvoiceStatus.DRAFT}>Draft</MenuItem>
                   <MenuItem value={InvoiceStatus.ISSUED}>Issued</MenuItem>
@@ -238,7 +284,12 @@ export default function CreateInvoicePage() {
                 startIcon={
                   loading ? <CircularProgress size={20} /> : <SaveIcon />
                 }
-                disabled={loading}
+                disabled={
+                  loading ||
+                  !formData.customerId ||
+                  !formData.totalMiners ||
+                  !formData.unitPrice
+                }
               >
                 {loading ? "Creating..." : "Create Invoice"}
               </Button>

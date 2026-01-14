@@ -15,14 +15,14 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
-import { useMockInvoices } from "@/lib/mocks/useMockInvoices";
+import { useDashboardStats } from "@/lib/hooks/useDashboard";
 import { StatsCard } from "@/components/accounting/dashboard/StatsCard";
 import { UpcomingInvoices } from "@/components/accounting/dashboard/UpcomingInvoices";
 import { RecentInvoices } from "@/components/accounting/dashboard/RecentInvoices";
 import RefreshIcon from "@mui/icons-material/Refresh";
 
 export default function AccountingDashboard() {
-  const { dashboard, loading, error, refetch } = useMockInvoices();
+  const { dashboard, loading, error, refetch } = useDashboardStats();
 
   if (loading) {
     return (

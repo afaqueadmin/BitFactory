@@ -9,7 +9,7 @@ import {
   InvoiceStatus,
   NotificationType,
   AuditAction,
-} from "@/lib/types/invoice";
+} from "@/generated/prisma";
 
 // ============================================================================
 // CURRENCY & FORMATTING
@@ -84,6 +84,7 @@ export const INVOICE_STATUS_LABELS: Record<InvoiceStatus, string> = {
   [InvoiceStatus.PAID]: "Paid",
   [InvoiceStatus.OVERDUE]: "Overdue",
   [InvoiceStatus.CANCELLED]: "Cancelled",
+  [InvoiceStatus.REFUNDED]: "Refunded",
 };
 
 // MUI color variants for each status
@@ -96,6 +97,7 @@ export const INVOICE_STATUS_COLORS: Record<
   [InvoiceStatus.PAID]: "success",
   [InvoiceStatus.OVERDUE]: "error",
   [InvoiceStatus.CANCELLED]: "warning",
+  [InvoiceStatus.REFUNDED]: "secondary",
 };
 
 // Hex color codes for charts and custom styling
@@ -105,6 +107,7 @@ export const INVOICE_STATUS_HEX_COLORS: Record<InvoiceStatus, string> = {
   [InvoiceStatus.PAID]: "#10B981", // Green
   [InvoiceStatus.OVERDUE]: "#EF4444", // Red
   [InvoiceStatus.CANCELLED]: "#F59E0B", // Amber
+  [InvoiceStatus.REFUNDED]: "#8B5CF6", // Purple
 };
 
 // ============================================================================
@@ -136,6 +139,8 @@ export const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
   [NotificationType.INVOICE_ISSUED]: "Invoice Issued",
   [NotificationType.PAYMENT_REMINDER]: "Payment Reminder",
   [NotificationType.OVERDUE_REMINDER]: "Overdue Reminder",
+  [NotificationType.PAYMENT_RECEIVED]: "Payment Received",
+  [NotificationType.INVOICE_VIEWED]: "Invoice Viewed",
 };
 
 export const NOTIFICATION_EMAIL_SUBJECTS: Record<NotificationType, string> = {
@@ -143,6 +148,8 @@ export const NOTIFICATION_EMAIL_SUBJECTS: Record<NotificationType, string> = {
   [NotificationType.PAYMENT_REMINDER]: "Payment Reminder - Invoice Due Soon",
   [NotificationType.OVERDUE_REMINDER]:
     "Payment Overdue - Immediate Action Required",
+  [NotificationType.PAYMENT_RECEIVED]: "Payment Received - Thank You",
+  [NotificationType.INVOICE_VIEWED]: "Your Invoice Has Been Viewed",
 };
 
 // Retry configuration for failed email sends
@@ -157,15 +164,23 @@ export const EMAIL_RETRY_BACKOFF_MULTIPLIER = 2; // 5, 10, 20 minutes
 export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   [AuditAction.INVOICE_CREATED]: "Invoice Created",
   [AuditAction.INVOICE_UPDATED]: "Invoice Updated",
-  [AuditAction.INVOICE_SENT]: "Invoice Sent",
+  [AuditAction.INVOICE_ISSUED]: "Invoice Issued",
+  [AuditAction.INVOICE_SENT_TO_CUSTOMER]: "Invoice Sent to Customer",
   [AuditAction.INVOICE_CANCELLED]: "Invoice Cancelled",
   [AuditAction.PAYMENT_ADDED]: "Payment Added",
-  [AuditAction.PAYMENT_RECEIVED]: "Payment Received",
+  [AuditAction.PAYMENT_REMOVED]: "Payment Removed",
+  [AuditAction.PAYMENT_REFUNDED]: "Payment Refunded",
   [AuditAction.RECURRING_INVOICE_CREATED]: "Recurring Invoice Created",
   [AuditAction.RECURRING_INVOICE_UPDATED]: "Recurring Invoice Updated",
   [AuditAction.RECURRING_INVOICE_DELETED]: "Recurring Invoice Deleted",
+  [AuditAction.RECURRING_INVOICE_PAUSED]: "Recurring Invoice Paused",
+  [AuditAction.RECURRING_INVOICE_RESUMED]: "Recurring Invoice Resumed",
   [AuditAction.PRICING_CONFIG_CREATED]: "Pricing Config Created",
   [AuditAction.PRICING_CONFIG_UPDATED]: "Pricing Config Updated",
+  [AuditAction.PRICING_CONFIG_ARCHIVED]: "Pricing Config Archived",
+  [AuditAction.EMAIL_SENT]: "Email Sent",
+  [AuditAction.EMAIL_FAILED]: "Email Failed",
+  [AuditAction.EMAIL_RETRY]: "Email Retry",
 };
 
 // ============================================================================

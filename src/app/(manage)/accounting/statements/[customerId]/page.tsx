@@ -19,7 +19,7 @@ import {
   Typography,
 } from "@mui/material";
 import { useParams } from "next/navigation";
-import { useMockCustomerInvoices } from "@/lib/mocks/useMockInvoices";
+import { useAccountStatement } from "@/lib/hooks/useStatements";
 import { StatusBadge } from "@/components/accounting/common/StatusBadge";
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
 import { DateDisplay } from "@/components/accounting/common/DateDisplay";
@@ -28,8 +28,13 @@ import PrintIcon from "@mui/icons-material/Print";
 
 export default function CustomerStatementPage() {
   const { customerId } = useParams();
-  const { invoices, customer, totals, loading, error } =
-    useMockCustomerInvoices(customerId as string);
+  const { statement, loading, error } = useAccountStatement(
+    customerId as string,
+  );
+
+  const invoices = statement?.invoices || [];
+  const customer = statement?.customer;
+  const totals = statement?.stats;
 
   if (loading) {
     return (
@@ -96,7 +101,7 @@ export default function CustomerStatementPage() {
               Total Amount
             </Typography>
             <Typography variant="h5">
-              <CurrencyDisplay value={totals.totalAmount} />
+              <CurrencyDisplay value={totals?.totalAmount || 0} />
             </Typography>
           </CardContent>
         </Card>
@@ -106,7 +111,7 @@ export default function CustomerStatementPage() {
               Total Paid
             </Typography>
             <Typography variant="h5">
-              <CurrencyDisplay value={totals.totalPaid} />
+              <CurrencyDisplay value={totals?.totalPaid || 0} />
             </Typography>
           </CardContent>
         </Card>
@@ -116,7 +121,7 @@ export default function CustomerStatementPage() {
               Outstanding
             </Typography>
             <Typography variant="h5" sx={{ color: "#d32f2f" }}>
-              <CurrencyDisplay value={totals.totalOutstanding} />
+              <CurrencyDisplay value={totals?.totalPending || 0} />
             </Typography>
           </CardContent>
         </Card>

@@ -20,7 +20,7 @@ import {
   Alert,
   CircularProgress,
 } from "@mui/material";
-import { useMockInvoiceDetail } from "@/lib/mocks/useMockInvoices";
+import { useInvoice } from "@/lib/hooks/useInvoices";
 import { StatusBadge } from "@/components/accounting/common/StatusBadge";
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
 import { DateDisplay } from "@/components/accounting/common/DateDisplay";
@@ -29,7 +29,7 @@ import DownloadIcon from "@mui/icons-material/Download";
 
 export default function InvoiceDetailPage() {
   const params = useParams();
-  const { invoice, loading, error } = useMockInvoiceDetail(params.id as string);
+  const { invoice, loading, error } = useInvoice(params.id as string);
 
   if (loading) {
     return (
