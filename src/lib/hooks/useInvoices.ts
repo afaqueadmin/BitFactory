@@ -274,3 +274,123 @@ export function useCustomerMiners(customerId?: string) {
 
   return { miners, loading, error };
 }
+
+export function useUpdateInvoice() {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const update = async (
+    invoiceId: string,
+    data: {
+      totalMiners: number;
+      unitPrice: number;
+      dueDate: string;
+    },
+  ) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const res = await fetch(`/api/accounting/invoices/${invoiceId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(data),
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to update invoice");
+      }
+
+      return await res.json();
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : "Unknown error";
+      setError(errorMsg);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return { update, loading, error };
+}
+
+export function useRecordPayment() {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const recordPayment = async (
+    invoiceId: string,
+    data: {
+      amountPaid: number;
+      paymentDate: string;
+      notes?: string;
+    },
+  ) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const res = await fetch(
+        `/api/accounting/invoices/${invoiceId}/record-payment`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify(data),
+        },
+      );
+
+      if (!res.ok) {
+        throw new Error("Failed to record payment");
+      }
+
+      return await res.json();
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : "Unknown error";
+      setError(errorMsg);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return { recordPayment, loading, error };
+}
+
+export function useChangeInvoiceStatus() {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const changeStatus = async (
+    invoiceId: string,
+    status: "ISSUED" | "PAID" | "CANCELLED" | "OVERDUE",
+  ) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const res = await fetch(`/api/accounting/invoices/${invoiceId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ status }),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Failed to change invoice status");
+      }
+
+      return await res.json();
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : "Unknown error";
+      setError(errorMsg);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return { changeStatus, loading, error };
+}

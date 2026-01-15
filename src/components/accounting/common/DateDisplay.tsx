@@ -11,6 +11,7 @@ interface DateDisplayProps {
   format?: "date" | "datetime";
   variant?: TypographyProps["variant"];
   color?: TypographyProps["color"];
+  standalone?: boolean; // If true, wraps in Typography. If false, just returns text
 }
 
 export function DateDisplay({
@@ -18,6 +19,7 @@ export function DateDisplay({
   format = "date",
   variant = "body2",
   color = "textSecondary",
+  standalone = false,
 }: DateDisplayProps) {
   const dateObj = typeof date === "string" ? new Date(date) : date;
 
@@ -34,9 +36,15 @@ export function DateDisplay({
 
   const formatted = formatter.format(dateObj);
 
-  return (
-    <Typography variant={variant} color={color}>
-      {formatted}
-    </Typography>
-  );
+  // If standalone, wrap in Typography. Otherwise, just return the text
+  if (standalone) {
+    return (
+      <Typography variant={variant} color={color}>
+        {formatted}
+      </Typography>
+    );
+  }
+
+  // Return as span to avoid nested paragraph issues
+  return <span>{formatted}</span>;
 }

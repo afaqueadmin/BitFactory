@@ -36,11 +36,133 @@ export async function GET(
       return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
     }
 
-    return NextResponse.json(invoice);
+    const response = NextResponse.json(invoice);
+    response.headers.set(
+      "Cache-Control",
+      "no-store, no-cache, must-revalidate, proxy-revalidate",
+    );
+    return response;
   } catch (error) {
     console.error("Get invoice error:", error);
     return NextResponse.json(
       { error: "Failed to fetch invoice" },
+      { status: 500 },
+    );
+  }
+}
+
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    const { id } = await params;
+    const token = request.cookies.get("token")?.value;
+
+    if (!token) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const decoded = await verifyJwtToken(token);
+    const userId = decoded.userId;
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    });
+
+    if (user?.role !== "ADMIN" && user?.role !== "SUPER_ADMIN") {
+      return NextResponse.json(
+        { error: "Only administrators can update invoices" },
+        { status: 403 },
+      );
+    }
+
+    const body = await request.json();
+    const { totalMiners, unitPrice, dueDate } = body;
+
+    const currentInvoice = await prisma.invoice.findUnique({
+      where: { id },
+    });
+
+    if (!currentInvoice) {
+      return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
+    }
+
+    // Only allow editing DRAFT invoices
+    if (currentInvoice.status !== "DRAFT") {
+      return NextResponse.json(
+        { error: "Only DRAFT invoices can be edited" },
+        { status: 400 },
+      );
+    }
+
+    const updateData: Record<string, unknown> = { updatedBy: userId };
+    const changes: Record<string, unknown> = {};
+
+    if (totalMiners !== undefined) {
+      updateData.totalMiners = totalMiners;
+      changes.totalMiners = {
+        from: currentInvoice.totalMiners,
+        to: totalMiners,
+      };
+    }
+    if (unitPrice !== undefined) {
+      updateData.unitPrice = unitPrice;
+      changes.unitPrice = { from: currentInvoice.unitPrice, to: unitPrice };
+    }
+    if (dueDate) {
+      updateData.dueDate = new Date(dueDate);
+      changes.dueDate = dueDate;
+    }
+
+    // Recalculate totalAmount if totalMiners or unitPrice changed
+    const newTotalMiners =
+      totalMiners !== undefined ? totalMiners : currentInvoice.totalMiners;
+    const newUnitPrice =
+      unitPrice !== undefined ? unitPrice : Number(currentInvoice.unitPrice);
+    const newTotalAmount = newTotalMiners * newUnitPrice;
+
+    if (newTotalAmount !== Number(currentInvoice.totalAmount)) {
+      updateData.totalAmount = newTotalAmount;
+      changes.totalAmount = {
+        from: currentInvoice.totalAmount,
+        to: newTotalAmount,
+      };
+    }
+
+    const invoice = await prisma.invoice.update({
+      where: { id },
+      data: updateData,
+      include: {
+        user: { select: { id: true, email: true, name: true } },
+        createdByUser: { select: { id: true, email: true, name: true } },
+        updatedByUser: { select: { id: true, email: true, name: true } },
+        payments: {
+          include: {
+            costPayment: true,
+          },
+        },
+      },
+    });
+
+    // Log audit
+    await prisma.auditLog.create({
+      data: {
+        action: AuditAction.INVOICE_UPDATED,
+        entityType: "Invoice",
+        entityId: invoice.id,
+        userId,
+        description: `Invoice ${invoice.invoiceNumber} updated`,
+        changes: JSON.stringify(changes),
+      },
+    });
+
+    return NextResponse.json(invoice);
+  } catch (error) {
+    console.error("Update invoice error:", error);
+    return NextResponse.json(
+      { error: "Failed to update invoice" },
       { status: 500 },
     );
   }
@@ -90,6 +212,12 @@ export async function PUT(
     if (status) {
       updateData.status = status;
       changes.status = { from: currentInvoice.status, to: status };
+
+      // Auto-set issuedDate when changing to ISSUED
+      if (status === "ISSUED" && !currentInvoice.issuedDate) {
+        updateData.issuedDate = new Date();
+        changes.issuedDate = new Date().toISOString();
+      }
     }
     if (issuedDate) {
       updateData.issuedDate = new Date(issuedDate);

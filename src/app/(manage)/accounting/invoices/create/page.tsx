@@ -117,6 +117,14 @@ export default function CreateInvoicePage() {
         throw new Error("Miners count and unit price must be greater than 0");
       }
 
+      // Validate due date is not in the past
+      const selectedDate = new Date(formData.dueDate);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // Reset time to start of day for fair comparison
+      if (selectedDate < today) {
+        throw new Error("Due date must be in the future (not a past date)");
+      }
+
       // Call API to create invoice
       await createInvoice({
         customerId: formData.customerId,
