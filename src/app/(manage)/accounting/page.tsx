@@ -227,7 +227,7 @@ export default function AccountingDashboard() {
                   <TableCell sx={{ fontWeight: "bold" }}>
                     Days Until Due
                   </TableCell>
-                  <TableCell sx={{ fontWeight: "bold" }}>Action</TableCell>
+                  {/*<TableCell sx={{ fontWeight: "bold" }}>Action</TableCell>*/}
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -283,13 +283,13 @@ export default function AccountingDashboard() {
                                 : `${daysUntilDue} days`}
                         </Typography>
                       </TableCell>
-                      <TableCell>
-                        <Link href={`/accounting/${invoice.id}`}>
-                          <Button size="small" variant="outlined">
-                            View
-                          </Button>
-                        </Link>
-                      </TableCell>
+                      {/*<TableCell>*/}
+                      {/*  <Link href={`/accounting/${invoice.id}`}>*/}
+                      {/*    <Button size="small" variant="outlined">*/}
+                      {/*      View*/}
+                      {/*    </Button>*/}
+                      {/*  </Link>*/}
+                      {/*</TableCell>*/}
                     </TableRow>
                   );
                 })}
