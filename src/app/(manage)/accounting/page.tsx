@@ -123,13 +123,6 @@ export default function AccountingDashboard() {
               Create Invoice
             </Button>
           </Link>
-          <Button
-            variant="outlined"
-            startIcon={<RefreshIcon />}
-            onClick={refetch}
-          >
-            Refresh
-          </Button>
         </Stack>
       </Stack>
 
