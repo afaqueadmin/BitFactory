@@ -73,6 +73,70 @@ export const sendPasswordResetEmail = async (
   }
 };
 
+export const sendInvoiceEmail = async (
+  email: string,
+  customerName: string,
+  invoiceNumber: string,
+  totalAmount: number,
+  dueDate: Date,
+  issuedDate: Date,
+) => {
+  const formatDate = (date: Date) => {
+    return new Date(date).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+  };
+
+  const mailOptions = {
+    from:
+      `BitFactory Admin <${process.env.SMTP_FROM}>` || "noreply@bitfactory.com",
+    to: email,
+    subject: `Invoice ${invoiceNumber} from BitFactory`,
+    html: `
+      <h1>Invoice Notification</h1>
+      <p>Dear ${customerName},</p>
+      <p>Your invoice from BitFactory is now ready. Please find the details below:</p>
+      <br>
+      <table style="width: 100%; border-collapse: collapse;">
+        <tr style="background-color: #f5f5f5;">
+          <td style="padding: 10px; border: 1px solid #ddd;"><strong>Invoice Number</strong></td>
+          <td style="padding: 10px; border: 1px solid #ddd;">${invoiceNumber}</td>
+        </tr>
+        <tr>
+          <td style="padding: 10px; border: 1px solid #ddd;"><strong>Amount</strong></td>
+          <td style="padding: 10px; border: 1px solid #ddd;">$${totalAmount.toFixed(2)}</td>
+        </tr>
+        <tr style="background-color: #f5f5f5;">
+          <td style="padding: 10px; border: 1px solid #ddd;"><strong>Issued Date</strong></td>
+          <td style="padding: 10px; border: 1px solid #ddd;">${formatDate(issuedDate)}</td>
+        </tr>
+        <tr>
+          <td style="padding: 10px; border: 1px solid #ddd;"><strong>Due Date</strong></td>
+          <td style="padding: 10px; border: 1px solid #ddd;">${formatDate(dueDate)}</td>
+        </tr>
+      </table>
+      <br>
+      <p>Please log in to your BitFactory account to view the complete invoice details.</p>
+      <p><strong>Login URL:</strong> <a href="https://my.bitfactory.ae" target="_blank">my.bitfactory.ae</a></p>
+      <br>
+      <p>If you have any questions about this invoice, please contact our support team.</p>
+      <br>
+      <p>Best regards,</p>
+      <p>The BitFactory Team</p>
+    `,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    return { success: true };
+  } catch (error) {
+    console.error("Error sending invoice email:", error);
+    return { success: false, error };
+  }
+};
+
 export const sendCronRunSuccessfulEmail = async (userCount: number) => {
   const date = new Date();
   const mailOptions = {

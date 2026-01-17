@@ -1,5 +1,18 @@
 import { useState, useEffect } from "react";
-import { Invoice, InvoiceStatus, InvoicePayment } from "@/generated/prisma";
+import {
+  Invoice,
+  InvoiceStatus,
+  InvoicePayment,
+  AuditLog,
+} from "@/generated/prisma";
+
+export interface AuditLogWithUser extends AuditLog {
+  user?: {
+    id: string;
+    name: string | null;
+    email: string;
+  };
+}
 
 export interface InvoiceWithDetails extends Invoice {
   user?: {
@@ -314,7 +327,80 @@ export function useUpdateInvoice() {
 
   return { update, loading, error };
 }
+export function useInvoiceAuditLog(invoiceId: string) {
+  const [auditLogs, setAuditLogs] = useState<AuditLogWithUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (!invoiceId) return;
+
+    const fetchAuditLogs = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const res = await fetch(
+          `/api/accounting/invoices/${invoiceId}/audit-log`,
+          {
+            method: "GET",
+            credentials: "include",
+          },
+        );
+
+        if (!res.ok) {
+          throw new Error("Failed to fetch audit logs");
+        }
+
+        const data = await res.json();
+        setAuditLogs(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Unknown error");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAuditLogs();
+  }, [invoiceId]);
+
+  return { auditLogs, loading, error };
+}
+
+export function useSendInvoiceEmail() {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const sendEmail = async (invoiceId: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const res = await fetch(
+        `/api/accounting/invoices/${invoiceId}/send-email`,
+        {
+          method: "POST",
+          credentials: "include",
+        },
+      );
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Failed to send email");
+      }
+
+      return await res.json();
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : "Unknown error";
+      setError(errorMsg);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return { sendEmail, loading, error };
+}
 export function useRecordPayment() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -393,4 +479,71 @@ export function useChangeInvoiceStatus() {
   };
 
   return { changeStatus, loading, error };
+}
+export function useDeleteInvoice() {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const deleteInvoice = async (invoiceId: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const res = await fetch(`/api/accounting/invoices/${invoiceId}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Failed to delete invoice");
+      }
+
+      return await res.json();
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : "Unknown error";
+      setError(errorMsg);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return { deleteInvoice, loading, error };
+}
+
+export function useBulkSendInvoiceEmail() {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const bulkSendEmail = async (invoiceIds: string[]) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const res = await fetch("/api/accounting/invoices/bulk-send-email", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ invoiceIds }),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Failed to send emails");
+      }
+
+      return await res.json();
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : "Unknown error";
+      setError(errorMsg);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return { bulkSendEmail, loading, error };
 }
