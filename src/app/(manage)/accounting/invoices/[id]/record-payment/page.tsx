@@ -169,7 +169,7 @@ export default function RecordPaymentPage() {
                 </h3>
                 <Stack spacing={2}>
                   <TextField
-                    label="Amount to Pay (USD)"
+                    label="Amount Paid (USD)"
                     name="amountPaid"
                     type="number"
                     value={formData.amountPaid}
