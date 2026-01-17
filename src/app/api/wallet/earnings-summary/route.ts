@@ -11,8 +11,8 @@ import { prisma } from "@/lib/prisma";
  *
  * Response:
  * {
- *   totalEarnings: { btc: number, usd: number },
- *   pendingPayouts: { btc: number, usd: number },
+ *   totalEarnings: { btc: number },
+ *   pendingPayouts: { btc: number },
  *   currency: "BTC",
  *   dataSource: "luxor",
  *   timestamp: string,
@@ -118,7 +118,6 @@ export async function GET(request: NextRequest) {
     // Note: We're doing a simplified calculation - in production you might want to
     // cache this or use a different approach if there are millions of transactions
     let totalEarningsBtc = 0;
-    let totalEarningsUsd = 0;
 
     // Get first page to establish baseline
     let currentPage = 1;
@@ -141,7 +140,6 @@ export async function GET(request: NextRequest) {
 
       for (const tx of pageTransactions.transactions) {
         totalEarningsBtc += tx.currency_amount;
-        totalEarningsUsd += tx.usd_equivalent;
       }
 
       hasMore = pageTransactions.pagination.next_page_url !== null;
@@ -152,27 +150,12 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    console.log(
-      `[Earnings Summary API] Completed aggregation - Total Earnings: ${totalEarningsBtc} BTC (${totalEarningsUsd} USD)`,
-    );
-
-    // Get current BTC price for pending payouts USD conversion
-    // Use the most recent transaction's price as reference, or estimate
-    let pendingPayoutsUsd = 0;
-    if (transactions.transactions.length > 0) {
-      const recentTx = transactions.transactions[0];
-      const btcPrice = recentTx.usd_equivalent / recentTx.currency_amount;
-      pendingPayoutsUsd = totalPendingBtc * btcPrice;
-    }
-
     const response = {
       totalEarnings: {
         btc: parseFloat(totalEarningsBtc.toFixed(8)),
-        usd: parseFloat(totalEarningsUsd.toFixed(2)),
       },
       pendingPayouts: {
         btc: parseFloat(totalPendingBtc.toFixed(8)),
-        usd: parseFloat(pendingPayoutsUsd.toFixed(2)),
       },
       currency: "BTC",
       dataSource: "luxor",

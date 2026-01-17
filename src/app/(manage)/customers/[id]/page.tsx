@@ -20,6 +20,7 @@ import EstimatedMonthlyCostCard from "@/components/dashboardCards/EstimatedMonth
 import { getDaysInCurrentMonth } from "@/lib/helpers/getDaysInCurrentMonth";
 import { formatValue } from "@/lib/helpers/formatValue";
 import { LuxorPaymentSettings } from "@/lib/types/wallet";
+import { useBitcoinLivePrice } from "@/components/useBitcoinLivePrice";
 
 interface CustomerDetails {
   id: string;
@@ -352,6 +353,7 @@ export default function CustomerDetailPage() {
     }
   }, [customerId]);
 
+  const { btcLiveData, BtcLivePriceComponent } = useBitcoinLivePrice();
   return (
     <Box
       component="main"
@@ -384,29 +386,39 @@ export default function CustomerDetailPage() {
       ) : (
         <>
           {/* Customer Header */}
-          <Box sx={{ mb: 3 }}>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-              <Typography variant="h4" fontWeight="bold">
-                {customer.name}
+          <Box
+            sx={{
+              mb: 3,
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "flex-start",
+            }}
+          >
+            <Box sx={{ flex: 1 }}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <Typography variant="h4" fontWeight="bold">
+                  {customer.name}
+                </Typography>
+                {customer.isDeleted && (
+                  <Typography
+                    variant="h4"
+                    fontWeight="bold"
+                    sx={{ color: "#d32f2f" }}
+                  >
+                    (Deleted)
+                  </Typography>
+                )}
+              </Box>
+              <Typography variant="body1" color="text.secondary" gutterBottom>
+                {customer.email} • {customer.role}
               </Typography>
-              {customer.isDeleted && (
-                <Typography
-                  variant="h4"
-                  fontWeight="bold"
-                  sx={{ color: "#d32f2f" }}
-                >
-                  (Deleted)
+              {customer.companyName && (
+                <Typography variant="body2" color="text.secondary">
+                  Company: {customer.companyName}
                 </Typography>
               )}
             </Box>
-            <Typography variant="body1" color="text.secondary" gutterBottom>
-              {customer.email} • {customer.role}
-            </Typography>
-            {customer.companyName && (
-              <Typography variant="body2" color="text.secondary">
-                Company: {customer.companyName}
-              </Typography>
-            )}
+            {BtcLivePriceComponent}
           </Box>
 
           {error && (
@@ -481,7 +493,12 @@ export default function CustomerDetailPage() {
                       ₿ {summary?.totalEarnings.btc.toFixed(8) ?? "0.00"}
                     </Typography>
                     <Typography variant="h5" fontWeight="bold">
-                      ${summary?.totalEarnings.usd.toFixed(2) ?? "0.00"}
+                      $
+                      {summary?.totalEarnings.btc && btcLiveData?.price
+                        ? (
+                            summary.totalEarnings.btc * btcLiveData.price
+                          ).toFixed(2)
+                        : "0.00"}
                     </Typography>
                   </Box>
                 )}
@@ -531,7 +548,12 @@ export default function CustomerDetailPage() {
                       ₿ {summary?.pendingPayouts.btc.toFixed(8) ?? "0.00"}
                     </Typography>
                     <Typography variant="h5" fontWeight="bold">
-                      ${summary?.pendingPayouts.usd.toFixed(2) ?? "0.00"}
+                      $
+                      {summary?.pendingPayouts.btc && btcLiveData?.price
+                        ? (
+                            summary?.pendingPayouts.btc * btcLiveData.price
+                          ).toFixed(2)
+                        : "0.00"}
                     </Typography>
                   </Box>
                 )}

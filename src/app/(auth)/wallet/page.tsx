@@ -3,10 +3,9 @@
 import React, { useEffect, useState } from "react";
 import { Box, Typography, Paper, CircularProgress } from "@mui/material";
 import ElectricityCostTable from "@/components/ElectricityCostTable";
-// import TransactionHistory from "@/components/TransactionHistory"; // TODO: Enable in future
-import { formatValue } from "@/lib/helpers/formatValue";
 import { useUser } from "@/lib/hooks/useUser";
 import { LuxorPaymentSettings } from "@/lib/types/wallet";
+import { useBitcoinLivePrice } from "@/components/useBitcoinLivePrice";
 
 interface EarningsSummary {
   totalEarnings: { btc: number; usd: number };
@@ -37,6 +36,22 @@ export default function WalletPage() {
   const [walletError, setWalletError] = useState<string | null>(null);
   const { user } = useUser();
 
+  // // Fetch BTC price using TanStack Query
+  // const { data: btcLiveData, isLoading: btcPriceLoading, error: btcPriceError } = useQuery<BtcPrice>({
+  //   queryKey: ["btcprice"],
+  //   queryFn: async () => {
+  //     // const response = await fetch("/api/btcprice");
+  //     const response = await fetch(
+  //   "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT"
+  //     );
+  //     if (!response.ok) {
+  //       throw new Error("Failed to fetch BTC price");
+  //     }
+  //     return response.json();
+  //   },
+  //   staleTime: 1000 * 60 * 5, // 5 minutes
+  //   refetchInterval: 1000 * 60 * 5, // Refetch every 5 minutes. Enable this to fetch live data periodically
+  // });
   useEffect(() => {
     // Fetch earnings summary from API
     const fetchEarningsSummary = async () => {
@@ -169,6 +184,8 @@ export default function WalletPage() {
       .join(" ");
   };
 
+  const { btcLiveData, BtcLivePriceComponent } = useBitcoinLivePrice();
+
   return (
     <Box
       component="main"
@@ -181,12 +198,24 @@ export default function WalletPage() {
         minHeight: "100vh",
       }}
     >
-      <Typography variant="h4" fontWeight="bold" gutterBottom>
-        My Wallet
-      </Typography>
-      <Typography variant="body1" color="text.secondary" gutterBottom>
-        Overview of your mining earnings and transactions.
-      </Typography>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          mb: 3,
+        }}
+      >
+        <Box>
+          <Typography variant="h4" fontWeight="bold" gutterBottom>
+            My Wallet
+          </Typography>
+          <Typography variant="body1" color="text.secondary" gutterBottom>
+            Overview of your mining earnings and transactions.
+          </Typography>
+        </Box>
+        {BtcLivePriceComponent}
+      </Box>
 
       {error && (
         <Paper
@@ -243,7 +272,10 @@ export default function WalletPage() {
                   ₿ {summary?.totalEarnings.btc.toFixed(8) ?? "0.00"}
                 </Typography>
                 <Typography variant="h5" fontWeight="bold">
-                  ${summary?.totalEarnings.usd.toFixed(2) ?? "0.00"}
+                  $
+                  {summary?.totalEarnings.btc && btcLiveData?.price
+                    ? (summary.totalEarnings.btc * btcLiveData.price).toFixed(2)
+                    : "0.00"}
                 </Typography>
               </Box>
             )}
@@ -323,7 +355,12 @@ export default function WalletPage() {
                   ₿ {revenue24h?.revenue24h.btc.toFixed(8) ?? "0.00"}
                 </Typography>
                 <Typography variant="h5" fontWeight="bold">
-                  ${revenue24h?.revenue24h.usd.toFixed(2) ?? "0.00"}
+                  $
+                  {revenue24h?.revenue24h.btc && btcLiveData?.price
+                    ? (revenue24h?.revenue24h.btc * btcLiveData.price).toFixed(
+                        2,
+                      )
+                    : "0.00"}
                 </Typography>
               </Box>
             )}
@@ -360,7 +397,12 @@ export default function WalletPage() {
                   ₿ {summary?.pendingPayouts.btc.toFixed(8) ?? "0.00"}
                 </Typography>
                 <Typography variant="h5" fontWeight="bold">
-                  ${summary?.pendingPayouts.usd.toFixed(2) ?? "0.00"}
+                  $
+                  {summary?.pendingPayouts.btc && btcLiveData?.price
+                    ? (summary?.pendingPayouts.btc * btcLiveData.price).toFixed(
+                        2,
+                      )
+                    : "0.00"}
                 </Typography>
               </Box>
             )}
