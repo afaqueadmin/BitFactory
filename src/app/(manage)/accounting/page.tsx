@@ -117,13 +117,11 @@ export default function AccountingDashboard() {
             Overview of invoices, payments, and recurring income
           </Typography>
         </div>
-        <Stack direction="row" spacing={2}>
-          <Link href="/accounting/create">
-            <Button variant="contained" startIcon={<AddIcon />}>
-              Create Invoice
-            </Button>
-          </Link>
-        </Stack>
+        <Link href="/accounting/create">
+          <Button variant="contained" startIcon={<AddIcon />}>
+            Create Invoice
+          </Button>
+        </Link>
       </Stack>
 
       {/* Stats Row */}
