@@ -284,7 +284,7 @@ export default function AccountingDashboard() {
                               ? "1 day"
                               : daysUntilDue < 0
                                 ? `${Math.abs(daysUntilDue)} ${Math.abs(daysUntilDue) === 1 ? "day" : "days"} overdue`
-                                : `${daysUntilDue} days`}
+                                : `${daysUntilDue} ${daysUntilDue === 1 ? "day" : "days"}`}
                         </Typography>
                       </TableCell>
                       {/*<TableCell>*/}
