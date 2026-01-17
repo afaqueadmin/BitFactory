@@ -262,13 +262,22 @@ export default function RecordPaymentPage() {
 
               {formData.amountPaid > 0 && (
                 <Box
-                  sx={{ p: 1.5, backgroundColor: "#e8f5e9", borderRadius: 1 }}
+                  sx={{
+                    p: 1.5,
+                    backgroundColor:
+                      formData.amountPaid > outstandingAmount
+                        ? "#fff3cd"
+                        : "#e8f5e9",
+                    borderRadius: 1,
+                  }}
                 >
                   <Typography color="textSecondary" variant="body2">
-                    Remaining After Payment
+                    {formData.amountPaid > outstandingAmount
+                      ? "Positive Balance After Payment"
+                      : "Remaining After Payment"}
                   </Typography>
                   <CurrencyDisplay
-                    value={Math.max(0, outstandingAmount - formData.amountPaid)}
+                    value={Math.abs(outstandingAmount - formData.amountPaid)}
                     fontWeight="bold"
                   />
                 </Box>
