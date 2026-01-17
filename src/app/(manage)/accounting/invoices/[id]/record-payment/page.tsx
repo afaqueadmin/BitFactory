@@ -191,7 +191,7 @@ export default function RecordPaymentPage() {
                     required
                   />
                   <TextField
-                    label="Notes (Optional)"
+                    label="Notes, like Invoice # (Optional)"
                     name="notes"
                     multiline
                     rows={3}
