@@ -118,7 +118,7 @@ export default function AccountingDashboard() {
           </Typography>
         </div>
         <Stack direction="row" spacing={2}>
-          <Link href="/accounting/invoices/create">
+          <Link href="/accounting/create">
             <Button variant="contained" startIcon={<AddIcon />}>
               Create Invoice
             </Button>
@@ -217,7 +217,7 @@ export default function AccountingDashboard() {
             <Typography variant="h6" sx={{ fontWeight: "bold" }}>
               All Invoices
             </Typography>
-            <Link href="/accounting/invoices/create">
+            <Link href="/accounting/create">
               <Button variant="contained" startIcon={<AddIcon />}>
                 Create Invoice
               </Button>
@@ -246,7 +246,7 @@ export default function AccountingDashboard() {
                     <TableRow key={invoice.id} hover>
                       <TableCell>
                         <Link
-                          href={`/accounting/invoices/${invoice.id}`}
+                          href={`/accounting/${invoice.id}`}
                           style={{ color: "#1976d2", textDecoration: "none" }}
                         >
                           {invoice.invoiceNumber}
@@ -293,7 +293,7 @@ export default function AccountingDashboard() {
                         </Typography>
                       </TableCell>
                       <TableCell>
-                        <Link href={`/accounting/invoices/${invoice.id}`}>
+                        <Link href={`/accounting/${invoice.id}`}>
                           <Button size="small" variant="outlined">
                             View
                           </Button>
