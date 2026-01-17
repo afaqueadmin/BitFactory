@@ -51,6 +51,8 @@ export interface DashboardStats {
     amount: number;
     dueDate: string;
     daysUntilDue: number;
+    issuedDate: string;
+    status: InvoiceStatus;
   }>;
   recentInvoices: Array<{
     invoiceId: string;
@@ -58,6 +60,8 @@ export interface DashboardStats {
     customerId: string;
     customerName: string;
     amount: number;
+    dueDate: string;
+    daysUntilDue: number;
     issuedDate: string;
     status: InvoiceStatus;
   }>;
@@ -149,6 +153,8 @@ export function useDashboardStats() {
               amount: Number(inv.totalAmount),
               dueDate: inv.dueDate,
               daysUntilDue,
+              issuedDate: inv.issuedDate || inv.createdAt,
+              status: inv.status as InvoiceStatus,
             };
           }),
         recentInvoices: invoices
@@ -157,16 +163,24 @@ export function useDashboardStats() {
               new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
           )
           .slice(0, 5)
-          .map((inv: InvoiceData) => ({
-            invoiceId: inv.id,
-            invoiceNumber: inv.invoiceNumber,
-            customerId: inv.userId,
-            customerName:
-              inv.user?.name || `Customer ${inv.userId.slice(0, 8)}`,
-            amount: Number(inv.totalAmount),
-            issuedDate: inv.issuedDate || inv.createdAt,
-            status: inv.status as InvoiceStatus,
-          })),
+          .map((inv: InvoiceData) => {
+            const daysUntilDue = Math.ceil(
+              (new Date(inv.dueDate).getTime() - now.getTime()) /
+                (1000 * 60 * 60 * 24),
+            );
+            return {
+              invoiceId: inv.id,
+              invoiceNumber: inv.invoiceNumber,
+              customerId: inv.userId,
+              customerName:
+                inv.user?.name || `Customer ${inv.userId.slice(0, 8)}`,
+              amount: Number(inv.totalAmount),
+              dueDate: inv.dueDate,
+              daysUntilDue,
+              issuedDate: inv.issuedDate || inv.createdAt,
+              status: inv.status as InvoiceStatus,
+            };
+          }),
       };
 
       setDashboard(stats);

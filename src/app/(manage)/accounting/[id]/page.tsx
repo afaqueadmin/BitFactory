@@ -102,7 +102,7 @@ export default function InvoiceDetailPage() {
       await deleteInvoice(invoice!.id);
       setDeleteDialogOpen(false);
       // Redirect to invoices list
-      router.push("/accounting/invoices");
+      router.push("/accounting");
     } catch (err) {
       setDeleteDialogError(
         err instanceof Error ? err.message : "Failed to delete invoice",
@@ -410,9 +410,7 @@ export default function InvoiceDetailPage() {
                   fullWidth
                   size="large"
                   onClick={() =>
-                    router.push(
-                      `/accounting/invoices/${invoice.id}/record-payment`,
-                    )
+                    router.push(`/accounting/${invoice.id}/record-payment`)
                   }
                   disabled={
                     invoice.status === "PAID" || invoice.status === "CANCELLED"
