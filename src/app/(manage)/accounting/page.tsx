@@ -254,10 +254,14 @@ export default function AccountingDashboard() {
                         <StatusBadge status={invoice.status} />
                       </TableCell>
                       <TableCell>
-                        <DateDisplay
-                          date={invoice.issuedDate || new Date()}
-                          format="date"
-                        />
+                        {invoice.issuedDate ? (
+                          <DateDisplay
+                            date={invoice.issuedDate}
+                            format="date"
+                          />
+                        ) : (
+                          "-"
+                        )}
                       </TableCell>
                       <TableCell>
                         <DateDisplay date={invoice.dueDate} format="date" />
