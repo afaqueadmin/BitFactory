@@ -117,9 +117,50 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate invoice number
+    // Fetch customer to get luxorSubaccountName
+    const customer = await prisma.user.findUnique({
+      where: { id: customerId },
+      select: { luxorSubaccountName: true },
+    });
+
+    if (!customer) {
+      return NextResponse.json(
+        { error: "Customer not found" },
+        { status: 404 },
+      );
+    }
+
+    if (!customer.luxorSubaccountName) {
+      return NextResponse.json(
+        { error: "Customer does not have a Luxor subaccount name" },
+        { status: 400 },
+      );
+    }
+
+    // Generate invoice number: luxorSubaccountName-YYYYMMDD-sequence
     const timestamp = new Date();
-    const invoiceNumber = `INV-${timestamp.getFullYear()}${String(timestamp.getMonth() + 1).padStart(2, "0")}${String(timestamp.getDate()).padStart(2, "0")}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
+    const dateStr = `${timestamp.getFullYear()}${String(timestamp.getMonth() + 1).padStart(2, "0")}${String(timestamp.getDate()).padStart(2, "0")}`;
+
+    // Count existing invoices for this customer today to determine sequence number
+    const customerLastInvoice = await prisma.invoice.findFirst({
+      where: {
+        userId: customerId,
+        // invoiceGeneratedDate: {
+        //   gte: new Date(timestamp.getFullYear(), timestamp.getMonth(), timestamp.getDate()),
+        //   lt: new Date(timestamp.getFullYear(), timestamp.getMonth(), timestamp.getDate() + 1),
+        // },
+      },
+      select: { invoiceNumber: true },
+      orderBy: { createdAt: "desc" },
+    });
+
+    const sequenceNumber = customerLastInvoice
+      ? String(
+          parseInt(customerLastInvoice.invoiceNumber.split("-").pop() || "0") +
+            1,
+        ).padStart(3, "0")
+      : "001";
+    const invoiceNumber = `${customer.luxorSubaccountName}-${dateStr}-${sequenceNumber}`;
 
     const totalAmount = totalMiners * Number(unitPrice);
 
