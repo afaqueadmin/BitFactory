@@ -117,20 +117,6 @@ export interface CustomerPricingConfig {
 }
 
 /**
- * Invoice Payment Link
- *
- * Links an Invoice to a CostPayment for tracking
- */
-export interface InvoicePayment {
-  id: string;
-  invoiceId: string; // FK to Invoice
-  costPaymentId: string; // FK to CostPayment (existing table)
-  amountPaid: number; // USD amount paid
-  paidDate: Date; // When payment received
-  createdAt: Date;
-}
-
-/**
  * Audit Log Entry
  *
  * Complete audit trail of all accounting actions

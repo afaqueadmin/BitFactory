@@ -1,22 +1,21 @@
 import { useState, useEffect } from "react";
-import { InvoicePayment } from "@/generated/prisma";
+import { CostPayment } from "@/generated/prisma";
 
-export interface InvoicePaymentWithDetails extends InvoicePayment {
+export interface CostPaymentWithDetails extends CostPayment {
   invoice?: {
     id: string;
     invoiceNumber: string;
     status: string;
     totalAmount: number;
   };
-  costPayment?: Record<string, unknown>;
 }
 
-export function useInvoicePayments(
+export function useCostPayments(
   page: number = 1,
   limit: number = 10,
   invoiceId?: string,
 ) {
-  const [payments, setPayments] = useState<InvoicePaymentWithDetails[]>([]);
+  const [payments, setPayments] = useState<CostPaymentWithDetails[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -57,10 +56,8 @@ export function useInvoicePayments(
   return { payments, total, loading, error };
 }
 
-export function useInvoicePayment(id: string) {
-  const [payment, setPayment] = useState<InvoicePaymentWithDetails | null>(
-    null,
-  );
+export function useCostPayment(id: string) {
+  const [payment, setPayment] = useState<CostPaymentWithDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 

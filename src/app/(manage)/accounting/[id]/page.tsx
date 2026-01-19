@@ -1,4 +1,5 @@
 /**
+ * src/app/(manage)/accounting/[id]/page.tsx
  * Invoice Detail Page
  *
  * Display full invoice details

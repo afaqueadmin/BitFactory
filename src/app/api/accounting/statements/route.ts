@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
     const invoices = await prisma.invoice.findMany({
       where,
       include: {
-        payments: true,
+        costPayments: true,
         notifications: true,
       },
       orderBy: { createdAt: "asc" },
@@ -80,8 +80,7 @@ export async function GET(request: NextRequest) {
       ),
       totalPaid: invoices.reduce(
         (sum, inv) =>
-          sum +
-          inv.payments.reduce((pSum, p) => pSum + Number(p.amountPaid), 0),
+          sum + inv.costPayments.reduce((pSum, p) => pSum + p.amount, 0),
         0,
       ),
       totalPending: 0,
@@ -126,8 +125,7 @@ export async function GET(request: NextRequest) {
         invoiceDate: inv.invoiceGeneratedDate,
         dueDate: inv.dueDate,
         totalAmount: inv.totalAmount,
-        paidAmount:
-          inv.payments.reduce((sum, p) => sum + Number(p.amountPaid), 0) || 0,
+        paidAmount: inv.costPayments.reduce((sum, p) => sum + p.amount, 0) || 0,
         status: inv.status,
         issuedDate: inv.issuedDate,
         paidDate: inv.paidDate,

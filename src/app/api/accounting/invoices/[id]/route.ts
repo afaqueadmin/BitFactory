@@ -23,11 +23,7 @@ export async function GET(
         user: { select: { id: true, email: true, name: true } },
         createdByUser: { select: { id: true, email: true, name: true } },
         updatedByUser: { select: { id: true, email: true, name: true } },
-        payments: {
-          include: {
-            costPayment: true,
-          },
-        },
+        costPayments: true,
         notifications: true,
       },
     });
@@ -138,11 +134,7 @@ export async function PATCH(
         user: { select: { id: true, email: true, name: true } },
         createdByUser: { select: { id: true, email: true, name: true } },
         updatedByUser: { select: { id: true, email: true, name: true } },
-        payments: {
-          include: {
-            costPayment: true,
-          },
-        },
+        costPayments: true,
       },
     });
 
@@ -239,11 +231,7 @@ export async function PUT(
         user: { select: { id: true, email: true, name: true } },
         createdByUser: { select: { id: true, email: true, name: true } },
         updatedByUser: { select: { id: true, email: true, name: true } },
-        payments: {
-          include: {
-            costPayment: true,
-          },
-        },
+        costPayments: true,
       },
     });
 

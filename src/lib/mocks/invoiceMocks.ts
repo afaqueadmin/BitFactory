@@ -6,13 +6,13 @@
  */
 
 import { faker } from "@faker-js/faker";
+import { CostPayment } from "@/generated/prisma";
 import {
   Invoice,
   InvoiceStatus,
   RecurringFrequency,
   RecurringInvoice,
   CustomerPricingConfig,
-  InvoicePayment,
   AuditLog,
   AuditAction,
   InvoiceNotification,
@@ -189,30 +189,12 @@ export function generateMockPricingConfigs(
 /**
  * Generate a single mock invoice payment
  */
-export function generateMockInvoicePayment(
-  overrides?: Partial<InvoicePayment>,
-): InvoicePayment {
-  const paidDate = faker.date.past({ years: 1 });
-
-  return {
-    id: faker.string.uuid(),
-    invoiceId: faker.string.uuid(),
-    costPaymentId: faker.string.uuid(),
-    amountPaid: faker.number.float({ min: 100, max: 5000 }),
-    paidDate,
-    createdAt: paidDate,
-    ...overrides,
-  };
-}
+// InvoicePayment mocks removed - now using CostPayment directly
 
 /**
  * Generate multiple mock invoice payments
  */
-export function generateMockInvoicePayments(
-  count: number = 10,
-): InvoicePayment[] {
-  return Array.from({ length: count }, () => generateMockInvoicePayment());
-}
+// InvoicePayment mocks removed - now using CostPayment directly
 
 // ============================================================================
 // AUDIT LOG MOCK GENERATORS
@@ -317,7 +299,7 @@ export interface MockAccountingDataset {
   invoices: Invoice[];
   recurringInvoices: RecurringInvoice[];
   pricingConfigs: CustomerPricingConfig[];
-  payments: InvoicePayment[];
+  costPayments: CostPayment[];
   auditLogs: AuditLog[];
   notifications: InvoiceNotification[];
 }
@@ -343,7 +325,7 @@ export function generateMockAccountingDataset(options?: {
     invoices: generateMockInvoices(invoiceCount),
     recurringInvoices: generateMockRecurringInvoices(recurringCount),
     pricingConfigs: generateMockPricingConfigs(pricingCount),
-    payments: generateMockInvoicePayments(paymentCount),
+    costPayments: [],
     auditLogs: generateMockAuditLogs(auditCount),
     notifications: generateMockInvoiceNotifications(notificationCount),
   };

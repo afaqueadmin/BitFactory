@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import {
   Invoice,
   InvoiceStatus,
-  InvoicePayment,
+  CostPayment,
   AuditLog,
 } from "@/generated/prisma";
 
@@ -25,7 +25,7 @@ export interface InvoiceWithDetails extends Invoice {
     email: string;
     name: string | null;
   };
-  payments?: InvoicePayment[];
+  costPayments?: CostPayment[];
 }
 
 export function useInvoices(

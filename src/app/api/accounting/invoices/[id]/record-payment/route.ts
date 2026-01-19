@@ -52,7 +52,7 @@ export async function POST(
     const invoice = await prisma.invoice.findUnique({
       where: { id },
       include: {
-        payments: true,
+        costPayments: true,
         user: {
           select: {
             id: true,
@@ -78,30 +78,21 @@ export async function POST(
     }
 
     // Calculate outstanding balance (allow overpayment for admins)
-    const totalPaid = invoice.payments.reduce(
-      (sum, p) => sum + Number(p.amountPaid),
+    const totalPaid = invoice.costPayments.reduce(
+      (sum, p) => sum + p.amount,
       0,
     );
     const outstanding = Number(invoice.totalAmount) - totalPaid;
 
-    // Create cost payment entry first
+    // Create cost payment entry with invoiceId (this replaces the old InvoicePayment table)
     const costPayment = await prisma.costPayment.create({
       data: {
         userId: invoice.userId,
+        invoiceId: id,
         amount: amountPaid,
         type: "PAYMENT",
         consumption: 0,
         narration: notes || null,
-      },
-    });
-
-    // Create invoice payment link
-    const invoicePayment = await prisma.invoicePayment.create({
-      data: {
-        invoiceId: id,
-        costPaymentId: costPayment.id,
-        amountPaid,
-        paidDate: new Date(paymentDate),
       },
     });
 
@@ -133,7 +124,6 @@ export async function POST(
           amountPaid,
           paymentDate,
           costPaymentId: costPayment.id,
-          invoicePaymentId: invoicePayment.id,
           isPaid: Math.abs(remainingBalance) < 0.01,
           remainingBalance: remainingBalance.toFixed(2),
         }),
@@ -144,7 +134,7 @@ export async function POST(
     const finalInvoice = await prisma.invoice.findUnique({
       where: { id },
       include: {
-        payments: true,
+        costPayments: true,
         user: {
           select: {
             id: true,

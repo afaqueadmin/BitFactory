@@ -10,8 +10,8 @@ export {
   useCreatePricingConfig,
 } from "./usePricingConfigs";
 export {
-  useInvoicePayments,
-  useInvoicePayment,
+  useCostPayments,
+  useCostPayment,
   useRecordPayment,
 } from "./usePayments";
 export { useAccountStatement, useGenerateInvoice } from "./useStatements";

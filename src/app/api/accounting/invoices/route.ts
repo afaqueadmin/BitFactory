@@ -44,11 +44,7 @@ export async function GET(request: NextRequest) {
         include: {
           user: { select: { id: true, email: true, name: true } },
           createdByUser: { select: { id: true, email: true, name: true } },
-          payments: {
-            include: {
-              costPayment: true,
-            },
-          },
+          costPayments: true,
         },
         orderBy: { createdAt: "desc" },
         skip,

@@ -44,13 +44,10 @@ export default function RecordPaymentPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Calculate paid amount from payments
+  // Calculate paid amount from cost payments
   const paidAmount =
-    invoice && invoice.payments
-      ? invoice.payments.reduce(
-          (sum, payment) => sum + Number(payment.amountPaid),
-          0,
-        )
+    invoice && invoice.costPayments
+      ? invoice.costPayments.reduce((sum, payment) => sum + payment.amount, 0)
       : 0;
 
   const outstandingAmount = invoice

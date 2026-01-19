@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
     const skip = (page - 1) * limit;
 
     const [payments, total] = await Promise.all([
-      prisma.invoicePayment.findMany({
+      prisma.costPayment.findMany({
         where,
         include: {
           invoice: {
@@ -48,13 +48,12 @@ export async function GET(request: NextRequest) {
               totalAmount: true,
             },
           },
-          costPayment: true,
         },
-        orderBy: { paidDate: "desc" },
+        orderBy: { createdAt: "desc" },
         skip,
         take: limit,
       }),
-      prisma.invoicePayment.count({ where }),
+      prisma.costPayment.count({ where }),
     ]);
 
     return NextResponse.json({
@@ -99,13 +98,12 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { invoiceId, costPaymentId, amountPaid, paidDate } = body;
+    const { invoiceId, costPaymentId } = body;
 
-    if (!invoiceId || !costPaymentId || !amountPaid || !paidDate) {
+    if (!invoiceId || !costPaymentId) {
       return NextResponse.json(
         {
-          error:
-            "Missing required fields: invoiceId, costPaymentId, amountPaid, paidDate",
+          error: "Missing required fields: invoiceId, costPaymentId",
         },
         { status: 400 },
       );
@@ -120,7 +118,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
     }
 
-    // Verify cost payment exists
+    // Verify cost payment exists and not already linked
     const costPayment = await prisma.costPayment.findUnique({
       where: { id: costPaymentId },
     });
@@ -132,30 +130,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check for duplicate payment
-    const existingPayment = await prisma.invoicePayment.findUnique({
-      where: {
-        invoiceId_costPaymentId: {
-          invoiceId,
-          costPaymentId,
-        },
-      },
-    });
-
-    if (existingPayment) {
+    if (costPayment.invoiceId) {
       return NextResponse.json(
-        { error: "Payment already recorded for this invoice and cost payment" },
+        { error: "Cost payment is already linked to an invoice" },
         { status: 409 },
       );
     }
 
-    const payment = await prisma.invoicePayment.create({
-      data: {
-        invoiceId,
-        costPaymentId,
-        amountPaid: parseFloat(amountPaid),
-        paidDate: new Date(paidDate),
-      },
+    // Update cost payment with invoice ID
+    const payment = await prisma.costPayment.update({
+      where: { id: costPaymentId },
+      data: { invoiceId },
       include: {
         invoice: {
           select: {
@@ -165,18 +150,17 @@ export async function POST(request: NextRequest) {
             totalAmount: true,
           },
         },
-        costPayment: true,
       },
     });
 
     // Check if invoice is now fully paid
-    const totalPaid = await prisma.invoicePayment.aggregate({
+    const totalPaid = await prisma.costPayment.aggregate({
       where: { invoiceId },
-      _sum: { amountPaid: true },
+      _sum: { amount: true },
     });
 
     const invoiceTotalAmount = Number(invoice.totalAmount);
-    const totalPaidAmount = Number(totalPaid._sum.amountPaid || 0);
+    const totalPaidAmount = Number(totalPaid._sum.amount || 0);
 
     let newStatus = invoice.status;
     if (totalPaidAmount >= invoiceTotalAmount) {
@@ -191,14 +175,13 @@ export async function POST(request: NextRequest) {
     await prisma.auditLog.create({
       data: {
         action: AuditAction.PAYMENT_ADDED,
-        entityType: "InvoicePayment",
+        entityType: "CostPayment",
         entityId: payment.id,
         userId,
-        description: `Payment of ${amountPaid} recorded for invoice ${invoice.invoiceNumber}`,
+        description: `Payment of $${payment.amount.toFixed(2)} linked to invoice ${invoice.invoiceNumber}`,
         changes: JSON.stringify({
-          amountPaid: amountPaid.toString(),
+          amount: payment.amount.toString(),
           invoiceId,
-          costPaymentId,
           invoiceStatus: newStatus,
         }),
       },
@@ -206,9 +189,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(payment, { status: 201 });
   } catch (error) {
-    console.error("Create invoice payment error:", error);
+    console.error("Link cost payment to invoice error:", error);
     return NextResponse.json(
-      { error: "Failed to record invoice payment" },
+      { error: "Failed to link cost payment to invoice" },
       { status: 500 },
     );
   }

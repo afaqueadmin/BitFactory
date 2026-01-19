@@ -44,10 +44,10 @@ export async function GET(request: NextRequest) {
           select: {
             id: true,
             totalAmount: true,
-            payments: {
+            costPayments: {
               select: {
-                amountPaid: true,
-                paidDate: true,
+                amount: true,
+                createdAt: true,
               },
             },
           },
@@ -73,8 +73,8 @@ export async function GET(request: NextRequest) {
       );
 
       const totalPaid = customer.invoices.reduce((sum, inv) => {
-        const invPaid = inv.payments.reduce(
-          (pSum, p) => pSum + Number(p.amountPaid),
+        const invPaid = inv.costPayments.reduce(
+          (pSum, p) => pSum + p.amount,
           0,
         );
         return sum + invPaid;
@@ -82,8 +82,8 @@ export async function GET(request: NextRequest) {
 
       const lastPaymentDate =
         customer.invoices
-          .flatMap((inv) => inv.payments)
-          .map((p) => p.paidDate)
+          .flatMap((inv) => inv.costPayments)
+          .map((p) => p.createdAt)
           .filter((date): date is Date => date !== null)
           .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0] ||
         null;

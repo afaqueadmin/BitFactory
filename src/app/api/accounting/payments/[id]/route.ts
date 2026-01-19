@@ -17,7 +17,7 @@ export async function GET(
 
     await verifyJwtToken(token);
 
-    const payment = await prisma.invoicePayment.findUnique({
+    const payment = await prisma.costPayment.findUnique({
       where: { id },
       include: {
         invoice: {
@@ -29,7 +29,7 @@ export async function GET(
             userId: true,
           },
         },
-        costPayment: true,
+        user: true,
       },
     });
 
@@ -39,9 +39,9 @@ export async function GET(
 
     return NextResponse.json(payment);
   } catch (error) {
-    console.error("Get invoice payment error:", error);
+    console.error("Get cost payment error:", error);
     return NextResponse.json(
-      { error: "Failed to fetch invoice payment" },
+      { error: "Failed to fetch cost payment" },
       { status: 500 },
     );
   }
@@ -74,7 +74,7 @@ export async function DELETE(
       );
     }
 
-    const payment = await prisma.invoicePayment.findUnique({
+    const payment = await prisma.costPayment.findUnique({
       where: { id },
       include: { invoice: true },
     });
@@ -83,20 +83,21 @@ export async function DELETE(
       return NextResponse.json({ error: "Payment not found" }, { status: 404 });
     }
 
-    await prisma.invoicePayment.delete({
+    await prisma.costPayment.delete({
       where: { id },
     });
 
     // Log audit
+    const invoiceNumber = payment.invoice?.invoiceNumber || "N/A";
     await prisma.auditLog.create({
       data: {
         action: AuditAction.PAYMENT_REMOVED,
-        entityType: "InvoicePayment",
+        entityType: "CostPayment",
         entityId: id,
         userId,
-        description: `Payment removed from invoice ${payment.invoice.invoiceNumber}`,
+        description: `Payment removed from invoice ${invoiceNumber}`,
         changes: JSON.stringify({
-          amountPaid: payment.amountPaid.toString(),
+          amount: payment.amount.toString(),
           invoiceId: payment.invoiceId,
         }),
       },
@@ -104,9 +105,9 @@ export async function DELETE(
 
     return NextResponse.json({ success: true, message: "Payment deleted" });
   } catch (error) {
-    console.error("Delete invoice payment error:", error);
+    console.error("Delete cost payment error:", error);
     return NextResponse.json(
-      { error: "Failed to delete invoice payment" },
+      { error: "Failed to delete cost payment" },
       { status: 500 },
     );
   }
