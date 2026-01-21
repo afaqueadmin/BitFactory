@@ -177,7 +177,7 @@ export default function MiningEarningsChart({
           <ResponsiveContainer width="100%" height={height}>
             <BarChart
               data={miningData}
-              margin={{ top: 20, right: 30, left: 60, bottom: 80 }}
+              margin={{ top: 20, right: 30, left: 60, bottom: 0 }}
             >
               <defs>
                 <linearGradient
@@ -227,7 +227,7 @@ export default function MiningEarningsChart({
                   value: "Revenue (BTC ₿)",
                   angle: -90,
                   position: "left",
-                  offset: 10,
+                  offset: 24,
                   style: {
                     textAnchor: "middle",
                     fill: theme.palette.text.secondary,
@@ -236,10 +236,10 @@ export default function MiningEarningsChart({
                 }}
                 tickFormatter={(value) => {
                   if (value === 0) return "0";
-                  if (value < 0.0001) {
+                  if (value < 0.00009) {
                     return value.toExponential(1);
                   }
-                  return value.toFixed(4);
+                  return value.toFixed(8);
                 }}
               />
 

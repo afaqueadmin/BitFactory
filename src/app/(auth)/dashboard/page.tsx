@@ -332,7 +332,7 @@ export default function DashboardPage() {
           <MiningEarningsChart
             title="Daily Mining Performance"
             height={400}
-            days={10}
+            days={31}
           />
         </Box>
       </Container>
