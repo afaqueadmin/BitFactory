@@ -40,6 +40,7 @@ interface MinerData {
     | "AUTO"
     | "DEPLOYMENT_IN_PROGRESS";
   hashRate: string;
+  firmware: string;
   hardware?: Hardware;
 }
 
@@ -96,8 +97,10 @@ export default function HostedMinersList({
         }
 
         // Step 2: Fetch worker status from Luxor API
-        const luxorWorkers: Map<string, { status: string; hashrate: number }> =
-          new Map();
+        const luxorWorkers: Map<
+          string,
+          { status: string; hashrate: number; firmware: string }
+        > = new Map();
         try {
           const luxorUrl =
             "/api/luxor?endpoint=workers&currency=BTC&page_size=1000";
@@ -122,10 +125,12 @@ export default function HostedMinersList({
                   name: string;
                   status: string;
                   hashrate: number;
+                  firmware: string;
                 }) => {
                   luxorWorkers.set(worker.name, {
                     status: worker.status,
                     hashrate: worker.hashrate || 0,
+                    firmware: worker.firmware || "N/A",
                   });
                 },
               );
@@ -173,7 +178,8 @@ export default function HostedMinersList({
               connectedPool: miner.space?.name || "Unknown",
               // Priority: Luxor API status > fallback to Inactive
               status: luxorStatus === "ACTIVE" ? "Active" : "Inactive",
-              hashRate: `${luxorWorker?.hashrate || miner.hardware?.hashRate || miner.hashRate || 0} TH/s`,
+              hashRate: `${(luxorWorker?.hashrate && (luxorWorker.hashrate / 1000000000000).toFixed(2)) || miner.hardware?.hashRate || miner.hashRate || 0} TH/s`,
+              firmware: luxorWorker?.firmware || "N/A",
             };
           },
         );
@@ -362,7 +368,20 @@ export default function HostedMinersList({
                     Miner Details
                   </Typography>
 
-                  <Stack direction="row" spacing={4} flexWrap="wrap">
+                  <Stack direction="row" spacing={6} flexWrap="wrap">
+                    <Box>
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{ mb: 0.5 }}
+                      >
+                        Firmware
+                      </Typography>
+                      <Typography variant="body1" fontWeight="500">
+                        {miner.firmware || "N/A"}
+                      </Typography>
+                    </Box>
+
                     <Box>
                       <Typography
                         variant="body2"
