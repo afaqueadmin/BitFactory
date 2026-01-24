@@ -111,9 +111,16 @@ export default function AddPaymentModal({
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
+          gap: 1,
         }}
       >
-        Startup Payment
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <span>Startup Payment</span>
+          <span>•</span>
+          <span style={{ color: "#d32f2f", fontWeight: 500 }}>
+            (No customer invoice)
+          </span>
+        </Box>
         <IconButton
           onClick={handleClose}
           sx={{
