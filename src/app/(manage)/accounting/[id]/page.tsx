@@ -7,7 +7,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   Container,
   Card,
@@ -42,6 +42,7 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EmailIcon from "@mui/icons-material/Email";
+import { useReactToPrint } from "react-to-print";
 
 function formatAuditAction(action: string): string {
   const actionMap: { [key: string]: string } = {
@@ -59,6 +60,7 @@ function formatAuditAction(action: string): string {
 }
 
 export default function InvoiceDetailPage() {
+  const printableRef = useRef(null);
   const params = useParams();
   const router = useRouter();
   const { invoice, loading, error } = useInvoice(params.id as string);
@@ -124,6 +126,12 @@ export default function InvoiceDetailPage() {
       );
     }
   };
+
+  // Hook handles the print logic
+  const handlePrint = useReactToPrint({
+    contentRef: printableRef, // Link the hook to your targeted div
+    documentTitle: `Invoice-${invoice!.invoiceNumber}`, // Optional: set file name for PDF saving
+  });
 
   if (loading) {
     return (
@@ -218,13 +226,19 @@ export default function InvoiceDetailPage() {
           <Button
             startIcon={<DownloadIcon />}
             variant="contained"
-            onClick={() => window.print()}
+            // onClick={() => window.print()}
+            onClick={() => {
+              // setPrintMode(true);
+              handlePrint();
+              // setPrintMode(false);
+            }}
           >
             Download
           </Button>
         </Stack>
       </Box>
       <Box
+        ref={printableRef}
         sx={{
           display: "grid",
           gridTemplateColumns: { xs: "1fr", md: "2fr 1fr" },
@@ -407,6 +421,7 @@ export default function InvoiceDetailPage() {
                 )}
 
                 <Button
+                  sx={{ displayPrint: "none" }}
                   variant="contained"
                   fullWidth
                   size="large"
