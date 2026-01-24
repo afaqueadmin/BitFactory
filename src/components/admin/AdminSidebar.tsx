@@ -120,11 +120,11 @@ const sidebarItems: SidebarItem[] = [
         icon: <DashboardIcon />,
         path: "/accounting",
       },
-      {
-        title: "Invoices",
-        icon: <InvoicesIcon />,
-        path: "/accounting/invoices",
-      },
+      // {
+      //   title: "Invoices",
+      //   icon: <InvoicesIcon />,
+      //   path: "/accounting/invoices",
+      // },
       {
         title: "Recurring Invoices",
         icon: <RevenueIcon />,
