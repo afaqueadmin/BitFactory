@@ -97,11 +97,6 @@ export default function CreateInvoicePage() {
     setFormData(newFormData);
   };
 
-  const handleSelectChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData({ ...formData, [name]: value });
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -268,18 +263,7 @@ export default function CreateInvoicePage() {
                   helperText="When payment is due (defaults to 30 days from today)"
                   required
                 />
-                <TextField
-                  select
-                  label="Status"
-                  name="status"
-                  value={formData.status}
-                  onChange={handleSelectChange}
-                  fullWidth
-                  helperText="Draft: Not sent yet | Issued: Sent to customer"
-                >
-                  <MenuItem value={InvoiceStatus.DRAFT}>Draft</MenuItem>
-                  <MenuItem value={InvoiceStatus.ISSUED}>Issued</MenuItem>
-                </TextField>
+                {/* Status is automatically set to DRAFT when creating invoices */}
               </Stack>
             </Box>
 

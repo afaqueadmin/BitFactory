@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
 import { AuditAction, InvoiceStatus } from "@/generated/prisma";
+import { sendInvoiceEmail } from "@/lib/email";
 
 export async function GET(
   request: NextRequest,
@@ -246,6 +247,42 @@ export async function PUT(
         changes: JSON.stringify(changes),
       },
     });
+
+    // Auto-send email when status changes to ISSUED (don't block if email fails)
+    if (
+      status === "ISSUED" &&
+      currentInvoice.status !== "ISSUED" &&
+      invoice.user?.email
+    ) {
+      sendInvoiceEmail(
+        invoice.user.email,
+        invoice.user.name || "Valued Customer",
+        invoice.invoiceNumber,
+        Number(invoice.totalAmount),
+        invoice.dueDate,
+        invoice.issuedDate || new Date(),
+      ).catch((err) => {
+        console.error(
+          `Failed to auto-send invoice email for ${invoice.invoiceNumber}:`,
+          err,
+        );
+      });
+
+      // Create notification record
+      try {
+        await prisma.invoiceNotification.create({
+          data: {
+            invoiceId: invoice.id,
+            notificationType: "INVOICE_ISSUED",
+            sentTo: invoice.user.email,
+            sentAt: new Date(),
+            status: "SENT",
+          },
+        });
+      } catch (notificationErr) {
+        console.error(`Failed to create notification record:`, notificationErr);
+      }
+    }
 
     return NextResponse.json(invoice);
   } catch (error) {

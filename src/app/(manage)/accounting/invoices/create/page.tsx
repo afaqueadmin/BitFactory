@@ -40,6 +40,7 @@ export default function CreateInvoicePage() {
     dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
       .toISOString()
       .split("T")[0],
+    // Status always starts as DRAFT - no user selection during creation
     status: InvoiceStatus.DRAFT,
   });
 
@@ -266,18 +267,7 @@ export default function CreateInvoicePage() {
                   helperText="When payment is due (defaults to 30 days from today)"
                   required
                 />
-                <TextField
-                  select
-                  label="Status"
-                  name="status"
-                  value={formData.status}
-                  onChange={handleSelectChange}
-                  fullWidth
-                  helperText="Draft: Not sent yet | Issued: Sent to customer"
-                >
-                  <MenuItem value={InvoiceStatus.DRAFT}>Draft</MenuItem>
-                  <MenuItem value={InvoiceStatus.ISSUED}>Issued</MenuItem>
-                </TextField>
+                {/* Status automatically set to DRAFT on creation - no user selection needed */}
               </Stack>
             </Box>
 

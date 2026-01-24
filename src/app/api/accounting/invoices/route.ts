@@ -95,13 +95,11 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const {
-      customerId,
-      totalMiners,
-      unitPrice,
-      dueDate,
-      status = InvoiceStatus.DRAFT,
-    } = body;
+    const { customerId, totalMiners, unitPrice, dueDate } = body;
+
+    // Status is always DRAFT when creating new invoices
+    // Admins can change to ISSUED after creation via the status change endpoint
+    const status = InvoiceStatus.DRAFT;
 
     if (!customerId || !totalMiners || !unitPrice || !dueDate) {
       return NextResponse.json(
@@ -137,25 +135,24 @@ export async function POST(request: NextRequest) {
     const timestamp = new Date();
     const dateStr = `${timestamp.getFullYear()}${String(timestamp.getMonth() + 1).padStart(2, "0")}${String(timestamp.getDate()).padStart(2, "0")}`;
 
-    // Count existing invoices for this customer today to determine sequence number
+    // Get last invoice for this customer (cumulative counter, not daily)
     const customerLastInvoice = await prisma.invoice.findFirst({
       where: {
         userId: customerId,
-        // invoiceGeneratedDate: {
-        //   gte: new Date(timestamp.getFullYear(), timestamp.getMonth(), timestamp.getDate()),
-        //   lt: new Date(timestamp.getFullYear(), timestamp.getMonth(), timestamp.getDate() + 1),
-        // },
       },
       select: { invoiceNumber: true },
       orderBy: { createdAt: "desc" },
     });
 
-    const sequenceNumber = customerLastInvoice
-      ? String(
-          parseInt(customerLastInvoice.invoiceNumber.split("-").pop() || "0") +
-            1,
-        ).padStart(3, "0")
-      : "001";
+    // Extract sequence number from last invoice and increment
+    // Format: subaccount-YYYYMMDD-XXX where XXX is the sequence
+    const lastSeq = customerLastInvoice
+      ? parseInt(
+          customerLastInvoice.invoiceNumber.split("-").pop() || "0",
+          10,
+        ) || 0
+      : 0;
+    const sequenceNumber = String(lastSeq + 1).padStart(3, "0");
     const invoiceNumber = `${customer.luxorSubaccountName}-${dateStr}-${sequenceNumber}`;
 
     const totalAmount = totalMiners * Number(unitPrice);
