@@ -523,12 +523,21 @@ export default function InvoiceDetailPage() {
             <Typography>
               Are you sure you want to issue this invoice? This will:
             </Typography>
-            <ul style={{ marginTop: 12 }}>
+            <ul
+              style={{
+                paddingLeft: 16,
+                marginTop: 12,
+                listStyleType: "square",
+              }}
+            >
               <li>Change the status from DRAFT to ISSUED</li>
               <li>
                 Set the issued date to today ({new Date().toLocaleDateString()})
               </li>
               <li>Make the invoice available for payment</li>
+              <li>
+                <b>Send an email to the customer</b>
+              </li>
             </ul>
           </Box>
         </DialogContent>
