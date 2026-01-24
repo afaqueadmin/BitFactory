@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 interface UserActivity {
   id: string;
@@ -25,18 +25,20 @@ interface UserData {
   role: "ADMIN" | "SUPER_ADMIN" | "CLIENT";
 }
 
+interface UserResponse {
+  user: UserData;
+  recentActivities: UserActivity[];
+}
+
 export function useUser() {
-  const [user, setUser] = useState<UserData | null>(null);
-  const [recentActivities, setRecentActivities] = useState<UserActivity[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const fetchUser = async () => {
+  const {
+    data,
+    isLoading: loading,
+    error: queryError,
+  } = useQuery<UserResponse>({
+    queryKey: ["user"],
+    queryFn: async () => {
       try {
-        setLoading(true);
-        setError(null);
-
         console.log("Starting user fetch process...");
 
         // First verify the auth status
@@ -107,22 +109,23 @@ export function useUser() {
           throw new Error("User data is missing from response");
         }
 
-        setUser(profileData.user);
-        setRecentActivities(profileData.recentActivities || []);
+        return {
+          user: profileData.user,
+          recentActivities: profileData.recentActivities || [],
+        };
       } catch (err) {
         console.error("Error in user fetch process:", err);
-        setError(
-          err instanceof Error ? err.message : "Failed to fetch user data",
-        );
-        setUser(null);
-        setRecentActivities([]);
-      } finally {
-        setLoading(false);
+        throw err;
       }
-    };
+    },
+    staleTime: 1000 * 60 * 5, // 5 minutes
+    retry: 1,
+  });
 
-    fetchUser();
-  }, []);
-
-  return { user, recentActivities, loading, error };
+  return {
+    user: data?.user || null,
+    recentActivities: data?.recentActivities || [],
+    loading,
+    error: queryError?.message || null,
+  };
 }
