@@ -1,7 +1,19 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Box, Typography, Paper, CircularProgress } from "@mui/material";
+import {
+  Box,
+  Typography,
+  Paper,
+  CircularProgress,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Chip,
+} from "@mui/material";
 import ElectricityCostTable from "@/components/ElectricityCostTable";
 import { useUser } from "@/lib/hooks/useUser";
 import { LuxorPaymentSettings } from "@/lib/types/wallet";
@@ -22,6 +34,67 @@ interface Revenue24h {
   timestamp: string;
   dataSource: string;
 }
+
+interface Invoice {
+  id: string;
+  invoiceNumber: string;
+  customer: string;
+  amount: number;
+  status: "Paid" | "Pending" | "Overdue";
+  issuedDate: Date;
+  dueDate: Date;
+}
+
+// Placeholder invoice data
+const PLACEHOLDER_INVOICES: Invoice[] = [
+  {
+    id: "5",
+    invoiceNumber: "INV-2025-004",
+    customer: "Mining Ventures Inc",
+    amount: 22500,
+    status: "Pending",
+    issuedDate: new Date(2026, 0, 10),
+    dueDate: new Date(2026, 0, 25),
+  },
+
+  {
+    id: "4",
+    invoiceNumber: "INV-2025-002",
+    customer: "CryptoFlow Ltd",
+    amount: 8500,
+    status: "Pending",
+    issuedDate: new Date(2026, 0, 5),
+    dueDate: new Date(2026, 0, 20),
+  },
+
+  {
+    id: "3",
+    invoiceNumber: "INV-2025-005",
+    customer: "Digital Assets Group",
+    amount: 18750,
+    status: "Paid",
+    issuedDate: new Date(2025, 11, 20),
+    dueDate: new Date(2026, 0, 5),
+  },
+  {
+    id: "2",
+    invoiceNumber: "INV-2025-003",
+    customer: "BitHash Solutions",
+    amount: 12000,
+    status: "Overdue",
+    issuedDate: new Date(2025, 11, 15),
+    dueDate: new Date(2026, 0, 10),
+  },
+  {
+    id: "1",
+    invoiceNumber: "INV-2025-001",
+    customer: "TechMine Corp",
+    amount: 15000,
+    status: "Paid",
+    issuedDate: new Date(2025, 11, 1),
+    dueDate: new Date(2025, 11, 15),
+  },
+];
 
 export default function WalletPage() {
   const [summary, setSummary] = useState<EarningsSummary | null>(null);
@@ -183,6 +256,15 @@ export default function WalletPage() {
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
       .join(" ");
   };
+
+  let payoutDate = new Date();
+  let twoHoursLaterPayoutDate = new Date();
+  if (walletSettings?.next_payout_at !== undefined) {
+    payoutDate = new Date(walletSettings.next_payout_at);
+    twoHoursLaterPayoutDate = new Date(
+      payoutDate.getTime() + 2 * 60 * 60 * 1000,
+    );
+  }
 
   const { btcLiveData, BtcLivePriceComponent } = useBitcoinLivePrice();
 
@@ -472,21 +554,23 @@ export default function WalletPage() {
             ) : walletSettings?.next_payout_at ? (
               <Box sx={{ mt: 1 }}>
                 <Typography variant="h6" fontWeight="bold">
-                  {new Date(walletSettings.next_payout_at).toLocaleDateString(
-                    "en-US",
-                    {
-                      weekday: "short",
-                      month: "short",
-                      day: "numeric",
-                      year: "numeric",
-                    },
-                  )}
+                  {payoutDate.toLocaleDateString("en-US", {
+                    weekday: "short",
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  })}
                 </Typography>
                 <Typography variant="body2" sx={{ mt: 0.5, opacity: 0.9 }}>
-                  {new Date(walletSettings.next_payout_at).toLocaleTimeString(
-                    "en-US",
-                    { hour: "2-digit", minute: "2-digit" },
-                  )}
+                  {payoutDate.toLocaleTimeString("en-US", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}{" "}
+                  -{" "}
+                  {twoHoursLaterPayoutDate.toLocaleTimeString("en-US", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
                 </Typography>
               </Box>
             ) : (

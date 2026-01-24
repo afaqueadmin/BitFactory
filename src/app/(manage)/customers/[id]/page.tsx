@@ -318,6 +318,15 @@ export default function CustomerDetailPage() {
       .join(" ");
   };
 
+  let payoutDate = new Date();
+  let twoHoursLaterPayoutDate = new Date();
+  if (walletSettings?.next_payout_at !== undefined) {
+    payoutDate = new Date(walletSettings.next_payout_at);
+    twoHoursLaterPayoutDate = new Date(
+      payoutDate.getTime() + 2 * 60 * 60 * 1000,
+    );
+  }
+
   const { btcLiveData, BtcLivePriceComponent } = useBitcoinLivePrice();
   return (
     <Box
@@ -620,9 +629,7 @@ export default function CustomerDetailPage() {
                 ) : walletSettings?.next_payout_at ? (
                   <Box sx={{ mt: 1 }}>
                     <Typography variant="h6" fontWeight="bold">
-                      {new Date(
-                        walletSettings.next_payout_at,
-                      ).toLocaleDateString("en-US", {
+                      {payoutDate.toLocaleDateString("en-US", {
                         weekday: "short",
                         month: "short",
                         day: "numeric",
@@ -630,12 +637,14 @@ export default function CustomerDetailPage() {
                       })}
                     </Typography>
                     <Typography variant="body2" sx={{ mt: 0.5, opacity: 0.9 }}>
-                      {new Date(
-                        walletSettings.next_payout_at,
-                      ).toLocaleTimeString("en-US", {
+                      {payoutDate.toLocaleTimeString("en-US", {
                         hour: "2-digit",
                         minute: "2-digit",
-                        second: "2-digit",
+                      })}{" "}
+                      -{" "}
+                      {twoHoursLaterPayoutDate.toLocaleTimeString("en-US", {
+                        hour: "2-digit",
+                        minute: "2-digit",
                       })}
                     </Typography>
                   </Box>
