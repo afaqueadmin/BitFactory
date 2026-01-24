@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   Box,
   Typography,
@@ -15,6 +15,7 @@ import {
   CircularProgress,
 } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import { useQuery } from "@tanstack/react-query";
 
 // Types
 interface Hardware {
@@ -61,15 +62,12 @@ export default function HostedMinersList({
 }: HostedMinersListProps) {
   const theme = useTheme();
   const [activeFilter, setActiveFilter] = useState<FilterType>("ALL MINERS");
-  const [miners, setMiners] = useState<MinerData[]>([]);
-  const [loading, setLoading] = useState(true);
 
-  // Fetch miners from API and enrich with Luxor worker status
-  useEffect(() => {
-    const fetchMiners = async () => {
+  // TanStack Query hook to fetch and transform miners
+  const { data: miners = [], isLoading: loading } = useQuery({
+    queryKey: ["miners", customerId],
+    queryFn: async () => {
       try {
-        setLoading(true);
-
         // Step 1: Fetch miners from database
         const minerUrl = customerId
           ? `/api/miners/user?customerId=${customerId}`
@@ -84,8 +82,7 @@ export default function HostedMinersList({
 
         if (!minerResponse.ok) {
           console.error("Failed to fetch miners from API");
-          setMiners([]);
-          return;
+          return [];
         }
 
         const minerData = await minerResponse.json();
@@ -95,8 +92,7 @@ export default function HostedMinersList({
           !Array.isArray(minerData.miners) ||
           minerData.miners.length === 0
         ) {
-          setMiners([]);
-          return;
+          return [];
         }
 
         // Step 2: Fetch worker status from Luxor API
@@ -182,21 +178,17 @@ export default function HostedMinersList({
           },
         );
 
-        // Remove duplicates based on ID
-        const uniqueMiners = Array.from(
+        // Remove duplicates based on ID and return
+        return Array.from(
           new Map(transformedMiners.map((m) => [m.id, m])).values(),
         );
-        setMiners(uniqueMiners);
       } catch (err) {
         console.error("Error fetching miners:", err);
-        setMiners([]);
-      } finally {
-        setLoading(false);
+        return [];
       }
-    };
-
-    fetchMiners();
-  }, [customerId]);
+    },
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  });
 
   // Filter miners based on active filter
   const filteredMiners = miners.filter((miner) => {

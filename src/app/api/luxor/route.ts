@@ -319,7 +319,11 @@ export async function GET(
   try {
     // ✅ STEP 1: Authenticate the user
     console.log("[Luxor Proxy V2] GET: Authenticating user...");
-    let user;
+    let user: {
+      userId: string;
+      role: string;
+      luxorSubaccountName: string | null;
+    };
     try {
       user = await extractUserFromToken(request);
       console.log(`[Luxor Proxy V2] GET: User authenticated: ${user.userId}`);
@@ -365,7 +369,7 @@ export async function GET(
     const currency = searchParams.get("currency");
     const siteId =
       searchParams.get("site_id") || process.env.LUXOR_FIXED_SITE_ID;
-    const subaccountName = searchParams.get("subaccount_name");
+    const subaccountName = searchParams.get("subaccount_name") || undefined;
 
     console.log("[Luxor Proxy V2] GET: Built query params:", queryParams);
 
@@ -542,7 +546,7 @@ export async function GET(
             `[Luxor Proxy V2] GET: Getting payment settings for ${currency}`,
           );
           data = await luxorClient.getPaymentSettings(currency, {
-            subaccount_names: searchParams.get("subaccount_names") || undefined,
+            subaccount_names: subaccountName,
             site_id: siteId || undefined,
             page_number: searchParams.get("page_number")
               ? parseInt(searchParams.get("page_number")!)
@@ -568,7 +572,7 @@ export async function GET(
             `[Luxor Proxy V2] GET: Getting transactions for ${currency}`,
           );
           data = await luxorClient.getTransactions(currency, {
-            subaccount_names: searchParams.get("subaccount_names") || undefined,
+            subaccount_names: subaccountName,
             site_id: siteId || undefined,
             start_date: searchParams.get("start_date") || undefined,
             end_date: searchParams.get("end_date") || undefined,
@@ -595,8 +599,13 @@ export async function GET(
           }
           console.log(`[Luxor Proxy V2] GET: Getting workers for ${currency}`);
           data = await luxorClient.getWorkers(currency, {
-            // subaccount_names: searchParams.get("subaccount_names") || undefined,
-            site_id: siteId,
+            subaccount_names:
+              user.role === "CLIENT" && user.luxorSubaccountName
+                ? user.luxorSubaccountName
+                : undefined,
+            site_id: ["ADMIN", "SUPER_ADMIN"].includes(user.role)
+              ? siteId
+              : undefined,
             status: searchParams.get("status") || undefined,
             page_number: searchParams.get("page_number")
               ? parseInt(searchParams.get("page_number")!)
@@ -619,7 +628,7 @@ export async function GET(
           }
           console.log(`[Luxor Proxy V2] GET: Getting revenue for ${currency}`);
           data = await luxorClient.getRevenue(currency, {
-            subaccount_names: searchParams.get("subaccount_names") || undefined,
+            subaccount_names: subaccountName,
             site_id: siteId || undefined,
             start_date: searchParams.get("start_date") || undefined,
             end_date: searchParams.get("end_date") || undefined,
@@ -641,7 +650,7 @@ export async function GET(
             `[Luxor Proxy V2] GET: Getting active workers for ${currency}`,
           );
           data = await luxorClient.getActiveWorkers(currency, {
-            subaccount_names: searchParams.get("subaccount_names") || undefined,
+            subaccount_names: subaccountName,
             site_id: siteId || undefined,
             start_date: searchParams.get("start_date") || undefined,
             end_date: searchParams.get("end_date") || undefined,
@@ -670,7 +679,7 @@ export async function GET(
             `[Luxor Proxy V2] GET: Getting hashrate efficiency for ${currency}`,
           );
           data = await luxorClient.getHashrateEfficiency(currency, {
-            subaccount_names: searchParams.get("subaccount_names") || undefined,
+            subaccount_names: subaccountName,
             site_id: siteId || undefined,
             start_date: searchParams.get("start_date") || undefined,
             end_date: searchParams.get("end_date") || undefined,
@@ -745,7 +754,7 @@ export async function GET(
           }
           console.log(`[Luxor Proxy V2] GET: Getting uptime for ${currency}`);
           data = await luxorClient.getUptime(currency, {
-            subaccount_names: searchParams.get("subaccount_names") || undefined,
+            subaccount_names: subaccountName,
             site_id: siteId || undefined,
             start_date: searchParams.get("start_date") || undefined,
             end_date: searchParams.get("end_date") || undefined,
@@ -788,17 +797,16 @@ export async function GET(
           console.log(`[Luxor Proxy V2] GET: Getting summary for ${currency}`);
           // NOTE: Luxor API requires exactly ONE of subaccount_names or site_id, not both
           // Prefer subaccount_names if provided, otherwise use site_id
-          const subaccountNamesParam = searchParams.get("subaccount_names");
           data = await luxorClient.getSummary(currency, {
-            subaccount_names: subaccountNamesParam || undefined,
-            site_id: subaccountNamesParam ? undefined : siteId || undefined,
+            subaccount_names: subaccountName,
+            site_id: subaccountName ? undefined : siteId || undefined,
           });
           break;
 
         case "dev-fee":
           console.log("[Luxor Proxy V2] GET: Getting dev fee data");
           data = await luxorClient.getDevFee({
-            subaccount_names: searchParams.get("subaccount_names") || undefined,
+            subaccount_names: subaccountName,
             site_id: siteId || undefined,
             start_date: searchParams.get("start_date") || undefined,
             end_date: searchParams.get("end_date") || undefined,
