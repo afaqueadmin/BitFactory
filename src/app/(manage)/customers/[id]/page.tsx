@@ -645,7 +645,15 @@ export default function CustomerDetailPage() {
                       {twoHoursLaterPayoutDate.toLocaleTimeString("en-US", {
                         hour: "2-digit",
                         minute: "2-digit",
-                      })}
+                      })}{" "}
+                      (
+                      {new Intl.DateTimeFormat("en-US", {
+                        timeZoneName: "shortOffset",
+                      })
+                        .formatToParts(payoutDate)
+                        .find((part) => part.type === "timeZoneName")?.value ||
+                        "GMT"}
+                      )
                     </Typography>
                   </Box>
                 ) : (

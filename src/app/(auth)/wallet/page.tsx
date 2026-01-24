@@ -13,6 +13,7 @@ import {
   TableHead,
   TableRow,
   Chip,
+  useTheme,
 } from "@mui/material";
 import ElectricityCostTable from "@/components/ElectricityCostTable";
 import { useUser } from "@/lib/hooks/useUser";
@@ -108,6 +109,7 @@ export default function WalletPage() {
   const [revenue24hError, setRevenue24hError] = useState<string | null>(null);
   const [walletError, setWalletError] = useState<string | null>(null);
   const { user } = useUser();
+  const theme = useTheme();
 
   // // Fetch BTC price using TanStack Query
   // const { data: btcLiveData, isLoading: btcPriceLoading, error: btcPriceError } = useQuery<BtcPrice>({
@@ -570,7 +572,15 @@ export default function WalletPage() {
                   {twoHoursLaterPayoutDate.toLocaleTimeString("en-US", {
                     hour: "2-digit",
                     minute: "2-digit",
-                  })}
+                  })}{" "}
+                  (
+                  {new Intl.DateTimeFormat("en-US", {
+                    timeZoneName: "shortOffset",
+                  })
+                    .formatToParts(payoutDate)
+                    .find((part) => part.type === "timeZoneName")?.value ||
+                    "GMT"}
+                  )
                 </Typography>
               </Box>
             ) : (
