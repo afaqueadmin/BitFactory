@@ -89,10 +89,12 @@ export const sendInvoiceEmail = async (
     });
   };
 
+  const ccInvoicesEmail = process.env.CC_INVOICES_EMAIL;
   const mailOptions = {
     from:
       `BitFactory Admin <${process.env.SMTP_FROM}>` || "noreply@bitfactory.com",
     to: email,
+    cc: ccInvoicesEmail,
     subject: `Invoice ${invoiceNumber} from BitFactory`,
     html: `
       <h1>Invoice Notification</h1>
@@ -121,7 +123,7 @@ export const sendInvoiceEmail = async (
       <p>Please log in to your BitFactory account to view the complete invoice details.</p>
       <p><strong>Login URL:</strong> <a href="https://my.bitfactory.ae" target="_blank">my.bitfactory.ae</a></p>
       <br>
-      <p>If you have any questions about this invoice, please contact our support team.</p>
+      <p>If you have any questions about this invoice, please contact our invoices team at <a href="mailto:${ccInvoicesEmail}">${ccInvoicesEmail}</a>.</p>
       <br>
       <p>Best regards,</p>
       <p>The BitFactory Team</p>

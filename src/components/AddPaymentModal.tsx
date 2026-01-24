@@ -113,7 +113,7 @@ export default function AddPaymentModal({
           alignItems: "center",
         }}
       >
-        Add Payment
+        Startup Payment
         <IconButton
           onClick={handleClose}
           sx={{
@@ -175,7 +175,7 @@ export default function AddPaymentModal({
             {loading ? (
               <CircularProgress size={24} color="inherit" />
             ) : (
-              "Add Payment"
+              "Startup Payment"
             )}
           </Button>
         </DialogActions>
