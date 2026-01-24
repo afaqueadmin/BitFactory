@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   Box,
@@ -11,6 +11,7 @@ import {
   Button,
 } from "@mui/material";
 import { ArrowBack as ArrowBackIcon } from "@mui/icons-material";
+import { useQuery } from "@tanstack/react-query";
 import ElectricityCostTable from "@/components/ElectricityCostTable";
 import HostedMinersList from "@/components/HostedMinersList";
 import BalanceCard from "@/components/dashboardCards/BalanceCard";
@@ -110,20 +111,190 @@ export default function CustomerDetailPage() {
   const router = useRouter();
   const customerId = params.id as string;
 
-  const [customer, setCustomer] = useState<CustomerDetails | null>(null);
-  const [customerLoading, setCustomerLoading] = useState(true);
-  const [customerError, setCustomerError] = useState<string | null>(null);
-  const [balance, setBalance] = React.useState<number>(0);
-  const [balanceLoading, setBalanceLoading] = React.useState(true);
-  const [dailyCost, setDailyCost] = React.useState<number>(0);
-  const [dailyCostLoading, setDailyCostLoading] = React.useState(true);
-  const [summary, setSummary] = useState<EarningsSummary | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [walletSettings, setWalletSettings] =
-    useState<LuxorPaymentSettings | null>(null);
-  const [walletLoading, setWalletLoading] = useState(false);
-  const [walletError, setWalletError] = useState<string | null>(null);
+  // Fetch customer details
+  const {
+    data: customer,
+    isLoading: customerLoading,
+    error: customerError,
+  } = useQuery<CustomerDetails>({
+    queryKey: ["customer", customerId],
+    queryFn: async () => {
+      try {
+        const response = await fetch(
+          `/api/user/profile?customerId=${customerId}`,
+        );
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch customer details");
+        }
+
+        const { user } = await response.json();
+        console.log(user);
+        return {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          city: user.city || "",
+          country: user.country || "",
+          phoneNumber: user.phoneNumber || "",
+          companyName: user.companyName || "",
+          luxorSubaccountName: user.luxorSubaccountName || "",
+          streetAddress: user.streetAddress || "",
+          twoFactorEnabled: user.twoFactorEnabled || false,
+          joinDate: user.joinDate || "",
+          miners: user.miners || 0,
+          status: user.status || "active",
+          isDeleted: user.isDeleted,
+        };
+      } catch (error) {
+        throw error instanceof Error ? error : new Error("Unknown error");
+      }
+    },
+    staleTime: 1000 * 60 * 5, // 5 minutes
+    enabled: !!customerId,
+  });
+
+  // Fetch balance
+  const { data: balanceData, isLoading: balanceLoading } = useQuery<{
+    balance: number;
+  }>({
+    queryKey: ["balance", customerId],
+    queryFn: async () => {
+      try {
+        const response = await fetch(
+          `/api/user/balance?customerId=${customerId}`,
+          {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+            },
+          },
+        );
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch balance");
+        }
+
+        const data = await response.json();
+        return { balance: data.balance || 0 };
+      } catch (error) {
+        console.error("Error fetching balance:", error);
+        return { balance: 0 };
+      }
+    },
+    staleTime: 1000 * 60 * 5, // 5 minutes
+    enabled: !!customerId,
+  });
+
+  // Fetch daily costs
+  const { data: dailyCostsData, isLoading: dailyCostLoading } = useQuery<{
+    totalDailyCost: number;
+  }>({
+    queryKey: ["dailyCosts", customerId],
+    queryFn: async () => {
+      try {
+        const response = await fetch(
+          `/api/miners/daily-costs?customerId=${customerId}`,
+          {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+            },
+          },
+        );
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch daily costs");
+        }
+
+        const data = await response.json();
+        return { totalDailyCost: data.totalDailyCost || 0 };
+      } catch (err) {
+        console.error("Error fetching daily costs:", err);
+        return { totalDailyCost: 0 };
+      }
+    },
+    staleTime: 1000 * 60 * 5, // 5 minutes
+    enabled: !!customerId,
+  });
+
+  // Fetch earnings summary
+  const {
+    data: summary,
+    isLoading,
+    error,
+  } = useQuery<EarningsSummary>({
+    queryKey: ["earningsSummary", customerId],
+    queryFn: async () => {
+      try {
+        const response = await fetch(
+          `/api/wallet/earnings-summary?customerId=${customerId}`,
+        );
+
+        if (!response.ok) {
+          throw new Error(
+            `Failed to fetch earnings summary: ${response.statusText}`,
+          );
+        }
+
+        const data: EarningsSummary = await response.json();
+        console.log("[Wallet] Earnings summary loaded:", data);
+        return data;
+      } catch (error) {
+        throw error instanceof Error ? error : new Error("Unknown error");
+      }
+    },
+    staleTime: 1000 * 60 * 5, // 5 minutes
+    enabled: !!customerId,
+  });
+
+  // Fetch wallet settings
+  const {
+    data: walletSettings,
+    isLoading: walletLoading,
+    error: walletError,
+  } = useQuery<LuxorPaymentSettings>({
+    queryKey: ["walletSettings", customerId],
+    queryFn: async () => {
+      try {
+        const response = await fetch(
+          `/api/wallet/settings?currency=BTC&customerId=${customerId}`,
+          {
+            credentials: "include",
+            headers: {
+              "Cache-Control": "no-cache",
+            },
+          },
+        );
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(
+            errorData.error ||
+              `Failed to fetch wallet settings: ${response.statusText}`,
+          );
+        }
+
+        const data = await response.json();
+        if (data.success && data.data) {
+          console.log("[Wallet] Settings loaded from Luxor:", data.data);
+          return data.data;
+        } else {
+          throw new Error(
+            data.error || "Invalid response from wallet settings endpoint",
+          );
+        }
+      } catch (error) {
+        throw error instanceof Error ? error : new Error("Unknown error");
+      }
+    },
+    staleTime: 1000 * 60 * 5, // 5 minutes
+    enabled: !!customerId,
+  });
+
+  const balance = balanceData?.balance || 0;
+  const dailyCost = dailyCostsData?.totalDailyCost || 0;
 
   const estimatedMonthlyCost = React.useMemo(() => {
     if (dailyCostLoading) return 0;
@@ -146,212 +317,6 @@ export default function CustomerDetailPage() {
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
       .join(" ");
   };
-
-  // Fetch customer details
-  useEffect(() => {
-    const fetchCustomer = async () => {
-      try {
-        setCustomerLoading(true);
-        setCustomerError(null);
-
-        const response = await fetch(
-          `/api/user/profile?customerId=${customerId}`,
-        );
-
-        if (!response.ok) {
-          setCustomerError("Failed to fetch customer details");
-          return;
-        }
-
-        const { user } = await response.json();
-        console.log(user);
-        setCustomer({
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-          city: user.city || "",
-          country: user.country || "",
-          phoneNumber: user.phoneNumber || "",
-          companyName: user.companyName || "",
-          luxorSubaccountName: user.luxorSubaccountName || "",
-          streetAddress: user.streetAddress || "",
-          twoFactorEnabled: user.twoFactorEnabled || false,
-          joinDate: user.joinDate || "",
-          miners: user.miners || 0,
-          status: user.status || "active",
-          isDeleted: user.isDeleted,
-        });
-      } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : "Unknown error";
-        console.error("Error fetching customer:", error);
-        setCustomerError(errorMessage);
-      } finally {
-        setCustomerLoading(false);
-      }
-    };
-
-    if (customerId) {
-      fetchCustomer();
-    }
-  }, [customerId]);
-
-  // Fetch daily costs on component mount
-  React.useEffect(() => {
-    const fetchDailyCosts = async () => {
-      try {
-        setDailyCostLoading(true);
-        const response = await fetch(
-          `/api/miners/daily-costs?customerId=${customerId}`,
-          {
-            method: "GET",
-            headers: {
-              "Content-Type": "application/json",
-            },
-          },
-        );
-
-        if (!response.ok) {
-          console.error("Failed to fetch daily costs");
-          setDailyCost(0);
-          return;
-        }
-
-        const data = await response.json();
-        setDailyCost(data.totalDailyCost || 0);
-      } catch (err) {
-        console.error("Error fetching daily costs:", err);
-        setDailyCost(0);
-      } finally {
-        setDailyCostLoading(false);
-      }
-    };
-
-    if (customerId) {
-      fetchDailyCosts();
-    }
-  }, [customerId]);
-
-  // Fetch balance on component mount
-  React.useEffect(() => {
-    const fetchBalance = async () => {
-      try {
-        setBalanceLoading(true);
-        const response = await fetch(
-          `/api/user/balance?customerId=${customerId}`,
-          {
-            method: "GET",
-            headers: {
-              "Content-Type": "application/json",
-            },
-          },
-        );
-
-        if (!response.ok) {
-          console.error("Failed to fetch balance");
-          setBalance(0);
-          return;
-        }
-
-        const data = await response.json();
-        setBalance(data.balance || 0);
-      } catch (err) {
-        console.error("Error fetching balance:", err);
-        setBalance(0);
-      } finally {
-        setBalanceLoading(false);
-      }
-    };
-
-    if (customerId) {
-      fetchBalance();
-    }
-  }, [customerId]);
-
-  useEffect(() => {
-    // Fetch earnings summary from API
-    const fetchEarningsSummary = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-
-        const response = await fetch(
-          `/api/wallet/earnings-summary?customerId=${customerId}`,
-        );
-
-        if (!response.ok) {
-          setError(`Failed to fetch earnings summary: ${response.statusText}`);
-          return;
-        }
-
-        const data: EarningsSummary = await response.json();
-        setSummary(data);
-        console.log("[Wallet] Earnings summary loaded:", data);
-      } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : "Unknown error";
-        console.error("[Wallet] Error fetching earnings summary:", error);
-        setError(errorMessage);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    // Call the API immediately on component mount
-    if (customerId) {
-      fetchEarningsSummary();
-    }
-  }, [customerId]);
-
-  // Fetch wallet settings from Luxor API
-  useEffect(() => {
-    const fetchWalletSettings = async () => {
-      try {
-        setWalletLoading(true);
-        setWalletError(null);
-
-        const response = await fetch(
-          `/api/wallet/settings?currency=BTC&customerId=${customerId}`,
-          {
-            credentials: "include",
-            headers: {
-              "Cache-Control": "no-cache",
-            },
-          },
-        );
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(
-            errorData.error ||
-              `Failed to fetch wallet settings: ${response.statusText}`,
-          );
-        }
-
-        const data = await response.json();
-        if (data.success && data.data) {
-          setWalletSettings(data.data);
-          console.log("[Wallet] Settings loaded from Luxor:", data.data);
-        } else {
-          throw new Error(
-            data.error || "Invalid response from wallet settings endpoint",
-          );
-        }
-      } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : "Unknown error";
-        console.error("[Wallet] Error fetching wallet settings:", error);
-        setWalletError(errorMessage);
-      } finally {
-        setWalletLoading(false);
-      }
-    };
-
-    if (customerId) {
-      fetchWalletSettings();
-    }
-  }, [customerId]);
 
   const { btcLiveData, BtcLivePriceComponent } = useBitcoinLivePrice();
   return (
@@ -381,7 +346,7 @@ export default function CustomerDetailPage() {
         </Box>
       ) : customerError || !customer ? (
         <Alert severity="error">
-          {customerError || "Failed to load customer details"}
+          {customerError?.message || "Failed to load customer details"}
         </Alert>
       ) : (
         <>
@@ -433,7 +398,8 @@ export default function CustomerDetailPage() {
               }}
             >
               <Typography variant="body2">
-                <strong>Error loading earnings:</strong> {error}
+                <strong>Error loading earnings:</strong>{" "}
+                {error?.message || "An error occurred"}
               </Typography>
             </Paper>
           )}
