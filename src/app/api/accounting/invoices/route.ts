@@ -36,10 +36,9 @@ export async function GET(request: NextRequest) {
     if (customerId) where.userId = customerId;
     if (status) {
       where.status = status as InvoiceStatus;
-    } else {
-      // Exclude CANCELLED invoices by default (show only active invoices)
-      where.status = { not: InvoiceStatus.CANCELLED };
     }
+    // Note: CANCELLED invoices are now included in the dashboard table
+    // They won't affect calculations (amount, outstanding, etc) as they're already excluded from those queries
 
     const skip = (page - 1) * limit;
 
