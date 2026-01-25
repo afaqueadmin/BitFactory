@@ -107,22 +107,24 @@ export function useDashboardStats() {
 
       const recurringData: RecurringResponse = await recurringRes.json();
 
-      // Calculate stats from invoices (excluding CANCELLED)
-      const invoices = (invoicesData.invoices || []).filter(
+      // All invoices for counts (including CANCELLED)
+      const allInvoices = invoicesData.invoices || [];
+      // Non-cancelled invoices for financial calculations only
+      const activeInvoices = allInvoices.filter(
         (inv: InvoiceData) => inv.status !== InvoiceStatus.CANCELLED,
       );
       const now = new Date();
 
       const stats: DashboardStats = {
-        totalInvoices: invoices.length,
-        unpaidInvoices: invoices.filter(
+        totalInvoices: allInvoices.length,
+        unpaidInvoices: allInvoices.filter(
           (inv: InvoiceData) => inv.status !== InvoiceStatus.PAID,
         ).length,
-        overdueInvoices: invoices.filter(
+        overdueInvoices: allInvoices.filter(
           (inv: InvoiceData) =>
             inv.status !== InvoiceStatus.PAID && new Date(inv.dueDate) < now,
         ).length,
-        totalOutstanding: invoices
+        totalOutstanding: activeInvoices
           .filter((inv: InvoiceData) => inv.status !== InvoiceStatus.PAID)
           .reduce(
             (sum: number, inv: InvoiceData) => sum + Number(inv.totalAmount),
@@ -134,7 +136,7 @@ export function useDashboardStats() {
             (r: RecurringInvoiceData) => r.isActive,
           ).length,
         },
-        upcomingInvoices: invoices
+        upcomingInvoices: activeInvoices
           .filter((inv: InvoiceData) => new Date(inv.dueDate) >= now)
           .sort(
             (a: InvoiceData, b: InvoiceData) =>
@@ -159,7 +161,7 @@ export function useDashboardStats() {
               status: inv.status as InvoiceStatus,
             };
           }),
-        recentInvoices: invoices
+        recentInvoices: activeInvoices
           .sort(
             (a: InvoiceData, b: InvoiceData) =>
               new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
