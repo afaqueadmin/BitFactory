@@ -41,6 +41,7 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EmailIcon from "@mui/icons-material/Email";
+import CancelIcon from "@mui/icons-material/Cancel";
 
 function formatAuditAction(action: string): string {
   const actionMap: { [key: string]: string } = {
@@ -79,6 +80,11 @@ export default function InvoiceDetailPage() {
   );
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
   const [emailDialogError, setEmailDialogError] = useState<string | null>(null);
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [cancelDialogError, setCancelDialogError] = useState<string | null>(
+    null,
+  );
+  const [cancelLoading, setCancelLoading] = useState(false);
 
   const isAdmin = user?.role === "ADMIN" || user?.role === "SUPER_ADMIN";
 
@@ -121,6 +127,35 @@ export default function InvoiceDetailPage() {
       setEmailDialogError(
         err instanceof Error ? err.message : "Failed to send email",
       );
+    }
+  };
+
+  // Handle invoice cancellation (ISSUED invoices only)
+  const handleCancelInvoice = async () => {
+    try {
+      setCancelDialogError(null);
+      setCancelLoading(true);
+
+      const response = await fetch(`/api/accounting/invoices/${invoice!.id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to cancel invoice");
+      }
+
+      setCancelDialogOpen(false);
+      // Reload to show updated invoice status
+      window.location.reload();
+    } catch (err) {
+      setCancelDialogError(
+        err instanceof Error ? err.message : "Failed to cancel invoice",
+      );
+    } finally {
+      setCancelLoading(false);
     }
   };
 
@@ -212,6 +247,16 @@ export default function InvoiceDetailPage() {
               onClick={() => setEmailDialogOpen(true)}
             >
               Send Email
+            </Button>
+          )}
+          {invoice.status === "ISSUED" && (
+            <Button
+              startIcon={<CancelIcon />}
+              variant="outlined"
+              color="warning"
+              onClick={() => setCancelDialogOpen(true)}
+            >
+              Cancel Invoice
             </Button>
           )}
           <Button
@@ -633,6 +678,44 @@ export default function InvoiceDetailPage() {
             disabled={emailLoading}
           >
             {emailLoading ? "Sending..." : "Send Email"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+      {/* Cancel Invoice Confirmation Dialog */}
+      <Dialog
+        open={cancelDialogOpen}
+        onClose={() => setCancelDialogOpen(false)}
+      >
+        <DialogTitle>Cancel Invoice</DialogTitle>
+        <DialogContent>
+          <Box sx={{ pt: 2 }}>
+            {cancelDialogError && (
+              <Alert severity="error" sx={{ mb: 2 }}>
+                {cancelDialogError}
+              </Alert>
+            )}
+            <Typography sx={{ mb: 2 }}>
+              Are you sure you want to cancel this invoice? The invoice status
+              will be changed to &quot;Cancelled&quot; and a cancellation
+              notification will be sent to the customer. No payment will be
+              required.
+            </Typography>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => setCancelDialogOpen(false)}
+            disabled={cancelLoading}
+          >
+            Keep Invoice
+          </Button>
+          <Button
+            onClick={handleCancelInvoice}
+            variant="contained"
+            color="warning"
+            disabled={cancelLoading}
+          >
+            {cancelLoading ? "Cancelling..." : "Cancel Invoice"}
           </Button>
         </DialogActions>
       </Dialog>{" "}

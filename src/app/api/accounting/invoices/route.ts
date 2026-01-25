@@ -34,7 +34,12 @@ export async function GET(request: NextRequest) {
 
     const where: Record<string, unknown> = {};
     if (customerId) where.userId = customerId;
-    if (status) where.status = status as InvoiceStatus;
+    if (status) {
+      where.status = status as InvoiceStatus;
+    } else {
+      // Exclude CANCELLED invoices by default (show only active invoices)
+      where.status = { not: InvoiceStatus.CANCELLED };
+    }
 
     const skip = (page - 1) * limit;
 

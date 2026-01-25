@@ -36,10 +36,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Fetch all invoices
+    // Fetch all invoices (excluding CANCELLED)
     const invoices = await prisma.invoice.findMany({
       where: {
         id: { in: invoiceIds },
+        status: { not: "CANCELLED" },
       },
       include: {
         user: {

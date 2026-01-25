@@ -387,6 +387,7 @@ enum NotificationType {
   OVERDUE_REMINDER
   PAYMENT_RECEIVED
   INVOICE_VIEWED
+  INVOICE_CANCELLED
 }
 
 enum NotificationStatus {

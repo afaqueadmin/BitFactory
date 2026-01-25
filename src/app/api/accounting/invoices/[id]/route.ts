@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
 import { AuditAction, InvoiceStatus } from "@/generated/prisma";
-import { sendInvoiceEmail } from "@/lib/email";
+import { sendInvoiceEmail, sendInvoiceCancellationEmail } from "@/lib/email";
 
 export async function GET(
   request: NextRequest,
@@ -289,6 +289,129 @@ export async function PUT(
     console.error("Update invoice error:", error);
     return NextResponse.json(
       { error: "Failed to update invoice" },
+      { status: 500 },
+    );
+  }
+}
+
+// POST: Cancel an ISSUED invoice
+// Only ISSUED invoices can be cancelled (DRAFT invoices should be deleted)
+// Prevents cancelling already PAID invoices
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    const { id } = await params;
+    const token = request.cookies.get("token")?.value;
+
+    if (!token) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const decoded = await verifyJwtToken(token);
+    const userId = decoded.userId;
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true, email: true },
+    });
+
+    if (user?.role !== "ADMIN" && user?.role !== "SUPER_ADMIN") {
+      return NextResponse.json(
+        { error: "Only administrators can cancel invoices" },
+        { status: 403 },
+      );
+    }
+
+    const invoice = await prisma.invoice.findUnique({
+      where: { id },
+      include: {
+        user: { select: { id: true, email: true, name: true } },
+      },
+    });
+
+    if (!invoice) {
+      return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
+    }
+
+    // Only allow cancelling ISSUED invoices
+    if (invoice.status !== InvoiceStatus.ISSUED) {
+      return NextResponse.json(
+        {
+          error:
+            "Only ISSUED invoices can be cancelled. DRAFT invoices should be deleted.",
+        },
+        { status: 400 },
+      );
+    }
+
+    // Update invoice status to CANCELLED
+    const cancelledInvoice = await prisma.invoice.update({
+      where: { id },
+      data: {
+        status: InvoiceStatus.CANCELLED,
+        updatedBy: userId,
+      },
+      include: {
+        user: { select: { id: true, email: true, name: true } },
+      },
+    });
+
+    // Log audit - default reason: "Invoice cancelled by admin"
+    await prisma.auditLog.create({
+      data: {
+        action: AuditAction.INVOICE_CANCELLED,
+        entityType: "Invoice",
+        entityId: invoice.id,
+        userId,
+        description: `Invoice ${invoice.invoiceNumber} cancelled by admin`,
+        changes: JSON.stringify({
+          status: { from: InvoiceStatus.ISSUED, to: InvoiceStatus.CANCELLED },
+          reason: "Invoice cancelled by admin",
+        }),
+      },
+    });
+
+    // Send cancellation email to customer (non-blocking)
+    if (invoice.user?.email) {
+      sendInvoiceCancellationEmail(
+        invoice.user.email,
+        invoice.user.name || "Valued Customer",
+        invoice.invoiceNumber,
+        Number(invoice.totalAmount),
+        invoice.dueDate || new Date(),
+      ).catch((err) => {
+        console.error(
+          `Failed to send cancellation email for ${invoice.invoiceNumber}:`,
+          err,
+        );
+      });
+
+      // Create notification record
+      try {
+        await prisma.invoiceNotification.create({
+          data: {
+            invoiceId: invoice.id,
+            notificationType: "INVOICE_CANCELLED",
+            sentTo: invoice.user.email,
+            sentAt: new Date(),
+            status: "SENT",
+          },
+        });
+      } catch (notificationErr) {
+        console.error(
+          `Failed to create cancellation notification:`,
+          notificationErr,
+        );
+      }
+    }
+
+    return NextResponse.json(cancelledInvoice);
+  } catch (error) {
+    console.error("Cancel invoice error:", error);
+    return NextResponse.json(
+      { error: "Failed to cancel invoice" },
       { status: 500 },
     );
   }

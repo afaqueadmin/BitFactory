@@ -141,6 +141,7 @@ export const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
   [NotificationType.OVERDUE_REMINDER]: "Overdue Reminder",
   [NotificationType.PAYMENT_RECEIVED]: "Payment Received",
   [NotificationType.INVOICE_VIEWED]: "Invoice Viewed",
+  [NotificationType.INVOICE_CANCELLED]: "Invoice Cancelled",
 };
 
 export const NOTIFICATION_EMAIL_SUBJECTS: Record<NotificationType, string> = {
@@ -150,6 +151,8 @@ export const NOTIFICATION_EMAIL_SUBJECTS: Record<NotificationType, string> = {
     "Payment Overdue - Immediate Action Required",
   [NotificationType.PAYMENT_RECEIVED]: "Payment Received - Thank You",
   [NotificationType.INVOICE_VIEWED]: "Your Invoice Has Been Viewed",
+  [NotificationType.INVOICE_CANCELLED]:
+    "Invoice Cancelled - No Payment Required",
 };
 
 // Retry configuration for failed email sends

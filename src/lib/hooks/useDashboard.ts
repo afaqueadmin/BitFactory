@@ -107,12 +107,14 @@ export function useDashboardStats() {
 
       const recurringData: RecurringResponse = await recurringRes.json();
 
-      // Calculate stats from invoices
-      const invoices = invoicesData.invoices || [];
+      // Calculate stats from invoices (excluding CANCELLED)
+      const invoices = (invoicesData.invoices || []).filter(
+        (inv: InvoiceData) => inv.status !== InvoiceStatus.CANCELLED,
+      );
       const now = new Date();
 
       const stats: DashboardStats = {
-        totalInvoices: invoicesData.pagination.total,
+        totalInvoices: invoices.length,
         unpaidInvoices: invoices.filter(
           (inv: InvoiceData) => inv.status !== InvoiceStatus.PAID,
         ).length,

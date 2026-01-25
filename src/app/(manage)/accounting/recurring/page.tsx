@@ -27,6 +27,7 @@ import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
 import { useRecurringInvoices } from "@/lib/hooks/useRecurringInvoices";
+import { useCustomers } from "@/lib/hooks/useInvoices";
 import { StatusBadge } from "@/components/accounting/common/StatusBadge";
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
 import { DateDisplay } from "@/components/accounting/common/DateDisplay";
@@ -34,6 +35,9 @@ import { DateDisplay } from "@/components/accounting/common/DateDisplay";
 export default function RecurringInvoicesPage() {
   const [page, setPage] = useState(1);
   const { recurringInvoices, loading, error } = useRecurringInvoices(page);
+  // Fetch customers for dropdown
+  const { customers, loading: customersLoading } = useCustomers();
+
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [openDialog, setOpenDialog] = useState(false);
   const [formData, setFormData] = useState({
@@ -73,6 +77,7 @@ export default function RecurringInvoicesPage() {
     setOpenDialog(false);
   };
 
+  // Handle changes to both customer dropdown and regular inputs
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     const numValue =
@@ -86,10 +91,19 @@ export default function RecurringInvoicesPage() {
     });
   };
 
+  // Handle customer selection from dropdown
+  const handleCustomerChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      customerId: value,
+    }));
+  };
+
   const handleSubmit = async () => {
     try {
       if (!formData.customerId) {
-        alert("Customer ID is required");
+        alert("Customer is required");
         return;
       }
       if (formData.dayOfMonth < 1 || formData.dayOfMonth > 31) {
@@ -275,14 +289,32 @@ export default function RecurringInvoicesPage() {
         <DialogTitle>Create Recurring Invoice</DialogTitle>
         <DialogContent sx={{ pt: 3 }}>
           <Stack spacing={2}>
+            {/* Customer dropdown - replaces text input for customer ID */}
             <TextField
-              label="Customer ID"
-              value={formData.customerId}
-              onChange={handleInputChange}
+              select
+              label="Select Customer"
               name="customerId"
+              value={formData.customerId}
+              onChange={handleCustomerChange}
               fullWidth
+              helperText="Select a customer with their subaccount (shown as: Name (Subaccount))"
+              disabled={customersLoading}
               required
-            />
+            >
+              <MenuItem value="">-- Select a Customer --</MenuItem>
+              {customers.map((customer) => (
+                <MenuItem key={customer.id} value={customer.id}>
+                  {customer.displayName}
+                </MenuItem>
+              ))}
+            </TextField>
+            {customersLoading && (
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <CircularProgress size={20} />
+                <span>Loading customers...</span>
+              </Box>
+            )}
+
             <TextField
               label="Day of Month (1-31)"
               type="number"

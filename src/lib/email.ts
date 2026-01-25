@@ -164,3 +164,39 @@ export const sendCronRunSuccessfulEmail = async (userCount: number) => {
     return { success: false, error };
   }
 };
+
+// Send invoice cancellation email
+export const sendInvoiceCancellationEmail = async (
+  email: string,
+  customerName: string,
+  invoiceNumber: string,
+  totalAmount: number,
+  dueDate: Date,
+) => {
+  const { generateInvoiceCancellationEmailHTML } = await import(
+    "./email-templates/cancellation-email"
+  );
+
+  const htmlContent = generateInvoiceCancellationEmailHTML(
+    customerName,
+    invoiceNumber,
+    totalAmount,
+    dueDate,
+  );
+
+  const mailOptions = {
+    from:
+      `BitFactory Admin <${process.env.SMTP_FROM}>` || "noreply@bitfactory.com",
+    to: email,
+    subject: `Invoice ${invoiceNumber} - Cancellation Notice`,
+    html: htmlContent,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    return { success: true };
+  } catch (error) {
+    console.error("Error sending invoice cancellation email:", error);
+    return { success: false, error };
+  }
+};

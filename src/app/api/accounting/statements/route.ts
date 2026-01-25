@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
+import { InvoiceStatus } from "@/generated/prisma";
 
 export async function GET(request: NextRequest) {
   try {
@@ -61,9 +62,12 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Get all invoices for the period
+    // Get all invoices for the period (excluding CANCELLED)
     const invoices = await prisma.invoice.findMany({
-      where,
+      where: {
+        ...where,
+        status: { not: InvoiceStatus.CANCELLED },
+      },
       include: {
         costPayments: true,
         notifications: true,
