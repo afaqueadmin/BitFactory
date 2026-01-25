@@ -43,7 +43,6 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EmailIcon from "@mui/icons-material/Email";
 import CancelIcon from "@mui/icons-material/Cancel";
-import { useReactToPrint } from "react-to-print";
 
 function formatAuditAction(action: string): string {
   const actionMap: { [key: string]: string } = {
@@ -133,13 +132,6 @@ export default function InvoiceDetailPage() {
     }
   };
 
-<<<<<<< HEAD
-  // Hook handles the print logic
-  const handlePrint = useReactToPrint({
-    contentRef: printableRef, // Link the hook to your targeted div
-    documentTitle: `Invoice-${invoice!.invoiceNumber}`, // Optional: set file name for PDF saving
-  });
-=======
   // Handle invoice cancellation (ISSUED invoices only)
   const handleCancelInvoice = async () => {
     try {
@@ -168,7 +160,6 @@ export default function InvoiceDetailPage() {
       setCancelLoading(false);
     }
   };
->>>>>>> 6704a73 (Add Cancel Invoice functionality to /accounting/[id] page)
 
   if (loading) {
     return (
@@ -273,12 +264,7 @@ export default function InvoiceDetailPage() {
           <Button
             startIcon={<DownloadIcon />}
             variant="contained"
-            // onClick={() => window.print()}
-            onClick={() => {
-              // setPrintMode(true);
-              handlePrint();
-              // setPrintMode(false);
-            }}
+            onClick={() => window.print()}
           >
             Download
           </Button>
