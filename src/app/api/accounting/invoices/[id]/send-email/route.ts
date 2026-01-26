@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
 import { AuditAction } from "@/generated/prisma";
-import { sendInvoiceEmail } from "@/lib/email";
+import {
+  sendInvoiceEmail,
+  generateInvoicePDF,
+  sendInvoiceEmailWithPDF,
+} from "@/lib/email";
 
 export async function POST(
   request: NextRequest,
@@ -55,15 +59,46 @@ export async function POST(
       );
     }
 
-    // Send invoice email using real email service
-    const emailResult = await sendInvoiceEmail(
-      invoice.user.email,
-      invoice.user.name || "Valued Customer",
-      invoice.invoiceNumber,
-      Number(invoice.totalAmount),
-      invoice.dueDate,
-      invoice.issuedDate || new Date(),
-    );
+    // Send invoice email with PDF attachment
+    let emailResult;
+    try {
+      const pdfBuffer = await generateInvoicePDF(
+        invoice.invoiceNumber,
+        invoice.user.name || "Valued Customer",
+        invoice.user.email,
+        Number(invoice.totalAmount),
+        invoice.issuedDate || new Date(),
+        invoice.dueDate,
+        invoice.totalMiners,
+        Number(invoice.unitPrice),
+        invoice.id,
+        new Date(),
+      );
+
+      emailResult = await sendInvoiceEmailWithPDF(
+        invoice.user.email,
+        invoice.user.name || "Valued Customer",
+        invoice.invoiceNumber,
+        Number(invoice.totalAmount),
+        invoice.issuedDate || new Date(),
+        invoice.dueDate,
+        invoice.totalMiners,
+        Number(invoice.unitPrice),
+        invoice.id,
+        pdfBuffer,
+      );
+    } catch (pdfError) {
+      console.error("Failed to generate PDF, trying without PDF:", pdfError);
+      // Fallback to simple email without PDF
+      emailResult = await sendInvoiceEmail(
+        invoice.user.email,
+        invoice.user.name || "Valued Customer",
+        invoice.invoiceNumber,
+        Number(invoice.totalAmount),
+        invoice.dueDate,
+        invoice.issuedDate || new Date(),
+      );
+    }
 
     if (!emailResult.success) {
       console.error("Failed to send invoice email:", emailResult.error);

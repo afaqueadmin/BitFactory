@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .container {
+      background-color: #f9f9f9;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      padding: 30px;
+    }
+    .header {
+      border-bottom: 2px solid #007bff;
+      padding-bottom: 20px;
+      margin-bottom: 30px;
+    }
+    h1 {
+      color: #007bff;
+      margin: 0 0 10px 0;
+      font-size: 24px;
+    }
+    .invoice-number {
+      color: #666;
+      font-size: 14px;
+    }
+    .section {
+      margin-bottom: 25px;
+    }
+    .section-title {
+      font-weight: bold;
+      color: #333;
+      margin-bottom: 10px;
+      font-size: 16px;
+    }
+    .row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid #eee;
+    }
+    .label {
+      color: #666;
+      font-weight: 500;
+    }
+    .value {
+      color: #333;
+      font-weight: 600;
+    }
+    .amount {
+      color: #007bff;
+      font-weight: bold;
+      font-size: 18px;
+    }
+    .summary {
+      background-color: #f0f7ff;
+      border-left: 4px solid #007bff;
+      padding: 15px;
+      margin: 20px 0;
+      border-radius: 3px;
+    }
+    .footer {
+      text-align: center;
+      color: #999;
+      font-size: 12px;
+      margin-top: 30px;
+      padding-top: 20px;
+      border-top: 1px solid #ddd;
+    }
+    .button {
+      display: inline-block;
+      background-color: #007bff;
+      color: white;
+      padding: 10px 20px;
+      text-decoration: none;
+      border-radius: 3px;
+      margin-top: 15px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Invoice {{invoiceNumber}}</h1>
+      <p class="invoice-number">Status: <strong>{{status}}</strong></p>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Invoice Summary</div>
+      <div class="row">
+        <span class="label">Invoice Date:</span>
+        <span class="value">{{issuedDate}}</span>
+      </div>
+      <div class="row">
+        <span class="label">Due Date:</span>
+        <span class="value">{{dueDate}}</span>
+      </div>
+      <div class="row">
+        <span class="label">Customer:</span>
+        <span class="value">{{customerName}}</span>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Amount Details</div>
+      <div class="row">
+        <span class="label">Total Miners:</span>
+        <span class="value">{{totalMiners}} units</span>
+      </div>
+      <div class="row">
+        <span class="label">Unit Price:</span>
+        <span class="value">{{unitPrice}}</span>
+      </div>
+    </div>
+
+    <div class="summary">
+      <div class="row">
+        <span class="label">Total Amount Due:</span>
+        <span class="amount">{{totalAmount}}</span>
+      </div>
+    </div>
+
+    <div class="section">
+      <p style="color: #666; line-height: 1.8;">
+        Dear {{customerName}},<br><br>
+        Please find attached the complete invoice details and a PDF copy for your records. 
+        Please ensure payment is made by the due date to avoid any late fees.
+      </p>
+    </div>
+
+    <div class="footer">
+      <p>This is an automated email. Please do not reply directly. For inquiries, contact our accounts team.</p>
+      <p>&copy; 2026 BitFactory. All rights reserved.</p>
+    </div>
+  </div>
+</body>
+</html>

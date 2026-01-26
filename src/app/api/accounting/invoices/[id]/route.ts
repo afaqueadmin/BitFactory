@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
 import { AuditAction, InvoiceStatus } from "@/generated/prisma";
-import { sendInvoiceEmail, sendInvoiceCancellationEmail } from "@/lib/email";
+import {
+  sendInvoiceEmail,
+  sendInvoiceCancellationEmail,
+  generateInvoicePDF,
+  sendInvoiceEmailWithPDF,
+} from "@/lib/email";
 
 export async function GET(
   request: NextRequest,
@@ -254,19 +259,53 @@ export async function PUT(
       currentInvoice.status !== "ISSUED" &&
       invoice.user?.email
     ) {
-      sendInvoiceEmail(
-        invoice.user.email,
-        invoice.user.name || "Valued Customer",
-        invoice.invoiceNumber,
-        Number(invoice.totalAmount),
-        invoice.dueDate,
-        invoice.issuedDate || new Date(),
-      ).catch((err) => {
+      // Generate PDF and send with attachment
+      try {
+        const pdfBuffer = await generateInvoicePDF(
+          invoice.invoiceNumber,
+          invoice.user.name || "Valued Customer",
+          invoice.user.email,
+          Number(invoice.totalAmount),
+          invoice.issuedDate || new Date(),
+          invoice.dueDate,
+          invoice.totalMiners,
+          Number(invoice.unitPrice),
+          invoice.id,
+          new Date(),
+        );
+
+        await sendInvoiceEmailWithPDF(
+          invoice.user.email,
+          invoice.user.name || "Valued Customer",
+          invoice.invoiceNumber,
+          Number(invoice.totalAmount),
+          invoice.issuedDate || new Date(),
+          invoice.dueDate,
+          invoice.totalMiners,
+          Number(invoice.unitPrice),
+          invoice.id,
+          pdfBuffer,
+        );
+      } catch (err) {
         console.error(
-          `Failed to auto-send invoice email for ${invoice.invoiceNumber}:`,
+          `Failed to auto-send invoice email with PDF for ${invoice.invoiceNumber}:`,
           err,
         );
-      });
+        // Try fallback to simple email without PDF
+        sendInvoiceEmail(
+          invoice.user.email,
+          invoice.user.name || "Valued Customer",
+          invoice.invoiceNumber,
+          Number(invoice.totalAmount),
+          invoice.dueDate,
+          invoice.issuedDate || new Date(),
+        ).catch((fallbackErr) => {
+          console.error(
+            `Failed to send fallback invoice email for ${invoice.invoiceNumber}:`,
+            fallbackErr,
+          );
+        });
+      }
 
       // Create notification record
       try {
