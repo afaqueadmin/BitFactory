@@ -2,6 +2,7 @@ import nodemailer from "nodemailer";
 import { readFileSync } from "fs";
 import { join } from "path";
 import puppeteer from "puppeteer-core";
+import chromium from "@sparticuz/chromium-min";
 
 // Utility function to format dates
 const formatDate = (date: Date): string => {
@@ -311,10 +312,13 @@ export const generatePDFFromHTML = async (
         "--disable-dev-shm-usage",
         "--disable-gpu",
       ],
+      executablePath: await chromium.executablePath(
+        `https://github.com/Sparticuz/chromium/releases/download/v116.0.0/chromium-v116.0.0-pack.tar`,
+      ),
     });
 
     const page = await browser.newPage();
-    await page.setContent(htmlContent, { waitUntil: "networkidle0" });
+    await page.setContent(htmlContent, { waitUntil: "networkidle2" });
     const pdfBuffer = await page.pdf({
       format: "A4",
       margin: { top: "0.4in", right: "0.4in", bottom: "0.4in", left: "0.4in" },
