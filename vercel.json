@@ -6,7 +6,7 @@
     }
   ],
   "functions": {
-    "app/api/pdf/route.ts": {
+    "app/api/pdf/generate/route.ts": {
       "memory": 1024,
       "maxDuration": 30,
       "includeFiles": "node_modules/@sparticuz/chromium-min/**"
