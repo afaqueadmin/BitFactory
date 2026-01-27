@@ -241,7 +241,7 @@ export default function WalletPage() {
   }
 
   const { btcLiveData, BtcLivePriceComponent } = useBitcoinLivePrice();
-
+  const minCardHeight = 140;
   return (
     <Box
       component="main"
@@ -474,6 +474,7 @@ export default function WalletPage() {
               backgroundColor: (theme) =>
                 theme.palette.mode === "light" ? "#ff6f00" : "#e65100",
               color: "white",
+              minHeight: minCardHeight,
             }}
           >
             <Typography variant="subtitle1">Payment Frequency</Typography>
@@ -495,11 +496,12 @@ export default function WalletPage() {
                   : "Not set"}
               </Typography>
             )}
-            {walletSettings?.day_of_week && (
-              <Typography variant="body2" sx={{ mt: 1, opacity: 0.9 }}>
-                Every {toProperCase(walletSettings.day_of_week)}
-              </Typography>
-            )}
+            {walletSettings?.payment_frequency === "WEEKLY" &&
+              walletSettings?.day_of_week && (
+                <Typography variant="body2" sx={{ mt: 1, opacity: 0.9 }}>
+                  Every {toProperCase(walletSettings.day_of_week)}
+                </Typography>
+              )}
           </Paper>
         </Box>
 
@@ -511,6 +513,7 @@ export default function WalletPage() {
               backgroundColor: (theme) =>
                 theme.palette.mode === "light" ? "#00796b" : "#004d40",
               color: "white",
+              minHeight: minCardHeight,
             }}
           >
             <Typography variant="subtitle1">Next Payout</Typography>

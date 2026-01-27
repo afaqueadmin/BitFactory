@@ -328,6 +328,7 @@ export default function CustomerDetailPage() {
   }
 
   const { btcLiveData, BtcLivePriceComponent } = useBitcoinLivePrice();
+  const minCardHeight = 140;
   return (
     <Box
       component="main"
@@ -557,6 +558,7 @@ export default function CustomerDetailPage() {
                   height: "100%",
                   display: "flex",
                   flexDirection: "column",
+                  minHeight: minCardHeight,
                 }}
               >
                 <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
@@ -585,11 +587,15 @@ export default function CustomerDetailPage() {
                         ? toProperCase(walletSettings.payment_frequency)
                         : "Not set"}
                     </Typography>
-                    {walletSettings?.day_of_week && (
-                      <Typography variant="body2" sx={{ mt: 1, opacity: 0.9 }}>
-                        Every {toProperCase(walletSettings.day_of_week)}
-                      </Typography>
-                    )}
+                    {walletSettings?.payment_frequency === "WEEKLY" &&
+                      walletSettings?.day_of_week && (
+                        <Typography
+                          variant="body2"
+                          sx={{ mt: 1, opacity: 0.9 }}
+                        >
+                          Every {toProperCase(walletSettings.day_of_week)}
+                        </Typography>
+                      )}
                   </Box>
                 )}
               </Paper>
@@ -605,6 +611,7 @@ export default function CustomerDetailPage() {
                   height: "100%",
                   display: "flex",
                   flexDirection: "column",
+                  minHeight: minCardHeight,
                 }}
               >
                 <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
