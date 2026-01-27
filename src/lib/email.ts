@@ -306,7 +306,7 @@ export const generatePDFFromHTML = async (
     const baseUrl =
       process.env.NODE_ENV === "production"
         ? // process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL
-          `https://my.bitfactory.ae`
+          window.location.origin
         : "http://localhost:3000";
 
     const url = new URL("/api/pdf/generate", baseUrl);
