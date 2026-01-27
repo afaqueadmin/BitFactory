@@ -1,7 +1,7 @@
 import nodemailer from "nodemailer";
 import { readFileSync } from "fs";
 import { join } from "path";
-import puppeteer from "puppeteer";
+import puppeteer from "puppeteer-core";
 
 // Utility function to format dates
 const formatDate = (date: Date): string => {
