@@ -317,7 +317,7 @@ export const generatePDFFromHTML = async (
       //   "--disable-gpu",
       // ],
       executablePath: await chromium.executablePath(
-        `https://github.com/Sparticuz/chromium/releases/download/v143.0.4/chromium-v143.0.4-pack.tar.br`,
+        `https://github.com/Sparticuz/chromium/releases/download/v143.0.4/chromium-v143.0.4-pack.tar`, //.br
       ),
     });
 
