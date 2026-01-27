@@ -308,12 +308,14 @@ export const generatePDFFromHTML = async (
     // await (chromium as unknown as { fonts: () => Promise<void> }).fonts();
     const browser = await puppeteer.launch({
       headless: true,
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-gpu",
-      ],
+      args: chromium.args,
+      //
+      //   args: [
+      //   "--no-sandbox",
+      //   "--disable-setuid-sandbox",
+      //   "--disable-dev-shm-usage",
+      //   "--disable-gpu",
+      // ],
       executablePath: await chromium.executablePath(
         `https://github.com/Sparticuz/chromium/releases/download/v143.0.4/chromium-v143.0.4-pack.tar.br`,
       ),
