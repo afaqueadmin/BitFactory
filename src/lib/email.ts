@@ -304,6 +304,8 @@ export const generatePDFFromHTML = async (
   htmlContent: string,
 ): Promise<Buffer> => {
   try {
+    // 🔑 Required for PDFs (typings are wrong, runtime is correct)
+    // await (chromium as unknown as { fonts: () => Promise<void> }).fonts();
     const browser = await puppeteer.launch({
       headless: true,
       args: [
