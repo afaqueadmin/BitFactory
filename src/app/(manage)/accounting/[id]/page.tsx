@@ -254,7 +254,7 @@ export default function InvoiceDetailPage() {
               variant="outlined"
               onClick={() => setEmailDialogOpen(true)}
             >
-              Send Email
+              Resend Email
             </Button>
           )}
           {invoice.status === "ISSUED" && (
