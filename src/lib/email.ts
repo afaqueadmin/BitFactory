@@ -322,7 +322,7 @@ export const generatePDFFromHTML = async (
     });
 
     const page = await browser.newPage();
-    await page.setContent(htmlContent, { waitUntil: "networkidle2" });
+    await page.setContent(htmlContent, { waitUntil: "networkidle0" });
     const pdfBuffer = await page.pdf({
       format: "A4",
       margin: { top: "0.4in", right: "0.4in", bottom: "0.4in", left: "0.4in" },
