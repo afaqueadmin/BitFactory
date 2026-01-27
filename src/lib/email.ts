@@ -1,7 +1,8 @@
 import nodemailer from "nodemailer";
 import { readFileSync } from "fs";
 import { join } from "path";
-import puppeteer from "puppeteer-core";
+import puppeteerCore from "puppeteer-core";
+import puppeteer from "puppeteer";
 import chromium from "@sparticuz/chromium-min";
 
 // Utility function to format dates
@@ -306,20 +307,28 @@ export const generatePDFFromHTML = async (
   try {
     // 🔑 Required for PDFs (typings are wrong, runtime is correct)
     // await (chromium as unknown as { fonts: () => Promise<void> }).fonts();
-    const browser = await puppeteer.launch({
-      headless: true,
-      args: chromium.args,
-      //
-      //   args: [
-      //   "--no-sandbox",
-      //   "--disable-setuid-sandbox",
-      //   "--disable-dev-shm-usage",
-      //   "--disable-gpu",
-      // ],
-      executablePath: await chromium.executablePath(
-        `https://github.com/Sparticuz/chromium/releases/download/v121.0.0/chromium-v121.0.0-pack.tar`, //.br
-      ),
-    });
+    let browser;
+    if (process.env.NODE_ENV === "production") {
+      browser = await puppeteerCore.launch({
+        headless: true,
+        args: chromium.args,
+        //
+        //   args: [
+        //   "--no-sandbox",
+        //   "--disable-setuid-sandbox",
+        //   "--disable-dev-shm-usage",
+        //   "--disable-gpu",
+        // ],
+        executablePath: await chromium.executablePath(
+          `https://github.com/Sparticuz/chromium/releases/download/v121.0.0/chromium-v121.0.0-pack.tar`, //.br
+        ),
+      });
+    } else {
+      browser = await puppeteer.launch({
+        headless: true,
+        args: ["--no-sandbox", "--disable-setuid-sandbox"],
+      });
+    }
 
     const page = await browser.newPage();
     await page.setContent(htmlContent, { waitUntil: "networkidle0" });

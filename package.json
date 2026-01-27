@@ -49,6 +49,7 @@
     "nodemailer": "7.0.12",
     "pg": "^8.16.3",
     "prisma": "^6.16.2",
+    "puppeteer": "^24.36.0",
     "puppeteer-core": "^24.36.0",
     "qrcode": "^1.5.4",
     "react": "19.1.0",
