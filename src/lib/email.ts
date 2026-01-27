@@ -1,6 +1,7 @@
 import nodemailer from "nodemailer";
 import { readFileSync } from "fs";
 import { join } from "path";
+import puppeteer from "puppeteer";
 
 // Utility function to format dates
 const formatDate = (date: Date): string => {
@@ -296,36 +297,32 @@ export const sendInvoiceEmailWithPDF = async (
 
 /**
  * Generate PDF from HTML content
- * Calls the backend PDF generation API route
+ * Uses Puppeteer for server-side rendering
  */
 export const generatePDFFromHTML = async (
   htmlContent: string,
 ): Promise<Buffer> => {
   try {
-    // Determine the base URL for the fetch request
-    const baseUrl =
-      process.env.NODE_ENV === "production"
-        ? // process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL
-          `https://my.bitfactory.ae`
-        : "http://localhost:3000";
-
-    const url = new URL("/api/pdf/generate", baseUrl);
-
-    const response = await fetch(url.toString(), {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ htmlContent }),
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu",
+      ],
     });
 
-    if (!response.ok) {
-      throw new Error(`Failed to generate PDF: ${response.statusText}`);
-    }
+    const page = await browser.newPage();
+    await page.setContent(htmlContent, { waitUntil: "networkidle0" });
+    const pdfBuffer = await page.pdf({
+      format: "A4",
+      margin: { top: "0.4in", right: "0.4in", bottom: "0.4in", left: "0.4in" },
+      printBackground: true,
+    });
 
-    // Get the PDF as a buffer from the binary response
-    const pdfBuffer = await response.arrayBuffer();
-    return Buffer.from(pdfBuffer);
+    await browser.close();
+    return pdfBuffer as Buffer;
   } catch (error) {
     console.error("Error generating PDF:", error);
     throw error;

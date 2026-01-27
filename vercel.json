@@ -4,12 +4,5 @@
       "path": "/api/cron_deduct_daily_cost",
       "schedule": "0 0 * * *"
     }
-  ],
-  "functions": {
-    "**/*.func": {
-      "memory": 1024,
-      "maxDuration": 30,
-      "includeFiles": "node_modules/@sparticuz/chromium-min/**"
-    }
-  }
+  ]
 }
