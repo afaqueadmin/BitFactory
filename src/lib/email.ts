@@ -1,9 +1,6 @@
 import nodemailer from "nodemailer";
 import { readFileSync } from "fs";
 import { join } from "path";
-// import puppeteer from "puppeteer";
-import puppeteer from "puppeteer-core";
-import chromium from "@sparticuz/chromium-min";
 
 // Utility function to format dates
 const formatDate = (date: Date): string => {
@@ -299,29 +296,35 @@ export const sendInvoiceEmailWithPDF = async (
 
 /**
  * Generate PDF from HTML content
- * Uses Puppeteer for server-side rendering
+ * Calls the backend PDF generation API route
  */
 export const generatePDFFromHTML = async (
   htmlContent: string,
 ): Promise<Buffer> => {
   try {
-    const browser = await puppeteer.launch({
-      args: chromium.args,
-      // defaultViewport: chromium.defaultViewport,
-      executablePath: await chromium.executablePath(),
-      headless: true,
+    // Determine the base URL for the fetch request
+    const baseUrl =
+      process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL
+        ? `https://${process.env.VERCEL_URL}`
+        : "http://localhost:3000";
+
+    const url = new URL("/api/pdf/generate", baseUrl);
+
+    const response = await fetch(url.toString(), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ htmlContent }),
     });
 
-    const page = await browser.newPage();
-    await page.setContent(htmlContent, { waitUntil: "networkidle2" });
-    const pdfBuffer = await page.pdf({
-      format: "A4",
-      margin: { top: "0.4in", right: "0.4in", bottom: "0.4in", left: "0.4in" },
-      printBackground: true,
-    });
+    if (!response.ok) {
+      throw new Error(`Failed to generate PDF: ${response.statusText}`);
+    }
 
-    await browser.close();
-    return pdfBuffer as Buffer;
+    // Get the PDF as a buffer from the binary response
+    const pdfBuffer = await response.arrayBuffer();
+    return Buffer.from(pdfBuffer);
   } catch (error) {
     console.error("Error generating PDF:", error);
     throw error;
