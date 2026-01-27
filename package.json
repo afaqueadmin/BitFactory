@@ -4,9 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
-    "build": "prisma generate && next build --turbopack",
+    "build": "prisma generate && npx puppeteer browsers install chrome && next build --turbopack",
     "start": "next start",
-    "postinstall": "npx puppeteer browsers install chrome",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts",
