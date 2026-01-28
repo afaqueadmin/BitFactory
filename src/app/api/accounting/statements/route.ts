@@ -114,8 +114,6 @@ export async function GET(request: NextRequest) {
       }
     });
 
-    stats.totalPending -= stats.totalPaid;
-
     const statement = {
       period: {
         from: fromDate || "All time",

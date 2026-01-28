@@ -164,7 +164,7 @@ export default function CustomerStatementPage() {
                 </TableCell>
                 <TableCell>
                   <CurrencyDisplay
-                    value={invoice.status === "PAID" ? invoice.totalAmount : 0}
+                    value={invoice.status === "PAID" ? invoice.paidAmount : 0}
                   />
                 </TableCell>
                 <TableCell>
