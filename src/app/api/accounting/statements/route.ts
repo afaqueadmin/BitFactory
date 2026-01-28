@@ -110,7 +110,7 @@ export async function GET(request: NextRequest) {
         ]++;
       }
       if (inv.status !== "PAID") {
-        stats.totalPending += Number(inv.totalAmount);
+        stats.totalPending += Number(inv.totalAmount); /// This logic is still not correct. What if partial payments exist for this invoice
       }
     });
 
