@@ -15,7 +15,7 @@ import {
   Divider,
   Typography,
 } from "@mui/material";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import SaveIcon from "@mui/icons-material/Save";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
@@ -76,11 +76,11 @@ export default function RecordPaymentPage() {
         throw new Error("Payment amount must be greater than 0");
       }
 
-      if (formData.amountPaid > Number(invoice!.totalAmount)) {
-        throw new Error(
-          `Payment amount cannot exceed invoice total (${Number(invoice!.totalAmount)})`,
-        );
-      }
+      // if (formData.amountPaid > Number(invoice!.totalAmount)) {
+      //   throw new Error(
+      //     `Payment amount cannot exceed invoice total (${Number(invoice!.totalAmount)})`,
+      //   );
+      // }
 
       // Call API to record payment
       await recordPayment(invoiceId, {
