@@ -101,7 +101,7 @@ export async function POST(
     const remainingBalance = Number(invoice.totalAmount) - newTotalPaid;
 
     // Update invoice status if fully paid
-    if (Math.abs(remainingBalance) < 0.01) {
+    if (remainingBalance <= 0.0) {
       // Fully paid (accounting for floating point)
       await prisma.invoice.update({
         where: { id },
