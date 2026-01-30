@@ -14,6 +14,9 @@ import {
   TableRow,
   Chip,
   useTheme,
+  Button,
+  TextField,
+  Alert,
 } from "@mui/material";
 import { useQuery } from "@tanstack/react-query";
 import ElectricityCostTable from "@/components/ElectricityCostTable";
@@ -50,6 +53,13 @@ export default function WalletPage() {
   const [error, setError] = useState<string | null>(null);
   const [revenue24hError, setRevenue24hError] = useState<string | null>(null);
   const [walletError, setWalletError] = useState<string | null>(null);
+
+  // Statement download state
+  const [statementStartDate, setStatementStartDate] = useState<string>("");
+  const [statementEndDate, setStatementEndDate] = useState<string>("");
+  const [statementError, setStatementError] = useState<string | null>(null);
+  const [statementDownloading, setStatementDownloading] = useState(false);
+
   const { user } = useUser();
   const theme = useTheme();
 
@@ -242,6 +252,74 @@ export default function WalletPage() {
 
   const { btcLiveData, BtcLivePriceComponent } = useBitcoinLivePrice();
   const minCardHeight = 140;
+
+  // Handle statement download
+  const handleDownloadStatement = async () => {
+    try {
+      setStatementError(null);
+
+      // Validate dates
+      if (!statementStartDate || !statementEndDate) {
+        setStatementError("Both start and end dates are required");
+        return;
+      }
+
+      const startDate = new Date(statementStartDate);
+      const endDate = new Date(statementEndDate);
+
+      if (startDate > endDate) {
+        setStatementError("Start date must be before end date");
+        return;
+      }
+
+      // Check 12-month limit
+      const monthsDiff =
+        (endDate.getFullYear() - startDate.getFullYear()) * 12 +
+        (endDate.getMonth() - startDate.getMonth());
+
+      if (monthsDiff > 12) {
+        setStatementError("Date range cannot exceed 12 months");
+        return;
+      }
+
+      setStatementDownloading(true);
+
+      const params = new URLSearchParams({
+        startDate: statementStartDate,
+        endDate: statementEndDate,
+      });
+
+      const response = await fetch(`/api/wallet/statement?${params}`, {
+        method: "GET",
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to generate statement");
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const startFormatted = statementStartDate.split("-").reverse().join("-");
+      const endFormatted = statementEndDate.split("-").reverse().join("-");
+      a.download = `account-statement-${startFormatted}-to-${endFormatted}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to download statement";
+      setStatementError(errorMessage);
+      console.error("Statement download error:", error);
+    } finally {
+      setStatementDownloading(false);
+    }
+  };
+
   return (
     <Box
       component="main"
@@ -565,6 +643,97 @@ export default function WalletPage() {
             )}
           </Paper>
         </Box>
+      </Box>
+
+      {/* Statement Download Section */}
+      <Box sx={{ width: "100%", mt: 4 }}>
+        <Paper
+          sx={{
+            p: 3,
+            borderRadius: 2,
+            backgroundColor: (theme) =>
+              theme.palette.mode === "light"
+                ? "rgba(33, 150, 243, 0.05)"
+                : "rgba(33, 150, 243, 0.1)",
+            borderLeft: "4px solid #2196f3",
+          }}
+        >
+          <Typography variant="h6" fontWeight="bold" sx={{ mb: 2 }}>
+            Download Account Statement
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Select a date range (max 12 months) to generate and download your
+            account statement as PDF.
+          </Typography>
+
+          {statementError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {statementError}
+            </Alert>
+          )}
+
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr auto" },
+              gap: 2,
+              alignItems: "flex-end",
+            }}
+          >
+            <TextField
+              label="Start Date"
+              type="date"
+              value={statementStartDate}
+              onChange={(e) => {
+                setStatementStartDate(e.target.value);
+                setStatementError(null);
+              }}
+              InputLabelProps={{
+                shrink: true,
+              }}
+              inputProps={{
+                max: new Date().toISOString().split("T")[0],
+              }}
+              fullWidth
+              size="small"
+            />
+            <TextField
+              label="End Date"
+              type="date"
+              value={statementEndDate}
+              onChange={(e) => {
+                setStatementEndDate(e.target.value);
+                setStatementError(null);
+              }}
+              InputLabelProps={{
+                shrink: true,
+              }}
+              inputProps={{
+                max: new Date().toISOString().split("T")[0],
+              }}
+              fullWidth
+              size="small"
+            />
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={handleDownloadStatement}
+              disabled={
+                statementDownloading || !statementStartDate || !statementEndDate
+              }
+              sx={{ whiteSpace: "nowrap", minWidth: "150px" }}
+            >
+              {statementDownloading ? (
+                <>
+                  <CircularProgress size={18} sx={{ mr: 1 }} />
+                  Generating...
+                </>
+              ) : (
+                "Download PDF"
+              )}
+            </Button>
+          </Box>
+        </Paper>
       </Box>
 
       {/* Invoices Table */}

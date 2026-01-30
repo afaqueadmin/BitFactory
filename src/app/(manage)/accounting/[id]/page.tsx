@@ -43,7 +43,6 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EmailIcon from "@mui/icons-material/Email";
 import CancelIcon from "@mui/icons-material/Cancel";
-import { useReactToPrint } from "react-to-print";
 
 function formatAuditAction(action: string): string {
   const actionMap: { [key: string]: string } = {
@@ -61,7 +60,7 @@ function formatAuditAction(action: string): string {
 }
 
 export default function InvoiceDetailPage() {
-  const printableRef = useRef(null);
+  const [downloadLoading, setDownloadLoading] = useState(false);
   const params = useParams();
   const router = useRouter();
   const { invoice, loading, error } = useInvoice(params.id as string);
@@ -133,11 +132,39 @@ export default function InvoiceDetailPage() {
     }
   };
 
-  // Hook handles the print logic
-  const handlePrint = useReactToPrint({
-    contentRef: printableRef, // Link the hook to your targeted div
-    documentTitle: "Invoice", // Optional: set file name for PDF saving
-  });
+  // Handle invoice download
+  const handleDownload = async () => {
+    try {
+      setDownloadLoading(true);
+      const response = await fetch(
+        `/api/accounting/invoices/${invoice?.id}/download`,
+        {
+          method: "GET",
+          credentials: "include",
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to download invoice");
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `invoice-${invoice?.invoiceNumber}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error("Download error:", error);
+      alert("Failed to download invoice PDF");
+    } finally {
+      setDownloadLoading(false);
+    }
+  };
+
   // Handle invoice cancellation (ISSUED invoices only)
   const handleCancelInvoice = async () => {
     try {
@@ -270,14 +297,14 @@ export default function InvoiceDetailPage() {
           <Button
             startIcon={<DownloadIcon />}
             variant="contained"
-            onClick={handlePrint}
+            onClick={handleDownload}
+            disabled={downloadLoading}
           >
-            Download
+            {downloadLoading ? "Downloading..." : "Download"}
           </Button>
         </Stack>
       </Box>
       <Box
-        ref={printableRef}
         sx={{
           display: "grid",
           gridTemplateColumns: { xs: "1fr", md: "2fr 1fr" },

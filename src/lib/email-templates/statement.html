@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Account Statement</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #333;
+            background-color: #f5f5f5;
+            line-height: 1.6;
+        }
+        .container {
+            width: 100%;
+            max-width: 900px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 40px;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #2196f3;
+            padding-bottom: 20px;
+        }
+        .logo-section h1 {
+            color: #2196f3;
+            font-size: 28px;
+            margin-bottom: 5px;
+        }
+        .logo-section p {
+            color: #666;
+            font-size: 14px;
+        }
+        .statement-title {
+            text-align: right;
+        }
+        .statement-title h2 {
+            color: #2196f3;
+            font-size: 20px;
+            margin-bottom: 10px;
+        }
+        .statement-title p {
+            color: #666;
+            font-size: 13px;
+            margin: 4px 0;
+        }
+        .customer-info {
+            margin-bottom: 30px;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-left: 4px solid #2196f3;
+        }
+        .customer-info h3 {
+            color: #2196f3;
+            font-size: 14px;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+        .info-row {
+            display: flex;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        .info-label {
+            font-weight: 600;
+            min-width: 120px;
+            color: #333;
+        }
+        .info-value {
+            color: #666;
+        }
+        .summary-section {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        .summary-card {
+            padding: 20px;
+            background-color: #f9f9f9;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            min-height: 140px;
+        }
+        .summary-card h4 {
+            color: #2196f3;
+            font-size: 12px;
+            text-transform: uppercase;
+            margin-bottom: 12px;
+            font-weight: 600;
+            margin-top: 0;
+        }
+        .summary-card .value {
+            font-size: 28px;
+            font-weight: bold;
+            color: #333;
+            margin: 8px 0;
+        }
+        .summary-card .subtext {
+            font-size: 11px;
+            color: #999;
+            margin-top: 8px;
+        }
+        .invoices-section h3 {
+            color: #2196f3;
+            font-size: 16px;
+            margin: 30px 0 15px 0;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+        .invoices-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 30px;
+        }
+        .invoices-table thead {
+            background-color: #2196f3;
+            color: white;
+        }
+        .invoices-table th {
+            padding: 12px 8px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 13px;
+        }
+        .invoices-table th:last-child {
+            text-align: right;
+        }
+        .invoices-table td {
+            padding: 10px 8px;
+            border-bottom: 1px solid #ddd;
+            font-size: 13px;
+        }
+        .invoices-table tbody tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        .invoices-table tbody tr:hover {
+            background-color: #f0f7ff;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            color: white;
+            text-align: center;
+        }
+        .status-draft {
+            background-color: #9e9e9e;
+        }
+        .status-issued {
+            background-color: #2196f3;
+        }
+        .status-paid {
+            background-color: #4caf50;
+        }
+        .status-overdue {
+            background-color: #f44336;
+        }
+        .status-cancelled {
+            background-color: #757575;
+        }
+        .footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #e0e0e0;
+            text-align: center;
+            color: #999;
+            font-size: 12px;
+        }
+        .footer p {
+            margin: 5px 0;
+        }
+        @media (max-width: 600px) {
+            .container {
+                padding: 20px;
+            }
+            .summary-section {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .invoices-table {
+                font-size: 12px;
+            }
+            .invoices-table th, .invoices-table td {
+                padding: 8px 4px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="logo-section">
+                <h1>BitFactory</h1>
+                <p>Mining Revenue Platform</p>
+            </div>
+            <div class="statement-title">
+                <h2>Account Statement</h2>
+                <p><strong>Generated:</strong> {{generatedDate}}</p>
+                <p><strong>Period:</strong> {{startDate}} to {{endDate}}</p>
+            </div>
+        </div>
+
+        <!-- Customer Information -->
+        <div class="customer-info">
+            <h3>Account Holder</h3>
+            <div class="info-row">
+                <span class="info-label">Name:</span>
+                <span class="info-value">{{customerName}}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Email:</span>
+                <span class="info-value">{{customerEmail}}</span>
+            </div>
+        </div>
+
+        <!-- Summary Cards -->
+        <div class="summary-section">
+            <div class="summary-card">
+                <h4>Total Amount</h4>
+                <div class="value">{{totalAmount}}</div>
+            </div>
+            <div class="summary-card">
+                <h4>Total Consumption</h4>
+                <div class="value">{{totalConsumption}}</div>
+            </div>
+            <div class="summary-card">
+                <h4>Total Transactions</h4>
+                <div class="value">{{totalTransactions}}</div>
+                <div class="subtext">records</div>
+            </div>
+            <div class="summary-card">
+                <h4>Period</h4>
+                <div class="value" style="font-size: 16px; line-height: 1.5;">
+                    {{startDate}}<br><span style="font-size: 12px; color: #999;">to</span><br>{{endDate}}
+                </div>
+            </div>
+        </div>
+
+        <!-- Transactions List -->
+        <h3 style="color: #2196f3; font-size: 16px; margin: 30px 0 15px 0; text-transform: uppercase; font-weight: 600;">Transaction History</h3>
+        <table class="invoices-table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Type</th>
+                    <th style="text-align: right;">Consumption</th>
+                    <th style="text-align: right;">Amount</th>
+                    <th style="text-align: right;">Balance</th>
+                    <th>Description</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{transactionRows}}
+            </tbody>
+        </table>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p>This is an automatically generated statement from BitFactory.</p>
+            <p>For questions or discrepancies, please contact support@bitfactory.ae</p>
+            <p style="margin-top: 15px; font-size: 11px; color: #bbb;">© 2026 BitFactory. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>
