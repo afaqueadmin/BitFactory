@@ -291,8 +291,8 @@ export default function AdminDashboard() {
 
           {/* === RESERVED FOR FUTURE LUXOR ENDPOINTS === */}
 
-          {/* Open Orders - Not yet implemented */}
-          <AdminValueCard title="Open Orders" value="N/A" />
+          {/* Hosting Cost - Not yet implemented */}
+          <AdminValueCard title="Hosting Cost" value="N/A" />
 
           {/* Hosting Revenue - Not yet implemented */}
           <AdminValueCard title="Hosting Revenue" value="N/A" />
@@ -311,9 +311,6 @@ export default function AdminDashboard() {
 
           {/* Est Yearly Hosting Profit - Not yet implemented */}
           <AdminValueCard title="Est Yearly Hosting Profit" value="N/A" />
-
-          {/* Blocked Deposit - Not yet implemented */}
-          <AdminValueCard title="Total Blocked Deposit" value="N/A" />
 
           {/* Positive Balance - Aggregated from customer payments */}
           <AdminValueCard title="Positive Customer Balance" value="N/A" />
