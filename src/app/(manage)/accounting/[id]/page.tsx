@@ -7,7 +7,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import {
   Container,
   Card,
@@ -232,10 +232,10 @@ export default function InvoiceDetailPage() {
           <Button
             startIcon={<ArrowBackIcon />}
             variant="text"
-            onClick={() => router.push("/accounting")}
+            onClick={() => router.back()}
             sx={{ mb: 2 }}
           >
-            Back to Accounting Dashboard
+            Back to Invoices
           </Button>
           <Typography variant="h4" sx={{ fontWeight: 700 }}>
             {invoice.invoiceNumber}

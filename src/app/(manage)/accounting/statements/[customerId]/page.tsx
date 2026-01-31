@@ -25,6 +25,7 @@ import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay"
 import { DateDisplay } from "@/components/accounting/common/DateDisplay";
 import DownloadIcon from "@mui/icons-material/Download";
 import PrintIcon from "@mui/icons-material/Print";
+import Link from "next/link";
 
 export default function CustomerStatementPage() {
   const { customerId } = useParams();
@@ -78,7 +79,7 @@ export default function CustomerStatementPage() {
         </Box>
         <Stack direction="row" spacing={1}>
           <Button variant="outlined" startIcon={<DownloadIcon />}>
-            Download PDF
+            Download Statement
           </Button>
           <Button variant="outlined" startIcon={<PrintIcon />}>
             Print
@@ -148,7 +149,12 @@ export default function CustomerStatementPage() {
             {invoices.map((invoice) => (
               <TableRow key={invoice.id} hover>
                 <TableCell sx={{ fontWeight: "bold" }}>
-                  {invoice.invoiceNumber}
+                  <Link
+                    href={`/accounting/${invoice.id}`}
+                    style={{ color: "#1976d2", textDecoration: "none" }}
+                  >
+                    {invoice.invoiceNumber}
+                  </Link>
                 </TableCell>
                 <TableCell>
                   <DateDisplay
