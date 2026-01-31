@@ -388,7 +388,7 @@ export default function HostedMinersList({
                         color="text.secondary"
                         sx={{ mb: 0.5 }}
                       >
-                        Hash Rate
+                        Hash Rate (Instant)
                       </Typography>
                       <Typography variant="body1" fontWeight="500">
                         {miner.hashRate || "N/A"}
