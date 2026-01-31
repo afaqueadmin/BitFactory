@@ -18,17 +18,11 @@ import {
   Memory as HardwareIcon,
   CloudQueue as PoolsIcon,
   LocationOn as LocationsIcon,
-  Inventory as InventoryIcon,
-  Receipt as InvoicesIcon,
-  Settings as CustomizeIcon,
-  Download as DownloadsIcon,
   Storage as MinersIcon,
   Timeline as OverviewIcon,
   AttachMoney as RevenueIcon,
   Construction as SelfMiningIcon,
-  ShoppingCart as ECommerceIcon,
   PriceCheck as HostingPricesIcon,
-  Bolt as ConsumptionIcon,
   Assignment as AccountingIcon,
   ChevronLeft,
   ChevronRight,
@@ -156,47 +150,9 @@ const sidebarItems: SidebarItem[] = [
     ],
   },
   {
-    title: "E-Commerce",
-    icon: <ECommerceIcon />,
-    items: [
-      {
-        title: "Hosting Prices",
-        icon: <HostingPricesIcon />,
-        path: "/ecommerce/hosting-prices",
-      },
-      {
-        title: "Total Consumptions",
-        icon: <ConsumptionIcon />,
-        path: "/ecommerce/consumptions",
-      },
-    ],
-  },
-  {
-    title: "Downloads",
-    icon: <DownloadsIcon />,
-    path: "/downloads",
-  },
-
-  {
     title: "Pools",
     icon: <PoolsIcon />,
     path: "/pools",
-  },
-
-  {
-    title: "Inventory",
-    icon: <InventoryIcon />,
-    path: "/inventory",
-  },
-  {
-    title: "Invoices",
-    icon: <InvoicesIcon />,
-    path: "/invoices",
-  },
-  {
-    title: "Customize",
-    icon: <CustomizeIcon />,
-    path: "/customize",
   },
 ];
 
