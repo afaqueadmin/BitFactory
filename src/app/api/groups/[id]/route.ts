@@ -207,12 +207,14 @@ export async function GET(
 
 /**
  * PUT /api/groups/[id]
- * Update a group's name and description
+ * Update a group's name, relationship manager, email, and description
  *
  * Request body:
  * {
- *   name?: string
- *   description?: string
+ *   name?: string (required if updating)
+ *   relationshipManager?: string (required if updating)
+ *   email?: string (required if updating)
+ *   description?: string (optional)
  *   isActive?: boolean
  * }
  */
@@ -269,7 +271,7 @@ export async function PUT(
 
     // Parse request body
     const body = await request.json();
-    const { name, description, isActive } = body;
+    const { name, relationshipManager, email, description, isActive } = body;
 
     // Build update data
     const updateData: Record<string, unknown> = {
@@ -290,6 +292,57 @@ export async function PUT(
         );
       }
       updateData.name = name.trim();
+    }
+
+    if (relationshipManager !== undefined) {
+      if (
+        typeof relationshipManager !== "string" ||
+        !relationshipManager.trim()
+      ) {
+        console.warn(
+          "[Groups API] PUT[id] - Validation error: relationshipManager is invalid",
+        );
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Relationship Manager is required and must be non-empty",
+          } as ApiResponse,
+          { status: 400 },
+        );
+      }
+      updateData.relationshipManager = relationshipManager.trim();
+    }
+
+    if (email !== undefined) {
+      if (typeof email !== "string" || !email.trim()) {
+        console.warn(
+          "[Groups API] PUT[id] - Validation error: email is invalid",
+        );
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Email is required and must be non-empty",
+          } as ApiResponse,
+          { status: 400 },
+        );
+      }
+
+      // Basic email validation
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email.trim())) {
+        console.warn(
+          "[Groups API] PUT[id] - Validation error: invalid email format",
+        );
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Invalid email format",
+          } as ApiResponse,
+          { status: 400 },
+        );
+      }
+
+      updateData.email = email.trim();
     }
 
     if (description !== undefined) {

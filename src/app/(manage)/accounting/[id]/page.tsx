@@ -556,6 +556,110 @@ export default function InvoiceDetailPage() {
           </Card>
         </Box>
       </Box>
+      {/* Customer & Relationship Manager Information Section */}
+      <Box sx={{ mt: 4 }}>
+        <Card>
+          <CardHeader title="Customer & Relationship Manager Information" />
+          <Divider />
+          <CardContent>
+            <Box
+              sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 3 }}
+            >
+              {/* Customer Name */}
+              <Box>
+                <Typography color="textSecondary" variant="body2">
+                  Customer Name
+                </Typography>
+                <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
+                  {invoice.user?.name || "N/A"}
+                </Typography>
+              </Box>
+
+              {/* Customer Email */}
+              <Box>
+                <Typography color="textSecondary" variant="body2">
+                  Customer Email
+                </Typography>
+                <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
+                  {invoice.user?.email || "N/A"}
+                </Typography>
+              </Box>
+
+              {/* Relationship Manager Name */}
+              <Box>
+                <Typography color="textSecondary" variant="body2">
+                  Relationship Manager
+                </Typography>
+                {groupLoading ? (
+                  <Box
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 1,
+                      mt: 0.5,
+                    }}
+                  >
+                    <CircularProgress size={16} />
+                    <Typography variant="body2">Loading...</Typography>
+                  </Box>
+                ) : (
+                  <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
+                    {groupInfo?.relationshipManager || "Not assigned"}
+                  </Typography>
+                )}
+              </Box>
+
+              {/* Relationship Manager Email */}
+              <Box>
+                <Typography color="textSecondary" variant="body2">
+                  RM Email
+                </Typography>
+                {groupLoading ? (
+                  <Box
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 1,
+                      mt: 0.5,
+                    }}
+                  >
+                    <CircularProgress size={16} />
+                    <Typography variant="body2">Loading...</Typography>
+                  </Box>
+                ) : (
+                  <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
+                    {groupInfo?.email || "Not assigned"}
+                  </Typography>
+                )}
+              </Box>
+
+              {/* Group Name */}
+              <Box>
+                <Typography color="textSecondary" variant="body2">
+                  Group Name
+                </Typography>
+                {groupLoading ? (
+                  <Box
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 1,
+                      mt: 0.5,
+                    }}
+                  >
+                    <CircularProgress size={16} />
+                    <Typography variant="body2">Loading...</Typography>
+                  </Box>
+                ) : (
+                  <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
+                    {groupInfo?.name || "No group assigned"}
+                  </Typography>
+                )}
+              </Box>
+            </Box>
+          </CardContent>
+        </Card>
+      </Box>
       {/* Audit Trail Section */}
       <Box sx={{ mt: 4 }}>
         <Card>

@@ -88,6 +88,9 @@ interface ApiResponse<T = Record<string, unknown>> {
  */
 interface GroupFormData {
   name: string;
+  relationshipManager: string;
+  email: string;
+  confirmEmail: string;
   description: string;
 }
 
@@ -121,6 +124,9 @@ const initialDialogState: DialogState = {
   selectedGroup: null,
   formData: {
     name: "",
+    relationshipManager: "",
+    email: "",
+    confirmEmail: "",
     description: "",
   },
   submitting: false,
@@ -401,12 +407,19 @@ export default function GroupsPage() {
    * Open edit group dialog
    */
   const openEditDialog = (group: Group) => {
+    const groupWithRMFields = group as unknown as {
+      relationshipManager?: string;
+      email?: string;
+    };
     setDialog({
       open: true,
       mode: "edit",
       selectedGroup: group,
       formData: {
         name: group.name,
+        relationshipManager: groupWithRMFields.relationshipManager || "",
+        email: groupWithRMFields.email || "",
+        confirmEmail: groupWithRMFields.email || "",
         description: group.description || "",
       },
       submitting: false,
@@ -805,6 +818,81 @@ export default function GroupsPage() {
                   disabled={dialog.submitting}
                   variant="outlined"
                   autoFocus
+                  required
+                />
+
+                <TextField
+                  fullWidth
+                  label="Relationship Manager"
+                  placeholder="Enter relationship manager name"
+                  value={dialog.formData.relationshipManager}
+                  onChange={(e) =>
+                    setDialog((prev) => ({
+                      ...prev,
+                      formData: {
+                        ...prev.formData,
+                        relationshipManager: e.target.value,
+                      },
+                      message: null,
+                    }))
+                  }
+                  disabled={dialog.submitting}
+                  variant="outlined"
+                  required
+                />
+
+                <TextField
+                  fullWidth
+                  label="Email"
+                  placeholder="Enter email address"
+                  type="email"
+                  value={dialog.formData.email}
+                  onChange={(e) =>
+                    setDialog((prev) => ({
+                      ...prev,
+                      formData: {
+                        ...prev.formData,
+                        email: e.target.value,
+                      },
+                      message: null,
+                    }))
+                  }
+                  disabled={dialog.submitting}
+                  variant="outlined"
+                  required
+                />
+
+                <TextField
+                  fullWidth
+                  label="Confirm Email"
+                  placeholder="Re-enter email address"
+                  type="email"
+                  value={dialog.formData.confirmEmail}
+                  onChange={(e) =>
+                    setDialog((prev) => ({
+                      ...prev,
+                      formData: {
+                        ...prev.formData,
+                        confirmEmail: e.target.value,
+                      },
+                      message: null,
+                    }))
+                  }
+                  disabled={dialog.submitting}
+                  variant="outlined"
+                  required
+                  error={
+                    dialog.formData.email &&
+                    dialog.formData.confirmEmail &&
+                    dialog.formData.email !== dialog.formData.confirmEmail
+                  }
+                  helperText={
+                    dialog.formData.email &&
+                    dialog.formData.confirmEmail &&
+                    dialog.formData.email !== dialog.formData.confirmEmail
+                      ? "Emails do not match"
+                      : ""
+                  }
                 />
 
                 <TextField
@@ -838,7 +926,15 @@ export default function GroupsPage() {
             <Button
               onClick={handleDialogSubmit}
               variant="contained"
-              disabled={dialog.submitting}
+              disabled={
+                dialog.submitting ||
+                !dialog.formData.name.trim() ||
+                !dialog.formData.relationshipManager.trim() ||
+                !dialog.formData.email.trim() ||
+                !dialog.formData.confirmEmail.trim() ||
+                (dialog.formData.email !== dialog.formData.confirmEmail &&
+                  dialog.mode !== "delete")
+              }
               color={dialog.mode === "delete" ? "error" : "primary"}
             >
               {dialog.submitting ? (

@@ -127,7 +127,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
  * Request body:
  * {
  *   name: string (required)
- *   description?: string
+ *   relationshipManager: string (required)
+ *   email: string (required)
+ *   description?: string (optional)
  * }
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
@@ -162,7 +164,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     // Parse request body
     const body = await request.json();
-    const { name, description } = body;
+    const { name, relationshipManager, email, description } = body;
 
     // Validate required fields
     if (!name || typeof name !== "string" || !name.trim()) {
@@ -176,8 +178,53 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
+    if (
+      !relationshipManager ||
+      typeof relationshipManager !== "string" ||
+      !relationshipManager.trim()
+    ) {
+      console.warn(
+        "[Groups API] POST - Validation error: relationshipManager is required",
+      );
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Relationship Manager is required",
+        } as ApiResponse,
+        { status: 400 },
+      );
+    }
+
+    if (!email || typeof email !== "string" || !email.trim()) {
+      console.warn("[Groups API] POST - Validation error: email is required");
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Email is required",
+        } as ApiResponse,
+        { status: 400 },
+      );
+    }
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      console.warn(
+        "[Groups API] POST - Validation error: invalid email format",
+      );
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Invalid email format",
+        } as ApiResponse,
+        { status: 400 },
+      );
+    }
+
     console.log("[Groups API] POST - Creating group:", {
       name: name.trim(),
+      relationshipManager: relationshipManager.trim(),
+      email: email.trim(),
       description: description?.trim() || null,
       createdBy: user.userId,
     });
@@ -186,6 +233,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const newGroup = await prisma.group.create({
       data: {
         name: name.trim(),
+        relationshipManager: relationshipManager.trim(),
+        email: email.trim(),
         description: description?.trim() || null,
         isActive: true,
         createdBy: user.userId,

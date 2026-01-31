@@ -10,6 +10,7 @@ import {
   CircularProgress,
   Alert,
   MenuItem,
+  Typography,
 } from "@mui/material";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -25,11 +26,7 @@ import {
 
 export default function CreateInvoicePage() {
   const router = useRouter();
-  const {
-    create: createInvoice,
-    loading: createLoading,
-    error: createError,
-  } = useCreateInvoice();
+  const { create: createInvoice, error: createError } = useCreateInvoice();
   const { customers, loading: customersLoading } = useCustomers();
 
   const [formData, setFormData] = useState({
@@ -47,6 +44,15 @@ export default function CreateInvoicePage() {
   const { miners, loading: minersLoading } = useCustomerMiners(
     formData.customerId || undefined,
   );
+
+  // Fetch group/RM info when customerId changes
+  const [groupInfo, setGroupInfo] = useState<{
+    id: string;
+    name: string;
+    relationshipManager: string;
+    email: string;
+  } | null>(null);
+  const [groupLoading, setGroupLoading] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -66,6 +72,27 @@ export default function CreateInvoicePage() {
       }));
     }
   }, [formData.customerId, miners]);
+
+  // Fetch group/RM info when customerId changes
+  useEffect(() => {
+    if (!formData.customerId) {
+      setGroupInfo(null);
+      return;
+    }
+
+    setGroupLoading(true);
+    fetch(`/api/accounting/customer-group?customerId=${formData.customerId}`)
+      .then((res) => res.json())
+      .then((data) => {
+        setGroupInfo(data.group || null);
+      })
+      .catch(() => {
+        setGroupInfo(null);
+      })
+      .finally(() => {
+        setGroupLoading(false);
+      });
+  }, [formData.customerId]);
 
   const handleCustomerChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { value } = e.target;
@@ -196,6 +223,51 @@ export default function CreateInvoicePage() {
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                     <CircularProgress size={20} />
                     <span>Loading customers...</span>
+                  </Box>
+                )}
+
+                {/* Relationship Manager Info Section */}
+                {formData.customerId && (
+                  <Box
+                    sx={{
+                      p: 2,
+                      backgroundColor: "#f5f5f5",
+                      borderRadius: 1,
+                      mt: 2,
+                    }}
+                  >
+                    <Typography sx={{ fontWeight: 600, mb: 1.5 }}>
+                      💼 Relationship Manager Information
+                    </Typography>
+                    <Box sx={{ ml: 1 }}>
+                      {groupLoading ? (
+                        <Box
+                          sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                        >
+                          <CircularProgress size={16} />
+                          <Typography variant="body2">
+                            Loading RM details...
+                          </Typography>
+                        </Box>
+                      ) : groupInfo ? (
+                        <Box>
+                          <Typography variant="body2" sx={{ mb: 0.5 }}>
+                            <strong>Name:</strong>{" "}
+                            {groupInfo.relationshipManager}
+                          </Typography>
+                          <Typography variant="body2" sx={{ mb: 0.5 }}>
+                            <strong>Email:</strong> {groupInfo.email}
+                          </Typography>
+                          <Typography variant="body2">
+                            <strong>Group:</strong> {groupInfo.name}
+                          </Typography>
+                        </Box>
+                      ) : (
+                        <Typography variant="body2" sx={{ color: "#d32f2f" }}>
+                          ⚠️ No RM assigned to this customer&apos;s group
+                        </Typography>
+                      )}
+                    </Box>
                   </Box>
                 )}
               </Stack>
