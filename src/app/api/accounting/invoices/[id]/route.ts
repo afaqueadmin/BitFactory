@@ -26,7 +26,14 @@ export async function GET(
     const invoice = await prisma.invoice.findUnique({
       where: { id },
       include: {
-        user: { select: { id: true, email: true, name: true } },
+        user: {
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            luxorSubaccountName: true,
+          },
+        },
         createdByUser: { select: { id: true, email: true, name: true } },
         updatedByUser: { select: { id: true, email: true, name: true } },
         costPayments: true,

@@ -192,15 +192,17 @@ model HardwareProcurementHistory {
 }
 
 model Group {
-  id          String            @id @default(cuid())
-  name        String            @db.VarChar(255)
-  description String?
-  isActive    Boolean           @default(true)
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
-  createdBy   String
-  subaccounts GroupSubaccount[]
-  creator     User              @relation(fields: [createdBy], references: [id])
+  id                    String            @id @default(cuid())
+  name                  String            @db.VarChar(255)
+  relationshipManager   String?           @db.VarChar(255)
+  email                 String?           @db.VarChar(255)
+  description           String?
+  isActive              Boolean           @default(true)
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+  createdBy             String
+  subaccounts           GroupSubaccount[]
+  creator               User              @relation(fields: [createdBy], references: [id])
 
   @@index([isActive])
   @@map("groups")
@@ -320,6 +322,7 @@ model InvoiceNotification {
   invoiceId        String
   notificationType NotificationType
   sentTo           String
+  ccEmails         String?
   sentAt           DateTime
   isRead           Boolean            @default(false)
   openedAt         DateTime?

@@ -113,6 +113,7 @@ export const sendInvoiceEmail = async (
   totalAmount: number,
   dueDate: Date,
   issuedDate: Date,
+  ccEmails?: string[],
 ) => {
   const formatDate = (date: Date) => {
     return new Date(date).toLocaleDateString("en-US", {
@@ -123,11 +124,14 @@ export const sendInvoiceEmail = async (
   };
 
   const ccInvoicesEmail = process.env.CC_INVOICES_EMAIL;
+  // Build CC list: use provided ccEmails if available, otherwise use default
+  const ccList =
+    ccEmails && ccEmails.length > 0 ? ccEmails.join(",") : ccInvoicesEmail;
   const mailOptions = {
     from:
       `BitFactory Admin <${process.env.SMTP_FROM}>` || "noreply@bitfactory.com",
     to: email,
-    cc: ccInvoicesEmail,
+    cc: ccList,
     subject: `Invoice ${invoiceNumber} from BitFactory`,
     html: `
       <h1>Invoice Notification</h1>
@@ -249,6 +253,7 @@ export const sendInvoiceEmailWithPDF = async (
   unitPrice: number | string,
   invoiceId: string,
   pdfBuffer: Buffer,
+  ccEmails?: string[],
 ) => {
   try {
     // Load email template
@@ -272,12 +277,15 @@ export const sendInvoiceEmailWithPDF = async (
 
     const htmlContent = renderInvoiceTemplate(emailTemplate, emailData);
 
+    // Build CC list: use provided ccEmails if available, otherwise use default
+    const ccList =
+      ccEmails && ccEmails.length > 0 ? ccEmails.join(",") : CC_INVOICE_EMAIL;
     const mailOptions = {
       from:
         `BitFactory Accounts <${process.env.SMTP_FROM}>` ||
         "noreply@bitfactory.com",
       to: email,
-      cc: CC_INVOICE_EMAIL,
+      cc: ccList,
       subject: `Invoice ${invoiceNumber} - BitFactory`,
       html: htmlContent,
       attachments: [

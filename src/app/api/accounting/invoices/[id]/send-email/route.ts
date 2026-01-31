@@ -7,6 +7,7 @@ import {
   generateInvoicePDF,
   sendInvoiceEmailWithPDF,
 } from "@/lib/email";
+import { getGroupBySubaccountName } from "@/lib/groupUtils";
 
 export async function POST(
   request: NextRequest,
@@ -43,6 +44,7 @@ export async function POST(
             id: true,
             email: true,
             name: true,
+            luxorSubaccountName: true,
           },
         },
       },
@@ -57,6 +59,30 @@ export async function POST(
         { error: "Customer email not found" },
         { status: 400 },
       );
+    }
+
+    // Fetch group and build CC list
+    const ccEmails: string[] = [];
+    let rmInfo = { name: "", email: "" };
+
+    if (invoice.user.luxorSubaccountName) {
+      const group = await getGroupBySubaccountName(
+        invoice.user.luxorSubaccountName,
+      );
+      if (group && group.relationshipManager && group.email) {
+        rmInfo = {
+          name: group.relationshipManager,
+          email: group.email,
+        };
+        ccEmails.push(group.email);
+      }
+    }
+
+    // Always add invoices@bitfactory.ae to CC
+    const invoiceCCEmail =
+      process.env.INVOICE_CC_EMAIL || "invoices@bitfactory.ae";
+    if (!ccEmails.includes(invoiceCCEmail)) {
+      ccEmails.push(invoiceCCEmail);
     }
 
     // Send invoice email with PDF attachment
@@ -86,6 +112,7 @@ export async function POST(
         Number(invoice.unitPrice),
         invoice.id,
         pdfBuffer,
+        ccEmails,
       );
     } catch (pdfError) {
       console.error("Failed to generate PDF, trying without PDF:", pdfError);
@@ -97,6 +124,7 @@ export async function POST(
         Number(invoice.totalAmount),
         invoice.dueDate,
         invoice.issuedDate || new Date(),
+        ccEmails,
       );
     }
 
@@ -110,6 +138,7 @@ export async function POST(
           sentTo: invoice.user.email,
           sentAt: new Date(),
           status: "FAILED",
+          ccEmails: ccEmails.join(","),
         },
       });
 
@@ -130,6 +159,7 @@ export async function POST(
         sentTo: invoice.user.email,
         sentAt: new Date(),
         status: "SENT",
+        ccEmails: ccEmails.join(","),
       },
     });
 
@@ -152,6 +182,11 @@ export async function POST(
       success: true,
       message: `Invoice sent to ${invoice.user.email}`,
       sentTo: invoice.user.email,
+      ccEmails: ccEmails,
+      ccDescription:
+        rmInfo.email && rmInfo.name
+          ? `CC'd to: ${rmInfo.name} (${rmInfo.email}), invoices@bitfactory.ae`
+          : "CC'd to: invoices@bitfactory.ae",
     });
   } catch (error) {
     console.error("Send invoice email error:", error);

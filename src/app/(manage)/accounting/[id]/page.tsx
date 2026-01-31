@@ -7,7 +7,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Container,
   Card,
@@ -88,15 +88,66 @@ export default function InvoiceDetailPage() {
   );
   const [cancelLoading, setCancelLoading] = useState(false);
 
+  const [groupInfo, setGroupInfo] = useState<{
+    id: string;
+    name: string;
+    relationshipManager: string;
+    email: string;
+  } | null>(null);
+  const [groupLoading, setGroupLoading] = useState(false);
+  const [issueSuccess, setIssueSuccess] = useState<{
+    message: string;
+    sentTo: string;
+    ccDescription: string;
+  } | null>(null);
+
+  // Fetch group info when invoice loads
+  useEffect(() => {
+    if (!invoice?.user?.id) return;
+
+    setGroupLoading(true);
+    fetch(`/api/accounting/customer-group?customerId=${invoice.user.id}`)
+      .then((res) => res.json())
+      .then((data) => {
+        setGroupInfo(data.group || null);
+      })
+      .catch(() => {
+        setGroupInfo(null);
+      })
+      .finally(() => {
+        setGroupLoading(false);
+      });
+  }, [invoice?.user?.id]);
+
   const isAdmin = user?.role === "ADMIN" || user?.role === "SUPER_ADMIN";
 
   const handleIssueInvoice = async () => {
     try {
       setStatusDialogError(null);
+      setIssueSuccess(null);
+
+      // First, change status to ISSUED
       await changeStatus(invoice!.id, "ISSUED");
-      setStatusDialogOpen(false);
-      // Reload the page to show updated invoice status
-      window.location.reload();
+
+      // Then, automatically send the email
+      try {
+        const emailResult = await sendEmail(invoice!.id);
+        setIssueSuccess({
+          message: emailResult.message,
+          sentTo: emailResult.sentTo,
+          ccDescription: emailResult.ccDescription,
+        });
+        // Keep dialog open to show success
+        // Auto-reload after 3 seconds
+        setTimeout(() => {
+          window.location.reload();
+        }, 3000);
+      } catch (emailErr) {
+        // Status was changed but email failed - show error but don't fail completely
+        setStatusDialogError(
+          `Invoice issued successfully, but failed to send email: ${emailErr instanceof Error ? emailErr.message : "Unknown error"}`,
+        );
+      }
     } catch (err) {
       setStatusDialogError(
         err instanceof Error ? err.message : "Failed to issue invoice",
@@ -591,52 +642,138 @@ export default function InvoiceDetailPage() {
       {/* Issue Invoice Dialog */}
       <Dialog
         open={statusDialogOpen}
-        onClose={() => setStatusDialogOpen(false)}
+        onClose={() => {
+          if (!statusLoading) setStatusDialogOpen(false);
+        }}
       >
         <DialogTitle>Issue Invoice</DialogTitle>
         <DialogContent>
           <Box sx={{ pt: 2 }}>
-            {statusDialogError && (
+            {issueSuccess ? (
+              <Alert severity="success" sx={{ mb: 2 }}>
+                <Typography sx={{ fontWeight: 600, mb: 1 }}>
+                  ✅ Invoice Issued Successfully!
+                </Typography>
+                <Typography variant="body2" sx={{ mb: 1 }}>
+                  {issueSuccess.message}
+                </Typography>
+                <Typography variant="body2" sx={{ fontWeight: 500, mt: 1 }}>
+                  Email Details:
+                </Typography>
+                <Typography variant="body2" sx={{ ml: 1, mt: 0.5 }}>
+                  To: {issueSuccess.sentTo}
+                </Typography>
+                <Typography variant="body2" sx={{ ml: 1 }}>
+                  {issueSuccess.ccDescription}
+                </Typography>
+              </Alert>
+            ) : statusDialogError && !statusLoading ? (
               <Alert severity="error" sx={{ mb: 2 }}>
                 {statusDialogError}
               </Alert>
+            ) : (
+              <>
+                <Typography sx={{ fontWeight: 600, mb: 2 }}>
+                  Are you sure you want to issue this invoice? This will:
+                </Typography>
+                <ul style={{ marginTop: 0, marginBottom: 16 }}>
+                  <li>Change the status from DRAFT to ISSUED</li>
+                  <li>
+                    Set the issued date to today (
+                    {new Date().toLocaleDateString()})
+                  </li>
+                  <li>Make the invoice available for payment</li>
+                  <li>Automatically send an email to the customer</li>
+                </ul>
+
+                {/* Email Details Section */}
+                <Box
+                  sx={{
+                    mb: 2,
+                    p: 2,
+                    backgroundColor: "#f5f5f5",
+                    borderRadius: 1,
+                  }}
+                >
+                  <Typography sx={{ fontWeight: 600, mb: 1.5 }}>
+                    📧 Email will be sent to:
+                  </Typography>
+                  <Box sx={{ ml: 1 }}>
+                    <Typography variant="body2" sx={{ mb: 1 }}>
+                      <strong>To:</strong> {invoice?.user?.email}
+                    </Typography>
+                    {groupLoading ? (
+                      <Box
+                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                      >
+                        <CircularProgress size={16} />
+                        <Typography variant="body2">
+                          Loading CC details...
+                        </Typography>
+                      </Box>
+                    ) : groupInfo ? (
+                      <Box>
+                        <Typography variant="body2" sx={{ mb: 0.5 }}>
+                          <strong>CC:</strong> {groupInfo.relationshipManager} (
+                          {groupInfo.email})
+                        </Typography>
+                        <Typography variant="body2">
+                          <strong>CC:</strong> invoices@bitfactory.ae
+                        </Typography>
+                      </Box>
+                    ) : (
+                      <Typography variant="body2" sx={{ color: "#d32f2f" }}>
+                        <strong>CC:</strong> invoices@bitfactory.ae{" "}
+                        <em>(No RM assigned to this customer)</em>
+                      </Typography>
+                    )}
+                  </Box>
+                </Box>
+              </>
             )}
-            <Typography>
-              Are you sure you want to issue this invoice? This will:
-            </Typography>
-            <ul
-              style={{
-                paddingLeft: 16,
-                marginTop: 12,
-                listStyleType: "square",
-              }}
-            >
-              <li>Change the status from DRAFT to ISSUED</li>
-              <li>
-                Set the issued date to today ({new Date().toLocaleDateString()})
-              </li>
-              <li>Make the invoice available for payment</li>
-              <li>
-                <b>Send an email to the customer</b>
-              </li>
-            </ul>
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button
-            onClick={() => setStatusDialogOpen(false)}
-            disabled={statusLoading}
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleIssueInvoice}
-            variant="contained"
-            color="success"
-            disabled={statusLoading}
-          >
-            {statusLoading ? "Issuing..." : "Issue Invoice"}
-          </Button>
+          {!issueSuccess && statusDialogError && !statusLoading && (
+            <Button
+              onClick={() => {
+                setStatusDialogOpen(false);
+                setStatusDialogError(null);
+                setIssueSuccess(null);
+              }}
+            >
+              Close
+            </Button>
+          )}
+          {!issueSuccess && !statusDialogError && (
+            <>
+              <Button
+                onClick={() => setStatusDialogOpen(false)}
+                disabled={statusLoading}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleIssueInvoice}
+                variant="contained"
+                color="success"
+                disabled={statusLoading}
+              >
+                {statusLoading ? "Issuing & Sending..." : "Issue Invoice"}
+              </Button>
+            </>
+          )}
+          {issueSuccess && (
+            <Button
+              onClick={() => {
+                setStatusDialogOpen(false);
+                setIssueSuccess(null);
+              }}
+              variant="contained"
+            >
+              Close
+            </Button>
+          )}
         </DialogActions>
       </Dialog>
       {/* Delete Invoice Dialog */}
