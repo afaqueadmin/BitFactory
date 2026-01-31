@@ -437,6 +437,9 @@ export default function GroupsPage() {
       selectedGroup: group,
       formData: {
         name: "",
+        relationshipManager: "",
+        email: "",
+        confirmEmail: "",
         description: "",
       },
       submitting: false,
