@@ -13,7 +13,6 @@ import {
   TableRow,
   TablePagination,
   TextField,
-  Stack,
   CircularProgress,
   Alert,
 } from "@mui/material";
@@ -78,7 +77,7 @@ export default function StatementsPage() {
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
       <Box>
-        <h1 style={{ margin: 0 }}>Account Statements</h1>
+        <h1 style={{ margin: 0 }}>Customer Statements</h1>
         <p style={{ margin: "8px 0 0 0", color: "#666" }}>
           View customer statements and payment history
         </p>

@@ -28,7 +28,6 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
 import { useRecurringInvoices } from "@/lib/hooks/useRecurringInvoices";
 import { useCustomers } from "@/lib/hooks/useInvoices";
-import { StatusBadge } from "@/components/accounting/common/StatusBadge";
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
 import { DateDisplay } from "@/components/accounting/common/DateDisplay";
 
@@ -166,7 +165,7 @@ export default function RecurringInvoicesPage() {
         }}
       >
         <Box>
-          <h1 style={{ margin: 0 }}>Recurring Invoices</h1>
+          <h1 style={{ margin: 0 }}>Customer Bulk Invoices</h1>
           <p style={{ margin: "8px 0 0 0", color: "#666" }}>
             Manage monthly billing templates
           </p>
