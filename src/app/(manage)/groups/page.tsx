@@ -885,9 +885,11 @@ export default function GroupsPage() {
                   variant="outlined"
                   required
                   error={
-                    dialog.formData.email &&
-                    dialog.formData.confirmEmail &&
-                    dialog.formData.email !== dialog.formData.confirmEmail
+                    !!(
+                      dialog.formData.email &&
+                      dialog.formData.confirmEmail &&
+                      dialog.formData.email !== dialog.formData.confirmEmail
+                    )
                   }
                   helperText={
                     dialog.formData.email &&
