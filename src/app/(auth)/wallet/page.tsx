@@ -645,97 +645,6 @@ export default function WalletPage() {
         </Box>
       </Box>
 
-      {/* Statement Download Section */}
-      <Box sx={{ width: "100%", mt: 4 }}>
-        <Paper
-          sx={{
-            p: 3,
-            borderRadius: 2,
-            backgroundColor: (theme) =>
-              theme.palette.mode === "light"
-                ? "rgba(33, 150, 243, 0.05)"
-                : "rgba(33, 150, 243, 0.1)",
-            borderLeft: "4px solid #2196f3",
-          }}
-        >
-          <Typography variant="h6" fontWeight="bold" sx={{ mb: 2 }}>
-            Download Account Statement
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Select a date range (max 12 months) to generate and download your
-            account statement as PDF.
-          </Typography>
-
-          {statementError && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {statementError}
-            </Alert>
-          )}
-
-          <Box
-            sx={{
-              display: "grid",
-              gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr auto" },
-              gap: 2,
-              alignItems: "flex-end",
-            }}
-          >
-            <TextField
-              label="Start Date"
-              type="date"
-              value={statementStartDate}
-              onChange={(e) => {
-                setStatementStartDate(e.target.value);
-                setStatementError(null);
-              }}
-              InputLabelProps={{
-                shrink: true,
-              }}
-              inputProps={{
-                max: new Date().toISOString().split("T")[0],
-              }}
-              fullWidth
-              size="small"
-            />
-            <TextField
-              label="End Date"
-              type="date"
-              value={statementEndDate}
-              onChange={(e) => {
-                setStatementEndDate(e.target.value);
-                setStatementError(null);
-              }}
-              InputLabelProps={{
-                shrink: true,
-              }}
-              inputProps={{
-                max: new Date().toISOString().split("T")[0],
-              }}
-              fullWidth
-              size="small"
-            />
-            <Button
-              variant="contained"
-              color="primary"
-              onClick={handleDownloadStatement}
-              disabled={
-                statementDownloading || !statementStartDate || !statementEndDate
-              }
-              sx={{ whiteSpace: "nowrap", minWidth: "150px" }}
-            >
-              {statementDownloading ? (
-                <>
-                  <CircularProgress size={18} sx={{ mr: 1 }} />
-                  Generating...
-                </>
-              ) : (
-                "Download PDF"
-              )}
-            </Button>
-          </Box>
-        </Paper>
-      </Box>
-
       {/* Invoices Table */}
       <Box sx={{ width: "100%", mt: 3 }}>
         <Box sx={{ mb: 2 }}>
@@ -891,6 +800,97 @@ export default function WalletPage() {
               </TableBody>
             </Table>
           </TableContainer>
+        </Paper>
+      </Box>
+
+      {/* Statement Download Section */}
+      <Box sx={{ width: "100%", mt: 4 }}>
+        <Paper
+          sx={{
+            p: 3,
+            borderRadius: 2,
+            backgroundColor: (theme) =>
+              theme.palette.mode === "light"
+                ? "rgba(33, 150, 243, 0.05)"
+                : "rgba(33, 150, 243, 0.1)",
+            borderLeft: "4px solid #2196f3",
+          }}
+        >
+          <Typography variant="h6" fontWeight="bold" sx={{ mb: 2 }}>
+            Download Account Statement
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Select a date range (max 12 months) to generate and download your
+            account statement as PDF.
+          </Typography>
+
+          {statementError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {statementError}
+            </Alert>
+          )}
+
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr auto" },
+              gap: 2,
+              alignItems: "flex-end",
+            }}
+          >
+            <TextField
+              label="Start Date"
+              type="date"
+              value={statementStartDate}
+              onChange={(e) => {
+                setStatementStartDate(e.target.value);
+                setStatementError(null);
+              }}
+              InputLabelProps={{
+                shrink: true,
+              }}
+              inputProps={{
+                max: new Date().toISOString().split("T")[0],
+              }}
+              fullWidth
+              size="small"
+            />
+            <TextField
+              label="End Date"
+              type="date"
+              value={statementEndDate}
+              onChange={(e) => {
+                setStatementEndDate(e.target.value);
+                setStatementError(null);
+              }}
+              InputLabelProps={{
+                shrink: true,
+              }}
+              inputProps={{
+                max: new Date().toISOString().split("T")[0],
+              }}
+              fullWidth
+              size="small"
+            />
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={handleDownloadStatement}
+              disabled={
+                statementDownloading || !statementStartDate || !statementEndDate
+              }
+              sx={{ whiteSpace: "nowrap", minWidth: "150px" }}
+            >
+              {statementDownloading ? (
+                <>
+                  <CircularProgress size={18} sx={{ mr: 1 }} />
+                  Generating...
+                </>
+              ) : (
+                "Download PDF"
+              )}
+            </Button>
+          </Box>
         </Paper>
       </Box>
 
