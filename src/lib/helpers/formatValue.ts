@@ -1,6 +1,6 @@
 export const formatValue = (
   value: number | string,
-  type: "currency" | "BTC" | "number" = "number",
+  type: "currency" | "BTC" | "percentage" | "number" = "number",
   options: Intl.NumberFormatOptions = {},
 ): string => {
   // If value is a string (like "N/A"), return as-is
@@ -18,9 +18,20 @@ export const formatValue = (
     }).format(value);
   }
   if (type === "BTC") {
+    return (
+      "₿ " +
+      new Intl.NumberFormat("en-US", {
+        minimumFractionDigits: 8,
+        maximumFractionDigits: 8,
+        ...options,
+      }).format(value)
+    );
+  }
+  if (type === "percentage") {
     return new Intl.NumberFormat("en-US", {
-      minimumFractionDigits: 8,
-      maximumFractionDigits: 8,
+      style: "percent",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
       ...options,
     }).format(value);
   }

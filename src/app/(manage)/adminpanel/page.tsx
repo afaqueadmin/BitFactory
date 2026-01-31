@@ -224,7 +224,7 @@ export default function AdminDashboard() {
           {/* Uptime 24h - From Luxor */}
           <AdminValueCard
             title="Uptime (24 hours)"
-            value={`${(stats?.luxor.uptime_24h ?? 0).toFixed(4)}%`}
+            value={`${(stats?.luxor.uptime_24h ?? 0).toFixed(2)}%`}
           />
 
           {/* Hashrate 5 min - Current from Luxor */}

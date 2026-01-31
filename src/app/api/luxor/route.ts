@@ -797,9 +797,15 @@ export async function GET(
           console.log(`[Luxor Proxy V2] GET: Getting summary for ${currency}`);
           // NOTE: Luxor API requires exactly ONE of subaccount_names or site_id, not both
           // Prefer subaccount_names if provided, otherwise use site_id
+
           data = await luxorClient.getSummary(currency, {
-            subaccount_names: subaccountName,
-            site_id: subaccountName ? undefined : siteId || undefined,
+            subaccount_names:
+              user.role === "CLIENT" && user.luxorSubaccountName
+                ? user.luxorSubaccountName
+                : undefined,
+            site_id: ["ADMIN", "SUPER_ADMIN"].includes(user.role)
+              ? siteId
+              : undefined,
           });
           break;
 

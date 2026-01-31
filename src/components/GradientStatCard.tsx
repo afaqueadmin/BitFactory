@@ -20,11 +20,18 @@
  */
 
 import React from "react";
-import { Box, Typography, useTheme, SvgIcon } from "@mui/material";
+import {
+  Box,
+  Typography,
+  useTheme,
+  SvgIcon,
+  CircularProgress,
+} from "@mui/material";
 
 export interface GradientStatCardProps {
   title: string;
   value: string | number;
+  isLoading?: boolean;
   caption?: string;
   tag?: string;
   gradient?: string;
@@ -35,8 +42,10 @@ export default function GradientStatCard({
   title,
   value,
   caption,
+  tag,
   gradient,
   icon,
+  isLoading = false,
 }: GradientStatCardProps) {
   const theme = useTheme();
 
@@ -76,17 +85,26 @@ export default function GradientStatCard({
           {title}
         </Typography>
       </Box>
-      <Box>
-        <Typography variant="h5" sx={{ fontWeight: 800, mt: 0.5 }}>
-          {value}
-        </Typography>
-      </Box>
+      {isLoading ? (
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1 }}>
+          <CircularProgress size={24} sx={{ color: "white" }} />
+          <Typography variant="body2">Loading...</Typography>
+        </Box>
+      ) : (
+        <div>
+          <Box>
+            <Typography variant="h5" sx={{ fontWeight: 800, mt: 0.5 }}>
+              {value} {tag && <span>{tag}</span>}
+            </Typography>
+          </Box>
 
-      {/* Caption */}
-      {caption && (
-        <Typography variant="caption" sx={{ opacity: 0.9 }}>
-          {caption}
-        </Typography>
+          {/* Caption */}
+          {caption && (
+            <Typography variant="caption" sx={{ opacity: 0.9 }}>
+              {caption}
+            </Typography>
+          )}
+        </div>
       )}
     </Box>
   );

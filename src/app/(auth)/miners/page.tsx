@@ -2,94 +2,38 @@
 
 import { Box, Typography } from "@mui/material";
 import HostedMinersList from "@/components/HostedMinersList";
-import BalanceCard from "@/components/dashboardCards/BalanceCard";
-import CostsCard from "@/components/dashboardCards/CostsCard";
-import EstimatedMonthlyCostCard from "@/components/dashboardCards/EstimatedMonthlyCostCard";
-import EstimatedMiningDaysLeftCard from "@/components/dashboardCards/EstimatedMiningDaysLeftCard";
 import React from "react";
-import { formatValue } from "@/lib/helpers/formatValue";
-import { getDaysInCurrentMonth } from "@/lib/helpers/getDaysInCurrentMonth";
+import { useQuery } from "@tanstack/react-query";
+import ShareEfficiencyCard from "@/components/dashboardCards/ShareEfficiencyCard";
+import Uptime24HoursCard from "@/components/dashboardCards/Uptime24HoursCard";
+import HashRate24HoursCard from "@/components/dashboardCards/HashRate24HoursCard";
+import HashpriceCard from "@/components/dashboardCards/HashpriceCard";
 
 export default function Miners() {
-  const [balance, setBalance] = React.useState<number>(0);
-  const [balanceLoading, setBalanceLoading] = React.useState(true);
-  const [dailyCost, setDailyCost] = React.useState<number>(0);
-  const [dailyCostLoading, setDailyCostLoading] = React.useState(true);
-
-  const daysLeft = React.useMemo(() => {
-    if (balanceLoading || dailyCostLoading) return 0;
-    if (dailyCost === 0) return "∞";
-    return Number(
-      formatValue(balance / dailyCost, "number", { maximumFractionDigits: 0 }),
-    );
-  }, [balance, balanceLoading, dailyCost, dailyCostLoading]);
-
-  const estimatedMonthlyCost = React.useMemo(() => {
-    if (dailyCostLoading) return 0;
-    return dailyCost * getDaysInCurrentMonth();
-  }, [dailyCost, dailyCostLoading]);
-
-  // Fetch balance on component mount
-  React.useEffect(() => {
-    const fetchBalance = async () => {
-      try {
-        setBalanceLoading(true);
-        const response = await fetch("/api/user/balance", {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
+  // Fetch luxor summary using TanStack Query
+  const { data: luxorSummary = { data: {} }, isLoading: luxorSummaryLoading } =
+    useQuery({
+      queryKey: ["luxor-summary"],
+      queryFn: async () => {
+        const response = await fetch(
+          "/api/luxor?endpoint=summary&currency=BTC",
+          {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+            },
           },
-        });
+        );
 
         if (!response.ok) {
-          console.error("Failed to fetch balance");
-          setBalance(0);
-          return;
+          console.error("Failed to fetch luxor summary");
+          return null;
         }
 
-        const data = await response.json();
-        setBalance(data.balance || 0);
-      } catch (err) {
-        console.error("Error fetching balance:", err);
-        setBalance(0);
-      } finally {
-        setBalanceLoading(false);
-      }
-    };
+        return response.json();
+      },
+    });
 
-    fetchBalance();
-  }, []);
-
-  // Fetch daily costs on component mount
-  React.useEffect(() => {
-    const fetchDailyCosts = async () => {
-      try {
-        setDailyCostLoading(true);
-        const response = await fetch("/api/miners/daily-costs", {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-          },
-        });
-
-        if (!response.ok) {
-          console.error("Failed to fetch daily costs");
-          setDailyCost(0);
-          return;
-        }
-
-        const data = await response.json();
-        setDailyCost(data.totalDailyCost || 0);
-      } catch (err) {
-        console.error("Error fetching daily costs:", err);
-        setDailyCost(0);
-      } finally {
-        setDailyCostLoading(false);
-      }
-    };
-
-    fetchDailyCosts();
-  }, []);
   return (
     <Box sx={{ p: 3, mt: 2, minHeight: "100vh" }}>
       {/* Page Heading */}
@@ -117,34 +61,37 @@ export default function Miners() {
         }}
       >
         <Box sx={{ flex: { xs: 1, md: "1 1 25%" }, minWidth: 0 }}>
-          <BalanceCard value={balanceLoading ? 0 : balance} />
+          <ShareEfficiencyCard
+            value={luxorSummary.data.efficiency_5m}
+            loading={luxorSummaryLoading}
+          />
         </Box>
 
         <Box sx={{ flex: { xs: 1, md: "1 1 25%" }, minWidth: 0 }}>
-          <CostsCard value={dailyCostLoading ? 0 : dailyCost} />
+          <HashRate24HoursCard
+            value={luxorSummary.data.hashrate_24h}
+            loading={luxorSummaryLoading}
+          />
         </Box>
 
         <Box sx={{ flex: { xs: 1, md: "1 1 25%" }, minWidth: 0 }}>
-          <EstimatedMiningDaysLeftCard days={daysLeft} />
+          <Uptime24HoursCard
+            value={luxorSummary.data.uptime_24h}
+            loading={luxorSummaryLoading}
+          />
         </Box>
 
         <Box sx={{ flex: { xs: 1, md: "1 1 25%" }, minWidth: 0 }}>
-          <EstimatedMonthlyCostCard value={estimatedMonthlyCost} />
+          <HashpriceCard
+            value={
+              luxorSummary.data.hashprice
+                ? luxorSummary.data.hashprice[0].value
+                : ""
+            }
+            loading={luxorSummaryLoading}
+          />
         </Box>
       </Box>
-
-      {/* Hosted Miners Summary Card */}
-      {/* <Box sx={{ mb: 4 }}>
-                <HostedMinersCard 
-                    runningCount={5}
-                    progress={75}
-                    errorCount={2}
-                    onAddMiner={() => {
-                        console.log("Add miner clicked");
-                        // Add your logic here to handle adding a new miner
-                    }}
-                />
-            </Box> */}
 
       {/* Hosted Miners List */}
       <HostedMinersList />
