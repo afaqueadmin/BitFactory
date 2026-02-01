@@ -49,6 +49,7 @@ model User {
   recurringInvoices          RecurringInvoice[]           @relation("recurringInvoices")
   blacklisted                TokenBlacklist[]
   activities                 UserActivity[]
+  paymentDetailsUpdates      PaymentDetails[]
 
   @@index([isDeleted])
   @@map("users")
@@ -399,4 +400,42 @@ enum NotificationStatus {
   FAILED
   BOUNCED
   UNSUBSCRIBED
+}
+// Payment Details for Invoice PDF - Admin configurable settings
+model PaymentDetails {
+  id                      String    @id @default(cuid())
+  
+  // Company Information
+  companyName             String    @default("BitFactory.AE")
+  companyLegalName        String    @default("Higgs Computing Limited")
+  companyLocation         String    @default("Ras Al Khaimah, UAE")
+  machineHostingLocation  String    @default("Addis Ababa, Ethiopia")
+  logoBase64              String?   // Base64 encoded logo image
+  
+  // Payment Options
+  paymentOption1Title     String    @default("OPTION 1:")
+  paymentOption1Details   String    @default("USDT (Tron): TLNjcYnokhA1UcVsYVKjdeh9HzMS6GQJNe")
+  
+  paymentOption2Title     String    @default("OPTION 2:")
+  paymentOption2Details   String    @default("USDC (ETH): 0x722460E434013075E8cF8dd42c8854424aFa336E")
+  
+  paymentOption3Title     String    @default("OPTION 3:")
+  paymentOption3Details   String    // Bank details (multiline)
+  
+  // Billing Contact Information
+  billingInquiriesEmail   String    @default("invoices@bitfactory.ae")
+  billingInquiriesWhatsApp String   @default("+971-52-6062903")
+  
+  // Support Contact Information
+  supportEmail            String    @default("support@bitfactory.ae")
+  supportWhatsApp         String    @default("+971-52-6062903")
+  
+  // Metadata
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+  updatedBy               String?
+  updatedByUser           User?     @relation(fields: [updatedBy], references: [id], onDelete: SetNull)
+  
+  @@index([id])
+  @@index([updatedBy])
 }

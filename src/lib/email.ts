@@ -16,16 +16,30 @@ const formatDate = (date: Date): string => {
 
 /**
  * Render HTML template with invoice data
+ * Supports {{variable}} replacement and {{#if variable}}...{{/if}} conditionals
  */
 const renderInvoiceTemplate = (
   template: string,
-  data: Record<string, string | number>,
+  data: Record<string, string | number | null | undefined>,
 ): string => {
   let html = template;
+
+  // Process conditionals: {{#if variable}}...{{/if}}
+  const conditionalRegex = /{{#if\s+(\w+)\s*}}([\s\S]*?){{\/if}}/g;
+  html = html.replace(conditionalRegex, (match, variable, content) => {
+    const value = data[variable];
+    // Show content if variable is truthy and not empty
+    const shouldShow = value !== null && value !== undefined && value !== "";
+    return shouldShow ? content : "";
+  });
+
+  // Process simple variable replacements: {{variable}}
   Object.keys(data).forEach((key) => {
     const regex = new RegExp(`{{${key}}}`, "g");
-    html = html.replace(regex, String(data[key]));
+    const value = data[key] ?? ""; // Use empty string for null/undefined
+    html = html.replace(regex, String(value));
   });
+
   return html;
 };
 
@@ -377,8 +391,18 @@ export const generateInvoicePDF = async (
     );
     const pdfTemplate = readFileSync(pdfTemplatePath, "utf-8");
 
-    // Render PDF template with invoice data
-    const pdfData = {
+    // Fetch PaymentDetails from database for dynamic configuration
+    let paymentDetails = null;
+    try {
+      const { prisma } = await import("./prisma");
+      paymentDetails = await prisma.paymentDetails.findFirst();
+    } catch (dbError) {
+      console.warn("Could not fetch PaymentDetails from database:", dbError);
+      // Continue with null paymentDetails - template will use conditional rendering
+    }
+
+    // Render PDF template with invoice data and payment details
+    const pdfData: Record<string, string | number | null | undefined> = {
       invoiceNumber,
       customerName,
       customerEmail,
@@ -391,10 +415,49 @@ export const generateInvoicePDF = async (
       totalAmount: `$${Number(totalAmount).toFixed(2)}`,
       invoiceId,
       generatedDate: formatDate(generatedDate),
+      // Add PaymentDetails if available - include all fields as-is
+      ...(paymentDetails
+        ? {
+            companyName: paymentDetails.companyName,
+            companyLegalName: paymentDetails.companyLegalName,
+            companyLocation: paymentDetails.companyLocation,
+            machineHostingLocation: paymentDetails.machineHostingLocation,
+            logoBase64: paymentDetails.logoBase64,
+            billingInquiriesEmail: paymentDetails.billingInquiriesEmail,
+            billingInquiriesWhatsApp: paymentDetails.billingInquiriesWhatsApp,
+            supportEmail: paymentDetails.supportEmail,
+            supportWhatsApp: paymentDetails.supportWhatsApp,
+            paymentOption1Title: paymentDetails.paymentOption1Title,
+            paymentOption1Details: paymentDetails.paymentOption1Details,
+            paymentOption2Title: paymentDetails.paymentOption2Title,
+            paymentOption2Details: paymentDetails.paymentOption2Details,
+            paymentOption3Title: paymentDetails.paymentOption3Title,
+            paymentOption3Details: paymentDetails.paymentOption3Details,
+          }
+        : {}),
     };
 
+    console.log(
+      "[PDF] PaymentDetails loaded:",
+      paymentDetails
+        ? {
+            companyName: paymentDetails.companyName,
+            paymentOption1Title: paymentDetails.paymentOption1Title,
+            paymentOption2Title: paymentDetails.paymentOption2Title,
+            paymentOption3Title: paymentDetails.paymentOption3Title,
+          }
+        : "none",
+    );
+
     const htmlContent = renderInvoiceTemplate(pdfTemplate, pdfData);
+    console.log("[PDF] Template rendered successfully, generating PDF...");
+
     const pdfBuffer = await generatePDFFromHTML(htmlContent);
+    console.log(
+      "[PDF] PDF generated successfully, size:",
+      pdfBuffer.length,
+      "bytes",
+    );
 
     return pdfBuffer;
   } catch (error) {

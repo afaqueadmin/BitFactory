@@ -10,7 +10,7 @@
       box-sizing: border-box;
     }
     body {
-      font-family: 'Arial', sans-serif;
+      font-family: 'Times New Roman', 'Georgia', serif;
       color: #333;
       background-color: #fff;
       padding: 20px;
@@ -65,6 +65,7 @@
     .info-row {
       display: flex;
       font-size: 12px;
+      margin-bottom: 12px;
     }
     .info-label {
       font-weight: bold;
@@ -107,6 +108,7 @@
       background-color: #e8e8e8;
       padding: 20px;
       margin: 20px 0;
+      min-height: 200px;
     }
     .payment-title {
       font-weight: bold;
@@ -119,7 +121,7 @@
       font-size: 12px;
     }
     .payment-option {
-      margin-bottom: 15px;
+      margin-bottom: 25px;
       font-size: 12px;
     }
     .payment-option-title {
@@ -130,6 +132,9 @@
     .payment-option-content {
       margin-left: 10px;
       font-family: monospace;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      line-height: 1.5;
     }
     .footer-section {
       margin-top: 20px;
@@ -193,7 +198,7 @@
       </div>
       <div class="location">
         <span class="location-label">Machine Hosting Location:</span><br>
-        <span class="location-value">Addis Ababa, Ethiopia</span>
+        <span class="location-value">{{machineHostingLocation}}</span>
       </div>
     </div>
 
@@ -253,46 +258,50 @@
       <div class="payment-title">PAYMENT INSTRUCTIONS:</div>
       <div class="payment-subtitle">Please make all transfers directly to the following accounts:</div>
 
+{{#if paymentOption1Title}}
       <div class="payment-option">
-        <div class="payment-option-title">OPTION 1:</div>
-        <div>USDT (Tron): TLNjcYnokhA1UcVsYVKjdeh9HzMS6GQJNe</div>
+        <div class="payment-option-title">{{paymentOption1Title}}</div>
+        <div class="payment-option-content">{{paymentOption1Details}}</div>
       </div>
-
+{{/if}}
+{{#if paymentOption2Title}}
       <div class="payment-option">
-        <div class="payment-option-title">OPTION 2:</div>
-        <div>USDC (ETH): 0x722460E434013075E8cF8dd42c8854424aFa336E</div>
+        <div class="payment-option-title">{{paymentOption2Title}}</div>
+        <div class="payment-option-content">{{paymentOption2Details}}</div>
       </div>
-
+{{/if}}
+{{#if paymentOption3Title}}
       <div class="payment-option">
-        <div class="payment-option-title">OPTION 3:</div>
-        <div>
-          Account Title: Higgs Computing Limited<br>
-          Account IBAN: AE5213230013299500000001<br>
-          Bank Name: Ruya Community Islamic Bank LLC<br>
-          SWIFT Code/BIC: E132AEXX<br>
-          Routing Code: 413240101<br>
-          Account Currency: AED<br>
-          Conversion: 3.67 AED/USD
-        </div>
+        <div class="payment-option-title">{{paymentOption3Title}}</div>
+        <div class="payment-option-content">{{paymentOption3Details}}</div>
       </div>
+{{/if}}
     </div>
 
     <!-- Footer -->
     <div class="footer-section">
       <div class="footer-contact">
         <div class="footer-contact-title">Direct all Billing Inquiries:</div>
-        <div class="footer-contact-item">Email: <a href="mailto:invoices@bitfactory.ae">invoices@bitfactory.ae</a></div>
-        <div class="footer-contact-item">WhatsApp: +971-52-6062903</div>
+{{#if billingInquiriesEmail}}
+        <div class="footer-contact-item">Email: <a href="mailto:{{billingInquiriesEmail}}">{{billingInquiriesEmail}}</a></div>
+{{/if}}
+{{#if billingInquiriesWhatsApp}}
+        <div class="footer-contact-item">WhatsApp: {{billingInquiriesWhatsApp}}</div>
+{{/if}}
       </div>
       <div class="footer-branding">
-        <div class="footer-branding-text">BitFactory.AE</div>
-        <div class="footer-company">Higgs Computing Limited</div>
-        <div class="footer-company-address">Ras Al Khaimah, UAE</div>
+        <div class="footer-branding-text">{{companyName}}</div>
+        <div class="footer-company">{{companyLegalName}}</div>
+        <div class="footer-company-address">{{companyLocation}}</div>
       </div>
       <div class="footer-contact2">
         <div class="footer-contact-title">Direct all Support Inquiries:</div>
-        <div class="footer-contact-item">Email: <a href="mailto:support@bitfactory.ae">support@bitfactory.ae</a></div>
-        <div class="footer-contact-item">WhatsApp: +971-52-6062903</div>
+{{#if supportEmail}}
+        <div class="footer-contact-item">Email: <a href="mailto:{{supportEmail}}">{{supportEmail}}</a></div>
+{{/if}}
+{{#if supportWhatsApp}}
+        <div class="footer-contact-item">WhatsApp: {{supportWhatsApp}}</div>
+{{/if}}
       </div>
     </div>
   </div>

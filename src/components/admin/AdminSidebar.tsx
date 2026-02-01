@@ -24,6 +24,7 @@ import {
   Construction as SelfMiningIcon,
   PriceCheck as HostingPricesIcon,
   Assignment as AccountingIcon,
+  Description as DocumentIcon,
   ChevronLeft,
   ChevronRight,
 } from "@mui/icons-material";
@@ -133,6 +134,11 @@ const sidebarItems: SidebarItem[] = [
         title: "Pricing",
         icon: <HostingPricesIcon />,
         path: "/accounting/pricing",
+      },
+      {
+        title: "PDF Invoice Settings",
+        icon: <DocumentIcon />,
+        path: "/accounting/pdf-invoice-settings",
       },
     ],
   },

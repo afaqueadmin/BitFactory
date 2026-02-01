@@ -88,6 +88,10 @@ export async function POST(
     // Send invoice email with PDF attachment
     let emailResult;
     try {
+      console.log(
+        `[Email] Starting PDF generation for invoice ${invoice.invoiceNumber}...`,
+      );
+
       const pdfBuffer = await generateInvoicePDF(
         invoice.invoiceNumber,
         invoice.user.name || "Valued Customer",
@@ -99,6 +103,10 @@ export async function POST(
         Number(invoice.unitPrice),
         invoice.id,
         new Date(),
+      );
+
+      console.log(
+        `[Email] PDF generated successfully (${pdfBuffer.length} bytes), now sending email...`,
       );
 
       emailResult = await sendInvoiceEmailWithPDF(
@@ -114,8 +122,15 @@ export async function POST(
         pdfBuffer,
         ccEmails,
       );
+
+      console.log(
+        `[Email] Email sent with PDF attachment to ${invoice.user.email}`,
+      );
     } catch (pdfError) {
-      console.error("Failed to generate PDF, trying without PDF:", pdfError);
+      console.error(
+        `[Email] Failed to generate PDF for ${invoice.invoiceNumber}:`,
+        pdfError,
+      );
       // Fallback to simple email without PDF
       emailResult = await sendInvoiceEmail(
         invoice.user.email,
