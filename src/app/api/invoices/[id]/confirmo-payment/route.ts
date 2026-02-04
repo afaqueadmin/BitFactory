@@ -17,9 +17,11 @@ import { ConfirmoPaymentService } from "@/services/confirmoPaymentService";
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    const { id } = await params;
+
     // Check authentication
     const token = request.cookies.get("token")?.value;
     if (!token) {
@@ -34,13 +36,10 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    console.log("Creating Confirmo payment for invoice:", params.id);
+    console.log("Creating Confirmo payment for invoice:", id);
 
     const service = new ConfirmoPaymentService();
-    const result = await service.createPaymentForInvoice(
-      params.id,
-      decoded.userId,
-    );
+    const result = await service.createPaymentForInvoice(id, decoded.userId);
 
     return NextResponse.json(result);
   } catch (error: unknown) {
@@ -63,9 +62,11 @@ export async function POST(
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    const { id } = await params;
+
     // Check authentication
     const token = request.cookies.get("token")?.value;
     if (!token) {
@@ -77,7 +78,7 @@ export async function GET(
     const { prisma } = await import("@/lib/prisma");
 
     const payment = await prisma.confirmoPayment.findUnique({
-      where: { invoiceId: params.id },
+      where: { invoiceId: id },
       include: {
         invoice: {
           select: {
