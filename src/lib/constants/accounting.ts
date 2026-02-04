@@ -170,6 +170,7 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   [AuditAction.INVOICE_ISSUED]: "Invoice Issued",
   [AuditAction.INVOICE_SENT_TO_CUSTOMER]: "Invoice Sent to Customer",
   [AuditAction.INVOICE_CANCELLED]: "Invoice Cancelled",
+  [AuditAction.INVOICE_PAID]: "Invoice Paid",
   [AuditAction.PAYMENT_ADDED]: "Payment Added",
   [AuditAction.PAYMENT_REMOVED]: "Payment Removed",
   [AuditAction.PAYMENT_REFUNDED]: "Payment Refunded",
