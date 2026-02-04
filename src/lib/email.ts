@@ -20,7 +20,7 @@ const formatDate = (date: Date): string => {
  */
 const renderInvoiceTemplate = (
   template: string,
-  data: Record<string, string | number | null | undefined>,
+  data: Record<string, string | number | boolean | null | undefined>,
 ): string => {
   let html = template;
 
