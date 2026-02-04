@@ -164,6 +164,15 @@ export default function AdminHeader() {
 
             <MenuItem
               onClick={() => {
+                router.push("/settings/payment");
+                handleClose();
+              }}
+            >
+              Payment Settings
+            </MenuItem>
+
+            <MenuItem
+              onClick={() => {
                 router.push("/adminpanel/settings");
                 handleClose();
               }}

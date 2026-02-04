@@ -240,6 +240,7 @@ model Invoice {
   updatedAt            DateTime              @updatedAt
   notifications        InvoiceNotification[] @relation("invoiceNotifications")
   costPayments         CostPayment[]         @relation("invoiceCostPayments")
+  confirmoPayment      ConfirmoPayment?
   createdByUser        User                  @relation("invoicesCreated", fields: [createdBy], references: [id])
   updatedByUser        User?                 @relation("invoicesUpdated", fields: [updatedBy], references: [id])
   user                 User                  @relation("invoices", fields: [userId], references: [id])
@@ -369,6 +370,7 @@ enum AuditAction {
   INVOICE_ISSUED
   INVOICE_SENT_TO_CUSTOMER
   INVOICE_CANCELLED
+  INVOICE_PAID
   PAYMENT_ADDED
   PAYMENT_REMOVED
   PAYMENT_REFUNDED
@@ -430,6 +432,11 @@ model PaymentDetails {
   supportEmail            String    @default("support@bitfactory.ae")
   supportWhatsApp         String    @default("+971-52-6062903")
   
+  // Confirmo Integration Settings
+  confirmoEnabled           Boolean   @default(false)
+  confirmoSettlementCurrency String?  @default("USDC")
+  confirmoReturnUrl         String?   @default("https://my.bitfactory.ae/invoices/payment-success")
+  
   // Metadata
   createdAt               DateTime  @default(now())
   updatedAt               DateTime  @updatedAt
@@ -438,4 +445,53 @@ model PaymentDetails {
   
   @@index([id])
   @@index([updatedBy])
+}
+
+model ConfirmoPayment {
+  id                String                   @id @default(cuid())
+  
+  // Link to Invoice
+  invoiceId         String                   @unique
+  invoice           Invoice                  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  
+  // Confirmo Details
+  confirmoInvoiceId String                   @unique
+  paymentUrl        String
+  amount            Decimal                  @db.Decimal(12, 2)
+  currency          String                   @default("USD")
+  settlementCurrency String?                 @default("USDC")
+  
+  // Status Tracking
+  status            ConfirmoPaymentStatus    @default(PENDING)
+  
+  // Webhook Data (populated after payment)
+  paidAmount        Decimal?                 @db.Decimal(12, 8)
+  paidCurrency      String?
+  transactionHash   String?
+  confirmedAt       DateTime?
+  
+  // Metadata
+  customerEmail     String
+  notifyEmail       String
+  reference         String
+  
+  // Timestamps
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+  expiresAt         DateTime?
+  
+  @@index([confirmoInvoiceId])
+  @@index([status])
+  @@index([invoiceId])
+  @@map("confirmo_payments")
+}
+
+enum ConfirmoPaymentStatus {
+  PENDING
+  PROCESSING
+  CONFIRMED
+  COMPLETED
+  EXPIRED
+  CANCELLED
+  FAILED
 }

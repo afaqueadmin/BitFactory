@@ -268,6 +268,7 @@ export const sendInvoiceEmailWithPDF = async (
   invoiceId: string,
   pdfBuffer: Buffer,
   ccEmails?: string[],
+  cryptoPaymentUrl?: string | null,
 ) => {
   try {
     // Load email template
@@ -287,6 +288,8 @@ export const sendInvoiceEmailWithPDF = async (
       totalMiners,
       unitPrice: `$${Number(unitPrice).toFixed(2)}`,
       totalAmount: `$${Number(totalAmount).toFixed(2)}`,
+      cryptoPaymentUrl: cryptoPaymentUrl || "",
+      hasCryptoPayment: !!cryptoPaymentUrl,
     };
 
     const htmlContent = renderInvoiceTemplate(emailTemplate, emailData);
@@ -382,6 +385,7 @@ export const generateInvoicePDF = async (
   unitPrice: number | string,
   invoiceId: string,
   generatedDate: Date,
+  cryptoPaymentUrl?: string | null,
 ): Promise<Buffer> => {
   try {
     // Load PDF template
@@ -402,7 +406,10 @@ export const generateInvoicePDF = async (
     }
 
     // Render PDF template with invoice data and payment details
-    const pdfData: Record<string, string | number | null | undefined> = {
+    const pdfData: Record<
+      string,
+      string | number | null | undefined | boolean
+    > = {
       invoiceNumber,
       customerName,
       customerEmail,
@@ -415,6 +422,8 @@ export const generateInvoicePDF = async (
       totalAmount: `$${Number(totalAmount).toFixed(2)}`,
       invoiceId,
       generatedDate: formatDate(generatedDate),
+      cryptoPaymentUrl: cryptoPaymentUrl || "",
+      hasCryptoPayment: !!cryptoPaymentUrl,
       // Add PaymentDetails if available - include all fields as-is
       ...(paymentDetails
         ? {

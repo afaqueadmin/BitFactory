@@ -136,6 +136,24 @@
       word-wrap: break-word;
       line-height: 1.5;
     }
+    .crypto-payment-button {
+      display: inline-block;
+      background-color: #28a745;
+      color: white;
+      padding: 12px 24px;
+      text-decoration: none;
+      border-radius: 5px;
+      font-weight: bold;
+      margin: 10px 0;
+      font-family: Arial, sans-serif;
+    }
+    .crypto-payment-info {
+      margin-top: 8px;
+      font-family: Arial, sans-serif;
+      font-size: 11px;
+      color: #555;
+      line-height: 1.4;
+    }
     .footer-section {
       margin-top: 20px;
       padding-top: 20px;
@@ -258,6 +276,17 @@
       <div class="payment-title">PAYMENT INSTRUCTIONS:</div>
       <div class="payment-subtitle">Please make all transfers directly to the following accounts:</div>
 
+{{#if hasCryptoPayment}}
+      <div class="payment-option" style="background-color: #e8f5e9; border-left: 4px solid #28a745; padding: 15px;">
+        <div class="payment-option-title" style="color: #28a745; margin-bottom: 12px;">💳 CRYPTO PAYMENT</div>
+        <div style="text-align: center;">
+          <a href="{{cryptoPaymentUrl}}" class="crypto-payment-button">Pay with Crypto</a>
+          <div class="crypto-payment-info">
+            You can pay using USDT, USDC, BTC, etc. from your exchange or wallet directly
+          </div>
+        </div>
+      </div>
+{{/if}}
 {{#if paymentOption1Title}}
       <div class="payment-option">
         <div class="payment-option-title">{{paymentOption1Title}}</div>

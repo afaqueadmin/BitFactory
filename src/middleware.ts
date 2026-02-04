@@ -37,6 +37,7 @@ const securePaths = {
     "/hardware",
     "/machine",
     "/security-settings",
+    "/settings/payment",
     "/space",
     "/subaccounts",
     "/workers",

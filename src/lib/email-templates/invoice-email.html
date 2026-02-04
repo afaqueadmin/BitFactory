@@ -134,6 +134,16 @@
         Please find attached the complete invoice details and a PDF copy for your records. 
         Please ensure payment is made by the due date to avoid any late fees.
       </p>
+      {{#if hasCryptoPayment}}
+      <div style="text-align: center; margin: 30px 0;">
+        <a href="{{cryptoPaymentUrl}}" class="button" style="background-color: #28a745; font-size: 16px; padding: 12px 30px;">
+          💳 Pay with Crypto
+        </a>
+        <p style="color: #666; font-size: 13px; margin-top: 10px;">
+          You can pay using USDT, USDC, BTC, etc. from your exchange or wallet directly
+        </p>
+      </div>
+      {{/if}}
     </div>
 
     <div class="footer">

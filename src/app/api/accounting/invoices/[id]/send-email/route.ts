@@ -8,6 +8,7 @@ import {
   sendInvoiceEmailWithPDF,
 } from "@/lib/email";
 import { getGroupBySubaccountName } from "@/lib/groupUtils";
+import { ConfirmoPaymentService } from "@/services/confirmoPaymentService";
 
 export async function POST(
   request: NextRequest,
@@ -85,6 +86,34 @@ export async function POST(
       ccEmails.push(invoiceCCEmail);
     }
 
+    // Check if crypto payments are enabled and generate payment link
+    let cryptoPaymentUrl: string | null = null;
+    try {
+      const paymentSettings = await prisma.paymentDetails.findFirst();
+      if (paymentSettings?.confirmoEnabled) {
+        console.log(
+          `[Email] Crypto payments enabled, generating payment link for invoice ${invoice.invoiceNumber}...`,
+        );
+        const confirmoService = new ConfirmoPaymentService();
+        const result = await confirmoService.createPaymentForInvoice(
+          id,
+          userId,
+        );
+        if (result.success && result.data?.paymentUrl) {
+          cryptoPaymentUrl = result.data.paymentUrl;
+          console.log(
+            `[Email] Crypto payment link generated: ${cryptoPaymentUrl}`,
+          );
+        }
+      }
+    } catch (cryptoError) {
+      console.error(
+        "[Email] Failed to generate crypto payment link:",
+        cryptoError,
+      );
+      // Continue without crypto payment link
+    }
+
     // Send invoice email with PDF attachment
     let emailResult;
     try {
@@ -103,6 +132,7 @@ export async function POST(
         Number(invoice.unitPrice),
         invoice.id,
         new Date(),
+        cryptoPaymentUrl,
       );
 
       console.log(
@@ -121,6 +151,7 @@ export async function POST(
         invoice.id,
         pdfBuffer,
         ccEmails,
+        cryptoPaymentUrl,
       );
 
       console.log(
