@@ -326,12 +326,12 @@ export default function DashboardPage() {
               textAlign: "left",
             }}
           >
-            Total overview of your Hosted Miners
+            Hosted Miners
           </Typography>
 
           <MiningEarningsChart
             title="Daily Mining Performance"
-            height={400}
+            height={520}
             days={31}
           />
         </Box>

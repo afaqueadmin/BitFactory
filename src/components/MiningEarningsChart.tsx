@@ -44,6 +44,30 @@ export default function MiningEarningsChart({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const { yMin, yMax } = React.useMemo(() => {
+    if (!miningData.length) {
+      return { yMin: 0, yMax: 1 };
+    }
+
+    const values = miningData
+      .map((item) => Number(item.earnings))
+      .filter((value) => Number.isFinite(value));
+
+    if (!values.length) {
+      return { yMin: 0, yMax: 1 };
+    }
+
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const range = max - min || Math.max(max * 0.05, 0.00000001);
+    const padding = range * 0.7;
+
+    return {
+      yMin: Math.max(0, min - padding),
+      yMax: max + padding,
+    };
+  }, [miningData]);
+
   // Fetch mining performance data
   useEffect(() => {
     const fetchMiningData = async () => {
@@ -109,7 +133,7 @@ export default function MiningEarningsChart({
       sx={{
         p: 3,
         width: "100%",
-        minHeight: height + 80,
+        minHeight: height + 120,
         display: "flex",
         flexDirection: "column",
         background:
@@ -222,7 +246,8 @@ export default function MiningEarningsChart({
 
               <YAxis
                 tick={{ fontSize: 11, fill: theme.palette.text.secondary }}
-                domain={[0, (dataMax: number) => dataMax * 1.2]}
+                domain={[yMin, yMax]}
+                tickCount={12}
                 label={{
                   value: "Revenue (BTC ₿)",
                   angle: -90,
