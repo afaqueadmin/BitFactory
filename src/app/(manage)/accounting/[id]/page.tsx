@@ -43,6 +43,7 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EmailIcon from "@mui/icons-material/Email";
 import CancelIcon from "@mui/icons-material/Cancel";
+import { AuditLog } from "@/lib/types/invoice";
 
 function formatAuditAction(action: string): string {
   const actionMap: { [key: string]: string } = {
@@ -677,7 +678,7 @@ export default function InvoiceDetailPage() {
               </Typography>
             ) : (
               <Stack spacing={2}>
-                {auditLogs.map((log, index) => (
+                {auditLogs.map((log: AuditLog, index: number) => (
                   <Box
                     key={log.id}
                     sx={{

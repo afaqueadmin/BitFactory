@@ -5,7 +5,7 @@
  * Used by both UI (mock data) and API (real data) to ensure consistency.
  */
 
-import { InvoiceStatus } from "@/generated/prisma";
+import { InvoiceStatus, User } from "@/generated/prisma";
 
 export { InvoiceStatus } from "@/generated/prisma";
 
@@ -132,6 +132,7 @@ export interface AuditLog {
   ipAddress: string | null; // Client IP
   userAgent: string | null; // Browser info
   createdAt: Date;
+  user: User;
 }
 
 /**
