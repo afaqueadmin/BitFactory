@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Invoice,
   InvoiceStatus,
@@ -34,84 +34,60 @@ export function useInvoices(
   customerId?: string,
   status?: InvoiceStatus,
 ) {
-  const [invoices, setInvoices] = useState<InvoiceWithDetails[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["invoices", page, limit, customerId, status],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      params.append("page", page.toString());
+      params.append("limit", limit.toString());
+      if (customerId) params.append("customerId", customerId);
+      if (status) params.append("status", status);
 
-  useEffect(() => {
-    const fetchInvoices = async () => {
-      try {
-        setLoading(true);
-        setError(null);
+      const res = await fetch(`/api/accounting/invoices?${params}`, {
+        method: "GET",
+        credentials: "include",
+      });
 
-        const params = new URLSearchParams();
-        params.append("page", page.toString());
-        params.append("limit", limit.toString());
-        if (customerId) params.append("customerId", customerId);
-        if (status) params.append("status", status);
-
-        const res = await fetch(`/api/accounting/invoices?${params}`, {
-          method: "GET",
-          credentials: "include",
-        });
-
-        if (!res.ok) {
-          throw new Error("Failed to fetch invoices");
-        }
-
-        const data = await res.json();
-        setInvoices(data.invoices);
-        setTotal(data.pagination.total);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Unknown error");
-      } finally {
-        setLoading(false);
+      if (!res.ok) {
+        throw new Error("Failed to fetch invoices");
       }
-    };
 
-    fetchInvoices();
-  }, [page, limit, customerId, status]);
+      return res.json();
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
 
-  return { invoices, total, loading, error };
+  return {
+    invoices: data?.invoices || [],
+    total: data?.pagination?.total || 0,
+    loading: isLoading,
+    error: error instanceof Error ? error.message : null,
+  };
 }
 
 export function useInvoice(id: string) {
-  const [invoice, setInvoice] = useState<InvoiceWithDetails | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    if (!id) return;
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["invoice", id],
+    queryFn: async () => {
+      const res = await fetch(`/api/accounting/invoices/${id}`, {
+        method: "GET",
+        credentials: "include",
+      });
 
-    const fetchInvoice = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        const res = await fetch(`/api/accounting/invoices/${id}`, {
-          method: "GET",
-          credentials: "include",
-        });
-
-        if (!res.ok) {
-          throw new Error("Failed to fetch invoice");
-        }
-
-        const data = await res.json();
-        setInvoice(data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Unknown error");
-      } finally {
-        setLoading(false);
+      if (!res.ok) {
+        throw new Error("Failed to fetch invoice");
       }
-    };
 
-    fetchInvoice();
-  }, [id]);
+      return res.json();
+    },
+    enabled: !!id,
+    staleTime: 5 * 60 * 1000,
+  });
 
-  const updateInvoice = async (updates: Partial<InvoiceWithDetails>) => {
-    try {
+  const updateInvoiceMutation = useMutation({
+    mutationFn: async (updates: Partial<InvoiceWithDetails>) => {
       const res = await fetch(`/api/accounting/invoices/${id}`, {
         method: "PUT",
         credentials: "include",
@@ -123,18 +99,15 @@ export function useInvoice(id: string) {
         throw new Error("Failed to update invoice");
       }
 
-      const data = await res.json();
-      setInvoice(data);
-      return data;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Unknown error";
-      setError(message);
-      throw err;
-    }
-  };
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData(["invoice", id], data);
+    },
+  });
 
-  const deleteInvoice = async () => {
-    try {
+  const deleteInvoiceMutation = useMutation({
+    mutationFn: async () => {
       const res = await fetch(`/api/accounting/invoices/${id}`, {
         method: "DELETE",
         credentials: "include",
@@ -144,32 +117,33 @@ export function useInvoice(id: string) {
         throw new Error("Failed to delete invoice");
       }
 
-      return await res.json();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Unknown error";
-      setError(message);
-      throw err;
-    }
-  };
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+    },
+  });
 
-  return { invoice, loading, error, updateInvoice, deleteInvoice };
+  return {
+    invoice: data || null,
+    loading: isLoading,
+    error: error instanceof Error ? error.message : null,
+    updateInvoice: updateInvoiceMutation.mutateAsync,
+    deleteInvoice: deleteInvoiceMutation.mutateAsync,
+  };
 }
 
 export function useCreateInvoice() {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
-  const create = async (invoiceData: {
-    customerId: string;
-    totalMiners: number;
-    unitPrice: number;
-    dueDate: string;
-    status?: InvoiceStatus;
-  }) => {
-    try {
-      setLoading(true);
-      setError(null);
-
+  const mutation = useMutation({
+    mutationFn: async (invoiceData: {
+      customerId: string;
+      totalMiners: number;
+      unitPrice: number;
+      dueDate: string;
+      status?: InvoiceStatus;
+    }) => {
       const res = await fetch("/api/accounting/invoices", {
         method: "POST",
         credentials: "include",
@@ -182,17 +156,18 @@ export function useCreateInvoice() {
         throw new Error(error.error || "Failed to create invoice");
       }
 
-      return await res.json();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Unknown error";
-      setError(message);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  };
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+    },
+  });
 
-  return { create, loading, error };
+  return {
+    create: mutation.mutateAsync,
+    loading: mutation.isPending,
+    error: mutation.error instanceof Error ? mutation.error.message : null,
+  };
 }
 
 export interface Customer {
@@ -203,39 +178,28 @@ export interface Customer {
 }
 
 export function useCustomers() {
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["customers"],
+    queryFn: async () => {
+      const res = await fetch("/api/accounting/customers", {
+        method: "GET",
+        credentials: "include",
+      });
 
-  useEffect(() => {
-    const fetchCustomers = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        const res = await fetch("/api/accounting/customers", {
-          method: "GET",
-          credentials: "include",
-        });
-
-        if (!res.ok) {
-          throw new Error("Failed to fetch customers");
-        }
-
-        const data = await res.json();
-        setCustomers(data.customers || []);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Unknown error");
-        setCustomers([]);
-      } finally {
-        setLoading(false);
+      if (!res.ok) {
+        throw new Error("Failed to fetch customers");
       }
-    };
 
-    fetchCustomers();
-  }, []);
+      return res.json();
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
 
-  return { customers, loading, error };
+  return {
+    customers: data?.customers || [],
+    loading: isLoading,
+    error: error instanceof Error ? error.message : null,
+  };
 }
 
 export interface Miner {
@@ -245,65 +209,49 @@ export interface Miner {
 }
 
 export function useCustomerMiners(customerId?: string) {
-  const [miners, setMiners] = useState<Miner[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["customerMiners", customerId],
+    queryFn: async () => {
+      const res = await fetch(
+        `/api/accounting/miners?customerId=${customerId}&status=Auto`,
+        {
+          method: "GET",
+          credentials: "include",
+        },
+      );
 
-  useEffect(() => {
-    if (!customerId) {
-      setMiners([]);
-      return;
-    }
-
-    const fetchMiners = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        const res = await fetch(
-          `/api/accounting/miners?customerId=${customerId}&status=Auto`,
-          {
-            method: "GET",
-            credentials: "include",
-          },
-        );
-
-        if (!res.ok) {
-          throw new Error("Failed to fetch miners");
-        }
-
-        const data = await res.json();
-        setMiners(data.miners || []);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Unknown error");
-        setMiners([]);
-      } finally {
-        setLoading(false);
+      if (!res.ok) {
+        throw new Error("Failed to fetch miners");
       }
-    };
 
-    fetchMiners();
-  }, [customerId]);
+      return res.json();
+    },
+    enabled: !!customerId,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
 
-  return { miners, loading, error };
+  return {
+    miners: data?.miners || [],
+    loading: isLoading,
+    error: error instanceof Error ? error.message : null,
+  };
 }
 
 export function useUpdateInvoice() {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
-  const update = async (
-    invoiceId: string,
-    data: {
-      totalMiners: number;
-      unitPrice: number;
-      dueDate: string;
-    },
-  ) => {
-    try {
-      setLoading(true);
-      setError(null);
-
+  const mutation = useMutation({
+    mutationFn: async ({
+      invoiceId,
+      data,
+    }: {
+      invoiceId: string;
+      data: {
+        totalMiners: number;
+        unitPrice: number;
+        dueDate: string;
+      };
+    }) => {
       const res = await fetch(`/api/accounting/invoices/${invoiceId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -316,66 +264,58 @@ export function useUpdateInvoice() {
       }
 
       return await res.json();
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : "Unknown error";
-      setError(errorMsg);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+    onSuccess: (data, variables) => {
+      queryClient.setQueryData(["invoice", variables.invoiceId], data);
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+    },
+  });
 
-  return { update, loading, error };
+  return {
+    update: async (
+      invoiceId: string,
+      data: {
+        totalMiners: number;
+        unitPrice: number;
+        dueDate: string;
+      },
+    ) => mutation.mutateAsync({ invoiceId, data }),
+    loading: mutation.isPending,
+    error: mutation.error instanceof Error ? mutation.error.message : null,
+  };
 }
 export function useInvoiceAuditLog(invoiceId: string) {
-  const [auditLogs, setAuditLogs] = useState<AuditLogWithUser[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["invoiceAuditLog", invoiceId],
+    queryFn: async () => {
+      const res = await fetch(
+        `/api/accounting/invoices/${invoiceId}/audit-log`,
+        {
+          method: "GET",
+          credentials: "include",
+        },
+      );
 
-  useEffect(() => {
-    if (!invoiceId) return;
-
-    const fetchAuditLogs = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        const res = await fetch(
-          `/api/accounting/invoices/${invoiceId}/audit-log`,
-          {
-            method: "GET",
-            credentials: "include",
-          },
-        );
-
-        if (!res.ok) {
-          throw new Error("Failed to fetch audit logs");
-        }
-
-        const data = await res.json();
-        setAuditLogs(data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Unknown error");
-      } finally {
-        setLoading(false);
+      if (!res.ok) {
+        throw new Error("Failed to fetch audit logs");
       }
-    };
 
-    fetchAuditLogs();
-  }, [invoiceId]);
+      return await res.json();
+    },
+    enabled: !!invoiceId,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
 
-  return { auditLogs, loading, error };
+  return {
+    auditLogs: data || [],
+    loading: isLoading,
+    error: error instanceof Error ? error.message : null,
+  };
 }
 
 export function useSendInvoiceEmail() {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const sendEmail = async (invoiceId: string) => {
-    try {
-      setLoading(true);
-      setError(null);
-
+  const mutation = useMutation({
+    mutationFn: async (invoiceId: string) => {
       const res = await fetch(
         `/api/accounting/invoices/${invoiceId}/send-email`,
         {
@@ -390,33 +330,30 @@ export function useSendInvoiceEmail() {
       }
 
       return await res.json();
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : "Unknown error";
-      setError(errorMsg);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+  });
 
-  return { sendEmail, loading, error };
+  return {
+    sendEmail: mutation.mutateAsync,
+    loading: mutation.isPending,
+    error: mutation.error instanceof Error ? mutation.error.message : null,
+  };
 }
 export function useRecordPayment() {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
-  const recordPayment = async (
-    invoiceId: string,
-    data: {
-      amountPaid: number;
-      paymentDate: string;
-      notes?: string;
-    },
-  ) => {
-    try {
-      setLoading(true);
-      setError(null);
-
+  const mutation = useMutation({
+    mutationFn: async ({
+      invoiceId,
+      data,
+    }: {
+      invoiceId: string;
+      data: {
+        amountPaid: number;
+        paymentDate: string;
+        notes?: string;
+      };
+    }) => {
       const res = await fetch(
         `/api/accounting/invoices/${invoiceId}/record-payment`,
         {
@@ -432,30 +369,38 @@ export function useRecordPayment() {
       }
 
       return await res.json();
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : "Unknown error";
-      setError(errorMsg);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+    onSuccess: (data, variables) => {
+      queryClient.setQueryData(["invoice", variables.invoiceId], data);
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+    },
+  });
 
-  return { recordPayment, loading, error };
+  return {
+    recordPayment: (
+      invoiceId: string,
+      data: {
+        amountPaid: number;
+        paymentDate: string;
+        notes?: string;
+      },
+    ) => mutation.mutateAsync({ invoiceId, data }),
+    loading: mutation.isPending,
+    error: mutation.error instanceof Error ? mutation.error.message : null,
+  };
 }
 
 export function useChangeInvoiceStatus() {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
-  const changeStatus = async (
-    invoiceId: string,
-    status: "ISSUED" | "PAID" | "CANCELLED" | "OVERDUE",
-  ) => {
-    try {
-      setLoading(true);
-      setError(null);
-
+  const mutation = useMutation({
+    mutationFn: async ({
+      invoiceId,
+      status,
+    }: {
+      invoiceId: string;
+      status: "ISSUED" | "PAID" | "CANCELLED" | "OVERDUE";
+    }) => {
       const res = await fetch(`/api/accounting/invoices/${invoiceId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -469,26 +414,27 @@ export function useChangeInvoiceStatus() {
       }
 
       return await res.json();
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : "Unknown error";
-      setError(errorMsg);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+    onSuccess: (data, variables) => {
+      queryClient.setQueryData(["invoice", variables.invoiceId], data);
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+    },
+  });
 
-  return { changeStatus, loading, error };
+  return {
+    changeStatus: (
+      invoiceId: string,
+      status: "ISSUED" | "PAID" | "CANCELLED" | "OVERDUE",
+    ) => mutation.mutateAsync({ invoiceId, status }),
+    loading: mutation.isPending,
+    error: mutation.error instanceof Error ? mutation.error.message : null,
+  };
 }
 export function useDeleteInvoice() {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
-  const deleteInvoice = async (invoiceId: string) => {
-    try {
-      setLoading(true);
-      setError(null);
-
+  const mutation = useMutation({
+    mutationFn: async (invoiceId: string) => {
       const res = await fetch(`/api/accounting/invoices/${invoiceId}`, {
         method: "DELETE",
         credentials: "include",
@@ -500,27 +446,22 @@ export function useDeleteInvoice() {
       }
 
       return await res.json();
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : "Unknown error";
-      setError(errorMsg);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+    },
+  });
 
-  return { deleteInvoice, loading, error };
+  return {
+    deleteInvoice: mutation.mutateAsync,
+    loading: mutation.isPending,
+    error: mutation.error instanceof Error ? mutation.error.message : null,
+  };
 }
 
 export function useBulkSendInvoiceEmail() {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const bulkSendEmail = async (invoiceIds: string[]) => {
-    try {
-      setLoading(true);
-      setError(null);
-
+  const mutation = useMutation({
+    mutationFn: async (invoiceIds: string[]) => {
       const res = await fetch("/api/accounting/invoices/bulk-send-email", {
         method: "POST",
         credentials: "include",
@@ -536,14 +477,12 @@ export function useBulkSendInvoiceEmail() {
       }
 
       return await res.json();
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : "Unknown error";
-      setError(errorMsg);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+  });
 
-  return { bulkSendEmail, loading, error };
+  return {
+    bulkSendEmail: mutation.mutateAsync,
+    loading: mutation.isPending,
+    error: mutation.error instanceof Error ? mutation.error.message : null,
+  };
 }
