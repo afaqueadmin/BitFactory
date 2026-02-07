@@ -149,14 +149,15 @@ export async function GET(
       };
     });
 
-    // Get available subaccounts (users not in this group yet)
-    const subaccountNamesInGroup = group.subaccounts.map(
-      (s) => s.subaccountName,
-    );
+    // Get all subaccounts assigned to ANY group (globally)
+    const allGroupedSubaccounts = await prisma.groupSubaccount.findMany({
+      select: { subaccountName: true },
+    });
+    const allGroupedNames = allGroupedSubaccounts.map((s) => s.subaccountName);
+
+    // Get available subaccounts (users not assigned to any group yet)
     const availableSubaccounts = allUsers
-      .filter(
-        (u) => !subaccountNamesInGroup.includes(u.luxorSubaccountName || ""),
-      )
+      .filter((u) => !allGroupedNames.includes(u.luxorSubaccountName || ""))
       .map((user) => ({
         id: user.id,
         subaccountName: user.luxorSubaccountName || "",

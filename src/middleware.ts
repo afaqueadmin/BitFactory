@@ -20,8 +20,11 @@ const publicPaths = new Set([
 const securePaths = {
   CLIENT: new Set<string>([
     "/account-settings",
+    "/btc-price-history",
     "/clientworkers",
     "/dashboard",
+    "/hashprice-history",
+    "/invoices",
     "/luxor",
     "/miners",
     "/security-setting",

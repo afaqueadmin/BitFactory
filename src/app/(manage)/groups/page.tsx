@@ -41,6 +41,14 @@ import {
   Chip,
   IconButton,
   Tooltip,
+  Tabs,
+  Tab,
+  Checkbox,
+  List,
+  ListItem,
+  ListItemButton,
+  ListItemIcon,
+  ListItemText,
 } from "@mui/material";
 import {
   Add as AddIcon,
@@ -95,6 +103,22 @@ interface GroupFormData {
 }
 
 /**
+ * Subaccount interface
+ */
+interface Subaccount {
+  id: string;
+  subaccountName: string;
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+    luxorSubaccountName: string;
+  };
+  minerCount: number;
+}
+
+/**
  * Component state for managing groups
  */
 interface GroupsState {
@@ -113,6 +137,11 @@ interface DialogState {
   formData: GroupFormData;
   submitting: boolean;
   message: string | null;
+  activeTab: number;
+  availableSubaccounts: Subaccount[];
+  currentSubaccounts: Subaccount[];
+  selectedSubaccountIds: Set<string>;
+  loadingSubaccounts: boolean;
 }
 
 /**
@@ -131,6 +160,11 @@ const initialDialogState: DialogState = {
   },
   submitting: false,
   message: null,
+  activeTab: 0,
+  availableSubaccounts: [],
+  currentSubaccounts: [],
+  selectedSubaccountIds: new Set(),
+  loadingSubaccounts: false,
 };
 
 export default function GroupsPage() {
@@ -393,6 +427,202 @@ export default function GroupsPage() {
   };
 
   /**
+   * Fetch available and current subaccounts for a group
+   */
+  const fetchGroupSubaccounts = useCallback(async (groupId: string) => {
+    setDialog((prev) => ({ ...prev, loadingSubaccounts: true, message: null }));
+
+    try {
+      console.log("[Groups] Fetching subaccounts for group:", groupId);
+
+      const response = await fetch(`/api/groups/${groupId}`);
+
+      if (!response.ok) {
+        throw new Error(`API returned status ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (!data.success) {
+        throw new Error(data.error || "Failed to fetch subaccounts");
+      }
+
+      console.log("[Groups] Fetched subaccounts:", {
+        available: data.data?.availableSubaccounts?.length || 0,
+        current: data.data?.subaccounts?.length || 0,
+      });
+
+      setDialog((prev) => ({
+        ...prev,
+        availableSubaccounts: data.data?.availableSubaccounts || [],
+        currentSubaccounts: data.data?.subaccounts || [],
+        loadingSubaccounts: false,
+      }));
+    } catch (error) {
+      const errorMsg =
+        error instanceof Error ? error.message : "Unknown error occurred";
+      console.error("[Groups] Error fetching subaccounts:", errorMsg);
+      setDialog((prev) => ({
+        ...prev,
+        loadingSubaccounts: false,
+        message: errorMsg,
+      }));
+    }
+  }, []);
+
+  /**
+   * Toggle subaccount selection
+   */
+  const handleSubaccountToggle = (subaccountId: string) => {
+    setDialog((prev) => {
+      const newSelected = new Set(prev.selectedSubaccountIds);
+      if (newSelected.has(subaccountId)) {
+        newSelected.delete(subaccountId);
+      } else {
+        newSelected.add(subaccountId);
+      }
+      return {
+        ...prev,
+        selectedSubaccountIds: newSelected,
+      };
+    });
+  };
+
+  /**
+   * Select all available subaccounts
+   */
+  const handleSelectAllSubaccounts = () => {
+    setDialog((prev) => ({
+      ...prev,
+      selectedSubaccountIds: new Set(
+        prev.availableSubaccounts.map((s) => s.id),
+      ),
+    }));
+  };
+
+  /**
+   * Deselect all subaccounts
+   */
+  const handleDeselectAllSubaccounts = () => {
+    setDialog((prev) => ({
+      ...prev,
+      selectedSubaccountIds: new Set(),
+    }));
+  };
+
+  /**
+   * Add selected subaccounts to group
+   */
+  const handleAddSubaccounts = async () => {
+    if (!dialog.selectedGroup || dialog.selectedSubaccountIds.size === 0) {
+      return;
+    }
+
+    setDialog((prev) => ({ ...prev, submitting: true, message: null }));
+
+    try {
+      const selectedSubaccounts = dialog.availableSubaccounts.filter((s) =>
+        dialog.selectedSubaccountIds.has(s.id),
+      );
+      const subaccountNames = selectedSubaccounts.map((s) => s.subaccountName);
+
+      console.log("[Groups] Adding subaccounts:", subaccountNames);
+
+      const response = await fetch(
+        `/api/groups/${dialog.selectedGroup.id}/subaccounts/bulk-add`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ subaccountNames }),
+        },
+      );
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        const errorMsg = data.error || `API returned status ${response.status}`;
+        console.error("[Groups] Error adding subaccounts:", errorMsg);
+        throw new Error(errorMsg);
+      }
+
+      console.log("[Groups] Subaccounts added successfully");
+
+      // Refresh subaccounts
+      await fetchGroupSubaccounts(dialog.selectedGroup.id);
+
+      // Clear selection
+      setDialog((prev) => ({
+        ...prev,
+        submitting: false,
+        selectedSubaccountIds: new Set(),
+        message: `Successfully added ${data.data.count} subaccount(s)`,
+      }));
+    } catch (error) {
+      const errorMsg =
+        error instanceof Error ? error.message : "Unknown error occurred";
+      console.error("[Groups] Error adding subaccounts:", errorMsg);
+      setDialog((prev) => ({
+        ...prev,
+        submitting: false,
+        message: errorMsg,
+      }));
+    }
+  };
+
+  /**
+   * Remove subaccounts from group
+   */
+  const handleRemoveSubaccounts = async (subaccountIds: string[]) => {
+    if (!dialog.selectedGroup || subaccountIds.length === 0) {
+      return;
+    }
+
+    setDialog((prev) => ({ ...prev, submitting: true, message: null }));
+
+    try {
+      console.log("[Groups] Removing subaccounts:", subaccountIds);
+
+      const response = await fetch(
+        `/api/groups/${dialog.selectedGroup.id}/subaccounts/bulk-remove`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ subaccountIds }),
+        },
+      );
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        const errorMsg = data.error || `API returned status ${response.status}`;
+        console.error("[Groups] Error removing subaccounts:", errorMsg);
+        throw new Error(errorMsg);
+      }
+
+      console.log("[Groups] Subaccounts removed successfully");
+
+      // Refresh subaccounts
+      await fetchGroupSubaccounts(dialog.selectedGroup.id);
+
+      // Clear selection
+      setDialog((prev) => ({
+        ...prev,
+        submitting: false,
+        message: `Successfully removed ${data.data.count} subaccount(s)`,
+      }));
+    } catch (error) {
+      const errorMsg =
+        error instanceof Error ? error.message : "Unknown error occurred";
+      console.error("[Groups] Error removing subaccounts:", errorMsg);
+      setDialog((prev) => ({
+        ...prev,
+        submitting: false,
+        message: errorMsg,
+      }));
+    }
+  };
+
+  /**
    * Open create group dialog
    */
   const openCreateDialog = () => {
@@ -424,7 +654,15 @@ export default function GroupsPage() {
       },
       submitting: false,
       message: null,
+      activeTab: 0,
+      availableSubaccounts: [],
+      currentSubaccounts: [],
+      selectedSubaccountIds: new Set(),
+      loadingSubaccounts: false,
     });
+
+    // Fetch subaccounts
+    fetchGroupSubaccounts(group.id);
   };
 
   /**
@@ -444,6 +682,11 @@ export default function GroupsPage() {
       },
       submitting: false,
       message: null,
+      activeTab: 0,
+      availableSubaccounts: [],
+      currentSubaccounts: [],
+      selectedSubaccountIds: new Set(),
+      loadingSubaccounts: false,
     });
   };
 
@@ -745,13 +988,18 @@ export default function GroupsPage() {
             </IconButton>
           </DialogTitle>
 
-          <DialogContent sx={{ pt: 2 }}>
+          <DialogContent
+            sx={{ pt: 2, minHeight: dialog.mode === "edit" ? "600px" : "auto" }}
+          >
             {dialog.message && (
               <Alert
                 severity={
                   dialog.message.toLowerCase().includes("error")
                     ? "error"
-                    : "info"
+                    : dialog.message.toLowerCase().includes("added") ||
+                        dialog.message.toLowerCase().includes("removed")
+                      ? "success"
+                      : "info"
                 }
                 sx={{ mb: 2 }}
               >
@@ -802,125 +1050,361 @@ export default function GroupsPage() {
                 </Alert>
               </Box>
             ) : (
-              <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                <TextField
-                  fullWidth
-                  label="Group Name"
-                  placeholder="Enter group name"
-                  value={dialog.formData.name}
-                  onChange={(e) =>
-                    setDialog((prev) => ({
-                      ...prev,
-                      formData: {
-                        ...prev.formData,
-                        name: e.target.value,
-                      },
-                      message: null,
-                    }))
-                  }
-                  disabled={dialog.submitting}
-                  variant="outlined"
-                  autoFocus
-                  required
-                />
+              <>
+                {dialog.mode === "edit" && (
+                  <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 3 }}>
+                    <Tabs
+                      value={dialog.activeTab}
+                      onChange={(e, newValue) =>
+                        setDialog((prev) => ({
+                          ...prev,
+                          activeTab: newValue,
+                        }))
+                      }
+                    >
+                      <Tab label="Group Details" />
+                      <Tab label="Manage Subaccounts" />
+                    </Tabs>
+                  </Box>
+                )}
 
-                <TextField
-                  fullWidth
-                  label="Relationship Manager"
-                  placeholder="Enter relationship manager name"
-                  value={dialog.formData.relationshipManager}
-                  onChange={(e) =>
-                    setDialog((prev) => ({
-                      ...prev,
-                      formData: {
-                        ...prev.formData,
-                        relationshipManager: e.target.value,
-                      },
-                      message: null,
-                    }))
-                  }
-                  disabled={dialog.submitting}
-                  variant="outlined"
-                  required
-                />
+                {/* Tab 0: Group Details Form */}
+                {(dialog.mode !== "edit" || dialog.activeTab === 0) && (
+                  <Box
+                    sx={{ display: "flex", flexDirection: "column", gap: 2 }}
+                  >
+                    <TextField
+                      fullWidth
+                      label="Group Name"
+                      placeholder="Enter group name"
+                      value={dialog.formData.name}
+                      onChange={(e) =>
+                        setDialog((prev) => ({
+                          ...prev,
+                          formData: {
+                            ...prev.formData,
+                            name: e.target.value,
+                          },
+                          message: null,
+                        }))
+                      }
+                      disabled={dialog.submitting}
+                      variant="outlined"
+                      autoFocus
+                      required
+                    />
 
-                <TextField
-                  fullWidth
-                  label="Email"
-                  placeholder="Enter email address"
-                  type="email"
-                  value={dialog.formData.email}
-                  onChange={(e) =>
-                    setDialog((prev) => ({
-                      ...prev,
-                      formData: {
-                        ...prev.formData,
-                        email: e.target.value,
-                      },
-                      message: null,
-                    }))
-                  }
-                  disabled={dialog.submitting}
-                  variant="outlined"
-                  required
-                />
+                    <TextField
+                      fullWidth
+                      label="Relationship Manager"
+                      placeholder="Enter relationship manager name"
+                      value={dialog.formData.relationshipManager}
+                      onChange={(e) =>
+                        setDialog((prev) => ({
+                          ...prev,
+                          formData: {
+                            ...prev.formData,
+                            relationshipManager: e.target.value,
+                          },
+                          message: null,
+                        }))
+                      }
+                      disabled={dialog.submitting}
+                      variant="outlined"
+                      required
+                    />
 
-                <TextField
-                  fullWidth
-                  label="Confirm Email"
-                  placeholder="Re-enter email address"
-                  type="email"
-                  value={dialog.formData.confirmEmail}
-                  onChange={(e) =>
-                    setDialog((prev) => ({
-                      ...prev,
-                      formData: {
-                        ...prev.formData,
-                        confirmEmail: e.target.value,
-                      },
-                      message: null,
-                    }))
-                  }
-                  disabled={dialog.submitting}
-                  variant="outlined"
-                  required
-                  error={
-                    !!(
-                      dialog.formData.email &&
-                      dialog.formData.confirmEmail &&
-                      dialog.formData.email !== dialog.formData.confirmEmail
-                    )
-                  }
-                  helperText={
-                    dialog.formData.email &&
-                    dialog.formData.confirmEmail &&
-                    dialog.formData.email !== dialog.formData.confirmEmail
-                      ? "Emails do not match"
-                      : ""
-                  }
-                />
+                    <TextField
+                      fullWidth
+                      label="Email"
+                      placeholder="Enter email address"
+                      type="email"
+                      value={dialog.formData.email}
+                      onChange={(e) =>
+                        setDialog((prev) => ({
+                          ...prev,
+                          formData: {
+                            ...prev.formData,
+                            email: e.target.value,
+                          },
+                          message: null,
+                        }))
+                      }
+                      disabled={dialog.submitting}
+                      variant="outlined"
+                      required
+                    />
 
-                <TextField
-                  fullWidth
-                  label="Description"
-                  placeholder="Enter group description (optional)"
-                  multiline
-                  rows={3}
-                  value={dialog.formData.description}
-                  onChange={(e) =>
-                    setDialog((prev) => ({
-                      ...prev,
-                      formData: {
-                        ...prev.formData,
-                        description: e.target.value,
-                      },
-                      message: null,
-                    }))
-                  }
-                  disabled={dialog.submitting}
-                  variant="outlined"
-                />
-              </Box>
+                    <TextField
+                      fullWidth
+                      label="Confirm Email"
+                      placeholder="Re-enter email address"
+                      type="email"
+                      value={dialog.formData.confirmEmail}
+                      onChange={(e) =>
+                        setDialog((prev) => ({
+                          ...prev,
+                          formData: {
+                            ...prev.formData,
+                            confirmEmail: e.target.value,
+                          },
+                          message: null,
+                        }))
+                      }
+                      disabled={dialog.submitting}
+                      variant="outlined"
+                      required
+                      error={
+                        !!(
+                          dialog.formData.email &&
+                          dialog.formData.confirmEmail &&
+                          dialog.formData.email !== dialog.formData.confirmEmail
+                        )
+                      }
+                      helperText={
+                        dialog.formData.email &&
+                        dialog.formData.confirmEmail &&
+                        dialog.formData.email !== dialog.formData.confirmEmail
+                          ? "Emails do not match"
+                          : ""
+                      }
+                    />
+
+                    <TextField
+                      fullWidth
+                      label="Description"
+                      placeholder="Enter group description (optional)"
+                      multiline
+                      rows={3}
+                      value={dialog.formData.description}
+                      onChange={(e) =>
+                        setDialog((prev) => ({
+                          ...prev,
+                          formData: {
+                            ...prev.formData,
+                            description: e.target.value,
+                          },
+                          message: null,
+                        }))
+                      }
+                      disabled={dialog.submitting}
+                      variant="outlined"
+                    />
+                  </Box>
+                )}
+
+                {/* Tab 1: Manage Subaccounts */}
+                {dialog.mode === "edit" && dialog.activeTab === 1 && (
+                  <Box>
+                    {dialog.loadingSubaccounts ? (
+                      <Box
+                        sx={{ display: "flex", justifyContent: "center", p: 3 }}
+                      >
+                        <CircularProgress />
+                      </Box>
+                    ) : (
+                      <>
+                        {/* Current Subaccounts */}
+                        <Box sx={{ mb: 4 }}>
+                          <Typography
+                            variant="h6"
+                            sx={{ mb: 2, fontWeight: "bold" }}
+                          >
+                            Current Subaccounts (
+                            {dialog.currentSubaccounts.length})
+                          </Typography>
+                          {dialog.currentSubaccounts.length > 0 ? (
+                            <Paper
+                              sx={{ maxHeight: "300px", overflow: "auto" }}
+                            >
+                              <List>
+                                {dialog.currentSubaccounts.map((subaccount) => (
+                                  <ListItem
+                                    key={subaccount.id}
+                                    secondaryAction={
+                                      <Tooltip title="Remove from group">
+                                        <IconButton
+                                          edge="end"
+                                          color="error"
+                                          onClick={() =>
+                                            handleRemoveSubaccounts([
+                                              subaccount.id,
+                                            ])
+                                          }
+                                          disabled={dialog.submitting}
+                                        >
+                                          <DeleteIcon fontSize="small" />
+                                        </IconButton>
+                                      </Tooltip>
+                                    }
+                                    sx={{
+                                      borderBottom: "1px solid",
+                                      borderColor: "divider",
+                                    }}
+                                  >
+                                    <ListItemText
+                                      primary={subaccount.subaccountName}
+                                      secondary={`${subaccount.user?.name || "Unknown"} • ${subaccount.minerCount} miners`}
+                                    />
+                                  </ListItem>
+                                ))}
+                              </List>
+                            </Paper>
+                          ) : (
+                            <Typography variant="body2" color="text.secondary">
+                              No subaccounts assigned yet
+                            </Typography>
+                          )}
+                        </Box>
+
+                        {/* Available Subaccounts */}
+                        <Box>
+                          <Box
+                            sx={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              mb: 2,
+                            }}
+                          >
+                            <Typography
+                              variant="h6"
+                              sx={{ fontWeight: "bold" }}
+                            >
+                              Available Subaccounts (
+                              {dialog.availableSubaccounts.length})
+                            </Typography>
+                            {dialog.availableSubaccounts.length > 0 && (
+                              <Stack direction="row" spacing={1}>
+                                <Button
+                                  size="small"
+                                  variant="outlined"
+                                  onClick={handleSelectAllSubaccounts}
+                                  disabled={
+                                    dialog.submitting ||
+                                    dialog.selectedSubaccountIds.size ===
+                                      dialog.availableSubaccounts.length
+                                  }
+                                >
+                                  Select All
+                                </Button>
+                                <Button
+                                  size="small"
+                                  variant="outlined"
+                                  onClick={handleDeselectAllSubaccounts}
+                                  disabled={
+                                    dialog.submitting ||
+                                    dialog.selectedSubaccountIds.size === 0
+                                  }
+                                >
+                                  Deselect All
+                                </Button>
+                              </Stack>
+                            )}
+                          </Box>
+
+                          {dialog.availableSubaccounts.length > 0 ? (
+                            <>
+                              <Paper
+                                sx={{ maxHeight: "300px", overflow: "auto" }}
+                              >
+                                <List>
+                                  {dialog.availableSubaccounts.map(
+                                    (subaccount) => (
+                                      <ListItem
+                                        key={subaccount.id}
+                                        disablePadding
+                                        sx={{
+                                          borderBottom: "1px solid",
+                                          borderColor: "divider",
+                                        }}
+                                      >
+                                        <ListItemButton
+                                          role={undefined}
+                                          onClick={() =>
+                                            handleSubaccountToggle(
+                                              subaccount.id,
+                                            )
+                                          }
+                                          dense
+                                        >
+                                          <ListItemIcon
+                                            sx={{ minWidth: "40px" }}
+                                          >
+                                            <Checkbox
+                                              edge="start"
+                                              checked={dialog.selectedSubaccountIds.has(
+                                                subaccount.id,
+                                              )}
+                                              onChange={(e) => {
+                                                e.stopPropagation();
+                                                handleSubaccountToggle(
+                                                  subaccount.id,
+                                                );
+                                              }}
+                                              tabIndex={-1}
+                                              disableRipple
+                                            />
+                                          </ListItemIcon>
+                                          <ListItemText
+                                            primary={subaccount.subaccountName}
+                                            secondary={`${subaccount.user?.name || "Unknown"} (${subaccount.user?.email}) • ${subaccount.minerCount} miners`}
+                                          />
+                                        </ListItemButton>
+                                      </ListItem>
+                                    ),
+                                  )}
+                                </List>
+                              </Paper>
+
+                              <Box
+                                sx={{
+                                  mt: 2,
+                                  minHeight: "80px",
+                                  p: 2,
+                                  backgroundColor:
+                                    dialog.selectedSubaccountIds.size > 0
+                                      ? "action.hover"
+                                      : "transparent",
+                                  borderRadius: 1,
+                                }}
+                              >
+                                {dialog.selectedSubaccountIds.size > 0 && (
+                                  <>
+                                    <Typography variant="body2" sx={{ mb: 2 }}>
+                                      {dialog.selectedSubaccountIds.size}{" "}
+                                      subaccount(s) selected
+                                    </Typography>
+                                    <Button
+                                      variant="contained"
+                                      color="primary"
+                                      fullWidth
+                                      onClick={handleAddSubaccounts}
+                                      disabled={dialog.submitting}
+                                    >
+                                      {dialog.submitting ? (
+                                        <CircularProgress
+                                          size={20}
+                                          sx={{ mr: 1 }}
+                                        />
+                                      ) : null}
+                                      Add Selected Subaccounts
+                                    </Button>
+                                  </>
+                                )}
+                              </Box>
+                            </>
+                          ) : (
+                            <Typography variant="body2" color="text.secondary">
+                              All subaccounts are already assigned to groups
+                            </Typography>
+                          )}
+                        </Box>
+                      </>
+                    )}
+                  </Box>
+                )}
+              </>
             )}
           </DialogContent>
 
@@ -928,6 +1412,21 @@ export default function GroupsPage() {
             <Button onClick={closeDialog} disabled={dialog.submitting}>
               Cancel
             </Button>
+            {dialog.mode === "edit" &&
+              dialog.activeTab === 1 &&
+              dialog.currentSubaccounts.length > 0 && (
+                <Button
+                  onClick={() => {
+                    const ids = dialog.currentSubaccounts.map((s) => s.id);
+                    handleRemoveSubaccounts(ids);
+                  }}
+                  variant="outlined"
+                  color="error"
+                  disabled={dialog.submitting}
+                >
+                  Remove All from Group
+                </Button>
+              )}
             <Button
               onClick={handleDialogSubmit}
               variant="contained"

@@ -40,6 +40,18 @@ export async function GET(
       return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
     }
 
+    if (
+      invoice.status !== InvoiceStatus.DRAFT &&
+      invoice.status !== InvoiceStatus.CANCELLED
+    ) {
+      return NextResponse.json(
+        {
+          error: "Only DRAFT or CANCELLED invoices can be deleted",
+        },
+        { status: 400 },
+      );
+    }
+
     const response = NextResponse.json(invoice);
     response.headers.set(
       "Cache-Control",

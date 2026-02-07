@@ -48,6 +48,14 @@ import {
   Close as CloseIcon,
   Search as SearchIcon,
 } from "@mui/icons-material";
+import {
+  List,
+  ListItem,
+  ListItemButton,
+  ListItemIcon,
+  ListItemText,
+  Checkbox,
+} from "@mui/material";
 import GradientStatCard from "@/components/GradientStatCard";
 
 /**
@@ -108,6 +116,7 @@ interface DialogState {
   selectedSubaccount: GroupSubaccount | null;
   submitting: boolean;
   message: string | null;
+  selectedSubaccountIds: Set<string>;
 }
 
 const initialDialogState: DialogState = {
@@ -116,6 +125,7 @@ const initialDialogState: DialogState = {
   selectedSubaccount: null,
   submitting: false,
   message: null,
+  selectedSubaccountIds: new Set(),
 };
 
 export default function GroupDetailPage() {
@@ -285,15 +295,113 @@ export default function GroupDetailPage() {
   };
 
   /**
+   * Toggle subaccount selection for multi-add
+   */
+  const handleSubaccountToggle = (subaccountId: string) => {
+    setDialog((prev) => {
+      const newSelected = new Set(prev.selectedSubaccountIds);
+      if (newSelected.has(subaccountId)) {
+        newSelected.delete(subaccountId);
+      } else {
+        newSelected.add(subaccountId);
+      }
+      return {
+        ...prev,
+        selectedSubaccountIds: newSelected,
+      };
+    });
+  };
+
+  /**
+   * Select all available subaccounts
+   */
+  const handleSelectAllSubaccounts = () => {
+    setDialog((prev) => ({
+      ...prev,
+      selectedSubaccountIds: new Set(
+        state.availableSubaccounts.map((s) => s.id),
+      ),
+    }));
+  };
+
+  /**
+   * Deselect all subaccounts
+   */
+  const handleDeselectAllSubaccounts = () => {
+    setDialog((prev) => ({
+      ...prev,
+      selectedSubaccountIds: new Set(),
+    }));
+  };
+
+  /**
+   * Add multiple selected subaccounts to group
+   */
+  const handleAddMultipleSubaccounts = async () => {
+    if (dialog.selectedSubaccountIds.size === 0) {
+      setDialog((prev) => ({
+        ...prev,
+        message: "Please select at least one subaccount",
+      }));
+      return;
+    }
+
+    setDialog((prev) => ({ ...prev, submitting: true, message: null }));
+
+    try {
+      const selectedSubaccounts = state.availableSubaccounts.filter((s) =>
+        dialog.selectedSubaccountIds.has(s.id),
+      );
+      const subaccountNames = selectedSubaccounts.map((s) => s.subaccountName);
+
+      console.log("[GroupDetail] Adding subaccounts:", subaccountNames);
+
+      const response = await fetch(
+        `/api/groups/${groupId}/subaccounts/bulk-add`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ subaccountNames }),
+        },
+      );
+
+      const data: ApiResponse = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || `API returned status ${response.status}`);
+      }
+
+      console.log("[GroupDetail] Subaccounts added successfully");
+
+      // Refresh data
+      await fetchGroupData();
+
+      // Close dialog
+      setDialog(initialDialogState);
+      setPage(0);
+    } catch (error) {
+      const errorMsg =
+        error instanceof Error ? error.message : "Unknown error occurred";
+      console.error("[GroupDetail] Error adding subaccounts:", errorMsg);
+      setDialog((prev) => ({
+        ...prev,
+        submitting: false,
+        message: errorMsg,
+      }));
+    }
+  };
+
+  /**
    * Open add subaccount dialog
    */
-  const openAddDialog = (subaccount: GroupSubaccount) => {
+  const openAddDialog = () => {
     setDialog({
       open: true,
       mode: "add",
-      selectedSubaccount: subaccount,
+      selectedSubaccount: null,
       submitting: false,
       message: null,
+      selectedSubaccountIds: new Set(),
     });
   };
 
@@ -307,6 +415,7 @@ export default function GroupDetailPage() {
       selectedSubaccount: subaccount,
       submitting: false,
       message: null,
+      selectedSubaccountIds: new Set(),
     });
   };
 
@@ -497,9 +606,7 @@ export default function GroupDetailPage() {
               <Button
                 variant="contained"
                 startIcon={<AddIcon />}
-                onClick={() =>
-                  openAddDialog(state.availableSubaccounts[0] || null)
-                }
+                onClick={openAddDialog}
                 disabled={state.availableSubaccounts.length === 0}
                 size="small"
               >
@@ -676,35 +783,100 @@ export default function GroupDetailPage() {
                   color="text.secondary"
                   sx={{ mb: 2 }}
                 >
-                  Select a subaccount to add to this group:
+                  Select subaccounts to add to this group:
                 </Typography>
                 {state.availableSubaccounts.length > 0 ? (
-                  <TextField
-                    select
-                    fullWidth
-                    label="Available Subaccounts"
-                    value={dialog.selectedSubaccount?.id || ""}
-                    onChange={(e) => {
-                      const selected = state.availableSubaccounts.find(
-                        (s) => s.id === e.target.value,
-                      );
-                      if (selected) {
-                        setDialog((prev) => ({
-                          ...prev,
-                          selectedSubaccount: selected,
-                          message: null,
-                        }));
-                      }
-                    }}
-                    disabled={dialog.submitting}
-                    variant="outlined"
-                  >
-                    {state.availableSubaccounts.map((sub) => (
-                      <MenuItem key={sub.id} value={sub.id}>
-                        {sub.user.name} ({sub.user.email})
-                      </MenuItem>
-                    ))}
-                  </TextField>
+                  <>
+                    <Box sx={{ display: "flex", gap: 1, mb: 2 }}>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={handleSelectAllSubaccounts}
+                        disabled={
+                          dialog.submitting ||
+                          dialog.selectedSubaccountIds.size ===
+                            state.availableSubaccounts.length
+                        }
+                      >
+                        Select All
+                      </Button>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={handleDeselectAllSubaccounts}
+                        disabled={
+                          dialog.submitting ||
+                          dialog.selectedSubaccountIds.size === 0
+                        }
+                      >
+                        Deselect All
+                      </Button>
+                    </Box>
+
+                    <Paper sx={{ maxHeight: "400px", overflow: "auto" }}>
+                      <List>
+                        {state.availableSubaccounts.map((subaccount) => (
+                          <ListItem
+                            key={subaccount.id}
+                            disablePadding
+                            sx={{
+                              borderBottom: "1px solid",
+                              borderColor: "divider",
+                            }}
+                          >
+                            <ListItemButton
+                              role={undefined}
+                              onClick={() =>
+                                handleSubaccountToggle(subaccount.id)
+                              }
+                              dense
+                            >
+                              <ListItemIcon sx={{ minWidth: "40px" }}>
+                                <Checkbox
+                                  edge="start"
+                                  checked={dialog.selectedSubaccountIds.has(
+                                    subaccount.id,
+                                  )}
+                                  onChange={(e) => {
+                                    e.stopPropagation();
+                                    handleSubaccountToggle(subaccount.id);
+                                  }}
+                                  tabIndex={-1}
+                                  disableRipple
+                                />
+                              </ListItemIcon>
+                              <ListItemText
+                                primary={subaccount.subaccountName}
+                                secondary={`${subaccount.user?.name || "Unknown"} (${subaccount.user?.email}) • ${subaccount.minerCount} miners`}
+                              />
+                            </ListItemButton>
+                          </ListItem>
+                        ))}
+                      </List>
+                    </Paper>
+
+                    <Box
+                      sx={{
+                        mt: 2,
+                        minHeight: "60px",
+                        p: 2,
+                        backgroundColor:
+                          dialog.selectedSubaccountIds.size > 0
+                            ? "action.hover"
+                            : "transparent",
+                        borderRadius: 1,
+                        display: "flex",
+                        alignItems: "center",
+                      }}
+                    >
+                      {dialog.selectedSubaccountIds.size > 0 && (
+                        <Typography variant="body2">
+                          {dialog.selectedSubaccountIds.size} subaccount(s)
+                          selected
+                        </Typography>
+                      )}
+                    </Box>
+                  </>
                 ) : (
                   <Alert severity="info">
                     All subaccounts are already in this group
@@ -754,15 +926,26 @@ export default function GroupDetailPage() {
               Cancel
             </Button>
             <Button
-              onClick={handleDialogSubmit}
+              onClick={
+                dialog.mode === "add"
+                  ? handleAddMultipleSubaccounts
+                  : handleDialogSubmit
+              }
               variant="contained"
-              disabled={dialog.submitting || !dialog.selectedSubaccount}
+              disabled={
+                dialog.submitting ||
+                (dialog.mode === "add" &&
+                  dialog.selectedSubaccountIds.size === 0) ||
+                (dialog.mode === "remove" && !dialog.selectedSubaccount)
+              }
               color={dialog.mode === "remove" ? "error" : "primary"}
             >
               {dialog.submitting ? (
                 <CircularProgress size={20} sx={{ mr: 1 }} />
               ) : null}
-              {dialog.mode === "add" ? "Add" : "Remove"}
+              {dialog.mode === "add"
+                ? `Add (${dialog.selectedSubaccountIds.size})`
+                : "Remove"}
             </Button>
           </DialogActions>
         </Dialog>
