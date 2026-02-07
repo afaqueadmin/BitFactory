@@ -22,6 +22,7 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import Link from "next/link";
 import { useInvoice, useRecordPayment } from "@/lib/hooks/useInvoices";
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
+import { CostPayment } from "@/generated/prisma";
 
 export default function RecordPaymentPage() {
   const params = useParams();
@@ -47,7 +48,10 @@ export default function RecordPaymentPage() {
   // Calculate paid amount from cost payments
   const paidAmount =
     invoice && invoice.costPayments
-      ? invoice.costPayments.reduce((sum, payment) => sum + payment.amount, 0)
+      ? invoice.costPayments.reduce(
+          (sum: number, payment: CostPayment) => sum + payment.amount,
+          0,
+        )
       : 0;
 
   const outstandingAmount = invoice
