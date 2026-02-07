@@ -24,14 +24,14 @@ export async function POST(
     }
 
     const user = await verifyJwtToken(token);
-    if (!user || typeof user !== "object" || !("id" in user)) {
+    if (!user) {
       return NextResponse.json(
         { success: false, error: "Invalid token" },
         { status: 401 },
       );
     }
 
-    const userId = (user as unknown as { id: string }).id;
+    const userId = user.userId;
 
     if (!Array.isArray(subaccountNames) || subaccountNames.length === 0) {
       return NextResponse.json(
