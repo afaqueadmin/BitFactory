@@ -137,7 +137,7 @@ export default function AppBarComponent() {
                 },
               }}
             >
-              My Miners
+              Miners
             </Button>
             <Button
               component={Link}
@@ -166,7 +166,94 @@ export default function AppBarComponent() {
                 },
               }}
             >
-              My Wallet
+              Wallet
+            </Button>
+            <Button
+              component={Link}
+              href="/invoices"
+              sx={{
+                color: darkMode ? "white" : "black",
+                textTransform: "none",
+                fontWeight: 500,
+                px: 2,
+                position: "relative",
+                "&:hover": {
+                  backgroundColor: darkMode
+                    ? "rgba(255,255,255,0.1)"
+                    : "rgba(0,0,0,0.1)",
+                },
+                "&::after": {
+                  content: '""',
+                  position: "absolute",
+                  bottom: 0,
+                  left: 8,
+                  right: 8,
+                  height: 2,
+                  backgroundColor: "primary.main",
+                  transform: pathname === "/invoices" ? "scaleX(1)" : "scaleX(0)",
+                  transition: "transform 0.2s ease-in-out",
+                },
+              }}
+            >
+              Invoices
+            </Button>
+            <Button
+              component={Link}
+              href="/btc-price-history"
+              sx={{
+                color: darkMode ? "white" : "black",
+                textTransform: "none",
+                fontWeight: 500,
+                px: 2,
+                position: "relative",
+                "&:hover": {
+                  backgroundColor: darkMode
+                    ? "rgba(255,255,255,0.1)"
+                    : "rgba(0,0,0,0.1)",
+                },
+                "&::after": {
+                  content: '""',
+                  position: "absolute",
+                  bottom: 0,
+                  left: 8,
+                  right: 8,
+                  height: 2,
+                  backgroundColor: "primary.main",
+                  transform: pathname === "/btc-price-history" ? "scaleX(1)" : "scaleX(0)",
+                  transition: "transform 0.2s ease-in-out",
+                },
+              }}
+            >
+              BTC Price
+            </Button>
+            <Button
+              component={Link}
+              href="/hashprice-history"
+              sx={{
+                color: darkMode ? "white" : "black",
+                textTransform: "none",
+                fontWeight: 500,
+                px: 2,
+                position: "relative",
+                "&:hover": {
+                  backgroundColor: darkMode
+                    ? "rgba(255,255,255,0.1)"
+                    : "rgba(0,0,0,0.1)",
+                },
+                "&::after": {
+                  content: '""',
+                  position: "absolute",
+                  bottom: 0,
+                  left: 8,
+                  right: 8,
+                  height: 2,
+                  backgroundColor: "primary.main",
+                  transform: pathname === "/hashprice-history" ? "scaleX(1)" : "scaleX(0)",
+                  transition: "transform 0.2s ease-in-out",
+                },
+              }}
+            >
+              Hashprice
             </Button>
           </Stack>
         </Box>
