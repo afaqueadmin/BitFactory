@@ -316,16 +316,17 @@ export default function InvoiceDetailPage() {
               Issue Invoice
             </Button>
           )}
-          {isAdmin && invoice.status === "DRAFT" && (
-            <Button
-              startIcon={<DeleteIcon />}
-              variant="outlined"
-              color="error"
-              onClick={() => setDeleteDialogOpen(true)}
-            >
-              Delete
-            </Button>
-          )}
+          {isAdmin &&
+            (invoice.status === "DRAFT" || invoice.status === "CANCELLED") && (
+              <Button
+                startIcon={<DeleteIcon />}
+                variant="outlined"
+                color="error"
+                onClick={() => setDeleteDialogOpen(true)}
+              >
+                Delete
+              </Button>
+            )}
           {invoice.status === "ISSUED" && (
             <Button
               startIcon={<EmailIcon />}
