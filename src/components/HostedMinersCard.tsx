@@ -107,7 +107,7 @@ export default function HostedMinersCard({
               aria-hidden
             />
             <Typography variant="h6" sx={{ fontWeight: 700 }}>
-              My Factory Status
+              Factory Status
             </Typography>
           </Box>
           <Tooltip title="Refresh worker data">
