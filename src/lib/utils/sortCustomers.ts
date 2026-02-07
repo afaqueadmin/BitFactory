@@ -15,7 +15,8 @@ export type CustomerSortField =
   | "luxorSubaccount"
   | "miners"
   | "status"
-  | "joinDate";
+  | "joinDate"
+  | "balance";
 
 /**
  * Sort direction type
@@ -49,6 +50,7 @@ interface Customer {
   joinDate: string;
   miners: number;
   status: "active" | "inactive";
+  balance: string;
 }
 
 /**
@@ -79,6 +81,9 @@ function getSortValue(
 
     case "joinDate":
       return new Date(customer.joinDate).getTime();
+
+    case "balance":
+      return Number(customer.balance || 0);
 
     default:
       return "";
@@ -152,6 +157,7 @@ export function getSortFieldLabel(field: CustomerSortField): string {
     miners: "Miners",
     status: "Status",
     joinDate: "Join Date",
+    balance: "Balance",
   };
 
   return labels[field];
@@ -171,5 +177,6 @@ export function getAllSortFields(): CustomerSortField[] {
     "miners",
     "status",
     "joinDate",
+    "balance",
   ];
 }

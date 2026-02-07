@@ -9,6 +9,7 @@ interface AdminValueCardProps {
   value: number | string;
   subtitle?: string;
   type?: "currency" | "BTC" | "number";
+  onClick?: () => void;
 }
 
 export default function AdminValueCard({
@@ -16,11 +17,13 @@ export default function AdminValueCard({
   value,
   subtitle,
   type = "number",
+  onClick,
 }: AdminValueCardProps) {
   const formattedValue = formatValue(value, type);
 
   return (
     <Card
+      onClick={onClick}
       sx={{
         height: "100%",
         background: (theme) =>
@@ -32,6 +35,7 @@ export default function AdminValueCard({
         boxShadow: "0 8px 32px rgba(0, 0, 0, 0.08)",
         borderRadius: 2,
         transition: "transform 0.2s, box-shadow 0.2s",
+        cursor: onClick ? "pointer" : "default",
         "&:hover": {
           transform: "translateY(-4px)",
           boxShadow: "0 12px 40px rgba(0, 0, 0, 0.12)",

@@ -76,6 +76,11 @@ export async function GET(request: NextRequest) {
             id: true,
           },
         },
+        costPayments: {
+          select: {
+            amount: true,
+          },
+        },
       },
       where,
       orderBy: {
@@ -83,23 +88,30 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    // Transform the data to include miner count
-    const transformedUsers = users.map((user) => ({
-      id: user.id,
-      email: user.email,
-      name: user.name || "N/A",
-      role: user.role,
-      city: user.city || "N/A",
-      country: user.country || "N/A",
-      phoneNumber: user.phoneNumber || "N/A",
-      companyName: user.companyName || "N/A",
-      luxorSubaccountName: user.luxorSubaccountName || "N/A",
-      twoFactorEnabled: user.twoFactorEnabled,
-      joinDate: user.createdAt.toISOString().split("T")[0],
-      miners: user.miners.length,
-      status: user.isDeleted ? "deleted" : "active", // You can add logic to determine status
-      isDeleted: user.isDeleted,
-    }));
+    // Transform the data to include miner count and aggregate amount
+    const transformedUsers = users.map((user) => {
+      const aggregateAmount = user.costPayments
+        .reduce((sum: number, payment) => sum + (payment.amount || 0), 0)
+        .toFixed(2);
+
+      return {
+        id: user.id,
+        email: user.email,
+        name: user.name || "N/A",
+        role: user.role,
+        city: user.city || "N/A",
+        country: user.country || "N/A",
+        phoneNumber: user.phoneNumber || "N/A",
+        companyName: user.companyName || "N/A",
+        luxorSubaccountName: user.luxorSubaccountName || "N/A",
+        twoFactorEnabled: user.twoFactorEnabled,
+        joinDate: user.createdAt.toISOString().split("T")[0],
+        miners: user.miners.length,
+        status: user.isDeleted ? "deleted" : "active",
+        isDeleted: user.isDeleted,
+        balance: aggregateAmount,
+      };
+    });
 
     const totalRevenue = await prisma.costPayment.aggregate({
       where: {

@@ -1,6 +1,7 @@
 "use client";
 //src/app/(manage)/adminpanel/page.tsx
 import React from "react";
+import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import AdminStatCard from "@/components/admin/AdminStatCard";
 import AdminValueCard from "@/components/admin/AdminValueCard";
@@ -53,9 +54,17 @@ interface CustomerBalanceData {
   totalNegativeBalance: number;
   positiveCustomerCount: number;
   negativeCustomerCount: number;
+  customerBalances: Array<{
+    userId: string;
+    email: string | null;
+    name: string | null;
+    balance: number;
+  }>;
 }
 
 export default function AdminDashboard() {
+  const router = useRouter();
+
   const {
     data: stats,
     isLoading: loading,
@@ -359,12 +368,14 @@ export default function AdminDashboard() {
           <AdminValueCard
             title="Positive Balance Customers"
             value={customerBalanceData?.positiveCustomerCount ?? 0}
+            onClick={() => router.push("/customers/overview?balanceFilter=> 0")}
           />
 
           {/* Negative Balance Customers Count */}
           <AdminValueCard
             title="Negative Balance Customers"
             value={customerBalanceData?.negativeCustomerCount ?? 0}
+            onClick={() => router.push("/customers/overview?balanceFilter=< 0")}
           />
         </Box>
 

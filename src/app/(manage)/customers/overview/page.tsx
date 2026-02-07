@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   Box,
@@ -22,8 +23,8 @@ import {
   MenuItem,
   IconButton,
   Snackbar,
-  // FormControl,
-  // Select,
+  FormControl,
+  Select,
   TextField,
   Checkbox,
   FormControlLabel,
@@ -75,6 +76,7 @@ interface FetchedUser {
   joinDate: string;
   miners: number;
   status: "active" | "inactive";
+  balance: string;
 }
 
 interface FilterColumns {
@@ -85,6 +87,7 @@ interface FilterColumns {
   miners: string;
   status: string;
   joinDate: string;
+  balance: string;
 }
 
 // Create a Grid component that includes the 'item' prop
@@ -294,7 +297,18 @@ export default function CustomerOverview() {
     miners: "",
     status: "",
     joinDate: "",
+    balance: "",
   });
+
+  const searchParams = useSearchParams();
+
+  // Read balance filter from URL query parameter and set it
+  useEffect(() => {
+    const balanceFilter = searchParams.get("balanceFilter");
+    if (balanceFilter) {
+      setFilters((prev) => ({ ...prev, balance: balanceFilter }));
+    }
+  }, [searchParams]);
 
   const handleFilterChange = (column: keyof FilterColumns, value: string) => {
     setFilters((prev) => ({ ...prev, [column]: value }));
@@ -304,6 +318,20 @@ export default function CustomerOverview() {
     () =>
       users.filter((row: FetchedUser) =>
         (Object.keys(filters) as Array<keyof FilterColumns>).every((column) => {
+          if (column === "balance") {
+            const filterValue =
+              filters[column] === "> 0"
+                ? "positive"
+                : filters[column] === "< 0"
+                  ? "negative"
+                  : "";
+            if (filterValue === "positive") {
+              return row[column].toString() > "0";
+            } else if (filterValue === "negative") {
+              return row[column].toString() < "0";
+            }
+          }
+
           const searchValue = filters[column].toLowerCase();
           return row[column].toString().toLowerCase().includes(searchValue);
         }),
@@ -823,6 +851,30 @@ export default function CustomerOverview() {
                           />
                         ))}
                     </TableCell>
+                    <TableCell
+                      sx={{
+                        fontWeight: "bold",
+                        cursor: "pointer",
+                        userSelect: "none",
+                        "&:hover": { backgroundColor: "action.selected" },
+                        whiteSpace: "nowrap",
+                      }}
+                      onClick={() => handleHeaderClick("balance")}
+                    >
+                      Balance{" "}
+                      {sortConfig.field === "balance" &&
+                        (sortConfig.direction === "asc" ? (
+                          <ArrowUpwardIcon
+                            fontSize="small"
+                            sx={{ verticalAlign: "middle", ml: 0.5 }}
+                          />
+                        ) : (
+                          <ArrowDownwardIcon
+                            fontSize="small"
+                            sx={{ verticalAlign: "middle", ml: 0.5 }}
+                          />
+                        ))}
+                    </TableCell>
                     <TableCell align="center" sx={{ fontWeight: "bold" }}>
                       Actions
                     </TableCell>
@@ -831,14 +883,29 @@ export default function CustomerOverview() {
                     {(Object.keys(filters) as Array<keyof FilterColumns>).map(
                       (column) => (
                         <TableCell key={column}>
-                          <TextField
-                            // placeholder={column}
-                            size="small"
-                            value={filters[column]}
-                            onChange={(e) =>
-                              handleFilterChange(column, e.target.value)
-                            }
-                          />
+                          {column === "balance" ? (
+                            <FormControl size="small" sx={{ minWidth: 100 }}>
+                              <Select
+                                value={filters[column]}
+                                onChange={(e) =>
+                                  handleFilterChange(column, e.target.value)
+                                }
+                              >
+                                <MenuItem value="">All</MenuItem>
+                                <MenuItem value="> 0">&gt; 0</MenuItem>
+                                <MenuItem value="< 0">&lt; 0</MenuItem>
+                              </Select>
+                            </FormControl>
+                          ) : (
+                            <TextField
+                              // placeholder={column}
+                              size="small"
+                              value={filters[column]}
+                              onChange={(e) =>
+                                handleFilterChange(column, e.target.value)
+                              }
+                            />
+                          )}
                         </TableCell>
                       ),
                     )}
@@ -954,6 +1021,9 @@ export default function CustomerOverview() {
                         />
                       </TableCell>
                       <TableCell>{customer.joinDate}</TableCell>
+                      <TableCell>
+                        {customer.role === "CLIENT" ? customer.balance : "-"}
+                      </TableCell>
                       <TableCell align="center">
                         <IconButton
                           size="small"
