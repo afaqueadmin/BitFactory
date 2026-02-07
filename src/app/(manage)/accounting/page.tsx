@@ -26,12 +26,11 @@ import {
 import Link from "next/link";
 import { useState } from "react";
 import { useDashboardStats } from "@/lib/hooks/useDashboard";
-import { useInvoices } from "@/lib/hooks/useInvoices";
+import { InvoiceWithDetails, useInvoices } from "@/lib/hooks/useInvoices";
 import { StatsCard } from "@/components/accounting/dashboard/StatsCard";
 import { StatusBadge } from "@/components/accounting/common/StatusBadge";
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
 import { DateDisplay } from "@/components/accounting/common/DateDisplay";
-import RefreshIcon from "@mui/icons-material/Refresh";
 import AddIcon from "@mui/icons-material/Add";
 
 export default function AccountingDashboard() {
@@ -230,7 +229,7 @@ export default function AccountingDashboard() {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {invoices.map((invoice) => {
+                {invoices.map((invoice: InvoiceWithDetails) => {
                   const daysUntilDue = calculateDaysUntilDue(invoice.dueDate);
                   return (
                     <TableRow key={invoice.id} hover>

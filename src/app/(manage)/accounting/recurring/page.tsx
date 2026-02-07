@@ -27,7 +27,7 @@ import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
 import { useRecurringInvoices } from "@/lib/hooks/useRecurringInvoices";
-import { useCustomers } from "@/lib/hooks/useInvoices";
+import { Customer, useCustomers } from "@/lib/hooks/useInvoices";
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
 import { DateDisplay } from "@/components/accounting/common/DateDisplay";
 
@@ -301,7 +301,7 @@ export default function RecurringInvoicesPage() {
               required
             >
               <MenuItem value="">-- Select a Customer --</MenuItem>
-              {customers.map((customer) => (
+              {customers.map((customer: Customer) => (
                 <MenuItem key={customer.id} value={customer.id}>
                   {customer.displayName}
                 </MenuItem>

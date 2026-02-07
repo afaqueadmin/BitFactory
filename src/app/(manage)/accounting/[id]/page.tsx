@@ -31,6 +31,7 @@ import {
   useDeleteInvoice,
   useInvoiceAuditLog,
   useSendInvoiceEmail,
+  AuditLogWithUser,
 } from "@/lib/hooks/useInvoices";
 import { useUser } from "@/lib/hooks/useUser";
 import { StatusBadge } from "@/components/accounting/common/StatusBadge";
@@ -43,7 +44,6 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EmailIcon from "@mui/icons-material/Email";
 import CancelIcon from "@mui/icons-material/Cancel";
-import { AuditLog } from "@/lib/types/invoice";
 
 function formatAuditAction(action: string): string {
   const actionMap: { [key: string]: string } = {
@@ -678,7 +678,7 @@ export default function InvoiceDetailPage() {
               </Typography>
             ) : (
               <Stack spacing={2}>
-                {auditLogs.map((log: AuditLog, index: number) => (
+                {auditLogs.map((log: AuditLogWithUser, index: number) => (
                   <Box
                     key={log.id}
                     sx={{

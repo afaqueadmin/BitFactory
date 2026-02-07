@@ -22,6 +22,7 @@ import {
   useCreateInvoice,
   useCustomers,
   useCustomerMiners,
+  Customer,
 } from "@/lib/hooks/useInvoices";
 
 export default function CreateInvoicePage() {
@@ -213,7 +214,7 @@ export default function CreateInvoicePage() {
                   required
                 >
                   <MenuItem value="">-- Select a Customer --</MenuItem>
-                  {customers.map((customer) => (
+                  {customers.map((customer: Customer) => (
                     <MenuItem key={customer.id} value={customer.id}>
                       {customer.displayName}
                     </MenuItem>
