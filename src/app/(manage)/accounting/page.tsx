@@ -266,25 +266,29 @@ export default function AccountingDashboard() {
                         <DateDisplay date={invoice.dueDate} format="date" />
                       </TableCell>
                       <TableCell>
-                        <Typography
-                          sx={{
-                            color:
-                              daysUntilDue < 0
-                                ? "error.main"
-                                : daysUntilDue < 7
-                                  ? "warning.main"
-                                  : "success.main",
-                            fontWeight: "500",
-                          }}
-                        >
-                          {daysUntilDue === 0
-                            ? "Today"
-                            : daysUntilDue === 1
-                              ? "1 day"
-                              : daysUntilDue < 0
-                                ? `${Math.abs(daysUntilDue)} ${Math.abs(daysUntilDue) === 1 ? "day" : "days"} overdue`
-                                : `${daysUntilDue} ${daysUntilDue === 1 ? "day" : "days"}`}
-                        </Typography>
+                        {invoice.status === "PAID" ? (
+                          "-"
+                        ) : (
+                          <Typography
+                            sx={{
+                              color:
+                                daysUntilDue < 0
+                                  ? "error.main"
+                                  : daysUntilDue < 7
+                                    ? "warning.main"
+                                    : "success.main",
+                              fontWeight: "500",
+                            }}
+                          >
+                            {daysUntilDue === 0
+                              ? "Today"
+                              : daysUntilDue === 1
+                                ? "1 day"
+                                : daysUntilDue < 0
+                                  ? `${Math.abs(daysUntilDue)} ${Math.abs(daysUntilDue) === 1 ? "day" : "days"} overdue`
+                                  : `${daysUntilDue} ${daysUntilDue === 1 ? "day" : "days"}`}
+                          </Typography>
+                        )}
                       </TableCell>
                     </TableRow>
                   );
