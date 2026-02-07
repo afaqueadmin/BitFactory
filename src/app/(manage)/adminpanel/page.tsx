@@ -48,6 +48,13 @@ interface DashboardStats {
   warnings: string[];
 }
 
+interface CustomerBalanceData {
+  totalPositiveBalance: number;
+  totalNegativeBalance: number;
+  positiveCustomerCount: number;
+  negativeCustomerCount: number;
+}
+
 export default function AdminDashboard() {
   const {
     data: stats,
@@ -74,7 +81,29 @@ export default function AdminDashboard() {
     retry: 2,
   });
 
-  if (loading) {
+  const { data: customerBalanceData, isLoading: customerBalanceLoading } =
+    useQuery<CustomerBalanceData>({
+      queryKey: ["customerBalance"],
+      queryFn: async () => {
+        const response = await fetch("/api/customer-balance");
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch customer balance");
+        }
+
+        const data = await response.json();
+
+        if (!data.success) {
+          throw new Error(data.error || "Failed to fetch customer balance");
+        }
+
+        return data.data;
+      },
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      retry: 2,
+    });
+
+  if (loading || customerBalanceLoading) {
     return (
       <Box
         sx={{
@@ -217,7 +246,7 @@ export default function AdminDashboard() {
           <AdminValueCard
             title="Total Mined Revenue"
             value={stats?.financial.totalMinedRevenue ?? 0}
-            subtitle="₿"
+            // subtitle="₿"
             type="BTC"
           />
 
@@ -313,13 +342,30 @@ export default function AdminDashboard() {
           <AdminValueCard title="Est Yearly Hosting Profit" value="N/A" />
 
           {/* Positive Balance - Aggregated from customer payments */}
-          <AdminValueCard title="Positive Customer Balance" value="N/A" />
+          <AdminValueCard
+            title="Positive Customer Balance"
+            value={customerBalanceData?.totalPositiveBalance ?? 0}
+            type="currency"
+          />
 
           {/* Negative Balance - Aggregated from customer payments */}
-          <AdminValueCard title="Negative Customer Balance" value="N/A" />
+          <AdminValueCard
+            title="Negative Customer Balance"
+            value={customerBalanceData?.totalNegativeBalance ?? 0}
+            type="currency"
+          />
+
+          {/* Positive Balance Customers Count */}
+          <AdminValueCard
+            title="Positive Balance Customers"
+            value={customerBalanceData?.positiveCustomerCount ?? 0}
+          />
 
           {/* Negative Balance Customers Count */}
-          <AdminValueCard title="Negative Balance Customers" value="N/A" />
+          <AdminValueCard
+            title="Negative Balance Customers"
+            value={customerBalanceData?.negativeCustomerCount ?? 0}
+          />
         </Box>
 
         {/* === WARNINGS AND NOTES === */}
