@@ -27,6 +27,7 @@ const securePaths = {
     "/invoices",
     "/luxor",
     "/miners",
+    "/payback-analysis",
     "/security-setting",
     "/wallet",
     // Add client-specific public paths if any

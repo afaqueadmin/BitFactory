@@ -190,13 +190,15 @@ export default function AppBarComponent() {
                   right: 8,
                   height: 2,
                   backgroundColor: "primary.main",
-                  transform: pathname === "/invoices" ? "scaleX(1)" : "scaleX(0)",
+                  transform:
+                    pathname === "/invoices" ? "scaleX(1)" : "scaleX(0)",
                   transition: "transform 0.2s ease-in-out",
                 },
               }}
             >
               Invoices
             </Button>
+
             <Button
               component={Link}
               href="/btc-price-history"
@@ -219,7 +221,10 @@ export default function AppBarComponent() {
                   right: 8,
                   height: 2,
                   backgroundColor: "primary.main",
-                  transform: pathname === "/btc-price-history" ? "scaleX(1)" : "scaleX(0)",
+                  transform:
+                    pathname === "/btc-price-history"
+                      ? "scaleX(1)"
+                      : "scaleX(0)",
                   transition: "transform 0.2s ease-in-out",
                 },
               }}
@@ -248,12 +253,47 @@ export default function AppBarComponent() {
                   right: 8,
                   height: 2,
                   backgroundColor: "primary.main",
-                  transform: pathname === "/hashprice-history" ? "scaleX(1)" : "scaleX(0)",
+                  transform:
+                    pathname === "/hashprice-history"
+                      ? "scaleX(1)"
+                      : "scaleX(0)",
                   transition: "transform 0.2s ease-in-out",
                 },
               }}
             >
               Hashprice
+            </Button>
+            <Button
+              component={Link}
+              href="/payback-analysis"
+              sx={{
+                color: darkMode ? "white" : "black",
+                textTransform: "none",
+                fontWeight: 500,
+                px: 2,
+                position: "relative",
+                "&:hover": {
+                  backgroundColor: darkMode
+                    ? "rgba(255,255,255,0.1)"
+                    : "rgba(0,0,0,0.1)",
+                },
+                "&::after": {
+                  content: '""',
+                  position: "absolute",
+                  bottom: 0,
+                  left: 8,
+                  right: 8,
+                  height: 2,
+                  backgroundColor: "primary.main",
+                  transform:
+                    pathname === "/payback-analysis"
+                      ? "scaleX(1)"
+                      : "scaleX(0)",
+                  transition: "transform 0.2s ease-in-out",
+                },
+              }}
+            >
+              Payback Analysis
             </Button>
           </Stack>
         </Box>
