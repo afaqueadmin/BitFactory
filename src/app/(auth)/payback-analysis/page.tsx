@@ -24,21 +24,87 @@ const columns = [
   "BREAKEVEN",
 ];
 
-const rows: Array<{
+// Constants
+const POOL_COMMISSION = 0.025; // 2.5%
+const STOCK_HASHRATE_TH = 236; // TH
+const LUX_HASHRATE_TH = 252; // TH
+const ELECTRICITY_CHARGES = 199; // USD
+const MACHINE_COST = 3850; // USD
+
+// Scenario BTC prices
+const SCENARIO_BTC_PRICES = [100000, 125000, 150000, 200000, 63500];
+
+// Types for calculations
+interface CalculationValues {
+  dailyBtcStock: number;
+  dailyBtcLux: number;
+  monthlyRevenueStock: number;
+  monthlyRevenueLux: number;
+  netRevenueStock: number;
+  netRevenueLux: number;
+  paybackMonthsStock: number;
+  paybackMonthsLux: number;
+}
+
+// Helper functions for calculations
+const thToPh = (th: number): number => th / 1000;
+
+const calculateDailyBtc = (
+  hashrateTh: number,
+  rewardBtcPerPhDay: number,
+): number => {
+  const hashratePh = thToPh(hashrateTh);
+  return hashratePh * rewardBtcPerPhDay * (1 - POOL_COMMISSION);
+};
+
+const calculateMonthlyRevenue = (
+  dailyBtc: number,
+  btcPrice: number,
+): number => {
+  return (dailyBtc * btcPrice * 365) / 12;
+};
+
+const calculateNetRevenue = (monthlyRevenue: number): number => {
+  return monthlyRevenue - ELECTRICITY_CHARGES;
+};
+
+const calculatePaybackMonths = (netRevenue: number): number => {
+  if (netRevenue <= 0) return Infinity;
+  return MACHINE_COST / netRevenue;
+};
+
+const calculateAllValues = (
+  btcPrice: number,
+  rewardBtcPerPhDay: number,
+): CalculationValues => {
+  const dailyBtcStock = calculateDailyBtc(STOCK_HASHRATE_TH, rewardBtcPerPhDay);
+  const dailyBtcLux = calculateDailyBtc(LUX_HASHRATE_TH, rewardBtcPerPhDay);
+
+  const monthlyRevenueStock = calculateMonthlyRevenue(dailyBtcStock, btcPrice);
+  const monthlyRevenueLux = calculateMonthlyRevenue(dailyBtcLux, btcPrice);
+
+  const netRevenueStock = calculateNetRevenue(monthlyRevenueStock);
+  const netRevenueLux = calculateNetRevenue(monthlyRevenueLux);
+
+  const paybackMonthsStock = calculatePaybackMonths(netRevenueStock);
+  const paybackMonthsLux = calculatePaybackMonths(netRevenueLux);
+
+  return {
+    dailyBtcStock,
+    dailyBtcLux,
+    monthlyRevenueStock,
+    monthlyRevenueLux,
+    netRevenueStock,
+    netRevenueLux,
+    paybackMonthsStock,
+    paybackMonthsLux,
+  };
+};
+
+const staticRows: Array<{
   label: string;
   values: Array<string | number>;
 }> = [
-  {
-    label: "Reward (BTC/PH/Day)",
-    values: [
-      "0.00044827",
-      "0.00044827",
-      "0.00044827",
-      "0.00044827",
-      "0.00044827",
-      "0.00044827",
-    ],
-  },
   {
     label: "Pool Commission",
     values: ["2.50%", "2.50%", "2.50%", "2.50%", "2.50%", "2.50%"],
@@ -51,56 +117,6 @@ const rows: Array<{
     label: "S21Pro Hashrate (LUXOS)",
     values: [252, 252, 252, 252, 252, 252],
   },
-  {
-    label: "Daily BTC Reward (Stock OS)",
-    values: [
-      "0.00010315",
-      "0.00010315",
-      "0.00010315",
-      "0.00010315",
-      "0.00010315",
-      "0.00010315",
-    ],
-  },
-  {
-    label: "Daily BTC Reward (LUX OS)",
-    values: [
-      "0.00011014",
-      "0.00011014",
-      "0.00011014",
-      "0.00011014",
-      "0.00011014",
-      "0.00011014",
-    ],
-  },
-  {
-    label: "Monthly Revenue (Stock OS)",
-    values: ["$213.20", "$313.74", "$392.17", "$470.61", "$627.48", "$199.22"],
-  },
-  {
-    label: "Monthly Revenue (LUX OS)",
-    values: ["$227.65", "$335.01", "$418.76", "$502.51", "$670.02", "$212.73"],
-  },
-  {
-    label: "Electricity & Hosting Charges",
-    values: ["$199.00", "$199.00", "$199.00", "$199.00", "$199.00", "$199.00"],
-  },
-  {
-    label: "Net Revenue (Stock OS)",
-    values: ["$14.20", "$114.74", "$193.17", "$271.61", "$428.48", "$0.22"],
-  },
-  {
-    label: "Net Revenue (LUX OS)",
-    values: ["$28.65", "$136.01", "$219.76", "$303.51", "$471.02", "$13.73"],
-  },
-  {
-    label: "Payback Months (Stock OS)",
-    values: [271, 34, 20, 14, 9, 17188],
-  },
-  {
-    label: "Payback Months (LUX OS)",
-    values: [134, 28, 18, 13, 8, 280],
-  },
 ];
 
 export default function PaybackAnalysisPage() {
@@ -109,10 +125,15 @@ export default function PaybackAnalysisPage() {
     null,
   );
   const [liveRewardBtcPerPhDay, setLiveRewardBtcPerPhDay] = useState<
-    string | null
+    number | null
   >(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+
+  // Calculated values for all scenarios
+  const [calculatedValues, setCalculatedValues] = useState<CalculationValues[]>(
+    [],
+  );
 
   const fetchLivePrice = useCallback(async () => {
     try {
@@ -166,11 +187,29 @@ export default function PaybackAnalysisPage() {
         rewardBtcPerPhDay = hashprice.value / liveBtcPriceValue;
       }
 
-      setLiveRewardBtcPerPhDay(rewardBtcPerPhDay.toFixed(8));
+      setLiveRewardBtcPerPhDay(rewardBtcPerPhDay);
     } catch {
       // ignore and keep fallback
     }
   }, [liveBtcPriceValue]);
+
+  // Recalculate values when BTC price or reward changes
+  useEffect(() => {
+    if (liveBtcPriceValue !== null && liveRewardBtcPerPhDay !== null) {
+      // Calculate for CURRENT (index 0)
+      const currentCalc = calculateAllValues(
+        liveBtcPriceValue,
+        liveRewardBtcPerPhDay,
+      );
+
+      // Calculate for each scenario with different BTC price
+      const scenarioCalcs = SCENARIO_BTC_PRICES.map((price) =>
+        calculateAllValues(price, liveRewardBtcPerPhDay),
+      );
+
+      setCalculatedValues([currentCalc, ...scenarioCalcs]);
+    }
+  }, [liveBtcPriceValue, liveRewardBtcPerPhDay]);
 
   useEffect(() => {
     fetchLivePrice();
@@ -197,7 +236,7 @@ export default function PaybackAnalysisPage() {
   const rewardRow = {
     label: "Reward (BTC/PH/Day)",
     values: [
-      liveRewardBtcPerPhDay || "0.00044827",
+      liveRewardBtcPerPhDay?.toFixed(8) || "0.00044827",
       "0.00044827",
       "0.00044827",
       "0.00044827",
@@ -206,11 +245,75 @@ export default function PaybackAnalysisPage() {
     ],
   };
 
-  const tableRows = [
-    btcPriceRow,
-    rewardRow,
-    ...rows.filter((r) => r.label !== "Reward (BTC/PH/Day)"),
-  ];
+  // Build dynamic rows for calculated values
+  const dynamicRows: Array<{
+    label: string;
+    values: Array<string | number>;
+  }> = [];
+
+  if (calculatedValues.length > 0) {
+    dynamicRows.push({
+      label: "Daily BTC Reward (Stock OS)",
+      values: calculatedValues.map((calc) => calc.dailyBtcStock.toFixed(8)),
+    });
+    dynamicRows.push({
+      label: "Daily BTC Reward (LUX OS)",
+      values: calculatedValues.map((calc) => calc.dailyBtcLux.toFixed(8)),
+    });
+    dynamicRows.push({
+      label: "Monthly Revenue (Stock OS)",
+      values: calculatedValues.map(
+        (calc) => `$${calc.monthlyRevenueStock.toFixed(2)}`,
+      ),
+    });
+    dynamicRows.push({
+      label: "Monthly Revenue (LUX OS)",
+      values: calculatedValues.map(
+        (calc) => `$${calc.monthlyRevenueLux.toFixed(2)}`,
+      ),
+    });
+    dynamicRows.push({
+      label: "Electricity & Hosting Charges",
+      values: [
+        "$199.00",
+        "$199.00",
+        "$199.00",
+        "$199.00",
+        "$199.00",
+        "$199.00",
+      ],
+    });
+    dynamicRows.push({
+      label: "Net Revenue (Stock OS)",
+      values: calculatedValues.map(
+        (calc) => `$${calc.netRevenueStock.toFixed(2)}`,
+      ),
+    });
+    dynamicRows.push({
+      label: "Net Revenue (LUX OS)",
+      values: calculatedValues.map(
+        (calc) => `$${calc.netRevenueLux.toFixed(2)}`,
+      ),
+    });
+    dynamicRows.push({
+      label: "Payback Months (Stock OS)",
+      values: calculatedValues.map((calc) =>
+        calc.paybackMonthsStock === Infinity
+          ? "∞"
+          : Math.round(calc.paybackMonthsStock),
+      ),
+    });
+    dynamicRows.push({
+      label: "Payback Months (LUX OS)",
+      values: calculatedValues.map((calc) =>
+        calc.paybackMonthsLux === Infinity
+          ? "∞"
+          : Math.round(calc.paybackMonthsLux),
+      ),
+    });
+  }
+
+  const tableRows = [btcPriceRow, rewardRow, ...staticRows, ...dynamicRows];
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
