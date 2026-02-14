@@ -112,9 +112,14 @@ const sidebarItems: SidebarItem[] = [
     icon: <AccountingIcon />,
     items: [
       {
-        title: "Dashboard",
+        title: "Electricity Charges Dashboard",
         icon: <DashboardIcon />,
         path: "/accounting",
+      },
+      {
+        title: "Hardware Purchase Dashboard",
+        icon: <DashboardIcon />,
+        path: "/hardware-purchase",
       },
       // {
       //   title: "Invoices",
