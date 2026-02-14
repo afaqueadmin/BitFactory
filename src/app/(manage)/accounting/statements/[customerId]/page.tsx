@@ -139,6 +139,7 @@ export default function CustomerStatementPage() {
               <TableCell sx={{ fontWeight: "bold" }}>Invoice #</TableCell>
               <TableCell sx={{ fontWeight: "bold" }}>Date</TableCell>
               <TableCell sx={{ fontWeight: "bold" }}>Due Date</TableCell>
+              <TableCell sx={{ fontWeight: "bold" }}>Type</TableCell>
               <TableCell sx={{ fontWeight: "bold" }}>Amount</TableCell>
               <TableCell sx={{ fontWeight: "bold" }}>Paid</TableCell>
               <TableCell sx={{ fontWeight: "bold" }}>Outstanding</TableCell>
@@ -164,6 +165,11 @@ export default function CustomerStatementPage() {
                 </TableCell>
                 <TableCell>
                   <DateDisplay date={invoice.dueDate} format="date" />
+                </TableCell>
+                <TableCell>
+                  {invoice.invoiceType === "HARDWARE_PURCHASE"
+                    ? "Hardware"
+                    : "Hosting & Electricity"}
                 </TableCell>
                 <TableCell>
                   <CurrencyDisplay value={invoice.totalAmount} />
