@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyJwtToken } from "@/lib/jwt";
 import { prisma } from "@/lib/prisma";
-import { createLuxorClient, SummaryResponse, LuxorError } from "@/lib/luxor";
+import { createLuxorClient, LuxorError } from "@/lib/luxor";
 
 /**
  * GET /api/miners/summary
@@ -32,18 +32,27 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
 
-    // Fetch the user's Luxor subaccount name from database
+    // Fetch the user's Luxor subaccount name and role from database
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { luxorSubaccountName: true },
+      select: { luxorSubaccountName: true, role: true },
     });
 
     console.log(
-      `[Miners Summary API] User lookup - ID: ${userId}, Found: ${!!user}, Data:`,
+      `[Miners Summary API] User lookup - ID: ${userId}, Found: ${!!user}, Role: ${user?.role}, Data:`,
       user,
     );
 
-    if (!user || !user.luxorSubaccountName) {
+    // Use 'higgs' subaccount for admin users, otherwise use user's configured subaccount
+    let subaccountName: string;
+    if (user?.role === "ADMIN") {
+      subaccountName = "higgs";
+      console.log(
+        `[Miners Summary API] Admin user detected - using 'higgs' subaccount`,
+      );
+    } else if (user?.luxorSubaccountName) {
+      subaccountName = user.luxorSubaccountName;
+    } else {
       console.error(
         `[Miners Summary API] User ${userId} has no Luxor subaccount name configured. User data:`,
         user,
@@ -53,8 +62,6 @@ export async function GET(request: NextRequest) {
         { status: 404 },
       );
     }
-
-    const subaccountName = user.luxorSubaccountName;
     console.log(
       `[Miners Summary API] Fetching summary for subaccount: ${subaccountName}`,
     );
@@ -97,7 +104,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : "Failed to fetch summary",
+        error:
+          error instanceof Error ? error.message : "Failed to fetch summary",
       },
       { status: 500 },
     );

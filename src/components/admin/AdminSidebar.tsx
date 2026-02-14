@@ -25,6 +25,7 @@ import {
   PriceCheck as HostingPricesIcon,
   Assignment as AccountingIcon,
   Description as DocumentIcon,
+  Settings as SettingsIcon,
   ChevronLeft,
   ChevronRight,
 } from "@mui/icons-material";
@@ -141,6 +142,16 @@ const sidebarItems: SidebarItem[] = [
         path: "/accounting/pdf-invoice-settings",
       },
     ],
+  },
+  {
+    title: "Payback Analysis",
+    icon: <OverviewIcon />,
+    path: "/admin/payback-analysis",
+  },
+  {
+    title: "Payback Analysis Settings",
+    icon: <SettingsIcon />,
+    path: "/admin/payback-analysis-settings",
   },
 
   {

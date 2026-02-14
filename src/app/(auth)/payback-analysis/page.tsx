@@ -12,6 +12,8 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  CircularProgress,
+  Alert,
 } from "@mui/material";
 import { useCallback, useEffect, useState } from "react";
 
@@ -24,15 +26,25 @@ const columns = [
   "BREAKEVEN",
 ];
 
-// Constants
-const POOL_COMMISSION = 0.025; // 2.5%
-const STOCK_HASHRATE_TH = 236; // TH
-const LUX_HASHRATE_TH = 252; // TH
-const ELECTRICITY_CHARGES = 199; // USD
-const MACHINE_COST = 3850; // USD
+// Fallback constants (only used if API fails)
+const FALLBACK_BTC_PRICE = 67953.35; // USD
+const FALLBACK_REWARD_BTC_PER_PH_DAY = 0.00044827;
 
-// Scenario BTC prices
-const SCENARIO_BTC_PRICES = [100000, 125000, 150000, 200000, 63500];
+// Scenario BTC prices (first 4 are fixed, last one comes from DB)
+const FIXED_SCENARIO_PRICES = [100000, 125000, 150000, 200000];
+
+// Interface for config data from API
+interface PaybackConfigData {
+  hostingCharges: number;
+  monthlyInvoicingAmount: number;
+  powerConsumption: number;
+  machineCapitalCost: number;
+  poolCommission: number;
+  s21proHashrateStockOs: number;
+  s21proHashrateLuxos: number;
+  breakevenBtcPrice: number;
+  invoicedAmount: number;
+}
 
 // Types for calculations
 interface CalculationValues {
@@ -52,9 +64,10 @@ const thToPh = (th: number): number => th / 1000;
 const calculateDailyBtc = (
   hashrateTh: number,
   rewardBtcPerPhDay: number,
+  poolCommission: number,
 ): number => {
   const hashratePh = thToPh(hashrateTh);
-  return hashratePh * rewardBtcPerPhDay * (1 - POOL_COMMISSION);
+  return hashratePh * rewardBtcPerPhDay * (1 - poolCommission / 100);
 };
 
 const calculateMonthlyRevenue = (
@@ -64,30 +77,64 @@ const calculateMonthlyRevenue = (
   return (dailyBtc * btcPrice * 365) / 12;
 };
 
-const calculateNetRevenue = (monthlyRevenue: number): number => {
-  return monthlyRevenue - ELECTRICITY_CHARGES;
+const calculateNetRevenue = (
+  monthlyRevenue: number,
+  monthlyElectricityHosting: number,
+): number => {
+  return monthlyRevenue - monthlyElectricityHosting;
 };
 
-const calculatePaybackMonths = (netRevenue: number): number => {
+const calculatePaybackMonths = (
+  netRevenue: number,
+  machineCost: number,
+): number => {
   if (netRevenue <= 0) return Infinity;
-  return MACHINE_COST / netRevenue;
+  return machineCost / netRevenue;
 };
+
+const formatUsd = (value: number): string =>
+  new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value);
 
 const calculateAllValues = (
   btcPrice: number,
   rewardBtcPerPhDay: number,
+  config: PaybackConfigData,
+  monthlyElectricityHosting: number,
+  machineCost: number,
 ): CalculationValues => {
-  const dailyBtcStock = calculateDailyBtc(STOCK_HASHRATE_TH, rewardBtcPerPhDay);
-  const dailyBtcLux = calculateDailyBtc(LUX_HASHRATE_TH, rewardBtcPerPhDay);
+  const dailyBtcStock = calculateDailyBtc(
+    config.s21proHashrateStockOs,
+    rewardBtcPerPhDay,
+    config.poolCommission,
+  );
+  const dailyBtcLux = calculateDailyBtc(
+    config.s21proHashrateLuxos,
+    rewardBtcPerPhDay,
+    config.poolCommission,
+  );
 
   const monthlyRevenueStock = calculateMonthlyRevenue(dailyBtcStock, btcPrice);
   const monthlyRevenueLux = calculateMonthlyRevenue(dailyBtcLux, btcPrice);
 
-  const netRevenueStock = calculateNetRevenue(monthlyRevenueStock);
-  const netRevenueLux = calculateNetRevenue(monthlyRevenueLux);
+  const netRevenueStock = calculateNetRevenue(
+    monthlyRevenueStock,
+    monthlyElectricityHosting,
+  );
+  const netRevenueLux = calculateNetRevenue(
+    monthlyRevenueLux,
+    monthlyElectricityHosting,
+  );
 
-  const paybackMonthsStock = calculatePaybackMonths(netRevenueStock);
-  const paybackMonthsLux = calculatePaybackMonths(netRevenueLux);
+  const paybackMonthsStock = calculatePaybackMonths(
+    netRevenueStock,
+    machineCost,
+  );
+  const paybackMonthsLux = calculatePaybackMonths(netRevenueLux, machineCost);
 
   return {
     dailyBtcStock,
@@ -101,25 +148,13 @@ const calculateAllValues = (
   };
 };
 
-const staticRows: Array<{
-  label: string;
-  values: Array<string | number>;
-}> = [
-  {
-    label: "Pool Commission",
-    values: ["2.50%", "2.50%", "2.50%", "2.50%", "2.50%", "2.50%"],
-  },
-  {
-    label: "S21Pro Hashrate (Stock OS)",
-    values: [236, 236, 236, 236, 236, 236],
-  },
-  {
-    label: "S21Pro Hashrate (LUXOS)",
-    values: [252, 252, 252, 252, 252, 252],
-  },
-];
-
 export default function PaybackAnalysisPage() {
+  // Config state
+  const [config, setConfig] = useState<PaybackConfigData | null>(null);
+  const [configLoading, setConfigLoading] = useState(true);
+  const [configError, setConfigError] = useState<string | null>(null);
+
+  // Price and reward state
   const [liveBtcPrice, setLiveBtcPrice] = useState<string | null>(null);
   const [liveBtcPriceValue, setLiveBtcPriceValue] = useState<number | null>(
     null,
@@ -134,6 +169,31 @@ export default function PaybackAnalysisPage() {
   const [calculatedValues, setCalculatedValues] = useState<CalculationValues[]>(
     [],
   );
+
+  // Fetch config from API
+  const fetchConfig = useCallback(async () => {
+    try {
+      setConfigLoading(true);
+      setConfigError(null);
+      const response = await fetch("/api/payback-config");
+      if (!response.ok) {
+        throw new Error("Failed to fetch configuration");
+      }
+      const data = await response.json();
+      if (data.success && data.data) {
+        setConfig(data.data);
+      } else {
+        throw new Error(data.error || "Invalid configuration data");
+      }
+    } catch (error) {
+      const errorMsg =
+        error instanceof Error ? error.message : "Failed to load configuration";
+      setConfigError(errorMsg);
+      console.error("[Payback Analysis] Config fetch error:", error);
+    } finally {
+      setConfigLoading(false);
+    }
+  }, []);
 
   const fetchLivePrice = useCallback(async () => {
     try {
@@ -193,23 +253,56 @@ export default function PaybackAnalysisPage() {
     }
   }, [liveBtcPriceValue]);
 
-  // Recalculate values when BTC price or reward changes
+  const resolvedBtcPriceValue = liveBtcPriceValue ?? FALLBACK_BTC_PRICE;
+  const resolvedRewardBtcPerPhDay =
+    liveRewardBtcPerPhDay ?? FALLBACK_REWARD_BTC_PER_PH_DAY;
+
+  // Calculate derived values from config
+  const monthlyElectricityHosting = config ? config.monthlyInvoicingAmount : 0;
+  const machineCost = config
+    ? config.invoicedAmount - config.monthlyInvoicingAmount
+    : 0;
+
+  // Recalculate values when BTC price, reward, or config changes
   useEffect(() => {
-    if (liveBtcPriceValue !== null && liveRewardBtcPerPhDay !== null) {
-      // Calculate for CURRENT (index 0)
-      const currentCalc = calculateAllValues(
-        liveBtcPriceValue,
-        liveRewardBtcPerPhDay,
-      );
+    if (!config) return;
 
-      // Calculate for each scenario with different BTC price
-      const scenarioCalcs = SCENARIO_BTC_PRICES.map((price) =>
-        calculateAllValues(price, liveRewardBtcPerPhDay),
-      );
+    // Build scenario prices: fixed scenarios + breakeven from DB
+    const scenarioPrices = [...FIXED_SCENARIO_PRICES, config.breakevenBtcPrice];
 
-      setCalculatedValues([currentCalc, ...scenarioCalcs]);
-    }
-  }, [liveBtcPriceValue, liveRewardBtcPerPhDay]);
+    // Calculate for CURRENT (index 0)
+    const currentCalc = calculateAllValues(
+      resolvedBtcPriceValue,
+      resolvedRewardBtcPerPhDay,
+      config,
+      monthlyElectricityHosting,
+      machineCost,
+    );
+
+    // Calculate for each scenario with different BTC price
+    const scenarioCalcs = scenarioPrices.map((price) =>
+      calculateAllValues(
+        price,
+        resolvedRewardBtcPerPhDay,
+        config,
+        monthlyElectricityHosting,
+        machineCost,
+      ),
+    );
+
+    setCalculatedValues([currentCalc, ...scenarioCalcs]);
+  }, [
+    resolvedBtcPriceValue,
+    resolvedRewardBtcPerPhDay,
+    config,
+    monthlyElectricityHosting,
+    machineCost,
+  ]);
+
+  // Fetch config on mount
+  useEffect(() => {
+    fetchConfig();
+  }, [fetchConfig]);
 
   useEffect(() => {
     fetchLivePrice();
@@ -224,26 +317,49 @@ export default function PaybackAnalysisPage() {
   const btcPriceRow = {
     label: "BTC Price (USD)",
     values: [
-      liveBtcPrice || "$67,953.35",
+      liveBtcPrice || formatUsd(resolvedBtcPriceValue),
       "$100,000",
       "$125,000",
       "$150,000",
       "$200,000",
-      "$63,500",
+      config ? formatUsd(config.breakevenBtcPrice) : "$63,500",
     ],
   };
 
   const rewardRow = {
     label: "Reward (BTC/PH/Day)",
-    values: [
-      liveRewardBtcPerPhDay?.toFixed(8) || "0.00044827",
-      "0.00044827",
-      "0.00044827",
-      "0.00044827",
-      "0.00044827",
-      "0.00044827",
-    ],
+    values: Array.from({ length: 6 }, () =>
+      resolvedRewardBtcPerPhDay.toFixed(8),
+    ),
   };
+
+  // Build static rows from config
+  const staticRows: Array<{
+    label: string;
+    values: Array<string | number>;
+  }> = config
+    ? [
+        {
+          label: "Pool Commission",
+          values: Array.from(
+            { length: 6 },
+            () => `${config.poolCommission.toFixed(2)}%`,
+          ),
+        },
+        {
+          label: "S21Pro Hashrate (Stock OS)",
+          values: Array.from({ length: 6 }, () =>
+            config.s21proHashrateStockOs.toFixed(2),
+          ),
+        },
+        {
+          label: "S21Pro Hashrate (LUXOS)",
+          values: Array.from({ length: 6 }, () =>
+            config.s21proHashrateLuxos.toFixed(2),
+          ),
+        },
+      ]
+    : [];
 
   // Build dynamic rows for calculated values
   const dynamicRows: Array<{
@@ -251,7 +367,7 @@ export default function PaybackAnalysisPage() {
     values: Array<string | number>;
   }> = [];
 
-  if (calculatedValues.length > 0) {
+  if (calculatedValues.length > 0 && config) {
     dynamicRows.push({
       label: "Daily BTC Reward (Stock OS)",
       values: calculatedValues.map((calc) => calc.dailyBtcStock.toFixed(8)),
@@ -274,14 +390,10 @@ export default function PaybackAnalysisPage() {
     });
     dynamicRows.push({
       label: "Electricity & Hosting Charges",
-      values: [
-        "$199.00",
-        "$199.00",
-        "$199.00",
-        "$199.00",
-        "$199.00",
-        "$199.00",
-      ],
+      values: Array.from(
+        { length: 6 },
+        () => `$${monthlyElectricityHosting.toFixed(2)}`,
+      ),
     });
     dynamicRows.push({
       label: "Net Revenue (Stock OS)",
@@ -314,6 +426,38 @@ export default function PaybackAnalysisPage() {
   }
 
   const tableRows = [btcPriceRow, rewardRow, ...staticRows, ...dynamicRows];
+
+  // Show loading state
+  if (configLoading) {
+    return (
+      <Container maxWidth="lg" sx={{ py: 4 }}>
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            minHeight: "400px",
+          }}
+        >
+          <CircularProgress />
+        </Box>
+      </Container>
+    );
+  }
+
+  // Show error state
+  if (configError || !config) {
+    return (
+      <Container maxWidth="lg" sx={{ py: 4 }}>
+        <Alert severity="error" sx={{ mb: 3 }}>
+          {configError || "Failed to load configuration"}
+        </Alert>
+        <Button variant="contained" onClick={fetchConfig}>
+          Retry
+        </Button>
+      </Container>
+    );
+  }
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
@@ -370,19 +514,31 @@ export default function PaybackAnalysisPage() {
             <Typography variant="subtitle2" color="text.secondary">
               Hosting Charges
             </Typography>
-            <Typography>$0.0780 — $199.00</Typography>
+            <Typography>{`$${config.hostingCharges.toFixed(5)}`}</Typography>
+          </Box>
+          <Box>
+            <Typography variant="subtitle2" color="text.secondary">
+              Monthly Invoicing Amount
+            </Typography>
+            <Typography>{formatUsd(config.monthlyInvoicingAmount)}</Typography>
           </Box>
           <Box>
             <Typography variant="subtitle2" color="text.secondary">
               Power Consumption
             </Typography>
-            <Typography>3.5550 KWH</Typography>
+            <Typography>{`${config.powerConsumption.toFixed(4)} KWH`}</Typography>
           </Box>
           <Box>
             <Typography variant="subtitle2" color="text.secondary">
-              Machine Purchase Price
+              Invoiced Amount
             </Typography>
-            <Typography>$3,850.00</Typography>
+            <Typography>{formatUsd(config.invoicedAmount)}</Typography>
+          </Box>
+          <Box>
+            <Typography variant="subtitle2" color="text.secondary">
+              Machine/Capital Cost
+            </Typography>
+            <Typography>{formatUsd(machineCost)}</Typography>
           </Box>
         </Box>
       </Paper>
@@ -402,14 +558,24 @@ export default function PaybackAnalysisPage() {
           <TableBody>
             {tableRows.map((row) => (
               <TableRow key={row.label} hover>
-                <TableCell sx={{ fontWeight: 600 }}>{row.label}</TableCell>
+                <TableCell
+                  sx={{
+                    fontWeight: 600,
+                    ...(row.label === "Reward (BTC/PH/Day)" && {
+                      backgroundColor: "#FFF3C4",
+                      fontWeight: 700,
+                    }),
+                  }}
+                >
+                  {row.label}
+                </TableCell>
                 {row.values.map((value, index) => (
                   <TableCell
                     key={`${row.label}-${index}`}
                     align="right"
                     sx={
                       (row.label === "BTC Price (USD)" && index === 0) ||
-                      (row.label === "Reward (BTC/PH/Day)" && index === 0)
+                      row.label === "Reward (BTC/PH/Day)"
                         ? {
                             backgroundColor: "#FFF3C4",
                             fontWeight: 700,

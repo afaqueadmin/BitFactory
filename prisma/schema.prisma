@@ -50,6 +50,7 @@ model User {
   blacklisted                TokenBlacklist[]
   activities                 UserActivity[]
   paymentDetailsUpdates      PaymentDetails[]
+  invoicedAmount             Decimal                      @default(4250) @db.Decimal(12, 2)
 
   @@index([isDeleted])
   @@map("users")
@@ -78,6 +79,22 @@ model UserActivity {
 
   @@index([userId])
   @@map("user_activities")
+}
+
+model PaybackConfig {
+  id                     Int      @id @default(autoincrement())
+  hostingCharges         Decimal  @db.Decimal(10, 5)
+  monthlyInvoicingAmount Decimal  @db.Decimal(12, 2)
+  powerConsumption       Decimal  @db.Decimal(10, 4)
+  machineCapitalCost     Decimal  @db.Decimal(12, 2)
+  poolCommission         Decimal  @db.Decimal(5, 2)
+  s21proHashrateStockOs  Decimal  @db.Decimal(10, 2)
+  s21proHashrateLuxos    Decimal  @db.Decimal(10, 2)
+  breakevenBtcPrice      Decimal  @default(63500) @db.Decimal(12, 2)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@map("payback_config")
 }
 
 model Hardware {

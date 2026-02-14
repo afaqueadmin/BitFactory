@@ -35,6 +35,8 @@ const securePaths = {
   ADMIN: new Set<string>([
     "/admin-profile",
     "/adminpanel",
+    "/admin/payback-analysis",
+    "/admin/payback-analysis-settings",
     "/accounting",
     "/customers/overview",
     "/groups",
