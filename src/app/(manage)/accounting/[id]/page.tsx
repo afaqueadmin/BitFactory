@@ -284,7 +284,7 @@ export default function InvoiceDetailPage() {
           <Button
             startIcon={<ArrowBackIcon />}
             variant="text"
-            onClick={() => router.back()}
+            onClick={() => router.push("/accounting")}
             sx={{ mb: 2 }}
           >
             Back to Invoices

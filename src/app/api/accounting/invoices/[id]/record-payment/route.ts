@@ -107,7 +107,7 @@ export async function POST(
         where: { id },
         data: {
           status: "PAID",
-          paidDate: new Date(),
+          paidDate: new Date(paymentDate),
         },
       });
     }
