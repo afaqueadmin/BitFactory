@@ -24,7 +24,8 @@ const renderInvoiceTemplate = (
 ): string => {
   let html = template;
 
-  // Process conditionals: {{#if variable}}content{{else}}altContent{{/if}}
+  // FIRST: Process conditionals BEFORE variable replacement
+  // This ensures {{#if hardwareModel}}{{hardwareModel}}{{else}}default{{/if}} works correctly
   const conditionalRegex = /{{#if\s+(\w+)\s*}}([\s\S]*?){{\/if}}/g;
   html = html.replace(conditionalRegex, (match, variable, content) => {
     const value = data[variable];
@@ -40,15 +41,15 @@ const renderInvoiceTemplate = (
       const elseContent = elseMatch[2];
       return shouldShow ? ifContent : elseContent;
     } else {
-      // No {{else}} clause - original behavior
+      // No {{else}} clause
       return shouldShow ? content : "";
     }
   });
 
-  // Process simple variable replacements: {{variable}}
+  // SECOND: Process variable replacements AFTER conditionals are resolved
   Object.keys(data).forEach((key) => {
     const regex = new RegExp(`{{${key}}}`, "g");
-    const value = data[key] ?? ""; // Use empty string for null/undefined
+    const value = data[key] ?? "";
     html = html.replace(regex, String(value));
   });
 
@@ -141,14 +142,6 @@ export const sendInvoiceEmail = async (
   issuedDate: Date,
   ccEmails?: string[],
 ) => {
-  const formatDate = (date: Date) => {
-    return new Date(date).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-  };
-
   const ccInvoicesEmail = process.env.CC_INVOICES_EMAIL;
   // Build CC list: use provided ccEmails if available, otherwise use default
   const ccList =
@@ -186,7 +179,7 @@ export const sendInvoiceEmail = async (
       <p>Please log in to your BitFactory account to view the complete invoice details.</p>
       <p><strong>Login URL:</strong> <a href="https://my.bitfactory.ae" target="_blank">my.bitfactory.ae</a></p>
       <br>
-      <p>If you have any questions about this invoice, please contact our invoices team at <a href="mailto:${CC_INVOICE_EMAIL}">${CC_INVOICE_EMAIL}</a>.</p>
+      <p>If you have any questions about this invoice, please contact our invoices team at <a href="mailto:${ccInvoicesEmail}">${ccInvoicesEmail}</a>.</p>
       <br>
       <p>Best regards,</p>
       <p>The BitFactory Team</p>
@@ -247,11 +240,13 @@ export const sendInvoiceCancellationEmail = async (
     dueDate,
   );
 
+  const ccEmail = process.env.INVOICE_CC_EMAIL || "invoices@bitfactory.ae";
+
   const mailOptions = {
     from:
       `BitFactory Admin <${process.env.SMTP_FROM}>` || "noreply@bitfactory.com",
     to: email,
-    cc: CC_INVOICE_EMAIL,
+    cc: ccEmail,
     subject: `Invoice ${invoiceNumber} - Cancellation Notice`,
     html: htmlContent,
   };
@@ -308,7 +303,9 @@ export const sendInvoiceEmailWithPDF = async (
 
     // Build CC list: use provided ccEmails if available, otherwise use default
     const ccList =
-      ccEmails && ccEmails.length > 0 ? ccEmails.join(",") : CC_INVOICE_EMAIL;
+      ccEmails && ccEmails.length > 0
+        ? ccEmails.join(",")
+        : CC_INVOICE_EMAIL || "invoices@bitfactory.ae";
     const mailOptions = {
       from:
         `BitFactory Accounts <${process.env.SMTP_FROM}>` ||

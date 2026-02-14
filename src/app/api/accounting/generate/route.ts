@@ -88,13 +88,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const totalAmount = totalMiners * Number(unitPrice);
+    const totalAmount = parseFloat(
+      (totalMiners * Number(unitPrice)).toFixed(2),
+    );
 
     // Create invoice
     const timestamp = new Date(year, month - 1, 1);
     const invoiceNumber = `INV-${year}${String(month).padStart(2, "0")}-${customerId.slice(0, 6).toUpperCase()}`;
 
-    const dueDate = new Date(year, month, recurringInvoice.dayOfMonth);
+    // Note: dayOfMonth is 1-based (1-31), new Date uses 0-based month index
+    const dueDate = new Date(year, month - 1, recurringInvoice.dayOfMonth);
 
     const invoice = await prisma.invoice.create({
       data: {

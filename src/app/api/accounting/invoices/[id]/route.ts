@@ -125,7 +125,9 @@ export async function PATCH(
       totalMiners !== undefined ? totalMiners : currentInvoice.totalMiners;
     const newUnitPrice =
       unitPrice !== undefined ? unitPrice : Number(currentInvoice.unitPrice);
-    const newTotalAmount = newTotalMiners * newUnitPrice;
+    const newTotalAmount = parseFloat(
+      (newTotalMiners * newUnitPrice).toFixed(2),
+    );
 
     if (newTotalAmount !== Number(currentInvoice.totalAmount)) {
       updateData.totalAmount = newTotalAmount;

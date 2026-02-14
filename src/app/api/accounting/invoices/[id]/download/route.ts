@@ -57,6 +57,16 @@ export async function GET(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
+    // Fetch hardware model if invoice has hardware
+    let hardwareModel: string | null = null;
+    if (invoice.hardwareId) {
+      const hardware = await prisma.hardware.findUnique({
+        where: { id: invoice.hardwareId },
+        select: { model: true },
+      });
+      hardwareModel = hardware?.model || null;
+    }
+
     // Generate PDF
     const pdfBuffer = await generateInvoicePDF(
       invoice.invoiceNumber,
@@ -69,6 +79,8 @@ export async function GET(
       Number(invoice.unitPrice),
       invoice.id,
       new Date(),
+      null, // cryptoPaymentUrl
+      hardwareModel,
     );
 
     // Return PDF as file download

@@ -173,7 +173,9 @@ export async function POST(request: NextRequest) {
     const sequenceNumber = String(lastSeq + 1).padStart(3, "0");
     const invoiceNumber = `${customer.luxorSubaccountName}-${dateStr}-${sequenceNumber}`;
 
-    const totalAmount = totalMiners * Number(unitPrice);
+    const totalAmount = parseFloat(
+      (totalMiners * Number(unitPrice)).toFixed(2),
+    );
 
     const invoice = await prisma.invoice.create({
       data: {
