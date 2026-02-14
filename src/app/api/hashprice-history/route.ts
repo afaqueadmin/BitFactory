@@ -106,11 +106,14 @@ export async function GET(request: NextRequest) {
     });
 
     // Fetch hashrate data from /pool/hashrate-efficiency/BTC (daily tick_size)
+    // Note: API is paginated, we need to handle pagination to get all data
     const hashrateResponse = await luxorClient.getHashrateEfficiency("BTC", {
       subaccount_names: subaccountName,
       start_date: startDateStr,
       end_date: endDateStr,
       tick_size: "1d",
+      page_size: 100, // Increase page size to get more records per request
+      page_number: 1,
     });
 
     console.log(
@@ -158,23 +161,27 @@ export async function GET(request: NextRequest) {
         if (item && item.date_time) {
           const dateStr = item.date_time.split("T")[0]; // Extract YYYY-MM-DD
           const revenue = item.revenue?.revenue || 0;
-          const hashrate = hashrateByDate[dateStr] || 0;
+          const hashrateRaw = hashrateByDate[dateStr] || 0;
+
+          // Hashrate from API is in H/s, but we need PH/s (Petahash/s)
+          // 1 PH/s = 1e15 H/s
+          const hashratePHs = hashrateRaw / 1e15;
 
           console.log(
-            `[Hashprice History API] Date: ${dateStr}, Revenue: ${revenue}, Hashrate: ${hashrate}`,
+            `[Hashprice History API] Date: ${dateStr}, Revenue: ${revenue}, Hashrate: ${hashrateRaw} H/s (${hashratePHs} PH/s)`,
           );
 
-          // Calculate hashprice: revenue / hashrate
-          // Include even if one value is 0 (will show as 0 or Infinity, which we handle)
-          if (hashrate > 0) {
-            const hashprice = hashrate > 0 ? revenue / hashrate : 0;
+          // Calculate hashprice: revenue (BTC) / hashrate (PH/s)
+          // Result: BTC/PH/s/day
+          if (hashratePHs > 0) {
+            const hashprice = revenue / hashratePHs;
 
             hashpriceData.push({
               date: dateStr,
               timestamp: new Date(item.date_time).getTime(),
               hashprice: isFinite(hashprice) ? hashprice : 0,
               revenue,
-              hashrate,
+              hashrate: hashrateRaw,
             });
           }
         }
