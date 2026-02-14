@@ -222,6 +222,7 @@ export default function AccountingDashboard() {
                   <TableCell sx={{ fontWeight: "bold" }}>Amount</TableCell>
                   <TableCell sx={{ fontWeight: "bold" }}>Status</TableCell>
                   <TableCell sx={{ fontWeight: "bold" }}>Issued Date</TableCell>
+                  <TableCell sx={{ fontWeight: "bold" }}>Paid Date</TableCell>
                   <TableCell sx={{ fontWeight: "bold" }}>Due Date</TableCell>
                   <TableCell sx={{ fontWeight: "bold" }}>
                     Days Until Due
@@ -257,6 +258,13 @@ export default function AccountingDashboard() {
                             date={invoice.issuedDate}
                             format="date"
                           />
+                        ) : (
+                          "-"
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {invoice.status === "PAID" && invoice.paidDate ? (
+                          <DateDisplay date={invoice.paidDate} format="date" />
                         ) : (
                           "-"
                         )}
