@@ -17,10 +17,10 @@ export interface TimeframeConfig {
 }
 
 const TIMEFRAME_CONFIGS: Record<string, TimeframeConfig> = {
-  "1D": { interval: "1d", limit: 365, label: "1 Day" },
-  "1W": { interval: "1w", limit: 52, label: "1 Week" },
-  "1M": { interval: "1M", limit: 12, label: "1 Month" },
-  "3M": { interval: "3d", limit: 120, label: "3 Months" },
+  "1D": { interval: "1h", limit: 24, label: "1 Day" },
+  "1W": { interval: "4h", limit: 42, label: "1 Week" },
+  "1M": { interval: "1d", limit: 30, label: "1 Month" },
+  "3M": { interval: "1d", limit: 90, label: "3 Months" },
   "1Y": { interval: "1d", limit: 365, label: "1 Year" },
   ALL: { interval: "1w", limit: 1000, label: "All Time" },
 };
@@ -54,15 +54,17 @@ export const useBinanceKlines = (timeframe: string = "1D") => {
         );
 
         // Transform raw Binance data to KlineData format
-        const transformed: KlineData[] = data.map((candle: (string | number)[]) => ({
-          openTime: candle[0] as number,
-          open: parseFloat(String(candle[1])),
-          high: parseFloat(String(candle[2])),
-          low: parseFloat(String(candle[3])),
-          close: parseFloat(String(candle[4])),
-          volume: parseFloat(String(candle[7])),
-          closeTime: candle[6] as number,
-        }));
+        const transformed: KlineData[] = data.map(
+          (candle: (string | number)[]) => ({
+            openTime: candle[0] as number,
+            open: parseFloat(String(candle[1])),
+            high: parseFloat(String(candle[2])),
+            low: parseFloat(String(candle[3])),
+            close: parseFloat(String(candle[4])),
+            volume: parseFloat(String(candle[7])),
+            closeTime: candle[6] as number,
+          }),
+        );
 
         return transformed;
       } catch (err) {

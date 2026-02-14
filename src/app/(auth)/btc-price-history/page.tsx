@@ -4,7 +4,7 @@
  * BTC Price History Page
  *
  * FEATURES:
- * 
+ *
  * Statistics Cards (Top Section):
  * - Current Price Card: Shows the latest BTC/USDT price from the selected timeframe
  *   (most recent closing price in your chosen period)
@@ -12,27 +12,27 @@
  *   as both percentage and absolute value. Color-coded: green if up, red if down
  * - High/Low Cards: Show the highest and lowest prices during the selected timeframe
  *   (for the entire timeframe you picked like 1W, 1M, etc., not just 24 hours)
- * 
+ *
  * Chart (Main Visualization):
  * - Close Price (Golden Line): The main line showing how price moved throughout the period
- * - High/Low (Subtle Range): Dashed lines showing daily highs (green) and lows (red)
+ * - High/Low (Subtle Range): Dashed lines showing per-candle highs (green) and lows (red)
  *   creating a range band
  * - Volume Bars (Semi-transparent): Gray bars showing trading volume at the bottom
- * 
+ *
  * Timeframe Selector:
- * - 1D: Last 24 hours with hourly data (365 candles)
- * - 1W: Last 7 days with 4-hour data (52 candles)
- * - 1M: Last 30 days with daily data (12 candles)
- * - 3M: Last 3 months (120 candles)
- * - 1Y: Last year (365 candles)
- * - ALL: Extended history (1000 candles)
- * 
+ * - 1D: Last 24 hours with hourly data (24 candles)
+ * - 1W: Last 7 days with 4-hour data (42 candles)
+ * - 1M: Last 30 days with daily data (30 candles)
+ * - 3M: Last 3 months with daily data (90 candles)
+ * - 1Y: Last year with daily data (365 candles)
+ * - ALL: Extended history with weekly data (1000 candles)
+ *
  * Data Updates:
  * - Automatically refetches fresh data from Binance every 5 minutes
  * - No manual refresh needed - happens silently in the background
  * - Chart and cards update instantly when new data arrives
  * - Page itself doesn't reload/refresh (no flicker) - only data updates
- * 
+ *
  * Caching Strategy:
  * - Data is "fresh" for 5 minutes - clicking a timeframe within 5 min uses cache (instant)
  * - After 5 minutes, marked "stale" and will refetch on next interaction
@@ -95,13 +95,22 @@ const formatDate = (timestamp: number, timeframe: string): string => {
         minute: "2-digit",
       });
     case "1W":
-      return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+      return date.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+      });
     case "1M":
     case "3M":
     case "1Y":
-      return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+      return date.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+      });
     case "ALL":
-      return date.toLocaleDateString("en-US", { month: "short", year: "2-digit" });
+      return date.toLocaleDateString("en-US", {
+        month: "short",
+        year: "2-digit",
+      });
     default:
       return date.toLocaleDateString();
   }
@@ -110,7 +119,8 @@ const formatDate = (timestamp: number, timeframe: string): string => {
 export default function BtcPriceHistoryPage() {
   const theme = useTheme();
   const [selectedTimeframe, setSelectedTimeframe] = useState("1D");
-  const { klines, isLoading, isError, error } = useBinanceKlines(selectedTimeframe);
+  const { klines, isLoading, isError, error } =
+    useBinanceKlines(selectedTimeframe);
 
   // Transform kline data for chart
   const chartData: ChartData[] = useMemo(() => {
@@ -140,14 +150,33 @@ export default function BtcPriceHistoryPage() {
     }
 
     const current = chartData[chartData.length - 1].close;
-    const previous = chartData[0].open;
     const high = Math.max(...chartData.map((d) => d.high));
     const low = Math.min(...chartData.map((d) => d.low));
+
+    // For 24h change: find data from last 24 hours
+    // If viewing 1D, use first data point; otherwise find candle closest to 24h ago
+    let previous = chartData[0].open;
+    if (selectedTimeframe !== "1D" && chartData.length > 0) {
+      const now = Date.now();
+      const oneDayAgo = now - 24 * 60 * 60 * 1000;
+      let closestIdx = 0;
+      let closestDiff = Math.abs(chartData[0].timestamp - oneDayAgo);
+
+      for (let i = 1; i < chartData.length; i++) {
+        const diff = Math.abs(chartData[i].timestamp - oneDayAgo);
+        if (diff < closestDiff) {
+          closestDiff = diff;
+          closestIdx = i;
+        }
+      }
+      previous = chartData[closestIdx].open;
+    }
+
     const change = current - previous;
     const changePercent = (change / previous) * 100;
 
     return { current, high, low, change, changePercent };
-  }, [chartData]);
+  }, [chartData, selectedTimeframe]);
 
   const isDark = theme.palette.mode === "dark";
   // Binance-style golden/yellow color for close price
@@ -159,7 +188,11 @@ export default function BtcPriceHistoryPage() {
     <Container maxWidth="lg" sx={{ py: 4 }}>
       {/* Header */}
       <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" component="h1" sx={{ fontWeight: "bold", mb: 1 }}>
+        <Typography
+          variant="h4"
+          component="h1"
+          sx={{ fontWeight: "bold", mb: 1 }}
+        >
           Bitcoin Price History
         </Typography>
         <Typography variant="body2" color="textSecondary">
@@ -211,7 +244,8 @@ export default function BtcPriceHistoryPage() {
             }}
           >
             {statistics.change >= 0 ? "+" : ""}
-            {formatCurrency(statistics.change)} ({statistics.changePercent.toFixed(2)}%)
+            {formatCurrency(statistics.change)} (
+            {statistics.changePercent.toFixed(2)}%)
           </Typography>
         </Paper>
 
@@ -257,7 +291,9 @@ export default function BtcPriceHistoryPage() {
             <Button
               key={timeframe}
               onClick={() => setSelectedTimeframe(timeframe)}
-              variant={selectedTimeframe === timeframe ? "contained" : "outlined"}
+              variant={
+                selectedTimeframe === timeframe ? "contained" : "outlined"
+              }
               size="small"
               sx={{
                 minWidth: "60px",
@@ -328,7 +364,7 @@ export default function BtcPriceHistoryPage() {
                 stroke={textColor}
                 style={{ fontSize: "0.8rem" }}
                 tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
-                domain={["dataMin - 100", "dataMax + 100"]}
+                domain={["dataMin", "dataMax"]}
               />
               <Tooltip
                 contentStyle={{
@@ -337,7 +373,7 @@ export default function BtcPriceHistoryPage() {
                   borderRadius: "8px",
                   color: textColor,
                 }}
-                formatter={(value: any, name: string) => {
+                formatter={(value: number, name: string) => {
                   if (name === "volume") {
                     return [
                       (value / 1000000).toFixed(2) + "M",
@@ -369,7 +405,7 @@ export default function BtcPriceHistoryPage() {
               {/* High/Low range dashed lines */}
               <Line
                 yAxisId="left"
-                type="stepAfter"
+                type="monotone"
                 dataKey="high"
                 stroke="#66bb6a"
                 strokeWidth={1}
@@ -380,7 +416,7 @@ export default function BtcPriceHistoryPage() {
               />
               <Line
                 yAxisId="left"
-                type="stepAfter"
+                type="monotone"
                 dataKey="low"
                 stroke="#ef5350"
                 strokeWidth={1}
@@ -424,8 +460,8 @@ export default function BtcPriceHistoryPage() {
         }}
       >
         <Typography variant="body2" color="textSecondary">
-          <strong>Data Source:</strong> Binance Public API (BTCUSDT) • Updated every 5
-          minutes • All prices in USDT
+          <strong>Data Source:</strong> Binance Public API (BTCUSDT) • Updated
+          every 5 minutes • All prices in USDT
         </Typography>
       </Paper>
     </Container>

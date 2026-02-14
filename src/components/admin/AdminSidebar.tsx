@@ -144,7 +144,7 @@ const sidebarItems: SidebarItem[] = [
   },
 
   {
-    title: "Hardware",
+    title: "Hardware Purchases",
     icon: <HardwareIcon />,
     items: [
       {
