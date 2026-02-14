@@ -30,7 +30,6 @@ import {
 } from "@mui/material";
 import DashboardHeader from "@/components/DashboardHeader";
 import HostedMinersCard from "@/components/HostedMinersCard";
-import MarketplaceCard from "@/components/MarketplaceCard";
 import MiningEarningsChart from "@/components/MiningEarningsChart";
 import { useUser } from "@/lib/hooks/useUser";
 import BalanceCard from "@/components/dashboardCards/BalanceCard";
@@ -326,14 +325,10 @@ export default function DashboardPage() {
               textAlign: "left",
             }}
           >
-            Hosted Miners
+            Daily Mining Performance
           </Typography>
 
-          <MiningEarningsChart
-            title="Daily Mining Performance"
-            height={520}
-            days={31}
-          />
+          <MiningEarningsChart height={520} days={31} />
         </Box>
       </Container>
     </Box>

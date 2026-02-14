@@ -29,13 +29,11 @@ interface DailyPerformanceData {
 }
 
 interface MiningEarningsChartProps {
-  title?: string;
   height?: number;
   days?: number;
 }
 
 export default function MiningEarningsChart({
-  title = "Mining Performance",
   height = 300,
   days = 10, // Default to 10 days as per Luxor API request
 }: MiningEarningsChartProps) {
@@ -144,20 +142,6 @@ export default function MiningEarningsChart({
         border: `1px solid ${theme.palette.mode === "dark" ? "rgba(255,255,255,0.1)" : "rgba(0,198,255,0.1)"}`,
       }}
     >
-      <Typography
-        variant="h6"
-        gutterBottom
-        sx={{
-          background: "linear-gradient(135deg, #00C6FF 0%, #0072FF 100%)",
-          WebkitBackgroundClip: "text",
-          WebkitTextFillColor: "transparent",
-          fontWeight: 600,
-          mb: 2,
-        }}
-      >
-        {title}
-      </Typography>
-
       {/* Loading State */}
       {loading && (
         <Box
