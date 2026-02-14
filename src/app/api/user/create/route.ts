@@ -82,6 +82,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (user && user.role !== "SUPER_ADMIN" && role === "ADMIN") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+    }
+
     // Validate luxorSubaccountName only for CLIENT role (V2 API: no groups, direct subaccount)
     if (role === "CLIENT") {
       if (!luxorSubaccountName || luxorSubaccountName.trim().length === 0) {

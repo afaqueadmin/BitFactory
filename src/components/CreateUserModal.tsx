@@ -23,6 +23,7 @@ import {
   Typography,
 } from "@mui/material";
 import { Close as CloseIcon } from "@mui/icons-material";
+import { useUser } from "@/lib/hooks";
 
 /**
  * Response structure from /api/luxor proxy route
@@ -71,6 +72,7 @@ export default function CreateUserModal({
     groupId: "",
     initialDeposit: 0,
   });
+  const { user } = useUser();
   const [error, setError] = useState("");
   const [emailError, setEmailError] = useState("");
   const [checkingEmail, setCheckingEmail] = useState(false);
@@ -425,7 +427,9 @@ export default function CreateUserModal({
                 }
               >
                 <MenuItem value="CLIENT">Client</MenuItem>
-                <MenuItem value="ADMIN">Admin</MenuItem>
+                {user && user.role === "SUPER_ADMIN" && (
+                  <MenuItem value="ADMIN">Admin</MenuItem>
+                )}
               </Select>
             </FormControl>
 
