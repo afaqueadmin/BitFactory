@@ -108,6 +108,7 @@ model Hardware {
   isDeleted          Boolean                      @default(false)
   procurementHistory HardwareProcurementHistory[]
   miners             Miner[]
+  invoices           Invoice[]
 
   @@index([isDeleted])
   @@map("hardware")
@@ -243,6 +244,7 @@ model Invoice {
   id                   String                @id @default(cuid())
   invoiceNumber        String                @unique
   userId               String
+  hardwareId           String?
   totalMiners          Int
   unitPrice            Decimal               @db.Decimal(10, 2)
   totalAmount          Decimal               @db.Decimal(12, 2)
@@ -262,6 +264,7 @@ model Invoice {
   createdByUser        User                  @relation("invoicesCreated", fields: [createdBy], references: [id])
   updatedByUser        User?                 @relation("invoicesUpdated", fields: [updatedBy], references: [id])
   user                 User                  @relation("invoices", fields: [userId], references: [id])
+  hardware             Hardware?             @relation(fields: [hardwareId], references: [id])
 
   @@index([userId])
   @@index([status])

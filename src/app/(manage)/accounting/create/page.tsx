@@ -40,6 +40,7 @@ export default function CreateInvoicePage() {
       .split("T")[0],
     status: InvoiceStatus.DRAFT,
     invoiceType: "ELECTRICITY_CHARGES",
+    hardwareId: "",
   });
 
   // Fetch miners only when customerId changes
@@ -58,6 +59,30 @@ export default function CreateInvoicePage() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hardwareList, setHardwareList] = useState<
+    Array<{ id: string; model: string }>
+  >([]);
+  const [hardwareLoading, setHardwareLoading] = useState(false);
+
+  // Fetch hardware list on mount
+  useEffect(() => {
+    const fetchHardware = async () => {
+      try {
+        setHardwareLoading(true);
+        const response = await fetch("/api/hardware");
+        if (response.ok) {
+          const data = await response.json();
+          setHardwareList(data.hardware || []);
+        }
+      } catch (err) {
+        console.error("Error fetching hardware:", err);
+      } finally {
+        setHardwareLoading(false);
+      }
+    };
+
+    fetchHardware();
+  }, []);
 
   // When customer changes, auto-populate total miners from all their active miners
   useEffect(() => {
@@ -157,6 +182,7 @@ export default function CreateInvoicePage() {
         dueDate: formData.dueDate,
         status: formData.status,
         invoiceType: formData.invoiceType,
+        hardwareId: formData.hardwareId || undefined,
       });
 
       // Redirect to accounting dashboard
@@ -338,6 +364,26 @@ export default function CreateInvoicePage() {
                   helperText="When payment is due (defaults to 30 days from today)"
                   required
                 />
+                <TextField
+                  select
+                  label="Hardware Model (for Hardware Purchase invoices)"
+                  name="hardwareId"
+                  value={formData.hardwareId}
+                  onChange={handleInputChange}
+                  fullWidth
+                  helperText="Select hardware model for Hardware Purchase invoice type"
+                  disabled={
+                    hardwareLoading ||
+                    formData.invoiceType === "ELECTRICITY_CHARGES"
+                  }
+                >
+                  <MenuItem value="">-- No Hardware --</MenuItem>
+                  {hardwareList.map((hw) => (
+                    <MenuItem key={hw.id} value={hw.id}>
+                      {hw.model}
+                    </MenuItem>
+                  ))}
+                </TextField>
                 {/* Status is automatically set to DRAFT when creating invoices */}
               </Stack>
             </Box>

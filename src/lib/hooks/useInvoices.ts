@@ -146,6 +146,7 @@ export function useCreateInvoice() {
       dueDate: string;
       status?: InvoiceStatus;
       invoiceType?: string;
+      hardwareId?: string;
     }) => {
       const res = await fetch("/api/accounting/invoices", {
         method: "POST",

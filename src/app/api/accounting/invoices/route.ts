@@ -106,7 +106,14 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { customerId, totalMiners, unitPrice, dueDate, invoiceType } = body;
+    const {
+      customerId,
+      totalMiners,
+      unitPrice,
+      dueDate,
+      invoiceType,
+      hardwareId,
+    } = body;
 
     // Status is always DRAFT when creating new invoices
     // Admins can change to ISSUED after creation via the status change endpoint
@@ -172,6 +179,7 @@ export async function POST(request: NextRequest) {
       data: {
         invoiceNumber,
         userId: customerId,
+        hardwareId: hardwareId || undefined,
         totalMiners,
         unitPrice: parseFloat(unitPrice),
         totalAmount,

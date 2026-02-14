@@ -386,6 +386,7 @@ export const generateInvoicePDF = async (
   invoiceId: string,
   generatedDate: Date,
   cryptoPaymentUrl?: string | null,
+  hardwareModel?: string | null,
 ): Promise<Buffer> => {
   try {
     // Load PDF template
@@ -424,6 +425,7 @@ export const generateInvoicePDF = async (
       generatedDate: formatDate(generatedDate),
       cryptoPaymentUrl: cryptoPaymentUrl || "",
       hasCryptoPayment: !!cryptoPaymentUrl,
+      hardwareModel: hardwareModel || "",
       // Add PaymentDetails if available - include all fields as-is
       ...(paymentDetails
         ? {
