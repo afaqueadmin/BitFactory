@@ -16,12 +16,12 @@
  * - Area fill: Subtle gradient underneath for visual appeal
  *
  * Timeframe Selector:
- * - 1D: Last 24 hours (if available)
+ * - 1D: Last 24 hours
  * - 1W: Last 7 days
  * - 1M: Last 30 days
- * - 3M: Last 90 days
- * - 1Y: Last 365 days
- * - ALL: Last available year of data
+ * - 3M: Last 45 days (Luxor API historical limit)
+ * - 6M: Last 45 days (Luxor API historical limit)
+ * - ALL: All available data (~45 days from Luxor API)
  *
  * Data Source:
  * - Luxor Mining Pool API (pool-specific hashprice)
@@ -67,9 +67,9 @@ const TIMEFRAMES = [
   { label: "1D", days: 1 },
   { label: "1W", days: 7 },
   { label: "1M", days: 30 },
-  { label: "3M", days: 90 },
-  { label: "1Y", days: 365 },
-  { label: "ALL", days: 365 }, // Use max 365 days
+  { label: "3M", days: 45 }, // Luxor API max historical data is ~45 days
+  { label: "6M", days: 45 },
+  { label: "ALL", days: 45 }, // Max historical available from Luxor API
 ];
 
 const formatHashprice = (value: number): string => {
@@ -331,6 +331,22 @@ export default function HashpriceHistoryPage() {
             </Button>
           ))}
         </Box>
+
+        {/* Debug Info - Shows actual data returned */}
+        {!isLoading && hashpriceData.length > 0 && (
+          <Box sx={{ mb: 2, p: 1.5, bgcolor: "info.lighter", borderRadius: 1 }}>
+            <Typography
+              variant="caption"
+              sx={{ fontSize: "0.7rem", color: "info.main" }}
+            >
+              📊 Data: {hashpriceData.length} days returned | Requested: {days}{" "}
+              days |
+              {hashpriceData.length < days
+                ? ` ⚠️ Limited history`
+                : ` ✓ Full period`}
+            </Typography>
+          </Box>
+        )}
 
         {/* Loading State */}
         {isLoading && (

@@ -43,9 +43,10 @@ export async function GET(request: NextRequest) {
     const daysParam = request.nextUrl.searchParams.get("days");
     const days = parseInt(daysParam || "30", 10);
 
-    if (isNaN(days) || days < 1 || days > 365) {
+    // Luxor API has ~45 days of historical data maximum
+    if (isNaN(days) || days < 1 || days > 45) {
       return NextResponse.json(
-        { error: "Days must be between 1 and 365" },
+        { error: "Days must be between 1 and 45 (Luxor API limit)" },
         { status: 400 },
       );
     }
@@ -107,6 +108,10 @@ export async function GET(request: NextRequest) {
 
     // Fetch hashrate data from /pool/hashrate-efficiency/BTC (daily tick_size)
     // Note: API is paginated, we need to handle pagination to get all data
+    console.log(
+      `[Hashprice History API] Requesting hashrate from ${startDateStr} to ${endDateStr} (${days} days)`,
+    );
+
     const hashrateResponse = await luxorClient.getHashrateEfficiency("BTC", {
       subaccount_names: subaccountName,
       start_date: startDateStr,
@@ -116,12 +121,28 @@ export async function GET(request: NextRequest) {
       page_number: 1,
     });
 
+    console.log(`[Hashprice History API] ===== PERIOD DEBUG =====`);
+    console.log(`[Hashprice History API] Requested days: ${days}`);
     console.log(
-      `[Hashprice History API] Revenue records: ${revenueResponse.revenue?.length || 0}`,
+      `[Hashprice History API] Date range: ${startDateStr} to ${endDateStr}`,
     );
     console.log(
-      `[Hashprice History API] Hashrate records: ${hashrateResponse.hashrate_efficiency?.length || 0}`,
+      `[Hashprice History API] Revenue records returned: ${revenueResponse.revenue?.length || 0}`,
     );
+    console.log(
+      `[Hashprice History API] Hashrate records returned: ${hashrateResponse.hashrate_efficiency?.length || 0}`,
+    );
+    console.log(
+      `[Hashprice History API] Hashrate pagination: page ${hashrateResponse.pagination?.page_number}, size ${hashrateResponse.pagination?.page_size}, total items: ${hashrateResponse.pagination?.item_count}`,
+    );
+
+    // Check if we got fewer records than requested
+    const recordsReturned = hashrateResponse.hashrate_efficiency?.length || 0;
+    if (recordsReturned < days) {
+      console.log(
+        `[Hashprice History API] ⚠️  WARNING: Got ${recordsReturned} records but requested ${days} days - API may have limited history`,
+      );
+    }
 
     // Create a map of hashrate by date for quick lookup
     const hashrateByDate: Record<string, number> = {};
@@ -191,9 +212,27 @@ export async function GET(request: NextRequest) {
     // Sort by date (ascending)
     hashpriceData.sort((a, b) => a.timestamp - b.timestamp);
 
+    console.log(`[Hashprice History API] ===== FINAL RESULTS =====`);
     console.log(
       `[Hashprice History API] Calculated ${hashpriceData.length} hashprice points`,
     );
+
+    if (hashpriceData.length > 0) {
+      const firstDate = new Date(hashpriceData[0].timestamp)
+        .toISOString()
+        .split("T")[0];
+      const lastDate = new Date(
+        hashpriceData[hashpriceData.length - 1].timestamp,
+      )
+        .toISOString()
+        .split("T")[0];
+      console.log(
+        `[Hashprice History API] Date range in results: ${firstDate} to ${lastDate}`,
+      );
+      console.log(
+        `[Hashprice History API] Actual period covered: ${hashpriceData.length} days`,
+      );
+    }
 
     // Calculate statistics
     const current =
