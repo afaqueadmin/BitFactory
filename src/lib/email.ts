@@ -16,7 +16,7 @@ const formatDate = (date: Date): string => {
 
 /**
  * Render HTML template with invoice data
- * Supports {{variable}} replacement and {{#if variable}}...{{/if}} conditionals
+ * Supports {{variable}} replacement and {{#if variable}}...{{else}}...{{/if}} conditionals
  */
 const renderInvoiceTemplate = (
   template: string,
@@ -24,13 +24,25 @@ const renderInvoiceTemplate = (
 ): string => {
   let html = template;
 
-  // Process conditionals: {{#if variable}}...{{/if}}
+  // Process conditionals: {{#if variable}}content{{else}}altContent{{/if}}
   const conditionalRegex = /{{#if\s+(\w+)\s*}}([\s\S]*?){{\/if}}/g;
   html = html.replace(conditionalRegex, (match, variable, content) => {
     const value = data[variable];
-    // Show content if variable is truthy and not empty
     const shouldShow = value !== null && value !== undefined && value !== "";
-    return shouldShow ? content : "";
+
+    // Check if there's an {{else}} clause
+    const elseRegex = /^([\s\S]*?){{else}}([\s\S]*)$/;
+    const elseMatch = content.match(elseRegex);
+
+    if (elseMatch) {
+      // Has {{else}} clause
+      const ifContent = elseMatch[1];
+      const elseContent = elseMatch[2];
+      return shouldShow ? ifContent : elseContent;
+    } else {
+      // No {{else}} clause - original behavior
+      return shouldShow ? content : "";
+    }
   });
 
   // Process simple variable replacements: {{variable}}
