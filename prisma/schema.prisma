@@ -247,6 +247,7 @@ model Invoice {
   unitPrice            Decimal               @db.Decimal(10, 2)
   totalAmount          Decimal               @db.Decimal(12, 2)
   status               InvoiceStatus
+  invoiceType          InvoiceType           @default(ELECTRICITY_CHARGES)
   invoiceGeneratedDate DateTime
   issuedDate           DateTime?
   dueDate              DateTime
@@ -379,6 +380,11 @@ enum InvoiceStatus {
   PAID
   CANCELLED
   REFUNDED
+}
+
+enum InvoiceType {
+  ELECTRICITY_CHARGES
+  HARDWARE_PURCHASE
 }
 
 enum AuditAction {
