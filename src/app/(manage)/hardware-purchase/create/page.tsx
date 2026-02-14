@@ -21,11 +21,10 @@ import { InvoiceStatus } from "@/generated/prisma";
 import {
   useCreateInvoice,
   useCustomers,
-  useCustomerMiners,
   Customer,
 } from "@/lib/hooks/useInvoices";
 
-export default function CreateInvoicePage() {
+export default function CreateHardwarePurchaseInvoicePage() {
   const router = useRouter();
   const { create: createInvoice, error: createError } = useCreateInvoice();
   const { customers, loading: customersLoading } = useCustomers();
@@ -39,13 +38,8 @@ export default function CreateInvoicePage() {
       .toISOString()
       .split("T")[0],
     status: InvoiceStatus.DRAFT,
-    invoiceType: "ELECTRICITY_CHARGES",
+    invoiceType: "HARDWARE_PURCHASE",
   });
-
-  // Fetch miners only when customerId changes
-  const { miners, loading: minersLoading } = useCustomerMiners(
-    formData.customerId || undefined,
-  );
 
   // Fetch group/RM info when customerId changes
   const [groupInfo, setGroupInfo] = useState<{
@@ -58,22 +52,6 @@ export default function CreateInvoicePage() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // When customer changes, auto-populate total miners from all their active miners
-  useEffect(() => {
-    if (formData.customerId && miners.length > 0) {
-      // Each miner counts as 1, so totalMiners = number of miners
-      setFormData((prev) => ({
-        ...prev,
-        totalMiners: miners.length,
-      }));
-    } else if (!formData.customerId) {
-      setFormData((prev) => ({
-        ...prev,
-        totalMiners: 0,
-      }));
-    }
-  }, [formData.customerId, miners]);
 
   // Fetch group/RM info when customerId changes
   useEffect(() => {
@@ -138,7 +116,7 @@ export default function CreateInvoicePage() {
         throw new Error("Customer is required");
       }
       if (formData.totalMiners <= 0 || formData.unitPrice <= 0) {
-        throw new Error("Miners count and unit price must be greater than 0");
+        throw new Error("Quantity and unit price must be greater than 0");
       }
 
       // Validate due date is not in the past
@@ -159,8 +137,8 @@ export default function CreateInvoicePage() {
         invoiceType: formData.invoiceType,
       });
 
-      // Redirect to accounting dashboard
-      router.push("/accounting");
+      // Redirect to hardware-purchase dashboard
+      router.push("/hardware-purchase");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create invoice");
     } finally {
@@ -171,15 +149,15 @@ export default function CreateInvoicePage() {
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
       <Stack direction="row" spacing={2} sx={{ mb: 4 }}>
-        <Link href="/accounting">
+        <Link href="/hardware-purchase">
           <Button startIcon={<ArrowBackIcon />}>
-            Back to Accounting Dashboard
+            Back to Hardware Purchase Dashboard
           </Button>
         </Link>
         <Box flex={1}>
-          <h1 style={{ margin: 0 }}>Create New Invoice</h1>
+          <h1 style={{ margin: 0 }}>Create New Hardware Purchase Invoice</h1>
           <p style={{ margin: "8px 0 0 0", color: "#666" }}>
-            Create a new invoice and send it to a customer
+            Create a new hardware purchase invoice and send it to a customer
           </p>
         </Box>
       </Stack>
@@ -283,23 +261,14 @@ export default function CreateInvoicePage() {
               </h3>
               <Stack spacing={2}>
                 <TextField
-                  label="Number of Miners"
+                  label="Quantity"
                   name="totalMiners"
                   type="number"
                   value={formData.totalMiners}
                   onChange={handleInputChange}
                   fullWidth
                   inputProps={{ min: 0, step: 1 }}
-                  helperText={
-                    !formData.customerId
-                      ? "Select a customer first to auto-load their miners"
-                      : minersLoading
-                        ? "Loading miners (status=AUTO) for selected customer..."
-                        : miners.length > 0
-                          ? `Auto-loaded: ${miners.length} miner(s) with status=AUTO`
-                          : "No miners with status=AUTO found for this customer"
-                  }
-                  disabled={minersLoading || !formData.customerId}
+                  helperText="Number of hardware units"
                   required
                 />
                 <TextField
@@ -310,7 +279,7 @@ export default function CreateInvoicePage() {
                   onChange={handleInputChange}
                   fullWidth
                   inputProps={{ min: 0, step: 0.01 }}
-                  helperText="Price per miner unit (total = miners × unit price)"
+                  helperText="Price per hardware unit (total = quantity × unit price)"
                   required
                 />
                 <Box sx={{ p: 2, backgroundColor: "#f5f5f5", borderRadius: 1 }}>

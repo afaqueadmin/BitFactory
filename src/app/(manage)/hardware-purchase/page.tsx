@@ -1,7 +1,7 @@
 /**
- * Accounting Dashboard
+ * Hardware Purchase Dashboard
  *
- * Main dashboard showing accounting overview with all invoices
+ * Main dashboard showing hardware purchase invoices overview
  */
 
 "use client";
@@ -25,7 +25,6 @@ import {
 } from "@mui/material";
 import Link from "next/link";
 import { useState } from "react";
-import { useDashboardStats } from "@/lib/hooks/useDashboard";
 import { InvoiceWithDetails, useInvoices } from "@/lib/hooks/useInvoices";
 import { StatsCard } from "@/components/accounting/dashboard/StatsCard";
 import { StatusBadge } from "@/components/accounting/common/StatusBadge";
@@ -33,13 +32,7 @@ import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay"
 import { DateDisplay } from "@/components/accounting/common/DateDisplay";
 import AddIcon from "@mui/icons-material/Add";
 
-export default function AccountingDashboard() {
-  const {
-    dashboard,
-    loading: statsLoading,
-    error: statsError,
-    refetch,
-  } = useDashboardStats();
+export default function HardwarePurchaseDashboard() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const {
@@ -47,7 +40,7 @@ export default function AccountingDashboard() {
     total,
     loading: invoicesLoading,
     error: invoicesError,
-  } = useInvoices(page, pageSize, undefined, undefined, "ELECTRICITY_CHARGES");
+  } = useInvoices(page, pageSize, undefined, undefined, "HARDWARE_PURCHASE");
 
   const handleChangePage = (event: unknown, newPage: number) => {
     setPage(newPage + 1);
@@ -70,8 +63,28 @@ export default function AccountingDashboard() {
     return diffDays;
   };
 
-  const loading = statsLoading || invoicesLoading;
-  const error = statsError || invoicesError;
+  // Calculate stats from invoices
+  const totalInvoices = total;
+  const unpaidInvoices = invoices.filter(
+    (inv: InvoiceWithDetails) => inv.status !== "PAID",
+  ).length;
+  const now = new Date();
+  const overdueInvoices = invoices.filter(
+    (inv: InvoiceWithDetails) =>
+      inv.status !== "PAID" && new Date(inv.dueDate) < now,
+  ).length;
+  const totalOutstanding = invoices
+    .filter(
+      (inv: InvoiceWithDetails) =>
+        inv.status !== "PAID" && inv.status !== "CANCELLED",
+    )
+    .reduce(
+      (sum: number, inv: InvoiceWithDetails) => sum + Number(inv.totalAmount),
+      0,
+    );
+
+  const loading = invoicesLoading;
+  const error = invoicesError;
 
   if (loading) {
     return (
@@ -91,14 +104,6 @@ export default function AccountingDashboard() {
     );
   }
 
-  if (!dashboard) {
-    return (
-      <Container maxWidth="lg">
-        <Alert severity="warning">No data available</Alert>
-      </Container>
-    );
-  }
-
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
       {/* Header */}
@@ -110,13 +115,13 @@ export default function AccountingDashboard() {
       >
         <div>
           <Typography variant="h4" sx={{ fontWeight: "bold" }}>
-            Accounting Dashboard
+            Hardware Purchase Dashboard
           </Typography>
           <Typography color="textSecondary" sx={{ mt: 0.5 }}>
-            Overview of invoices, payments, and recurring income
+            Overview of hardware purchase invoices and payments
           </Typography>
         </div>
-        <Link href="/accounting/create">
+        <Link href="/hardware-purchase/create">
           <Button variant="contained" startIcon={<AddIcon />}>
             Create Invoice
           </Button>
@@ -139,56 +144,30 @@ export default function AccountingDashboard() {
         <Box>
           <StatsCard
             label="Total Invoices"
-            value={dashboard.totalInvoices}
+            value={totalInvoices}
             color="info"
           />
         </Box>
         <Box>
           <StatsCard
             label="Unpaid Invoices"
-            value={dashboard.unpaidInvoices}
+            value={unpaidInvoices}
             color="warning"
           />
         </Box>
         <Box>
           <StatsCard
             label="Overdue Invoices"
-            value={dashboard.overdueInvoices}
+            value={overdueInvoices}
             color="error"
           />
         </Box>
         <Box>
           <StatsCard
             label="Total Outstanding"
-            value={dashboard.totalOutstanding}
+            value={totalOutstanding}
             isCurrency
             color="primary"
-          />
-        </Box>
-      </Box>
-
-      {/* Recurring Overview */}
-      <Box
-        sx={{
-          display: "grid",
-          gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
-          gap: 3,
-          mb: 4,
-        }}
-      >
-        <Box>
-          <StatsCard
-            label="Recurring Templates"
-            value={dashboard.recurringInvoices.total}
-            subtext={`${dashboard.recurringInvoices.active} active`}
-            color="success"
-          />
-        </Box>
-        <Box>
-          <StatsCard
-            label="Active Templates"
-            value={dashboard.recurringInvoices.active}
-            color="success"
           />
         </Box>
       </Box>
@@ -205,9 +184,9 @@ export default function AccountingDashboard() {
             }}
           >
             <Typography variant="h6" sx={{ fontWeight: "bold" }}>
-              All Invoices
+              All Hardware Purchase Invoices
             </Typography>
-            <Link href="/accounting/create">
+            <Link href="/hardware-purchase/create">
               <Button variant="contained" startIcon={<AddIcon />}>
                 Create Invoice
               </Button>
@@ -236,7 +215,7 @@ export default function AccountingDashboard() {
                     <TableRow key={invoice.id} hover>
                       <TableCell>
                         <Link
-                          href={`/accounting/${invoice.id}`}
+                          href={`/hardware-purchase/${invoice.id}`}
                           style={{ color: "#1976d2", textDecoration: "none" }}
                         >
                           {invoice.invoiceNumber}
