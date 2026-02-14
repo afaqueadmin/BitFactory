@@ -47,7 +47,7 @@ export default function Miners() {
           textAlign: { xs: "center", md: "left" },
         }}
       >
-        My Miners
+        Miners
       </Typography>
 
       {/* 4 gradient stat cards - Full width, 25% each */}

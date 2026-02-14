@@ -302,7 +302,7 @@ export default function WalletPage() {
       >
         <Box>
           <Typography variant="h4" fontWeight="bold" gutterBottom>
-            My Wallet
+            Wallet
           </Typography>
           <Typography variant="body1" color="text.secondary" gutterBottom>
             Overview of your mining earnings and transactions.

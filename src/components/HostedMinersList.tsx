@@ -257,14 +257,6 @@ export default function HostedMinersList({
           mb: 3,
         }}
       >
-        <Typography
-          variant="h4"
-          fontWeight="bold"
-          sx={{ color: theme.palette.text.primary }}
-        >
-          All Hosted Miners
-        </Typography>
-
         {/* Filter Buttons */}
         <Stack direction="row" spacing={1}>
           {filterValuesWithCounts.map(({ value, count }) => (
