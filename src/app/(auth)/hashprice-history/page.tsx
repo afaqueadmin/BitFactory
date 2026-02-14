@@ -73,12 +73,8 @@ const TIMEFRAMES = [
 ];
 
 const formatHashprice = (value: number): string => {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "BTC",
-    minimumFractionDigits: 8,
-    maximumFractionDigits: 8,
-  }).format(value);
+  const formatted = value.toFixed(8);
+  return `₿${formatted}`;
 };
 
 const formatDate = (timestamp: number): string => {
@@ -163,22 +159,30 @@ export default function HashpriceHistoryPage() {
       <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ mb: 4 }}>
         <Paper
           sx={{
-            p: 2,
+            p: 2.5,
             flex: 1,
             backgroundColor: isDark ? theme.palette.grey[800] : "#f5f5f5",
             borderRadius: 2,
+            border: `1px solid ${isDark ? theme.palette.grey[700] : "#e0e0e0"}`,
           }}
         >
-          <Typography variant="caption" color="textSecondary">
-            Current Hashprice
+          <Typography
+            variant="caption"
+            color="textSecondary"
+            sx={{ fontSize: "0.75rem", fontWeight: "600" }}
+          >
+            CURRENT HASHPRICE
           </Typography>
-          <Typography variant="h6" sx={{ fontWeight: "bold", mt: 0.5 }}>
+          <Typography
+            variant="h5"
+            sx={{ fontWeight: "bold", mt: 1, fontSize: "1.75rem" }}
+          >
             {formatHashprice(cardStatistics.current)}
           </Typography>
           <Typography
             variant="caption"
             color="textSecondary"
-            sx={{ display: "block", mt: 0.5 }}
+            sx={{ display: "block", mt: 0.75, fontSize: "0.7rem" }}
           >
             per PH/s per day
           </Typography>
@@ -186,44 +190,106 @@ export default function HashpriceHistoryPage() {
 
         <Paper
           sx={{
-            p: 2,
+            p: 2.5,
             flex: 1,
             backgroundColor: isDark ? theme.palette.grey[800] : "#f5f5f5",
             borderRadius: 2,
+            border: `1px solid ${isDark ? theme.palette.grey[700] : "#e0e0e0"}`,
           }}
         >
-          <Typography variant="caption" color="textSecondary">
-            Period Change
-          </Typography>
           <Typography
-            variant="h6"
-            sx={{
-              fontWeight: "bold",
-              mt: 0.5,
-              color: cardStatistics.change >= 0 ? "#4caf50" : "#f44336",
-            }}
+            variant="caption"
+            color="textSecondary"
+            sx={{ fontSize: "0.75rem", fontWeight: "600" }}
           >
-            {cardStatistics.change >= 0 ? "+" : ""}
-            {formatHashprice(cardStatistics.change)} (
-            {cardStatistics.changePercent.toFixed(2)}%)
+            PERIOD CHANGE
           </Typography>
+          <Box sx={{ mt: 1 }}>
+            <Typography
+              variant="h5"
+              sx={{
+                fontWeight: "bold",
+                fontSize: "1.75rem",
+                color: cardStatistics.change >= 0 ? "#4caf50" : "#f44336",
+              }}
+            >
+              {cardStatistics.change >= 0 ? "+" : ""}
+              {formatHashprice(cardStatistics.change)}
+            </Typography>
+            <Typography
+              variant="caption"
+              sx={{
+                fontSize: "0.85rem",
+                color: cardStatistics.change >= 0 ? "#4caf50" : "#f44336",
+                fontWeight: "600",
+                mt: 0.3,
+                display: "block",
+              }}
+            >
+              {cardStatistics.change >= 0 ? "↑" : "↓"}{" "}
+              {cardStatistics.changePercent.toFixed(2)}%
+            </Typography>
+          </Box>
         </Paper>
 
         <Paper
           sx={{
-            p: 2,
+            p: 2.5,
             flex: 1,
             backgroundColor: isDark ? theme.palette.grey[800] : "#f5f5f5",
             borderRadius: 2,
+            border: `1px solid ${isDark ? theme.palette.grey[700] : "#e0e0e0"}`,
           }}
         >
-          <Typography variant="caption" color="textSecondary">
-            High / Low
+          <Typography
+            variant="caption"
+            color="textSecondary"
+            sx={{ fontSize: "0.75rem", fontWeight: "600" }}
+          >
+            HIGH / LOW
           </Typography>
-          <Typography variant="body2" sx={{ fontWeight: "bold", mt: 0.5 }}>
-            {formatHashprice(cardStatistics.high)} /{" "}
-            {formatHashprice(cardStatistics.low)}
-          </Typography>
+          <Box sx={{ mt: 1 }}>
+            <Box sx={{ mb: 1.5 }}>
+              <Typography
+                variant="caption"
+                color="textSecondary"
+                sx={{ fontSize: "0.7rem" }}
+              >
+                24h High
+              </Typography>
+              <Typography
+                variant="body2"
+                sx={{
+                  fontWeight: "bold",
+                  color: "#4caf50",
+                  fontSize: "1rem",
+                  mt: 0.3,
+                }}
+              >
+                {formatHashprice(cardStatistics.high)}
+              </Typography>
+            </Box>
+            <Box>
+              <Typography
+                variant="caption"
+                color="textSecondary"
+                sx={{ fontSize: "0.7rem" }}
+              >
+                24h Low
+              </Typography>
+              <Typography
+                variant="body2"
+                sx={{
+                  fontWeight: "bold",
+                  color: "#f44336",
+                  fontSize: "1rem",
+                  mt: 0.3,
+                }}
+              >
+                {formatHashprice(cardStatistics.low)}
+              </Typography>
+            </Box>
+          </Box>
         </Paper>
       </Stack>
 
@@ -308,7 +374,12 @@ export default function HashpriceHistoryPage() {
             <AreaChart data={chartData}>
               <defs>
                 <linearGradient id="colorHashprice" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={chartColor} stopOpacity={0.3} />
+                  <stop offset="5%" stopColor={chartColor} stopOpacity={0.4} />
+                  <stop
+                    offset="50%"
+                    stopColor={chartColor}
+                    stopOpacity={0.15}
+                  />
                   <stop offset="95%" stopColor={chartColor} stopOpacity={0} />
                 </linearGradient>
               </defs>
@@ -320,22 +391,31 @@ export default function HashpriceHistoryPage() {
               />
               <YAxis
                 stroke={textColor}
-                style={{ fontSize: "0.8rem" }}
-                tickFormatter={(value) => value.toFixed(8)}
+                style={{ fontSize: "0.75rem" }}
+                tickFormatter={(value) => {
+                  if (value === 0) return "0";
+                  if (value < 0.00000001) return "<0.00000001";
+                  return value.toFixed(8);
+                }}
                 domain={["dataMin", "dataMax"]}
+                width={110}
               />
               <Tooltip
                 contentStyle={{
                   backgroundColor: isDark ? "#333" : "#fff",
-                  border: `1px solid ${theme.palette.divider}`,
+                  border: `2px solid ${chartColor}`,
                   borderRadius: "8px",
                   color: textColor,
+                  padding: "12px",
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+                  fontSize: "0.85rem",
                 }}
                 formatter={(value: number) => [
                   formatHashprice(value),
                   "Hashprice",
                 ]}
-                labelFormatter={(date) => `Date: ${date}`}
+                labelFormatter={(date) => `📅 Date: ${date}`}
+                separator=" = "
               />
               <Legend
                 wrapperStyle={{ color: textColor }}
@@ -348,11 +428,12 @@ export default function HashpriceHistoryPage() {
                 type="monotone"
                 dataKey="hashprice"
                 stroke={chartColor}
-                strokeWidth={2.5}
+                strokeWidth={3}
                 fillOpacity={1}
                 fill="url(#colorHashprice)"
                 dot={false}
-                name="Hashprice"
+                activeDot={{ r: 6, fill: chartColor, opacity: 1 }}
+                name="Hashprice (BTC/PH/s/Day)"
               />
             </AreaChart>
           </ResponsiveContainer>
