@@ -217,7 +217,7 @@ export default function AccountingDashboard() {
             <Table>
               <TableHead sx={{ backgroundColor: "#f5f5f5" }}>
                 <TableRow>
-                  <TableCell sx={{ fontWeight: "bold" }}>Invoice #</TableCell>
+                  <TableCell sx={{ fontWeight: "bold" }}>Invoice</TableCell>
                   <TableCell sx={{ fontWeight: "bold" }}>Customer</TableCell>
                   <TableCell sx={{ fontWeight: "bold" }}>Amount</TableCell>
                   <TableCell sx={{ fontWeight: "bold" }}>Status</TableCell>
