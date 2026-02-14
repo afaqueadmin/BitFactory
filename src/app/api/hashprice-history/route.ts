@@ -127,8 +127,8 @@ export async function GET(request: NextRequest) {
       Array.isArray(hashrateResponse.hashrate_efficiency)
     ) {
       for (const point of hashrateResponse.hashrate_efficiency) {
-        const date = point.timestamp
-          ? new Date(point.timestamp).toISOString().split("T")[0]
+        const date = point.date_time
+          ? new Date(point.date_time).toISOString().split("T")[0]
           : null;
         if (date && point.hashrate) {
           hashrateByDate[date] = parseFloat(String(point.hashrate));
