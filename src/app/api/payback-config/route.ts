@@ -18,9 +18,11 @@ export async function GET(request: NextRequest) {
 
     // Verify token and extract user ID
     let userId: string;
+    let userRole: string;
     try {
       const decoded = await verifyJwtToken(token);
       userId = decoded.userId;
+      userRole = decoded.role;
     } catch (error) {
       console.error("[Payback Config API] Token verification failed:", error);
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
@@ -65,6 +67,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       data: responseData,
+      userRole: userRole,
     });
   } catch (error) {
     console.error("[Payback Config API] Error fetching config:", error);

@@ -14,6 +14,8 @@ import {
   TableRow,
   CircularProgress,
   Alert,
+  TextField,
+  InputAdornment,
 } from "@mui/material";
 import { useCallback, useEffect, useState } from "react";
 
@@ -154,6 +156,18 @@ export default function PaybackAnalysisPage() {
   const [configLoading, setConfigLoading] = useState(true);
   const [configError, setConfigError] = useState<string | null>(null);
 
+  // User role and invoiced amount state
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [editableInvoicedAmount, setEditableInvoicedAmount] =
+    useState<string>("4250");
+  const [isUpdatingInvoiced, setIsUpdatingInvoiced] = useState(false);
+  const [invoicedUpdateSuccess, setInvoicedUpdateSuccess] = useState<
+    string | null
+  >(null);
+  const [invoicedUpdateError, setInvoicedUpdateError] = useState<string | null>(
+    null,
+  );
+
   // Price and reward state
   const [liveBtcPrice, setLiveBtcPrice] = useState<string | null>(null);
   const [liveBtcPriceValue, setLiveBtcPriceValue] = useState<number | null>(
@@ -182,6 +196,16 @@ export default function PaybackAnalysisPage() {
       const data = await response.json();
       if (data.success && data.data) {
         setConfig(data.data);
+        setUserRole(data.userRole || null);
+
+        // Set editable invoiced amount based on user role
+        if (data.userRole === "ADMIN") {
+          // Admin default: 4250
+          setEditableInvoicedAmount("4250");
+        } else {
+          // Client: use value from database
+          setEditableInvoicedAmount(String(data.data.invoicedAmount || "4250"));
+        }
       } else {
         throw new Error(data.error || "Invalid configuration data");
       }
@@ -253,6 +277,63 @@ export default function PaybackAnalysisPage() {
     }
   }, [liveBtcPriceValue]);
 
+  // Handle invoiced amount update
+  const handleUpdateInvoicedAmount = useCallback(async () => {
+    try {
+      setIsUpdatingInvoiced(true);
+      setInvoicedUpdateError(null);
+      setInvoicedUpdateSuccess(null);
+
+      const numValue = parseFloat(editableInvoicedAmount);
+      if (isNaN(numValue) || numValue < 0) {
+        setInvoicedUpdateError("Please enter a valid amount");
+        return;
+      }
+
+      // For ADMIN: just use the value temporarily (no API call)
+      if (userRole === "ADMIN") {
+        setInvoicedUpdateSuccess("Invoiced amount updated for this session");
+        setTimeout(() => setInvoicedUpdateSuccess(null), 3000);
+        return;
+      }
+
+      // For CLIENT: save to database
+      const response = await fetch("/api/user/invoiced-amount", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ invoicedAmount: numValue }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to update invoiced amount");
+      }
+
+      if (data.success) {
+        setInvoicedUpdateSuccess("Invoiced amount saved successfully!");
+        // Update the config with new value
+        if (config) {
+          setConfig({
+            ...config,
+            invoicedAmount: numValue,
+          });
+        }
+        setTimeout(() => setInvoicedUpdateSuccess(null), 3000);
+      }
+    } catch (error) {
+      const errorMsg =
+        error instanceof Error
+          ? error.message
+          : "Failed to update invoiced amount";
+      setInvoicedUpdateError(errorMsg);
+    } finally {
+      setIsUpdatingInvoiced(false);
+    }
+  }, [editableInvoicedAmount, userRole, config]);
+
   const resolvedBtcPriceValue = liveBtcPriceValue ?? FALLBACK_BTC_PRICE;
   const resolvedRewardBtcPerPhDay =
     liveRewardBtcPerPhDay ?? FALLBACK_REWARD_BTC_PER_PH_DAY;
@@ -260,7 +341,7 @@ export default function PaybackAnalysisPage() {
   // Calculate derived values from config
   const monthlyElectricityHosting = config ? config.monthlyInvoicingAmount : 0;
   const machineCost = config
-    ? config.invoicedAmount - config.monthlyInvoicingAmount
+    ? parseFloat(editableInvoicedAmount || "0") - config.monthlyInvoicingAmount
     : 0;
 
   // Recalculate values when BTC price, reward, or config changes
@@ -461,6 +542,26 @@ export default function PaybackAnalysisPage() {
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
+      {/* Success/Error messages for invoiced amount update */}
+      {invoicedUpdateSuccess && (
+        <Alert
+          severity="success"
+          sx={{ mb: 2 }}
+          onClose={() => setInvoicedUpdateSuccess(null)}
+        >
+          {invoicedUpdateSuccess}
+        </Alert>
+      )}
+      {invoicedUpdateError && (
+        <Alert
+          severity="error"
+          sx={{ mb: 2 }}
+          onClose={() => setInvoicedUpdateError(null)}
+        >
+          {invoicedUpdateError}
+        </Alert>
+      )}
+
       <Box sx={{ mb: 3 }}>
         <Box
           sx={{
@@ -474,13 +575,44 @@ export default function PaybackAnalysisPage() {
           <Typography variant="h4" sx={{ fontWeight: 700, mb: 1 }}>
             Payback Analysis
           </Typography>
-          <Button
-            variant="outlined"
-            onClick={handleRefresh}
-            disabled={isRefreshing}
+          <Box
+            sx={{
+              display: "flex",
+              gap: 2,
+              alignItems: "center",
+              flexWrap: "wrap",
+            }}
           >
-            {isRefreshing ? "Refreshing..." : "Refresh BTC Price"}
-          </Button>
+            <TextField
+              label="Invoiced Amount"
+              type="number"
+              value={editableInvoicedAmount}
+              onChange={(e) => setEditableInvoicedAmount(e.target.value)}
+              size="small"
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">$</InputAdornment>
+                ),
+              }}
+              inputProps={{ step: "0.01", min: "0" }}
+              sx={{ width: "180px" }}
+            />
+            <Button
+              variant="contained"
+              onClick={handleUpdateInvoicedAmount}
+              disabled={isUpdatingInvoiced}
+              size="medium"
+            >
+              {isUpdatingInvoiced ? "Updating..." : "Update"}
+            </Button>
+            <Button
+              variant="outlined"
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+            >
+              {isRefreshing ? "Refreshing..." : "Refresh BTC Price"}
+            </Button>
+          </Box>
         </Box>
         <Typography color="text.secondary">
           Updated:{" "}
@@ -532,7 +664,9 @@ export default function PaybackAnalysisPage() {
             <Typography variant="subtitle2" color="text.secondary">
               Invoiced Amount
             </Typography>
-            <Typography>{formatUsd(config.invoicedAmount)}</Typography>
+            <Typography>
+              {formatUsd(parseFloat(editableInvoicedAmount || "0"))}
+            </Typography>
           </Box>
           <Box>
             <Typography variant="subtitle2" color="text.secondary">

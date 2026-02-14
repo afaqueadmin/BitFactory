@@ -1,0 +1,2 @@
+-- This migration was already applied to the database
+-- It is recreated here to reconcile the migration history
