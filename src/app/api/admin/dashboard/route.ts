@@ -177,10 +177,13 @@ async function fetchSubaccountStats(
         name: string;
       }>;
       const totalSubaccounts = subaccounts.length;
+      const activeSubaccounts = subaccounts.filter(
+        ({ name }) => !name.includes("_test"),
+      ).length;
       return {
         total: totalSubaccounts,
-        active: totalSubaccounts, // Will be refined by workers fetch
-        inactive: 0,
+        active: activeSubaccounts, // Will be refined by workers fetch
+        inactive: totalSubaccounts - activeSubaccounts,
       };
     }
   } catch (error) {
@@ -573,7 +576,15 @@ export async function GET(request: NextRequest) {
 
     // Fetch customers (users with role CLIENT) statistics
     const totalCustomers = await prisma.user.findMany({
-      where: { role: "CLIENT", isDeleted: false },
+      where: {
+        role: "CLIENT",
+        isDeleted: false,
+        NOT: {
+          luxorSubaccountName: {
+            contains: "_test",
+          },
+        },
+      },
       include: {
         miners: true,
       },
