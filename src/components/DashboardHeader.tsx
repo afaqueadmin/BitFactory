@@ -12,59 +12,58 @@
  */
 
 import React from "react";
-import { Box, Typography, Stack, Chip, Skeleton } from "@mui/material";
+import { Box, Typography, Skeleton } from "@mui/material";
 import { useUser } from "@/lib/hooks/useUser";
 
 export default function DashboardHeader() {
-  const { user, loading, error } = useUser();
+  const { user, loading } = useUser();
 
   return (
     <Box
       component="section"
       aria-labelledby="dashboard-greeting"
       sx={{
-        textAlign: "center",
-        mb: { xs: 4, md: 5 },
-        mt: { xs: 3, md: 4 },
-        py: { xs: 2, md: 3 },
+        display: "flex",
+        mb: { xs: 2, md: 3 },
+        mt: { xs: 2, md: 2 },
       }}
     >
-      {/* Large greeting */}
-      <Typography
-        id="dashboard-greeting"
-        variant="h3"
-        component="h1"
+      {/* Greeting box - top right, compact */}
+      <Box
         sx={{
-          fontWeight: 700,
-          mb: { xs: 3, md: 4 },
-          lineHeight: 1.2,
-          // Responsive font sizing
-          fontSize: { xs: "1.6rem", sm: "2.2rem", md: "2.6rem" },
+          display: "flex",
+          alignItems: "center",
+          gap: 1,
         }}
       >
-        {loading ? (
-          <Skeleton
-            width="80%"
-            sx={{
-              mx: "auto",
-              height: { xs: "2rem", sm: "2.75rem", md: "3.25rem" },
-            }}
-          />
-        ) : (
-          <>
-            Hello,&nbsp;
-            <Box
-              component="span"
-              sx={{
-                color: "primary.main",
-                display: "inline-block",
-              }}
-            >
-              {user?.name || "Guest"}
-            </Box>
-          </>
-        )}
-      </Typography>
+        <Typography
+          id="dashboard-greeting"
+          variant="body1"
+          component="span"
+          sx={{
+            fontWeight: 600,
+            fontSize: { xs: "1.6rem", sm: "2.75rem", md: "3.25rem" },
+          }}
+        >
+          {loading ? (
+            <Skeleton width={100} height={24} />
+          ) : (
+            <>
+              Hello,&nbsp;
+              <Box
+                component="span"
+                sx={{
+                  color: "primary.main",
+                  display: "inline-block",
+                  fontWeight: 700,
+                }}
+              >
+                {user?.name || "Guest"}
+              </Box>
+            </>
+          )}
+        </Typography>
+      </Box>
 
       {/* Centered chip filters */}
       {/* commented to hide these for now will be removed soon */}
