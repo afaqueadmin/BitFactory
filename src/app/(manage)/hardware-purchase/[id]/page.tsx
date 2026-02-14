@@ -162,7 +162,7 @@ export default function InvoiceDetailPage() {
       await deleteInvoice(invoice!.id);
       setDeleteDialogOpen(false);
       // Redirect to invoices list
-      router.push("/accounting");
+      router.push("/hardware-purchase");
     } catch (err) {
       setDeleteDialogError(
         err instanceof Error ? err.message : "Failed to delete invoice",
@@ -284,7 +284,7 @@ export default function InvoiceDetailPage() {
           <Button
             startIcon={<ArrowBackIcon />}
             variant="text"
-            onClick={() => router.push("/accounting")}
+            onClick={() => router.push("/hardware-purchase")}
             sx={{ mb: 2 }}
           >
             Back to Invoices
