@@ -44,7 +44,6 @@ export default function PaybackAnalysisSettingsPage() {
     hostingCharges: "",
     monthlyInvoicingAmount: "",
     powerConsumption: "",
-    machineCapitalCost: "",
     poolCommission: "",
     s21proHashrateStockOs: "",
     s21proHashrateLuxos: "",
@@ -71,7 +70,6 @@ export default function PaybackAnalysisSettingsPage() {
           hostingCharges: data.data.hostingCharges,
           monthlyInvoicingAmount: data.data.monthlyInvoicingAmount,
           powerConsumption: data.data.powerConsumption,
-          machineCapitalCost: data.data.machineCapitalCost,
           poolCommission: data.data.poolCommission,
           s21proHashrateStockOs: data.data.s21proHashrateStockOs,
           s21proHashrateLuxos: data.data.s21proHashrateLuxos,
@@ -242,19 +240,6 @@ export default function PaybackAnalysisSettingsPage() {
               onChange={handleChange("powerConsumption")}
               helperText="Power consumption per miner"
               inputProps={{ step: "0.0001", min: "0" }}
-            />
-          </Grid>
-
-          {/* Machine Capital Cost */}
-          <Grid item xs={12} md={6}>
-            <TextField
-              fullWidth
-              label="Machine Capital Cost ($)"
-              type="number"
-              value={formData.machineCapitalCost}
-              onChange={handleChange("machineCapitalCost")}
-              helperText="Initial cost of the mining machine"
-              inputProps={{ step: "0.01", min: "0" }}
             />
           </Grid>
 
