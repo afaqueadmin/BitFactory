@@ -126,35 +126,53 @@ export async function GET(request: NextRequest) {
       hashrateResponse.hashrate_efficiency &&
       Array.isArray(hashrateResponse.hashrate_efficiency)
     ) {
+      console.log(
+        `[Hashprice History API] Processing ${hashrateResponse.hashrate_efficiency.length} hashrate records`,
+      );
       for (const point of hashrateResponse.hashrate_efficiency) {
-        const date = point.timestamp
-          ? new Date(point.timestamp).toISOString().split("T")[0]
+        const date = point.date_time
+          ? new Date(point.date_time).toISOString().split("T")[0]
           : null;
         if (date && point.hashrate) {
-          hashrateByDate[date] = parseFloat(String(point.hashrate));
+          const hashrate = parseFloat(String(point.hashrate));
+          hashrateByDate[date] = hashrate;
+          console.log(
+            `[Hashprice History API] Hashrate for ${date}: ${hashrate}`,
+          );
         }
       }
     }
+
+    console.log(
+      `[Hashprice History API] Hashrate map has ${Object.keys(hashrateByDate).length} entries`,
+    );
 
     // Merge revenue and hashrate data, calculate hashprice
     const hashpriceData: HashpricePoint[] = [];
 
     if (revenueResponse.revenue && Array.isArray(revenueResponse.revenue)) {
+      console.log(
+        `[Hashprice History API] Processing ${revenueResponse.revenue.length} revenue records`,
+      );
       for (const item of revenueResponse.revenue) {
         if (item && item.date_time) {
           const dateStr = item.date_time.split("T")[0]; // Extract YYYY-MM-DD
           const revenue = item.revenue?.revenue || 0;
           const hashrate = hashrateByDate[dateStr] || 0;
 
+          console.log(
+            `[Hashprice History API] Date: ${dateStr}, Revenue: ${revenue}, Hashrate: ${hashrate}`,
+          );
+
           // Calculate hashprice: revenue / hashrate
-          // Only include if we have both values
-          if (revenue > 0 && hashrate > 0) {
-            const hashprice = revenue / hashrate;
+          // Include even if one value is 0 (will show as 0 or Infinity, which we handle)
+          if (hashrate > 0) {
+            const hashprice = hashrate > 0 ? revenue / hashrate : 0;
 
             hashpriceData.push({
               date: dateStr,
               timestamp: new Date(item.date_time).getTime(),
-              hashprice,
+              hashprice: isFinite(hashprice) ? hashprice : 0,
               revenue,
               hashrate,
             });
