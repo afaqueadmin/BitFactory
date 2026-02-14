@@ -1,11 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
-import {
-  WorkersResponse,
-  HashrateEfficiencyResponse,
-  SummaryResponse,
-} from "@/lib/luxor";
+import { WorkersResponse, SummaryResponse } from "@/lib/luxor";
 
 interface DashboardStats {
   // Database-backed stats
@@ -533,8 +529,47 @@ export async function GET(request: NextRequest) {
       _sum: { powerCapacity: true },
     });
 
-    // Power usage is now calculated from Luxor workers
-    const usedMinersPower = 0; // Will be calculated from Luxor worker hashrate later
+    // Calculate power usage: Sum of (hardware.powerUsage * count of AUTO miners using that hardware)
+    let usedMinersPower = 0;
+    try {
+      // Get all hardware with count of AUTO miners using it
+      const hardwareWithMinerCounts = await prisma.hardware.findMany({
+        where: { isDeleted: false },
+        select: {
+          id: true,
+          powerUsage: true,
+          miners: {
+            where: {
+              status: "AUTO",
+              isDeleted: false,
+            },
+            select: {
+              id: true,
+            },
+          },
+        },
+      });
+
+      // Calculate total power: sum of (powerUsage * number of AUTO miners)
+      usedMinersPower = Number(
+        hardwareWithMinerCounts
+          .reduce((total, hw) => {
+            const minerCount = hw.miners.length;
+            const powerForThisHardware = hw.powerUsage * minerCount;
+            return total + powerForThisHardware;
+          }, 0)
+          .toFixed(2),
+      );
+
+      console.log(
+        `[Admin Dashboard] Total power from AUTO miners: ${usedMinersPower} kW (from ${hardwareWithMinerCounts.length} hardware types)`,
+      );
+    } catch (error) {
+      console.error(
+        "[Admin Dashboard] Error calculating power from miners:",
+        error,
+      );
+    }
 
     // Fetch customers (users with role CLIENT) statistics
     const totalCustomers = await prisma.user.findMany({
@@ -563,6 +598,10 @@ export async function GET(request: NextRequest) {
 
     // ========== LUXOR STATS (Mining Pool) ==========
 
+    const totalPower = Number(
+      (totalSpacePower._sum.powerCapacity || 0).toFixed(2),
+    );
+
     const luxorStats = {
       poolAccounts: { total: 0, active: 0, inactive: 0 },
       workers: { activeWorkers: 0, inactiveWorkers: 0, totalWorkers: 0 },
@@ -570,8 +609,9 @@ export async function GET(request: NextRequest) {
       hashrate_24h: 0,
       uptime_24h: 0,
       power: {
-        totalPower: usedMinersPower, // kW from active miners
-        availablePower: totalSpacePower._sum.powerCapacity || 0, // kW from spaces
+        usedPower: usedMinersPower, // kW from active miners
+        totalPower: totalPower, // kW from spaces
+        availablePower: Number((totalPower - usedMinersPower).toFixed(2)), // available power
       },
     };
 

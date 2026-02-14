@@ -38,6 +38,7 @@ interface DashboardStats {
     uptime_24h: number;
     power: {
       totalPower: number;
+      usedPower: number;
       availablePower: number;
     };
   };
@@ -222,14 +223,12 @@ export default function AdminDashboard() {
             stats={[
               {
                 label: "Free kW",
-                value:
-                  (stats?.luxor.power.availablePower ?? 0) -
-                  (stats?.luxor.power.totalPower ?? 0),
+                value: stats?.luxor.power.availablePower ?? 0,
                 color: "#00C853",
               },
               {
                 label: "Used kW",
-                value: stats?.luxor.power.totalPower ?? 0,
+                value: stats?.luxor.power.usedPower ?? 0,
                 color: "#00B0FF",
               },
             ]}
