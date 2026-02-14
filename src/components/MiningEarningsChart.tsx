@@ -249,7 +249,7 @@ export default function MiningEarningsChart({
                 domain={[yMin, yMax]}
                 tickCount={12}
                 label={{
-                  value: "Revenue (BTC ₿)",
+                  value: "Revenue (BTC)",
                   angle: -90,
                   position: "left",
                   offset: 24,
