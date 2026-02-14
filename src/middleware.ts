@@ -38,6 +38,7 @@ const securePaths = {
     "/admin/payback-analysis",
     "/admin/payback-analysis-settings",
     "/accounting",
+    "/hardware-purchase",
     "/customers/overview",
     "/groups",
     "/hardware",
@@ -55,6 +56,7 @@ const dynamicPatternsPaths = {
   CLIENT: [],
   ADMIN: [
     new URLPattern({ pathname: "/accounting/:path*" }),
+    new URLPattern({ pathname: "/hardware-purchase/:path*" }),
     new URLPattern({ pathname: "/customers/:id*" }),
     new URLPattern({ pathname: "/groups/:id*" }),
   ],
