@@ -922,7 +922,7 @@ export default function CustomerOverviewContent() {
         <MenuItem onClick={handleEditCustomer}>Edit Customer</MenuItem>
         <MenuItem onClick={handleChangePassword}>Change Password</MenuItem>
         <MenuItem onClick={handleAddPayment}>Add Startup Payment</MenuItem>
-        <MenuItem onClick={handleCreateAdjustment}>Create Adjustment</MenuItem>
+        <MenuItem onClick={handleCreateAdjustment}>Credit Account</MenuItem>
         <MenuItem
           onClick={handleDeleteCustomer}
           sx={{ color: "error.main" }}

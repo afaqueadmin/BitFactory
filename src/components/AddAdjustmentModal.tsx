@@ -87,17 +87,17 @@ export default function AddAdjustmentModal({
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Failed to create adjustment");
+        throw new Error(data.error || "Failed to credit aaccount");
       }
 
-      setSuccess("Adjustment created successfully");
+      setSuccess("Account credited successfully");
       setTimeout(() => {
-        onSuccess("Adjustment created successfully");
+        onSuccess("Account credited successfully");
         handleClose();
       }, 1500);
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to create adjustment",
+        err instanceof Error ? err.message : "Failed to credit aaccount",
       );
     } finally {
       setLoading(false);
@@ -133,7 +133,7 @@ export default function AddAdjustmentModal({
           alignItems: "center",
         }}
       >
-        Create Adjustment
+        Credit Account
         <IconButton
           onClick={handleClose}
           sx={{
@@ -156,14 +156,14 @@ export default function AddAdjustmentModal({
             {customerName && (
               <Box sx={{ mb: 1 }}>
                 <p style={{ margin: 0, fontSize: "0.9rem", color: "#666" }}>
-                  Creating adjustment for: <strong>{customerName}</strong>
+                  Credit Account for: <strong>{customerName}</strong>
                 </p>
               </Box>
             )}
 
             <TextField
               fullWidth
-              label="Adjustment Amount (USD)"
+              label="Credit Amount (USD)"
               type="number"
               inputProps={{
                 step: "0.01",
@@ -215,7 +215,7 @@ export default function AddAdjustmentModal({
             {loading ? (
               <CircularProgress size={24} color="inherit" />
             ) : (
-              "Create Adjustment"
+              "Credit Account"
             )}
           </Button>
         </DialogActions>
