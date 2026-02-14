@@ -53,7 +53,7 @@ const securePaths = {
 }; // Add admin-specific public paths if any
 
 const dynamicPatternsPaths = {
-  CLIENT: [],
+  CLIENT: [new URLPattern({ pathname: "/invoices/:id*" })],
   ADMIN: [
     new URLPattern({ pathname: "/accounting/:path*" }),
     new URLPattern({ pathname: "/hardware-purchase/:path*" }),

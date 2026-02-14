@@ -657,7 +657,7 @@ export default function MinersTable({
                   </TableCell>
                   <TableCell align="right">
                     {miner.rate_per_kwh ? (
-                      `$${Number(miner.rate_per_kwh).toFixed(3)}`
+                      `$${Number(miner.rate_per_kwh).toFixed(4)}`
                     ) : (
                       <Typography variant="body2" color="text.secondary">
                         —
