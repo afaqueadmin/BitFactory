@@ -383,6 +383,7 @@ export function useRecordPayment() {
         amountPaid: number;
         paymentDate: string;
         notes?: string;
+        markAsPaid?: boolean;
       },
     ) => mutation.mutateAsync({ invoiceId, data }),
     loading: mutation.isPending,

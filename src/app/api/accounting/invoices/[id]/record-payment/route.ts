@@ -31,10 +31,10 @@ export async function POST(
     }
 
     const body = await request.json();
-    const { amountPaid, paymentDate, notes } = body;
+    const { amountPaid, paymentDate, notes, markAsPaid } = body;
 
     // Validate input
-    if (!amountPaid || amountPaid <= 0) {
+    if (!markAsPaid && (!amountPaid || amountPaid <= 0)) {
       return NextResponse.json(
         { error: "Amount paid must be greater than 0" },
         { status: 400 },
@@ -101,7 +101,7 @@ export async function POST(
     const remainingBalance = Number(invoice.totalAmount) - newTotalPaid;
 
     // Update invoice status if fully paid
-    if (remainingBalance <= 0.0) {
+    if (markAsPaid || remainingBalance <= 0.0) {
       // Fully paid (accounting for floating point)
       await prisma.invoice.update({
         where: { id },
