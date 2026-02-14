@@ -13,10 +13,10 @@ import {
   Divider,
 } from "@mui/material";
 import { Save as SaveIcon, Refresh as RefreshIcon } from "@mui/icons-material";
-import type { GridProps } from "@mui/material/Grid";
 
 // Type workaround for MUI Grid component
-const Grid = MuiGrid as React.ComponentType<GridProps>;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const Grid = MuiGrid as React.ComponentType<any>;
 
 interface PaybackConfig {
   id: number;

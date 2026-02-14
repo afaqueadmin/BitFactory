@@ -112,7 +112,8 @@ export async function PATCH(request: NextRequest) {
       if (value === undefined || value === null || value === "") {
         return undefined;
       }
-      const numValue = typeof value === "string" ? parseFloat(value) : value;
+      const numValue =
+        typeof value === "string" ? parseFloat(value) : Number(value);
       if (isNaN(numValue)) {
         return undefined;
       }
