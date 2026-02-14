@@ -131,6 +131,7 @@ export async function GET(request: NextRequest) {
         status: inv.status,
         issuedDate: inv.issuedDate,
         paidDate: inv.paidDate,
+        invoiceType: inv.invoiceType,
       })),
     };
 

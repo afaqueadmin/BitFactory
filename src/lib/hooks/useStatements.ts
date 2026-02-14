@@ -12,6 +12,7 @@ export interface InvoiceStatement {
   status: InvoiceStatus;
   issuedDate: string | null;
   paidDate: string | null;
+  invoiceType: string;
 }
 
 export interface AccountStatement {
