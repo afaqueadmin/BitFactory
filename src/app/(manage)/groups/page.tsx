@@ -253,6 +253,22 @@ export default function GroupsPage() {
       return;
     }
 
+    if (!dialog.formData.relationshipManager.trim()) {
+      setDialog((prev) => ({
+        ...prev,
+        message: "Relationship Manager is required",
+      }));
+      return;
+    }
+
+    if (!dialog.formData.email.trim()) {
+      setDialog((prev) => ({
+        ...prev,
+        message: "Email is required",
+      }));
+      return;
+    }
+
     setDialog((prev) => ({ ...prev, submitting: true, message: null }));
 
     try {
@@ -263,6 +279,8 @@ export default function GroupsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: dialog.formData.name.trim(),
+          relationshipManager: dialog.formData.relationshipManager.trim(),
+          email: dialog.formData.email.trim(),
           description: dialog.formData.description.trim(),
         }),
       });
