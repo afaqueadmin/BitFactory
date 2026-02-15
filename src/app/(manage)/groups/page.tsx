@@ -66,6 +66,8 @@ import GradientStatCard from "@/components/GradientStatCard";
 interface Group {
   id: string;
   name: string;
+  relationshipManager: string;
+  email: string;
   description?: string;
   isActive: boolean;
   createdAt: string;
@@ -269,6 +271,14 @@ export default function GroupsPage() {
       return;
     }
 
+    if (dialog.formData.email !== dialog.formData.confirmEmail) {
+      setDialog((prev) => ({
+        ...prev,
+        message: "Emails do not match",
+      }));
+      return;
+    }
+
     setDialog((prev) => ({ ...prev, submitting: true, message: null }));
 
     try {
@@ -335,6 +345,30 @@ export default function GroupsPage() {
       setDialog((prev) => ({
         ...prev,
         message: "Group name is required",
+      }));
+      return;
+    }
+
+    if (!dialog.formData.relationshipManager.trim()) {
+      setDialog((prev) => ({
+        ...prev,
+        message: "Relationship Manager is required",
+      }));
+      return;
+    }
+
+    if (!dialog.formData.email.trim()) {
+      setDialog((prev) => ({
+        ...prev,
+        message: "Email is required",
+      }));
+      return;
+    }
+
+    if (dialog.formData.email !== dialog.formData.confirmEmail) {
+      setDialog((prev) => ({
+        ...prev,
+        message: "Emails do not match",
       }));
       return;
     }
@@ -657,19 +691,15 @@ export default function GroupsPage() {
    * Open edit group dialog
    */
   const openEditDialog = (group: Group) => {
-    const groupWithRMFields = group as unknown as {
-      relationshipManager?: string;
-      email?: string;
-    };
     setDialog({
       open: true,
       mode: "edit",
       selectedGroup: group,
       formData: {
         name: group.name,
-        relationshipManager: groupWithRMFields.relationshipManager || "",
-        email: groupWithRMFields.email || "",
-        confirmEmail: groupWithRMFields.email || "",
+        relationshipManager: group.relationshipManager,
+        email: group.email,
+        confirmEmail: group.email,
         description: group.description || "",
       },
       submitting: false,
