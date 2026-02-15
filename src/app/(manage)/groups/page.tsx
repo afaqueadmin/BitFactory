@@ -333,6 +333,8 @@ export default function GroupsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: dialog.formData.name.trim(),
+          relationshipManager: dialog.formData.relationshipManager.trim(),
+          email: dialog.formData.email.trim(),
           description: dialog.formData.description.trim(),
         }),
       });
