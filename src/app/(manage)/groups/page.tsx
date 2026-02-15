@@ -697,9 +697,9 @@ export default function GroupsPage() {
       selectedGroup: group,
       formData: {
         name: group.name,
-        relationshipManager: group.relationshipManager,
-        email: group.email,
-        confirmEmail: group.email,
+        relationshipManager: group.relationshipManager || "",
+        email: group.email || "",
+        confirmEmail: group.email || "",
         description: group.description || "",
       },
       submitting: false,
@@ -1482,10 +1482,10 @@ export default function GroupsPage() {
               variant="contained"
               disabled={
                 dialog.submitting ||
-                !dialog.formData.name.trim() ||
-                !dialog.formData.relationshipManager.trim() ||
-                !dialog.formData.email.trim() ||
-                !dialog.formData.confirmEmail.trim() ||
+                !dialog.formData.name?.trim() ||
+                !dialog.formData.relationshipManager?.trim() ||
+                !dialog.formData.email?.trim() ||
+                !dialog.formData.confirmEmail?.trim() ||
                 (dialog.formData.email !== dialog.formData.confirmEmail &&
                   dialog.mode !== "delete")
               }
