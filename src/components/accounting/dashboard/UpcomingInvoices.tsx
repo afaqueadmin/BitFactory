@@ -70,7 +70,7 @@ export function UpcomingInvoices({ invoices }: UpcomingInvoicesProps) {
                 </TableCell>
                 <TableCell>{invoice.customerName}</TableCell>
                 <TableCell align="right">
-                  <CurrencyDisplay value={invoice.amount} />
+                  <CurrencyDisplay value={invoice.amount} standalone={true} />
                 </TableCell>
                 <TableCell>
                   <DateDisplay date={invoice.dueDate} />

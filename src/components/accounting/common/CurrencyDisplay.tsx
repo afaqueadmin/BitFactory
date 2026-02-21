@@ -16,6 +16,7 @@ interface CurrencyDisplayProps {
   variant?: TypographyProps["variant"];
   color?: TypographyProps["color"];
   fontWeight?: "bold" | "normal" | number;
+  standalone?: boolean; // If true, wraps in Typography. If false, just returns text
 }
 
 export function CurrencyDisplay({
@@ -23,6 +24,7 @@ export function CurrencyDisplay({
   variant = "body2",
   color = "textPrimary",
   fontWeight = "normal",
+  standalone = false,
 }: CurrencyDisplayProps) {
   const numValue =
     typeof value === "string" ? parseFloat(value) : Number(value);
@@ -32,9 +34,15 @@ export function CurrencyDisplay({
   );
   const formatted = formatter.format(numValue);
 
-  return (
-    <Typography variant={variant} color={color} sx={{ fontWeight }}>
-      {formatted}
-    </Typography>
-  );
+  // If standalone, wrap in Typography. Otherwise, just return the text
+  if (standalone) {
+    return (
+      <Typography variant={variant} color={color} sx={{ fontWeight }}>
+        {formatted}
+      </Typography>
+    );
+  }
+
+  // Return as span to avoid nested paragraph issues
+  return <span>{formatted}</span>;
 }

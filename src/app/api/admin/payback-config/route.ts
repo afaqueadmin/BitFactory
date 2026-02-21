@@ -29,8 +29,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
 
-    // Only admins can access this endpoint
-    if (userRole !== "ADMIN") {
+    // Only admins and super admins can access this endpoint
+    if (userRole !== "ADMIN" && userRole !== "SUPER_ADMIN") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -96,8 +96,8 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
 
-    // Only admins can access this endpoint
-    if (userRole !== "ADMIN") {
+    // Only admins and super admins can access this endpoint
+    if (userRole !== "ADMIN" && userRole !== "SUPER_ADMIN") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

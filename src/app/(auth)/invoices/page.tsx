@@ -199,7 +199,16 @@ export default function InvoicesPage() {
                       onClick={() => router.push(`/invoices/${invoice.id}`)}
                     >
                       <TableCell sx={{ py: 2 }}>
-                        <Typography variant="body2" fontWeight="medium">
+                        <Typography
+                          variant="body2"
+                          fontWeight="medium"
+                          sx={{
+                            color: "primary.main",
+                            "&:hover": {
+                              textDecoration: "underline",
+                            },
+                          }}
+                        >
                           {invoice.invoiceNumber}
                         </Typography>
                       </TableCell>

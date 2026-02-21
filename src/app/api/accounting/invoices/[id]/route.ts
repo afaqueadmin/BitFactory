@@ -40,7 +40,27 @@ export async function GET(
       return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
     }
 
-    const response = NextResponse.json(invoice);
+    // Fetch group information if customer has a Luxor subaccount
+    let group = null;
+    if (invoice.user.luxorSubaccountName) {
+      group = await prisma.group.findFirst({
+        where: {
+          subaccounts: {
+            some: {
+              subaccountName: invoice.user.luxorSubaccountName,
+            },
+          },
+        },
+        select: {
+          id: true,
+          name: true,
+          relationshipManager: true,
+          email: true,
+        },
+      });
+    }
+
+    const response = NextResponse.json({ ...invoice, group });
     response.headers.set(
       "Cache-Control",
       "no-store, no-cache, must-revalidate, proxy-revalidate",

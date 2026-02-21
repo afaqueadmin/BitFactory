@@ -226,7 +226,10 @@ export default function HardwarePurchaseDashboard() {
                           `Customer ${invoice.userId.slice(0, 8)}`}
                       </TableCell>
                       <TableCell>
-                        <CurrencyDisplay value={invoice.totalAmount} />
+                        <CurrencyDisplay
+                          value={invoice.totalAmount}
+                          standalone={true}
+                        />
                       </TableCell>
                       <TableCell>
                         <StatusBadge status={invoice.status} />

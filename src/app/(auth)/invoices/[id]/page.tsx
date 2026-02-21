@@ -1,7 +1,6 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
 import {
   Container,
   Card,
@@ -13,7 +12,6 @@ import {
   Divider,
   Alert,
   CircularProgress,
-  Stack,
 } from "@mui/material";
 import { useInvoice } from "@/lib/hooks/useInvoices";
 import { StatusBadge } from "@/components/accounting/common/StatusBadge";
@@ -25,32 +23,6 @@ export default function CustomerInvoiceDetailPage() {
   const params = useParams();
   const router = useRouter();
   const { invoice, loading, error } = useInvoice(params.id as string);
-
-  const [groupInfo, setGroupInfo] = useState<{
-    id: string;
-    name: string;
-    relationshipManager: string;
-    email: string;
-  } | null>(null);
-  const [groupLoading, setGroupLoading] = useState(false);
-
-  // Fetch group info when invoice loads
-  useEffect(() => {
-    if (!invoice?.user?.id) return;
-
-    setGroupLoading(true);
-    fetch(`/api/accounting/customer-group?customerId=${invoice.user.id}`)
-      .then((res) => res.json())
-      .then((data) => {
-        setGroupInfo(data.group || null);
-      })
-      .catch(() => {
-        setGroupInfo(null);
-      })
-      .finally(() => {
-        setGroupLoading(false);
-      });
-  }, [invoice?.user?.id]);
 
   if (loading) {
     return (
@@ -132,17 +104,30 @@ export default function CustomerInvoiceDetailPage() {
                   Total Miners
                 </Typography>
                 <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
-                  {invoice.totalMiners || 0}
+                  {invoice.totalMiners || 0} units
                 </Typography>
               </Box>
 
-              {/* Total Amount */}
+              {/* Unit Price */}
               <Box>
                 <Typography color="textSecondary" variant="body2">
-                  Total Amount
+                  Unit Price
                 </Typography>
                 <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
-                  <CurrencyDisplay value={invoice.totalAmount} />
+                  <CurrencyDisplay value={invoice.unitPrice} />
+                </Typography>
+              </Box>
+
+              {/* Generated Date */}
+              <Box>
+                <Typography color="textSecondary" variant="body2">
+                  Generated Date
+                </Typography>
+                <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
+                  <DateDisplay
+                    date={invoice.invoiceGeneratedDate}
+                    format="datetime"
+                  />
                 </Typography>
               </Box>
 
@@ -153,7 +138,7 @@ export default function CustomerInvoiceDetailPage() {
                 </Typography>
                 <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
                   {invoice.issuedDate ? (
-                    <DateDisplay date={invoice.issuedDate} />
+                    <DateDisplay date={invoice.issuedDate} format="datetime" />
                   ) : (
                     "Not issued yet"
                   )}
@@ -170,109 +155,20 @@ export default function CustomerInvoiceDetailPage() {
                 </Typography>
               </Box>
 
-              {/* Start Date */}
+              {/* Paid Date */}
               <Box>
                 <Typography color="textSecondary" variant="body2">
-                  Period Start
+                  Paid Date
                 </Typography>
                 <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
-                  <DateDisplay date={invoice.periodStart} />
+                  {invoice.paidDate ? (
+                    <DateDisplay date={invoice.paidDate} format="datetime" />
+                  ) : (
+                    "Not yet paid"
+                  )}
                 </Typography>
               </Box>
-
-              {/* End Date */}
-              <Box>
-                <Typography color="textSecondary" variant="body2">
-                  Period End
-                </Typography>
-                <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
-                  <DateDisplay date={invoice.periodEnd} />
-                </Typography>
-              </Box>
-
-              {/* Paid Date (if paid) */}
-              {invoice.paidDate && (
-                <Box>
-                  <Typography color="textSecondary" variant="body2">
-                    Paid Date
-                  </Typography>
-                  <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
-                    <DateDisplay date={invoice.paidDate} />
-                  </Typography>
-                </Box>
-              )}
-
-              {/* Payment Method (if paid) */}
-              {invoice.paymentMethod && (
-                <Box>
-                  <Typography color="textSecondary" variant="body2">
-                    Payment Method
-                  </Typography>
-                  <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
-                    {invoice.paymentMethod}
-                  </Typography>
-                </Box>
-              )}
             </Box>
-
-            {/* Summary Section */}
-            <Divider sx={{ my: 3 }} />
-            <Stack spacing={1.5}>
-              <Box
-                sx={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                }}
-              >
-                <Typography color="textSecondary">Subtotal:</Typography>
-                <CurrencyDisplay value={invoice.subtotal} />
-              </Box>
-
-              <Box
-                sx={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                }}
-              >
-                <Typography color="textSecondary">Tax:</Typography>
-                <Typography sx={{ fontWeight: 600 }}>$0.00</Typography>
-              </Box>
-
-              <Divider sx={{ my: 1 }} />
-
-              <Box
-                sx={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                }}
-              >
-                <Typography sx={{ fontWeight: 600, fontSize: "1.1rem" }}>
-                  Total Due:
-                </Typography>
-                <CurrencyDisplay
-                  value={invoice.totalAmount}
-                  variant="h6"
-                  fontWeight="bold"
-                />
-              </Box>
-
-              <Divider sx={{ my: 1 }} />
-
-              {invoice.paidDate && (
-                <Alert severity="success" sx={{ my: 1 }}>
-                  Invoice has been paid
-                </Alert>
-              )}
-
-              {invoice.status === "OVERDUE" && (
-                <Alert severity="error" sx={{ my: 1 }}>
-                  Invoice is overdue
-                </Alert>
-              )}
-            </Stack>
           </CardContent>
         </Card>
       </Box>
@@ -311,23 +207,9 @@ export default function CustomerInvoiceDetailPage() {
                 <Typography color="textSecondary" variant="body2">
                   Relationship Manager
                 </Typography>
-                {groupLoading ? (
-                  <Box
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 1,
-                      mt: 0.5,
-                    }}
-                  >
-                    <CircularProgress size={16} />
-                    <Typography variant="body2">Loading...</Typography>
-                  </Box>
-                ) : (
-                  <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
-                    {groupInfo?.relationshipManager || "Not assigned"}
-                  </Typography>
-                )}
+                <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
+                  {invoice.group?.relationshipManager || "Not assigned"}
+                </Typography>
               </Box>
 
               {/* Relationship Manager Email */}
@@ -335,23 +217,9 @@ export default function CustomerInvoiceDetailPage() {
                 <Typography color="textSecondary" variant="body2">
                   RM Email
                 </Typography>
-                {groupLoading ? (
-                  <Box
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 1,
-                      mt: 0.5,
-                    }}
-                  >
-                    <CircularProgress size={16} />
-                    <Typography variant="body2">Loading...</Typography>
-                  </Box>
-                ) : (
-                  <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
-                    {groupInfo?.email || "Not assigned"}
-                  </Typography>
-                )}
+                <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
+                  {invoice.group?.email || "Not assigned"}
+                </Typography>
               </Box>
 
               {/* Group Name */}
@@ -359,23 +227,9 @@ export default function CustomerInvoiceDetailPage() {
                 <Typography color="textSecondary" variant="body2">
                   Group Name
                 </Typography>
-                {groupLoading ? (
-                  <Box
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 1,
-                      mt: 0.5,
-                    }}
-                  >
-                    <CircularProgress size={16} />
-                    <Typography variant="body2">Loading...</Typography>
-                  </Box>
-                ) : (
-                  <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
-                    {groupInfo?.name || "No group assigned"}
-                  </Typography>
-                )}
+                <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
+                  {invoice.group?.name || "No group assigned"}
+                </Typography>
               </Box>
             </Box>
           </CardContent>

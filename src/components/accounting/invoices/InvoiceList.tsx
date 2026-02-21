@@ -149,6 +149,7 @@ export function InvoiceList({
                     <CurrencyDisplay
                       value={invoice.totalAmount}
                       fontWeight="bold"
+                      standalone={true}
                     />
                   </TableCell>
                   <TableCell>

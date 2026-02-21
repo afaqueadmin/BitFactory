@@ -72,6 +72,7 @@ export function StatsCard({
                   value={typeof value === "number" ? value : 0}
                   variant="h5"
                   fontWeight="bold"
+                  standalone={true}
                 />
               ) : (
                 <Typography variant="h5" sx={{ fontWeight: "bold" }}>

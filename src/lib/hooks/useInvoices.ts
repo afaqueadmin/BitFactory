@@ -26,6 +26,12 @@ export interface InvoiceWithDetails extends Invoice {
     name: string | null;
   };
   costPayments?: CostPayment[];
+  group?: {
+    id: string;
+    name: string;
+    relationshipManager: string;
+    email: string;
+  } | null;
 }
 
 export function useInvoices(
