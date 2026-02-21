@@ -86,19 +86,27 @@ export default function CreateInvoicePage() {
 
   // When customer changes, auto-populate total miners from all their active miners
   useEffect(() => {
-    if (formData.customerId && miners.length > 0) {
-      // Each miner counts as 1, so totalMiners = number of miners
-      setFormData((prev) => ({
-        ...prev,
-        totalMiners: miners.length,
-      }));
+    const minerCount = miners.length;
+
+    if (formData.customerId && minerCount > 0) {
+      // Only update if the count actually changed to avoid re-render loops
+      setFormData((prev) => {
+        if (prev.totalMiners === minerCount) return prev;
+        return {
+          ...prev,
+          totalMiners: minerCount,
+        };
+      });
     } else if (!formData.customerId) {
-      setFormData((prev) => ({
-        ...prev,
-        totalMiners: 0,
-      }));
+      setFormData((prev) => {
+        if (prev.totalMiners === 0) return prev;
+        return {
+          ...prev,
+          totalMiners: 0,
+        };
+      });
     }
-  }, [formData.customerId, miners]);
+  }, [formData.customerId, miners.length]);
 
   // Fetch group/RM info when customerId changes
   useEffect(() => {

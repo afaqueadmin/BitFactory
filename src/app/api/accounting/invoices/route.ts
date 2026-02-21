@@ -125,12 +125,31 @@ export async function POST(request: NextRequest) {
     // Admins can change to ISSUED after creation via the status change endpoint
     const status = InvoiceStatus.DRAFT;
 
-    if (!customerId || !totalMiners || !unitPrice || !dueDate) {
+    if (
+      !customerId ||
+      totalMiners === undefined ||
+      unitPrice === undefined ||
+      !dueDate
+    ) {
       return NextResponse.json(
         {
           error:
             "Missing required fields: customerId, totalMiners, unitPrice, dueDate",
         },
+        { status: 400 },
+      );
+    }
+
+    if (typeof totalMiners !== "number" || totalMiners < 0) {
+      return NextResponse.json(
+        { error: "totalMiners must be a non-negative number" },
+        { status: 400 },
+      );
+    }
+
+    if (typeof unitPrice !== "number" || unitPrice <= 0) {
+      return NextResponse.json(
+        { error: "unitPrice must be a number greater than 0" },
         { status: 400 },
       );
     }
@@ -179,9 +198,9 @@ export async function POST(request: NextRequest) {
     const sequenceNumber = String(lastSeq + 1).padStart(3, "0");
     const invoiceNumber = `${customer.luxorSubaccountName}-${dateStr}-${sequenceNumber}`;
 
-    const totalAmount = parseFloat(
-      (totalMiners * Number(unitPrice)).toFixed(2),
-    );
+    const numericUnitPrice = Number(unitPrice);
+
+    const totalAmount = parseFloat((totalMiners * numericUnitPrice).toFixed(2));
 
     const invoice = await prisma.invoice.create({
       data: {
@@ -189,7 +208,7 @@ export async function POST(request: NextRequest) {
         userId: customerId,
         hardwareId: hardwareId || undefined,
         totalMiners,
-        unitPrice: parseFloat(unitPrice),
+        unitPrice: numericUnitPrice,
         totalAmount,
         status: status || InvoiceStatus.DRAFT,
         invoiceType: invoiceType || "ELECTRICITY_CHARGES",
