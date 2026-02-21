@@ -9,7 +9,7 @@ export const revalidate = 0;
 
 // Segment configuration to ensure this is treated as an API route
 export const fetchCache = "force-no-store";
-export const preferredRegion = "auto";
+export const preferredRegion = "iad1";
 
 // GET: Fetch user profile
 export async function GET(request: NextRequest) {

@@ -373,7 +373,10 @@ export default function BtcPriceHistoryPage() {
                   borderRadius: "8px",
                   color: textColor,
                 }}
-                formatter={(value: number, name: string) => {
+                formatter={(value: number | undefined, name?: string) => {
+                  if (value == null || !name) {
+                    return ["", ""];
+                  }
                   if (name === "volume") {
                     return [
                       (value / 1000000).toFixed(2) + "M",
