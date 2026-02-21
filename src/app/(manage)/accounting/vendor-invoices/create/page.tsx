@@ -11,11 +11,12 @@ import {
   Alert,
   Typography,
 } from "@mui/material";
-import { useState } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import SaveIcon from "@mui/icons-material/Save";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import Link from "next/link";
+import { useQuery } from "@tanstack/react-query";
 
 export interface VendorInvoiceFormData {
   invoiceNumber: string;
@@ -44,6 +45,28 @@ export default function CreateVendorInvoicePage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+
+  // Fetch machines using TanStack Query
+  const { data: machines } = useQuery({
+    queryKey: ["machines"],
+    queryFn: async () => {
+      const response = await fetch("/api/machine");
+      if (!response.ok) {
+        throw new Error("Failed to fetch machines");
+      }
+      return response.json();
+    },
+  });
+
+  // Update totalMiners when machines data is fetched
+  useEffect(() => {
+    if (machines && Array.isArray(machines.data)) {
+      setFormData((prev) => ({
+        ...prev,
+        totalMiners: machines.data.length,
+      }));
+    }
+  }, [machines]);
 
   // // Fetch existing invoice if editing
   // useEffect(() => {
