@@ -60,7 +60,11 @@ export default function InvoicesPage() {
     <Container maxWidth="lg" sx={{ py: 4 }}>
       {/* Header */}
       <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" component="h1" sx={{ fontWeight: "bold", mb: 1 }}>
+        <Typography
+          variant="h4"
+          component="h1"
+          sx={{ fontWeight: "bold", mb: 1 }}
+        >
           Invoices
         </Typography>
         <Typography variant="body2" color="textSecondary">
@@ -89,7 +93,7 @@ export default function InvoicesPage() {
                     py: 2,
                   }}
                 >
-                  Invoice#
+                  Invoice
                 </TableCell>
                 <TableCell
                   align="right"
