@@ -20,6 +20,7 @@ import { useUser } from "@/lib/hooks/useUser";
 import { StatusBadge } from "@/components/accounting/common/StatusBadge";
 import { Invoice } from "@/generated/prisma";
 import { useRouter } from "next/navigation";
+import { calculateDaysUntilDue } from "@/lib/mocks/invoiceMocks";
 
 interface InvoicesResponse {
   pagination: {
@@ -136,7 +137,27 @@ export default function InvoicesPage() {
                     py: 2,
                   }}
                 >
+                  Paid Date
+                </TableCell>
+                <TableCell
+                  sx={{
+                    fontWeight: "bold",
+                    borderBottom: "2px solid",
+                    borderBottomColor: "divider",
+                    py: 2,
+                  }}
+                >
                   Due Date
+                </TableCell>
+                <TableCell
+                  sx={{
+                    fontWeight: "bold",
+                    borderBottom: "2px solid",
+                    borderBottomColor: "divider",
+                    py: 2,
+                  }}
+                >
+                  Days Until Due
                 </TableCell>
               </TableRow>
             </TableHead>
@@ -161,6 +182,10 @@ export default function InvoicesPage() {
               ) : invoicesResponse?.invoices &&
                 invoicesResponse.invoices.length > 0 ? (
                 invoicesResponse.invoices.map((invoice) => {
+                  const daysUntilDue = calculateDaysUntilDue(
+                    new Date(invoice.dueDate),
+                  );
+
                   return (
                     <TableRow
                       hover
@@ -201,6 +226,19 @@ export default function InvoicesPage() {
                       </TableCell>
                       <TableCell sx={{ py: 2 }}>
                         <Typography variant="body2">
+                          {invoice.paidDate &&
+                            new Date(invoice.paidDate).toLocaleDateString(
+                              "en-US",
+                              {
+                                year: "numeric",
+                                month: "short",
+                                day: "numeric",
+                              },
+                            )}
+                        </Typography>
+                      </TableCell>
+                      <TableCell sx={{ py: 2 }}>
+                        <Typography variant="body2">
                           {new Date(invoice.dueDate).toLocaleDateString(
                             "en-US",
                             {
@@ -210,6 +248,31 @@ export default function InvoicesPage() {
                             },
                           )}
                         </Typography>
+                      </TableCell>
+                      <TableCell sx={{ py: 2 }}>
+                        {invoice.status === "PAID" ? (
+                          "-"
+                        ) : (
+                          <Typography
+                            sx={{
+                              color:
+                                daysUntilDue < 0
+                                  ? "error.main"
+                                  : daysUntilDue < 7
+                                    ? "warning.main"
+                                    : "success.main",
+                              fontWeight: "500",
+                            }}
+                          >
+                            {daysUntilDue === 0
+                              ? "Today"
+                              : daysUntilDue === 1
+                                ? "1 day"
+                                : daysUntilDue < 0
+                                  ? `${Math.abs(daysUntilDue)} ${Math.abs(daysUntilDue) === 1 ? "day" : "days"} overdue`
+                                  : `${daysUntilDue} ${daysUntilDue === 1 ? "day" : "days"}`}
+                          </Typography>
+                        )}
                       </TableCell>
                     </TableRow>
                   );
