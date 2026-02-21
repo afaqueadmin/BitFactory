@@ -6,5 +6,5 @@
     }
   ],
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "regions": ["sfo1"]
+  "regions": ["iad1"]
 }
