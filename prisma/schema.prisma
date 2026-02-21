@@ -41,6 +41,8 @@ model User {
   invoicesCreated            Invoice[]                    @relation("invoicesCreated")
   invoicesUpdated            Invoice[]                    @relation("invoicesUpdated")
   invoices                   Invoice[]                    @relation("invoices")
+  vendorInvoicesCreated      VendorInvoice[]              @relation("vendorInvoicesCreated")
+  vendorInvoicesUpdated      VendorInvoice[]              @relation("vendorInvoicesUpdated")
   createdMinerHistory        MinerOwnershipHistory[]      @relation("createdBy")
   ownedMinerHistory          MinerOwnershipHistory[]      @relation("owner")
   miners                     Miner[]
@@ -274,6 +276,32 @@ model Invoice {
   @@map("invoices")
 }
 
+model VendorInvoice {
+  id                   String                @id @default(cuid())
+  invoiceNumber        String                @unique
+  billingDate          DateTime              @db.Date
+  paidDate             DateTime?
+  dueDate              DateTime
+  totalMiners          Int
+  unitPrice            Decimal               @db.Decimal(10, 2)
+  miscellaneousCharges Decimal               @default(0.00) @db.Decimal(10, 2)
+  totalAmount          Decimal               @db.Decimal(12, 2)
+  paymentStatus        VendorPaymentStatus   @default(Pending)
+  notes                String?
+  createdBy            String
+  updatedBy            String?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  createdByUser        User                  @relation("vendorInvoicesCreated", fields: [createdBy], references: [id])
+  updatedByUser        User?                 @relation("vendorInvoicesUpdated", fields: [updatedBy], references: [id])
+
+  @@index([paymentStatus])
+  @@index([billingDate])
+  @@index([dueDate])
+  @@index([createdAt])
+  @@map("vendor_invoices")
+}
+
 model RecurringInvoice {
   id                String    @id @default(cuid())
   userId            String
@@ -428,6 +456,12 @@ enum NotificationStatus {
   FAILED
   BOUNCED
   UNSUBSCRIBED
+}
+
+enum VendorPaymentStatus {
+  Paid
+  Pending
+  Cancelled
 }
 // Payment Details for Invoice PDF - Admin configurable settings
 model PaymentDetails {
