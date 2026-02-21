@@ -5,14 +5,14 @@
  */
 
 import { Chip, ChipProps } from "@mui/material";
-import { InvoiceStatus } from "@/generated/prisma";
+import { InvoiceStatus, VendorPaymentStatus } from "@/generated/prisma";
 import {
   INVOICE_STATUS_LABELS,
   INVOICE_STATUS_COLORS,
 } from "@/lib/constants/accounting";
 
 interface StatusBadgeProps {
-  status: InvoiceStatus;
+  status: InvoiceStatus | VendorPaymentStatus;
   size?: "small" | "medium";
   variant?: "filled" | "outlined";
 }

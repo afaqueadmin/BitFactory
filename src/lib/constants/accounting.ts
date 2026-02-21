@@ -9,6 +9,7 @@ import {
   InvoiceStatus,
   NotificationType,
   AuditAction,
+  VendorPaymentStatus,
 } from "@/generated/prisma";
 
 // ============================================================================
@@ -78,18 +79,25 @@ export const VALID_DAY_OF_MONTH = Array.from({ length: 31 }, (_, i) => i + 1);
 // INVOICE STATUSES & COLORS
 // ============================================================================
 
-export const INVOICE_STATUS_LABELS: Record<InvoiceStatus, string> = {
+export const INVOICE_STATUS_LABELS: Record<
+  InvoiceStatus | VendorPaymentStatus,
+  string
+> = {
   [InvoiceStatus.DRAFT]: "Draft",
   [InvoiceStatus.ISSUED]: "Issued",
   [InvoiceStatus.PAID]: "Paid",
   [InvoiceStatus.OVERDUE]: "Overdue",
   [InvoiceStatus.CANCELLED]: "Cancelled",
   [InvoiceStatus.REFUNDED]: "Refunded",
+
+  [VendorPaymentStatus.Paid]: "Paid",
+  [VendorPaymentStatus.Pending]: "Pending",
+  [VendorPaymentStatus.Cancelled]: "Cancelled",
 };
 
 // MUI color variants for each status
 export const INVOICE_STATUS_COLORS: Record<
-  InvoiceStatus,
+  InvoiceStatus | VendorPaymentStatus,
   "default" | "primary" | "secondary" | "error" | "info" | "success" | "warning"
 > = {
   [InvoiceStatus.DRAFT]: "default",
@@ -98,16 +106,25 @@ export const INVOICE_STATUS_COLORS: Record<
   [InvoiceStatus.OVERDUE]: "error",
   [InvoiceStatus.CANCELLED]: "warning",
   [InvoiceStatus.REFUNDED]: "secondary",
+  [VendorPaymentStatus.Paid]: "success",
+  [VendorPaymentStatus.Pending]: "info",
+  [VendorPaymentStatus.Cancelled]: "warning",
 };
 
 // Hex color codes for charts and custom styling
-export const INVOICE_STATUS_HEX_COLORS: Record<InvoiceStatus, string> = {
+export const INVOICE_STATUS_HEX_COLORS: Record<
+  InvoiceStatus | VendorPaymentStatus,
+  string
+> = {
   [InvoiceStatus.DRAFT]: "#9CA3AF", // Gray
   [InvoiceStatus.ISSUED]: "#3B82F6", // Blue
   [InvoiceStatus.PAID]: "#10B981", // Green
   [InvoiceStatus.OVERDUE]: "#EF4444", // Red
   [InvoiceStatus.CANCELLED]: "#F59E0B", // Amber
   [InvoiceStatus.REFUNDED]: "#8B5CF6", // Purple
+  [VendorPaymentStatus.Paid]: "#10B981",
+  [VendorPaymentStatus.Pending]: "#3B82F6",
+  [VendorPaymentStatus.Cancelled]: "#F59E0B",
 };
 
 // ============================================================================

@@ -146,6 +146,11 @@ const sidebarItems: SidebarItem[] = [
         icon: <DocumentIcon />,
         path: "/accounting/pdf-invoice-settings",
       },
+      {
+        title: "Farm Tariffs",
+        icon: <DocumentIcon />,
+        path: "/accounting/farm-tariffs",
+      },
     ],
   },
   {
