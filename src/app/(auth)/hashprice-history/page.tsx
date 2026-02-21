@@ -426,8 +426,8 @@ export default function HashpriceHistoryPage() {
                   boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
                   fontSize: "0.85rem",
                 }}
-                formatter={(value: number) => [
-                  formatHashprice(value),
+                formatter={(value: number | undefined) => [
+                  value == null ? "" : formatHashprice(value),
                   "Hashprice",
                 ]}
                 labelFormatter={(date) => `📅 Date: ${date}`}

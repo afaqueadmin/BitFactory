@@ -253,7 +253,13 @@ export default function MiningEarningsChart({
               />
 
               <Tooltip
-                formatter={(value: number | string, name: string) => {
+                formatter={(
+                  value: number | string | undefined,
+                  name?: string,
+                ) => {
+                  if (value == null || !name) {
+                    return ["", ""];
+                  }
                   const num = Number(value);
                   if (name === "earnings" || name === "Daily Revenue (Luxor)") {
                     const btcValue = num.toFixed(8);
