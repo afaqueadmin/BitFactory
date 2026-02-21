@@ -63,6 +63,10 @@ interface CustomerBalanceData {
   }>;
 }
 
+interface HostingRevenueData {
+  hostingRevenue: number;
+}
+
 export default function AdminDashboard() {
   const router = useRouter();
 
@@ -113,7 +117,29 @@ export default function AdminDashboard() {
       retry: 2,
     });
 
-  if (loading || customerBalanceLoading) {
+  const { data: hostingRevenueData, isLoading: hostingRevenueLoading } =
+    useQuery<HostingRevenueData>({
+      queryKey: ["hostingRevenue"],
+      queryFn: async () => {
+        const response = await fetch("/api/cost-payments/hostingRevenue");
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch hosting revenue");
+        }
+
+        const data = await response.json();
+
+        if (!data.success) {
+          throw new Error(data.error || "Failed to fetch hosting revenue");
+        }
+
+        return data;
+      },
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      retry: 2,
+    });
+
+  if (loading || customerBalanceLoading || hostingRevenueLoading) {
     return (
       <Box
         sx={{
@@ -328,11 +354,15 @@ export default function AdminDashboard() {
 
           {/* === RESERVED FOR FUTURE LUXOR ENDPOINTS === */}
 
+          {/* Hosting Revenue - From Cost Payments */}
+          <AdminValueCard
+            title="Hosting Revenue (Electricity)"
+            value={hostingRevenueData?.hostingRevenue ?? 0}
+            type="currency"
+          />
+
           {/* Hosting Cost - Not yet implemented */}
           <AdminValueCard title="Hosting Cost" value="N/A" />
-
-          {/* Hosting Revenue - Not yet implemented */}
-          <AdminValueCard title="Hosting Revenue" value="N/A" />
 
           {/* Hosting Profit - Not yet implemented */}
           <AdminValueCard title="Hosting Profit" value="N/A" />

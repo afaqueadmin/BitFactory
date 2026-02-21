@@ -13,7 +13,7 @@ dist-ssr
 *.local
 .next/
 .env
-.env.local
+.env.localvercel
 .env.production
 .env.staging
 
@@ -29,3 +29,4 @@ dist-ssr
 *.sw?
 
 /src/generated/prisma
+.vercel
