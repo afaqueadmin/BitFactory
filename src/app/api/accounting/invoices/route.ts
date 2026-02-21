@@ -49,14 +49,20 @@ export async function GET(request: NextRequest) {
 
     const skip = (page - 1) * limit;
 
+    const include: Record<string, unknown> = {
+      user: { select: { id: true, email: true, name: true } },
+      costPayments: true,
+    };
+
+    // Only include createdByUser when customerId is not passed
+    if (!customerId) {
+      include.createdByUser = { select: { id: true, email: true, name: true } };
+    }
+
     const [invoices, total] = await Promise.all([
       prisma.invoice.findMany({
         where,
-        include: {
-          user: { select: { id: true, email: true, name: true } },
-          createdByUser: { select: { id: true, email: true, name: true } },
-          costPayments: true,
-        },
+        include,
         orderBy: { createdAt: "desc" },
         skip,
         take: limit,
