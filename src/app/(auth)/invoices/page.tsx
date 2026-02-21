@@ -19,6 +19,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useUser } from "@/lib/hooks/useUser";
 import { StatusBadge } from "@/components/accounting/common/StatusBadge";
 import { Invoice } from "@/generated/prisma";
+import { useRouter } from "next/navigation";
 
 interface InvoicesResponse {
   pagination: {
@@ -33,6 +34,7 @@ interface InvoicesResponse {
 export default function InvoicesPage() {
   const theme = useTheme();
   const { user } = useUser();
+  const router = useRouter();
 
   // Fetch invoices using TanStack Query
   const {
@@ -169,6 +171,7 @@ export default function InvoicesPage() {
                           backgroundColor: theme.palette.action.hover,
                         },
                       }}
+                      onClick={() => router.push(`/invoices/${invoice.id}`)}
                     >
                       <TableCell sx={{ py: 2 }}>
                         <Typography variant="body2" fontWeight="medium">

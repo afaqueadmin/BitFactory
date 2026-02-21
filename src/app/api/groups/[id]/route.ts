@@ -181,6 +181,8 @@ export async function GET(
           group: {
             id: group.id,
             name: group.name,
+            relationshipManager: group.relationshipManager,
+            email: group.email,
             description: group.description,
             isActive: group.isActive,
             createdAt: group.createdAt.toISOString(),

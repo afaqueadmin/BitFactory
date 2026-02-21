@@ -32,6 +32,7 @@ export async function GET(request: NextRequest) {
     }
 
     const status = searchParams.get("status");
+    const invoiceType = searchParams.get("invoiceType");
     const page = parseInt(searchParams.get("page") || "1", 10);
     const limit = parseInt(searchParams.get("limit") || "10", 10);
 
@@ -39,6 +40,9 @@ export async function GET(request: NextRequest) {
     if (customerId) where.userId = customerId;
     if (status) {
       where.status = status as InvoiceStatus;
+    }
+    if (invoiceType) {
+      where.invoiceType = invoiceType;
     }
     // Note: CANCELLED invoices are now included in the dashboard table
     // They won't affect calculations (amount, outstanding, etc) as they're already excluded from those queries
@@ -102,7 +106,14 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { customerId, totalMiners, unitPrice, dueDate } = body;
+    const {
+      customerId,
+      totalMiners,
+      unitPrice,
+      dueDate,
+      invoiceType,
+      hardwareId,
+    } = body;
 
     // Status is always DRAFT when creating new invoices
     // Admins can change to ISSUED after creation via the status change endpoint
@@ -162,16 +173,20 @@ export async function POST(request: NextRequest) {
     const sequenceNumber = String(lastSeq + 1).padStart(3, "0");
     const invoiceNumber = `${customer.luxorSubaccountName}-${dateStr}-${sequenceNumber}`;
 
-    const totalAmount = totalMiners * Number(unitPrice);
+    const totalAmount = parseFloat(
+      (totalMiners * Number(unitPrice)).toFixed(2),
+    );
 
     const invoice = await prisma.invoice.create({
       data: {
         invoiceNumber,
         userId: customerId,
+        hardwareId: hardwareId || undefined,
         totalMiners,
         unitPrice: parseFloat(unitPrice),
         totalAmount,
         status: status || InvoiceStatus.DRAFT,
+        invoiceType: invoiceType || "ELECTRICITY_CHARGES",
         invoiceGeneratedDate: timestamp,
         dueDate: new Date(dueDate),
         createdBy: userId,

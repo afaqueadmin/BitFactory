@@ -66,6 +66,8 @@ import GradientStatCard from "@/components/GradientStatCard";
 interface Group {
   id: string;
   name: string;
+  relationshipManager: string;
+  email: string;
   description?: string;
   isActive: boolean;
   createdAt: string;
@@ -253,6 +255,30 @@ export default function GroupsPage() {
       return;
     }
 
+    if (!dialog.formData.relationshipManager.trim()) {
+      setDialog((prev) => ({
+        ...prev,
+        message: "Relationship Manager is required",
+      }));
+      return;
+    }
+
+    if (!dialog.formData.email.trim()) {
+      setDialog((prev) => ({
+        ...prev,
+        message: "Email is required",
+      }));
+      return;
+    }
+
+    if (dialog.formData.email !== dialog.formData.confirmEmail) {
+      setDialog((prev) => ({
+        ...prev,
+        message: "Emails do not match",
+      }));
+      return;
+    }
+
     setDialog((prev) => ({ ...prev, submitting: true, message: null }));
 
     try {
@@ -263,6 +289,8 @@ export default function GroupsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: dialog.formData.name.trim(),
+          relationshipManager: dialog.formData.relationshipManager.trim(),
+          email: dialog.formData.email.trim(),
           description: dialog.formData.description.trim(),
         }),
       });
@@ -321,6 +349,30 @@ export default function GroupsPage() {
       return;
     }
 
+    if (!dialog.formData.relationshipManager.trim()) {
+      setDialog((prev) => ({
+        ...prev,
+        message: "Relationship Manager is required",
+      }));
+      return;
+    }
+
+    if (!dialog.formData.email.trim()) {
+      setDialog((prev) => ({
+        ...prev,
+        message: "Email is required",
+      }));
+      return;
+    }
+
+    if (dialog.formData.email !== dialog.formData.confirmEmail) {
+      setDialog((prev) => ({
+        ...prev,
+        message: "Emails do not match",
+      }));
+      return;
+    }
+
     setDialog((prev) => ({ ...prev, submitting: true, message: null }));
 
     try {
@@ -333,6 +385,8 @@ export default function GroupsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: dialog.formData.name.trim(),
+          relationshipManager: dialog.formData.relationshipManager.trim(),
+          email: dialog.formData.email.trim(),
           description: dialog.formData.description.trim(),
         }),
       });
@@ -637,19 +691,15 @@ export default function GroupsPage() {
    * Open edit group dialog
    */
   const openEditDialog = (group: Group) => {
-    const groupWithRMFields = group as unknown as {
-      relationshipManager?: string;
-      email?: string;
-    };
     setDialog({
       open: true,
       mode: "edit",
       selectedGroup: group,
       formData: {
         name: group.name,
-        relationshipManager: groupWithRMFields.relationshipManager || "",
-        email: groupWithRMFields.email || "",
-        confirmEmail: groupWithRMFields.email || "",
+        relationshipManager: group.relationshipManager || "",
+        email: group.email || "",
+        confirmEmail: group.email || "",
         description: group.description || "",
       },
       submitting: false,
@@ -1432,10 +1482,10 @@ export default function GroupsPage() {
               variant="contained"
               disabled={
                 dialog.submitting ||
-                !dialog.formData.name.trim() ||
-                !dialog.formData.relationshipManager.trim() ||
-                !dialog.formData.email.trim() ||
-                !dialog.formData.confirmEmail.trim() ||
+                !dialog.formData.name?.trim() ||
+                !dialog.formData.relationshipManager?.trim() ||
+                !dialog.formData.email?.trim() ||
+                !dialog.formData.confirmEmail?.trim() ||
                 (dialog.formData.email !== dialog.formData.confirmEmail &&
                   dialog.mode !== "delete")
               }

@@ -33,15 +33,17 @@ export function useInvoices(
   limit: number = 10,
   customerId?: string,
   status?: InvoiceStatus,
+  invoiceType?: string,
 ) {
   const { data, isLoading, error } = useQuery({
-    queryKey: ["invoices", page, limit, customerId, status],
+    queryKey: ["invoices", page, limit, customerId, status, invoiceType],
     queryFn: async () => {
       const params = new URLSearchParams();
       params.append("page", page.toString());
       params.append("limit", limit.toString());
       if (customerId) params.append("customerId", customerId);
       if (status) params.append("status", status);
+      if (invoiceType) params.append("invoiceType", invoiceType);
 
       const res = await fetch(`/api/accounting/invoices?${params}`, {
         method: "GET",
@@ -143,6 +145,8 @@ export function useCreateInvoice() {
       unitPrice: number;
       dueDate: string;
       status?: InvoiceStatus;
+      invoiceType?: string;
+      hardwareId?: string;
     }) => {
       const res = await fetch("/api/accounting/invoices", {
         method: "POST",

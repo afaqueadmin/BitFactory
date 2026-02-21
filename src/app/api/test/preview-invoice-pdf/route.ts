@@ -21,6 +21,8 @@ export async function GET() {
       250, // unitPrice
       "test-invoice-id-123", // invoiceId
       new Date(), // generatedDate
+      null, // cryptoPaymentUrl
+      "Bitmain S21 Pro", // hardwareModel (sample)
     );
 
     console.log(

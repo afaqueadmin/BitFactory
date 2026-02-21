@@ -77,9 +77,9 @@ export function useDashboardStats() {
       setLoading(true);
       setError(null);
 
-      // Fetch invoices
+      // Fetch invoices - filter for ELECTRICITY_CHARGES only
       const invoicesRes = await fetch(
-        "/api/accounting/invoices?page=1&limit=100",
+        "/api/accounting/invoices?page=1&limit=100&invoiceType=ELECTRICITY_CHARGES",
         {
           method: "GET",
           credentials: "include",

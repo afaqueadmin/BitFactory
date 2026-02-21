@@ -48,6 +48,11 @@ export async function POST(
             luxorSubaccountName: true,
           },
         },
+        hardware: {
+          select: {
+            model: true,
+          },
+        },
       },
     });
 
@@ -133,6 +138,7 @@ export async function POST(
         invoice.id,
         new Date(),
         cryptoPaymentUrl,
+        invoice.hardware?.model || null,
       );
 
       console.log(
