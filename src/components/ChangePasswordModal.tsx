@@ -13,6 +13,8 @@ import {
   CircularProgress,
   Alert,
 } from "@mui/material";
+import Checkbox from "@mui/material/Checkbox";
+import FormControlLabel from "@mui/material/FormControlLabel";
 import {
   Close as CloseIcon,
   Visibility,
@@ -38,12 +40,14 @@ export default function ChangePasswordModal({
     newPassword: "",
     confirmPassword: "",
   });
+  const [emailPassword, setEmailPassword] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
   const handleClose = () => {
     onClose();
     setFormData({ newPassword: "", confirmPassword: "" });
+    setEmailPassword(false);
     setError("");
     setSuccess("");
   };
@@ -74,6 +78,7 @@ export default function ChangePasswordModal({
         },
         body: JSON.stringify({
           newPassword: formData.newPassword,
+          emailPassword,
         }),
       });
 
@@ -184,6 +189,16 @@ export default function ChangePasswordModal({
                 }))
               }
               required
+            />
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={emailPassword}
+                  onChange={(e) => setEmailPassword(e.target.checked)}
+                  color="primary"
+                />
+              }
+              label="Email new password to client"
             />
           </Box>
         </DialogContent>

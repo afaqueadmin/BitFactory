@@ -46,6 +46,8 @@ model User {
   createdMinerHistory        MinerOwnershipHistory[]      @relation("createdBy")
   ownedMinerHistory          MinerOwnershipHistory[]      @relation("owner")
   miners                     Miner[]
+  emailSendRunsCreated       EmailSendRun[]               @relation("emailSendRunsCreated")
+  emailSendResults           EmailSendResult[]            @relation("emailSendResults")
   recurringCreated           RecurringInvoice[]           @relation("recurringInvoicesCreated")
   recurringUpdated           RecurringInvoice[]           @relation("recurringInvoicesUpdated")
   recurringInvoices          RecurringInvoice[]           @relation("recurringInvoices")
@@ -263,6 +265,7 @@ model Invoice {
   notifications        InvoiceNotification[] @relation("invoiceNotifications")
   costPayments         CostPayment[]         @relation("invoiceCostPayments")
   confirmoPayment      ConfirmoPayment?
+  emailSendResults     EmailSendResult[]     @relation("emailSendResults")
   createdByUser        User                  @relation("invoicesCreated", fields: [createdBy], references: [id])
   updatedByUser        User?                 @relation("invoicesUpdated", fields: [updatedBy], references: [id])
   user                 User                  @relation("invoices", fields: [userId], references: [id])
@@ -553,5 +556,56 @@ enum ConfirmoPaymentStatus {
   COMPLETED
   EXPIRED
   CANCELLED
+  FAILED
+}
+
+model EmailSendRun {
+  id             String              @id @default(cuid())
+  type           String              @default("INVOICE_BULK_EMAIL")
+  status         EmailRunStatus      @default(IN_PROGRESS)
+  totalInvoices  Int
+  successCount   Int                 @default(0)
+  failureCount   Int                 @default(0)
+  createdBy      String
+  startedAt      DateTime            @default(now())
+  completedAt    DateTime?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  results        EmailSendResult[]
+  creator        User                @relation("emailSendRunsCreated", fields: [createdBy], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([createdAt])
+  @@index([createdBy])
+  @@map("email_send_runs")
+}
+
+model EmailSendResult {
+  id             String              @id @default(cuid())
+  runId          String
+  invoiceId      String
+  customerId     String
+  customerName   String
+  customerEmail  String
+  success        Boolean
+  errorMessage   String?
+  sentAt         DateTime?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  run            EmailSendRun        @relation(fields: [runId], references: [id], onDelete: Cascade)
+  invoice        Invoice             @relation("emailSendResults", fields: [invoiceId], references: [id], onDelete: Cascade)
+  customer       User                @relation("emailSendResults", fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([runId])
+  @@index([invoiceId])
+  @@index([customerId])
+  @@index([success])
+  @@index([createdAt])
+  @@map("email_send_results")
+}
+
+enum EmailRunStatus {
+  IN_PROGRESS
+  COMPLETED
   FAILED
 }

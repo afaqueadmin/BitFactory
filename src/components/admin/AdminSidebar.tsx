@@ -151,6 +151,11 @@ const sidebarItems: SidebarItem[] = [
         icon: <DocumentIcon />,
         path: "/accounting/farm-tariffs",
       },
+      {
+        title: "Email Reports",
+        icon: <DocumentIcon />,
+        path: "/accounting/email-report",
+      },
     ],
   },
   {

@@ -130,7 +130,7 @@ export async function POST(
       },
     });
 
-    // Fetch updated invoice with all payments
+    // Fetch and return updated invoice with all payments
     const finalInvoice = await prisma.invoice.findUnique({
       where: { id },
       include: {
@@ -145,11 +145,7 @@ export async function POST(
       },
     });
 
-    return NextResponse.json({
-      success: true,
-      message: `Payment of $${amountPaid.toFixed(2)} recorded successfully`,
-      invoice: finalInvoice,
-    });
+    return NextResponse.json(finalInvoice);
   } catch (error) {
     console.error("Record payment error:", error);
     return NextResponse.json(

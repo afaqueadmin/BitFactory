@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
 import bcrypt from "bcryptjs";
+import { sendPasswordResetEmail } from "@/lib/email";
 
 export async function PUT(
   request: NextRequest,
@@ -38,7 +39,7 @@ export async function PUT(
       );
     }
 
-    const { newPassword } = await request.json();
+    const { newPassword, emailPassword } = await request.json();
 
     if (!newPassword || newPassword.length < 6) {
       return NextResponse.json(
@@ -51,12 +52,21 @@ export async function PUT(
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
     // Update user password
-    await prisma.user.update({
+    const updatedUser = await prisma.user.update({
       where: { id },
       data: {
         password: hashedPassword,
       },
+      select: {
+        email: true,
+      },
     });
+
+    // Optionally email the new password to the client
+    if (emailPassword && updatedUser.email) {
+      // Reuse the existing password reset email template
+      void sendPasswordResetEmail(updatedUser.email, newPassword);
+    }
 
     return NextResponse.json({
       message: "Password changed successfully",

@@ -42,6 +42,7 @@ import {
   useChangeInvoiceStatus,
   useDeleteInvoice,
   useSendInvoiceEmail,
+  useBulkSendInvoiceEmail,
   useInvoices,
 } from "@/lib/hooks/useInvoices";
 import { StatsCard } from "@/components/accounting/dashboard/StatsCard";
@@ -122,6 +123,7 @@ export default function AccountingDashboard() {
   const [bulkEmailFailureCount, setBulkEmailFailureCount] = useState<number>(0);
   const [bulkEmailCurrent, setBulkEmailCurrent] = useState<string | null>(null);
   const [bulkEmailError, setBulkEmailError] = useState<string | null>(null);
+  const [bulkEmailRunId, setBulkEmailRunId] = useState<string | null>(null);
   const {
     invoices,
     total,
@@ -148,6 +150,7 @@ export default function AccountingDashboard() {
   } = useDeleteInvoice();
 
   const { sendEmail } = useSendInvoiceEmail();
+  const { bulkSendEmail } = useBulkSendInvoiceEmail();
 
   const handleChangePage = (event: unknown, newPage: number) => {
     setPage(newPage + 1);
@@ -251,6 +254,7 @@ export default function AccountingDashboard() {
     if (selectedInvoiceIds.length === 0) return;
 
     setBulkEmailError(null);
+    setBulkEmailRunId(null);
     setBulkEmailTotal(selectedInvoiceIds.length);
     setBulkEmailProcessed(0);
     setBulkEmailSuccessCount(0);
@@ -260,38 +264,30 @@ export default function AccountingDashboard() {
     setBulkEmailProcessing(true);
 
     try {
+      // First, change status of DRAFT invoices to ISSUED
       for (const id of selectedInvoiceIds) {
         const invoice = invoices.find(
           (inv: InvoiceWithDetails) => inv.id === id,
         );
-        const customerName =
-          invoice?.user?.name ||
-          (invoice
-            ? `Customer ${invoice.userId.slice(0, 8)}`
-            : `Invoice ${id.slice(0, 8)}`);
-
-        setBulkEmailCurrent(customerName);
-
-        try {
-          if (invoice && invoice.status === "DRAFT") {
-            await changeStatus(invoice.id, "ISSUED");
-          }
-
-          await sendEmail(id);
-          setBulkEmailSuccessCount((prev) => prev + 1);
-        } catch {
-          setBulkEmailFailureCount((prev) => prev + 1);
-        } finally {
-          setBulkEmailProcessed((prev) => prev + 1);
+        if (invoice && invoice.status === "DRAFT") {
+          await changeStatus(invoice.id, "ISSUED");
         }
+        setBulkEmailProcessed((prev) => prev + 1);
+      }
+
+      // Then send emails in bulk
+      const response = await bulkSendEmail(selectedInvoiceIds);
+
+      if (response.success && response.runId) {
+        setBulkEmailRunId(response.runId);
+        setBulkEmailSuccessCount(response.results.sent.length);
+        setBulkEmailFailureCount(response.results.failed.length);
       }
 
       setSelectedInvoiceIds([]);
     } catch (err) {
       setBulkEmailError(
-        err instanceof Error
-          ? err.message
-          : "Failed to send some invoice emails.",
+        err instanceof Error ? err.message : "Failed to send bulk emails.",
       );
     } finally {
       setBulkEmailProcessing(false);
@@ -356,42 +352,60 @@ export default function AccountingDashboard() {
       >
         <DialogTitle>Issue and send invoices</DialogTitle>
         <DialogContent dividers>
-          <Typography gutterBottom>
-            Issuing and sending invoices to {bulkEmailTotal} {"customers"}
-          </Typography>
-          <Typography variant="body2" color="textSecondary" gutterBottom>
-            This may take a moment. You can keep this window open while we
-            process each invoice.
-          </Typography>
-          <Box sx={{ mt: 2 }}>
-            <LinearProgress
-              variant={bulkEmailTotal > 0 ? "determinate" : "indeterminate"}
-              value={
-                bulkEmailTotal > 0
-                  ? (bulkEmailProcessed / Math.max(bulkEmailTotal, 1)) * 100
-                  : 0
-              }
-            />
-            <Box sx={{ mt: 1 }}>
+          {!bulkEmailProcessing && bulkEmailRunId ? (
+            <Stack spacing={2}>
+              <Alert severity="success">
+                Emails sent successfully! {bulkEmailSuccessCount} successful,{" "}
+                {bulkEmailFailureCount} failed.
+              </Alert>
               <Typography variant="body2">
-                Progress: {bulkEmailProcessed} of {bulkEmailTotal} invoice
-                {bulkEmailTotal === 1 ? "" : "s"} processed.
+                View the detailed report and resend failed emails:
               </Typography>
-              <Typography variant="body2">
-                Status: Sent successfully {bulkEmailSuccessCount}, Unsuccessful{" "}
-                {bulkEmailFailureCount}.
+              <Button
+                component={Link}
+                href={`/accounting/email-report/${bulkEmailRunId}`}
+                variant="contained"
+                color="primary"
+                fullWidth
+              >
+                View Email Report
+              </Button>
+            </Stack>
+          ) : (
+            <>
+              <Typography gutterBottom>
+                Issuing and sending invoices to {bulkEmailTotal} {"customers"}
               </Typography>
-              {bulkEmailCurrent && (
-                <Typography variant="body2" color="textSecondary">
-                  Currently processing: {bulkEmailCurrent}
-                </Typography>
+              <Typography variant="body2" color="textSecondary" gutterBottom>
+                This may take a moment. You can keep this window open while we
+                process each invoice.
+              </Typography>
+              <Box sx={{ mt: 2 }}>
+                <LinearProgress
+                  variant={bulkEmailTotal > 0 ? "determinate" : "indeterminate"}
+                  value={
+                    bulkEmailTotal > 0
+                      ? (bulkEmailProcessed / Math.max(bulkEmailTotal, 1)) * 100
+                      : 0
+                  }
+                />
+                <Box sx={{ mt: 1 }}>
+                  <Typography variant="body2">
+                    Progress: {bulkEmailProcessed} of {bulkEmailTotal} invoice
+                    {bulkEmailTotal === 1 ? "" : "s"} processed.
+                  </Typography>
+                  <Typography variant="body2">
+                    Status: Sent successfully {bulkEmailSuccessCount},
+                    Unsuccessful {bulkEmailFailureCount}.
+                  </Typography>
+                </Box>
+              </Box>
+              {bulkEmailError && (
+                <Alert severity="error" sx={{ mt: 2 }}>
+                  {bulkEmailError}
+                </Alert>
               )}
-            </Box>
-          </Box>
-          {bulkEmailError && (
-            <Alert severity="error" sx={{ mt: 2 }}>
-              {bulkEmailError}
-            </Alert>
+            </>
           )}
         </DialogContent>
         <DialogActions>

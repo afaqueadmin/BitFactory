@@ -210,7 +210,7 @@ export default function ElectricityCostTable({
   const [order, setOrder] = useState<Order>("desc");
   const [orderBy, setOrderBy] = useState<OrderBy>("date");
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -460,7 +460,7 @@ export default function ElectricityCostTable({
               </Table>
             </TableContainer>
             <TablePagination
-              rowsPerPageOptions={[5, 10, 25]}
+              rowsPerPageOptions={[10, 25, 50]}
               component="div"
               count={totalCount}
               rowsPerPage={rowsPerPage}
