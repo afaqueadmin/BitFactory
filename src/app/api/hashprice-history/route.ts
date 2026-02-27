@@ -80,8 +80,10 @@ export async function GET(request: NextRequest) {
     const luxorClient = createLuxorClient(subaccountName);
 
     // Calculate date range
-    const today = new Date();
-    const startDate = new Date(today);
+    // Note: Luxor API requires end_date to be in the past, so we use yesterday
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const startDate = new Date(yesterday);
     startDate.setDate(startDate.getDate() - days);
 
     // Format dates as YYYY-MM-DD for Luxor API
@@ -93,7 +95,7 @@ export async function GET(request: NextRequest) {
     };
 
     const startDateStr = formatDate(startDate);
-    const endDateStr = formatDate(today);
+    const endDateStr = formatDate(yesterday);
 
     console.log(
       `[Hashprice History API] Fetching data from ${startDateStr} to ${endDateStr}`,

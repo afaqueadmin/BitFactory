@@ -144,11 +144,11 @@ export default function DashboardPage() {
           },
         });
 
-        if (!response.ok) {
-          throw new Error("Failed to fetch workers stats");
-        }
-
         const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to fetch workers stats");
+        }
 
         if (data.success) {
           setWorkersStats({

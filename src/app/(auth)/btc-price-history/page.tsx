@@ -373,17 +373,24 @@ export default function BtcPriceHistoryPage() {
                   borderRadius: "8px",
                   color: textColor,
                 }}
-                formatter={(value: number | undefined, name?: string) => {
+                formatter={(value, name) => {
                   if (value == null || !name) {
                     return ["", ""];
                   }
-                  if (name === "volume") {
+                  const numValue =
+                    typeof value === "string"
+                      ? parseFloat(value)
+                      : typeof value === "number"
+                        ? value
+                        : 0;
+                  const nameStr = String(name);
+                  if (nameStr === "volume") {
                     return [
-                      (value / 1000000).toFixed(2) + "M",
-                      name.toUpperCase(),
+                      (numValue / 1000000).toFixed(2) + "M",
+                      nameStr.toUpperCase(),
                     ];
                   }
-                  return [formatCurrency(value), name.toUpperCase()];
+                  return [formatCurrency(numValue), nameStr.toUpperCase()];
                 }}
               />
               <Legend

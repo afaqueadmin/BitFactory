@@ -16,6 +16,8 @@ import {
   Alert,
   TextField,
   InputAdornment,
+  ToggleButtonGroup,
+  ToggleButton,
 } from "@mui/material";
 import { useCallback, useEffect, useState } from "react";
 
@@ -25,7 +27,7 @@ const columns = [
   "Scenario: 2",
   "Scenario: 3",
   "Scenario: 4",
-  "BREAKEVEN",
+  "BREAKEVEN (Charges-StockOS)",
 ];
 
 // Fallback constants (only used if API fails)
@@ -179,6 +181,9 @@ export default function PaybackAnalysisPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
+  // OS selector state
+  const [selectedOS, setSelectedOS] = useState<"STOCK" | "LUX">("STOCK");
+
   // Calculated values for all scenarios
   const [calculatedValues, setCalculatedValues] = useState<CalculationValues[]>(
     [],
@@ -246,36 +251,33 @@ export default function PaybackAnalysisPage() {
 
   const fetchLuxorReward = useCallback(async () => {
     try {
-      const response = await fetch("/api/miners/summary", {
+      // Use the same API as hashprice history page to get consistent hashprice value
+      const response = await fetch("/api/hashprice-history?days=1", {
         method: "GET",
         headers: { "Content-Type": "application/json" },
       });
       if (!response.ok) return;
       const data = (await response.json()) as {
-        success: boolean;
-        data?: { hashprice?: Array<{ currency_type: string; value: number }> };
+        hashpriceData?: Array<{
+          date: string;
+          timestamp: number;
+          hashprice: number;
+          revenue: number;
+          hashrate: number;
+        }>;
+        statistics?: { current: number; high: number; low: number };
       };
 
-      if (!data.success || !data.data?.hashprice?.length) return;
+      // Get the current (latest) hashprice from statistics - same as hashprice history page
+      if (!data.statistics || !Number.isFinite(data.statistics.current)) return;
 
-      const hashprice = data.data.hashprice[0];
-      if (!hashprice || !Number.isFinite(hashprice.value)) return;
-
-      let rewardBtcPerPhDay = hashprice.value;
-
-      if (
-        hashprice.currency_type !== "BTC" &&
-        liveBtcPriceValue &&
-        liveBtcPriceValue > 0
-      ) {
-        rewardBtcPerPhDay = hashprice.value / liveBtcPriceValue;
-      }
+      const rewardBtcPerPhDay = data.statistics.current;
 
       setLiveRewardBtcPerPhDay(rewardBtcPerPhDay);
     } catch {
       // ignore and keep fallback
     }
-  }, [liveBtcPriceValue]);
+  }, []);
 
   // Handle invoiced amount update
   const handleUpdateInvoicedAmount = useCallback(async () => {
@@ -415,7 +417,7 @@ export default function PaybackAnalysisPage() {
   };
 
   // Build static rows from config
-  const staticRows: Array<{
+  const allStaticRows: Array<{
     label: string;
     values: Array<string | number>;
   }> = config
@@ -428,13 +430,13 @@ export default function PaybackAnalysisPage() {
           ),
         },
         {
-          label: "S21Pro Hashrate (Stock OS)",
+          label: "S21Pro Hashrate (TH) (Stock OS)",
           values: Array.from({ length: 6 }, () =>
             config.s21proHashrateStockOs.toFixed(2),
           ),
         },
         {
-          label: "S21Pro Hashrate (LUXOS)",
+          label: "S21Pro Hashrate (TH) (LUXOS)",
           values: Array.from({ length: 6 }, () =>
             config.s21proHashrateLuxos.toFixed(2),
           ),
@@ -443,68 +445,87 @@ export default function PaybackAnalysisPage() {
     : [];
 
   // Build dynamic rows for calculated values
-  const dynamicRows: Array<{
+  const allDynamicRows: Array<{
     label: string;
     values: Array<string | number>;
   }> = [];
 
   if (calculatedValues.length > 0 && config) {
-    dynamicRows.push({
+    allDynamicRows.push({
       label: "Daily BTC Reward (Stock OS)",
       values: calculatedValues.map((calc) => calc.dailyBtcStock.toFixed(8)),
     });
-    dynamicRows.push({
+    allDynamicRows.push({
       label: "Daily BTC Reward (LUX OS)",
       values: calculatedValues.map((calc) => calc.dailyBtcLux.toFixed(8)),
     });
-    dynamicRows.push({
+    allDynamicRows.push({
       label: "Monthly Revenue (Stock OS)",
       values: calculatedValues.map(
         (calc) => `$${calc.monthlyRevenueStock.toFixed(2)}`,
       ),
     });
-    dynamicRows.push({
+    allDynamicRows.push({
       label: "Monthly Revenue (LUX OS)",
       values: calculatedValues.map(
         (calc) => `$${calc.monthlyRevenueLux.toFixed(2)}`,
       ),
     });
-    dynamicRows.push({
+    allDynamicRows.push({
       label: "Electricity & Hosting Charges",
       values: Array.from(
         { length: 6 },
         () => `$${monthlyElectricityHosting.toFixed(2)}`,
       ),
     });
-    dynamicRows.push({
+    allDynamicRows.push({
       label: "Net Revenue (Stock OS)",
       values: calculatedValues.map(
         (calc) => `$${calc.netRevenueStock.toFixed(2)}`,
       ),
     });
-    dynamicRows.push({
+    allDynamicRows.push({
       label: "Net Revenue (LUX OS)",
       values: calculatedValues.map(
         (calc) => `$${calc.netRevenueLux.toFixed(2)}`,
       ),
     });
-    dynamicRows.push({
+    allDynamicRows.push({
       label: "Payback Months (Stock OS)",
-      values: calculatedValues.map((calc) =>
-        calc.paybackMonthsStock === Infinity
-          ? "∞"
-          : Math.round(calc.paybackMonthsStock),
+      values: calculatedValues.map((calc, index) =>
+        index === 5 // BREAKEVEN column
+          ? "--"
+          : calc.paybackMonthsStock === Infinity
+            ? "∞"
+            : Math.round(calc.paybackMonthsStock),
       ),
     });
-    dynamicRows.push({
+    allDynamicRows.push({
       label: "Payback Months (LUX OS)",
-      values: calculatedValues.map((calc) =>
-        calc.paybackMonthsLux === Infinity
-          ? "∞"
-          : Math.round(calc.paybackMonthsLux),
+      values: calculatedValues.map((calc, index) =>
+        index === 5 // BREAKEVEN column
+          ? "--"
+          : calc.paybackMonthsLux === Infinity
+            ? "∞"
+            : Math.round(calc.paybackMonthsLux),
       ),
     });
   }
+
+  // Filter rows based on selected OS
+  const staticRows = allStaticRows.filter((row) => {
+    if (row.label === "Pool Commission") return true;
+    if (selectedOS === "STOCK" && row.label.includes("Stock OS")) return true;
+    if (selectedOS === "LUX" && row.label.includes("LUXOS")) return true;
+    return false;
+  });
+
+  const dynamicRows = allDynamicRows.filter((row) => {
+    if (row.label === "Electricity & Hosting Charges") return true;
+    if (selectedOS === "STOCK" && row.label.includes("Stock OS")) return true;
+    if (selectedOS === "LUX" && row.label.includes("LUX OS")) return true;
+    return false;
+  });
 
   const tableRows = [btcPriceRow, rewardRow, ...staticRows, ...dynamicRows];
 
@@ -570,11 +591,41 @@ export default function PaybackAnalysisPage() {
             justifyContent: "space-between",
             gap: 2,
             flexWrap: "wrap",
+            mb: 3,
           }}
         >
-          <Typography variant="h4" sx={{ fontWeight: 700, mb: 1 }}>
+          <Typography variant="h4" sx={{ fontWeight: 700 }}>
             Payback Analysis
           </Typography>
+          <ToggleButtonGroup
+            value={selectedOS}
+            exclusive
+            onChange={(e, newValue) => {
+              if (newValue !== null) {
+                setSelectedOS(newValue);
+              }
+            }}
+            aria-label="OS selector"
+            size="medium"
+          >
+            <ToggleButton value="STOCK" aria-label="Stock OS">
+              Stock OS
+            </ToggleButton>
+            <ToggleButton value="LUX" aria-label="LUX OS">
+              LUX OS
+            </ToggleButton>
+          </ToggleButtonGroup>
+        </Box>
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 2,
+            flexWrap: "wrap",
+          }}
+        >
+          <Box sx={{ flex: 1 }} />
           <Box
             sx={{
               display: "flex",
@@ -610,7 +661,7 @@ export default function PaybackAnalysisPage() {
               onClick={handleRefresh}
               disabled={isRefreshing}
             >
-              {isRefreshing ? "Refreshing..." : "Refresh BTC Price"}
+              {isRefreshing ? "Refreshing..." : "Refresh"}
             </Button>
           </Box>
         </Box>
@@ -674,6 +725,12 @@ export default function PaybackAnalysisPage() {
             </Typography>
             <Typography>{formatUsd(machineCost)}</Typography>
           </Box>
+          <Box>
+            <Typography variant="subtitle2" color="text.secondary">
+              Current OS
+            </Typography>
+            <Typography>Stock OS</Typography>
+          </Box>
         </Box>
       </Paper>
 
@@ -692,30 +749,12 @@ export default function PaybackAnalysisPage() {
           <TableBody>
             {tableRows.map((row) => (
               <TableRow key={row.label} hover>
-                <TableCell
-                  sx={{
-                    fontWeight: 600,
-                    ...(row.label === "Reward (BTC/PH/Day)" && {
-                      backgroundColor: "#FFF3C4",
-                      fontWeight: 700,
-                    }),
-                  }}
-                >
-                  {row.label}
-                </TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>{row.label}</TableCell>
                 {row.values.map((value, index) => (
                   <TableCell
                     key={`${row.label}-${index}`}
                     align="right"
-                    sx={
-                      (row.label === "BTC Price (USD)" && index === 0) ||
-                      row.label === "Reward (BTC/PH/Day)"
-                        ? {
-                            backgroundColor: "#FFF3C4",
-                            fontWeight: 700,
-                          }
-                        : undefined
-                    }
+                    sx={{ fontWeight: 400 }}
                   >
                     {value}
                   </TableCell>

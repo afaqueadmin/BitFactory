@@ -347,10 +347,16 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     );
   } catch (error) {
     console.error("[Wallet API] Unexpected error:", error);
+    // Log more details about the error
+    if (error instanceof Error) {
+      console.error("[Wallet API] Error name:", error.name);
+      console.error("[Wallet API] Error message:", error.message);
+      console.error("[Wallet API] Error stack:", error.stack);
+    }
     return NextResponse.json(
       {
         success: false,
-        error: "Internal server error",
+        error: error instanceof Error ? error.message : "Internal server error",
         code: "UNKNOWN_ERROR",
         timestamp: new Date().toISOString(),
       } as WalletErrorResponse,
@@ -434,8 +440,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     );
   } catch (error) {
     console.error("[Wallet API] POST error:", error);
+    if (error instanceof Error) {
+      console.error(
+        "[Wallet API] POST Error details:",
+        error.message,
+        error.stack,
+      );
+    }
     return NextResponse.json(
-      { error: "Internal server error" },
+      {
+        error: error instanceof Error ? error.message : "Internal server error",
+        success: false,
+      },
       { status: 500 },
     );
   }

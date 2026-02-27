@@ -56,14 +56,16 @@ export async function GET(
     const currency = searchParams.get("currency") || "BTC";
 
     // Calculate date range for last 24 hours
-    const endDate = new Date();
-    const startDate = new Date(endDate.getTime() - 24 * 60 * 60 * 1000);
+    // Note: Luxor API requires end_date to be in the past, so we use yesterday
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const startDate = new Date(yesterday.getTime() - 24 * 60 * 60 * 1000);
 
     // Format dates as YYYY-MM-DD
     const formatDate = (date: Date) => date.toISOString().split("T")[0];
 
     const startDateStr = formatDate(startDate);
-    const endDateStr = formatDate(endDate);
+    const endDateStr = formatDate(yesterday);
 
     console.log(
       `[Wallet API] Fetching 24h revenue for ${currency} from ${startDateStr} to ${endDateStr}`,

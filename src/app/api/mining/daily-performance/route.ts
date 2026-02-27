@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyJwtToken } from "@/lib/jwt";
 import { prisma } from "@/lib/prisma";
-import { createLuxorClient, RevenueResponse, RevenueData } from "@/lib/luxor";
+import {
+  createLuxorClient,
+  RevenueResponse,
+  RevenueData,
+  LuxorError,
+} from "@/lib/luxor";
 
 interface DailyPerformanceData {
   date: string;
@@ -75,9 +80,11 @@ export async function GET(request: NextRequest) {
     // Create Luxor client
     const luxorClient = createLuxorClient(subaccountName);
 
-    // Calculate start_date (N days ago) and end_date (today)
-    const today = new Date();
-    const startDate = new Date(today);
+    // Calculate start_date (N days ago) and end_date (yesterday)
+    // Note: Luxor API requires end_date to be in the past, so we use yesterday
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const startDate = new Date(yesterday);
     startDate.setDate(startDate.getDate() - days);
 
     // Format dates as YYYY-MM-DD for Luxor API
@@ -89,7 +96,7 @@ export async function GET(request: NextRequest) {
     };
 
     const startDateStr = formatDate(startDate);
-    const endDateStr = formatDate(today);
+    const endDateStr = formatDate(yesterday);
 
     console.log(
       `[Mining Performance API] Fetching revenue from ${startDateStr} to ${endDateStr}`,
@@ -204,6 +211,21 @@ export async function GET(request: NextRequest) {
       { status: 200 },
     );
   } catch (error) {
+    // Handle LuxorError specifically
+    if (error instanceof LuxorError) {
+      console.error(
+        `[Mining Performance API] Luxor API error (${error.statusCode}): ${error.message}`,
+      );
+      return NextResponse.json(
+        {
+          success: false,
+          error: error.message,
+          details: error.errorDetails,
+        },
+        { status: error.statusCode || 500 },
+      );
+    }
+
     console.error("[Mining Performance API] Error:", error);
     return NextResponse.json(
       {
