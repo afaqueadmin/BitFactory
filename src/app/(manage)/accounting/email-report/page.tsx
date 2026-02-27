@@ -21,6 +21,7 @@ import {
 } from "@mui/material";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import RefreshIcon from "@mui/icons-material/Refresh";
 import { DateDisplay } from "@/components/accounting/common/DateDisplay";
 
 interface EmailSendRun {
@@ -45,19 +46,15 @@ export default function EmailReportPage() {
   const [runs, setRuns] = useState<EmailSendRun[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    // Fetch on mount
     fetchRuns();
-
-    // Set up auto-refresh every 5 seconds while dialog shows new runs
-    const interval = setInterval(fetchRuns, 5000);
-    return () => clearInterval(interval);
   }, []);
 
   const fetchRuns = async () => {
     try {
-      setLoading(true);
+      setRefreshing(true);
       setError(null);
       const response = await fetch("/api/accounting/email-runs");
 
@@ -74,6 +71,7 @@ export default function EmailReportPage() {
       );
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
@@ -100,13 +98,28 @@ export default function EmailReportPage() {
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
       <Stack spacing={3}>
-        <Box>
-          <Typography variant="h4" component="h1" gutterBottom>
-            Email Send Reports
-          </Typography>
-          <Typography variant="body2" color="textSecondary">
-            View and manage all bulk email operations
-          </Typography>
+        <Box
+          display="flex"
+          justifyContent="space-between"
+          alignItems="flex-start"
+        >
+          <Box>
+            <Typography variant="h4" component="h1" gutterBottom>
+              Email Send Reports
+            </Typography>
+            <Typography variant="body2" color="textSecondary">
+              View and manage all bulk email operations
+            </Typography>
+          </Box>
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<RefreshIcon />}
+            onClick={fetchRuns}
+            disabled={refreshing}
+          >
+            {refreshing ? "Refreshing..." : "Refresh"}
+          </Button>
         </Box>
 
         {error && (
