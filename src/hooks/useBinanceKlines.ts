@@ -17,16 +17,16 @@ export interface TimeframeConfig {
 }
 
 const TIMEFRAME_CONFIGS: Record<string, TimeframeConfig> = {
-  "1D": { interval: "1h", limit: 24, label: "1 Day" },
-  "1W": { interval: "4h", limit: 42, label: "1 Week" },
-  "1M": { interval: "1d", limit: 30, label: "1 Month" },
+  "24H": { interval: "1h", limit: 24, label: "24 Hours" },
+  "7D": { interval: "1d", limit: 7, label: "7 Days" },
+  "30D": { interval: "1d", limit: 30, label: "30 Days" },
   "3M": { interval: "1d", limit: 90, label: "3 Months" },
   "1Y": { interval: "1d", limit: 365, label: "1 Year" },
   ALL: { interval: "1w", limit: 1000, label: "All Time" },
 };
 
-export const useBinanceKlines = (timeframe: string = "1D") => {
-  const config = TIMEFRAME_CONFIGS[timeframe] || TIMEFRAME_CONFIGS["1D"];
+export const useBinanceKlines = (timeframe: string = "24H") => {
+  const config = TIMEFRAME_CONFIGS[timeframe] || TIMEFRAME_CONFIGS["24H"];
 
   const {
     data: klines,
