@@ -29,7 +29,15 @@ const renderInvoiceTemplate = (
   const conditionalRegex = /{{#if\s+(\w+)\s*}}([\s\S]*?){{\/if}}/g;
   html = html.replace(conditionalRegex, (match, variable, content) => {
     const value = data[variable];
-    const shouldShow = value !== null && value !== undefined && value !== "";
+    // Properly handle boolean false: false, null, undefined, and "" should not show content
+    const shouldShow =
+      value !== null && value !== undefined && value !== "" && value !== false;
+
+    console.log(`[TEMPLATE] Conditional {{#if ${variable}}}:`, {
+      value,
+      type: typeof value,
+      shouldShow,
+    });
 
     // Check if there's an {{else}} clause
     const elseRegex = /^([\s\S]*?){{else}}([\s\S]*)$/;
@@ -229,9 +237,8 @@ export const sendInvoiceCancellationEmail = async (
   totalAmount: number,
   dueDate: Date,
 ) => {
-  const { generateInvoiceCancellationEmailHTML } = await import(
-    "./email-templates/cancellation-email"
-  );
+  const { generateInvoiceCancellationEmailHTML } =
+    await import("./email-templates/cancellation-email");
 
   const htmlContent = generateInvoiceCancellationEmailHTML(
     customerName,
@@ -298,6 +305,12 @@ export const sendInvoiceEmailWithPDF = async (
       cryptoPaymentUrl: cryptoPaymentUrl || "",
       hasCryptoPayment: !!cryptoPaymentUrl,
     };
+
+    console.log("[EMAIL] Crypto payment data:", {
+      cryptoPaymentUrl,
+      hasCryptoPayment: !!cryptoPaymentUrl,
+      urlType: typeof cryptoPaymentUrl,
+    });
 
     const htmlContent = renderInvoiceTemplate(emailTemplate, emailData);
 
@@ -468,6 +481,12 @@ export const generateInvoicePDF = async (
           }
         : "none",
     );
+
+    console.log("[PDF] Crypto payment data:", {
+      cryptoPaymentUrl,
+      hasCryptoPayment: !!cryptoPaymentUrl,
+      urlType: typeof cryptoPaymentUrl,
+    });
 
     const htmlContent = renderInvoiceTemplate(pdfTemplate, pdfData);
     console.log("[PDF] Template rendered successfully, generating PDF...");

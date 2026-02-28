@@ -87,10 +87,20 @@ export class InvoiceEmailService {
 
       if (result.success && result.data?.paymentUrl) {
         console.log(
-          `[InvoiceEmailService] Crypto payment URL generated for invoice ${invoiceId}`,
+          `[InvoiceEmailService] Crypto payment URL generated for invoice ${invoiceId}:`,
+          result.data.paymentUrl,
         );
         return result.data.paymentUrl;
       }
+
+      console.log(
+        `[InvoiceEmailService] Crypto payment creation succeeded but no URL:`,
+        {
+          success: result.success,
+          hasData: !!result.data,
+          hasUrl: !!result.data?.paymentUrl,
+        },
+      );
     } catch (error) {
       console.error("[InvoiceEmailService] Crypto payment error:", error);
       // Continue without crypto payment

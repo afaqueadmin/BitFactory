@@ -77,6 +77,7 @@ export class ConfirmoPaymentService {
       totalMiners: invoice.totalMiners,
       unitPrice: invoice.unitPrice.toString(),
       totalAmount: invoice.totalAmount.toString(),
+      settlementCurrency: paymentDetails.confirmoSettlementCurrency || "USDC",
     });
 
     const confirmoInvoice = await this.client.createInvoice({
