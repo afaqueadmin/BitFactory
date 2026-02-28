@@ -66,7 +66,7 @@ export default function InvoiceDetailPage() {
   const router = useRouter();
   const { invoice, loading, error } = useInvoice(params.id as string);
   const { user } = useUser();
-  const { changeStatus, loading: statusLoading } = useChangeInvoiceStatus();
+  const { issueInvoice, loading: issueLoading } = useIssueInvoice();
   const { deleteInvoice, loading: deleteLoading } = useDeleteInvoice();
   const { auditLogs, loading: auditLoading } = useInvoiceAuditLog(
     params.id as string,
@@ -749,7 +749,7 @@ export default function InvoiceDetailPage() {
       <Dialog
         open={statusDialogOpen}
         onClose={() => {
-          if (!statusLoading) setStatusDialogOpen(false);
+          if (!issueLoading) setStatusDialogOpen(false);
         }}
       >
         <DialogTitle>Issue Invoice</DialogTitle>
@@ -773,7 +773,7 @@ export default function InvoiceDetailPage() {
                   {issueSuccess.ccDescription}
                 </Typography>
               </Alert>
-            ) : statusDialogError && !statusLoading ? (
+            ) : statusDialogError && !issueLoading ? (
               <Alert severity="error" sx={{ mb: 2 }}>
                 {statusDialogError}
               </Alert>
@@ -840,7 +840,7 @@ export default function InvoiceDetailPage() {
           </Box>
         </DialogContent>
         <DialogActions>
-          {!issueSuccess && statusDialogError && !statusLoading && (
+          {!issueSuccess && statusDialogError && !issueLoading && (
             <Button
               onClick={() => {
                 setStatusDialogOpen(false);
@@ -855,7 +855,7 @@ export default function InvoiceDetailPage() {
             <>
               <Button
                 onClick={() => setStatusDialogOpen(false)}
-                disabled={statusLoading}
+                disabled={issueLoading}
               >
                 Cancel
               </Button>
@@ -863,9 +863,9 @@ export default function InvoiceDetailPage() {
                 onClick={handleIssueInvoice}
                 variant="contained"
                 color="success"
-                disabled={statusLoading}
+                disabled={issueLoading}
               >
-                {statusLoading ? "Issuing & Sending..." : "Issue Invoice"}
+                {issueLoading ? "Issuing & Sending..." : "Issue Invoice"}
               </Button>
             </>
           )}
