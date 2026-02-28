@@ -181,7 +181,12 @@ export default function CustomerStatementPage() {
                 </TableCell>
                 <TableCell>
                   <CurrencyDisplay
-                    value={invoice.status === "PAID" ? 0 : invoice.totalAmount}
+                    value={
+                      invoice.status === "ISSUED" ||
+                      invoice.status === "OVERDUE"
+                        ? Math.max(0, invoice.totalAmount - invoice.paidAmount)
+                        : 0
+                    }
                   />
                 </TableCell>
                 <TableCell>

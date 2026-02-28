@@ -44,6 +44,7 @@ export async function GET(request: NextRequest) {
           select: {
             id: true,
             totalAmount: true,
+            status: true,
             costPayments: {
               select: {
                 amount: true,
@@ -80,6 +81,22 @@ export async function GET(request: NextRequest) {
         return sum + invPaid;
       }, 0);
 
+      // Only count outstanding for ISSUED invoices
+      const issuedInvoices = customer.invoices.filter(
+        (inv) => inv.status === "ISSUED",
+      );
+      const issuedTotalAmount = issuedInvoices.reduce(
+        (sum, inv) => sum + Number(inv.totalAmount),
+        0,
+      );
+      const issuedTotalPaid = issuedInvoices.reduce((sum, inv) => {
+        const invPaid = inv.costPayments.reduce(
+          (pSum, p) => pSum + p.amount,
+          0,
+        );
+        return sum + invPaid;
+      }, 0);
+
       const lastPaymentDate =
         customer.invoices
           .flatMap((inv) => inv.costPayments)
@@ -96,7 +113,7 @@ export async function GET(request: NextRequest) {
         totalInvoices: customer.invoices.length,
         totalAmount,
         totalPaid,
-        totalOutstanding: totalAmount - totalPaid,
+        totalOutstanding: issuedTotalAmount - issuedTotalPaid,
         lastPaymentDate: lastPaymentDate
           ? new Date(lastPaymentDate).toISOString()
           : null,

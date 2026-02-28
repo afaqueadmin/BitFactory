@@ -37,7 +37,12 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get("limit") || "10", 10);
 
     const where: Record<string, unknown> = {};
-    if (customerId) where.userId = customerId;
+    if (customerId) {
+      where.userId = customerId;
+      where.status = {
+        not: InvoiceStatus.DRAFT,
+      };
+    }
     if (status) {
       where.status = status as InvoiceStatus;
     }
