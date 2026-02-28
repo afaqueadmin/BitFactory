@@ -738,7 +738,9 @@ export default function PaybackAnalysisPage() {
         <Table>
           <TableHead>
             <TableRow>
-              <TableCell sx={{ fontWeight: 700 }}>Metric</TableCell>
+              <TableCell sx={{ fontWeight: 700, minWidth: 256 }}>
+                Metric
+              </TableCell>
               {columns.map((column) => (
                 <TableCell key={column} sx={{ fontWeight: 700 }} align="right">
                   {column}
