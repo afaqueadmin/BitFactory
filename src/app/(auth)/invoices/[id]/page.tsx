@@ -1,6 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
+import { useState } from "react";
 import {
   Container,
   Card,
@@ -18,11 +19,45 @@ import { StatusBadge } from "@/components/accounting/common/StatusBadge";
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
 import { DateDisplay } from "@/components/accounting/common/DateDisplay";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import DownloadIcon from "@mui/icons-material/Download";
 
 export default function CustomerInvoiceDetailPage() {
   const params = useParams();
   const router = useRouter();
   const { invoice, loading, error } = useInvoice(params.id as string);
+  const [downloadLoading, setDownloadLoading] = useState(false);
+
+  const handleDownload = async () => {
+    try {
+      setDownloadLoading(true);
+      const response = await fetch(
+        `/api/accounting/invoices/${invoice?.id}/download`,
+        {
+          method: "GET",
+          credentials: "include",
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to download invoice");
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `invoice-${invoice?.invoiceNumber}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error("Download error:", error);
+      alert("Failed to download invoice PDF");
+    } finally {
+      setDownloadLoading(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -55,14 +90,36 @@ export default function CustomerInvoiceDetailPage() {
           mb: 3,
         }}
       >
-        <Button
-          startIcon={<ArrowBackIcon />}
-          variant="text"
-          onClick={() => router.push("/invoices")}
-          sx={{ mb: 2 }}
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            mb: 2,
+          }}
         >
-          Back to Invoices
-        </Button>
+          <Button
+            startIcon={<ArrowBackIcon />}
+            variant="text"
+            onClick={() => router.push("/invoices")}
+          >
+            Back to Invoices
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<DownloadIcon />}
+            onClick={handleDownload}
+            disabled={downloadLoading}
+            sx={{
+              bgcolor: "primary.main",
+              "&:hover": {
+                bgcolor: "primary.dark",
+              },
+            }}
+          >
+            {downloadLoading ? "Downloading..." : "Download Invoice"}
+          </Button>
+        </Box>
         <Typography variant="h4" sx={{ fontWeight: 700 }}>
           {invoice.invoiceNumber}
         </Typography>
