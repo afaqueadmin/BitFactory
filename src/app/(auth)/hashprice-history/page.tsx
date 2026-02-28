@@ -6,13 +6,13 @@
  * FEATURES:
  *
  * Statistics Cards (Top Section):
- * - Current Hashprice Card: Shows the latest pool hashprice (BTC per PH/s per day)
+ * - Current Hashprice Card: Shows LIVE real-time hashprice from Luxor summary API (today's value, refreshes every 5 min)
  * - High/Low Card: Displays highest and lowest hashprice in selected period
  * - Hashprice Change Card: Shows price change from first to last day
  *   as both percentage and absolute value. Color-coded: green if up, red if down
  *
  * Chart (Main Visualization):
- * - Hashprice Line: Main line showing actual pool hashprice movement
+ * - Hashprice Line: Main line showing actual pool hashprice movement (historical data)
  * - Area fill: Subtle gradient underneath for visual appeal
  *
  * Timeframe Selector:
@@ -23,11 +23,11 @@
  * - 6M: Last 45 days (Luxor API historical limit)
  * - ALL: All available data (~45 days from Luxor API)
  *
- * Data Source:
- * - Luxor Mining Pool API (pool-specific hashprice)
- * - Calculated from: Daily Revenue ÷ Daily Hashrate
+ * Data Sources:
+ * - Current Hashprice: LIVE from /api/pool-hashprice-live (real-time Luxor summary API)
+ * - Historical Chart: From /api/hashprice-history (pool-wide daily revenue ÷ daily hashrate)
  * - Automatically refetches every 5 minutes
- * - Shows your mining pool's actual hashprice for miners
+ * - Shows pool-wide hashprice (same value for all users from 'higgs' main account)
  */
 
 import React, { useState, useMemo } from "react";
@@ -56,6 +56,7 @@ import {
   useHashpriceHistory,
   HashpricePoint,
 } from "@/hooks/useHashpriceHistory";
+import { useQuery } from "@tanstack/react-query";
 
 interface ChartData {
   date: string;
@@ -92,7 +93,21 @@ export default function HashpriceHistoryPage() {
   );
   const days = timeframeConfig?.days || 30;
 
-  // Fetch real hashprice history data from API
+  // Fetch live pool-wide hashprice (today's real-time value)
+  const { data: liveData, isLoading: isLiveLoading } = useQuery({
+    queryKey: ["pool-hashprice-live"],
+    queryFn: async () => {
+      const response = await fetch("/api/pool-hashprice-live");
+      if (!response.ok) throw new Error("Failed to fetch");
+      return response.json();
+    },
+    staleTime: 5 * 60 * 1000,
+    refetchInterval: 5 * 60 * 1000,
+  });
+
+  const liveHashprice = liveData?.data?.hashprice || 0;
+
+  // Fetch historical pool-wide hashprice data from API (for chart and period statistics)
   const { hashpriceData, statistics, isLoading, isError, error } =
     useHashpriceHistory(days);
 
@@ -109,7 +124,7 @@ export default function HashpriceHistoryPage() {
   const cardStatistics = useMemo(() => {
     if (chartData.length === 0) {
       return {
-        current: 0,
+        current: liveHashprice || 0, // Use live hashprice even if no historical data
         high: 0,
         low: 0,
         change: 0,
@@ -117,7 +132,9 @@ export default function HashpriceHistoryPage() {
       };
     }
 
-    const current = chartData[chartData.length - 1].hashprice;
+    // Use live hashprice for current (today's real-time value)
+    // Use last historical point as previous for comparison
+    const current = liveHashprice || chartData[chartData.length - 1].hashprice;
     const previous = chartData[0].hashprice;
     const high = statistics.high;
     const low = statistics.low;
@@ -125,7 +142,7 @@ export default function HashpriceHistoryPage() {
     const changePercent = previous !== 0 ? (change / previous) * 100 : 0;
 
     return { current, high, low, change, changePercent };
-  }, [chartData, statistics]);
+  }, [chartData, statistics, liveHashprice]);
 
   const isDark = theme.palette.mode === "dark";
   const chartColor = "#f7b923"; // Binance-style gold
@@ -144,15 +161,16 @@ export default function HashpriceHistoryPage() {
           Hashprice History
         </Typography>
         <Typography variant="body2" color="textSecondary">
-          Pool hashprice data from Luxor Mining (BTC per PH/s per day) •
-          Calculated from daily revenue ÷ daily hashrate
+          Pool-wide hashprice data from Luxor Mining (BTC per PH/s per day) •
+          Current: LIVE real-time (Luxor summary) • Chart: Historical calculated
+          from daily revenue ÷ daily hashrate
         </Typography>
       </Box>
 
       {/* Statistics Cards Section */}
       {/*
         These cards show key metrics:
-        1. Current Hashprice: Latest hashprice value from calculated data
+        1. Current Hashprice: Live real-time hashprice from Luxor API
         2. Period Change: Hashprice change from start to end of selected timeframe
         3. High/Low: Price range during entire selected period
       */}
@@ -166,18 +184,46 @@ export default function HashpriceHistoryPage() {
             border: `1px solid ${isDark ? theme.palette.grey[700] : "#e0e0e0"}`,
           }}
         >
-          <Typography
-            variant="caption"
-            color="textSecondary"
-            sx={{ fontSize: "0.75rem", fontWeight: "600" }}
-          >
-            CURRENT HASHPRICE
-          </Typography>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <Typography
+              variant="caption"
+              color="textSecondary"
+              sx={{ fontSize: "0.75rem", fontWeight: "600" }}
+            >
+              CURRENT HASHPRICE
+            </Typography>
+            <Box
+              sx={{
+                px: 0.75,
+                py: 0.25,
+                borderRadius: 1,
+                backgroundColor: "#4caf50",
+                display: "inline-flex",
+                alignItems: "center",
+              }}
+            >
+              <Typography
+                variant="caption"
+                sx={{
+                  fontSize: "0.6rem",
+                  fontWeight: "700",
+                  color: "white",
+                  letterSpacing: "0.5px",
+                }}
+              >
+                LIVE
+              </Typography>
+            </Box>
+          </Box>
           <Typography
             variant="h5"
             sx={{ fontWeight: "bold", mt: 1, fontSize: "1.75rem" }}
           >
-            {formatHashprice(cardStatistics.current)}
+            {isLiveLoading ? (
+              <CircularProgress size={24} />
+            ) : (
+              formatHashprice(cardStatistics.current)
+            )}
           </Typography>
           <Typography
             variant="caption"

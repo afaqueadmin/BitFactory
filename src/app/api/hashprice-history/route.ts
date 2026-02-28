@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyJwtToken } from "@/lib/jwt";
-import { prisma } from "@/lib/prisma";
 import { createLuxorClient } from "@/lib/luxor";
+import { prisma } from "@/lib/prisma";
 
 interface HashpricePoint {
   date: string;
@@ -13,10 +13,12 @@ interface HashpricePoint {
 
 /**
  * GET /api/hashprice-history?days=30
- * Fetches historical hashprice data by combining:
- * - /pool/revenue/BTC (daily earnings)
- * - /pool/hashrate-efficiency/BTC (daily hashrate)
+ * Fetches pool-wide historical hashprice data by combining:
+ * - /pool/revenue/BTC (pool daily earnings from 'higgs' main account)
+ * - /pool/hashrate-efficiency/BTC (pool daily hashrate from 'higgs' main account)
  * Calculates: hashprice = daily_revenue / daily_hashrate
+ *
+ * Returns the same pool-wide hashprice for all users (using 'higgs' subaccount)
  */
 export async function GET(request: NextRequest) {
   try {
@@ -52,32 +54,32 @@ export async function GET(request: NextRequest) {
     }
 
     console.log(
-      `[Hashprice History API] Fetching ${days} days of hashprice data for user ${userId}`,
+      `[Hashprice History API] Fetching ${days} days of pool-wide hashprice data for user ${userId}`,
     );
 
-    // Fetch the user's Luxor subaccount name from database
+    // Get user's subaccount for authentication (or use 'higgs' for admin)
+    // Note: We need a valid subaccount to authenticate, but we'll query pool-wide data
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { luxorSubaccountName: true },
+      select: { luxorSubaccountName: true, role: true },
     });
 
-    if (!user || !user.luxorSubaccountName) {
-      console.error(
-        `[Hashprice History API] User ${userId} has no Luxor subaccount configured`,
-      );
-      return NextResponse.json(
-        { error: "Luxor subaccount not configured for user" },
-        { status: 404 },
-      );
+    let subaccountForAuth: string;
+    if (user?.role === "ADMIN") {
+      subaccountForAuth = "higgs"; // Use main/admin subaccount for auth
+    } else if (user?.luxorSubaccountName) {
+      subaccountForAuth = user.luxorSubaccountName;
+    } else {
+      // Fallback to 'higgs' if user has no subaccount configured
+      subaccountForAuth = "higgs";
     }
 
-    const subaccountName = user.luxorSubaccountName;
     console.log(
-      `[Hashprice History API] Fetching data for subaccount: ${subaccountName}`,
+      `[Hashprice History API] Using subaccount '${subaccountForAuth}' for authentication`,
     );
 
-    // Create Luxor client
-    const luxorClient = createLuxorClient(subaccountName);
+    // Create Luxor client with valid subaccount for authentication
+    const luxorClient = createLuxorClient(subaccountForAuth);
 
     // Calculate date range
     // Note: Luxor API requires end_date to be in the past, so we use yesterday
@@ -98,24 +100,25 @@ export async function GET(request: NextRequest) {
     const endDateStr = formatDate(yesterday);
 
     console.log(
-      `[Hashprice History API] Fetching data from ${startDateStr} to ${endDateStr}`,
+      `[Hashprice History API] Fetching pool-wide data from ${startDateStr} to ${endDateStr}`,
     );
 
-    // Fetch revenue data from /pool/revenue/BTC
+    // Fetch pool-wide revenue data from /pool/revenue/BTC
+    // NOTE: Using 'higgs' subaccount for pool-wide data (main pool account)
     const revenueResponse = await luxorClient.getRevenue("BTC", {
-      subaccount_names: subaccountName,
+      subaccount_names: "higgs",
       start_date: startDateStr,
       end_date: endDateStr,
     });
 
-    // Fetch hashrate data from /pool/hashrate-efficiency/BTC (daily tick_size)
-    // Note: API is paginated, we need to handle pagination to get all data
+    // Fetch pool-wide hashrate data from /pool/hashrate-efficiency/BTC (daily tick_size)
+    // NOTE: Using 'higgs' subaccount for pool-wide data (main pool account)
     console.log(
-      `[Hashprice History API] Requesting hashrate from ${startDateStr} to ${endDateStr} (${days} days)`,
+      `[Hashprice History API] Requesting pool-wide hashrate from ${startDateStr} to ${endDateStr} (${days} days)`,
     );
 
     const hashrateResponse = await luxorClient.getHashrateEfficiency("BTC", {
-      subaccount_names: subaccountName,
+      subaccount_names: "higgs",
       start_date: startDateStr,
       end_date: endDateStr,
       tick_size: "1d",

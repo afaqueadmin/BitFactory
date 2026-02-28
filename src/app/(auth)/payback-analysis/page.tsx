@@ -30,6 +30,12 @@ const columns = [
   "BREAKEVEN (Charges-StockOS)",
 ];
 
+// Data Sources:
+// - BTC Price: CoinGecko API (live market price)
+// - Hashprice: Live pool-wide Luxor API (/api/pool-hashprice-live - real-time summary)
+// Note: Using live pool-wide hashprice ensures CLIENT and ADMIN see identical values
+// Note: Same live endpoint as hashprice history page for consistency
+
 // Fallback constants (only used if API fails)
 const FALLBACK_BTC_PRICE = 67953.35; // USD
 const FALLBACK_REWARD_BTC_PER_PH_DAY = 0.00044827;
@@ -251,27 +257,27 @@ export default function PaybackAnalysisPage() {
 
   const fetchLuxorReward = useCallback(async () => {
     try {
-      // Use the same API as hashprice history page to get consistent hashprice value
-      const response = await fetch("/api/hashprice-history?days=1", {
+      // Use live pool-wide hashprice API to get real-time value for all users
+      // Same endpoint as hashprice history page for consistency
+      const response = await fetch("/api/pool-hashprice-live", {
         method: "GET",
         headers: { "Content-Type": "application/json" },
       });
       if (!response.ok) return;
       const data = (await response.json()) as {
-        hashpriceData?: Array<{
-          date: string;
-          timestamp: number;
+        success: boolean;
+        data?: {
           hashprice: number;
-          revenue: number;
-          hashrate: number;
-        }>;
-        statistics?: { current: number; high: number; low: number };
+          hashrate_5m: string;
+          hashrate_24h: string;
+        };
       };
 
-      // Get the current (latest) hashprice from statistics - same as hashprice history page
-      if (!data.statistics || !Number.isFinite(data.statistics.current)) return;
+      // Get the live pool-wide hashprice (today's real-time value)
+      if (!data.success || !data.data || !Number.isFinite(data.data.hashprice))
+        return;
 
-      const rewardBtcPerPhDay = data.statistics.current;
+      const rewardBtcPerPhDay = data.data.hashprice;
 
       setLiveRewardBtcPerPhDay(rewardBtcPerPhDay);
     } catch {
