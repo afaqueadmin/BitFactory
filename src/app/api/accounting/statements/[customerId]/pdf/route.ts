@@ -203,11 +203,19 @@ export async function GET(
     );
     const pdfBuffer = await generatePDFFromHTML(htmlContent);
 
+    // Generate filename: statement-customerName-YYYYMMDD.pdf
+    const today = new Date();
+    const dateStr = today.toISOString().slice(0, 10).replace(/-/g, "");
+    const customerNameSanitized = (customer.name || "customer")
+      .toLowerCase()
+      .replace(/\s+/g, "-")
+      .replace(/[^a-z0-9-]/g, "");
+
     // Return PDF as file download
     return new NextResponse(pdfBuffer as unknown as ArrayBuffer, {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="statement-${customer.name || "customer"}-${new Date().toISOString().split("T")[0]}.pdf"`,
+        "Content-Disposition": `attachment; filename="statement-${customerNameSanitized}-${dateStr}.pdf"`,
         "Cache-Control": "no-cache, no-store, must-revalidate",
       },
     });

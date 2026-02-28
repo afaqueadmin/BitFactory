@@ -55,7 +55,7 @@ export default function CustomerStatementPage() {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `statement-${new Date().toISOString().split("T")[0]}.pdf`;
+      // Let the server's Content-Disposition header handle the filename
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
