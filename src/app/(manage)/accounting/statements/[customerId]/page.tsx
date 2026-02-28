@@ -19,6 +19,7 @@ import {
   Typography,
 } from "@mui/material";
 import { useParams } from "next/navigation";
+import { useState } from "react";
 import { useAccountStatement } from "@/lib/hooks/useStatements";
 import { StatusBadge } from "@/components/accounting/common/StatusBadge";
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
@@ -32,6 +33,76 @@ export default function CustomerStatementPage() {
   const { statement, loading, error } = useAccountStatement(
     customerId as string,
   );
+  const [downloadLoading, setDownloadLoading] = useState(false);
+  const [printLoading, setPrintLoading] = useState(false);
+
+  const handleDownloadPDF = async () => {
+    try {
+      setDownloadLoading(true);
+      const response = await fetch(
+        `/api/accounting/statements/${customerId}/pdf`,
+        {
+          method: "GET",
+          credentials: "include",
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to download statement");
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `statement-${new Date().toISOString().split("T")[0]}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Error downloading statement:", err);
+      alert("Failed to download statement. Please try again.");
+    } finally {
+      setDownloadLoading(false);
+    }
+  };
+
+  const handlePrint = async () => {
+    try {
+      setPrintLoading(true);
+      const response = await fetch(
+        `/api/accounting/statements/${customerId}/print`,
+        {
+          method: "GET",
+          credentials: "include",
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to load statement for printing");
+      }
+
+      const htmlContent = await response.text();
+
+      // Open in new window for printing
+      const printWindow = window.open("", "", "width=900,height=700");
+      if (printWindow) {
+        printWindow.document.write(htmlContent);
+        printWindow.document.close();
+
+        // Wait for content to load, then print
+        printWindow.onload = () => {
+          printWindow.print();
+        };
+      }
+    } catch (err) {
+      console.error("Error printing statement:", err);
+      alert("Failed to open print dialog. Please try again.");
+    } finally {
+      setPrintLoading(false);
+    }
+  };
 
   const invoices = statement?.invoices || [];
   const customer = statement?.customer;
@@ -78,11 +149,21 @@ export default function CustomerStatementPage() {
           </p>
         </Box>
         <Stack direction="row" spacing={1}>
-          <Button variant="outlined" startIcon={<DownloadIcon />}>
-            Download Statement
+          <Button
+            variant="outlined"
+            startIcon={<DownloadIcon />}
+            onClick={handleDownloadPDF}
+            disabled={downloadLoading}
+          >
+            {downloadLoading ? "Downloading..." : "Download Statement"}
           </Button>
-          <Button variant="outlined" startIcon={<PrintIcon />}>
-            Print
+          <Button
+            variant="outlined"
+            startIcon={<PrintIcon />}
+            onClick={handlePrint}
+            disabled={printLoading}
+          >
+            {printLoading ? "Loading..." : "Print"}
           </Button>
         </Stack>
       </Stack>

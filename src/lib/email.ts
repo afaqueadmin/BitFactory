@@ -18,7 +18,7 @@ const formatDate = (date: Date): string => {
  * Render HTML template with invoice data
  * Supports {{variable}} replacement and {{#if variable}}...{{else}}...{{/if}} conditionals
  */
-const renderInvoiceTemplate = (
+export const renderInvoiceTemplate = (
   template: string,
   data: Record<string, string | number | boolean | null | undefined>,
 ): string => {
