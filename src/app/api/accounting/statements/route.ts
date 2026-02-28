@@ -98,7 +98,7 @@ export async function GET(request: NextRequest) {
       },
     };
 
-    // Count by status
+    // Count by status and calculate pending (only for ISSUED invoices)
     invoices.forEach((inv) => {
       if (
         stats.invoicesByStatus[
@@ -109,8 +109,13 @@ export async function GET(request: NextRequest) {
           inv.status as keyof typeof stats.invoicesByStatus
         ]++;
       }
-      if (inv.status !== "PAID") {
-        stats.totalPending += Number(inv.totalAmount); /// This logic is still not correct. What if partial payments exist for this invoice
+      // Only count outstanding for ISSUED invoices
+      if (inv.status === "ISSUED" || inv.status === "OVERDUE") {
+        const paidAmount = inv.costPayments.reduce(
+          (sum, p) => sum + p.amount,
+          0,
+        );
+        stats.totalPending += Number(inv.totalAmount) - paidAmount;
       }
     });
 
