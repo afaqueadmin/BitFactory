@@ -516,7 +516,7 @@ export default function PaybackAnalysisPage() {
   const staticRows = allStaticRows.filter((row) => {
     if (row.label === "Pool Commission") return true;
     if (selectedOS === "STOCK" && row.label.includes("Stock OS")) return true;
-    if (selectedOS === "LUX" && row.label.includes("LUXOS")) return true;
+    if (selectedOS === "LUX" && row.label.includes("LUX OS")) return true;
     return false;
   });
 
