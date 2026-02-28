@@ -436,7 +436,7 @@ export default function PaybackAnalysisPage() {
           ),
         },
         {
-          label: "S21Pro Hashrate (TH) (LUXOS)",
+          label: "S21Pro Hashrate (TH) (LUX OS)",
           values: Array.from({ length: 6 }, () =>
             config.s21proHashrateLuxos.toFixed(2),
           ),
