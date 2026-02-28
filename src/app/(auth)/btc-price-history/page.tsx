@@ -6,8 +6,8 @@
  * FEATURES:
  *
  * Statistics Cards (Top Section):
- * - Current Price Card: Shows the latest BTC/USDT price from the selected timeframe
- *   (most recent closing price in your chosen period)
+ * - Current Price Card: Shows the live BTC/USDT price from Binance (independent of timeframe)
+ *   (always the latest market price, not affected by which timeframe you select)
  * - 24h Change Card: Displays how much the price has changed in the last 24 hours
  *   as both percentage and absolute value. Color-coded: green if up, red if down
  * - High/Low Cards: Show the highest and lowest prices during the selected timeframe
@@ -20,9 +20,9 @@
  * - Volume Bars (Semi-transparent): Gray bars showing trading volume at the bottom
  *
  * Timeframe Selector:
- * - 1D: Last 24 hours with hourly data (24 candles)
- * - 1W: Last 7 days with 4-hour data (42 candles)
- * - 1M: Last 30 days with daily data (30 candles)
+ * - 24H: Last 24 hours with hourly data (24 candles)
+ * - 7D: Last 7 days with daily data (7 candles)
+ * - 30D: Last 30 days with daily data (30 candles)
  * - 3M: Last 3 months with daily data (90 candles)
  * - 1Y: Last year with daily data (365 candles)
  * - ALL: Extended history with weekly data (1000 candles)
@@ -74,7 +74,7 @@ interface ChartData {
   volume: number;
 }
 
-const TIMEFRAMES = ["1D", "1W", "1M", "3M", "1Y", "ALL"];
+const TIMEFRAMES = ["24H", "7D", "30D", "3M", "1Y", "ALL"];
 
 const formatCurrency = (value: number): string => {
   return new Intl.NumberFormat("en-US", {
@@ -85,65 +85,88 @@ const formatCurrency = (value: number): string => {
   }).format(value);
 };
 
+/**
+ * Format date for chart display
+ * Uses UTC timezone (Binance API timezone) for accuracy
+ * Timestamps from Binance are in UTC and should not be converted to local time
+ */
 const formatDate = (timestamp: number, timeframe: string): string => {
+  // Create date in UTC (Binance provides UTC timestamps)
   const date = new Date(timestamp);
 
   switch (timeframe) {
-    case "1D":
+    case "24H":
+      // Display as HH:MM UTC for hourly data
       return date.toLocaleTimeString("en-US", {
         hour: "2-digit",
         minute: "2-digit",
+        timeZone: "UTC",
       });
-    case "1W":
+    case "7D":
       return date.toLocaleDateString("en-US", {
         month: "short",
         day: "numeric",
+        timeZone: "UTC",
       });
-    case "1M":
+    case "30D":
     case "3M":
     case "1Y":
       return date.toLocaleDateString("en-US", {
         month: "short",
         day: "numeric",
+        timeZone: "UTC",
       });
     case "ALL":
       return date.toLocaleDateString("en-US", {
         month: "short",
         year: "2-digit",
+        timeZone: "UTC",
       });
     default:
-      return date.toLocaleDateString();
+      return date.toLocaleDateString("en-US", { timeZone: "UTC" });
   }
 };
 
 export default function BtcPriceHistoryPage() {
   const theme = useTheme();
-  const [selectedTimeframe, setSelectedTimeframe] = useState("1D");
+  const [selectedTimeframe, setSelectedTimeframe] = useState("24H");
+  const [currentPrice, setCurrentPrice] = useState(0);
   const [change24h, setChange24h] = useState(0);
   const [changePercent24h, setChangePercent24h] = useState(0);
   const { klines, isLoading, isError, error } =
     useBinanceKlines(selectedTimeframe);
 
-  // Fetch 24h stats from single source (Binance ticker)
+  // Fetch live current price and 24h stats from Binance
   React.useEffect(() => {
-    const fetch24hStats = async () => {
+    const fetchPriceData = async () => {
       try {
-        const response = await fetch(
+        // Fetch live current price (independent of timeframe)
+        const tickerResponse = await fetch(
+          "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT",
+        );
+        const tickerData = await tickerResponse.json();
+        const price = parseFloat(tickerData.price);
+        if (Number.isFinite(price)) {
+          setCurrentPrice(price);
+        }
+
+        // Fetch 24h stats (consistent across all timeframes)
+        const statsResponse = await fetch(
           "https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT",
         );
-        const data = await response.json();
-        const changeValue = parseFloat(data.priceChange);
-        const changePercentValue = parseFloat(data.priceChangePercent);
+        const statsData = await statsResponse.json();
+        const changeValue = parseFloat(statsData.priceChange);
+        const changePercentValue = parseFloat(statsData.priceChangePercent);
         setChange24h(changeValue);
         setChangePercent24h(changePercentValue);
       } catch (err) {
-        console.error("Failed to fetch 24h stats:", err);
+        console.error("Failed to fetch price data:", err);
       }
     };
 
-    fetch24hStats();
+    fetchPriceData();
     // Refresh every 5 minutes like the klines data
-    const interval = setInterval(fetch24hStats, 5 * 60 * 1000);
+    const interval = setInterval(fetchPriceData, 5 * 60 * 1000);
     return () => clearInterval(interval);
   }, []);
 
@@ -166,7 +189,7 @@ export default function BtcPriceHistoryPage() {
   const statistics = useMemo(() => {
     if (chartData.length === 0) {
       return {
-        current: 0,
+        current: currentPrice,
         high: 0,
         low: 0,
         change: change24h,
@@ -174,20 +197,20 @@ export default function BtcPriceHistoryPage() {
       };
     }
 
-    const current = chartData[chartData.length - 1].close;
     const high = Math.max(...chartData.map((d) => d.high));
     const low = Math.min(...chartData.map((d) => d.low));
 
-    // 24h change comes from single source (Binance ticker API)
-    // This ensures consistency across all timeframes
+    // Current price comes from live Binance ticker (independent of timeframe)
+    // 24h change comes from Binance 24hr stats (consistent across all timeframes)
+    // High/Low come from selected timeframe data
     return {
-      current,
+      current: currentPrice,
       high,
       low,
       change: change24h,
       changePercent: changePercent24h,
     };
-  }, [chartData, change24h, changePercent24h]);
+  }, [chartData, currentPrice, change24h, changePercent24h]);
 
   const isDark = theme.palette.mode === "dark";
   // Binance-style golden/yellow color for close price
@@ -214,9 +237,9 @@ export default function BtcPriceHistoryPage() {
       {/* Statistics Cards Section */}
       {/* 
         These cards show key metrics:
-        1. Current Price: Latest closing price in the selected timeframe
+        1. Current Price: Latest live market price from Binance (fixed regardless of timeframe)
         2. 24h Change: Price change in last 24 hours (green/red colored)
-        3. High/Low: Range of prices during the entire timeframe period
+        3. High/Low: Range of prices during the entire selected timeframe period
       */}
       <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ mb: 4 }}>
         <Paper
@@ -292,29 +315,41 @@ export default function BtcPriceHistoryPage() {
         }}
       >
         {/* Timeframe Selector Buttons */}
-        {/* 
-          Users can switch between 6 different timeframes:
-          - 1D (hourly data), 1W (4-hour data), 1M (daily data)
-          - 3M (3-month span), 1Y (yearly), ALL (extended history)
-        */}
-        <Box sx={{ mb: 3, display: "flex", gap: 1, flexWrap: "wrap" }}>
-          {TIMEFRAMES.map((timeframe) => (
-            <Button
-              key={timeframe}
-              onClick={() => setSelectedTimeframe(timeframe)}
-              variant={
-                selectedTimeframe === timeframe ? "contained" : "outlined"
-              }
-              size="small"
-              sx={{
-                minWidth: "60px",
-                fontSize: "0.8rem",
-                textTransform: "uppercase",
-              }}
-            >
-              {timeframe}
-            </Button>
-          ))}
+        <Box
+          sx={{
+            mb: 2,
+            display: "flex",
+            gap: 2,
+            alignItems: "center",
+            flexWrap: "wrap",
+          }}
+        >
+          <Typography
+            variant="caption"
+            color="textSecondary"
+            sx={{ fontWeight: 600 }}
+          >
+            ⏰ All times in UTC
+          </Typography>
+          <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+            {TIMEFRAMES.map((timeframe) => (
+              <Button
+                key={timeframe}
+                onClick={() => setSelectedTimeframe(timeframe)}
+                variant={
+                  selectedTimeframe === timeframe ? "contained" : "outlined"
+                }
+                size="small"
+                sx={{
+                  minWidth: "60px",
+                  fontSize: "0.8rem",
+                  textTransform: "uppercase",
+                }}
+              >
+                {timeframe}
+              </Button>
+            ))}
+          </Box>
         </Box>
 
         {/* Loading State */}
@@ -481,8 +516,8 @@ export default function BtcPriceHistoryPage() {
         }}
       >
         <Typography variant="body2" color="textSecondary">
-          <strong>Data Source:</strong> Binance Public API (BTCUSDT) • Updated
-          every 5 minutes • All prices in USDT
+          <strong>Data Source:</strong> Binance Public API (BTCUSDT) • All
+          prices in USDT
         </Typography>
       </Paper>
     </Container>

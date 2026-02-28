@@ -27,10 +27,10 @@ import {
 } from "@mui/material";
 import {
   useInvoice,
-  useChangeInvoiceStatus,
   useDeleteInvoice,
   useInvoiceAuditLog,
   useSendInvoiceEmail,
+  useIssueInvoice,
   AuditLogWithUser,
 } from "@/lib/hooks/useInvoices";
 import { useUser } from "@/lib/hooks/useUser";
@@ -66,7 +66,7 @@ export default function InvoiceDetailPage() {
   const router = useRouter();
   const { invoice, loading, error } = useInvoice(params.id as string);
   const { user } = useUser();
-  const { changeStatus, loading: statusLoading } = useChangeInvoiceStatus();
+  const { issueInvoice, loading: issueLoading } = useIssueInvoice();
   const { deleteInvoice, loading: deleteLoading } = useDeleteInvoice();
   const { auditLogs, loading: auditLoading } = useInvoiceAuditLog(
     params.id as string,
@@ -127,28 +127,20 @@ export default function InvoiceDetailPage() {
       setStatusDialogError(null);
       setIssueSuccess(null);
 
-      // First, change status to ISSUED
-      await changeStatus(invoice!.id, "ISSUED");
+      // Call atomic issue endpoint: sends email first, then changes status to ISSUED
+      // If email fails, status stays DRAFT and error is returned
+      const result = await issueInvoice(invoice!.id);
 
-      // Then, automatically send the email
-      try {
-        const emailResult = await sendEmail(invoice!.id);
-        setIssueSuccess({
-          message: emailResult.message,
-          sentTo: emailResult.sentTo,
-          ccDescription: emailResult.ccDescription,
-        });
-        // Keep dialog open to show success
-        // Auto-reload after 3 seconds
-        setTimeout(() => {
-          window.location.reload();
-        }, 3000);
-      } catch (emailErr) {
-        // Status was changed but email failed - show error but don't fail completely
-        setStatusDialogError(
-          `Invoice issued successfully, but failed to send email: ${emailErr instanceof Error ? emailErr.message : "Unknown error"}`,
-        );
-      }
+      setIssueSuccess({
+        message: result.message,
+        sentTo: result.sentTo,
+        ccDescription: result.ccDescription,
+      });
+
+      // Auto-reload after 3 seconds to show updated status and audit logs
+      setTimeout(() => {
+        window.location.reload();
+      }, 3000);
     } catch (err) {
       setStatusDialogError(
         err instanceof Error ? err.message : "Failed to issue invoice",
@@ -749,7 +741,7 @@ export default function InvoiceDetailPage() {
       <Dialog
         open={statusDialogOpen}
         onClose={() => {
-          if (!statusLoading) setStatusDialogOpen(false);
+          if (!issueLoading) setStatusDialogOpen(false);
         }}
       >
         <DialogTitle>Issue Invoice</DialogTitle>
@@ -773,7 +765,7 @@ export default function InvoiceDetailPage() {
                   {issueSuccess.ccDescription}
                 </Typography>
               </Alert>
-            ) : statusDialogError && !statusLoading ? (
+            ) : statusDialogError && !issueLoading ? (
               <Alert severity="error" sx={{ mb: 2 }}>
                 {statusDialogError}
               </Alert>
@@ -840,7 +832,7 @@ export default function InvoiceDetailPage() {
           </Box>
         </DialogContent>
         <DialogActions>
-          {!issueSuccess && statusDialogError && !statusLoading && (
+          {!issueSuccess && statusDialogError && !issueLoading && (
             <Button
               onClick={() => {
                 setStatusDialogOpen(false);
@@ -855,7 +847,7 @@ export default function InvoiceDetailPage() {
             <>
               <Button
                 onClick={() => setStatusDialogOpen(false)}
-                disabled={statusLoading}
+                disabled={issueLoading}
               >
                 Cancel
               </Button>
@@ -863,9 +855,9 @@ export default function InvoiceDetailPage() {
                 onClick={handleIssueInvoice}
                 variant="contained"
                 color="success"
-                disabled={statusLoading}
+                disabled={issueLoading}
               >
-                {statusLoading ? "Issuing & Sending..." : "Issue Invoice"}
+                {issueLoading ? "Issuing & Sending..." : "Issue Invoice"}
               </Button>
             </>
           )}

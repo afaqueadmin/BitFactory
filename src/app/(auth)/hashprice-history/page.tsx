@@ -17,11 +17,9 @@
  *
  * Timeframe Selector:
  * - 1D: Last 24 hours
- * - 1W: Last 7 days
- * - 1M: Last 30 days
- * - 3M: Last 45 days (Luxor API historical limit)
- * - 6M: Last 45 days (Luxor API historical limit)
- * - ALL: All available data (~45 days from Luxor API)
+ * - 7D: Last 7 days
+ * - 30D: Last 30 days
+ * - 45D: Last 45 days (Luxor API historical limit)
  *
  * Data Sources:
  * - Current Hashprice: LIVE from /api/pool-hashprice-live (real-time Luxor summary API)
@@ -66,11 +64,9 @@ interface ChartData {
 
 const TIMEFRAMES = [
   { label: "1D", days: 1 },
-  { label: "1W", days: 7 },
-  { label: "1M", days: 30 },
-  { label: "3M", days: 45 }, // Luxor API max historical data is ~45 days
-  { label: "6M", days: 45 },
-  { label: "ALL", days: 45 }, // Max historical available from Luxor API
+  { label: "7D", days: 7 },
+  { label: "30D", days: 30 },
+  { label: "45D", days: 45 }, // Luxor API max historical data is ~45 days
 ];
 
 const formatHashprice = (value: number): string => {
@@ -177,165 +173,64 @@ export default function HashpriceHistoryPage() {
       <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ mb: 4 }}>
         <Paper
           sx={{
-            p: 2.5,
+            p: 2,
             flex: 1,
             backgroundColor: isDark ? theme.palette.grey[800] : "#f5f5f5",
             borderRadius: 2,
-            border: `1px solid ${isDark ? theme.palette.grey[700] : "#e0e0e0"}`,
           }}
         >
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            <Typography
-              variant="caption"
-              color="textSecondary"
-              sx={{ fontSize: "0.75rem", fontWeight: "600" }}
-            >
-              CURRENT HASHPRICE
-            </Typography>
-            <Box
-              sx={{
-                px: 0.75,
-                py: 0.25,
-                borderRadius: 1,
-                backgroundColor: "#4caf50",
-                display: "inline-flex",
-                alignItems: "center",
-              }}
-            >
-              <Typography
-                variant="caption"
-                sx={{
-                  fontSize: "0.6rem",
-                  fontWeight: "700",
-                  color: "white",
-                  letterSpacing: "0.5px",
-                }}
-              >
-                LIVE
-              </Typography>
-            </Box>
-          </Box>
-          <Typography
-            variant="h5"
-            sx={{ fontWeight: "bold", mt: 1, fontSize: "1.75rem" }}
-          >
+          <Typography variant="caption" color="textSecondary">
+            Current Hashprice
+          </Typography>
+          <Typography variant="h6" sx={{ fontWeight: "bold", mt: 0.5 }}>
             {isLiveLoading ? (
-              <CircularProgress size={24} />
+              <CircularProgress size={20} />
             ) : (
               formatHashprice(cardStatistics.current)
             )}
           </Typography>
+        </Paper>
+
+        <Paper
+          sx={{
+            p: 2,
+            flex: 1,
+            backgroundColor: isDark ? theme.palette.grey[800] : "#f5f5f5",
+            borderRadius: 2,
+          }}
+        >
+          <Typography variant="caption" color="textSecondary">
+            Period Change
+          </Typography>
           <Typography
-            variant="caption"
-            color="textSecondary"
-            sx={{ display: "block", mt: 0.75, fontSize: "0.7rem" }}
+            variant="h6"
+            sx={{
+              fontWeight: "bold",
+              mt: 0.5,
+              color: cardStatistics.change >= 0 ? "#4caf50" : "#f44336",
+            }}
           >
-            per PH/s per day
+            {cardStatistics.change >= 0 ? "+" : ""}
+            {formatHashprice(cardStatistics.change)} (
+            {cardStatistics.changePercent.toFixed(2)}%)
           </Typography>
         </Paper>
 
         <Paper
           sx={{
-            p: 2.5,
+            p: 2,
             flex: 1,
             backgroundColor: isDark ? theme.palette.grey[800] : "#f5f5f5",
             borderRadius: 2,
-            border: `1px solid ${isDark ? theme.palette.grey[700] : "#e0e0e0"}`,
           }}
         >
-          <Typography
-            variant="caption"
-            color="textSecondary"
-            sx={{ fontSize: "0.75rem", fontWeight: "600" }}
-          >
-            PERIOD CHANGE
+          <Typography variant="caption" color="textSecondary">
+            High / Low
           </Typography>
-          <Box sx={{ mt: 1 }}>
-            <Typography
-              variant="h5"
-              sx={{
-                fontWeight: "bold",
-                fontSize: "1.75rem",
-                color: cardStatistics.change >= 0 ? "#4caf50" : "#f44336",
-              }}
-            >
-              {cardStatistics.change >= 0 ? "+" : ""}
-              {formatHashprice(cardStatistics.change)}
-            </Typography>
-            <Typography
-              variant="caption"
-              sx={{
-                fontSize: "0.85rem",
-                color: cardStatistics.change >= 0 ? "#4caf50" : "#f44336",
-                fontWeight: "600",
-                mt: 0.3,
-                display: "block",
-              }}
-            >
-              {cardStatistics.change >= 0 ? "↑" : "↓"}{" "}
-              {cardStatistics.changePercent.toFixed(2)}%
-            </Typography>
-          </Box>
-        </Paper>
-
-        <Paper
-          sx={{
-            p: 2.5,
-            flex: 1,
-            backgroundColor: isDark ? theme.palette.grey[800] : "#f5f5f5",
-            borderRadius: 2,
-            border: `1px solid ${isDark ? theme.palette.grey[700] : "#e0e0e0"}`,
-          }}
-        >
-          <Typography
-            variant="caption"
-            color="textSecondary"
-            sx={{ fontSize: "0.75rem", fontWeight: "600" }}
-          >
-            HIGH / LOW
+          <Typography variant="body2" sx={{ fontWeight: "bold", mt: 0.5 }}>
+            {formatHashprice(cardStatistics.high)} /{" "}
+            {formatHashprice(cardStatistics.low)}
           </Typography>
-          <Box sx={{ mt: 1 }}>
-            <Box sx={{ mb: 1.5 }}>
-              <Typography
-                variant="caption"
-                color="textSecondary"
-                sx={{ fontSize: "0.7rem" }}
-              >
-                24h High
-              </Typography>
-              <Typography
-                variant="body2"
-                sx={{
-                  fontWeight: "bold",
-                  color: "#4caf50",
-                  fontSize: "1rem",
-                  mt: 0.3,
-                }}
-              >
-                {formatHashprice(cardStatistics.high)}
-              </Typography>
-            </Box>
-            <Box>
-              <Typography
-                variant="caption"
-                color="textSecondary"
-                sx={{ fontSize: "0.7rem" }}
-              >
-                24h Low
-              </Typography>
-              <Typography
-                variant="body2"
-                sx={{
-                  fontWeight: "bold",
-                  color: "#f44336",
-                  fontSize: "1rem",
-                  mt: 0.3,
-                }}
-              >
-                {formatHashprice(cardStatistics.low)}
-              </Typography>
-            </Box>
-          </Box>
         </Paper>
       </Stack>
 
@@ -354,9 +249,9 @@ export default function HashpriceHistoryPage() {
       >
         {/* Timeframe Selector Buttons */}
         {/*
-          Users can switch between 6 different timeframes:
-          - 1D (1 day), 1W (7 days), 1M (30 days)
-          - 3M (90 days), 1Y (365 days), ALL (365 days max)
+          Users can switch between 4 different timeframes:
+          - 1D (1 day), 7D (7 days), 30D (30 days)
+          - 45D (max Luxor API history limit)
         */}
         <Box sx={{ mb: 3, display: "flex", gap: 1, flexWrap: "wrap" }}>
           {TIMEFRAMES.map((timeframe) => (

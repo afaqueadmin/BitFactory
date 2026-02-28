@@ -441,6 +441,52 @@ export function useChangeInvoiceStatus() {
     error: mutation.error instanceof Error ? mutation.error.message : null,
   };
 }
+
+/**
+ * Issue a DRAFT invoice and send email in one atomic operation
+ * - Email sent and PDF generated BEFORE status changes to ISSUED
+ * - If email fails, status stays DRAFT
+ * - Returns complete issue response with email details
+ */
+export function useIssueInvoice() {
+  const queryClient = useQueryClient();
+
+  const mutation = useMutation({
+    mutationFn: async (invoiceId: string) => {
+      const res = await fetch(`/api/accounting/invoices/${invoiceId}/issue`, {
+        method: "POST",
+        credentials: "include",
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(
+          errorData.error || errorData.message || "Failed to issue invoice",
+        );
+      }
+
+      return await res.json();
+    },
+    onSuccess: (data, invoiceId) => {
+      queryClient.setQueryData(
+        ["invoice", invoiceId],
+        (oldData: Record<string, unknown> | undefined) => ({
+          ...oldData,
+          status: "ISSUED",
+          issuedDate: new Date(),
+        }),
+      );
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+    },
+  });
+
+  return {
+    issueInvoice: mutation.mutateAsync,
+    loading: mutation.isPending,
+    error: mutation.error instanceof Error ? mutation.error.message : null,
+  };
+}
+
 export function useDeleteInvoice() {
   const queryClient = useQueryClient();
 
