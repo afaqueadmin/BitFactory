@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
-import { sendInvoiceEmail } from "@/lib/email";
-import { AuditAction } from "@/generated/prisma";
+import {
+  InvoiceEmailService,
+  InvoiceEmailPayload,
+} from "@/services/invoiceEmailService";
 
 export async function POST(
   request: NextRequest,
@@ -59,7 +61,23 @@ export async function POST(
         runId,
       },
       include: {
-        invoice: true,
+        invoice: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                email: true,
+                name: true,
+                luxorSubaccountName: true,
+              },
+            },
+            hardware: {
+              select: {
+                model: true,
+              },
+            },
+          },
+        },
       },
     });
 
@@ -70,116 +88,64 @@ export async function POST(
       );
     }
 
-    const resendResults = {
-      resent: [] as string[],
-      failed: [] as { id: string; error: string }[],
-    };
+    // Build email payloads for all results
+    const emailPayloads: InvoiceEmailPayload[] = results
+      .filter((result) => result.invoice && result.invoice.user)
+      .map((result) => ({
+        invoiceId: result.invoice!.id,
+        invoiceNumber: result.invoice!.invoiceNumber,
+        customerEmail: result.customerEmail,
+        customerName: result.customerName,
+        totalAmount: Number(result.invoice!.totalAmount),
+        issuedDate: result.invoice!.issuedDate || new Date(),
+        dueDate: result.invoice!.dueDate,
+        totalMiners: result.invoice!.totalMiners,
+        unitPrice: Number(result.invoice!.unitPrice),
+        luxorSubaccountName:
+          result.invoice!.user?.luxorSubaccountName || undefined,
+        hardwareModel: result.invoice!.hardware?.model || undefined,
+      }));
 
-    // Resend emails
-    for (const result of results) {
-      try {
-        if (!result.customerEmail) {
-          resendResults.failed.push({
-            id: result.id,
-            error: "Customer email not available",
-          });
-          continue;
-        }
+    // Send all with service
+    const bulkResult = await InvoiceEmailService.sendBulkInvoices(
+      emailPayloads,
+      userId,
+    );
 
-        const invoice = result.invoice;
-        if (!invoice) {
-          resendResults.failed.push({
-            id: result.id,
-            error: "Invoice not found",
-          });
-          continue;
-        }
-
-        // Send invoice email
-        const emailResult = await sendInvoiceEmail(
-          result.customerEmail,
-          result.customerName || "Valued Customer",
-          invoice.invoiceNumber,
-          Number(invoice.totalAmount),
-          invoice.dueDate,
-          invoice.issuedDate || new Date(),
-        );
-
-        if (!emailResult.success) {
-          resendResults.failed.push({
-            id: result.id,
-            error: "Failed to send email",
-          });
-          continue;
-        }
-
-        // Update result with new sent timestamp
+    // Update result records with resend status
+    for (const result of bulkResult.results) {
+      const emailSendResult = results.find(
+        (r) => r.invoiceId === result.invoiceId,
+      );
+      if (emailSendResult) {
         await prisma.emailSendResult.update({
-          where: { id: result.id },
+          where: { id: emailSendResult.id },
           data: {
-            success: true,
-            errorMessage: null,
-            sentAt: new Date(),
+            success: result.success,
+            errorMessage: result.error || null,
+            sentAt: result.success ? new Date() : null,
           },
-        });
-
-        // Log audit
-        await prisma.auditLog.create({
-          data: {
-            action: AuditAction.INVOICE_SENT_TO_CUSTOMER,
-            entityType: "Invoice",
-            entityId: invoice.id,
-            userId,
-            description: `Invoice ${invoice.invoiceNumber} resent to ${result.customerEmail}`,
-            changes: JSON.stringify({
-              resendType: "bulk_resend",
-              originalRunId: runId,
-              timestamp: new Date().toISOString(),
-            }),
-          },
-        });
-
-        resendResults.resent.push(result.id);
-      } catch (error) {
-        console.error(`Error resending email for result ${result.id}:`, error);
-        resendResults.failed.push({
-          id: result.id,
-          error: error instanceof Error ? error.message : "Unknown error",
         });
       }
     }
 
-    // Update run summary if any emails were resent
-    if (resendResults.resent.length > 0) {
-      const updatedRun = await prisma.emailSendRun.findUnique({
-        where: { id: runId },
-        include: {
-          results: {
-            select: { success: true },
-          },
-        },
-      });
-
-      if (updatedRun) {
-        const successCount = updatedRun.results.filter((r) => r.success).length;
-        const failureCount = updatedRun.results.filter(
-          (r) => !r.success,
-        ).length;
-
-        await prisma.emailSendRun.update({
-          where: { id: runId },
-          data: {
-            successCount,
-            failureCount,
-          },
-        });
-      }
-    }
+    const resendResults = {
+      resent: bulkResult.results
+        .filter((r) => r.success)
+        .map((r) => r.invoiceId),
+      failed: bulkResult.results
+        .filter((r) => !r.success)
+        .map((r) => ({
+          id: r.invoiceId,
+          error: r.error,
+        })),
+    };
 
     return NextResponse.json({
       success: true,
-      message: `Resent ${resendResults.resent.length} email(s)`,
+      message: `Resent ${bulkResult.summary.successful} invoice(s), ${bulkResult.summary.failed} failed`,
       resendResults,
+      summary: bulkResult.summary,
     });
   } catch (error) {
     console.error("Resend email error:", error);
