@@ -27,7 +27,6 @@ import {
 } from "@mui/material";
 import {
   useInvoice,
-  useChangeInvoiceStatus,
   useDeleteInvoice,
   useInvoiceAuditLog,
   useSendInvoiceEmail,
@@ -128,28 +127,20 @@ export default function InvoiceDetailPage() {
       setStatusDialogError(null);
       setIssueSuccess(null);
 
-      // First, change status to ISSUED
-      await changeStatus(invoice!.id, "ISSUED");
+      // Call atomic issue endpoint: sends email first, then changes status to ISSUED
+      // If email fails, status stays DRAFT and error is returned
+      const result = await issueInvoice(invoice!.id);
 
-      // Then, automatically send the email
-      try {
-        const emailResult = await sendEmail(invoice!.id);
-        setIssueSuccess({
-          message: emailResult.message,
-          sentTo: emailResult.sentTo,
-          ccDescription: emailResult.ccDescription,
-        });
-        // Keep dialog open to show success
-        // Auto-reload after 3 seconds
-        setTimeout(() => {
-          window.location.reload();
-        }, 3000);
-      } catch (emailErr) {
-        // Status was changed but email failed - show error but don't fail completely
-        setStatusDialogError(
-          `Invoice issued successfully, but failed to send email: ${emailErr instanceof Error ? emailErr.message : "Unknown error"}`,
-        );
-      }
+      setIssueSuccess({
+        message: result.message,
+        sentTo: result.sentTo,
+        ccDescription: result.ccDescription,
+      });
+
+      // Auto-reload after 3 seconds to show updated status and audit logs
+      setTimeout(() => {
+        window.location.reload();
+      }, 3000);
     } catch (err) {
       setStatusDialogError(
         err instanceof Error ? err.message : "Failed to issue invoice",
