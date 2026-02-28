@@ -127,7 +127,7 @@ const sidebarItems: SidebarItem[] = [
       //   path: "/accounting/invoices",
       // },
       {
-        title: "Recurring Invoices",
+        title: "Bulk Invoices",
         icon: <RevenueIcon />,
         path: "/accounting/recurring",
       },
