@@ -119,8 +119,33 @@ const formatDate = (timestamp: number, timeframe: string): string => {
 export default function BtcPriceHistoryPage() {
   const theme = useTheme();
   const [selectedTimeframe, setSelectedTimeframe] = useState("1D");
+  const [change24h, setChange24h] = useState(0);
+  const [changePercent24h, setChangePercent24h] = useState(0);
   const { klines, isLoading, isError, error } =
     useBinanceKlines(selectedTimeframe);
+
+  // Fetch 24h stats from single source (Binance ticker)
+  React.useEffect(() => {
+    const fetch24hStats = async () => {
+      try {
+        const response = await fetch(
+          "https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT",
+        );
+        const data = await response.json();
+        const changeValue = parseFloat(data.priceChange);
+        const changePercentValue = parseFloat(data.priceChangePercent);
+        setChange24h(changeValue);
+        setChangePercent24h(changePercentValue);
+      } catch (err) {
+        console.error("Failed to fetch 24h stats:", err);
+      }
+    };
+
+    fetch24hStats();
+    // Refresh every 5 minutes like the klines data
+    const interval = setInterval(fetch24hStats, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Transform kline data for chart
   const chartData: ChartData[] = useMemo(() => {
@@ -144,8 +169,8 @@ export default function BtcPriceHistoryPage() {
         current: 0,
         high: 0,
         low: 0,
-        change: 0,
-        changePercent: 0,
+        change: change24h,
+        changePercent: changePercent24h,
       };
     }
 
@@ -153,30 +178,16 @@ export default function BtcPriceHistoryPage() {
     const high = Math.max(...chartData.map((d) => d.high));
     const low = Math.min(...chartData.map((d) => d.low));
 
-    // For 24h change: find data from last 24 hours
-    // If viewing 1D, use first data point; otherwise find candle closest to 24h ago
-    let previous = chartData[0].open;
-    if (selectedTimeframe !== "1D" && chartData.length > 0) {
-      const now = Date.now();
-      const oneDayAgo = now - 24 * 60 * 60 * 1000;
-      let closestIdx = 0;
-      let closestDiff = Math.abs(chartData[0].timestamp - oneDayAgo);
-
-      for (let i = 1; i < chartData.length; i++) {
-        const diff = Math.abs(chartData[i].timestamp - oneDayAgo);
-        if (diff < closestDiff) {
-          closestDiff = diff;
-          closestIdx = i;
-        }
-      }
-      previous = chartData[closestIdx].open;
-    }
-
-    const change = current - previous;
-    const changePercent = (change / previous) * 100;
-
-    return { current, high, low, change, changePercent };
-  }, [chartData, selectedTimeframe]);
+    // 24h change comes from single source (Binance ticker API)
+    // This ensures consistency across all timeframes
+    return {
+      current,
+      high,
+      low,
+      change: change24h,
+      changePercent: changePercent24h,
+    };
+  }, [chartData, change24h, changePercent24h]);
 
   const isDark = theme.palette.mode === "dark";
   // Binance-style golden/yellow color for close price
