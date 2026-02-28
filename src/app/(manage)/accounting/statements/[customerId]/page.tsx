@@ -55,7 +55,18 @@ export default function CustomerStatementPage() {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      // Let the server's Content-Disposition header handle the filename
+
+      // Extract filename from Content-Disposition header
+      const contentDisposition = response.headers.get("content-disposition");
+      let filename = "statement.pdf";
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
+        if (filenameMatch && filenameMatch[1]) {
+          filename = filenameMatch[1];
+        }
+      }
+
+      link.download = filename;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);

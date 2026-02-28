@@ -51,7 +51,6 @@ import {
 import {
   List,
   ListItem,
-  ListItemButton,
   ListItemIcon,
   ListItemText,
   Checkbox,
@@ -822,34 +821,35 @@ export default function GroupDetailPage() {
                             sx={{
                               borderBottom: "1px solid",
                               borderColor: "divider",
+                              "&:hover": {
+                                backgroundColor: "action.hover",
+                              },
                             }}
                           >
-                            <ListItemButton
-                              role={undefined}
+                            <ListItemIcon sx={{ minWidth: "40px" }}>
+                              <Checkbox
+                                edge="start"
+                                checked={dialog.selectedSubaccountIds.has(
+                                  subaccount.id,
+                                )}
+                                onChange={() => {
+                                  handleSubaccountToggle(subaccount.id);
+                                }}
+                                tabIndex={0}
+                                disableRipple
+                              />
+                            </ListItemIcon>
+                            <ListItemText
+                              primary={subaccount.subaccountName}
+                              secondary={`${subaccount.user?.name || "Unknown"} (${subaccount.user?.email}) • ${subaccount.minerCount} miners`}
                               onClick={() =>
                                 handleSubaccountToggle(subaccount.id)
                               }
-                              dense
-                            >
-                              <ListItemIcon sx={{ minWidth: "40px" }}>
-                                <Checkbox
-                                  edge="start"
-                                  checked={dialog.selectedSubaccountIds.has(
-                                    subaccount.id,
-                                  )}
-                                  onChange={(e) => {
-                                    e.stopPropagation();
-                                    handleSubaccountToggle(subaccount.id);
-                                  }}
-                                  tabIndex={-1}
-                                  disableRipple
-                                />
-                              </ListItemIcon>
-                              <ListItemText
-                                primary={subaccount.subaccountName}
-                                secondary={`${subaccount.user?.name || "Unknown"} (${subaccount.user?.email}) • ${subaccount.minerCount} miners`}
-                              />
-                            </ListItemButton>
+                              sx={{
+                                cursor: "pointer",
+                                flex: 1,
+                              }}
+                            />
                           </ListItem>
                         ))}
                       </List>
