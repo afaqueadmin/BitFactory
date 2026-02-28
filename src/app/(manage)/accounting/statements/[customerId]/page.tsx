@@ -17,16 +17,51 @@ import {
   Card,
   CardContent,
   Typography,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  FormControl,
+  FormLabel,
+  RadioGroup,
+  FormControlLabel,
+  Radio,
 } from "@mui/material";
 import { useParams } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAccountStatement } from "@/lib/hooks/useStatements";
 import { StatusBadge } from "@/components/accounting/common/StatusBadge";
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
 import { DateDisplay } from "@/components/accounting/common/DateDisplay";
 import DownloadIcon from "@mui/icons-material/Download";
 import PrintIcon from "@mui/icons-material/Print";
+import SendIcon from "@mui/icons-material/Send";
 import Link from "next/link";
+
+// Email templates for different tones
+const EMAIL_TEMPLATES = {
+  normal: `Please find attached your BitFactory's current account statement. If you have any questions, do let us know.
+
+Thanks!
+Sincerely,`,
+  reminder: `Please find attached your BitFactory's current account statement. To avoid any inconvenience, please make the requisite payment asap.
+
+If payment has already been made, please disregard this notice.
+
+If you have any questions, do let us know.
+
+Thanks!
+Sincerely,`,
+  final: `Please find attached your BitFactory's current account statement. To avoid disruption to your BitFactory's service, please make the requisite payment ASAP.
+
+If payment has already been made, please disregard this notice.
+
+If you have any further questions, do let us know.
+
+Thanks!
+Sincerely,`,
+};
 
 export default function CustomerStatementPage() {
   const { customerId } = useParams();
@@ -35,6 +70,21 @@ export default function CustomerStatementPage() {
   );
   const [downloadLoading, setDownloadLoading] = useState(false);
   const [printLoading, setPrintLoading] = useState(false);
+  const [emailDialogOpen, setEmailDialogOpen] = useState(false);
+  const [emailLoading, setEmailLoading] = useState(false);
+  const [emailTone, setEmailTone] = useState<"normal" | "reminder" | "final">(
+    "normal",
+  );
+  const [emailBody, setEmailBody] = useState<string>(EMAIL_TEMPLATES.normal);
+  const [emailError, setEmailError] = useState<string | null>(null);
+
+  // Auto-update email body when tone changes
+  useEffect(() => {
+    const baseTemplate = EMAIL_TEMPLATES[emailTone];
+    const customerName = statement?.customer?.name || "Customer";
+    const personalizedBody = `Dear ${customerName},\n\n${baseTemplate}\n\nhttp://bitfactory.ae/`;
+    setEmailBody(personalizedBody);
+  }, [emailTone, statement?.customer?.name]);
 
   const handleDownloadPDF = async () => {
     try {
@@ -115,6 +165,60 @@ export default function CustomerStatementPage() {
     }
   };
 
+  const handleSendEmail = async () => {
+    try {
+      setEmailLoading(true);
+      setEmailError(null);
+
+      if (!emailBody.trim()) {
+        setEmailError("Email message is required");
+        setEmailLoading(false);
+        return;
+      }
+
+      const response = await fetch(
+        `/api/accounting/statements/${customerId}/send-email`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            emailTone,
+            emailBody,
+            customerName: customer?.name,
+          }),
+        },
+      );
+
+      const data = await response.json();
+
+      console.log("Email send response:", { status: response.status, data });
+
+      if (!response.ok) {
+        throw new Error(
+          data.error || data.details || `Server error: ${response.status}`,
+        );
+      }
+
+      if (!data.success) {
+        throw new Error(
+          data.error || data.details || "Failed to send statement email",
+        );
+      }
+
+      setEmailDialogOpen(false);
+      setEmailBody(EMAIL_TEMPLATES[emailTone]);
+      alert(`Statement sent successfully to ${customer?.email}`);
+    } catch (err) {
+      const errorMsg =
+        err instanceof Error ? err.message : "Unknown error occurred";
+      console.error("Error sending statement:", err);
+      setEmailError(errorMsg);
+    } finally {
+      setEmailLoading(false);
+    }
+  };
+
   const invoices = statement?.invoices || [];
   const customer = statement?.customer;
   const totals = statement?.stats;
@@ -175,6 +279,14 @@ export default function CustomerStatementPage() {
             disabled={printLoading}
           >
             {printLoading ? "Loading..." : "Print"}
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<SendIcon />}
+            onClick={() => setEmailDialogOpen(true)}
+            disabled={emailLoading}
+          >
+            Send Email
           </Button>
         </Stack>
       </Stack>
@@ -295,6 +407,108 @@ export default function CustomerStatementPage() {
           <p style={{ color: "#999" }}>No invoices found for this customer</p>
         </Box>
       )}
+
+      {/* Send Email Dialog */}
+      <Dialog
+        open={emailDialogOpen}
+        onClose={() => setEmailDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Send Statement Email</DialogTitle>
+        <DialogContent sx={{ pt: 2 }}>
+          {emailError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {emailError}
+            </Alert>
+          )}
+          <Alert severity="info" sx={{ mb: 2 }}>
+            📧 Send this customer statement to {customer?.email}
+          </Alert>
+
+          <FormControl fullWidth sx={{ mb: 3 }}>
+            <FormLabel sx={{ mb: 2, fontWeight: 600 }}>Email Tone</FormLabel>
+            <RadioGroup
+              value={emailTone}
+              onChange={(e) =>
+                setEmailTone(e.target.value as "normal" | "reminder" | "final")
+              }
+            >
+              <FormControlLabel
+                value="normal"
+                control={<Radio />}
+                label="Statement Email (Normal Tone)"
+              />
+              <Typography
+                variant="caption"
+                sx={{ ml: 4, mb: 1, color: "#666" }}
+              >
+                Professional and standard statement notification
+              </Typography>
+
+              <FormControlLabel
+                value="reminder"
+                control={<Radio />}
+                label="Reminder/Warning Email (Moderate Tone)"
+              />
+              <Typography
+                variant="caption"
+                sx={{ ml: 4, mb: 1, color: "#666" }}
+              >
+                Payment reminder with moderate urgency
+              </Typography>
+
+              <FormControlLabel
+                value="final"
+                control={<Radio />}
+                label="Final Notice Email (Hard Tone)"
+              />
+              <Typography
+                variant="caption"
+                sx={{ ml: 4, mb: 2, color: "#666" }}
+              >
+                Urgent final notice requiring immediate action
+              </Typography>
+            </RadioGroup>
+          </FormControl>
+
+          <TextField
+            fullWidth
+            multiline
+            rows={6}
+            label="Email Message"
+            placeholder="Enter your message here..."
+            value={emailBody}
+            onChange={(e) => setEmailBody(e.target.value)}
+            variant="outlined"
+            helperText="This message will be included in the email along with the statement PDF"
+          />
+
+          <Alert severity="success" sx={{ mt: 2 }}>
+            ✅ Statement PDF will be automatically attached to the email
+          </Alert>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button
+            onClick={() => {
+              setEmailDialogOpen(false);
+              setEmailBody("");
+              setEmailError(null);
+            }}
+            disabled={emailLoading}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSendEmail}
+            variant="contained"
+            startIcon={<SendIcon />}
+            disabled={emailLoading || !emailBody.trim()}
+          >
+            {emailLoading ? "Sending..." : "Send Email"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 }
