@@ -27,7 +27,7 @@ import {
 } from "@mui/material";
 import {
   useInvoice,
-  useIssueInvoice,
+  useChangeInvoiceStatus,
   useDeleteInvoice,
   useInvoiceAuditLog,
   useSendInvoiceEmail,
@@ -66,7 +66,7 @@ export default function InvoiceDetailPage() {
   const router = useRouter();
   const { invoice, loading, error } = useInvoice(params.id as string);
   const { user } = useUser();
-  const { issueInvoice } = useIssueInvoice();
+  const { changeStatus, loading: statusLoading } = useChangeInvoiceStatus();
   const { deleteInvoice, loading: deleteLoading } = useDeleteInvoice();
   const { auditLogs, loading: auditLoading } = useInvoiceAuditLog(
     params.id as string,
@@ -127,20 +127,28 @@ export default function InvoiceDetailPage() {
       setStatusDialogError(null);
       setIssueSuccess(null);
 
-      // Call atomic issue endpoint: sends email first, then changes status to ISSUED
-      // If email fails, status stays DRAFT and error is returned
-      const result = await issueInvoice(invoice!.id);
+      // First, change status to ISSUED
+      await changeStatus(invoice!.id, "ISSUED");
 
-      setIssueSuccess({
-        message: result.message,
-        sentTo: result.sentTo,
-        ccDescription: result.ccDescription,
-      });
-
-      // Auto-reload after 3 seconds to show updated status and audit logs
-      setTimeout(() => {
-        window.location.reload();
-      }, 3000);
+      // Then, automatically send the email
+      try {
+        const emailResult = await sendEmail(invoice!.id);
+        setIssueSuccess({
+          message: emailResult.message,
+          sentTo: emailResult.sentTo,
+          ccDescription: emailResult.ccDescription,
+        });
+        // Keep dialog open to show success
+        // Auto-reload after 3 seconds
+        setTimeout(() => {
+          window.location.reload();
+        }, 3000);
+      } catch (emailErr) {
+        // Status was changed but email failed - show error but don't fail completely
+        setStatusDialogError(
+          `Invoice issued successfully, but failed to send email: ${emailErr instanceof Error ? emailErr.message : "Unknown error"}`,
+        );
+      }
     } catch (err) {
       setStatusDialogError(
         err instanceof Error ? err.message : "Failed to issue invoice",
