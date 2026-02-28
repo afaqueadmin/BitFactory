@@ -20,6 +20,7 @@ import {
   ToggleButton,
 } from "@mui/material";
 import { useCallback, useEffect, useState } from "react";
+import { formatValue } from "@/lib/helpers/formatValue";
 
 const columns = [
   "CURRENT",
@@ -101,14 +102,6 @@ const calculatePaybackMonths = (
   if (netRevenue <= 0) return Infinity;
   return machineCost / netRevenue;
 };
-
-const formatUsd = (value: number): string =>
-  new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value);
 
 const calculateAllValues = (
   btcPrice: number,
@@ -406,12 +399,12 @@ export default function PaybackAnalysisPage() {
   const btcPriceRow = {
     label: "BTC Price (USD)",
     values: [
-      liveBtcPrice || formatUsd(resolvedBtcPriceValue),
+      liveBtcPrice || formatValue(resolvedBtcPriceValue, "currency"),
       "$100,000",
       "$125,000",
       "$150,000",
       "$200,000",
-      config ? formatUsd(config.breakevenBtcPrice) : "$63,500",
+      config ? formatValue(config.breakevenBtcPrice, "currency") : "$63,500",
     ],
   };
 
@@ -709,7 +702,9 @@ export default function PaybackAnalysisPage() {
             <Typography variant="subtitle2" color="text.secondary">
               Monthly Invoicing Amount
             </Typography>
-            <Typography>{formatUsd(config.monthlyInvoicingAmount)}</Typography>
+            <Typography>
+              {formatValue(config.monthlyInvoicingAmount, "currency")}
+            </Typography>
           </Box>
           <Box>
             <Typography variant="subtitle2" color="text.secondary">
@@ -722,14 +717,17 @@ export default function PaybackAnalysisPage() {
               Invoiced Amount
             </Typography>
             <Typography>
-              {formatUsd(parseFloat(editableInvoicedAmount || "0"))}
+              {formatValue(
+                parseFloat(editableInvoicedAmount || "0"),
+                "currency",
+              )}
             </Typography>
           </Box>
           <Box>
             <Typography variant="subtitle2" color="text.secondary">
               Machine/Capital Cost
             </Typography>
-            <Typography>{formatUsd(machineCost)}</Typography>
+            <Typography>{formatValue(machineCost, "currency")}</Typography>
           </Box>
           <Box>
             <Typography variant="subtitle2" color="text.secondary">
@@ -744,7 +742,9 @@ export default function PaybackAnalysisPage() {
         <Table>
           <TableHead>
             <TableRow>
-              <TableCell sx={{ fontWeight: 700 }}>Metric</TableCell>
+              <TableCell sx={{ fontWeight: 700, minWidth: 256 }}>
+                Metric
+              </TableCell>
               {columns.map((column) => (
                 <TableCell key={column} sx={{ fontWeight: 700 }} align="right">
                   {column}

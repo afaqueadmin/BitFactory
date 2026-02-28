@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import AdminStatCard from "@/components/admin/AdminStatCard";
 import AdminValueCard from "@/components/admin/AdminValueCard";
 import { Box, CircularProgress, Alert } from "@mui/material";
+import { useVendorInvoices } from "@/lib/hooks/useVendorInvoices";
 
 interface DashboardStats {
   miners: {
@@ -139,6 +140,14 @@ export default function AdminDashboard() {
       retry: 2,
     });
 
+  const { vendorInvoices } = useVendorInvoices(1, 100000, undefined);
+  const vendorInvoicesTotalAmount = Number(
+    vendorInvoices.reduce((sum, invoice) => sum + invoice.totalAmount, 0),
+  );
+
+  const hostingProfit = hostingRevenueData?.hostingRevenue
+    ? hostingRevenueData.hostingRevenue - vendorInvoicesTotalAmount
+    : 0;
   if (loading || customerBalanceLoading || hostingRevenueLoading) {
     return (
       <Box
@@ -362,10 +371,18 @@ export default function AdminDashboard() {
           />
 
           {/* Hosting Cost - Not yet implemented */}
-          <AdminValueCard title="Hosting Cost" value="N/A" />
+          <AdminValueCard
+            title="Hosting Cost"
+            value={vendorInvoicesTotalAmount}
+            type="currency"
+          />
 
           {/* Hosting Profit - Not yet implemented */}
-          <AdminValueCard title="Hosting Profit" value="N/A" />
+          <AdminValueCard
+            title="Hosting Profit"
+            value={hostingProfit}
+            type="currency"
+          />
 
           {/* Est Monthly Hosting Revenue - Not yet implemented */}
           <AdminValueCard title="Est Monthly Hosting Revenue" value="N/A" />

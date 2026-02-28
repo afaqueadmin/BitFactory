@@ -1,14 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
-import { AuditAction } from "@/generated/prisma";
 import {
-  sendInvoiceEmail,
-  generateInvoicePDF,
-  sendInvoiceEmailWithPDF,
-} from "@/lib/email";
+  InvoiceEmailService,
+  InvoiceEmailPayload,
+} from "@/services/invoiceEmailService";
 import { getGroupBySubaccountName } from "@/lib/groupUtils";
-import { ConfirmoPaymentService } from "@/services/confirmoPaymentService";
 
 export async function POST(
   request: NextRequest,
@@ -67,178 +64,81 @@ export async function POST(
       );
     }
 
-    // Fetch group and build CC list
-    const ccEmails: string[] = [];
+    // Get relationship manager info for response
     let rmInfo = { name: "", email: "" };
-
     if (invoice.user.luxorSubaccountName) {
-      const group = await getGroupBySubaccountName(
-        invoice.user.luxorSubaccountName,
-      );
-      if (group && group.relationshipManager && group.email) {
-        rmInfo = {
-          name: group.relationshipManager,
-          email: group.email,
-        };
-        ccEmails.push(group.email);
-      }
-    }
-
-    // Always add invoices@bitfactory.ae to CC
-    const invoiceCCEmail =
-      process.env.INVOICE_CC_EMAIL || "invoices@bitfactory.ae";
-    if (!ccEmails.includes(invoiceCCEmail)) {
-      ccEmails.push(invoiceCCEmail);
-    }
-
-    // Check if crypto payments are enabled and generate payment link
-    let cryptoPaymentUrl: string | null = null;
-    try {
-      const paymentSettings = await prisma.paymentDetails.findFirst();
-      if (paymentSettings?.confirmoEnabled) {
-        console.log(
-          `[Email] Crypto payments enabled, generating payment link for invoice ${invoice.invoiceNumber}...`,
+      try {
+        const group = await getGroupBySubaccountName(
+          invoice.user.luxorSubaccountName,
         );
-        const confirmoService = new ConfirmoPaymentService();
-        const result = await confirmoService.createPaymentForInvoice(
-          id,
-          userId,
-        );
-        if (result.success && result.data?.paymentUrl) {
-          cryptoPaymentUrl = result.data.paymentUrl;
-          console.log(
-            `[Email] Crypto payment link generated: ${cryptoPaymentUrl}`,
-          );
+        if (group && group.relationshipManager && group.email) {
+          rmInfo = {
+            name: group.relationshipManager,
+            email: group.email,
+          };
         }
+      } catch (error) {
+        console.error("Error fetching group info:", error);
       }
-    } catch (cryptoError) {
-      console.error(
-        "[Email] Failed to generate crypto payment link:",
-        cryptoError,
-      );
-      // Continue without crypto payment link
     }
 
-    // Send invoice email with PDF attachment
-    let emailResult;
-    try {
-      console.log(
-        `[Email] Starting PDF generation for invoice ${invoice.invoiceNumber}...`,
-      );
+    // Build CC list and get crypto payment
+    const [ccEmails, cryptoPaymentUrl] = await Promise.all([
+      InvoiceEmailService.buildCCList(invoice.user.luxorSubaccountName),
+      InvoiceEmailService.getCryptoPaymentUrl(id, userId),
+    ]);
 
-      const pdfBuffer = await generateInvoicePDF(
-        invoice.invoiceNumber,
-        invoice.user.name || "Valued Customer",
-        invoice.user.email,
-        Number(invoice.totalAmount),
-        invoice.issuedDate || new Date(),
-        invoice.dueDate,
-        invoice.totalMiners,
-        Number(invoice.unitPrice),
-        invoice.id,
-        new Date(),
-        cryptoPaymentUrl,
-        invoice.hardware?.model || null,
-      );
+    // Build email payload
+    const emailPayload: InvoiceEmailPayload = {
+      invoiceId: invoice.id,
+      invoiceNumber: invoice.invoiceNumber,
+      customerEmail: invoice.user.email,
+      customerName: invoice.user.name || "Valued Customer",
+      totalAmount: Number(invoice.totalAmount),
+      issuedDate: invoice.issuedDate || new Date(),
+      dueDate: invoice.dueDate,
+      totalMiners: invoice.totalMiners,
+      unitPrice: Number(invoice.unitPrice),
+      luxorSubaccountName: invoice.user.luxorSubaccountName || undefined,
+      hardwareModel: invoice.hardware?.model || undefined,
+    };
 
-      console.log(
-        `[Email] PDF generated successfully (${pdfBuffer.length} bytes), now sending email...`,
-      );
+    // Send invoice with PDF
+    const result = await InvoiceEmailService.sendInvoiceWithPDF(
+      emailPayload,
+      userId,
+      ccEmails,
+      cryptoPaymentUrl,
+    );
 
-      emailResult = await sendInvoiceEmailWithPDF(
-        invoice.user.email,
-        invoice.user.name || "Valued Customer",
-        invoice.invoiceNumber,
-        Number(invoice.totalAmount),
-        invoice.issuedDate || new Date(),
-        invoice.dueDate,
-        invoice.totalMiners,
-        Number(invoice.unitPrice),
-        invoice.id,
-        pdfBuffer,
-        ccEmails,
-        cryptoPaymentUrl,
-      );
-
-      console.log(
-        `[Email] Email sent with PDF attachment to ${invoice.user.email}`,
-      );
-    } catch (pdfError) {
-      console.error(
-        `[Email] Failed to generate PDF for ${invoice.invoiceNumber}:`,
-        pdfError,
-      );
-      // Fallback to simple email without PDF
-      emailResult = await sendInvoiceEmail(
-        invoice.user.email,
-        invoice.user.name || "Valued Customer",
-        invoice.invoiceNumber,
-        Number(invoice.totalAmount),
-        invoice.dueDate,
-        invoice.issuedDate || new Date(),
-        ccEmails,
-      );
-    }
-
-    if (!emailResult.success) {
-      console.error("Failed to send invoice email:", emailResult.error);
-      // Still create notification even if email fails
-      await prisma.invoiceNotification.create({
-        data: {
-          invoiceId: id,
-          notificationType: "INVOICE_ISSUED",
-          sentTo: invoice.user.email,
-          sentAt: new Date(),
-          status: "FAILED",
-          ccEmails: ccEmails.join(","),
-        },
-      });
-
+    if (!result.success) {
       return NextResponse.json(
         {
+          success: false,
           error: "Failed to send invoice email",
-          details: emailResult.error,
+          details: result.error,
+          message: `Could not send invoice - ${result.error}`,
         },
         { status: 500 },
       );
     }
 
-    // Create notification record
-    await prisma.invoiceNotification.create({
-      data: {
-        invoiceId: id,
-        notificationType: "INVOICE_ISSUED",
-        sentTo: invoice.user.email,
-        sentAt: new Date(),
-        status: "SENT",
-        ccEmails: ccEmails.join(","),
-      },
-    });
-
-    // Log audit
-    await prisma.auditLog.create({
-      data: {
-        action: AuditAction.INVOICE_SENT_TO_CUSTOMER,
-        entityType: "Invoice",
-        entityId: id,
-        userId,
-        description: `Invoice ${invoice.invoiceNumber} sent to ${invoice.user.email}`,
-        changes: JSON.stringify({
-          sentTo: invoice.user.email,
-          timestamp: new Date().toISOString(),
-        }),
-      },
-    });
-
+    // Success response
     return NextResponse.json({
       success: true,
-      message: `Invoice sent to ${invoice.user.email}`,
+      message: `Invoice sent successfully to ${invoice.user.email}`,
       sentTo: invoice.user.email,
       ccEmails: ccEmails,
       ccDescription:
         rmInfo.email && rmInfo.name
           ? `CC'd to: ${rmInfo.name} (${rmInfo.email}), invoices@bitfactory.ae`
           : "CC'd to: invoices@bitfactory.ae",
+      pdfAttached: true,
+      details: {
+        invoiceNumber: invoice.invoiceNumber,
+        recipientCount: 1 + ccEmails.length,
+        status: "DELIVERED",
+      },
     });
   } catch (error) {
     console.error("Send invoice email error:", error);
