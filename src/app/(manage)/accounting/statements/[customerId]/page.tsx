@@ -38,6 +38,7 @@ import DownloadIcon from "@mui/icons-material/Download";
 import PrintIcon from "@mui/icons-material/Print";
 import SendIcon from "@mui/icons-material/Send";
 import Link from "next/link";
+import { calculateDaysUntilDue } from "@/lib/mocks/invoiceMocks";
 
 // Email templates for different tones
 const EMAIL_TEMPLATES = {
@@ -341,63 +342,97 @@ export default function CustomerStatementPage() {
           <TableHead sx={{ backgroundColor: "#f5f5f5" }}>
             <TableRow>
               <TableCell sx={{ fontWeight: "bold" }}>Invoice #</TableCell>
-              <TableCell sx={{ fontWeight: "bold" }}>Date</TableCell>
+              <TableCell sx={{ fontWeight: "bold" }}>Issued Date</TableCell>
               <TableCell sx={{ fontWeight: "bold" }}>Due Date</TableCell>
               <TableCell sx={{ fontWeight: "bold" }}>Type</TableCell>
               <TableCell sx={{ fontWeight: "bold" }}>Amount</TableCell>
               <TableCell sx={{ fontWeight: "bold" }}>Paid</TableCell>
               <TableCell sx={{ fontWeight: "bold" }}>Outstanding</TableCell>
               <TableCell sx={{ fontWeight: "bold" }}>Status</TableCell>
+              <TableCell sx={{ fontWeight: "bold" }}>Days Until Due</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {invoices.map((invoice) => (
-              <TableRow key={invoice.id} hover>
-                <TableCell sx={{ fontWeight: "bold" }}>
-                  <Link
-                    href={`/accounting/${invoice.id}`}
-                    style={{ color: "#1976d2", textDecoration: "none" }}
-                  >
-                    {invoice.invoiceNumber}
-                  </Link>
-                </TableCell>
-                <TableCell>
-                  <DateDisplay
-                    date={invoice.issuedDate || invoice.invoiceGeneratedDate}
-                    format="date"
-                  />
-                </TableCell>
-                <TableCell>
-                  <DateDisplay date={invoice.dueDate} format="date" />
-                </TableCell>
-                <TableCell>
-                  {invoice.invoiceType === "HARDWARE_PURCHASE"
-                    ? "Hardware"
-                    : "Hosting & Electricity"}
-                </TableCell>
-                <TableCell>
-                  <CurrencyDisplay value={invoice.totalAmount} />
-                </TableCell>
-                <TableCell>
-                  <CurrencyDisplay
-                    value={invoice.status === "PAID" ? invoice.paidAmount : 0}
-                  />
-                </TableCell>
-                <TableCell>
-                  <CurrencyDisplay
-                    value={
-                      invoice.status === "ISSUED" ||
-                      invoice.status === "OVERDUE"
-                        ? Math.max(0, invoice.totalAmount - invoice.paidAmount)
-                        : 0
-                    }
-                  />
-                </TableCell>
-                <TableCell>
-                  <StatusBadge status={invoice.status} />
-                </TableCell>
-              </TableRow>
-            ))}
+            {invoices.map((invoice) => {
+              const daysUntilDue = calculateDaysUntilDue(
+                new Date(invoice.dueDate),
+              );
+              return (
+                <TableRow key={invoice.id} hover>
+                  <TableCell sx={{ fontWeight: "bold" }}>
+                    <Link
+                      href={`/accounting/${invoice.id}`}
+                      style={{ color: "#1976d2", textDecoration: "none" }}
+                    >
+                      {invoice.invoiceNumber}
+                    </Link>
+                  </TableCell>
+                  <TableCell>
+                    <DateDisplay
+                      date={invoice.issuedDate || invoice.invoiceGeneratedDate}
+                      format="date"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <DateDisplay date={invoice.dueDate} format="date" />
+                  </TableCell>
+                  <TableCell>
+                    {invoice.invoiceType === "HARDWARE_PURCHASE"
+                      ? "Hardware"
+                      : "Hosting & Electricity"}
+                  </TableCell>
+                  <TableCell>
+                    <CurrencyDisplay value={invoice.totalAmount} />
+                  </TableCell>
+                  <TableCell>
+                    <CurrencyDisplay
+                      value={invoice.status === "PAID" ? invoice.paidAmount : 0}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <CurrencyDisplay
+                      value={
+                        invoice.status === "ISSUED" ||
+                        invoice.status === "OVERDUE"
+                          ? Math.max(
+                              0,
+                              invoice.totalAmount - invoice.paidAmount,
+                            )
+                          : 0
+                      }
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <StatusBadge status={invoice.status} />
+                  </TableCell>
+                  <TableCell>
+                    {invoice.status === "PAID" ? (
+                      "-"
+                    ) : (
+                      <Typography
+                        sx={{
+                          color:
+                            daysUntilDue < 0
+                              ? "error.main"
+                              : daysUntilDue < 7
+                                ? "warning.main"
+                                : "success.main",
+                          fontWeight: "500",
+                        }}
+                      >
+                        {daysUntilDue === 0
+                          ? "Today"
+                          : daysUntilDue === 1
+                            ? "1 day"
+                            : daysUntilDue < 0
+                              ? `${Math.abs(daysUntilDue)} ${Math.abs(daysUntilDue) === 1 ? "day" : "days"} overdue`
+                              : `${daysUntilDue} ${daysUntilDue === 1 ? "day" : "days"}`}
+                      </Typography>
+                    )}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       </TableContainer>
