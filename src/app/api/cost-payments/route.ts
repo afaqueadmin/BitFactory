@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
       userId = customerId;
     }
     // Validate pagination parameters
-    if (page < 0 || pageSize < 1 || pageSize > 100) {
+    if (page < 0 || pageSize < 1 || pageSize > 9999) {
       return NextResponse.json(
         { error: "Invalid pagination parameters" },
         { status: 400 },
