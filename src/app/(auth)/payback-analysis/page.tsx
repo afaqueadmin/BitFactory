@@ -181,7 +181,9 @@ export default function PaybackAnalysisPage() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   // OS selector state
-  const [selectedOS, setSelectedOS] = useState<"STOCK" | "LUX">("STOCK");
+  const [selectedOS, setSelectedOS] = useState<"STOCK" | "LUX" | "COMPARISON">(
+    "STOCK",
+  );
 
   // Calculated values for all scenarios
   const [calculatedValues, setCalculatedValues] = useState<CalculationValues[]>(
@@ -513,6 +515,7 @@ export default function PaybackAnalysisPage() {
 
   // Filter rows based on selected OS
   const staticRows = allStaticRows.filter((row) => {
+    if (selectedOS === "COMPARISON") return true;
     if (row.label === "Pool Commission") return true;
     if (selectedOS === "STOCK" && row.label.includes("Stock OS")) return true;
     if (selectedOS === "LUX" && row.label.includes("LUX OS")) return true;
@@ -520,6 +523,7 @@ export default function PaybackAnalysisPage() {
   });
 
   const dynamicRows = allDynamicRows.filter((row) => {
+    if (selectedOS === "COMPARISON") return true;
     if (row.label === "Electricity & Hosting Charges") return true;
     if (selectedOS === "STOCK" && row.label.includes("Stock OS")) return true;
     if (selectedOS === "LUX" && row.label.includes("LUX OS")) return true;
@@ -612,6 +616,9 @@ export default function PaybackAnalysisPage() {
             </ToggleButton>
             <ToggleButton value="LUX" aria-label="LUX OS">
               LUX OS
+            </ToggleButton>
+            <ToggleButton value="COMPARISON" aria-label="COMPARISON">
+              Comparison
             </ToggleButton>
           </ToggleButtonGroup>
         </Box>
