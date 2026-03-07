@@ -194,7 +194,7 @@ export default function PDFInvoiceSettingsPage() {
           gutterBottom
           sx={{ fontWeight: "bold" }}
         >
-          PDF Invoice Settings
+          Invoice PDF Settings
         </Typography>
         <Typography variant="body1" color="textSecondary">
           Configure invoice PDF fields that will be used in generated invoices

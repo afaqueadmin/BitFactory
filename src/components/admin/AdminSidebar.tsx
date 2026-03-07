@@ -143,7 +143,7 @@ const sidebarItems: SidebarItem[] = [
         path: "/accounting/pricing",
       },
       {
-        title: "PDF Invoice Settings",
+        title: "Invoice PDF Settings",
         icon: <DocumentIcon />,
         path: "/accounting/pdf-invoice-settings",
       },
