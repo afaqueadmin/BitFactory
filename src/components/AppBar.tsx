@@ -11,6 +11,7 @@ import {
   Button,
   Stack,
   CircularProgress,
+  Badge,
 } from "@mui/material";
 import { useAuth } from "@/lib/contexts/auth-context";
 // import SettingsIcon from "@mui/icons-material/Settings";
@@ -22,6 +23,9 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 
 import { useTheme } from "@/app/theme-provider";
+import { useQuery } from "@tanstack/react-query";
+import { useUser } from "@/lib/hooks/useUser";
+import { Invoice } from "@/generated/prisma";
 
 export default function AppBarComponent() {
   const { darkMode, toggleDarkMode } = useTheme();
@@ -29,6 +33,30 @@ export default function AppBarComponent() {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const { logout } = useAuth();
   const pathname = usePathname(); // Get current path
+
+  const { user } = useUser();
+
+  const { data: invoicesData } = useQuery<{ invoices: Invoice[] }>({
+    queryKey: ["invoices-unread", user?.id],
+    queryFn: async () => {
+      if (!user?.id) return { invoices: [] };
+      const res = await fetch(
+        `/api/accounting/invoices?customerId=${user.id}`,
+        {
+          method: "GET",
+          credentials: "include",
+        },
+      );
+      if (!res.ok) throw new Error("Failed to fetch invoices");
+      return res.json();
+    },
+    enabled: !!user?.id,
+    staleTime: 60 * 1000,
+  });
+
+  const unpaidCount =
+    invoicesData?.invoices?.filter((inv: Invoice) => inv.status !== "PAID")
+      .length || 0;
 
   const handleMenu = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
@@ -196,7 +224,13 @@ export default function AppBarComponent() {
                 },
               }}
             >
-              Invoices
+              <Badge
+                color="error"
+                badgeContent={unpaidCount}
+                invisible={unpaidCount === 0}
+              >
+                <span>Invoices</span>
+              </Badge>
             </Button>
 
             <Button
