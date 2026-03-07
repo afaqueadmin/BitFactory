@@ -228,6 +228,17 @@ export default function AppBarComponent() {
                 color="error"
                 badgeContent={unpaidCount}
                 invisible={unpaidCount === 0}
+                anchorOrigin={{ vertical: "top", horizontal: "right" }}
+                sx={{
+                  "& .MuiBadge-badge": {
+                    fontSize: "0.65rem",
+                    minWidth: 16,
+                    height: 16,
+                    padding: "0 4px",
+                    borderRadius: 8,
+                    transform: "translate(12px, -7px)",
+                  },
+                }}
               >
                 <span>Invoices</span>
               </Badge>
