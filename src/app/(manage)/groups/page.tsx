@@ -126,6 +126,7 @@ interface GroupsState {
   groups: Group[];
   loading: boolean;
   error: string | null;
+  unassignedSubaccounts?: Subaccount[];
 }
 
 /**
@@ -174,6 +175,7 @@ export default function GroupsPage() {
     groups: [],
     loading: true,
     error: null,
+    unassignedSubaccounts: [],
   });
 
   const [dialog, setDialog] = useState<DialogState>(initialDialogState);
@@ -212,12 +214,27 @@ export default function GroupsPage() {
 
       const groupsList = Array.isArray(data.data) ? data.data : [];
 
+      // Fetch unassigned (available) subaccounts
+      let unassigned: Subaccount[] = [];
+      try {
+        const uaResp = await fetch("/api/groups/available");
+        if (uaResp.ok) {
+          const uaData: ApiResponse<Subaccount[]> = await uaResp.json();
+          if (uaData.success && Array.isArray(uaData.data)) {
+            unassigned = uaData.data as Subaccount[];
+          }
+        }
+      } catch (e) {
+        console.warn("[Groups] Failed to fetch unassigned subaccounts", e);
+      }
+
       console.log("[Groups] Parsed groups:", groupsList);
 
       setState({
         groups: groupsList,
         loading: false,
         error: null,
+        unassignedSubaccounts: unassigned,
       });
 
       console.log(`[Groups] Successfully fetched ${groupsList.length} groups`);
@@ -862,7 +879,7 @@ export default function GroupsPage() {
             gridTemplateColumns: {
               xs: "1fr",
               sm: "1fr 1fr",
-              md: "repeat(2, 1fr)",
+              md: "repeat(3, 1fr)",
             },
             gap: 3,
             mb: 4,
@@ -882,6 +899,15 @@ export default function GroupsPage() {
               title="Total Subaccounts"
               value={String(totalSubaccounts)}
               gradient="linear-gradient(135deg, #f093fb 0%, #f5576c 100%)"
+              icon={<GroupIcon fontSize="small" />}
+            />
+          </Box>
+
+          <Box>
+            <GradientStatCard
+              title="Unassigned Subaccounts"
+              value={String(state.unassignedSubaccounts?.length || 0)}
+              gradient="linear-gradient(135deg, #63e6be 0%, #2dd4bf 100%)"
               icon={<GroupIcon fontSize="small" />}
             />
           </Box>
@@ -1010,6 +1036,35 @@ export default function GroupsPage() {
             </Typography>
           </Paper>
         )}
+
+        {/* Unassigned Subaccounts List */}
+        <Box sx={{ mb: 4 }}>
+          <Typography variant="h6" sx={{ mb: 2, fontWeight: "bold" }}>
+            Unassigned Subaccounts ({state.unassignedSubaccounts?.length || 0})
+          </Typography>
+          {state.unassignedSubaccounts &&
+          state.unassignedSubaccounts.length > 0 ? (
+            <Paper sx={{ p: 2 }}>
+              <List>
+                {state.unassignedSubaccounts.map((sub) => (
+                  <ListItem
+                    key={sub.id}
+                    sx={{ borderBottom: "1px solid", borderColor: "divider" }}
+                  >
+                    <ListItemText
+                      primary={sub.subaccountName}
+                      secondary={`${sub.user?.name || "Unknown"} • ${sub.user?.email} • ${sub.minerCount} miners`}
+                    />
+                  </ListItem>
+                ))}
+              </List>
+            </Paper>
+          ) : (
+            <Typography variant="body2" color="text.secondary">
+              All subaccounts are assigned to groups
+            </Typography>
+          )}
+        </Box>
 
         {/* Create/Edit/Delete Dialog */}
         <Dialog
