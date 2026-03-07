@@ -454,7 +454,7 @@ export default function EmailReportDetailPage() {
           </Table>
           {results.length > 0 && (
             <TablePagination
-              rowsPerPageOptions={[10, 25, 50]}
+              rowsPerPageOptions={[10, 25, 50, { value: 9999, label: "Max" }]}
               component="div"
               count={data.pagination.total}
               rowsPerPage={rowsPerPage}

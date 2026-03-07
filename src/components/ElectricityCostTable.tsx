@@ -460,7 +460,7 @@ export default function ElectricityCostTable({
               </Table>
             </TableContainer>
             <TablePagination
-              rowsPerPageOptions={[10, 25, 50]}
+              rowsPerPageOptions={[10, 25, 50, { value: 9999, label: "Max" }]}
               component="div"
               count={totalCount}
               rowsPerPage={rowsPerPage}

@@ -511,7 +511,13 @@ export default function SpacesPage() {
 
             {/* Pagination */}
             <TablePagination
-              rowsPerPageOptions={[5, 10, 25, 50]}
+              rowsPerPageOptions={[
+                5,
+                10,
+                25,
+                50,
+                { value: 9999, label: "Max" },
+              ]}
               component="div"
               count={filteredSpaces.length}
               rowsPerPage={rowsPerPage}

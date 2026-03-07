@@ -174,7 +174,7 @@ export default function StatementsPage() {
         </Table>
         {filteredCustomers.length > 0 && (
           <TablePagination
-            rowsPerPageOptions={[5, 10, 25, 50]}
+            rowsPerPageOptions={[5, 10, 25, 50, { value: 9999, label: "Max" }]}
             component="div"
             count={total}
             rowsPerPage={pageSize}

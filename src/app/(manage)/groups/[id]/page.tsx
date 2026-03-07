@@ -33,7 +33,6 @@ import {
   DialogContent,
   DialogActions,
   TextField,
-  MenuItem,
   Chip,
   IconButton,
   Tooltip,
@@ -712,7 +711,13 @@ export default function GroupDetailPage() {
               </TableContainer>
 
               <TablePagination
-                rowsPerPageOptions={[5, 10, 25, 50]}
+                rowsPerPageOptions={[
+                  5,
+                  10,
+                  25,
+                  50,
+                  { value: 9999, label: "Max" },
+                ]}
                 component="div"
                 count={filteredSubaccounts.length}
                 rowsPerPage={rowsPerPage}
