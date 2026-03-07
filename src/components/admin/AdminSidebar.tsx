@@ -28,6 +28,7 @@ import {
   Settings as SettingsIcon,
   ChevronLeft,
   ChevronRight,
+  Lock as LockIcon,
 } from "@mui/icons-material";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -265,13 +266,37 @@ export default function AdminSidebar() {
                 {item.icon}
               </ListItemIcon>
               {isExpanded && (
-                <ListItemText
-                  primary={item.title}
-                  primaryTypographyProps={{
-                    fontSize: "0.875rem",
-                    fontWeight: item.path === pathname ? 600 : 400,
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    width: "100%",
+                    justifyContent: "space-between",
                   }}
-                />
+                >
+                  <ListItemText
+                    primary={item.title}
+                    primaryTypographyProps={{
+                      fontSize: "0.875rem",
+                      fontWeight: item.path === pathname ? 600 : 400,
+                    }}
+                  />
+                  {item.items && (
+                    <ChevronLeft
+                      sx={{
+                        fontSize: "1.25rem",
+                        transition: (theme) =>
+                          theme.transitions.create("transform", {
+                            duration: theme.transitions.duration.shorter,
+                            easing: theme.transitions.easing.easeInOut,
+                          }),
+                        transform: expandedItems.includes(item.title)
+                          ? "rotate(90deg)"
+                          : "rotate(-90deg)",
+                      }}
+                    />
+                  )}
+                </Box>
               )}
             </ListItemButton>
           </Tooltip>
@@ -398,9 +423,12 @@ export default function AdminSidebar() {
             position: "absolute",
             right: 0,
             zIndex: 1,
+            display: "flex",
+            gap: 0.5,
           }}
         >
           {sideBarOpen || isHovered ? <ChevronLeft /> : <ChevronRight />}
+          {sideBarOpen && <LockIcon sx={{ fontSize: "0.75rem" }} />}
         </IconButton>
       </Box>
       <List sx={{ px: sideBarOpen || isHovered ? 2 : 1 }}>
