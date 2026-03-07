@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
 
-interface ApiResponse<T = Record<string, unknown>> {
+interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;
