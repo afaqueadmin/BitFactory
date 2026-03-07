@@ -297,6 +297,30 @@ export default function AccountingDashboard() {
   const sortedInvoices = useMemo(() => {
     const data = [...invoices];
     data.sort((a, b) => {
+      // Special sorting for daysUntilDue: sort by status descending first, then by daysUntilDue
+      if (sortBy === "daysUntilDue") {
+        const aStatus = getSortValue(a, "status");
+        const bStatus = getSortValue(b, "status");
+
+        // Sort by status descending first
+        let statusCmp: number;
+        if (typeof aStatus === "string" && typeof bStatus === "string") {
+          statusCmp = bStatus.localeCompare(aStatus);
+        } else {
+          statusCmp = (aStatus as number) - (bStatus as number);
+        }
+
+        // If statuses are equal, sort by daysUntilDue
+        if (statusCmp !== 0) {
+          return -statusCmp; // Descending for status
+        }
+
+        const aVal = getSortValue(a, sortBy);
+        const bVal = getSortValue(b, sortBy);
+        const daysUntilDueCmp = (aVal as number) - (bVal as number);
+        return sortDirection === "asc" ? daysUntilDueCmp : -daysUntilDueCmp;
+      }
+
       const aVal = getSortValue(a, sortBy);
       const bVal = getSortValue(b, sortBy);
 
