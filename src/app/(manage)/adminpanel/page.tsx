@@ -370,14 +370,14 @@ export default function AdminDashboard() {
             type="currency"
           />
 
-          {/* Hosting Cost - Not yet implemented */}
+          {/* Hosting Cost - implemented */}
           <AdminValueCard
             title="Hosting Cost"
             value={vendorInvoicesTotalAmount}
             type="currency"
           />
 
-          {/* Hosting Profit - Not yet implemented */}
+          {/* Hosting Profit - implemented */}
           <AdminValueCard
             title="Hosting Profit"
             value={hostingProfit}
@@ -385,16 +385,16 @@ export default function AdminDashboard() {
           />
 
           {/* Est Monthly Hosting Revenue - Not yet implemented */}
-          <AdminValueCard title="Est Monthly Hosting Revenue" value="N/A" />
+          {/*<AdminValueCard title="Est Monthly Hosting Revenue" value="N/A" />*/}
 
           {/* Est Monthly Hosting Profit - Not yet implemented */}
-          <AdminValueCard title="Est Monthly Hosting Profit" value="N/A" />
+          {/*<AdminValueCard title="Est Monthly Hosting Profit" value="N/A" />*/}
 
           {/* Est Yearly Hosting Revenue - Not yet implemented */}
-          <AdminValueCard title="Est Yearly Hosting Revenue" value="N/A" />
+          {/*<AdminValueCard title="Est Yearly Hosting Revenue" value="N/A" />*/}
 
           {/* Est Yearly Hosting Profit - Not yet implemented */}
-          <AdminValueCard title="Est Yearly Hosting Profit" value="N/A" />
+          {/*<AdminValueCard title="Est Yearly Hosting Profit" value="N/A" />*/}
 
           {/* Positive Balance - Aggregated from customer payments */}
           <AdminValueCard
