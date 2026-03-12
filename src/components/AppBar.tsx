@@ -278,6 +278,38 @@ export default function AppBarComponent() {
             </Button>
             <Button
               component={Link}
+              href="/btc-price-predictor"
+              sx={{
+                color: darkMode ? "white" : "black",
+                textTransform: "none",
+                fontWeight: 500,
+                px: 2,
+                position: "relative",
+                "&:hover": {
+                  backgroundColor: darkMode
+                    ? "rgba(255,255,255,0.1)"
+                    : "rgba(0,0,0,0.1)",
+                },
+                "&::after": {
+                  content: '""',
+                  position: "absolute",
+                  bottom: 0,
+                  left: 8,
+                  right: 8,
+                  height: 2,
+                  backgroundColor: "primary.main",
+                  transform:
+                    pathname === "/btc-price-predictor"
+                      ? "scaleX(1)"
+                      : "scaleX(0)",
+                  transition: "transform 0.2s ease-in-out",
+                },
+              }}
+            >
+              BTC Predictor
+            </Button>
+            <Button
+              component={Link}
               href="/hashprice-history"
               sx={{
                 color: darkMode ? "white" : "black",

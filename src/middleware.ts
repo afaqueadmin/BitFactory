@@ -21,6 +21,7 @@ const securePaths = {
   CLIENT: new Set<string>([
     "/account-settings",
     "/btc-price-history",
+    "/btc-price-predictor",
     "/clientworkers",
     "/dashboard",
     "/hashprice-history",
