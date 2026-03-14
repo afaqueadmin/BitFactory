@@ -253,7 +253,7 @@ export default function CreateVendorInvoicePage() {
 
       <Paper sx={{ p: 4 }}>
         <Typography variant="h4" sx={{ fontWeight: "bold", mb: 1 }}>
-          Create Vendor Invoice
+          Record Vendor Invoice
         </Typography>
         <Typography color="textSecondary" sx={{ mb: 3 }}>
           Add a new vendor invoice entry for farm tariffs
@@ -444,7 +444,7 @@ export default function CreateVendorInvoicePage() {
               startIcon={saving ? <CircularProgress size={20} /> : <SaveIcon />}
               disabled={saving}
             >
-              {saving ? "Creating..." : "Create Vendor Invoice"}
+              {saving ? "Recording..." : "Record Vendor Invoice"}
             </Button>
           </Stack>
         </form>

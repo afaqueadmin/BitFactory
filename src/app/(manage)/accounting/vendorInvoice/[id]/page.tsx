@@ -114,7 +114,7 @@ export default function VendorInvoiceDetailPage() {
 
     try {
       const response = await fetch(`/api/vendor-invoices/${invoiceId}`, {
-        method: "PATCH",
+        method: "PUT",
         headers: {
           "Content-Type": "application/json",
         },
