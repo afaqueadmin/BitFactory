@@ -277,14 +277,12 @@
      
 
 {{#if hasCryptoPayment}}
-      <div class="payment-option" style="background-color: #e8f5e9; border-left: 4px solid #28a745; padding: 15px;">
-        <div class="payment-option-title" style="color: #28a745; margin-bottom: 12px;">💳 CRYPTO PAYMENT</div>
-        <div style="text-align: center;">
-          <a href="{{cryptoPaymentUrl}}" class="crypto-payment-button">Pay with Crypto</a>
-          <div class="crypto-payment-info">
-            You can pay using USDT, USDC, BTC, etc. from your exchange or wallet directly
-          </div>
-        </div>
+      <!-- Minimal crypto payment block (very concise for PDF) -->
+      <div style="padding:0;margin:0;text-align:left;">
+        <a href="{{cryptoPaymentUrl}}" style="display:inline-block;background-color:#28a745;color:#ffffff;padding:8px 14px;border-radius:4px;text-decoration:none;font-weight:bold;font-family:Arial, sans-serif;font-size:12px;">
+          💳 Pay with Crypto
+        </a>
+        <div style="font-size:10px;color:#333;margin:4px 0 0 0; text-align:left;">Pay via supported crypto (USDT/USDC/BTC)</div>
       </div>
 {{/if}}
 {{#if paymentOption1Title}}

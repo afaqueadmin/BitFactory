@@ -11,6 +11,7 @@ import {
   Alert,
   MenuItem,
   Typography,
+  Switch,
 } from "@mui/material";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -63,6 +64,9 @@ export default function CreateInvoicePage() {
     Array<{ id: string; model: string }>
   >([]);
   const [hardwareLoading, setHardwareLoading] = useState(false);
+  // Confirmo payment toggle (global setting)
+  const [confirmoEnabled, setConfirmoEnabled] = useState<boolean>(false);
+  const [confirmoLoading, setConfirmoLoading] = useState<boolean>(false);
 
   // Fetch hardware list on mount
   useEffect(() => {
@@ -82,6 +86,31 @@ export default function CreateInvoicePage() {
     };
 
     fetchHardware();
+  }, []);
+
+  // Fetch payment settings (confirmoEnabled)
+  useEffect(() => {
+    let mounted = true;
+    const fetchSettings = async () => {
+      try {
+        const res = await fetch("/api/settings/payment", {
+          method: "GET",
+          credentials: "include",
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (mounted && data?.data) {
+          setConfirmoEnabled(!!data.data.confirmoEnabled);
+        }
+      } catch (err) {
+        console.error("Failed to fetch payment settings", err);
+      }
+    };
+
+    fetchSettings();
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   // When customer changes, auto-populate total miners from all their active miners
@@ -351,6 +380,51 @@ export default function CreateInvoicePage() {
                   <strong>
                     Total Amount: ${(formData.totalAmount || 0).toFixed(2)}
                   </strong>
+
+                  <Box
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 1,
+                      mt: 1,
+                    }}
+                  >
+                    <Switch
+                      checked={confirmoEnabled}
+                      onChange={async (_e, checked) => {
+                        setConfirmoLoading(true);
+                        try {
+                          const res = await fetch("/api/settings/payment", {
+                            method: "PUT",
+                            credentials: "include",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ confirmoEnabled: checked }),
+                          });
+                          if (!res.ok) {
+                            const err = await res.json();
+                            throw new Error(
+                              err.error ||
+                                err.message ||
+                                "Failed to update setting",
+                            );
+                          }
+                          const data = await res.json();
+                          setConfirmoEnabled(!!data?.data?.confirmoEnabled);
+                        } catch (err) {
+                          console.error(
+                            "Failed to update confirmo setting",
+                            err,
+                          );
+                        } finally {
+                          setConfirmoLoading(false);
+                        }
+                      }}
+                      disabled={confirmoLoading}
+                    />
+                    <Typography variant="body2" sx={{ color: "#666" }}>
+                      Enable payment via crypto (Confirmo)
+                    </Typography>
+                  </Box>
                 </Box>
               </Stack>
             </Box>

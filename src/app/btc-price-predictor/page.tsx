@@ -10,7 +10,7 @@ export default function BTCPricePredictorPage() {
     <Box>
       <AppBarComponent />
 
-      <Container maxWidth="md" sx={{ mt: "90px", mb: 6 }}>
+      <Container maxWidth={false} sx={{ mt: "90px", px: 0, mb: 6 }}>
         <Paper elevation={2} sx={{ p: { xs: 2, md: 4 } }}>
           <Typography variant="h4" component="h1" gutterBottom>
             BTC Price Predictor
@@ -24,22 +24,19 @@ export default function BTCPricePredictorPage() {
           <Box
             sx={{
               width: "100%",
-              maxWidth: 900,
-              height: 420,
-              mx: "auto",
-              pt: 3,
-              borderRadius: 1,
-              overflow: "hidden",
-              boxShadow: 3,
+              mx: 0,
+              pt: 2,
+              textAlign: "center",
+              minHeight: "95vh",
             }}
           >
             <iframe
               title="polymarket-market-iframe"
-              src="https://embed.polymarket.com/market?event=what-price-will-bitcoin-hit-before-2027&rotate=true&theme=dark&buttons=false&border=true&height=300"
-              width="100%"
-              height="100%"
+              src="https://embed.polymarket.com/market?event=what-price-will-bitcoin-hit-before-2027&rotate=true&theme=dark&buttons=false&border=true&height=500&width=700"
+              width="700"
+              height="500"
               frameBorder="0"
-              style={{ border: "0", display: "block" }}
+              style={{ display: "block", margin: "0 auto" }}
             />
           </Box>
         </Paper>
