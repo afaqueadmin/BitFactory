@@ -152,7 +152,7 @@ export default function FarmTariffs() {
         </div>
         <Link href="/accounting/vendor-invoices/create">
           <Button variant="contained" startIcon={<AddIcon />}>
-            Create Vendor Invoice
+            Record Vendor Invoice
           </Button>
         </Link>
       </Stack>
