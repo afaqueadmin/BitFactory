@@ -1,0 +1,11 @@
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'ConfirmoPaymentStatus') THEN
+CREATE TYPE "ConfirmoPaymentStatus" AS ENUM ('PENDING', 'PROCESSING', 'CONFIRMED', 'COMPLETED', 'EXPIRED', 'CANCELLED', 'FAILED');
+END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'EmailRunStatus') THEN
+CREATE TYPE "EmailRunStatus" AS ENUM ('IN_PROGRESS', 'COMPLETED', 'FAILED');
+END IF;
+END
+$$;
