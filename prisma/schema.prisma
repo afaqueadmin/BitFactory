@@ -286,6 +286,7 @@ model VendorInvoice {
   paidDate             DateTime?
   dueDate              DateTime
   totalMiners          Int
+  isDeleted            Boolean               @default(false)
   unitPrice            Decimal               @db.Decimal(10, 2)
   miscellaneousCharges Decimal               @default(0.00) @db.Decimal(10, 2)
   totalAmount          Decimal               @db.Decimal(12, 2)
@@ -302,6 +303,7 @@ model VendorInvoice {
   @@index([billingDate])
   @@index([dueDate])
   @@index([createdAt])
+  @@index([isDeleted])
   @@map("vendor_invoices")
 }
 
