@@ -13,12 +13,15 @@ export default function BTCPricePredictorPage() {
       <Container maxWidth={false} sx={{ mt: "90px", px: 0, mb: 6 }}>
         <Paper elevation={2} sx={{ p: { xs: 2, md: 4 } }}>
           <Typography variant="h4" component="h1" gutterBottom>
-            BTC Price Predictor
+            BTC Price Analysis
           </Typography>
 
+          <Typography variant="h5" sx={{ mb: 3 }}>
+            Polymarket BTC Price Prediction Charts
+          </Typography>
           <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-            Embedded market chart — view community probabilities for where BTC
-            may trade before 2027. Use the controls inside the chart to explore.
+            Polymarket is a community-driven prediction market — this chart
+            shows aggregated market probabilities for Bitcoin price outcomes.
           </Typography>
 
           <Box
@@ -27,7 +30,7 @@ export default function BTCPricePredictorPage() {
               mx: 0,
               pt: 2,
               textAlign: "center",
-              minHeight: "95vh",
+              minHeight: "70vh",
             }}
           >
             <iframe

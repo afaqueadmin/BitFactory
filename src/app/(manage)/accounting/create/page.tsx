@@ -67,6 +67,7 @@ export default function CreateInvoicePage() {
   // Confirmo payment toggle (global setting)
   const [confirmoEnabled, setConfirmoEnabled] = useState<boolean>(false);
   const [confirmoLoading, setConfirmoLoading] = useState<boolean>(false);
+  const [confirmoError, setConfirmoError] = useState<string | null>(null);
 
   // Fetch hardware list on mount
   useEffect(() => {
@@ -380,52 +381,51 @@ export default function CreateInvoicePage() {
                   <strong>
                     Total Amount: ${(formData.totalAmount || 0).toFixed(2)}
                   </strong>
-
-                  <Box
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 1,
-                      mt: 1,
-                    }}
-                  >
-                    <Switch
-                      checked={confirmoEnabled}
-                      onChange={async (_e, checked) => {
-                        setConfirmoLoading(true);
-                        try {
-                          const res = await fetch("/api/settings/payment", {
-                            method: "PUT",
-                            credentials: "include",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ confirmoEnabled: checked }),
-                          });
-                          if (!res.ok) {
-                            const err = await res.json();
-                            throw new Error(
-                              err.error ||
-                                err.message ||
-                                "Failed to update setting",
-                            );
-                          }
-                          const data = await res.json();
-                          setConfirmoEnabled(!!data?.data?.confirmoEnabled);
-                        } catch (err) {
-                          console.error(
-                            "Failed to update confirmo setting",
-                            err,
-                          );
-                        } finally {
-                          setConfirmoLoading(false);
-                        }
-                      }}
-                      disabled={confirmoLoading}
-                    />
-                    <Typography variant="body2" sx={{ color: "#666" }}>
-                      Enable payment via crypto (Confirmo)
-                    </Typography>
-                  </Box>
                 </Box>
+
+                <Box
+                  sx={{ mt: 1, display: "flex", alignItems: "center", gap: 1 }}
+                >
+                  <Switch
+                    checked={confirmoEnabled}
+                    onChange={async (_e, checked) => {
+                      setConfirmoError(null);
+                      setConfirmoLoading(true);
+                      try {
+                        const res = await fetch("/api/settings/payment", {
+                          method: "PUT",
+                          credentials: "include",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ confirmoEnabled: checked }),
+                        });
+                        if (!res.ok) {
+                          const err = await res.json();
+                          const msg =
+                            err?.error ||
+                            err?.message ||
+                            "Failed to update setting";
+                          setConfirmoError(msg);
+                          throw new Error(msg);
+                        }
+                        const data = await res.json();
+                        setConfirmoEnabled(!!data?.data?.confirmoEnabled);
+                      } catch (err) {
+                        console.error("Failed to update confirmo setting", err);
+                      } finally {
+                        setConfirmoLoading(false);
+                      }
+                    }}
+                    disabled={confirmoLoading}
+                  />
+                  <Typography variant="body2" sx={{ color: "#666" }}>
+                    Enable payment via crypto (Confirmo)
+                  </Typography>
+                </Box>
+                {confirmoError && (
+                  <Alert severity="error" sx={{ mt: 2 }}>
+                    {confirmoError}
+                  </Alert>
+                )}
               </Stack>
             </Box>
 

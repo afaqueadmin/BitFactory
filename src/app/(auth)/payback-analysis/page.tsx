@@ -28,7 +28,7 @@ const columns = [
   "Scenario: 2",
   "Scenario: 3",
   "Scenario: 4",
-  "BREAKEVEN (Charges-StockOS)",
+  "BREAKEVEN (Hosting Charges)",
 ];
 
 // Data Sources:
@@ -101,6 +101,25 @@ const calculatePaybackMonths = (
 ): number => {
   if (netRevenue <= 0) return Infinity;
   return machineCost / netRevenue;
+};
+
+const calculateBreakevenBtcPrice = (
+  monthlyElectricityHosting: number,
+  rewardBtcPerPhDay: number,
+  hashrateTh: number,
+  poolCommission: number,
+  fallbackPrice: number,
+): number => {
+  try {
+    const hashratePh = thToPh(hashrateTh);
+    const denominator =
+      rewardBtcPerPhDay * hashratePh * (1 - poolCommission / 100) * (365 / 12);
+
+    if (denominator <= 0) return fallbackPrice;
+    return monthlyElectricityHosting / denominator;
+  } catch {
+    return fallbackPrice;
+  }
 };
 
 const calculateAllValues = (
@@ -181,9 +200,9 @@ export default function PaybackAnalysisPage() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   // OS selector state
-  const [selectedOS, setSelectedOS] = useState<"STOCK" | "LUX" | "COMPARISON">(
-    "STOCK",
-  );
+  const [selectedOS, setSelectedOS] = useState<
+    "STOCK" | "CUSTOM" | "COMPARISON"
+  >("STOCK");
 
   // Calculated values for all scenarios
   const [calculatedValues, setCalculatedValues] = useState<CalculationValues[]>(
@@ -347,12 +366,37 @@ export default function PaybackAnalysisPage() {
     ? parseFloat(editableInvoicedAmount || "0") - config.monthlyInvoicingAmount
     : 0;
 
+  // Calculate breakeven BTC prices for both OS types
+  const breakevenBtcPriceStock = config
+    ? calculateBreakevenBtcPrice(
+        monthlyElectricityHosting,
+        resolvedRewardBtcPerPhDay,
+        config.s21proHashrateStockOs,
+        config.poolCommission,
+        config.breakevenBtcPrice,
+      )
+    : 0;
+
+  const breakevenBtcPriceCustom = config
+    ? calculateBreakevenBtcPrice(
+        monthlyElectricityHosting,
+        resolvedRewardBtcPerPhDay,
+        config.s21proHashrateLuxos,
+        config.poolCommission,
+        config.breakevenBtcPrice,
+      )
+    : 0;
+
+  // Select breakeven price based on selected OS
+  const selectedBreakevenPrice =
+    selectedOS === "CUSTOM" ? breakevenBtcPriceCustom : breakevenBtcPriceStock;
+
   // Recalculate values when BTC price, reward, or config changes
   useEffect(() => {
     if (!config) return;
 
-    // Build scenario prices: fixed scenarios + breakeven from DB
-    const scenarioPrices = [...FIXED_SCENARIO_PRICES, config.breakevenBtcPrice];
+    // Build scenario prices: fixed scenarios + calculated breakeven
+    const scenarioPrices = [...FIXED_SCENARIO_PRICES, selectedBreakevenPrice];
 
     // Calculate for CURRENT (index 0)
     const currentCalc = calculateAllValues(
@@ -381,6 +425,8 @@ export default function PaybackAnalysisPage() {
     config,
     monthlyElectricityHosting,
     machineCost,
+    selectedBreakevenPrice,
+    selectedOS,
   ]);
 
   // Fetch config on mount
@@ -406,7 +452,7 @@ export default function PaybackAnalysisPage() {
       "$125,000",
       "$150,000",
       "$200,000",
-      config ? formatValue(config.breakevenBtcPrice, "currency") : "$63,500",
+      formatValue(selectedBreakevenPrice, "currency"),
     ],
   };
 
@@ -437,7 +483,7 @@ export default function PaybackAnalysisPage() {
           ),
         },
         {
-          label: "S21Pro Hashrate (TH) (LUX OS)",
+          label: "S21Pro Hashrate (TH) (Custom OS)",
           values: Array.from({ length: 6 }, () =>
             config.s21proHashrateLuxos.toFixed(2),
           ),
@@ -457,7 +503,7 @@ export default function PaybackAnalysisPage() {
       values: calculatedValues.map((calc) => calc.dailyBtcStock.toFixed(8)),
     });
     allDynamicRows.push({
-      label: "Daily BTC Reward (LUX OS)",
+      label: "Daily BTC Reward (Custom OS)",
       values: calculatedValues.map((calc) => calc.dailyBtcLux.toFixed(8)),
     });
     allDynamicRows.push({
@@ -467,7 +513,7 @@ export default function PaybackAnalysisPage() {
       ),
     });
     allDynamicRows.push({
-      label: "Monthly Revenue (LUX OS)",
+      label: "Monthly Revenue (Custom OS)",
       values: calculatedValues.map(
         (calc) => `$${calc.monthlyRevenueLux.toFixed(2)}`,
       ),
@@ -486,7 +532,7 @@ export default function PaybackAnalysisPage() {
       ),
     });
     allDynamicRows.push({
-      label: "Net Revenue (LUX OS)",
+      label: "Net Revenue (Custom OS)",
       values: calculatedValues.map(
         (calc) => `$${calc.netRevenueLux.toFixed(2)}`,
       ),
@@ -502,7 +548,7 @@ export default function PaybackAnalysisPage() {
       ),
     });
     allDynamicRows.push({
-      label: "Payback Months (LUX OS)",
+      label: "Payback Months (Custom OS)",
       values: calculatedValues.map((calc, index) =>
         index === 5 // BREAKEVEN column
           ? "--"
@@ -518,7 +564,7 @@ export default function PaybackAnalysisPage() {
     if (selectedOS === "COMPARISON") return true;
     if (row.label === "Pool Commission") return true;
     if (selectedOS === "STOCK" && row.label.includes("Stock OS")) return true;
-    if (selectedOS === "LUX" && row.label.includes("LUX OS")) return true;
+    if (selectedOS === "CUSTOM" && row.label.includes("Custom OS")) return true;
     return false;
   });
 
@@ -526,7 +572,7 @@ export default function PaybackAnalysisPage() {
     if (selectedOS === "COMPARISON") return true;
     if (row.label === "Electricity & Hosting Charges") return true;
     if (selectedOS === "STOCK" && row.label.includes("Stock OS")) return true;
-    if (selectedOS === "LUX" && row.label.includes("LUX OS")) return true;
+    if (selectedOS === "CUSTOM" && row.label.includes("Custom OS")) return true;
     return false;
   });
 
@@ -604,9 +650,7 @@ export default function PaybackAnalysisPage() {
             value={selectedOS}
             exclusive
             onChange={(e, newValue) => {
-              if (newValue !== null) {
-                setSelectedOS(newValue);
-              }
+              if (newValue !== null) setSelectedOS(newValue);
             }}
             aria-label="OS selector"
             size="medium"
@@ -614,14 +658,15 @@ export default function PaybackAnalysisPage() {
             <ToggleButton value="STOCK" aria-label="Stock OS">
               Stock OS
             </ToggleButton>
-            <ToggleButton value="LUX" aria-label="LUX OS">
-              LUX OS
+            <ToggleButton value="CUSTOM" aria-label="Custom OS">
+              Custom OS
             </ToggleButton>
             <ToggleButton value="COMPARISON" aria-label="COMPARISON">
               Comparison
             </ToggleButton>
           </ToggleButtonGroup>
         </Box>
+
         <Box
           sx={{
             display: "flex",
@@ -632,6 +677,7 @@ export default function PaybackAnalysisPage() {
           }}
         >
           <Box sx={{ flex: 1 }} />
+
           <Box
             sx={{
               display: "flex",
@@ -654,6 +700,7 @@ export default function PaybackAnalysisPage() {
               inputProps={{ step: "0.01", min: "0" }}
               sx={{ width: "180px" }}
             />
+
             <Button
               variant="contained"
               onClick={handleUpdateInvoicedAmount}
@@ -662,6 +709,7 @@ export default function PaybackAnalysisPage() {
             >
               {isUpdatingInvoiced ? "Updating..." : "Update"}
             </Button>
+
             <Button
               variant="outlined"
               onClick={handleRefresh}
@@ -671,7 +719,8 @@ export default function PaybackAnalysisPage() {
             </Button>
           </Box>
         </Box>
-        <Typography color="text.secondary">
+
+        <Typography color="text.secondary" sx={{ mt: 1 }}>
           Updated:{" "}
           {lastUpdated
             ? lastUpdated.toLocaleString(undefined, {
@@ -753,7 +802,14 @@ export default function PaybackAnalysisPage() {
                 Metric
               </TableCell>
               {columns.map((column) => (
-                <TableCell key={column} sx={{ fontWeight: 700 }} align="right">
+                <TableCell
+                  key={column}
+                  sx={{
+                    fontWeight: 700,
+                    borderLeft: (theme) => `1px solid ${theme.palette.divider}`,
+                  }}
+                  align="right"
+                >
                   {column}
                 </TableCell>
               ))}
@@ -761,13 +817,28 @@ export default function PaybackAnalysisPage() {
           </TableHead>
           <TableBody>
             {tableRows.map((row) => (
-              <TableRow key={row.label} hover>
+              <TableRow
+                key={row.label}
+                hover
+                sx={
+                  row.label === "Reward (BTC/PH/Day)"
+                    ? { backgroundColor: "rgba(103, 177, 42, 0.35)" }
+                    : undefined
+                }
+              >
                 <TableCell sx={{ fontWeight: 600 }}>{row.label}</TableCell>
                 {row.values.map((value, index) => (
                   <TableCell
                     key={`${row.label}-${index}`}
                     align="right"
-                    sx={{ fontWeight: 400 }}
+                    sx={{
+                      fontWeight: 400,
+                      borderLeft: (theme) =>
+                        `1px solid ${theme.palette.divider}`,
+                      ...(row.label === "BTC Price (USD)" && index === 0
+                        ? { backgroundColor: "rgba(103, 177, 42, 0.35)" }
+                        : {}),
+                    }}
                   >
                     {value}
                   </TableCell>
