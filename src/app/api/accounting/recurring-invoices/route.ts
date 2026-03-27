@@ -96,9 +96,9 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { customerId, dayOfMonth, unitPrice, startDate, endDate } = body;
 
-    if (!customerId || !dayOfMonth || !startDate) {
+    if (!customerId || !dayOfMonth || !unitPrice || !startDate) {
       return NextResponse.json(
-        { error: "Missing required fields: customerId, dayOfMonth, startDate" },
+        { error: "Missing required fields: customerId, dayOfMonth, unitPrice, startDate" },
         { status: 400 },
       );
     }
@@ -114,7 +114,7 @@ export async function POST(request: NextRequest) {
       data: {
         userId: customerId,
         dayOfMonth,
-        unitPrice: unitPrice ? parseFloat(unitPrice) : null,
+        unitPrice: parseFloat(unitPrice),
         startDate: new Date(startDate),
         endDate: endDate ? new Date(endDate) : null,
         isActive: true,
