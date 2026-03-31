@@ -128,6 +128,7 @@ model Miner {
   updatedAt        DateTime                @updatedAt
   hardwareId       String
   isDeleted        Boolean                 @default(false)
+  poolAuth         String?
   ownershipHistory MinerOwnershipHistory[]
   rateHistory      MinerRateHistory[]
   hardware         Hardware                @relation(fields: [hardwareId], references: [id])
