@@ -36,7 +36,7 @@
  * ```
  */
 
-import type { Miner } from "@prisma/client";
+import type { Miner } from "@/generated/prisma";
 
 /**
  * Represents a grouped set of miners sharing the same pool and poolAuth
@@ -335,7 +335,7 @@ export function associateDataToMiners<T>(
   dataMap: Map<string, T>,
   fieldName: string,
   getKey: (miner: Miner) => string | null,
-): (Miner & Record<string, T | null>)[] {
+): Array<Record<string, unknown>> {
   return flattenGroups(groups).map((miner) => {
     const key = getKey(miner);
     const data = key ? dataMap.get(key) : null;

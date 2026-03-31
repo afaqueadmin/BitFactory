@@ -329,6 +329,20 @@ export async function GET(
         );
       }
 
+      // Verify poolAuth is set
+      if (!miner.poolAuth) {
+        console.error(
+          `[Braiins Proxy] GET: Miner ${minerId} has no poolAuth configured`,
+        );
+        return NextResponse.json<ProxyResponse>(
+          {
+            success: false,
+            error: "Miner does not have Braiins API credentials configured",
+          },
+          { status: 400 },
+        );
+      }
+
       // Initialize Braiins client with miner's token
       try {
         braiinsClient = createBraiinsClient(miner.poolAuth, user.userId);
