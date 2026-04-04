@@ -600,7 +600,6 @@ export default function AccountingDashboard() {
               <MenuItem value="DRAFT">Draft</MenuItem>
               <MenuItem value="ISSUED">Issued</MenuItem>
               <MenuItem value="PAID">Paid</MenuItem>
-              <MenuItem value="OVERDUE">Overdue</MenuItem>
               <MenuItem value="CANCELLED">Cancelled</MenuItem>
             </TextField>
             <Box sx={{ flexGrow: 1 }} />

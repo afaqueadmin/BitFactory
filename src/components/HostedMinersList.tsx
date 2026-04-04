@@ -169,6 +169,8 @@ export default function HostedMinersList({
             // For AUTO status, fetch from Luxor API
             const luxorWorker = luxorWorkers.get(miner.name);
             const luxorStatus = luxorWorker?.status;
+            const currentStatus =
+              luxorStatus === "ACTIVE" ? "Active" : "Inactive";
 
             return {
               id: miner.id,
@@ -177,9 +179,15 @@ export default function HostedMinersList({
               location: miner.space?.location || "Unknown",
               connectedPool: miner.space?.name || "Unknown",
               // Priority: Luxor API status > fallback to Inactive
-              status: luxorStatus === "ACTIVE" ? "Active" : "Inactive",
-              hashRate: `${(luxorWorker?.hashrate && (luxorWorker.hashrate / 1000000000000).toFixed(2)) || miner.hardware?.hashRate || miner.hashRate || 0} TH/s`,
-              firmware: luxorWorker?.firmware || "N/A",
+              status: currentStatus,
+              hashRate:
+                currentStatus === "Inactive"
+                  ? "NaN TH/s"
+                  : `${(luxorWorker?.hashrate && (luxorWorker.hashrate / 1000000000000).toFixed(2)) || miner.hardware?.hashRate || miner.hashRate || 0} TH/s`,
+              firmware:
+                luxorWorker?.firmware && luxorWorker.firmware !== "NaN"
+                  ? luxorWorker.firmware
+                  : "N/A",
             };
           },
         );

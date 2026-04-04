@@ -124,6 +124,7 @@ export async function POST(request: NextRequest) {
       dueDate,
       invoiceType,
       hardwareId,
+      billingMonth,
     } = body;
 
     // Status is always DRAFT when creating new invoices
@@ -219,6 +220,7 @@ export async function POST(request: NextRequest) {
         invoiceType: invoiceType || "ELECTRICITY_CHARGES",
         invoiceGeneratedDate: timestamp,
         dueDate: new Date(dueDate),
+        billingMonth: billingMonth ? new Date(billingMonth) : undefined,
         createdBy: userId,
       },
       include: {

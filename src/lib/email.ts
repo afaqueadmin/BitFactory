@@ -409,6 +409,7 @@ export const generateInvoicePDF = async (
   generatedDate: Date,
   cryptoPaymentUrl?: string | null,
   hardwareModel?: string | null,
+  billingMonth?: Date | null,
 ): Promise<Buffer> => {
   try {
     // Load PDF template
@@ -448,6 +449,12 @@ export const generateInvoicePDF = async (
       cryptoPaymentUrl: cryptoPaymentUrl || "",
       hasCryptoPayment: !!cryptoPaymentUrl,
       hardwareModel: hardwareModel || "",
+      billingMonth: billingMonth
+        ? new Date(billingMonth).toLocaleDateString("en-US", {
+            year: "numeric",
+            month: "long",
+          })
+        : "N/A",
       // Add PaymentDetails if available - include all fields as-is
       ...(paymentDetails
         ? {
