@@ -59,7 +59,7 @@ import { useQuery } from "@tanstack/react-query";
 interface ChartData {
   date: string;
   timestamp: number;
-  hashprice: number;
+  hashprice: number | null;
 }
 
 const TIMEFRAMES = [
@@ -81,13 +81,14 @@ const formatDate = (timestamp: number): string => {
 
 export default function HashpriceHistoryPage() {
   const theme = useTheme();
-  const [selectedTimeframe, setSelectedTimeframe] = useState("1M");
+  const [selectedTimeframe, setSelectedTimeframe] = useState("30D");
 
   // Get days from selected timeframe
   const timeframeConfig = TIMEFRAMES.find(
     (tf) => tf.label === selectedTimeframe,
   );
   const days = timeframeConfig?.days || 30;
+  const queryDays = selectedTimeframe === "1D" ? 2 : days;
 
   // Fetch live pool-wide hashprice (today's real-time value)
   const { data: liveData, isLoading: isLiveLoading } = useQuery({
@@ -105,20 +106,34 @@ export default function HashpriceHistoryPage() {
 
   // Fetch historical pool-wide hashprice data from API (for chart and period statistics)
   const { hashpriceData, statistics, isLoading, isError, error } =
-    useHashpriceHistory(days);
+    useHashpriceHistory(queryDays);
 
   // Transform API data for chart
   const chartData: ChartData[] = useMemo(() => {
-    return hashpriceData.map((point: HashpricePoint) => ({
-      date: formatDate(point.timestamp),
-      timestamp: point.timestamp,
-      hashprice: point.hashprice,
-    }));
+    // Show only actual returned days from API for all filters.
+    return hashpriceData
+      .slice()
+      .sort((a, b) => a.timestamp - b.timestamp)
+      .map((point: HashpricePoint) => ({
+        date: formatDate(point.timestamp),
+        timestamp: point.timestamp,
+        hashprice: point.hashprice,
+      }));
   }, [hashpriceData]);
+
+  const nonNullChartPoints = useMemo(
+    () => chartData.filter((point) => point.hashprice !== null).length,
+    [chartData],
+  );
+
+  const hasChartValues = useMemo(
+    () => chartData.some((point) => point.hashprice !== null),
+    [chartData],
+  );
 
   // Calculate statistics from actual data
   const cardStatistics = useMemo(() => {
-    if (chartData.length === 0) {
+    if (hashpriceData.length === 0) {
       return {
         current: liveHashprice || 0, // Use live hashprice even if no historical data
         high: 0,
@@ -130,15 +145,16 @@ export default function HashpriceHistoryPage() {
 
     // Use live hashprice for current (today's real-time value)
     // Use last historical point as previous for comparison
-    const current = liveHashprice || chartData[chartData.length - 1].hashprice;
-    const previous = chartData[0].hashprice;
+    const current =
+      liveHashprice || hashpriceData[hashpriceData.length - 1].hashprice;
+    const previous = hashpriceData[0].hashprice;
     const high = statistics.high;
     const low = statistics.low;
     const change = current - previous;
     const changePercent = previous !== 0 ? (change / previous) * 100 : 0;
 
     return { current, high, low, change, changePercent };
-  }, [chartData, statistics, liveHashprice]);
+  }, [hashpriceData, statistics, liveHashprice]);
 
   const isDark = theme.palette.mode === "dark";
   const chartColor = "#f7b923"; // Binance-style gold
@@ -280,9 +296,9 @@ export default function HashpriceHistoryPage() {
               variant="caption"
               sx={{ fontSize: "0.7rem", color: "info.main" }}
             >
-              📊 Data: {hashpriceData.length} days returned | Requested: {days}{" "}
-              days |
-              {hashpriceData.length < days
+              📊 Data: {hashpriceData.length} days returned | Requested:{" "}
+              {queryDays} days |
+              {hashpriceData.length < queryDays
                 ? ` ⚠️ Limited history`
                 : ` ✓ Full period`}
             </Typography>
@@ -326,7 +342,7 @@ export default function HashpriceHistoryPage() {
           Data is calculated from: Daily Revenue ÷ Daily Hashrate
           Updates automatically every 5 minutes
         */}
-        {!isLoading && !isError && chartData.length > 0 && (
+        {!isLoading && !isError && hasChartValues && (
           <ResponsiveContainer width="100%" height={400}>
             <AreaChart data={chartData}>
               <defs>
@@ -396,7 +412,12 @@ export default function HashpriceHistoryPage() {
                 strokeWidth={3}
                 fillOpacity={1}
                 fill="url(#colorHashprice)"
-                dot={false}
+                dot={
+                  nonNullChartPoints <= 2
+                    ? { r: 4, fill: chartColor, strokeWidth: 0 }
+                    : false
+                }
+                connectNulls
                 activeDot={{ r: 6, fill: chartColor, opacity: 1 }}
                 name="Hashprice (BTC/PH/s/Day)"
               />
@@ -405,7 +426,7 @@ export default function HashpriceHistoryPage() {
         )}
 
         {/* Empty State */}
-        {!isLoading && !isError && chartData.length === 0 && (
+        {!isLoading && !isError && !hasChartValues && (
           <Box
             sx={{
               display: "flex",

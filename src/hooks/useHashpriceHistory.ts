@@ -11,6 +11,7 @@ export interface HashpricePoint {
 export interface HashpriceHistoryResponse {
   success: boolean;
   data: HashpricePoint[];
+  error?: string;
   statistics: {
     current: number;
     high: number;
@@ -58,9 +59,7 @@ export const useHashpriceHistory = (days: number = 30) => {
       const data: HashpriceHistoryResponse = await fetchResponse.json();
 
       if (!data.success) {
-        throw new Error(
-          data.data?.toString() || "Failed to fetch hashprice history",
-        );
+        throw new Error(data.error || "Failed to fetch hashprice history");
       }
 
       return data;

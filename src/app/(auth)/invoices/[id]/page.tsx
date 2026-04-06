@@ -175,16 +175,13 @@ export default function CustomerInvoiceDetailPage() {
                 </Typography>
               </Box>
 
-              {/* Generated Date */}
+              {/* Total Amount */}
               <Box>
                 <Typography color="textSecondary" variant="body2">
-                  Generated Date
+                  Total Amount
                 </Typography>
                 <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
-                  <DateDisplay
-                    date={invoice.invoiceGeneratedDate}
-                    format="datetime"
-                  />
+                  <CurrencyDisplay value={invoice.totalAmount} />
                 </Typography>
               </Box>
 
@@ -229,6 +226,72 @@ export default function CustomerInvoiceDetailPage() {
           </CardContent>
         </Card>
       </Box>
+
+      {/* Invoice Narration */}
+      {invoice.costPayments && invoice.costPayments.length > 0 && (
+        <Box sx={{ mb: 3 }}>
+          <Card>
+            <CardHeader title="Invoice Narration" />
+            <Divider />
+            <CardContent>
+              {invoice.costPayments
+                .filter(
+                  (payment: { narration?: string | null }) => payment.narration,
+                )
+                .map(
+                  (
+                    payment: {
+                      id: string;
+                      amount: number;
+                      narration?: string | null;
+                      createdAt: string;
+                    },
+                    index: number,
+                    filtered: { id: string }[],
+                  ) => (
+                    <Box
+                      key={payment.id}
+                      sx={{
+                        pb: 2,
+                        mb: index < filtered.length - 1 ? 2 : 0,
+                        borderBottom:
+                          index < filtered.length - 1
+                            ? "1px solid #eee"
+                            : "none",
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          mb: 0.5,
+                        }}
+                      >
+                        <Typography variant="body2" color="textSecondary">
+                          Payment of ${Number(payment.amount).toFixed(2)}
+                        </Typography>
+                        <Typography variant="body2" color="textSecondary">
+                          {new Date(payment.createdAt).toLocaleDateString()}
+                        </Typography>
+                      </Box>
+                      <Typography variant="body1">
+                        {payment.narration}
+                      </Typography>
+                    </Box>
+                  ),
+                )}
+              {invoice.costPayments.every(
+                (payment: { narration?: string | null }) => !payment.narration,
+              ) && (
+                <Typography color="textSecondary">
+                  No narration added for this invoice
+                </Typography>
+              )}
+            </CardContent>
+          </Card>
+        </Box>
+      )}
 
       {/* Customer & Relationship Manager Information Section */}
       <Box>

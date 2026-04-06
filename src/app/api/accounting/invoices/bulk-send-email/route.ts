@@ -94,6 +94,7 @@ export async function POST(request: NextRequest) {
       unitPrice: Number(invoice.unitPrice),
       luxorSubaccountName: invoice.user?.luxorSubaccountName || undefined,
       hardwareModel: invoice.hardware?.model || undefined,
+      billingMonth: invoice.billingMonth || undefined,
     }));
 
     // Send all invoices

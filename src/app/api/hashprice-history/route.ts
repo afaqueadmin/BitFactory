@@ -81,13 +81,6 @@ export async function GET(request: NextRequest) {
     // Create Luxor client with valid subaccount for authentication
     const luxorClient = createLuxorClient(subaccountForAuth);
 
-    // Calculate date range
-    // Note: Luxor API requires end_date to be in the past, so we use yesterday
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const startDate = new Date(yesterday);
-    startDate.setDate(startDate.getDate() - days);
-
     // Format dates as YYYY-MM-DD for Luxor API
     const formatDate = (date: Date) => {
       const year = date.getFullYear();
@@ -96,126 +89,138 @@ export async function GET(request: NextRequest) {
       return `${year}-${month}-${day}`;
     };
 
-    const startDateStr = formatDate(startDate);
-    const endDateStr = formatDate(yesterday);
-
-    console.log(
-      `[Hashprice History API] Fetching pool-wide data from ${startDateStr} to ${endDateStr}`,
-    );
-
-    // Fetch pool-wide revenue data from /pool/revenue/BTC
-    // NOTE: Using 'higgs' subaccount for pool-wide data (main pool account)
-    const revenueResponse = await luxorClient.getRevenue("BTC", {
-      subaccount_names: "higgs",
-      start_date: startDateStr,
-      end_date: endDateStr,
-    });
-
-    // Fetch pool-wide hashrate data from /pool/hashrate-efficiency/BTC (daily tick_size)
-    // NOTE: Using 'higgs' subaccount for pool-wide data (main pool account)
-    console.log(
-      `[Hashprice History API] Requesting pool-wide hashrate from ${startDateStr} to ${endDateStr} (${days} days)`,
-    );
-
-    const hashrateResponse = await luxorClient.getHashrateEfficiency("BTC", {
-      subaccount_names: "higgs",
-      start_date: startDateStr,
-      end_date: endDateStr,
-      tick_size: "1d",
-      page_size: 100, // Increase page size to get more records per request
-      page_number: 1,
-    });
-
-    console.log(`[Hashprice History API] ===== PERIOD DEBUG =====`);
-    console.log(`[Hashprice History API] Requested days: ${days}`);
-    console.log(
-      `[Hashprice History API] Date range: ${startDateStr} to ${endDateStr}`,
-    );
-    console.log(
-      `[Hashprice History API] Revenue records returned: ${revenueResponse.revenue?.length || 0}`,
-    );
-    console.log(
-      `[Hashprice History API] Hashrate records returned: ${hashrateResponse.hashrate_efficiency?.length || 0}`,
-    );
-    console.log(
-      `[Hashprice History API] Hashrate pagination: page ${hashrateResponse.pagination?.page_number}, size ${hashrateResponse.pagination?.page_size}, total items: ${hashrateResponse.pagination?.item_count}`,
-    );
-
-    // Check if we got fewer records than requested
-    const recordsReturned = hashrateResponse.hashrate_efficiency?.length || 0;
-    if (recordsReturned < days) {
-      console.log(
-        `[Hashprice History API] ⚠️  WARNING: Got ${recordsReturned} records but requested ${days} days - API may have limited history`,
-      );
-    }
-
-    // Create a map of hashrate by date for quick lookup
-    const hashrateByDate: Record<string, number> = {};
-    if (
-      hashrateResponse.hashrate_efficiency &&
-      Array.isArray(hashrateResponse.hashrate_efficiency)
-    ) {
-      console.log(
-        `[Hashprice History API] Processing ${hashrateResponse.hashrate_efficiency.length} hashrate records`,
-      );
-      for (const point of hashrateResponse.hashrate_efficiency) {
-        const date = point.date_time
-          ? new Date(point.date_time).toISOString().split("T")[0]
-          : null;
-        if (date && point.hashrate) {
-          const hashrate = parseFloat(String(point.hashrate));
-          hashrateByDate[date] = hashrate;
-          console.log(
-            `[Hashprice History API] Hashrate for ${date}: ${hashrate}`,
-          );
-        }
+    // Keep date extraction stable across Luxor timestamps without timezone shifts.
+    const extractDateKey = (value?: string | null): string | null => {
+      if (!value) return null;
+      if (value.includes("T")) {
+        return value.split("T")[0] || null;
       }
-    }
+      if (value.length >= 10) {
+        return value.slice(0, 10);
+      }
+      return null;
+    };
 
-    console.log(
-      `[Hashprice History API] Hashrate map has ${Object.keys(hashrateByDate).length} entries`,
-    );
+    const getWindowBounds = (rangeDays: number) => {
+      const endDate = new Date();
+      endDate.setDate(endDate.getDate() - 1);
+      endDate.setHours(0, 0, 0, 0);
+      const startDate = new Date(endDate);
+      startDate.setDate(startDate.getDate() - (rangeDays - 1));
+      return {
+        startDate,
+        endDate,
+        startKey: formatDate(startDate),
+        endKey: formatDate(endDate),
+      };
+    };
 
-    // Merge revenue and hashrate data, calculate hashprice
-    const hashpriceData: HashpricePoint[] = [];
+    const filterByWindow = (data: HashpricePoint[], rangeDays: number) => {
+      const { startKey, endKey } = getWindowBounds(rangeDays);
+      return data
+        .filter((point) => point.date >= startKey && point.date <= endKey)
+        .sort((a, b) => a.timestamp - b.timestamp);
+    };
 
-    if (revenueResponse.revenue && Array.isArray(revenueResponse.revenue)) {
+    // Fetch helper with consistent date formatting and merge logic.
+    const fetchHashpriceRange = async (
+      rangeDays: number,
+    ): Promise<HashpricePoint[]> => {
+      const { startDate, endDate, startKey, endKey } =
+        getWindowBounds(rangeDays);
+
       console.log(
-        `[Hashprice History API] Processing ${revenueResponse.revenue.length} revenue records`,
+        `[Hashprice History API] Fetching pool-wide data from ${startKey} to ${endKey} (${rangeDays}d window)`,
       );
-      for (const item of revenueResponse.revenue) {
-        if (item && item.date_time) {
-          const dateStr = item.date_time.split("T")[0]; // Extract YYYY-MM-DD
-          const revenue = item.revenue?.revenue || 0;
-          const hashrateRaw = hashrateByDate[dateStr] || 0;
 
-          // Hashrate from API is in H/s, but we need PH/s (Petahash/s)
-          // 1 PH/s = 1e15 H/s
-          const hashratePHs = hashrateRaw / 1e15;
+      const revenueResponse = await luxorClient.getRevenue("BTC", {
+        subaccount_names: "higgs",
+        start_date: formatDate(startDate),
+        end_date: formatDate(endDate),
+      });
 
-          console.log(
-            `[Hashprice History API] Date: ${dateStr}, Revenue: ${revenue}, Hashrate: ${hashrateRaw} H/s (${hashratePHs} PH/s)`,
-          );
+      const hashrateResponse = await luxorClient.getHashrateEfficiency("BTC", {
+        subaccount_names: "higgs",
+        start_date: formatDate(startDate),
+        end_date: formatDate(endDate),
+        tick_size: "1d",
+        page_size: 100,
+        page_number: 1,
+      });
 
-          // Calculate hashprice: revenue (BTC) / hashrate (PH/s)
-          // Result: BTC/PH/s/day
-          if (hashratePHs > 0) {
-            const hashprice = revenue / hashratePHs;
+      console.log(`[Hashprice History API] ===== PERIOD DEBUG =====`);
+      console.log(`[Hashprice History API] Requested days: ${rangeDays}`);
+      console.log(
+        `[Hashprice History API] Date range: ${startKey} to ${endKey}`,
+      );
+      console.log(
+        `[Hashprice History API] Revenue records returned: ${revenueResponse.revenue?.length || 0}`,
+      );
+      console.log(
+        `[Hashprice History API] Hashrate records returned: ${hashrateResponse.hashrate_efficiency?.length || 0}`,
+      );
+      console.log(
+        `[Hashprice History API] Hashrate pagination: page ${hashrateResponse.pagination?.page_number}, size ${hashrateResponse.pagination?.page_size}, total items: ${hashrateResponse.pagination?.item_count}`,
+      );
 
-            hashpriceData.push({
-              date: dateStr,
-              timestamp: new Date(item.date_time).getTime(),
-              hashprice: isFinite(hashprice) ? hashprice : 0,
-              revenue,
-              hashrate: hashrateRaw,
-            });
+      const hashrateByDate: Record<string, number> = {};
+      if (
+        hashrateResponse.hashrate_efficiency &&
+        Array.isArray(hashrateResponse.hashrate_efficiency)
+      ) {
+        for (const point of hashrateResponse.hashrate_efficiency) {
+          const date = extractDateKey(point.date_time);
+          if (date && point.hashrate) {
+            const hashrate = parseFloat(String(point.hashrate));
+            hashrateByDate[date] = hashrate;
           }
         }
       }
-    }
 
-    // Sort by date (ascending)
-    hashpriceData.sort((a, b) => a.timestamp - b.timestamp);
+      const hashpriceData: HashpricePoint[] = [];
+      if (revenueResponse.revenue && Array.isArray(revenueResponse.revenue)) {
+        for (const item of revenueResponse.revenue) {
+          if (item && item.date_time) {
+            const dateStr = extractDateKey(item.date_time);
+            if (!dateStr) continue;
+            const revenue = item.revenue?.revenue || 0;
+            const hashrateRaw = hashrateByDate[dateStr] || 0;
+
+            // Hashrate from API is in H/s, but hashprice is BTC/PH/s/day.
+            const hashratePHs = hashrateRaw / 1e15;
+            if (hashratePHs > 0) {
+              const hashprice = revenue / hashratePHs;
+              hashpriceData.push({
+                date: dateStr,
+                timestamp: new Date(item.date_time).getTime(),
+                hashprice: isFinite(hashprice) ? hashprice : 0,
+                revenue,
+                hashrate: hashrateRaw,
+              });
+            }
+          }
+        }
+      }
+
+      hashpriceData.sort((a, b) => a.timestamp - b.timestamp);
+      return hashpriceData;
+    };
+
+    let hashpriceData = await fetchHashpriceRange(days);
+    hashpriceData = filterByWindow(hashpriceData, days);
+
+    // Fallback: short windows may have delayed Luxor daily points.
+    if (hashpriceData.length < Math.min(days, 2) && days < 45) {
+      console.log(
+        `[Hashprice History API] Sparse data in ${days}d window (${hashpriceData.length} points). Retrying with 45d fallback window.`,
+      );
+      const fallback = await fetchHashpriceRange(45);
+      const fallbackWindow = filterByWindow(fallback, days);
+      hashpriceData =
+        fallbackWindow.length > 0
+          ? fallbackWindow
+          : fallback.slice(-Math.max(days, 2));
+    }
 
     console.log(`[Hashprice History API] ===== FINAL RESULTS =====`);
     console.log(

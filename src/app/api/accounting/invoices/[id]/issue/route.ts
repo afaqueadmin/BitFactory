@@ -124,6 +124,7 @@ export async function POST(
       unitPrice: Number(invoice.unitPrice),
       luxorSubaccountName: invoice.user.luxorSubaccountName || undefined,
       hardwareModel: invoice.hardware?.model || undefined,
+      billingMonth: invoice.billingMonth || undefined,
     };
 
     // Send invoice with PDF (mandatory - fails entire operation if PDF fails)

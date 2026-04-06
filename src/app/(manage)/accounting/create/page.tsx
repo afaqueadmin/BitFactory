@@ -31,6 +31,19 @@ export default function CreateInvoicePage() {
   const { create: createInvoice, error: createError } = useCreateInvoice();
   const { customers, loading: customersLoading } = useCustomers();
 
+  // Auto-calculate billing month: next month from today
+  const getDefaultBillingMonth = () => {
+    const now = new Date();
+    const nextMonth = now.getMonth() + 1; // 0-indexed, so +1 gives next month
+    if (nextMonth > 11) {
+      // December wraps to January next year
+      return { month: 0, year: now.getFullYear() + 1 };
+    }
+    return { month: nextMonth, year: now.getFullYear() };
+  };
+
+  const defaultBilling = getDefaultBillingMonth();
+
   const [formData, setFormData] = useState({
     customerId: "",
     totalMiners: 0,
@@ -42,6 +55,8 @@ export default function CreateInvoicePage() {
     status: InvoiceStatus.DRAFT,
     invoiceType: "ELECTRICITY_CHARGES",
     hardwareId: "",
+    billingMonth: defaultBilling.month,
+    billingYear: defaultBilling.year,
   });
 
   // Fetch miners only when customerId changes
@@ -212,6 +227,13 @@ export default function CreateInvoicePage() {
         throw new Error("Due date must be in the future (not a past date)");
       }
 
+      // Build billingMonth as ISO date string (first day of selected month)
+      const billingMonthDate = new Date(
+        formData.billingYear,
+        formData.billingMonth,
+        1,
+      );
+
       // Call API to create invoice
       await createInvoice({
         customerId: formData.customerId,
@@ -221,6 +243,7 @@ export default function CreateInvoicePage() {
         status: formData.status,
         invoiceType: formData.invoiceType,
         hardwareId: formData.hardwareId || undefined,
+        billingMonth: billingMonthDate.toISOString(),
       });
 
       // Redirect to accounting dashboard
@@ -435,6 +458,43 @@ export default function CreateInvoicePage() {
                 Additional Information
               </h3>
               <Stack spacing={2}>
+                <Stack direction="row" spacing={2}>
+                  <TextField
+                    select
+                    label="Billing Month"
+                    value={formData.billingMonth}
+                    onChange={(e) => {
+                      const selectedMonth = Number(e.target.value);
+                      const now = new Date();
+                      // If December is selected, use next year
+                      const year =
+                        selectedMonth === 11
+                          ? now.getFullYear() + 1
+                          : now.getFullYear();
+                      setFormData((prev) => ({
+                        ...prev,
+                        billingMonth: selectedMonth,
+                        billingYear: year,
+                      }));
+                    }}
+                    fullWidth
+                    helperText={`Year: ${formData.billingYear} (auto-calculated)`}
+                    required
+                  >
+                    <MenuItem value={0}>January</MenuItem>
+                    <MenuItem value={1}>February</MenuItem>
+                    <MenuItem value={2}>March</MenuItem>
+                    <MenuItem value={3}>April</MenuItem>
+                    <MenuItem value={4}>May</MenuItem>
+                    <MenuItem value={5}>June</MenuItem>
+                    <MenuItem value={6}>July</MenuItem>
+                    <MenuItem value={7}>August</MenuItem>
+                    <MenuItem value={8}>September</MenuItem>
+                    <MenuItem value={9}>October</MenuItem>
+                    <MenuItem value={10}>November</MenuItem>
+                    <MenuItem value={11}>December</MenuItem>
+                  </TextField>
+                </Stack>
                 <TextField
                   label="Due Date"
                   name="dueDate"
