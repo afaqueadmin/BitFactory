@@ -6,7 +6,7 @@ import {
   InvoiceEmailPayload,
 } from "@/services/invoiceEmailService";
 import { getGroupBySubaccountName } from "@/lib/groupUtils";
-import { InvoiceStatus, AuditAction } from "@/generated/prisma";
+import { InvoiceStatus, AuditAction } from "@prisma/client";
 
 /**
  * POST /api/accounting/invoices/[id]/issue

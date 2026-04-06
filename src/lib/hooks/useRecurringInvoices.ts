@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { RecurringInvoice } from "@/generated/prisma";
+import { RecurringInvoice } from "@prisma/client";
 
 export interface RecurringInvoiceWithDetails extends RecurringInvoice {
   user?: {

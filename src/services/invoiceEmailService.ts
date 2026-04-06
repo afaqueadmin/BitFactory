@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { generateInvoicePDF, sendInvoiceEmailWithPDF } from "@/lib/email";
 import { getGroupBySubaccountName } from "@/lib/groupUtils";
 import { ConfirmoPaymentService } from "./confirmoPaymentService";
-import { AuditAction } from "@/generated/prisma";
+import { AuditAction } from "@prisma/client";
 
 export interface InvoiceEmailPayload {
   invoiceId: string;

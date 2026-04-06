@@ -22,7 +22,7 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import Link from "next/link";
 import { useInvoice, useRecordPayment } from "@/lib/hooks/useInvoices";
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
-import { CostPayment } from "@/generated/prisma";
+import { CostPayment } from "@prisma/client";
 
 export default function RecordPaymentPage() {
   const params = useParams();

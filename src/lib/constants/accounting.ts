@@ -10,7 +10,7 @@ import {
   NotificationType,
   AuditAction,
   VendorPaymentStatus,
-} from "@/generated/prisma";
+} from "@prisma/client";
 
 // ============================================================================
 // CURRENCY & FORMATTING

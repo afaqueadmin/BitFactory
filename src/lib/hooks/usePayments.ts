@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { CostPayment } from "@/generated/prisma";
+import { CostPayment } from "@prisma/client";
 
 export interface CostPaymentWithDetails extends CostPayment {
   invoice?: {

@@ -18,7 +18,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { useUser } from "@/lib/hooks/useUser";
 import { StatusBadge } from "@/components/accounting/common/StatusBadge";
-import { Invoice } from "@/generated/prisma";
+import { Invoice } from "@prisma/client";
 import { useRouter } from "next/navigation";
 import { calculateDaysUntilDue } from "@/lib/mocks/invoiceMocks";
 

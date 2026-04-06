@@ -17,7 +17,7 @@ import { useRouter } from "next/navigation";
 import SaveIcon from "@mui/icons-material/Save";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import Link from "next/link";
-import { InvoiceStatus } from "@/generated/prisma";
+import { InvoiceStatus } from "@prisma/client";
 import {
   useCreateInvoice,
   useCustomers,

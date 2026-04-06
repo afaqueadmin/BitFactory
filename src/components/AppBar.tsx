@@ -25,7 +25,7 @@ import { usePathname } from "next/navigation";
 import { useTheme } from "@/app/theme-provider";
 import { useQuery } from "@tanstack/react-query";
 import { useUser } from "@/lib/hooks/useUser";
-import { Invoice } from "@/generated/prisma";
+import { Invoice } from "@prisma/client";
 
 export default function AppBarComponent() {
   const { darkMode, toggleDarkMode } = useTheme();

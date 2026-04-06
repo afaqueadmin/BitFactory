@@ -5,9 +5,9 @@
  * Used by both UI (mock data) and API (real data) to ensure consistency.
  */
 
-import { InvoiceStatus } from "@/generated/prisma";
+import { InvoiceStatus } from "@prisma/client";
 
-export { InvoiceStatus } from "@/generated/prisma";
+export { InvoiceStatus } from "@prisma/client";
 
 // ============================================================================
 // ENUMS

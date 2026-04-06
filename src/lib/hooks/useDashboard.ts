@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { InvoiceStatus } from "@/generated/prisma";
+import { InvoiceStatus } from "@prisma/client";
 
 interface InvoiceData {
   id: string;

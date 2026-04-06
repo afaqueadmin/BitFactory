@@ -36,7 +36,7 @@
  * ```
  */
 
-import type { Miner } from "@/generated/prisma";
+import type { Miner } from "@prisma/client";
 
 /**
  * Represents a grouped set of miners sharing the same pool and poolAuth

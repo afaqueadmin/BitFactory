@@ -5,7 +5,7 @@
  */
 
 import { Chip, ChipProps } from "@mui/material";
-import { InvoiceStatus, VendorPaymentStatus } from "@/generated/prisma";
+import { InvoiceStatus, VendorPaymentStatus } from "@prisma/client";
 import {
   INVOICE_STATUS_LABELS,
   INVOICE_STATUS_COLORS,

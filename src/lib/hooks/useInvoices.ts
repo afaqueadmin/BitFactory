@@ -4,7 +4,7 @@ import {
   InvoiceStatus,
   CostPayment,
   AuditLog,
-} from "@/generated/prisma";
+} from "@prisma/client";
 
 export interface AuditLogWithUser extends AuditLog {
   user?: {

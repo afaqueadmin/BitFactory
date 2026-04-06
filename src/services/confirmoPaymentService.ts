@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { ConfirmoClient } from "@/lib/confirmo/client";
-import { Prisma, ConfirmoPaymentStatus } from "@/generated/prisma";
+import { Prisma, ConfirmoPaymentStatus } from "@prisma/client";
 
 export class ConfirmoPaymentService {
   private client: ConfirmoClient;

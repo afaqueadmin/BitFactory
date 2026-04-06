@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
-import { AuditAction, InvoiceStatus } from "@/generated/prisma";
+import { AuditAction, InvoiceStatus } from "@prisma/client";
 import { sendInvoiceCancellationEmail } from "@/lib/email";
 
 export async function GET(

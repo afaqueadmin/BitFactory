@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
-import { AuditAction } from "@/generated/prisma";
+import { AuditAction } from "@prisma/client";
 
 export async function GET(request: NextRequest) {
   try {

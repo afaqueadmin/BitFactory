@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { CustomerPricingConfig } from "@/generated/prisma";
+import { CustomerPricingConfig } from "@prisma/client";
 
 export interface PricingConfigWithDetails extends CustomerPricingConfig {
   user?: {

@@ -50,7 +50,7 @@ import { StatusBadge } from "@/components/accounting/common/StatusBadge";
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
 import { DateDisplay } from "@/components/accounting/common/DateDisplay";
 import AddIcon from "@mui/icons-material/Add";
-import { InvoiceStatus } from "@/generated/prisma";
+import { InvoiceStatus } from "@prisma/client";
 
 type SortKey =
   | "invoiceNumber"

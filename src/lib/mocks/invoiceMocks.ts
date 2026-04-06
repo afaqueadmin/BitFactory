@@ -6,7 +6,7 @@
  */
 
 import { faker } from "@faker-js/faker";
-import { CostPayment } from "@/generated/prisma";
+import { CostPayment } from "@prisma/client";
 import {
   Invoice,
   InvoiceStatus,
