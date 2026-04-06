@@ -26,16 +26,22 @@ interface DailyPerformanceData {
   earnings: number;
   costs: number;
   hashRate: number;
+  breakdown?: {
+    luxor: number;
+    braiins: number;
+  };
 }
 
 interface MiningEarningsChartProps {
   height?: number;
   days?: number;
+  viewMode?: "total" | "luxor" | "braiins" | "stacked";
 }
 
 export default function MiningEarningsChart({
   height = 300,
   days = 10, // Default to 10 days as per Luxor API request
+  viewMode = "total",
 }: MiningEarningsChartProps) {
   const theme = useTheme();
   const [miningData, setMiningData] = useState<DailyPerformanceData[]>([]);
@@ -47,9 +53,30 @@ export default function MiningEarningsChart({
       return { yMin: 0, yMax: 1 };
     }
 
-    const values = miningData
-      .map((item) => Number(item.earnings))
-      .filter((value) => Number.isFinite(value));
+    let values: number[] = [];
+
+    if (viewMode === "stacked") {
+      // In stacked mode, use both luxor and braiins values
+      values = miningData
+        .flatMap((item) => [
+          item.breakdown?.luxor || 0,
+          item.breakdown?.braiins || 0,
+        ])
+        .filter((value) => Number.isFinite(value));
+    } else if (viewMode === "luxor") {
+      values = miningData
+        .map((item) => item.breakdown?.luxor || 0)
+        .filter((value) => Number.isFinite(value));
+    } else if (viewMode === "braiins") {
+      values = miningData
+        .map((item) => item.breakdown?.braiins || 0)
+        .filter((value) => Number.isFinite(value));
+    } else {
+      // total mode
+      values = miningData
+        .map((item) => Number(item.earnings))
+        .filter((value) => Number.isFinite(value));
+    }
 
     if (!values.length) {
       return { yMin: 0, yMax: 1 };
@@ -64,7 +91,7 @@ export default function MiningEarningsChart({
       yMin: Math.max(0, min - padding),
       yMax: max + padding,
     };
-  }, [miningData]);
+  }, [miningData, viewMode]);
 
   // Fetch mining performance data
   useEffect(() => {
@@ -294,13 +321,58 @@ export default function MiningEarningsChart({
 
               <Legend />
 
-              <Bar
-                dataKey="earnings"
-                name="Daily Revenue (Luxor)"
-                barSize={18}
-                radius={[6, 6, 0, 0]}
-                fill="url(#earningsGradient)"
-              />
+              {/* Total earnings view - default */}
+              {viewMode === "total" && (
+                <Bar
+                  dataKey="earnings"
+                  name="Daily Revenue"
+                  barSize={18}
+                  radius={[6, 6, 0, 0]}
+                  fill="url(#earningsGradient)"
+                />
+              )}
+
+              {/* Luxor only view */}
+              {viewMode === "luxor" && (
+                <Bar
+                  dataKey="breakdown.luxor"
+                  name="Luxor Revenue"
+                  barSize={18}
+                  radius={[6, 6, 0, 0]}
+                  fill="#0066FF"
+                />
+              )}
+
+              {/* Braiins only view */}
+              {viewMode === "braiins" && (
+                <Bar
+                  dataKey="breakdown.braiins"
+                  name="Braiins Revenue"
+                  barSize={18}
+                  radius={[6, 6, 0, 0]}
+                  fill="#FFA500"
+                />
+              )}
+
+              {/* Stacked view - both pools */}
+              {viewMode === "stacked" && (
+                <>
+                  <Bar
+                    dataKey="breakdown.luxor"
+                    name="Luxor"
+                    stackId="revenue"
+                    radius={[6, 6, 0, 0]}
+                    fill="#0066FF"
+                  />
+                  <Bar
+                    dataKey="breakdown.braiins"
+                    name="Braiins"
+                    stackId="revenue"
+                    radius={[0, 0, 6, 6]}
+                    fill="#FFA500"
+                  />
+                </>
+              )}
               {/* <Bar
                 dataKey="costs"
                 name="Costs"

@@ -56,40 +56,59 @@ async function main() {
     },
   });
 
+  // Create hardware
+  const hardware1 = await prisma.hardware.create({
+    data: {
+      model: "Antminer S19 XP",
+      powerUsage: 3.1,
+      hashRate: 140.0,
+    },
+  });
+
+  const hardware2 = await prisma.hardware.create({
+    data: {
+      model: "Antminer S19j Pro",
+      powerUsage: 3.0,
+      hashRate: 110.0,
+    },
+  });
+
+  const hardware3 = await prisma.hardware.create({
+    data: {
+      model: "Whatsminer M50S",
+      powerUsage: 3.5,
+      hashRate: 234.0,
+    },
+  });
+
   // Create miners
   await prisma.miner.create({
     data: {
       name: "Antminer S19 XP",
-      model: "S19 XP",
       status: "AUTO",
-      powerUsage: 3.1, // 3.1 kW
-      hashRate: 140.0, // 140 TH/s
       userId: user.id,
       spaceId: space1.id,
+      hardwareId: hardware1.id,
     },
   });
 
   await prisma.miner.create({
     data: {
       name: "Antminer S19j Pro",
-      model: "S19j Pro",
       status: "AUTO",
-      powerUsage: 3.0, // 3.0 kW
-      hashRate: 110.0, // 110 TH/s
       userId: user.id,
       spaceId: space1.id,
+      hardwareId: hardware2.id,
     },
   });
 
   await prisma.miner.create({
     data: {
       name: "Whatsminer M50S",
-      model: "M50S",
       status: "DEPLOYMENT_IN_PROGRESS",
-      powerUsage: 3.5, // 3.5 kW
-      hashRate: 234.0, // 234 TH/s
       userId: user.id,
       spaceId: space2.id,
+      hardwareId: hardware3.id,
     },
   });
 

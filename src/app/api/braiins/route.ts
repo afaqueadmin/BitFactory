@@ -29,7 +29,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyJwtToken } from "@/lib/jwt";
 import { prisma } from "@/lib/prisma";
-import { createBraiinsClient, BraiinsError } from "@/lib/braiins";
+import { createBraiinsClient, BraiinsClient, BraiinsError } from "@/lib/braiins";
 
 // ✅ Ensure this runs on Node.js runtime (required for async operations)
 export const runtime = "nodejs";
@@ -98,8 +98,8 @@ const endpointMap: Record<
   },
   workers: {
     method: "GET",
-    requiresMiner: true,
-    description: "Get all workers for this user",
+    requiresMiner: false, // Changed: Can fetch workers from all miners or specific miner
+    description: "Get all workers for this user (optionally filtered by minerId)",
   },
   payouts: {
     method: "GET",
@@ -298,8 +298,78 @@ export async function GET(
     const endpointConfig = endpointMap[endpoint];
 
     // ✅ STEP 3: Validate and fetch miner (if required for this endpoint)
-    let braiinsClient;
-    if (endpointConfig.requiresMiner) {
+    let braiinsClient: BraiinsClient | undefined;
+    let braiinsClients: Array<{ client: BraiinsClient; miner: any }> = []; // For workers endpoint without minerId
+
+    // Special case: workers endpoint without minerId - fetch from all Braiins miners
+    if (endpoint === "workers" && !searchParams.get("minerId")) {
+      console.log(
+        "[Braiins Proxy] GET: Workers endpoint without minerId - fetching from all miners"
+      );
+      try {
+        // Fetch all Braiins miners for this user
+        const miners = await prisma.miner.findMany({
+          where: { userId: user.userId },
+          include: { pool: { select: { name: true } } },
+        });
+
+        const braiinsMinersList = miners.filter(
+          (m) => m.pool?.name === "Braiins" && m.poolAuth
+        );
+
+        if (braiinsMinersList.length === 0) {
+          console.log(
+            "[Braiins Proxy] GET: No Braiins miners with auth configured"
+          );
+          return NextResponse.json<ProxyResponse>(
+            {
+              success: true,
+              data: { workers: [] },
+              timestamp: new Date().toISOString(),
+            },
+            { status: 200 }
+          );
+        }
+
+        console.log(
+          `[Braiins Proxy] GET: Found ${braiinsMinersList.length} Braiins miners`
+        );
+
+        // Initialize clients for all miners
+        for (const miner of braiinsMinersList) {
+          try {
+            const client = createBraiinsClient(miner.poolAuth!, user.userId);
+            braiinsClients.push({ client, miner });
+          } catch (e) {
+            console.warn(
+              `[Braiins Proxy] GET: Failed to initialize client for miner ${miner.name}`
+            );
+          }
+        }
+
+        if (braiinsClients.length === 0) {
+          return NextResponse.json<ProxyResponse>(
+            {
+              success: false,
+              error:
+                "Failed to initialize Braiins clients for any miner. Please contact support.",
+            },
+            { status: 500 }
+          );
+        }
+      } catch (error) {
+        const errorMsg =
+          error instanceof Error
+            ? error.message
+            : "Failed to fetch Braiins miners";
+        console.error(`[Braiins Proxy] GET: ${errorMsg}`);
+        return NextResponse.json<ProxyResponse>(
+          { success: false, error: errorMsg },
+          { status: 500 }
+        );
+      }
+    } else if (endpointConfig.requiresMiner) {
+      // Original logic for other endpoints requiring minerId
       const minerId = searchParams.get("minerId");
       if (!minerId) {
         return NextResponse.json<ProxyResponse>(
@@ -307,7 +377,7 @@ export async function GET(
             success: false,
             error: `minerId parameter is required for ${endpoint} endpoint`,
           },
-          { status: 400 },
+          { status: 400 }
         );
       }
 
@@ -315,7 +385,7 @@ export async function GET(
       try {
         miner = await getMinerWithPoolAuth(minerId, user.userId);
         console.log(
-          `[Braiins Proxy] GET: Miner validated: ${miner.name} (${minerId})`,
+          `[Braiins Proxy] GET: Miner validated: ${miner.name} (${minerId})`
         );
       } catch (minerError) {
         const errorMsg =
@@ -325,21 +395,21 @@ export async function GET(
         console.error(`[Braiins Proxy] GET: ${errorMsg}`);
         return NextResponse.json<ProxyResponse>(
           { success: false, error: errorMsg },
-          { status: 403 },
+          { status: 403 }
         );
       }
 
       // Verify poolAuth is set
       if (!miner.poolAuth) {
         console.error(
-          `[Braiins Proxy] GET: Miner ${minerId} has no poolAuth configured`,
+          `[Braiins Proxy] GET: Miner ${minerId} has no poolAuth configured`
         );
         return NextResponse.json<ProxyResponse>(
           {
             success: false,
             error: "Miner does not have Braiins API credentials configured",
           },
-          { status: 400 },
+          { status: 400 }
         );
       }
 
@@ -357,12 +427,11 @@ export async function GET(
             success: false,
             error: "Service configuration error. Please contact support.",
           },
-          { status: 500 },
+          { status: 500 }
         );
       }
     } else {
       // For public endpoints like pool-stats, create client without auth
-      // Note: Braiins doesn't actually require auth for pool-stats, but we'll create a dummy client
       try {
         braiinsClient = createBraiinsClient("public-token", "system");
       } catch (clientError) {
@@ -376,7 +445,7 @@ export async function GET(
             success: false,
             error: "Service configuration error. Please contact support.",
           },
-          { status: 500 },
+          { status: 500 }
         );
       }
     }
@@ -384,15 +453,36 @@ export async function GET(
     // ✅ STEP 4: Route to appropriate client method and execute
     let data;
     try {
+      // Helper to convert Unix timestamp (seconds) to ISO date string (YYYY-MM-DD)
+      const unixToISODate = (unixSeconds?: number): string | undefined => {
+        if (!unixSeconds) return undefined;
+        const date = new Date(unixSeconds * 1000);
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, "0");
+        const day = String(date.getDate()).padStart(2, "0");
+        return `${year}-${month}-${day}`;
+      };
+
+      // For non-workers endpoints, ensure braiinsClient is initialized
+      if (endpoint !== "workers" && !braiinsClient) {
+        return NextResponse.json<ProxyResponse>(
+          {
+            success: false,
+            error: "Service configuration error. Please contact support.",
+          },
+          { status: 500 }
+        );
+      }
+
       switch (endpoint) {
         case "pool-stats":
           console.log("[Braiins Proxy] GET: Getting pool stats");
-          data = await braiinsClient.getPoolStats();
+          data = await braiinsClient!.getPoolStats();
           break;
 
         case "profile":
           console.log("[Braiins Proxy] GET: Getting user profile");
-          data = await braiinsClient.getUserProfile();
+          data = await braiinsClient!.getUserProfile();
           break;
 
         case "daily-rewards":
@@ -403,9 +493,9 @@ export async function GET(
           const rewardsTo = searchParams.get("to")
             ? parseInt(searchParams.get("to")!)
             : undefined;
-          data = await braiinsClient.getDailyRewards({
-            from: rewardsFrom,
-            to: rewardsTo,
+          data = await braiinsClient!.getDailyRewards({
+            from: unixToISODate(rewardsFrom),
+            to: unixToISODate(rewardsTo),
           });
           break;
 
@@ -418,9 +508,9 @@ export async function GET(
             ? parseInt(searchParams.get("to")!)
             : undefined;
           const group = searchParams.get("group") === "true";
-          data = await braiinsClient.getDailyHashrate({
-            from: hashrateFrom,
-            to: hashrateTo,
+          data = await braiinsClient!.getDailyHashrate({
+            from: unixToISODate(hashrateFrom),
+            to: unixToISODate(hashrateTo),
             group: group || undefined,
           });
           break;
@@ -433,15 +523,48 @@ export async function GET(
           const blockTo = searchParams.get("to")
             ? parseInt(searchParams.get("to")!)
             : undefined;
-          data = await braiinsClient.getBlockRewards({
-            from: blockFrom,
-            to: blockTo,
+          data = await braiinsClient!.getBlockRewards({
+            from: unixToISODate(blockFrom),
+            to: unixToISODate(blockTo),
           });
           break;
 
         case "workers":
           console.log("[Braiins Proxy] GET: Getting workers");
-          data = await braiinsClient.getWorkers();
+          // Handle both single-miner and multi-miner cases
+          if (braiinsClients && braiinsClients.length > 0) {
+            // Multi-miner case: aggregate workers from all clients
+            console.log(
+              `[Braiins Proxy] GET: Aggregating workers from ${braiinsClients.length} miners`
+            );
+            const allWorkers: any[] = [];
+            for (const { client, miner } of braiinsClients) {
+              try {
+                const workers = await client.getWorkers();
+                if (Array.isArray(workers)) {
+                  // Tag workers with miner name for reference
+                  workers.forEach((w: any) => {
+                    w.minerName = miner.name;
+                  });
+                  allWorkers.push(...workers);
+                  console.log(
+                    `[Braiins Proxy] GET: Got ${workers.length} workers from ${miner.name}`
+                  );
+                }
+              } catch (e) {
+                console.warn(
+                  `[Braiins Proxy] GET: Failed to get workers from ${miner.name}: ${
+                    e instanceof Error ? e.message : String(e)
+                  }`
+                );
+              }
+            }
+            data = { workers: allWorkers };
+          } else {
+            // Single-miner case - wrap in object for consistent format
+            const workers = await braiinsClient!.getWorkers();
+            data = { workers };
+          }
           break;
 
         case "payouts":
@@ -452,9 +575,9 @@ export async function GET(
           const payoutTo = searchParams.get("to")
             ? parseInt(searchParams.get("to")!)
             : undefined;
-          data = await braiinsClient.getPayouts({
-            from: payoutFrom,
-            to: payoutTo,
+          data = await braiinsClient!.getPayouts({
+            from: unixToISODate(payoutFrom),
+            to: unixToISODate(payoutTo),
           });
           break;
 

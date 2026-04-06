@@ -5,10 +5,25 @@ import { formatValue } from "@/lib/helpers/formatValue";
 const HashpriceCard = ({
   value,
   loading,
+  poolMode = "total",
 }: {
   value: number;
   loading: boolean;
+  poolMode?: "total" | "luxor" | "braiins";
 }) => {
+  // Hashprice is not available from Braiins API
+  if (poolMode === "braiins" && !loading) {
+    return (
+      <GradientStatCard
+        title="Hashprice"
+        value="ℹ️ Not available"
+        caption="Braiins pool API does not provide hashprice data"
+        gradient="linear-gradient(135deg, #FFB300 0%, #FFCA28 100%)"
+        isLoading={loading}
+      />
+    );
+  }
+
   return (
     <GradientStatCard
       title="Hashprice"

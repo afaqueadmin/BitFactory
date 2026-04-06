@@ -1,6 +1,5 @@
 generator client {
   provider = "prisma-client-js"
-  output   = "../src/generated/prisma"
 }
 
 datasource db {
@@ -54,6 +53,7 @@ model User {
   blacklisted                TokenBlacklist[]
   activities                 UserActivity[]
   paymentDetailsUpdates      PaymentDetails[]
+  poolAuths                  PoolAuth[]
   invoicedAmount             Decimal                      @default(4250) @db.Decimal(12, 2)
 
   @@index([isDeleted])
@@ -128,16 +128,19 @@ model Miner {
   updatedAt        DateTime                @updatedAt
   hardwareId       String
   isDeleted        Boolean                 @default(false)
+  poolId           String?
   poolAuth         String?
   ownershipHistory MinerOwnershipHistory[]
   rateHistory      MinerRateHistory[]
   hardware         Hardware                @relation(fields: [hardwareId], references: [id])
   space            Space                   @relation(fields: [spaceId], references: [id])
   user             User                    @relation(fields: [userId], references: [id])
+  pool             Pool?                   @relation(fields: [poolId], references: [id])
 
   @@unique([name, userId])
   @@index([hardwareId])
   @@index([isDeleted])
+  @@index([poolId])
   @@map("miners")
 }
 
@@ -165,6 +168,37 @@ model Space {
   miners        Miner[]
 
   @@map("spaces")
+}
+
+model Pool {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  apiUrl      String
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  miners      Miner[]
+  poolAuths   PoolAuth[]
+
+  @@map("pools")
+}
+
+model PoolAuth {
+  id        String   @id @default(cuid())
+  poolId    String
+  userId    String
+  authKey   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  pool      Pool     @relation(fields: [poolId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([poolId, userId])
+  @@index([userId])
+  @@index([poolId])
+  @@map("pool_auths")
 }
 
 model CostPayment {

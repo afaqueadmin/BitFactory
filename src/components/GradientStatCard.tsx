@@ -69,14 +69,15 @@ export default function GradientStatCard({
         boxShadow: "0px 6px 18px rgba(2,6,23,0.06)",
         color: "#fff",
         p: 2,
-        minHeight: 120,
+        height: "100%",
         display: "flex",
         flexDirection: "column",
-        justifyContent: "space-around",
+        justifyContent: "flex-start",
+        gap: 1.5,
         background: `${overlay} ${baseGradient}`,
       }}
     >
-      {/* Middle: title & value */}
+      {/* Title */}
       <Box sx={{ display: "flex", alignItems: "center" }}>
         {icon && (
           <SvgIcon sx={{ color: "rgba(255,255,255,0.9)" }}>{icon}</SvgIcon>
@@ -86,14 +87,14 @@ export default function GradientStatCard({
         </Typography>
       </Box>
       {isLoading ? (
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
           <CircularProgress size={24} sx={{ color: "white" }} />
           <Typography variant="body2">Loading...</Typography>
         </Box>
       ) : (
         <div>
           <Box>
-            <Typography variant="h5" sx={{ fontWeight: 800, mt: 0.5 }}>
+            <Typography variant="h5" sx={{ fontWeight: 800 }}>
               {value} {tag && <span>{tag}</span>}
             </Typography>
           </Box>

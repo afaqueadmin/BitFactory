@@ -47,6 +47,10 @@ export interface HostedMinersCardProps {
   loading?: boolean;
   error?: string | null;
   onRefresh?: () => void;
+  poolBreakdown?: {
+    luxor: { activeWorkers: number; inactiveWorkers: number };
+    braiins: { activeWorkers: number; inactiveWorkers: number };
+  };
 }
 
 export default function HostedMinersCard({
@@ -57,6 +61,7 @@ export default function HostedMinersCard({
   loading = false,
   error = null,
   onRefresh,
+  poolBreakdown,
 }: HostedMinersCardProps) {
   const theme = useTheme();
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -171,6 +176,94 @@ export default function HostedMinersCard({
                 {errorCount} error{errorCount !== 1 ? "s" : ""}
               </Typography>
             </Box>
+
+            {/* Pool Breakdown Section */}
+            {poolBreakdown && (
+              <Box
+                sx={{
+                  display: "flex",
+                  gap: 2,
+                  p: 1.5,
+                  backgroundColor:
+                    theme.palette.mode === "dark"
+                      ? "rgba(255,255,255,0.05)"
+                      : "rgba(0,0,0,0.03)",
+                  borderRadius: 1,
+                }}
+              >
+                {/* Luxor Stats */}
+                <Box sx={{ flex: 1 }}>
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      fontWeight: 600,
+                      color: "primary.main",
+                      display: "block",
+                      mb: 0.5,
+                    }}
+                  >
+                    🔷 Luxor
+                  </Typography>
+                  <Box sx={{ display: "flex", gap: 1, alignItems: "baseline" }}>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                      {poolBreakdown.luxor.activeWorkers}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      active
+                    </Typography>
+                  </Box>
+                  {poolBreakdown.luxor.inactiveWorkers > 0 && (
+                    <Box sx={{ display: "flex", gap: 1, alignItems: "baseline" }}>
+                      <Typography
+                        variant="body2"
+                        sx={{ fontWeight: 600, color: "error.main" }}
+                      >
+                        {poolBreakdown.luxor.inactiveWorkers}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        inactive
+                      </Typography>
+                    </Box>
+                  )}
+                </Box>
+
+                {/* Braiins Stats */}
+                <Box sx={{ flex: 1 }}>
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      fontWeight: 600,
+                      color: "warning.main",
+                      display: "block",
+                      mb: 0.5,
+                    }}
+                  >
+                    🔶 Braiins
+                  </Typography>
+                  <Box sx={{ display: "flex", gap: 1, alignItems: "baseline" }}>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                      {poolBreakdown.braiins.activeWorkers}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      active
+                    </Typography>
+                  </Box>
+                  {poolBreakdown.braiins.inactiveWorkers > 0 && (
+                    <Box sx={{ display: "flex", gap: 1, alignItems: "baseline" }}>
+                      <Typography
+                        variant="body2"
+                        sx={{ fontWeight: 600, color: "error.main" }}
+                      >
+                        {poolBreakdown.braiins.inactiveWorkers}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        inactive
+                      </Typography>
+                    </Box>
+                  )}
+                </Box>
+              </Box>
+            )}
 
             {/* Split progress bar - green for running, red for errors */}
             <Box sx={{ width: "100%", mt: 1 }}>

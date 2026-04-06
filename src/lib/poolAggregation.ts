@@ -125,18 +125,18 @@ export interface FailedMiner {
  * - With grouping: 10 miners on 2 pools = 2 API calls max
  *
  * Validation:
- * - Miners without space.name are skipped (need pool identifier)
+ * - Miners without pool are skipped (need pool identifier)
  * - Miners without poolAuth are skipped (need auth credential)
  * - Invalid/missing fields are logged and excluded
  *
- * @param miners - Array of Miner objects (should include space relation)
+ * @param miners - Array of Miner objects (should include pool relation)
  * @returns Object with:
  *   - groups: grouped miners ready for API calls
  *   - summary: statistics
  *   - invalidMiners: list of miners that couldn't be grouped
  */
 export function groupMinersByPool(
-  miners: (Miner & { space?: { name: string } | null })[],
+  miners: (Miner & { pool?: { id: string; name: string } | null })[],
 ): PoolAggregation & { invalidMiners: FailedMiner[] } {
   const groupMap = new Map<string, MinerGroup>();
   const invalidMiners: FailedMiner[] = [];
@@ -146,15 +146,15 @@ export function groupMinersByPool(
   );
 
   for (const miner of miners) {
-    // Validate: Space/Pool name exists
-    if (!miner.space?.name) {
+    // Validate: Pool is linked
+    if (!miner.pool?.name) {
       invalidMiners.push({
         minerId: miner.id,
         minerName: miner.name,
         reason: "missing_pool",
       });
       console.warn(
-        `[Pool Aggregation] Skipping miner "${miner.name}" (${miner.id}): missing pool/space information`,
+        `[Pool Aggregation] Skipping miner "${miner.name}" (${miner.id}): missing pool information`,
       );
       continue;
     }
@@ -172,7 +172,7 @@ export function groupMinersByPool(
       continue;
     }
 
-    const poolName = miner.space.name;
+    const poolName = miner.pool.name;
     const poolAuth = miner.poolAuth;
 
     // Create group key: "{pool}|{auth}"

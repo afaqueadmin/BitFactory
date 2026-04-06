@@ -1,0 +1,377 @@
+/**
+ * Data Migration Script: Migrate from Space-based pool identification to Pool + PoolAuth schema
+ * 
+ * This script:
+ * 1. Creates Pool entries from unique Space names
+ * 2. Creates PoolAuth entries for each user+pool combination with their API keys
+ * 3. Updates all Miners to link to their corresponding Pool
+ * 4. Verifies data integrity
+ * 
+ * SAFE: No existing data is deleted - only new tables populated and miners updated with poolId
+ * 
+ * Run with: npx ts-node scripts/migrate-to-pool-schema.ts
+ * 
+ * Date: April 4, 2026
+ */
+
+import { PrismaClient } from "@prisma/client";
+
+const prisma = new PrismaClient();
+
+interface MigrationStats {
+  poolsCreated: number;
+  poolAuthsCreated: number;
+  minersUpdated: number;
+  errors: string[];
+}
+
+const stats: MigrationStats = {
+  poolsCreated: 0,
+  poolAuthsCreated: 0,
+  minersUpdated: 0,
+  errors: [],
+};
+
+/**
+ * STEP 1: Create Pool entries from unique Space names
+ * 
+ * Logic:
+ * - Query all unique Space.name values
+ * - For each unique name, create a Pool entry
+ * - Map known pools to their API URLs:
+ *   - "Luxor" → "https://api.luxor.tech"
+ *   - "Braiins" → "https://pool.braiins.com"
+ *   - Unknown → null (can be added later)
+ */
+async function createPoolsFromSpaces() {
+  console.log("\n📦 STEP 1: Creating Pool entries from Space names...");
+
+  try {
+    // Get all unique space names where miners exist
+    const spaces = await prisma.space.findMany({
+      where: {
+        miners: {
+          some: {
+            isDeleted: false, // Only consider active miners
+          },
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+      },
+      distinct: ["name"],
+    });
+
+    console.log(`   Found ${spaces.length} unique space(s): ${spaces.map((s: { name: string }) => s.name).join(", ")}`);
+
+    // Map space names to API URLs
+    const poolUrlMap: Record<string, string> = {
+      Luxor: "https://api.luxor.tech",
+      Braiins: "https://pool.braiins.com",
+    };
+
+    // Create pools for each unique space
+    for (const space of spaces) {
+      const apiUrl = poolUrlMap[space.name] || null;
+
+      const existingPool = await prisma.pool.findUnique({
+        where: { name: space.name },
+      });
+
+      if (existingPool) {
+        console.log(`   ✓ Pool "${space.name}" already exists (id: ${existingPool.id})`);
+        continue;
+      }
+
+      const pool = await prisma.pool.create({
+        data: {
+          name: space.name,
+          apiUrl: apiUrl || "",
+          description: `Pool created from space "${space.name}"`,
+        },
+      });
+
+      console.log(`   ✓ Created Pool "${space.name}" (id: ${pool.id}, apiUrl: ${apiUrl || "N/A"})`);
+      stats.poolsCreated++;
+    }
+  } catch (error) {
+    const msg = `Error creating pools: ${error instanceof Error ? error.message : String(error)}`;
+    console.error(`   ✗ ${msg}`);
+    stats.errors.push(msg);
+  }
+}
+
+/**
+ * STEP 2: Create PoolAuth entries
+ * 
+ * Logic:
+ * - For each user that has miners
+ * - For each pool that user's miners belong to
+ * - Get the poolAuth (API key) from any miner in that user+pool combination
+ * - Create ONE PoolAuth entry (due to @@unique([poolId, userId]) constraint)
+ * 
+ * Example:
+ * User A has:
+ *   - 2 miners in Luxor pool with poolAuth "ooF4tScTnMOyPegE"
+ *   - 1 miner in Braiins pool with poolAuth "braiins_token_xyz"
+ * 
+ * Result:
+ *   - PoolAuth(poolId=pool_luxor, userId=A, authKey="ooF4tScTnMOyPegE")
+ *   - PoolAuth(poolId=pool_braiins, userId=A, authKey="braiins_token_xyz")
+ */
+async function createPoolAuths() {
+  console.log("\n🔐 STEP 2: Creating PoolAuth entries...");
+
+  try {
+    // Get all miners with their user and space info
+    const miners = await prisma.miner.findMany({
+      where: { isDeleted: false },
+      include: {
+        user: { select: { id: true, email: true } },
+        space: { select: { id: true, name: true } },
+      },
+    });
+
+    console.log(`   Processing ${miners.length} miners...`);
+
+    // Group miners by (user, pool) combination to find unique combinations
+    const userPoolCombos = new Map<
+      string,
+      { userId: string; poolName: string; poolAuth: string; minerNames: string[] }
+    >();
+
+    for (const miner of miners) {
+      if (!miner.poolAuth) {
+        const msg = `Miner "${miner.name}" (id: ${miner.id}) has no poolAuth - skipping`;
+        console.warn(`   ⚠ ${msg}`);
+        continue;
+      }
+
+      const key = `${miner.userId}|${miner.space.name}`;
+      const existing = userPoolCombos.get(key);
+
+      if (existing) {
+        existing.minerNames.push(miner.name);
+      } else {
+        userPoolCombos.set(key, {
+          userId: miner.userId,
+          poolName: miner.space.name,
+          poolAuth: miner.poolAuth,
+          minerNames: [miner.name],
+        });
+      }
+    }
+
+    console.log(`   Found ${userPoolCombos.size} unique (user, pool) combinations`);
+
+    // Create PoolAuth for each combination
+    for (const combo of userPoolCombos.values()) {
+      const pool = await prisma.pool.findUnique({
+        where: { name: combo.poolName },
+      });
+
+      if (!pool) {
+        const msg = `Pool "${combo.poolName}" not found for user ${combo.userId}`;
+        console.warn(`   ⚠ ${msg}`);
+        stats.errors.push(msg);
+        continue;
+      }
+
+      // Check if PoolAuth already exists
+      const existingAuth = await prisma.poolAuth.findUnique({
+        where: {
+          poolId_userId: {
+            poolId: pool.id,
+            userId: combo.userId,
+          },
+        },
+      });
+
+      if (existingAuth) {
+        console.log(
+          `   ✓ PoolAuth already exists for user ${combo.userId} + pool "${combo.poolName}"`
+        );
+        continue;
+      }
+
+      const poolAuth = await prisma.poolAuth.create({
+        data: {
+          poolId: pool.id,
+          userId: combo.userId,
+          authKey: combo.poolAuth,
+        },
+      });
+
+      console.log(
+        `   ✓ Created PoolAuth for user ${combo.userId} + pool "${combo.poolName}" (miners: ${combo.minerNames.join(", ")})`
+      );
+      stats.poolAuthsCreated++;
+    }
+  } catch (error) {
+    const msg = `Error creating pool auths: ${error instanceof Error ? error.message : String(error)}`;
+    console.error(`   ✗ ${msg}`);
+    stats.errors.push(msg);
+  }
+}
+
+/**
+ * STEP 3: Update Miners with poolId
+ * 
+ * Logic:
+ * - For each miner without a poolId
+ * - Find its related Space
+ * - Find the Pool with matching name
+ * - Update miner.poolId = pool.id
+ */
+async function updateMinersWithPoolId() {
+  console.log("\n⛓️  STEP 3: Updating Miners with poolId...");
+
+  try {
+    const minersWithoutPoolId = await prisma.miner.findMany({
+      where: {
+        isDeleted: false,
+        poolId: null, // Only update miners without poolId
+      },
+      include: {
+        space: { select: { name: true } },
+      },
+    });
+
+    console.log(`   Found ${minersWithoutPoolId.length} miners without poolId`);
+
+    for (const miner of minersWithoutPoolId) {
+      const pool = await prisma.pool.findUnique({
+        where: { name: miner.space.name },
+      });
+
+      if (!pool) {
+        const msg = `Pool "${miner.space.name}" not found for miner "${miner.name}"`;
+        console.warn(`   ⚠ ${msg}`);
+        stats.errors.push(msg);
+        continue;
+      }
+
+      await prisma.miner.update({
+        where: { id: miner.id },
+        data: { poolId: pool.id },
+      });
+
+      console.log(`   ✓ Updated miner "${miner.name}" with poolId (pool: "${miner.space.name}")`);
+      stats.minersUpdated++;
+    }
+  } catch (error) {
+    const msg = `Error updating miners: ${error instanceof Error ? error.message : String(error)}`;
+    console.error(`   ✗ ${msg}`);
+    stats.errors.push(msg);
+  }
+}
+
+/**
+ * STEP 4: Verify data integrity
+ * 
+ * Checks:
+ * - All active miners have poolId set
+ * - All miners with poolAuth have corresponding PoolAuth entry
+ * - All PoolAuth entries reference valid pools and users
+ */
+async function verifyDataIntegrity() {
+  console.log("\n✅ STEP 4: Verifying data integrity...");
+
+  try {
+    // Check 1: All active miners have poolId
+    const minersWithoutPoolId = await prisma.miner.count({
+      where: { isDeleted: false, poolId: null },
+    });
+
+    if (minersWithoutPoolId > 0) {
+      const msg = `Found ${minersWithoutPoolId} miners without poolId`;
+      console.error(`   ✗ ${msg}`);
+      stats.errors.push(msg);
+    } else {
+      console.log(`   ✓ All active miners have poolId`);
+    }
+
+    // Check 2: PoolAuth entries exist
+    const poolAuthCount = await prisma.poolAuth.count();
+    console.log(`   ✓ Created ${poolAuthCount} PoolAuth entries`);
+
+    // Check 3: All PoolAuth entries have valid references
+    const invalidPoolAuths = await prisma.poolAuth.findMany({
+      where: {
+        OR: [{ pool: null }, { user: null }],
+      },
+    });
+
+    if (invalidPoolAuths.length > 0) {
+      const msg = `Found ${invalidPoolAuths.length} PoolAuth entries with invalid references`;
+      console.error(`   ✗ ${msg}`);
+      stats.errors.push(msg);
+    } else {
+      console.log(`   ✓ All PoolAuth entries have valid references`);
+    }
+
+    // Check 4: Summary
+    const totalPools = await prisma.pool.count();
+    const totalMiners = await prisma.miner.count({ where: { isDeleted: false } });
+
+    console.log(`\n   📊 Summary:`);
+    console.log(`      - Total Pools: ${totalPools}`);
+    console.log(`      - Total Active Miners: ${totalMiners}`);
+    console.log(`      - Total PoolAuth Entries: ${poolAuthCount}`);
+  } catch (error) {
+    const msg = `Error verifying data: ${error instanceof Error ? error.message : String(error)}`;
+    console.error(`   ✗ ${msg}`);
+    stats.errors.push(msg);
+  }
+}
+
+/**
+ * Main execution
+ */
+async function main() {
+  console.log("================================================================================");
+  console.log("🚀 Starting Pool Schema Data Migration");
+  console.log("================================================================================");
+
+  const startTime = Date.now();
+
+  try {
+    await createPoolsFromSpaces();
+    await createPoolAuths();
+    await updateMinersWithPoolId();
+    await verifyDataIntegrity();
+
+    console.log("\n================================================================================");
+    console.log("📈 Migration Summary:");
+    console.log("================================================================================");
+    console.log(`✓ Pools created: ${stats.poolsCreated}`);
+    console.log(`✓ PoolAuths created: ${stats.poolAuthsCreated}`);
+    console.log(`✓ Miners updated: ${stats.minersUpdated}`);
+
+    if (stats.errors.length > 0) {
+      console.log(`\n⚠️  Errors encountered (${stats.errors.length}):`);
+      stats.errors.forEach((err, idx) => {
+        console.log(`   ${idx + 1}. ${err}`);
+      });
+    } else {
+      console.log(`\n✅ Migration completed successfully with no errors!`);
+    }
+
+    const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+    console.log(`⏱️  Duration: ${duration}s`);
+    console.log("================================================================================\n");
+
+    if (stats.errors.length > 0) {
+      process.exit(1);
+    }
+  } catch (error) {
+    console.error("\n❌ Fatal error during migration:");
+    console.error(error);
+    process.exit(1);
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
+main();

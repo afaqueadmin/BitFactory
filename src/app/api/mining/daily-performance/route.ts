@@ -7,12 +7,18 @@ import {
   RevenueData,
   LuxorError,
 } from "@/lib/luxor";
+import { createBraiinsClient } from "@/lib/braiins";
+import { groupMinersByPool, getLuxorGroups, getBraiinsGroups } from "@/lib/poolAggregation";
 
 interface DailyPerformanceData {
   date: string;
   earnings: number;
   costs: number;
   hashRate: number;
+  breakdown?: {
+    luxor: number;
+    braiins: number;
+  };
 }
 
 /**
@@ -56,38 +62,47 @@ export async function GET(request: NextRequest) {
       `[Mining Performance API] Fetching ${days} days of mining revenue data for user ${userId}`,
     );
 
-    // Fetch the user's Luxor subaccount name from database
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { luxorSubaccountName: true },
+    // Get all miners with pool info
+    const miners = await prisma.miner.findMany({
+      where: { userId },
+      include: {
+        pool: { select: { id: true, name: true } },
+      },
     });
 
-    if (!user || !user.luxorSubaccountName) {
+    if (!miners || miners.length === 0) {
       console.error(
-        `[Mining Performance API] User ${userId} has no Luxor subaccount configured`,
+        `[Mining Performance API] User ${userId} has no miners configured`,
       );
       return NextResponse.json(
-        { error: "Luxor subaccount not configured for user" },
+        { error: "No miners configured for user" },
         { status: 404 },
       );
     }
 
-    const subaccountName = user.luxorSubaccountName;
-    console.log(
-      `[Mining Performance API] Fetching revenue from Luxor for subaccount: ${subaccountName}`,
-    );
+    // Get PoolAuth entries for this user (contains API keys)
+    const poolAuths = await prisma.poolAuth.findMany({
+      where: { userId },
+      include: { pool: { select: { id: true, name: true } } },
+    });
 
-    // Create Luxor client
-    const luxorClient = createLuxorClient(subaccountName);
+    // Create a map of poolId -> authKey for quick lookup
+    const authKeyByPoolId = new Map<string, string>();
+    poolAuths.forEach((auth) => {
+      authKeyByPoolId.set(auth.poolId, auth.authKey);
+    });
 
-    // Calculate start_date (N days ago) and end_date (yesterday)
-    // Note: Luxor API requires end_date to be in the past, so we use yesterday
+    // Group miners by pool
+    const aggregation = groupMinersByPool(miners);
+    const luxorGroups = getLuxorGroups(aggregation);
+    const braiinsGroups = getBraiinsGroups(aggregation);
+
+    // Calculate start_date and end_date
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
     const startDate = new Date(yesterday);
     startDate.setDate(startDate.getDate() - days);
 
-    // Format dates as YYYY-MM-DD for Luxor API
     const formatDate = (date: Date) => {
       const year = date.getFullYear();
       const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -102,90 +117,157 @@ export async function GET(request: NextRequest) {
       `[Mining Performance API] Fetching revenue from ${startDateStr} to ${endDateStr}`,
     );
 
-    // Fetch revenue data from Luxor /pool/revenue/BTC endpoint
-    // Returns daily revenue breakdown for the user's subaccount
-    // Using getRevenue method for better error handling
-    const revenueResponse = await luxorClient.getRevenue("BTC", {
-      subaccount_names: subaccountName,
-      start_date: startDateStr,
-      end_date: endDateStr,
-    });
+    // Map to store daily performance data by date
+    const performanceByDate: Map<string, { luxor: number; braiins: number }> =
+      new Map();
 
-    console.log(
-      `[Mining Performance API] Received Luxor revenue response with keys:`,
-      Object.keys(revenueResponse).slice(0, 5),
-    );
-    console.log(
-      `[Mining Performance API] Full response:`,
-      JSON.stringify(revenueResponse).substring(0, 500),
-    );
+    // Fetch from Luxor groups
+    for (const group of luxorGroups) {
+      try {
+        // Get the poolId from the first miner in the group to look up auth
+        const minerWithPool = group.miners[0];
+        const poolId = minerWithPool?.poolId;
 
-    // Transform Luxor response into chart data format
-    // Response structure: { revenue: [ { date_time, revenue: { revenue: number } }, ... ] }
-    const performanceData: DailyPerformanceData[] = [];
-
-    // Luxor API returns revenue as an array of objects with date_time and revenue data
-    if (revenueResponse && Array.isArray(revenueResponse.revenue)) {
-      console.log(
-        `[Mining Performance API] Processing ${revenueResponse.revenue.length} revenue items from Luxor`,
-      );
-
-      for (const item of revenueResponse.revenue) {
-        if (item && typeof item === "object") {
-          // Extract date from date_time (format: YYYY-MM-DDTHH:mm:ss or similar)
-          const dateStr =
-            item.date_time && typeof item.date_time === "string"
-              ? item.date_time.split("T")[0] // Extract YYYY-MM-DD from ISO datetime
-              : null;
-
-          if (!dateStr) {
-            console.warn(
-              "[Mining Performance API] Skipping item without valid date_time:",
-              item,
-            );
-            continue;
-          }
-
-          // Extract BTC revenue from the revenue field
-          // Luxor returns: revenue: { currency_type: "BTC", revenue_type: "pool", revenue: number }
-          let btcRevenue = 0;
-          if (item.revenue && typeof item.revenue === "object") {
-            const revenueObj = item.revenue as Record<string, unknown>;
-            btcRevenue = Number(revenueObj.revenue || 0) || 0;
-          }
-
-          performanceData.push({
-            date: dateStr,
-            earnings: btcRevenue, // BTC revenue from Luxor
-            costs: 0, // Not available from Luxor revenue endpoint
-            hashRate: 0, // Available separately from workers endpoint if needed
-          });
+        if (!poolId) {
+          console.warn(
+            `[Mining Performance API] Luxor group has no poolId, skipping`,
+          );
+          continue;
         }
+
+        const authKey = authKeyByPoolId.get(poolId);
+        if (!authKey) {
+          console.warn(
+            `[Mining Performance API] No auth key found for Luxor pool ${poolId}`,
+          );
+          continue;
+        }
+
+        console.log(
+          `[Mining Performance API] Fetching Luxor revenue for auth key: ${authKey}`,
+        );
+        const luxorClient = createLuxorClient(authKey);
+        const revenueResponse = await luxorClient.getRevenue("BTC", {
+          subaccount_names: authKey,
+          start_date: startDateStr,
+          end_date: endDateStr,
+        });
+
+        if (revenueResponse && Array.isArray(revenueResponse.revenue)) {
+          for (const item of revenueResponse.revenue) {
+            if (item && typeof item === "object") {
+              const dateStr =
+                item.date_time &&  typeof item.date_time === "string"
+                  ? item.date_time.split("T")[0]
+                  : null;
+
+              if (!dateStr) continue;
+
+              let btcRevenue = 0;
+              if (item.revenue && typeof item.revenue === "object") {
+                const revenueObj = item.revenue as Record<string, unknown>;
+                btcRevenue = Number(revenueObj.revenue || 0) || 0;
+              }
+
+              if (!performanceByDate.has(dateStr)) {
+                performanceByDate.set(dateStr, { luxor: 0, braiins: 0 });
+              }
+              const dayData = performanceByDate.get(dateStr)!;
+              dayData.luxor += btcRevenue;
+            }
+          }
+        }
+      } catch (error) {
+        console.error(
+          `[Mining Performance API] Error fetching Luxor revenue:`,
+          error,
+        );
       }
-
-      console.log(
-        `[Mining Performance API] Parsed ${performanceData.length} daily performance records from Luxor`,
-      );
-    } else {
-      console.warn(
-        "[Mining Performance API] Revenue response does not have expected array format:",
-        typeof revenueResponse.revenue,
-      );
     }
 
-    // Sort by date to ensure chronological order
-    performanceData.sort((a, b) => a.date.localeCompare(b.date));
+    // Fetch from Braiins groups
+    for (const group of braiinsGroups) {
+      try {
+        // Get the poolId from the first miner in the group to look up auth
+        const minerWithPool = group.miners[0];
+        const poolId = minerWithPool?.poolId;
 
-    // If no data from Luxor, return empty but valid response
-    if (performanceData.length === 0) {
-      console.warn(
-        `[Mining Performance API] No revenue data returned from Luxor for ${days} days`,
-      );
+        if (!poolId) {
+          console.warn(
+            `[Mining Performance API] Braiins group has no poolId, skipping`,
+          );
+          continue;
+        }
+
+        const authKey = authKeyByPoolId.get(poolId);
+        if (!authKey) {
+          console.warn(
+            `[Mining Performance API] No auth key found for Braiins pool ${poolId}`,
+          );
+          continue;
+        }
+
+        console.log(
+          `[Mining Performance API] Fetching Braiins daily hashrate/rewards for auth key: ${authKey}`,
+        );
+        const braiinsClient = createBraiinsClient(authKey);
+        const rewards = await braiinsClient.getDailyRewards({
+          from: startDateStr,
+          to: endDateStr,
+        });
+
+        if (rewards?.btc?.daily_rewards) {
+          for (const reward of rewards.btc.daily_rewards) {
+            // Convert Unix timestamp to ISO date string
+            const date = new Date(reward.date * 1000);
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const dateStr = `${year}-${month}-${day}`;
+            const amount = parseFloat(reward.total_reward) || 0;
+
+            if (!performanceByDate.has(dateStr)) {
+              performanceByDate.set(dateStr, { luxor: 0, braiins: 0 });
+            }
+            const dayData = performanceByDate.get(dateStr)!;
+            dayData.braiins += amount;
+          }
+        }
+      } catch (error) {
+        console.error(
+          `[Mining Performance API] Error fetching Braiins rewards:`,
+          error,
+        );
+      }
     }
+
+    // Convert map to array and sort
+    const performanceData: DailyPerformanceData[] = Array.from(
+      performanceByDate.entries(),
+    )
+      .map(([date, data]) => ({
+        date,
+        earnings: data.luxor + data.braiins,
+        costs: 0,
+        hashRate: 0,
+        breakdown: {
+          luxor: parseFloat(data.luxor.toFixed(8)),
+          braiins: parseFloat(data.braiins.toFixed(8)),
+        },
+      }))
+      .sort((a, b) => a.date.localeCompare(b.date));
 
     // Calculate summary statistics
     const totalEarnings = performanceData.reduce(
       (sum, d) => sum + d.earnings,
+      0,
+    );
+    const totalLuxorEarnings = performanceData.reduce(
+      (sum, d) => sum + (d.breakdown?.luxor || 0),
+      0,
+    );
+    const totalBraiinsEarnings = performanceData.reduce(
+      (sum, d) => sum + (d.breakdown?.braiins || 0),
       0,
     );
     const avgEarnings =
@@ -204,7 +286,11 @@ export async function GET(request: NextRequest) {
           totalEarnings: parseFloat(totalEarnings.toFixed(8)),
           averageDailyEarnings: parseFloat(avgEarnings.toFixed(8)),
           currency: "BTC",
-          dataSource: "Luxor API /pool/revenue/BTC",
+          dataSource: "both",
+          poolBreakdown: {
+            luxor: parseFloat(totalLuxorEarnings.toFixed(8)),
+            braiins: parseFloat(totalBraiinsEarnings.toFixed(8)),
+          },
         },
         timestamp: new Date().toISOString(),
       },

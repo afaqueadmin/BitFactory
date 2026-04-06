@@ -51,6 +51,12 @@ export async function GET(request: NextRequest) {
             name: true,
           },
         },
+        pool: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
       },
       orderBy: {
         createdAt: "desc",

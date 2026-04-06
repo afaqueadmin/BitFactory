@@ -28,12 +28,13 @@ export const formatValue = (
     );
   }
   if (type === "percentage") {
-    return new Intl.NumberFormat("en-US", {
-      style: "percent",
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-      ...options,
-    }).format(value);
+    return (
+      new Intl.NumberFormat("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+        ...options,
+      }).format(value * 100) + "%"
+    );
   }
 
   return new Intl.NumberFormat("en-US", {

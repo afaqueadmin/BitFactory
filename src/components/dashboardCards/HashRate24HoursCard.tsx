@@ -1,5 +1,5 @@
 import GradientStatCard from "@/components/GradientStatCard";
-import { formatValue } from "@/lib/helpers/formatValue";
+import { formatHashrate } from "@/lib/workerNormalization";
 
 const HashRate24HoursCard = ({
   value,
@@ -8,14 +8,13 @@ const HashRate24HoursCard = ({
   value: number;
   loading: boolean;
 }) => {
+  // value is in H/s, use formatHashrate to display as TH/s or PH/s intelligently
+  const displayValue = formatHashrate(value);
+
   return (
     <GradientStatCard
       title="Hashrate (24 hours)"
-      value={formatValue(value / 1000000000000000, "number", {
-        minimumFractionDigits: 3,
-        maximumFractionDigits: 3,
-      })}
-      tag="PH/s"
+      value={displayValue}
       gradient="linear-gradient(135deg, #00BFA6 0%, #1DE9B6 100%)"
       isLoading={loading}
     />

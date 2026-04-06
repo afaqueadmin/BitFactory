@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyJwtToken } from "@/lib/jwt";
 import { createLuxorClient } from "@/lib/luxor";
+import { createBraiinsClient } from "@/lib/braiins";
+import { groupMinersByPool, getLuxorGroups, getBraiinsGroups } from "@/lib/poolAggregation";
 import { prisma } from "@/lib/prisma";
 
 /**
@@ -67,14 +69,17 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get user's subaccount name from database
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { luxorSubaccountName: true },
+    // Get all miners with pool and user info
+    const miners = await prisma.miner.findMany({
+      where: { userId },
+      include: {
+        pool: { select: { id: true, name: true } },
+        user: { select: { luxorSubaccountName: true } },
+      },
     });
 
-    if (!user?.luxorSubaccountName) {
-      console.log(`[Transactions API] User ${userId} has no Luxor subaccount`);
+    if (!miners || miners.length === 0) {
+      console.log(`[Transactions API] User ${userId} has no miners`);
       return NextResponse.json(
         {
           transactions: [],
@@ -91,14 +96,37 @@ export async function GET(request: NextRequest) {
             totalDebits: 0,
             netAmount: 0,
           },
-          message: "No Luxor subaccount assigned",
+          poolBreakdown: {
+            luxor: { count: 0, totalCredits: 0, totalDebits: 0 },
+            braiins: { count: 0, totalCredits: 0, totalDebits: 0 },
+          },
+          message: "No miners assigned",
         },
         { status: 200 },
       );
     }
 
-    // Create Luxor client
-    const client = createLuxorClient(user.luxorSubaccountName);
+    // Get PoolAuth entries for this user (contains API keys)
+    const poolAuths = await prisma.poolAuth.findMany({
+      where: { userId },
+      include: { pool: { select: { id: true, name: true } } },
+    });
+
+    // Create a map of poolId -> authKey for quick lookup
+    const authKeyByPoolId = new Map<string, string>();
+    poolAuths.forEach((auth) => {
+      authKeyByPoolId.set(auth.poolId, auth.authKey);
+    });
+
+    // Group miners by pool
+    const aggregation = groupMinersByPool(miners);
+    const luxorGroups = getLuxorGroups(aggregation);
+    const braiinsGroups = getBraiinsGroups(aggregation);
+
+    // Calculate date range - default to last 30 days
+    const endDate = new Date();
+    const startDate = new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const formatDate = (date: Date) => date.toISOString().split("T")[0];
 
     // Build transaction type filter for Luxor API
     let transactionType: string | undefined;
@@ -107,76 +135,197 @@ export async function GET(request: NextRequest) {
     } else if (typeFilter === "debit") {
       transactionType = "debit";
     }
-    // If "all", leave undefined (Luxor will return both)
 
-    // Calculate date range - default to last 30 days
-    const endDate = new Date();
-    const startDate = new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000);
-    const formatDate = (date: Date) => date.toISOString().split("T")[0];
+    // Collect all transactions from both pools
+    const allTransactions: Array<any> = [];
+    let luxorStats = { count: 0, totalCredits: 0, totalDebits: 0 };
+    let braiinsStats = { count: 0, totalCredits: 0, totalDebits: 0 };
 
-    // Fetch transactions from Luxor API
-    console.log(
-      `[Transactions API] Fetching ${typeFilter} transactions - page ${page}, limit ${limit}, dates: ${formatDate(startDate)} to ${formatDate(endDate)}`,
-    );
-    const params: Record<string, string | number> = {
-      page_number: page,
-      page_size: limit,
-      start_date: formatDate(startDate),
-      end_date: formatDate(endDate),
-      subaccount_names: user.luxorSubaccountName,
-    };
-    if (transactionType) {
-      params.transaction_type = transactionType;
-    }
+    // Fetch from Luxor groups
+    for (const group of luxorGroups) {
+      try {
+        // Get the poolId from the first miner in the group to look up auth
+        const minerWithPool = group.miners[0];
+        const poolId = minerWithPool?.poolId;
 
-    const luxorResponse = await client.getTransactions("BTC", params);
+        if (!poolId) {
+          console.warn(
+            `[Transactions API] Luxor group has no poolId, skipping`,
+          );
+          continue;
+        }
 
-    // Calculate summary statistics
-    let totalCredits = 0;
-    let totalDebits = 0;
+        const authKey = authKeyByPoolId.get(poolId);
+        if (!authKey) {
+          console.warn(
+            `[Transactions API] No auth key found for Luxor pool ${poolId}`,
+          );
+          continue;
+        }
 
-    for (const tx of luxorResponse.transactions) {
-      if (tx.transaction_type === "credit") {
-        totalCredits += tx.currency_amount;
-      } else if (tx.transaction_type === "debit") {
-        totalDebits += tx.currency_amount;
+        console.log(
+          `[Transactions API] Fetching Luxor transactions for auth key: ${authKey}`,
+        );
+        const client = createLuxorClient(authKey);
+        const params: Record<string, string | number> = {
+          page_number: 1,
+          page_size: 100, // Get more items per page from Luxor
+          start_date: formatDate(startDate),
+          end_date: formatDate(endDate),
+          subaccount_names: authKey,
+        };
+        if (transactionType) {
+          params.transaction_type = transactionType;
+        }
+
+        const luxorResponse = await client.getTransactions("BTC", params);
+
+        for (const tx of luxorResponse.transactions) {
+          allTransactions.push({
+            pool: "Luxor",
+            currency_type: tx.currency_type,
+            date_time: tx.date_time,
+            address_name: tx.address_name,
+            subaccount_name: tx.subaccount_name,
+            transaction_category: tx.transaction_category,
+            currency_amount: parseFloat(tx.currency_amount.toFixed(8)),
+            usd_equivalent: parseFloat(tx.usd_equivalent.toFixed(2)),
+            transaction_id: tx.transaction_id,
+            transaction_type: tx.transaction_type,
+          });
+
+          if (tx.transaction_type === "credit") {
+            luxorStats.totalCredits += tx.currency_amount;
+          } else if (tx.transaction_type === "debit") {
+            luxorStats.totalDebits += tx.currency_amount;
+          }
+        }
+        luxorStats.count += luxorResponse.transactions.length;
+        console.log(
+          `[Transactions API] Got ${luxorResponse.transactions.length} Luxor transactions`,
+        );
+      } catch (error) {
+        console.error(
+          `[Transactions API] Error fetching Luxor transactions:`,
+          error,
+        );
       }
     }
 
-    const pagination = luxorResponse.pagination;
-    const totalPages = Math.ceil(
-      pagination.item_count / (pagination.page_size || limit),
+    // Fetch from Braiins groups (use payouts as equivalent to transactions)
+    for (const group of braiinsGroups) {
+      try {
+        // Get the poolId from the first miner in the group to look up auth
+        const minerWithPool = group.miners[0];
+        const poolId = minerWithPool?.poolId;
+
+        if (!poolId) {
+          console.warn(
+            `[Transactions API] Braiins group has no poolId, skipping`,
+          );
+          continue;
+        }
+
+        const authKey = authKeyByPoolId.get(poolId);
+        if (!authKey) {
+          console.warn(
+            `[Transactions API] No auth key found for Braiins pool ${poolId}`,
+          );
+          continue;
+        }
+
+        console.log(
+          `[Transactions API] Fetching Braiins payouts for auth key: ${authKey}`,
+        );
+        const braiinsClient = createBraiinsClient(authKey);
+        const braiinsResponse = await braiinsClient.getPayouts({
+          from: formatDate(startDate),
+          to: formatDate(endDate),
+        });
+
+        for (const payout of braiinsResponse?.btc?.payouts || []) {
+          allTransactions.push({
+            pool: "Braiins",
+            currency_type: "BTC",
+            date_time: payout.date,
+            address_name: payout.transaction_id || "N/A",
+            subaccount_name: authKey,
+            transaction_category: "payout",
+            currency_amount: parseFloat(payout.amount) || 0,
+            usd_equivalent: 0, // Braiins API doesn't provide USD equivalent
+            transaction_id: payout.transaction_id,
+            transaction_type: "credit", // Payouts are always credits
+          });
+
+          braiinsStats.totalCredits += parseFloat(payout.amount) || 0;
+        }
+        braiinsStats.count += braiinsResponse?.btc?.payouts?.length ||0;
+        console.log(
+          `[Transactions API] Got ${braiinsResponse?.btc?.payouts?.length || 0} Braiins payouts for auth key: ${authKey}`,
+        );
+      } catch (error) {
+        console.error(`[Transactions API] Error fetching Braiins payouts:`, error);
+      }
+    }
+
+    // Sort all transactions by date (newest first)
+    allTransactions.sort(
+      (a, b) =>
+        new Date(b.date_time).getTime() - new Date(a.date_time).getTime(),
     );
 
+    // Apply pagination
+    const totalItems = allTransactions.length;
+    const totalPages = Math.ceil(totalItems / limit);
+    const startIndex = (page - 1) * limit;
+    const paginatedTransactions = allTransactions.slice(
+      startIndex,
+      startIndex + limit,
+    );
+
+    // Calculate summary statistics
+    const totalCredits =
+      luxorStats.totalCredits + braiinsStats.totalCredits;
+    const totalDebits =
+      luxorStats.totalDebits + braiinsStats.totalDebits;
+
     const response = {
-      transactions: luxorResponse.transactions.map((tx) => ({
-        currency_type: tx.currency_type,
-        date_time: tx.date_time,
-        address_name: tx.address_name,
-        subaccount_name: tx.subaccount_name,
-        transaction_category: tx.transaction_category,
-        currency_amount: parseFloat(tx.currency_amount.toFixed(8)),
-        usd_equivalent: parseFloat(tx.usd_equivalent.toFixed(2)),
-        transaction_id: tx.transaction_id,
-        transaction_type: tx.transaction_type,
-      })),
+      transactions: paginatedTransactions,
       pagination: {
-        pageNumber: pagination.page_number,
-        pageSize: pagination.page_size,
-        totalItems: pagination.item_count,
+        pageNumber: page,
+        pageSize: limit,
+        totalItems,
         totalPages,
-        hasNextPage: pagination.next_page_url !== null,
-        hasPreviousPage: pagination.previous_page_url !== null,
+        hasNextPage: page < totalPages,
+        hasPreviousPage: page > 1,
       },
       summary: {
         totalCredits: parseFloat(totalCredits.toFixed(8)),
         totalDebits: parseFloat(totalDebits.toFixed(8)),
         netAmount: parseFloat((totalCredits - totalDebits).toFixed(8)),
       },
+      poolBreakdown: {
+        luxor: {
+          count: luxorStats.count,
+          totalCredits: parseFloat(luxorStats.totalCredits.toFixed(8)),
+          totalDebits: parseFloat(luxorStats.totalDebits.toFixed(8)),
+          netAmount: parseFloat(
+            (luxorStats.totalCredits - luxorStats.totalDebits).toFixed(8),
+          ),
+        },
+        braiins: {
+          count: braiinsStats.count,
+          totalCredits: parseFloat(braiinsStats.totalCredits.toFixed(8)),
+          totalDebits: parseFloat(braiinsStats.totalDebits.toFixed(8)),
+          netAmount: parseFloat(
+            (braiinsStats.totalCredits - braiinsStats.totalDebits).toFixed(8),
+          ),
+        },
+      },
     };
 
     console.log(
-      `[Transactions API] Returning ${luxorResponse.transactions.length} transactions`,
+      `[Transactions API] Returning ${paginatedTransactions.length} transactions (Luxor: ${luxorStats.count}, Braiins: ${braiinsStats.count})`,
     );
 
     return NextResponse.json(response, {

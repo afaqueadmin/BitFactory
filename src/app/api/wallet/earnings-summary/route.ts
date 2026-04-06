@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyJwtToken } from "@/lib/jwt";
 import { createLuxorClient } from "@/lib/luxor";
+import { createBraiinsClient } from "@/lib/braiins";
+import { groupMinersByPool, getLuxorGroups, getBraiinsGroups } from "@/lib/poolAggregation";
 import { prisma } from "@/lib/prisma";
 
 /**
@@ -54,15 +56,17 @@ export async function GET(request: NextRequest) {
 
     console.log(`[Earnings Summary API] Fetching data for user: ${userId}`);
 
-    // Get user's subaccount name from database
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { luxorSubaccountName: true },
+    // Get all miners with pool info
+    const miners = await prisma.miner.findMany({
+      where: { userId },
+      include: {
+        pool: { select: { id: true, name: true } },
+      },
     });
 
-    if (!user?.luxorSubaccountName) {
+    if (!miners || miners.length === 0) {
       console.log(
-        `[Earnings Summary API] User ${userId} has no Luxor subaccount`,
+        `[Earnings Summary API] User ${userId} has no miners`,
       );
       return NextResponse.json(
         {
@@ -71,96 +75,187 @@ export async function GET(request: NextRequest) {
           currency: "BTC",
           dataSource: "none",
           timestamp: new Date().toISOString(),
-          subaccountCount: 0,
-          message: "No Luxor subaccount assigned",
+          poolBreakdown: {
+            luxor: { totalEarnings: 0, pendingPayouts: 0 },
+            braiins: { totalEarnings: 0, pendingPayouts: 0 },
+          },
+          message: "No miners assigned",
         },
         { status: 200 },
       );
     }
 
-    // Create Luxor client
-    const client = createLuxorClient(user.luxorSubaccountName);
-
-    // Fetch payment settings to get pending balance
-    console.log(
-      `[Earnings Summary API] Fetching payment settings for ${user.luxorSubaccountName}`,
-    );
-    // Use the single subaccount API since we're dealing with one user's subaccount
-    const paymentSettings = await client.getSubaccountPaymentSettings(
-      "BTC",
-      user.luxorSubaccountName,
-    );
-
-    // Calculate total pending payouts
-    // Single subaccount API returns the balance directly
-    const totalPendingBtc = paymentSettings.balance;
-    const subaccountCount = 1; // Single subaccount
-
-    // Fetch transactions to calculate total earnings (all credits)
-    console.log(
-      `[Earnings Summary API] Fetching transactions for ${user.luxorSubaccountName}`,
-    );
-
-    // Calculate date range - fetch all-time (use a large date range)
-    const endDate = new Date();
-    const startDate = new Date("2020-01-01"); // Far back date to catch all transactions
-    const formatDate = (date: Date) => date.toISOString().split("T")[0];
-
-    const transactions = await client.getTransactions("BTC", {
-      transaction_type: "credit",
-      page_size: 1,
-      start_date: formatDate(startDate),
-      end_date: formatDate(endDate),
-      subaccount_names: user.luxorSubaccountName,
+    // Get PoolAuth entries for this user (contains API keys)
+    const poolAuths = await prisma.poolAuth.findMany({
+      where: { userId },
+      include: { pool: { select: { id: true, name: true } } },
     });
 
-    // Calculate total earnings from all transactions
-    // Note: We're doing a simplified calculation - in production you might want to
-    // cache this or use a different approach if there are millions of transactions
-    let totalEarningsBtc = 0;
+    // Create a map of poolId -> authKey for quick lookup
+    const authKeyByPoolId = new Map<string, string>();
+    poolAuths.forEach((auth) => {
+      authKeyByPoolId.set(auth.poolId, auth.authKey);
+    });
 
-    // Get first page to establish baseline
-    let currentPage = 1;
-    let hasMore = true;
-    const pageSize = 100;
+    // Group miners by pool
+    const aggregation = groupMinersByPool(miners);
+    const luxorGroups = getLuxorGroups(aggregation);
+    const braiinsGroups = getBraiinsGroups(aggregation);
 
-    console.log(
-      `[Earnings Summary API] Starting transaction aggregation - Total items: ${transactions.pagination.item_count}`,
-    );
+    let totalLuxorEarnings = 0;
+    let totalLuxorPending = 0;
+    let totalBraiinsEarnings = 0;
+    let totalBraiinsPending = 0;
 
-    while (hasMore) {
-      const pageTransactions = await client.getTransactions("BTC", {
-        transaction_type: "credit",
-        page_number: currentPage,
-        page_size: pageSize,
-        start_date: formatDate(startDate),
-        end_date: formatDate(endDate),
-        subaccount_names: user.luxorSubaccountName,
-      });
+    const endDate = new Date();
+    const startDate = new Date("2020-01-01");
+    const formatDate = (date: Date) => date.toISOString().split("T")[0];
 
-      for (const tx of pageTransactions.transactions) {
-        totalEarningsBtc += tx.currency_amount;
+    // Fetch from Luxor groups
+    for (const group of luxorGroups) {
+      try {
+        // Get the poolId from the first miner in the group to look up auth
+        const minerWithPool = group.miners[0];
+        const poolId = minerWithPool?.poolId;
+
+        if (!poolId) {
+          console.warn(
+            `[Earnings Summary API] Luxor group has no poolId, skipping`,
+          );
+          continue;
+        }
+
+        const authKey = authKeyByPoolId.get(poolId);
+        if (!authKey) {
+          console.warn(
+            `[Earnings Summary API] No auth key found for Luxor pool ${poolId}`,
+          );
+          continue;
+        }
+
+        console.log(
+          `[Earnings Summary API] Fetching Luxor data for auth key: ${authKey}`,
+        );
+        const client = createLuxorClient(authKey);
+
+        // Get payment settings for pending balance
+        const paymentSettings = await client.getSubaccountPaymentSettings(
+          "BTC",
+          authKey,
+        );
+        totalLuxorPending += paymentSettings.balance || 0;
+
+        // Fetch all transactions to calculate total earnings
+        let currentPage = 1;
+        let hasMore = true;
+        const pageSize = 100;
+
+        while (hasMore) {
+          const pageTransactions = await client.getTransactions("BTC", {
+            transaction_type: "credit",
+            page_number: currentPage,
+            page_size: pageSize,
+            start_date: formatDate(startDate),
+            end_date: formatDate(endDate),
+            subaccount_names: authKey,
+          });
+
+          for (const tx of pageTransactions.transactions) {
+            totalLuxorEarnings += tx.currency_amount;
+          }
+
+          hasMore = pageTransactions.pagination.next_page_url !== null;
+          currentPage++;
+        }
+
+        console.log(
+          `[Earnings Summary API] Luxor - totalEarnings: ${totalLuxorEarnings}, pendingPayouts: ${totalLuxorPending}`,
+        );
+      } catch (error) {
+        console.error(
+          `[Earnings Summary API] Error fetching Luxor summary data:`,
+          error,
+        );
       }
-
-      hasMore = pageTransactions.pagination.next_page_url !== null;
-      currentPage++;
-
-      console.log(
-        `[Earnings Summary API] Processed page ${currentPage - 1}, running total: ${totalEarningsBtc} BTC`,
-      );
     }
+
+    // Fetch from Braiins groups
+    for (const group of braiinsGroups) {
+      try {
+        // Get the poolId from the first miner in the group to look up auth
+        const minerWithPool = group.miners[0];
+        const poolId = minerWithPool?.poolId;
+
+        if (!poolId) {
+          console.warn(
+            `[Earnings Summary API] Braiins group has no poolId, skipping`,
+          );
+          continue;
+        }
+
+        const authKey = authKeyByPoolId.get(poolId);
+        if (!authKey) {
+          console.warn(
+            `[Earnings Summary API] No auth key found for Braiins pool ${poolId}`,
+          );
+          continue;
+        }
+
+        console.log(
+          `[Earnings Summary API] Fetching Braiins data for auth key: ${authKey}`,
+        );
+        const braiinsClient = createBraiinsClient(authKey);
+
+        // Get user profile (note: Braiins doesn't provide pending balance in profile)
+        const profile = await braiinsClient.getUserProfile();
+        // totalBraiinsPending += profile.balance || 0; // Not available in Braiins API
+
+        // Get all payouts to calculate total earnings
+        const payouts = await braiinsClient.getPayouts({
+          from: formatDate(startDate),
+          to: formatDate(endDate),
+        });
+
+        if (payouts?.btc?.payouts) {
+          for (const payout of payouts.btc.payouts) {
+            totalBraiinsEarnings += parseFloat(payout.amount) || 0;
+          }
+        }
+
+        console.log(
+          `[Earnings Summary API] Braiins - totalEarnings: ${totalBraiinsEarnings}, pendingPayouts: ${totalBraiinsPending}`,
+        );
+      } catch (error) {
+        console.error(
+          `[Earnings Summary API] Error fetching Braiins summary data:`,
+          error,
+        );
+      }
+    }
+
+    const totalEarnings = totalLuxorEarnings + totalBraiinsEarnings;
+    const totalPending = totalLuxorPending + totalBraiinsPending;
 
     const response = {
       totalEarnings: {
-        btc: parseFloat(totalEarningsBtc.toFixed(8)),
+        btc: parseFloat(totalEarnings.toFixed(8)),
       },
       pendingPayouts: {
-        btc: parseFloat(totalPendingBtc.toFixed(8)),
+        btc: parseFloat(totalPending.toFixed(8)),
       },
       currency: "BTC",
-      dataSource: "luxor",
+      dataSource: luxorGroups.length > 0 && braiinsGroups.length > 0 ? "both" : luxorGroups.length > 0 ? "luxor" : "braiins",
       timestamp: new Date().toISOString(),
-      subaccountCount,
+      poolBreakdown: {
+        luxor: {
+          totalEarnings: parseFloat(totalLuxorEarnings.toFixed(8)),
+          pendingPayouts: parseFloat(totalLuxorPending.toFixed(8)),
+        },
+        braiins: {
+          totalEarnings: parseFloat(totalBraiinsEarnings.toFixed(8)),
+          pendingPayouts: parseFloat(totalBraiinsPending.toFixed(8)),
+        },
+      },
     };
 
     console.log(`[Earnings Summary API] Response:`, response);

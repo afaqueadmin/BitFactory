@@ -16,6 +16,11 @@ import {
 } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { useQuery } from "@tanstack/react-query";
+import {
+  normalizeLuxorWorker,
+  normalizeBraiinsWorker,
+  formatHashrate,
+} from "@/lib/workerNormalization";
 
 // Types
 interface Hardware {
@@ -56,10 +61,12 @@ export type FilterType = (typeof FILTER_VALUES)[number];
 
 interface HostedMinersListProps {
   customerId?: string;
+  poolFilter?: "all" | "luxor" | "braiins";
 }
 
 export default function HostedMinersList({
   customerId,
+  poolFilter = "all",
 }: HostedMinersListProps) {
   const theme = useTheme();
   const [activeFilter, setActiveFilter] = useState<FilterType>("ALL MINERS");
@@ -69,7 +76,7 @@ export default function HostedMinersList({
     queryKey: ["miners", customerId],
     queryFn: async () => {
       try {
-        // Step 1: Fetch miners from database
+        // Step 1: Fetch miners from database with pool and space relations
         const minerUrl = customerId
           ? `/api/miners/user?customerId=${customerId}`
           : "/api/miners/user";
@@ -96,6 +103,17 @@ export default function HostedMinersList({
           return [];
         }
 
+        console.log("[HostedMinersList] Fetched miners from DB:", {
+          count: minerData.miners.length,
+          poolNames: minerData.miners.map((m: any) => m.pool?.name || "no-pool"),
+          minerDetails: minerData.miners.map((m: any) => ({
+            name: m.name,
+            poolId: m.poolId,
+            poolName: m.pool?.name,
+            hasPool: !!m.pool,
+          })),
+        });
+
         // Step 2: Fetch worker status from Luxor API
         const luxorWorkers: Map<
           string,
@@ -114,6 +132,17 @@ export default function HostedMinersList({
 
           if (luxorResponse.ok) {
             const luxorData = await luxorResponse.json();
+            console.log("[HostedMinersList] Luxor raw API response:", luxorData);
+            console.log(
+              "[HostedMinersList] Luxor data structure:",
+              {
+                has_data: !!luxorData.data,
+                has_workers: !!luxorData.data?.workers,
+                is_workers_array: Array.isArray(luxorData.data?.workers),
+                workers_length: luxorData.data?.workers?.length,
+                data_keys: Object.keys(luxorData.data || {}),
+              }
+            );
             // Build a map of worker names to their status from Luxor
             if (
               luxorData.success &&
@@ -127,12 +156,33 @@ export default function HostedMinersList({
                   hashrate: number;
                   firmware: string;
                 }) => {
-                  luxorWorkers.set(worker.name, {
-                    status: worker.status,
-                    hashrate: worker.hashrate || 0,
-                    firmware: worker.firmware || "N/A",
-                  });
+                  // Normalize Luxor worker data to standard format
+                  const normalized = normalizeLuxorWorker(worker);
+                  luxorWorkers.set(normalized.name, normalized);
+                  console.log(
+                    `[HostedMinersList] Luxor worker normalized: ${normalized.name} → status=${normalized.status}, hashrate=${normalized.hashrate}`,
+                  );
                 },
+              );
+              console.log(
+                "[HostedMinersList] Luxor workers loaded:",
+                luxorWorkers.size,
+                "Entries:",
+                Array.from(luxorWorkers.entries()).map(([name, data]) => ({
+                  name,
+                  status: data.status,
+                  hashrate: data.hashrate,
+                })),
+              );
+            } else {
+              console.warn(
+                "[HostedMinersList] Luxor API response does not have expected structure",
+                {
+                  success: luxorData.success,
+                  has_data: !!luxorData.data,
+                  has_workers: !!luxorData.data?.workers,
+                  is_array: Array.isArray(luxorData.data?.workers),
+                }
               );
             }
           } else {
@@ -142,7 +192,114 @@ export default function HostedMinersList({
           console.warn("Error fetching Luxor workers:", luxorErr);
         }
 
-        // Step 3: Transform and merge data
+        // Step 3: Fetch worker status from Braiins API
+        const braiinsWorkers: Map<
+          string,
+          { status: string; hashrate: number; firmware: string }
+        > = new Map();
+        try {
+          const braiinsUrl = "/api/braiins?endpoint=workers";
+
+          const braiinsResponse = await fetch(braiinsUrl, {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+            },
+          });
+
+          if (braiinsResponse.ok) {
+            const braiinsData = await braiinsResponse.json();
+            console.log("[HostedMinersList] Braiins raw API response:", braiinsData);
+            // Build a map of worker names to their status from Braiins
+            if (
+              braiinsData.success &&
+              braiinsData.data?.workers &&
+              Array.isArray(braiinsData.data.workers)
+            ) {
+              // For Braiins, multiple workers can belong to one miner
+              // Aggregate workers by minerName to get miner-level status
+              const workersByMiner: Record<
+                string,
+                Array<{
+                  name: string;
+                  state: "ok" | "dis" | "low" | "off";
+                  hash_rate_5m: number;
+                  hash_rate_60m: number;
+                  hash_rate_24h: number;
+                  minerName?: string;
+                }>
+              > = {};
+
+              // Group workers by minerName
+              braiinsData.data.workers.forEach(
+                (worker: {
+                  name: string;
+                  state: "ok" | "dis" | "low" | "off";
+                  hash_rate_5m: number;
+                  hash_rate_60m: number;
+                  hash_rate_24h: number;
+                  minerName?: string;
+                }) => {
+                  const minerName = worker.minerName || "unknown";
+                  if (!workersByMiner[minerName]) {
+                    workersByMiner[minerName] = [];
+                  }
+                  workersByMiner[minerName].push(worker);
+                },
+              );
+
+              console.log(
+                "[HostedMinersList] Braiins workers grouped by miner:",
+                Object.entries(workersByMiner).map(([minerName, workers]) => ({
+                  minerName,
+                  workerCount: workers.length,
+                  states: workers.map((w) => w.state),
+                })),
+              );
+
+              // For each miner, aggregate worker data
+              Object.entries(workersByMiner).forEach(([minerName, workers]) => {
+                // Use best status: if any worker is "ok", miner is ACTIVE, otherwise INACTIVE
+                const hasOkWorker = workers.some((w) => w.state === "ok");
+                const status = hasOkWorker ? "ACTIVE" : "INACTIVE";
+
+                // Aggregate hashrate: sum of all workers
+                // IMPORTANT: Braiins workers return hash_rate_5m in Gh/s, convert to H/s
+                const totalHashrate = workers.reduce(
+                  (sum, w) => sum + ((w.hash_rate_5m || 0) * 1000000000),  // Gh/s * 10^9 = H/s
+                  0,
+                );
+
+                braiinsWorkers.set(minerName, {
+                  status,
+                  hashrate: totalHashrate,
+                  firmware: "N/A",
+                });
+
+                console.log(
+                  `[HostedMinersList] Braiins miner aggregated: ${minerName} → status=${status}, totalHashrate=${totalHashrate} H/s`,
+                );
+              });
+
+              console.log(
+                "[HostedMinersList] Braiins miners processed:",
+                braiinsWorkers.size,
+                "Entries:",
+                Array.from(braiinsWorkers.entries()).map(([minerName, data]) => ({
+                  minerName,
+                  status: data.status,
+                  hashrate: data.hashrate,
+                })),
+              );
+            }
+          } else {
+            console.warn("Failed to fetch worker status from Braiins API");
+          }
+        } catch (braiinsErr) {
+          console.warn("Error fetching Braiins workers:", braiinsErr);
+        }
+
+        // Step 4: Transform and merge data
         const transformedMiners: MinerData[] = minerData.miners.map(
           (miner: {
             id: string;
@@ -152,37 +309,93 @@ export default function HostedMinersList({
             hashRate?: number;
             hardware?: { model: string; hashRate: number | string };
             space?: { location: string; name: string };
+            pool?: { name: string };
           }) => {
+            // Determine which API pool this miner belongs to
+            const poolName = miner.pool?.name || "Unknown";
+            const isBraiins = poolName === "Braiins";
+            
+            // Select appropriate worker map based on pool
+            const workerMap = isBraiins ? braiinsWorkers : luxorWorkers;
+            const workerData = workerMap.get(miner.name);
+
+            // Log for debugging
+            console.log(`[HostedMinersList] Processing miner: ${miner.name}`, {
+              poolName,
+              isBraiins,
+              workerFound: !!workerData,
+              workerStatus: workerData?.status,
+              workerHashrate: workerData?.hashrate,
+            });
+
             // Check if miner is in deployment
             if (miner.status === "DEPLOYMENT_IN_PROGRESS") {
+              console.log(
+                `[HostedMinersList] Miner ${miner.name} is in deployment`,
+              );
               return {
                 id: miner.id,
                 model: miner.hardware?.model || miner.model || "Unknown",
                 workerName: miner.name,
                 location: miner.space?.location || "Unknown",
-                connectedPool: miner.space?.name || "Unknown",
+                connectedPool: poolName, // Use pool.name instead of space.name
                 status: "Deployment in Progress",
-                hashRate: `0 TH/s`,
+                hashRate: formatHashrate(0), // 0 H/s formatted
+                firmware: "N/A",
               };
             }
 
-            // For AUTO status, fetch from Luxor API
-            const luxorWorker = luxorWorkers.get(miner.name);
-            const luxorStatus = luxorWorker?.status;
+            // Use API data if available, otherwise fallback to database
+            const apiStatus = workerData?.status;
+            const apiHashrate = workerData?.hashrate || 0;
+            const apiFirmware = workerData?.firmware || "N/A";
+
+            console.log(
+              `[HostedMinersList] Final miner data: ${miner.name}`,
+              {
+                poolName,
+                isBraiins,
+                workerFound: !!workerData,
+                apiStatus,
+                apiHashrate,
+                apiFirmware,
+                formattedHashrate: formatHashrate(apiHashrate),
+              },
+            );
 
             return {
               id: miner.id,
               model: miner.hardware?.model || miner.model || "Unknown",
               workerName: miner.name,
               location: miner.space?.location || "Unknown",
-              connectedPool: miner.space?.name || "Unknown",
-              // Priority: Luxor API status > fallback to Inactive
-              status: luxorStatus === "ACTIVE" ? "Active" : "Inactive",
-              hashRate: `${(luxorWorker?.hashrate && (luxorWorker.hashrate / 1000000000000).toFixed(2)) || miner.hardware?.hashRate || miner.hashRate || 0} TH/s`,
-              firmware: luxorWorker?.firmware || "N/A",
+              connectedPool: poolName, // Use pool.name instead of space.name
+              // Priority: API status > fallback to Inactive
+              status:
+                apiStatus === "ACTIVE"
+                  ? "Active"
+                  : apiStatus === "INACTIVE"
+                    ? "Inactive"
+                    : "Inactive",
+              // Use normalized hashrate (in H/s) for display with proper unit conversion
+              hashRate: formatHashrate(apiHashrate),
+              firmware: apiFirmware,
             };
           },
         );
+
+        console.log("[HostedMinersList] Transformed miners:", {
+          total: transformedMiners.length,
+          luxor: transformedMiners.filter((m) => m.connectedPool === "Luxor")
+            .length,
+          braiins: transformedMiners.filter((m) => m.connectedPool === "Braiins")
+            .length,
+          poolBreakdown: transformedMiners.map((m) => ({
+            name: m.workerName,
+            connectedPool: m.connectedPool,
+            status: m.status,
+            hashRate: m.hashRate,
+          })),
+        });
 
         // Remove duplicates based on ID and return
         return Array.from(
@@ -196,8 +409,13 @@ export default function HostedMinersList({
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
 
-  // Filter miners based on active filter
+  // Filter miners based on active filter AND pool filter
   const filteredMiners = miners.filter((miner) => {
+    // First apply pool filter
+    if (poolFilter === "luxor" && miner.connectedPool !== "Luxor") return false;
+    if (poolFilter === "braiins" && miner.connectedPool !== "Braiins") return false;
+    
+    // Then apply status filter
     if (activeFilter === "ALL MINERS") return true;
     if (activeFilter === "ACTIVE") return miner.status === "Active";
     if (activeFilter === "INACTIVE") return miner.status === "Inactive";

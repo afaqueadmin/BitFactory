@@ -54,51 +54,48 @@ export class BraiinsError extends Error {
 // INTERFACE: Pool Stats (Global)
 // ============================================================================
 
+export interface PoolStatsData {
+  hash_rate_unit: string;
+  pool_active_workers: number;
+  blocks: Record<string, unknown>;
+  fpps_rate: number;
+  pool_5m_hash_rate: number;
+  pool_60m_hash_rate: number;
+  pool_24h_hash_rate: number;
+  update_ts: number;
+}
+
 export interface PoolStats {
-  pool_stats: {
-    btc: {
-      estimated_rewards: number;
-      last_block_found: string;
-      last_block_found_difficulty: string;
-      last_difficulties: Record<string, unknown>;
-      last_pay_time: string;
-      pay_interval: number;
-      pool_difficulty: string;
-      pool_hashrate: string;
-      pool_name: string;
-      total_hash_power: string;
-    };
-  };
+  btc: PoolStatsData;
 }
 
 // ============================================================================
 // INTERFACE: User Profile
 // ============================================================================
 
+export interface UserProfileBTC {
+  all_time_reward: string;
+  hash_rate_unit: string;
+  hash_rate_5m: number;
+  hash_rate_60m: number;
+  hash_rate_24h: number;
+  hash_rate_yesterday: number;
+  low_workers: number;
+  off_workers: number;
+  ok_workers: number;
+  dis_workers: number;
+  current_balance: string;
+  today_reward: string;
+  estimated_reward: string;
+  shares_5m: number;
+  shares_60m: number;
+  shares_24h: number;
+  shares_yesterday: number;
+}
+
 export interface UserProfile {
-  user: {
-    username: string;
-    email: string;
-    verified: boolean;
-    notifications_enabled: boolean; 
-    notification_email: string;
-  };
-  summary: {
-    hashrate_5min: string;
-    hashrate_1h: string;
-    hashrate_1d: string;
-    hashrate_7d: string;
-    difficulty: string;
-    workers: number;
-    active_workers: number;
-    disabled_workers: number;
-    total_reward_1min: number;
-    total_reward_1h: number;
-    total_reward_1d: number;
-    total_reward_1w: number;
-    total_reward_all_time: number;
-    estimated_reward_1d: number;
-  };
+  username: string;
+  btc: UserProfileBTC;
 }
 
 // ============================================================================
@@ -106,13 +103,27 @@ export interface UserProfile {
 // ============================================================================
 
 export interface RewardData {
-  date: string;
-  amount: number;
-  hashrate: string;
+  date: number; // Unix timestamp
+  total_reward: string;
+  mining_reward: string;
+  bos_plus_reward: string;
+  referral_bonus: string;
+  referral_reward: string;
+  shares: number;
+  share_prices: Array<{
+    from_ts: number;
+    to_ts: number;
+    share_price: string;
+  }>;
+  calculation_date: number;
+}
+
+export interface DailyRewardsBTC {
+  daily_rewards: RewardData[];
 }
 
 export interface DailyRewards {
-  rewards: RewardData[];
+  btc: DailyRewardsBTC;
 }
 
 // ============================================================================
@@ -124,13 +135,19 @@ export interface HashrateData {
   hashrate: string;
 }
 
+export interface DailyHashrateBTC {
+  hash_rate_unit: string;
+  daily_hashrate: Array<{
+    date: number;
+    hourly_data: Array<{
+      timestamp: number;
+      hash_rate: string;
+    }>;
+  }>;
+}
+
 export interface DailyHashrate {
-  hashrate: HashrateData[];
-  summary: {
-    average_hashrate: string;
-    minimum_hashrate: string;
-    maximum_hashrate: string;
-  };
+  btc: DailyHashrateBTC;
 }
 
 // ============================================================================
@@ -138,42 +155,41 @@ export interface DailyHashrate {
 // ============================================================================
 
 export interface BlockRewardData {
-  date: string;
+  date: number;
   blocks: number;
-  amount: number;
+  amount: string;
+}
+
+export interface BlockRewardsBTC {
+  block_rewards: BlockRewardData[];
 }
 
 export interface BlockRewards {
-  rewards: BlockRewardData[];
+  btc: BlockRewardsBTC;
 }
 
 // ============================================================================
 // INTERFACE: Worker
 // ============================================================================
 
-export interface Worker {
-  id: string;
-  name: string;
-  difficulty: string;
-  hashrate_5min: string;
-  hashrate_1h: string;
-  hashrate_1d: string;
-  hashrate_7d: string;
-  total_reward_1min: number;
-  total_reward_1h: number;
-  total_reward_1d: number;
-  total_reward_all_time: number;
-  accepted_shares: number;
-  rejected_shares: number;
-  stale_shares: number;
-  invalid_shares: number;
-  hardware: string;
-  last_share_time: string;
-  status: "active" | "idle" | "offline";
+export interface WorkerData {
+  state: "ok" | "dis" | "low" | "off";
+  last_share: number; // Unix timestamp
+  hash_rate_unit: string;
+  hash_rate_5m: number;
+  hash_rate_60m: number;
+  hash_rate_24h: number;
+  shares_5m: number;
+  shares_60m: number;
+  shares_24h: number;
+}
+
+export interface WorkersBTC {
+  workers: Record<string, WorkerData>; // Object with worker names as keys
 }
 
 export interface Workers {
-  workers: Worker[];
+  btc: WorkersBTC;
 }
 
 // ============================================================================
@@ -182,13 +198,17 @@ export interface Workers {
 
 export interface PayoutData {
   date: string;
-  amount: number;
-  status: "confirmed" | "pending" | "failed";
   transaction_id: string;
+  amount: string;
+  status: string;
+}
+
+export interface PayoutsBTC {
+  payouts: PayoutData[];
 }
 
 export interface Payouts {
-  payouts: PayoutData[];
+  btc: PayoutsBTC;
 }
 
 // ============================================================================
@@ -295,15 +315,15 @@ export class BraiinsClient {
 
   /**
    * Get daily rewards data for a date range
-   * GET /accounts/rewards/json/btc?from=<timestamp>&to=<timestamp>
+   * GET /accounts/rewards/json/btc?from=<date>&to=<date>
    *
    * Returns: Array of daily reward data with hashrate
-   * Parameters: from/to (Unix timestamps in seconds)
+   * Parameters: from/to (ISO format dates YYYY-MM-DD)
    * Scope: Single user
    */
   async getDailyRewards(params?: {
-    from?: number; // Unix timestamp in seconds
-    to?: number; // Unix timestamp in seconds
+    from?: string; // ISO format date YYYY-MM-DD
+    to?: string; // ISO format date YYYY-MM-DD
   }): Promise<DailyRewards> {
     try {
       const queryParams = new URLSearchParams();
@@ -342,8 +362,8 @@ export class BraiinsClient {
    * Scope: Single user
    */
   async getDailyHashrate(params?: {
-    from?: number; // Unix timestamp in seconds
-    to?: number; // Unix timestamp in seconds
+    from?: string; // ISO format date YYYY-MM-DD
+    to?: string; // ISO format date YYYY-MM-DD
     group?: boolean; // Aggregate all workers for this user
   }): Promise<DailyHashrate> {
     try {
@@ -376,15 +396,15 @@ export class BraiinsClient {
 
   /**
    * Get block rewards data for a date range
-   * GET /accounts/block_rewards/json/btc?from=<timestamp>&to=<timestamp>
+   * GET /accounts/block_rewards/json/btc?from=<date>&to=<date>
    *
    * Returns: Array of block rewards by date
-   * Parameters: from/to (Unix timestamps in seconds)
+   * Parameters: from/to (ISO format dates YYYY-MM-DD)
    * Scope: Single user
    */
   async getBlockRewards(params?: {
-    from?: number; // Unix timestamp in seconds
-    to?: number; // Unix timestamp in seconds
+    from?: string; // ISO format date YYYY-MM-DD
+    to?: string; // ISO format date YYYY-MM-DD
   }): Promise<BlockRewards> {
     try {
       const queryParams = new URLSearchParams();
@@ -418,8 +438,10 @@ export class BraiinsClient {
    * Returns: Array of all workers with their statistics
    * Note: Returns ALL workers for authenticated user (no filtering available)
    * Scope: Single user
+   * 
+   * Converts the API's object format to array format for easier consumption
    */
-  async getWorkers(): Promise<Workers> {
+  async getWorkers(): Promise<Array<{ name: string } & WorkerData>> {
     try {
       console.log(
         `[BraiinsClient] GET /accounts/workers/json/btc - User: ${this.userIdentifier}`,
@@ -427,7 +449,15 @@ export class BraiinsClient {
       const response = await this.client.get<Workers>(
         "/accounts/workers/json/btc",
       );
-      return response.data;
+      
+      // Convert workers object to array format
+      const workersObj = response.data.btc.workers;
+      const workersArray = Object.entries(workersObj).map(([name, data]) => ({
+        name,
+        ...data,
+      }));
+      
+      return workersArray;
     } catch (error) {
       throw error;
     }
@@ -439,15 +469,15 @@ export class BraiinsClient {
 
   /**
    * Get payouts for a date range
-   * GET /accounts/payouts/json/btc?from=<timestamp>&to=<timestamp>
+   * GET /accounts/payouts/json/btc?from=<date>&to=<date>
    *
    * Returns: Array of payout records
-   * Parameters: from/to (Unix timestamps in seconds)
+   * Parameters: from/to (ISO format dates YYYY-MM-DD)
    * Scope: Single user
    */
   async getPayouts(params?: {
-    from?: number; // Unix timestamp in seconds
-    to?: number; // Unix timestamp in seconds
+    from?: string; // ISO format date YYYY-MM-DD
+    to?: string; // ISO format date YYYY-MM-DD
   }): Promise<Payouts> {
     try {
       const queryParams = new URLSearchParams();
