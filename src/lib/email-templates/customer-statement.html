@@ -191,6 +191,10 @@
             color: #999;
         }
         @media print {
+            * {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
             body {
                 background-color: white;
             }
@@ -251,6 +255,7 @@
                         <th class="text-right">Paid</th>
                         <th class="text-right">Outstanding</th>
                         <th>Status</th>
+                        <th>Paid Past Due</th>
                     </tr>
                 </thead>
                 <tbody>

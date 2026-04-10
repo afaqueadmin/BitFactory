@@ -222,6 +222,43 @@ export default function CustomerInvoiceDetailPage() {
                   )}
                 </Typography>
               </Box>
+
+              {/* Paid Past Due */}
+              {invoice.status === "PAID" &&
+              invoice.paidDate &&
+              invoice.dueDate ? (
+                <Box>
+                  <Typography color="textSecondary" variant="body2">
+                    Paid Past Due
+                  </Typography>
+                  <Box sx={{ mt: 0.5 }}>
+                    <Box
+                      sx={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        px: 1.5,
+                        py: 0.4,
+                        borderRadius: "999px",
+                        backgroundColor: "#fdecea",
+                        border: "1px solid #f44336",
+                        color: "#c62828",
+                        fontSize: "0.8rem",
+                        fontWeight: 700,
+                      }}
+                    >
+                      {Math.max(
+                        0,
+                        Math.ceil(
+                          (new Date(invoice.paidDate).getTime() -
+                            new Date(invoice.dueDate).getTime()) /
+                            (1000 * 60 * 60 * 24),
+                        ),
+                      )}{" "}
+                      days
+                    </Box>
+                  </Box>
+                </Box>
+              ) : null}
             </Box>
           </CardContent>
         </Card>

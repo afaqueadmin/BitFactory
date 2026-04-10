@@ -349,6 +349,7 @@ export default function CustomerStatementPage() {
               <TableCell sx={{ fontWeight: "bold" }}>Paid</TableCell>
               <TableCell sx={{ fontWeight: "bold" }}>Outstanding</TableCell>
               <TableCell sx={{ fontWeight: "bold" }}>Status</TableCell>
+              <TableCell sx={{ fontWeight: "bold" }}>Paid Past Due</TableCell>
               <TableCell sx={{ fontWeight: "bold" }}>Days Until Due</TableCell>
             </TableRow>
           </TableHead>
@@ -404,6 +405,39 @@ export default function CustomerStatementPage() {
                   </TableCell>
                   <TableCell>
                     <StatusBadge status={invoice.status} />
+                  </TableCell>
+                  <TableCell>
+                    {invoice.status === "PAID" &&
+                    invoice.paidDate &&
+                    invoice.dueDate ? (
+                      <Box
+                        sx={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          px: 1,
+                          py: 0.25,
+                          borderRadius: "999px",
+                          backgroundColor: "#fdecea",
+                          border: "1px solid #f44336",
+                          color: "#c62828",
+                          fontSize: "0.75rem",
+                          fontWeight: 700,
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {Math.max(
+                          0,
+                          Math.ceil(
+                            (new Date(invoice.paidDate).getTime() -
+                              new Date(invoice.dueDate).getTime()) /
+                              (1000 * 60 * 60 * 24),
+                          ),
+                        )}{" "}
+                        days
+                      </Box>
+                    ) : (
+                      "-"
+                    )}
                   </TableCell>
                   <TableCell>
                     {invoice.status === "PAID" ? (

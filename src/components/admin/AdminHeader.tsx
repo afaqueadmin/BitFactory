@@ -180,6 +180,14 @@ export default function AdminHeader() {
               General Settings
             </MenuItem>
             <MenuItem
+              onClick={() => {
+                router.push("/external-resource");
+                handleClose();
+              }}
+            >
+              External Resource
+            </MenuItem>
+            <MenuItem
               onClick={handleLogout}
               disabled={isLoggingOut}
               sx={{

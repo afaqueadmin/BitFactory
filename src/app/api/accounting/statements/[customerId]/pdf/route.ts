@@ -109,6 +109,19 @@ export async function GET(
 
         const statusClass = `status-${invoice.status}`;
 
+        let paidPastDueDaysStr = "-";
+        if (invoice.status === "PAID" && invoice.paidDate && invoice.dueDate) {
+          const days = Math.max(
+            0,
+            Math.ceil(
+              (new Date(invoice.paidDate).getTime() -
+                new Date(invoice.dueDate).getTime()) /
+                (1000 * 60 * 60 * 24),
+            ),
+          );
+          paidPastDueDaysStr = `<span style="color: #c62828; font-weight: bold; background-color: #fdecea; padding: 2px 6px; border-radius: 999px; border: 1px solid #f44336; white-space: nowrap; font-size: 11px;">${days} days</span>`;
+        }
+
         return `
       <tr>
         <td><strong>${invoice.invoiceNumber}</strong></td>
@@ -119,6 +132,7 @@ export async function GET(
         <td class="text-right">$${paidAmount.toFixed(2)}</td>
         <td class="text-right">$${outstanding.toFixed(2)}</td>
         <td><span class="status-badge ${statusClass}">${invoice.status}</span></td>
+        <td>${invoice.status === "PAID" ? paidPastDueDaysStr : "-"}</td>
       </tr>
     `;
       })
@@ -169,7 +183,7 @@ export async function GET(
       totalOutstanding: `$${totalOutstanding.toFixed(2)}`,
       invoiceRows:
         invoiceRows ||
-        "<tr><td colspan='7' style='padding: 20px; text-align: center; color: #666;'>No invoices found for this customer</td></tr>",
+        "<tr><td colspan='8' style='padding: 20px; text-align: center; color: #666;'>No invoices found for this customer</td></tr>",
       // Add PaymentDetails if available - include all fields as-is
       ...(paymentDetails
         ? {

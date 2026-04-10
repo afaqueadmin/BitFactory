@@ -121,7 +121,6 @@ export default function AccountingDashboard() {
   const [bulkEmailProcessed, setBulkEmailProcessed] = useState<number>(0);
   const [bulkEmailSuccessCount, setBulkEmailSuccessCount] = useState<number>(0);
   const [bulkEmailFailureCount, setBulkEmailFailureCount] = useState<number>(0);
-  const [bulkEmailCurrent, setBulkEmailCurrent] = useState<string | null>(null);
   const [bulkEmailError, setBulkEmailError] = useState<string | null>(null);
   const [bulkEmailRunId, setBulkEmailRunId] = useState<string | null>(null);
   const {
@@ -149,7 +148,6 @@ export default function AccountingDashboard() {
     error: bulkDeleteHookError,
   } = useDeleteInvoice();
 
-  const { sendEmail } = useSendInvoiceEmail();
   const { bulkSendEmail } = useBulkSendInvoiceEmail();
 
   const handleChangePage = (event: unknown, newPage: number) => {
@@ -259,7 +257,6 @@ export default function AccountingDashboard() {
     setBulkEmailProcessed(0);
     setBulkEmailSuccessCount(0);
     setBulkEmailFailureCount(0);
-    setBulkEmailCurrent(null);
     setBulkEmailDialogOpen(true);
     setBulkEmailProcessing(true);
 
@@ -779,6 +776,9 @@ export default function AccountingDashboard() {
                       Due Date
                     </TableSortLabel>
                   </TableCell>
+                  <TableCell sx={{ fontWeight: "bold" }}>
+                    Paid Past Due
+                  </TableCell>
                   <TableCell
                     sx={{ fontWeight: "bold" }}
                     sortDirection={
@@ -847,6 +847,39 @@ export default function AccountingDashboard() {
                       </TableCell>
                       <TableCell>
                         <DateDisplay date={invoice.dueDate} format="date" />
+                      </TableCell>
+                      <TableCell>
+                        {invoice.status === "PAID" &&
+                        invoice.paidDate &&
+                        invoice.dueDate ? (
+                          <Box
+                            sx={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              px: 1,
+                              py: 0.25,
+                              borderRadius: "999px",
+                              backgroundColor: "#fdecea",
+                              border: "1px solid #f44336",
+                              color: "#c62828",
+                              fontSize: "0.75rem",
+                              fontWeight: 700,
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {Math.max(
+                              0,
+                              Math.ceil(
+                                (new Date(invoice.paidDate).getTime() -
+                                  new Date(invoice.dueDate).getTime()) /
+                                  (1000 * 60 * 60 * 24),
+                              ),
+                            )}{" "}
+                            days
+                          </Box>
+                        ) : (
+                          "-"
+                        )}
                       </TableCell>
                       <TableCell>
                         {invoice.status === "PAID" ? (

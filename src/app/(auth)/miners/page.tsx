@@ -1,6 +1,6 @@
 "use client";
 
-import { Box, Typography, useTheme, Button } from "@mui/material";
+import { Box, Typography, useTheme, Button, Alert } from "@mui/material";
 import HostedMinersList from "@/components/HostedMinersList";
 import React, { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -45,6 +45,29 @@ export default function Miners() {
   const [minerFilter, setMinerFilter] = useState<"all" | "luxor" | "braiins">(
     "all",
   );
+  const [externalLink, setExternalLink] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/external-resource?key=hosted-miners-sheet")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.resource?.url) {
+          setExternalLink(data.resource.url);
+        }
+      })
+      .catch((err) => console.error("Failed to fetch external resource:", err));
+  }, []);
+
+  const handleViewMinerList = () => {
+    if (externalLink) {
+      window.open(externalLink, "_blank");
+    } else {
+      setError(
+        "No external Google Sheet link has been configured for the Miner List yet. Please contact your administrator.",
+      );
+    }
+  };
 
   // Fetch miners summary using TanStack Query
   const {
@@ -66,28 +89,28 @@ export default function Miners() {
       }
 
       const result = await response.json();
-      console.log(
-        "[Miners Page] API Response Data:",
-        result.data
-      );
+      console.log("[Miners Page] API Response Data:", result.data);
       return result;
     },
   });
 
   const data = minersSummary.data as MinersSummary;
-  
+
   // Log current pool mode selection
   useEffect(() => {
     console.log(`[Miners Page] Pool Mode Changed: ${poolMode}`, {
       hashrate: data.pools?.[poolMode as keyof typeof data.pools]?.hashrate,
-      efficiency_5m: data.pools?.[poolMode as keyof typeof data.pools]?.efficiency_5m,
+      efficiency_5m:
+        data.pools?.[poolMode as keyof typeof data.pools]?.efficiency_5m,
       uptime_24h: data.pools?.[poolMode as keyof typeof data.pools]?.uptime_24h,
       hashprice: data.pools?.[poolMode as keyof typeof data.pools]?.hashprice,
     });
   }, [poolMode, data]);
 
   // Get values based on selected pool mode
-  const getMetric = (metric: "hashrate" | "hashprice" | "efficiency_5m" | "uptime_24h") => {
+  const getMetric = (
+    metric: "hashrate" | "hashprice" | "efficiency_5m" | "uptime_24h",
+  ) => {
     if (poolMode === "total") {
       switch (metric) {
         case "hashrate":
@@ -126,19 +149,49 @@ export default function Miners() {
 
   return (
     <Box sx={{ p: 3, mt: 2, minHeight: "100vh" }}>
-      {/* Page Heading */}
-      <Typography
-        variant="h3"
-        component="h1"
+      {/* Page Heading and Action Button */}
+      <Box
         sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: { xs: "center", md: "center" },
           mb: 4,
-          fontWeight: "bold",
-          color: "text.primary",
-          textAlign: { xs: "center", md: "left" },
+          flexDirection: { xs: "column", md: "row" },
+          gap: 2,
         }}
       >
-        Miners
-      </Typography>
+        <Typography
+          variant="h3"
+          component="h1"
+          sx={{
+            fontWeight: "bold",
+            color: "text.primary",
+            textAlign: { xs: "center", md: "left" },
+          }}
+        >
+          Miners
+        </Typography>
+
+        <Button
+          variant="contained"
+          color="info"
+          onClick={handleViewMinerList}
+          sx={{
+            background: (theme) =>
+              `linear-gradient(45deg, ${theme.palette.info.main}, ${theme.palette.info.dark})`,
+            px: 3,
+            py: 1,
+          }}
+        >
+          View All Hosted Miner List
+        </Button>
+      </Box>
+
+      {error && (
+        <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
+          {error}
+        </Alert>
+      )}
 
       {/* Pool Mode Toggle Buttons */}
       <Box
@@ -188,9 +241,7 @@ export default function Miners() {
                   ? "rgba(255,255,255,0.1)"
                   : "rgba(0,0,0,0.05)",
             color:
-              poolMode === "luxor"
-                ? "#FFFFFF"
-                : theme.palette.text.primary,
+              poolMode === "luxor" ? "#FFFFFF" : theme.palette.text.primary,
             transition: "all 0.2s",
           }}
         >
@@ -212,9 +263,7 @@ export default function Miners() {
                   ? "rgba(255,255,255,0.1)"
                   : "rgba(0,0,0,0.05)",
             color:
-              poolMode === "braiins"
-                ? "#FFFFFF"
-                : theme.palette.text.primary,
+              poolMode === "braiins" ? "#FFFFFF" : theme.palette.text.primary,
             transition: "all 0.2s",
           }}
         >
@@ -232,7 +281,9 @@ export default function Miners() {
           flexWrap: { xs: "nowrap", sm: "wrap", md: "nowrap" },
         }}
       >
-        <Box sx={{ flex: { xs: 1, md: "1 1 25%" }, minWidth: 0, minHeight: 200 }}>
+        <Box
+          sx={{ flex: { xs: 1, md: "1 1 25%" }, minWidth: 0, minHeight: 200 }}
+        >
           <ShareEfficiencyCard
             value={getMetric("efficiency_5m") || 0}
             loading={summaryLoading}
@@ -240,14 +291,18 @@ export default function Miners() {
           />
         </Box>
 
-        <Box sx={{ flex: { xs: 1, md: "1 1 25%" }, minWidth: 0, minHeight: 200 }}>
+        <Box
+          sx={{ flex: { xs: 1, md: "1 1 25%" }, minWidth: 0, minHeight: 200 }}
+        >
           <HashRate24HoursCard
             value={getMetric("hashrate") || 0}
             loading={summaryLoading}
           />
         </Box>
 
-        <Box sx={{ flex: { xs: 1, md: "1 1 25%" }, minWidth: 0, minHeight: 200 }}>
+        <Box
+          sx={{ flex: { xs: 1, md: "1 1 25%" }, minWidth: 0, minHeight: 200 }}
+        >
           <Uptime24HoursCard
             value={getMetric("uptime_24h") || 0}
             loading={summaryLoading}
@@ -255,7 +310,9 @@ export default function Miners() {
           />
         </Box>
 
-        <Box sx={{ flex: { xs: 1, md: "1 1 25%" }, minWidth: 0, minHeight: 200 }}>
+        <Box
+          sx={{ flex: { xs: 1, md: "1 1 25%" }, minWidth: 0, minHeight: 200 }}
+        >
           <HashpriceCard
             value={getMetric("hashprice") || 0}
             loading={summaryLoading}
@@ -299,9 +356,7 @@ export default function Miners() {
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 Hashrate:{" "}
-                <strong>
-                  {formatHashrate(data.pools.luxor.hashrate)}
-                </strong>
+                <strong>{formatHashrate(data.pools.luxor.hashrate)}</strong>
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 Active:{" "}
@@ -335,21 +390,19 @@ export default function Miners() {
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 Hashrate:{" "}
-                <strong>
-                  {formatHashrate(data.pools.braiins.hashrate)}
-                </strong>
+                <strong>{formatHashrate(data.pools.braiins.hashrate)}</strong>
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 Active:{" "}
                 <strong>{data.pools.braiins.activeWorkers} workers</strong>
               </Typography>
-              <Typography 
-                variant="caption" 
-                sx={{ 
+              <Typography
+                variant="caption"
+                sx={{
                   color: "text.secondary",
                   fontStyle: "italic",
                   mt: 1,
-                  opacity: 0.7
+                  opacity: 0.7,
                 }}
               >
                 ℹ️ Braiins API does not provide hashprice data
@@ -383,7 +436,10 @@ export default function Miners() {
             transition: "all 0.2s",
           }}
         >
-          All Miners ({(data.pools?.luxor?.miners || 0) + (data.pools?.braiins?.miners || 0)})
+          All Miners (
+          {(data.pools?.luxor?.miners || 0) +
+            (data.pools?.braiins?.miners || 0)}
+          )
         </button>
 
         <button
@@ -402,9 +458,7 @@ export default function Miners() {
                   ? "rgba(255,255,255,0.1)"
                   : "rgba(0,0,0,0.05)",
             color:
-              minerFilter === "luxor"
-                ? "#FFFFFF"
-                : theme.palette.text.primary,
+              minerFilter === "luxor" ? "#FFFFFF" : theme.palette.text.primary,
             transition: "all 0.2s",
           }}
         >

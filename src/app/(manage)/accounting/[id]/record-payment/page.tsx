@@ -17,7 +17,7 @@ import {
   Checkbox,
   FormControlLabel,
 } from "@mui/material";
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import SaveIcon from "@mui/icons-material/Save";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
@@ -47,42 +47,6 @@ export default function RecordPaymentPage() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const autoNotePrefixRef = useRef("");
-
-  useEffect(() => {
-    if (!invoice?.dueDate) return;
-
-    const paymentDate = new Date(formData.paymentDate);
-    const dueDate = new Date(invoice.dueDate);
-    paymentDate.setHours(0, 0, 0, 0);
-    dueDate.setHours(0, 0, 0, 0);
-
-    let newPrefix = "";
-    if (paymentDate > dueDate) {
-      const diffTime = paymentDate.getTime() - dueDate.getTime();
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      if (diffDays > 0) {
-        newPrefix = `Payment done ${diffDays} days late. `;
-      }
-    }
-
-    const oldPrefix = autoNotePrefixRef.current;
-
-    if (oldPrefix !== newPrefix) {
-      setFormData((prev) => {
-        let currentNotes = prev.notes;
-
-        // Remove old prefix if it exists at the start
-        if (oldPrefix && currentNotes.startsWith(oldPrefix)) {
-          currentNotes = currentNotes.substring(oldPrefix.length);
-        }
-
-        return { ...prev, notes: newPrefix + currentNotes };
-      });
-      autoNotePrefixRef.current = newPrefix;
-    }
-  }, [invoice?.dueDate, formData.paymentDate]);
 
   // Calculate paid amount from cost payments
   const paidAmount =

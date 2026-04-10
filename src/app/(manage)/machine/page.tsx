@@ -16,6 +16,7 @@ import {
   SelectChangeEvent,
 } from "@mui/material";
 import { Add as AddIcon } from "@mui/icons-material";
+import { useRouter } from "next/navigation";
 import MinerFormModal from "@/components/admin/MinerFormModal";
 import MinersTable from "@/components/admin/MinersTable";
 import { BulkEditModal } from "@/components/admin/BulkEditModal";
@@ -98,6 +99,7 @@ interface ApiResponse<T = unknown> {
 }
 
 export default function MachinePage() {
+  const router = useRouter();
   const [miners, setMiners] = useState<Miner[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [spaces, setSpaces] = useState<Space[]>([]);
@@ -113,6 +115,7 @@ export default function MachinePage() {
   const [showBulkEditModal, setShowBulkEditModal] = useState(false);
   const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
   const [showDeleted, setShowDeleted] = useState(false);
+  const [externalLink, setExternalLink] = useState<string | null>(null);
 
   /**
    * Fetch all miners, users, and spaces
@@ -179,6 +182,17 @@ export default function MachinePage() {
           setUsers(transformedUsers);
         }
       }
+      // Fetch external resource link separately without blocking
+      fetch("/api/external-resource?key=hosted-miners-sheet")
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.resource?.url) {
+            setExternalLink(data.resource.url);
+          }
+        })
+        .catch((err) =>
+          console.error("Failed to fetch external resource:", err),
+        );
     } catch (err) {
       const errorMsg =
         err instanceof Error
@@ -195,6 +209,7 @@ export default function MachinePage() {
    */
   useEffect(() => {
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showDeleted]);
 
   /**
@@ -254,6 +269,19 @@ export default function MachinePage() {
           ? err.message
           : "An error occurred while deleting the miner";
       setTableError(errorMsg);
+    }
+  };
+
+  /**
+   * Handle View Miner List
+   */
+  const handleViewMinerList = () => {
+    if (externalLink) {
+      window.open(externalLink, "_blank");
+    } else {
+      setError(
+        "No external Google Sheet link has been configured for the Miner List yet. Configure this in External Resources setting",
+      );
     }
   };
 
@@ -457,7 +485,19 @@ export default function MachinePage() {
               Manage and monitor all mining machines in your system
             </Typography>
           </Box>
-          <Stack direction="row" spacing={2}>
+          <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>
+            <Button
+              variant="contained"
+              color="info"
+              onClick={handleViewMinerList}
+              disabled={loading}
+              sx={{
+                background: (theme) =>
+                  `linear-gradient(45deg, ${theme.palette.info.main}, ${theme.palette.info.dark})`,
+              }}
+            >
+              View All Hosted Miner List
+            </Button>
             <Button
               variant="contained"
               color="warning"
@@ -492,16 +532,19 @@ export default function MachinePage() {
 
         {/* Error Message */}
         {error && (
-          <Alert severity="error" sx={{ mb: 3 }}>
+          <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
             {error}
-            <Button
-              size="small"
-              sx={{ ml: 2 }}
-              onClick={fetchData}
-              disabled={loading}
-            >
-              Retry
-            </Button>
+            {error.includes("Configure this in External Resources setting") && (
+              <Button
+                size="small"
+                variant="outlined"
+                color="error"
+                sx={{ ml: 2 }}
+                onClick={() => router.push("/external-resource")}
+              >
+                Here
+              </Button>
+            )}
           </Alert>
         )}
 
