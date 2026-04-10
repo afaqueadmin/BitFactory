@@ -36,6 +36,7 @@ import {
   FormControlLabel,
   Checkbox,
 } from "@mui/material";
+import RepairNotesModal from "./RepairNotesModal";
 import {
   Edit as EditIcon,
   Delete as DeleteIcon,
@@ -153,6 +154,8 @@ export default function MinersTable({
     null,
   );
   const [rateHistoryOpen, setRateHistoryOpen] = React.useState(false);
+  const [repairNotesOpen, setRepairNotesOpen] = React.useState(false);
+  const [selectedMinerName, setSelectedMinerName] = React.useState("");
 
   /**
    * Handle delete confirmation
@@ -229,6 +232,16 @@ export default function MinersTable({
     handleMenuClose();
     setSelectedMinerId(minerId);
     setRateHistoryOpen(true);
+  };
+
+  /**
+   * Handle view repair notes
+   */
+  const handleViewRepairNotes = (minerId: string, minerName: string) => {
+    handleMenuClose();
+    setSelectedMinerId(minerId);
+    setSelectedMinerName(minerName);
+    setRepairNotesOpen(true);
   };
 
   /**
@@ -691,6 +704,15 @@ export default function MinersTable({
                         <EditIcon fontSize="small" sx={{ mr: 1 }} />
                         Edit
                       </MenuItem>
+                      <MenuItem
+                        onClick={() =>
+                          handleViewRepairNotes(miner.id, miner.name)
+                        }
+                      >
+                        <Typography fontSize="small">
+                          🛠️ Repair Notes
+                        </Typography>
+                      </MenuItem>
                       <MenuItem onClick={() => handleViewRateHistory(miner.id)}>
                         <Typography fontSize="small">
                           📈 See Miner History
@@ -953,6 +975,14 @@ export default function MinersTable({
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Repair Notes Modal */}
+      <RepairNotesModal
+        open={repairNotesOpen}
+        onClose={() => setRepairNotesOpen(false)}
+        minerId={selectedMinerId}
+        minerName={selectedMinerName}
+      />
     </Box>
   );
 }

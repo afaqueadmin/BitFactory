@@ -18,9 +18,9 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { useQuery } from "@tanstack/react-query";
 import {
   normalizeLuxorWorker,
-  normalizeBraiinsWorker,
   formatHashrate,
 } from "@/lib/workerNormalization";
+import RepairNotesModal from "./admin/RepairNotesModal";
 
 // Types
 interface Hardware {
@@ -70,6 +70,15 @@ export default function HostedMinersList({
 }: HostedMinersListProps) {
   const theme = useTheme();
   const [activeFilter, setActiveFilter] = useState<FilterType>("ALL MINERS");
+  const [repairNotesOpen, setRepairNotesOpen] = useState(false);
+  const [selectedMinerId, setSelectedMinerId] = useState<string | null>(null);
+  const [selectedMinerName, setSelectedMinerName] = useState("");
+
+  const handleOpenNotes = (id: string, name: string) => {
+    setSelectedMinerId(id);
+    setSelectedMinerName(name);
+    setRepairNotesOpen(true);
+  };
 
   // TanStack Query hook to fetch and transform miners
   const { data: miners = [], isLoading: loading } = useQuery({
@@ -105,13 +114,21 @@ export default function HostedMinersList({
 
         console.log("[HostedMinersList] Fetched miners from DB:", {
           count: minerData.miners.length,
-          poolNames: minerData.miners.map((m: any) => m.pool?.name || "no-pool"),
-          minerDetails: minerData.miners.map((m: any) => ({
-            name: m.name,
-            poolId: m.poolId,
-            poolName: m.pool?.name,
-            hasPool: !!m.pool,
-          })),
+          poolNames: minerData.miners.map(
+            (m: { pool?: { name?: string } }) => m.pool?.name || "no-pool",
+          ),
+          minerDetails: minerData.miners.map(
+            (m: {
+              name: string;
+              poolId?: string;
+              pool?: { name?: string };
+            }) => ({
+              name: m.name,
+              poolId: m.poolId,
+              poolName: m.pool?.name,
+              hasPool: !!m.pool,
+            }),
+          ),
         });
 
         // Step 2: Fetch worker status from Luxor API
@@ -132,17 +149,17 @@ export default function HostedMinersList({
 
           if (luxorResponse.ok) {
             const luxorData = await luxorResponse.json();
-            console.log("[HostedMinersList] Luxor raw API response:", luxorData);
             console.log(
-              "[HostedMinersList] Luxor data structure:",
-              {
-                has_data: !!luxorData.data,
-                has_workers: !!luxorData.data?.workers,
-                is_workers_array: Array.isArray(luxorData.data?.workers),
-                workers_length: luxorData.data?.workers?.length,
-                data_keys: Object.keys(luxorData.data || {}),
-              }
+              "[HostedMinersList] Luxor raw API response:",
+              luxorData,
             );
+            console.log("[HostedMinersList] Luxor data structure:", {
+              has_data: !!luxorData.data,
+              has_workers: !!luxorData.data?.workers,
+              is_workers_array: Array.isArray(luxorData.data?.workers),
+              workers_length: luxorData.data?.workers?.length,
+              data_keys: Object.keys(luxorData.data || {}),
+            });
             // Build a map of worker names to their status from Luxor
             if (
               luxorData.success &&
@@ -182,7 +199,7 @@ export default function HostedMinersList({
                   has_data: !!luxorData.data,
                   has_workers: !!luxorData.data?.workers,
                   is_array: Array.isArray(luxorData.data?.workers),
-                }
+                },
               );
             }
           } else {
@@ -209,7 +226,10 @@ export default function HostedMinersList({
 
           if (braiinsResponse.ok) {
             const braiinsData = await braiinsResponse.json();
-            console.log("[HostedMinersList] Braiins raw API response:", braiinsData);
+            console.log(
+              "[HostedMinersList] Braiins raw API response:",
+              braiinsData,
+            );
             // Build a map of worker names to their status from Braiins
             if (
               braiinsData.success &&
@@ -266,7 +286,7 @@ export default function HostedMinersList({
                 // Aggregate hashrate: sum of all workers
                 // IMPORTANT: Braiins workers return hash_rate_5m in Gh/s, convert to H/s
                 const totalHashrate = workers.reduce(
-                  (sum, w) => sum + ((w.hash_rate_5m || 0) * 1000000000),  // Gh/s * 10^9 = H/s
+                  (sum, w) => sum + (w.hash_rate_5m || 0) * 1000000000, // Gh/s * 10^9 = H/s
                   0,
                 );
 
@@ -285,11 +305,13 @@ export default function HostedMinersList({
                 "[HostedMinersList] Braiins miners processed:",
                 braiinsWorkers.size,
                 "Entries:",
-                Array.from(braiinsWorkers.entries()).map(([minerName, data]) => ({
-                  minerName,
-                  status: data.status,
-                  hashrate: data.hashrate,
-                })),
+                Array.from(braiinsWorkers.entries()).map(
+                  ([minerName, data]) => ({
+                    minerName,
+                    status: data.status,
+                    hashrate: data.hashrate,
+                  }),
+                ),
               );
             }
           } else {
@@ -314,7 +336,7 @@ export default function HostedMinersList({
             // Determine which API pool this miner belongs to
             const poolName = miner.pool?.name || "Unknown";
             const isBraiins = poolName === "Braiins";
-            
+
             // Select appropriate worker map based on pool
             const workerMap = isBraiins ? braiinsWorkers : luxorWorkers;
             const workerData = workerMap.get(miner.name);
@@ -350,18 +372,15 @@ export default function HostedMinersList({
             const apiHashrate = workerData?.hashrate || 0;
             const apiFirmware = workerData?.firmware || "N/A";
 
-            console.log(
-              `[HostedMinersList] Final miner data: ${miner.name}`,
-              {
-                poolName,
-                isBraiins,
-                workerFound: !!workerData,
-                apiStatus,
-                apiHashrate,
-                apiFirmware,
-                formattedHashrate: formatHashrate(apiHashrate),
-              },
-            );
+            console.log(`[HostedMinersList] Final miner data: ${miner.name}`, {
+              poolName,
+              isBraiins,
+              workerFound: !!workerData,
+              apiStatus,
+              apiHashrate,
+              apiFirmware,
+              formattedHashrate: formatHashrate(apiHashrate),
+            });
 
             return {
               id: miner.id,
@@ -387,8 +406,9 @@ export default function HostedMinersList({
           total: transformedMiners.length,
           luxor: transformedMiners.filter((m) => m.connectedPool === "Luxor")
             .length,
-          braiins: transformedMiners.filter((m) => m.connectedPool === "Braiins")
-            .length,
+          braiins: transformedMiners.filter(
+            (m) => m.connectedPool === "Braiins",
+          ).length,
           poolBreakdown: transformedMiners.map((m) => ({
             name: m.workerName,
             connectedPool: m.connectedPool,
@@ -413,8 +433,9 @@ export default function HostedMinersList({
   const filteredMiners = miners.filter((miner) => {
     // First apply pool filter
     if (poolFilter === "luxor" && miner.connectedPool !== "Luxor") return false;
-    if (poolFilter === "braiins" && miner.connectedPool !== "Braiins") return false;
-    
+    if (poolFilter === "braiins" && miner.connectedPool !== "Braiins")
+      return false;
+
     // Then apply status filter
     if (activeFilter === "ALL MINERS") return true;
     if (activeFilter === "ACTIVE") return miner.status === "Active";
@@ -626,6 +647,26 @@ export default function HostedMinersList({
                         {miner.status}
                       </Typography>
                     </Box>
+
+                    <Box>
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{ mb: 0.5 }}
+                      >
+                        Action
+                      </Typography>
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        onClick={() =>
+                          handleOpenNotes(miner.id, miner.workerName)
+                        }
+                        sx={{ textTransform: "none", borderRadius: 2 }}
+                      >
+                        🛠️ Previous Repair Notes
+                      </Button>
+                    </Box>
                   </Stack>
                 </Box>
               </AccordionDetails>
@@ -633,6 +674,14 @@ export default function HostedMinersList({
           ))
         )}
       </Box>
+
+      <RepairNotesModal
+        open={repairNotesOpen}
+        onClose={() => setRepairNotesOpen(false)}
+        minerId={selectedMinerId}
+        minerName={selectedMinerName}
+        readonly={true}
+      />
     </Box>
   );
 }

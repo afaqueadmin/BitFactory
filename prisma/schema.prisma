@@ -55,6 +55,7 @@ model User {
   paymentDetailsUpdates      PaymentDetails[]
   poolAuths                  PoolAuth[]
   invoicedAmount             Decimal                      @default(4250) @db.Decimal(12, 2)
+  createdRepairNotes         MinerRepairNote[]            @relation("CreatedRepairNotes")
 
   @@index([isDeleted])
   @@map("users")
@@ -136,6 +137,7 @@ model Miner {
   space            Space                   @relation(fields: [spaceId], references: [id])
   user             User                    @relation(fields: [userId], references: [id])
   pool             Pool?                   @relation(fields: [poolId], references: [id])
+  repairNotes      MinerRepairNote[]       @relation("MinerRepairNotes")
 
   @@unique([name, userId])
   @@index([hardwareId])
@@ -171,15 +173,15 @@ model Space {
 }
 
 model Pool {
-  id          String    @id @default(cuid())
-  name        String    @unique
+  id          String   @id @default(cuid())
+  name        String   @unique
   apiUrl      String
   description String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  miners      Miner[]
-  poolAuths   PoolAuth[]
+  miners    Miner[]
+  poolAuths PoolAuth[]
 
   @@map("pools")
 }
@@ -192,8 +194,8 @@ model PoolAuth {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  pool      Pool     @relation(fields: [poolId], references: [id], onDelete: Cascade)
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pool Pool @relation(fields: [poolId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([poolId, userId])
   @@index([userId])
@@ -202,16 +204,16 @@ model PoolAuth {
 }
 
 model CostPayment {
-  id              String           @id @default(cuid())
-  userId          String
-  invoiceId       String?
-  amount          Float
-  consumption     Float
-  type            PaymentType
-  createdAt       DateTime         @default(now())
-  narration       String?
-  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  invoice         Invoice?  @relation("invoiceCostPayments", fields: [invoiceId], references: [id], onDelete: Cascade)
+  id          String      @id @default(cuid())
+  userId      String
+  invoiceId   String?
+  amount      Float
+  consumption Float
+  type        PaymentType
+  createdAt   DateTime    @default(now())
+  narration   String?
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  invoice     Invoice?    @relation("invoiceCostPayments", fields: [invoiceId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([invoiceId])
@@ -250,17 +252,17 @@ model HardwareProcurementHistory {
 }
 
 model Group {
-  id                    String            @id @default(cuid())
-  name                  String            @db.VarChar(255)
-  relationshipManager   String?           @db.VarChar(255)
-  email                 String?           @db.VarChar(255)
-  description           String?
-  isActive              Boolean           @default(true)
-  createdAt             DateTime          @default(now())
-  updatedAt             DateTime          @updatedAt
-  createdBy             String
-  subaccounts           GroupSubaccount[]
-  creator               User              @relation(fields: [createdBy], references: [id])
+  id                  String            @id @default(cuid())
+  name                String            @db.VarChar(255)
+  relationshipManager String?           @db.VarChar(255)
+  email               String?           @db.VarChar(255)
+  description         String?
+  isActive            Boolean           @default(true)
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  createdBy           String
+  subaccounts         GroupSubaccount[]
+  creator             User              @relation(fields: [createdBy], references: [id])
 
   @@index([isActive])
   @@map("groups")
@@ -292,7 +294,7 @@ model Invoice {
   invoiceGeneratedDate DateTime
   issuedDate           DateTime?
   dueDate              DateTime
-  billingMonth         DateTime?  // Format: First day of month (e.g., 2026-04-01 for April 2026)
+  billingMonth         DateTime? // Format: First day of month (e.g., 2026-04-01 for April 2026)
   paidDate             DateTime?
   createdBy            String
   updatedBy            String?
@@ -316,24 +318,24 @@ model Invoice {
 }
 
 model VendorInvoice {
-  id                   String                @id @default(cuid())
-  invoiceNumber        String                @unique
-  billingDate          DateTime              @db.Date
+  id                   String              @id @default(cuid())
+  invoiceNumber        String              @unique
+  billingDate          DateTime            @db.Date
   paidDate             DateTime?
   dueDate              DateTime
   totalMiners          Int
-  isDeleted            Boolean               @default(false)
-  unitPrice            Decimal               @db.Decimal(10, 2)
-  miscellaneousCharges Decimal               @default(0.00) @db.Decimal(10, 2)
-  totalAmount          Decimal               @db.Decimal(12, 2)
-  paymentStatus        VendorPaymentStatus   @default(Pending)
+  isDeleted            Boolean             @default(false)
+  unitPrice            Decimal             @db.Decimal(10, 2)
+  miscellaneousCharges Decimal             @default(0.00) @db.Decimal(10, 2)
+  totalAmount          Decimal             @db.Decimal(12, 2)
+  paymentStatus        VendorPaymentStatus @default(Pending)
   notes                String?
   createdBy            String
   updatedBy            String?
-  createdAt            DateTime              @default(now())
-  updatedAt            DateTime              @updatedAt
-  createdByUser        User                  @relation("vendorInvoicesCreated", fields: [createdBy], references: [id])
-  updatedByUser        User?                 @relation("vendorInvoicesUpdated", fields: [updatedBy], references: [id])
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+  createdByUser        User                @relation("vendorInvoicesCreated", fields: [createdBy], references: [id])
+  updatedByUser        User?               @relation("vendorInvoicesUpdated", fields: [updatedBy], references: [id])
 
   @@index([paymentStatus])
   @@index([billingDate])
@@ -504,83 +506,84 @@ enum VendorPaymentStatus {
   Pending
   Cancelled
 }
+
 // Payment Details for Invoice PDF - Admin configurable settings
 model PaymentDetails {
-  id                      String    @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   // Company Information
-  companyName             String    @default("BitFactory.AE")
-  companyLegalName        String    @default("Higgs Computing Limited")
-  companyLocation         String    @default("Ras Al Khaimah, UAE")
-  machineHostingLocation  String    @default("Addis Ababa, Ethiopia")
-  logoBase64              String?   // Base64 encoded logo image
-  
+  companyName            String  @default("BitFactory.AE")
+  companyLegalName       String  @default("Higgs Computing Limited")
+  companyLocation        String  @default("Ras Al Khaimah, UAE")
+  machineHostingLocation String  @default("Addis Ababa, Ethiopia")
+  logoBase64             String? // Base64 encoded logo image
+
   // Payment Options
-  paymentOption1Title     String    @default("OPTION 1:")
-  paymentOption1Details   String    @default("USDT (Tron): TLNjcYnokhA1UcVsYVKjdeh9HzMS6GQJNe")
-  
-  paymentOption2Title     String    @default("OPTION 2:")
-  paymentOption2Details   String    @default("USDC (ETH): 0x722460E434013075E8cF8dd42c8854424aFa336E")
-  
-  paymentOption3Title     String    @default("OPTION 3:")
-  paymentOption3Details   String    // Bank details (multiline)
-  
+  paymentOption1Title   String @default("OPTION 1:")
+  paymentOption1Details String @default("USDT (Tron): TLNjcYnokhA1UcVsYVKjdeh9HzMS6GQJNe")
+
+  paymentOption2Title   String @default("OPTION 2:")
+  paymentOption2Details String @default("USDC (ETH): 0x722460E434013075E8cF8dd42c8854424aFa336E")
+
+  paymentOption3Title   String @default("OPTION 3:")
+  paymentOption3Details String // Bank details (multiline)
+
   // Billing Contact Information
-  billingInquiriesEmail   String    @default("invoices@bitfactory.ae")
-  billingInquiriesWhatsApp String   @default("+971-52-6062903")
-  
+  billingInquiriesEmail    String @default("invoices@bitfactory.ae")
+  billingInquiriesWhatsApp String @default("+971-52-6062903")
+
   // Support Contact Information
-  supportEmail            String    @default("support@bitfactory.ae")
-  supportWhatsApp         String    @default("+971-52-6062903")
-  
+  supportEmail    String @default("support@bitfactory.ae")
+  supportWhatsApp String @default("+971-52-6062903")
+
   // Confirmo Integration Settings
-  confirmoEnabled           Boolean   @default(false)
-  confirmoSettlementCurrency String?  @default("USDC")
-  confirmoReturnUrl         String?   @default("https://my.bitfactory.ae/invoices/payment-success")
-  
+  confirmoEnabled            Boolean @default(false)
+  confirmoSettlementCurrency String? @default("USDC")
+  confirmoReturnUrl          String? @default("https://my.bitfactory.ae/invoices/payment-success")
+
   // Metadata
-  createdAt               DateTime  @default(now())
-  updatedAt               DateTime  @updatedAt
-  updatedBy               String?
-  updatedByUser           User?     @relation(fields: [updatedBy], references: [id], onDelete: SetNull)
-  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  updatedBy     String?
+  updatedByUser User?    @relation(fields: [updatedBy], references: [id], onDelete: SetNull)
+
   @@index([id])
   @@index([updatedBy])
 }
 
 model ConfirmoPayment {
-  id                String                   @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   // Link to Invoice
-  invoiceId         String                   @unique
-  invoice           Invoice                  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  
+  invoiceId String  @unique
+  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
   // Confirmo Details
-  confirmoInvoiceId String                   @unique
-  paymentUrl        String
-  amount            Decimal                  @db.Decimal(12, 2)
-  currency          String                   @default("USD")
-  settlementCurrency String?                 @default("USDC")
-  
+  confirmoInvoiceId  String  @unique
+  paymentUrl         String
+  amount             Decimal @db.Decimal(12, 2)
+  currency           String  @default("USD")
+  settlementCurrency String? @default("USDC")
+
   // Status Tracking
-  status            ConfirmoPaymentStatus    @default(PENDING)
-  
+  status ConfirmoPaymentStatus @default(PENDING)
+
   // Webhook Data (populated after payment)
-  paidAmount        Decimal?                 @db.Decimal(12, 8)
-  paidCurrency      String?
-  transactionHash   String?
-  confirmedAt       DateTime?
-  
+  paidAmount      Decimal?  @db.Decimal(12, 8)
+  paidCurrency    String?
+  transactionHash String?
+  confirmedAt     DateTime?
+
   // Metadata
-  customerEmail     String
-  notifyEmail       String
-  reference         String
-  
+  customerEmail String
+  notifyEmail   String
+  reference     String
+
   // Timestamps
-  createdAt         DateTime                 @default(now())
-  updatedAt         DateTime                 @updatedAt
-  expiresAt         DateTime?
-  
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  expiresAt DateTime?
+
   @@index([confirmoInvoiceId])
   @@index([status])
   @@index([invoiceId])
@@ -598,19 +601,19 @@ enum ConfirmoPaymentStatus {
 }
 
 model EmailSendRun {
-  id             String              @id @default(cuid())
-  type           String              @default("INVOICE_BULK_EMAIL")
-  status         EmailRunStatus      @default(IN_PROGRESS)
-  totalInvoices  Int
-  successCount   Int                 @default(0)
-  failureCount   Int                 @default(0)
-  createdBy      String
-  startedAt      DateTime            @default(now())
-  completedAt    DateTime?
-  createdAt      DateTime            @default(now())
-  updatedAt      DateTime            @updatedAt
-  results        EmailSendResult[]
-  creator        User                @relation("emailSendRunsCreated", fields: [createdBy], references: [id], onDelete: Cascade)
+  id            String            @id @default(cuid())
+  type          String            @default("INVOICE_BULK_EMAIL")
+  status        EmailRunStatus    @default(IN_PROGRESS)
+  totalInvoices Int
+  successCount  Int               @default(0)
+  failureCount  Int               @default(0)
+  createdBy     String
+  startedAt     DateTime          @default(now())
+  completedAt   DateTime?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  results       EmailSendResult[]
+  creator       User              @relation("emailSendRunsCreated", fields: [createdBy], references: [id], onDelete: Cascade)
 
   @@index([status])
   @@index([createdAt])
@@ -619,20 +622,20 @@ model EmailSendRun {
 }
 
 model EmailSendResult {
-  id             String              @id @default(cuid())
-  runId          String
-  invoiceId      String
-  customerId     String
-  customerName   String
-  customerEmail  String
-  success        Boolean
-  errorMessage   String?
-  sentAt         DateTime?
-  createdAt      DateTime            @default(now())
-  updatedAt      DateTime            @updatedAt
-  run            EmailSendRun        @relation(fields: [runId], references: [id], onDelete: Cascade)
-  invoice        Invoice             @relation("emailSendResults", fields: [invoiceId], references: [id], onDelete: Cascade)
-  customer       User                @relation("emailSendResults", fields: [customerId], references: [id], onDelete: Cascade)
+  id            String       @id @default(cuid())
+  runId         String
+  invoiceId     String
+  customerId    String
+  customerName  String
+  customerEmail String
+  success       Boolean
+  errorMessage  String?
+  sentAt        DateTime?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  run           EmailSendRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  invoice       Invoice      @relation("emailSendResults", fields: [invoiceId], references: [id], onDelete: Cascade)
+  customer      User         @relation("emailSendResults", fields: [customerId], references: [id], onDelete: Cascade)
 
   @@index([runId])
   @@index([invoiceId])
@@ -649,12 +652,29 @@ enum EmailRunStatus {
 }
 
 model ExternalResource {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  url       String
+  label     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("external_resources")
+}
+
+model MinerRepairNote {
   id          String   @id @default(cuid())
-  key         String   @unique
-  url         String
-  label       String?
+  minerId     String
+  note        String   @db.Text
+  dateOfEntry DateTime @default(now())
+  createdById String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  @@map("external_resources")
+  miner     Miner @relation("MinerRepairNotes", fields: [minerId], references: [id], onDelete: Cascade)
+  createdBy User  @relation("CreatedRepairNotes", fields: [createdById], references: [id])
+
+  @@index([minerId])
+  @@index([createdById])
+  @@map("miner_repair_notes")
 }
