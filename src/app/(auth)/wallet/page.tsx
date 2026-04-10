@@ -10,11 +10,18 @@ import {
   Button,
   TextField,
   Alert,
+  ToggleButton,
+  ToggleButtonGroup,
 } from "@mui/material";
 import ElectricityCostTable from "@/components/ElectricityCostTable";
 import { useUser } from "@/lib/hooks/useUser";
 import { LuxorPaymentSettings } from "@/lib/types/wallet";
 import { useBitcoinLivePrice } from "@/components/useBitcoinLivePrice";
+
+interface PoolBreakdown {
+  totalEarnings: number;
+  pendingPayouts: number;
+}
 
 interface EarningsSummary {
   totalEarnings: { btc: number; usd: number };
@@ -23,6 +30,10 @@ interface EarningsSummary {
   dataSource: string;
   timestamp: string;
   subaccountCount: number;
+  poolBreakdown?: {
+    luxor: PoolBreakdown;
+    braiins: PoolBreakdown;
+  };
 }
 
 interface Revenue24h {
@@ -30,6 +41,10 @@ interface Revenue24h {
   currency: string;
   timestamp: string;
   dataSource: string;
+  poolBreakdown?: {
+    luxor: { btc: number; usd: number };
+    braiins: { btc: number; usd: number };
+  };
 }
 
 export default function WalletPage() {
@@ -37,6 +52,9 @@ export default function WalletPage() {
   const [revenue24h, setRevenue24h] = useState<Revenue24h | null>(null);
   const [walletSettings, setWalletSettings] =
     useState<LuxorPaymentSettings | null>(null);
+  const [poolMode, setPoolMode] = useState<"total" | "luxor" | "braiins">(
+    "total",
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [revenue24hLoading, setRevenue24hLoading] = useState(false);
   const [walletLoading, setWalletLoading] = useState(false);
@@ -201,6 +219,37 @@ export default function WalletPage() {
       .join(" ");
   };
 
+  // Helper functions to get values based on pool mode
+  const getTotalEarnings = (): number => {
+    if (!summary) return 0;
+    if (poolMode === "total") return summary.totalEarnings.btc;
+    if (poolMode === "luxor")
+      return summary.poolBreakdown?.luxor.totalEarnings ?? 0;
+    if (poolMode === "braiins")
+      return summary.poolBreakdown?.braiins.totalEarnings ?? 0;
+    return 0;
+  };
+
+  const getPendingPayouts = (): number => {
+    if (!summary) return 0;
+    if (poolMode === "total") return summary.pendingPayouts.btc;
+    if (poolMode === "luxor")
+      return summary.poolBreakdown?.luxor.pendingPayouts ?? 0;
+    if (poolMode === "braiins")
+      return summary.poolBreakdown?.braiins.pendingPayouts ?? 0;
+    return 0;
+  };
+
+  const getRevenue24h = (): number => {
+    if (!revenue24h) return 0;
+    if (poolMode === "total") return revenue24h.revenue24h.btc;
+    if (poolMode === "luxor")
+      return revenue24h.poolBreakdown?.luxor.btc ?? 0;
+    if (poolMode === "braiins")
+      return revenue24h.poolBreakdown?.braiins.btc ?? 0;
+    return 0;
+  };
+
   let payoutDate = new Date();
   let twoHoursLaterPayoutDate = new Date();
   if (walletSettings?.next_payout_at !== undefined) {
@@ -308,7 +357,23 @@ export default function WalletPage() {
             Overview of your mining earnings and transactions.
           </Typography>
         </Box>
-        {BtcLivePriceComponent}
+        <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
+          <ToggleButtonGroup
+            value={poolMode}
+            exclusive
+            onChange={(e, newMode) => {
+              if (newMode !== null) {
+                setPoolMode(newMode);
+              }
+            }}
+            size="small"
+          >
+            <ToggleButton value="total">Total</ToggleButton>
+            <ToggleButton value="luxor">Luxor</ToggleButton>
+            <ToggleButton value="braiins">Braiins</ToggleButton>
+          </ToggleButtonGroup>
+          {BtcLivePriceComponent}
+        </Box>
       </Box>
 
       {error && (
@@ -346,7 +411,10 @@ export default function WalletPage() {
               color: "white",
             }}
           >
-            <Typography variant="subtitle1">Total Earnings</Typography>
+            <Typography variant="subtitle1">
+              Total Earnings
+              {poolMode !== "total" && ` (${poolMode.toUpperCase()})`}
+            </Typography>
             {isLoading ? (
               <Box
                 sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1 }}
@@ -363,12 +431,12 @@ export default function WalletPage() {
                 }}
               >
                 <Typography variant="h5" fontWeight="bold">
-                  ₿ {summary?.totalEarnings.btc.toFixed(8) ?? "0.00"}
+                  ₿ {getTotalEarnings().toFixed(8)}
                 </Typography>
                 <Typography variant="h5" fontWeight="bold">
                   $
-                  {summary?.totalEarnings.btc && btcLiveData?.price
-                    ? (summary.totalEarnings.btc * btcLiveData.price).toFixed(2)
+                  {getTotalEarnings() && btcLiveData?.price
+                    ? (getTotalEarnings() * btcLiveData.price).toFixed(2)
                     : "0.00"}
                 </Typography>
               </Box>
@@ -384,10 +452,22 @@ export default function WalletPage() {
               backgroundColor: (theme) =>
                 theme.palette.mode === "light" ? "#ffb300" : "#ff8f00",
               color: "white",
+              opacity: poolMode === "braiins" ? 0.6 : 1,
             }}
           >
             <Typography variant="subtitle1">Primary Wallet Address</Typography>
-            {walletLoading ? (
+            {poolMode === "braiins" ? (
+              <Typography
+                variant="body2"
+                sx={{
+                  mt: 1,
+                  fontFamily: "monospace",
+                  fontSize: "0.9rem",
+                }}
+              >
+                Not available for Braiins
+              </Typography>
+            ) : walletLoading ? (
               <Box
                 sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1 }}
               >
@@ -425,7 +505,10 @@ export default function WalletPage() {
               color: "white",
             }}
           >
-            <Typography variant="subtitle1">Revenue (24 Hours)</Typography>
+            <Typography variant="subtitle1">
+              Revenue (24 Hours)
+              {poolMode !== "total" && ` (${poolMode.toUpperCase()})`}
+            </Typography>
             {revenue24hLoading ? (
               <Box
                 sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1 }}
@@ -446,14 +529,12 @@ export default function WalletPage() {
                 }}
               >
                 <Typography variant="h5" fontWeight="bold">
-                  ₿ {revenue24h?.revenue24h.btc.toFixed(8) ?? "0.00"}
+                  ₿ {getRevenue24h().toFixed(8)}
                 </Typography>
                 <Typography variant="h5" fontWeight="bold">
                   $
-                  {revenue24h?.revenue24h.btc && btcLiveData?.price
-                    ? (revenue24h?.revenue24h.btc * btcLiveData.price).toFixed(
-                        2,
-                      )
+                  {getRevenue24h() && btcLiveData?.price
+                    ? (getRevenue24h() * btcLiveData.price).toFixed(2)
                     : "0.00"}
                 </Typography>
               </Box>
@@ -471,7 +552,10 @@ export default function WalletPage() {
               color: "white",
             }}
           >
-            <Typography variant="subtitle1">Pending Payouts</Typography>
+            <Typography variant="subtitle1">
+              Pending Payouts
+              {poolMode !== "total" && ` (${poolMode.toUpperCase()})`}
+            </Typography>
             {isLoading ? (
               <Box
                 sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1 }}
@@ -488,14 +572,12 @@ export default function WalletPage() {
                 }}
               >
                 <Typography variant="h5" fontWeight="bold">
-                  ₿ {summary?.pendingPayouts.btc.toFixed(8) ?? "0.00"}
+                  ₿ {getPendingPayouts().toFixed(8)}
                 </Typography>
                 <Typography variant="h5" fontWeight="bold">
                   $
-                  {summary?.pendingPayouts.btc && btcLiveData?.price
-                    ? (summary?.pendingPayouts.btc * btcLiveData.price).toFixed(
-                        2,
-                      )
+                  {getPendingPayouts() && btcLiveData?.price
+                    ? (getPendingPayouts() * btcLiveData.price).toFixed(2)
                     : "0.00"}
                 </Typography>
               </Box>
@@ -513,10 +595,15 @@ export default function WalletPage() {
                 theme.palette.mode === "light" ? "#ff6f00" : "#e65100",
               color: "white",
               minHeight: minCardHeight,
+              opacity: poolMode === "braiins" ? 0.6 : 1,
             }}
           >
             <Typography variant="subtitle1">Payment Frequency</Typography>
-            {walletLoading ? (
+            {poolMode === "braiins" ? (
+              <Typography variant="h5" fontWeight="bold" sx={{ mt: 1 }}>
+                Not available
+              </Typography>
+            ) : walletLoading ? (
               <Box
                 sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1 }}
               >
@@ -534,7 +621,8 @@ export default function WalletPage() {
                   : "Not set"}
               </Typography>
             )}
-            {walletSettings?.payment_frequency === "WEEKLY" &&
+            {poolMode !== "braiins" &&
+              walletSettings?.payment_frequency === "WEEKLY" &&
               walletSettings?.day_of_week && (
                 <Typography variant="body2" sx={{ mt: 1, opacity: 0.9 }}>
                   Every {toProperCase(walletSettings.day_of_week)}
@@ -552,10 +640,15 @@ export default function WalletPage() {
                 theme.palette.mode === "light" ? "#00796b" : "#004d40",
               color: "white",
               minHeight: minCardHeight,
+              opacity: poolMode === "braiins" ? 0.6 : 1,
             }}
           >
             <Typography variant="subtitle1">Next Payout</Typography>
-            {walletLoading ? (
+            {poolMode === "braiins" ? (
+              <Typography variant="h6" fontWeight="bold" sx={{ mt: 1 }}>
+                Not available
+              </Typography>
+            ) : walletLoading ? (
               <Box
                 sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1 }}
               >
