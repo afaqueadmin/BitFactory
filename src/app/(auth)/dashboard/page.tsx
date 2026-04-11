@@ -396,7 +396,7 @@ export default function DashboardPage() {
                   fontWeight: chartMode === "luxor" ? 600 : 400,
                   backgroundColor:
                     chartMode === "luxor"
-                      ? "#0066FF"
+                      ? "#1565C0"
                       : theme.palette.mode === "dark"
                         ? "rgba(255,255,255,0.1)"
                         : "rgba(0,0,0,0.05)",

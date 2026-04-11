@@ -339,7 +339,7 @@ export default function MiningEarningsChart({
                   name="Luxor Revenue"
                   barSize={18}
                   radius={[6, 6, 0, 0]}
-                  fill="#0066FF"
+                  fill="#1565C0"
                 />
               )}
 
@@ -362,7 +362,7 @@ export default function MiningEarningsChart({
                     name="Luxor"
                     stackId="revenue"
                     radius={[6, 6, 0, 0]}
-                    fill="#0066FF"
+                    fill="#1565C0"
                   />
                   <Bar
                     dataKey="breakdown.braiins"

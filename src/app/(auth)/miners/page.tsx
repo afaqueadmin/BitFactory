@@ -236,7 +236,7 @@ export default function Miners() {
             fontWeight: poolMode === "luxor" ? 600 : 400,
             backgroundColor:
               poolMode === "luxor"
-                ? "#0066FF"
+                ? "#1565C0"
                 : theme.palette.mode === "dark"
                   ? "rgba(255,255,255,0.1)"
                   : "rgba(0,0,0,0.05)",
@@ -341,12 +341,12 @@ export default function Miners() {
                 theme.palette.mode === "dark"
                   ? "rgba(0, 102, 255, 0.1)"
                   : "rgba(0, 102, 255, 0.05)",
-              border: "2px solid #0066FF",
+              border: "2px solid #1565C0",
             }}
           >
             <Typography
               variant="h6"
-              sx={{ fontWeight: 600, mb: 2, color: "#0066FF" }}
+              sx={{ fontWeight: 600, mb: 2, color: "#1565C0" }}
             >
               🔷 Luxor Pool
             </Typography>
@@ -453,7 +453,7 @@ export default function Miners() {
             fontWeight: minerFilter === "luxor" ? 600 : 400,
             backgroundColor:
               minerFilter === "luxor"
-                ? "#0066FF"
+                ? "#1565C0"
                 : theme.palette.mode === "dark"
                   ? "rgba(255,255,255,0.1)"
                   : "rgba(0,0,0,0.05)",
