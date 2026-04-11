@@ -42,10 +42,14 @@ interface MinerData {
     | "Active"
     | "Inactive"
     | "Deployment in Progress"
+    | "Under Maintenance"
     | "AUTO"
-    | "DEPLOYMENT_IN_PROGRESS";
+    | "DEPLOYMENT_IN_PROGRESS"
+    | "UNDER_MAINTENANCE";
   hashRate: string;
   firmware: string;
+  serialNumber?: string;
+  macAddress?: string;
   hardware?: Hardware;
 }
 
@@ -55,6 +59,7 @@ const FILTER_VALUES = [
   "ACTIVE",
   "INACTIVE",
   "DEPLOYMENT IN PROGRESS",
+  "UNDER MAINTENANCE",
 ] as const;
 // Filter type
 export type FilterType = (typeof FILTER_VALUES)[number];
@@ -328,6 +333,8 @@ export default function HostedMinersList({
             name: string;
             model?: string;
             status: string;
+            serialNumber?: string | null;
+            macAddress?: string | null;
             hashRate?: number;
             hardware?: { model: string; hashRate: number | string };
             space?: { location: string; name: string };
@@ -364,6 +371,23 @@ export default function HostedMinersList({
                 status: "Deployment in Progress",
                 hashRate: formatHashrate(0), // 0 H/s formatted
                 firmware: "N/A",
+                serialNumber: miner.serialNumber || "—",
+                macAddress: miner.macAddress || "—",
+              };
+            }
+
+            if (miner.status === "UNDER_MAINTENANCE") {
+              return {
+                id: miner.id,
+                model: miner.hardware?.model || miner.model || "Unknown",
+                workerName: miner.name,
+                location: miner.space?.location || "Unknown",
+                connectedPool: poolName,
+                status: "Under Maintenance",
+                hashRate: formatHashrate(0),
+                firmware: "N/A",
+                serialNumber: miner.serialNumber || "—",
+                macAddress: miner.macAddress || "—",
               };
             }
 
@@ -398,6 +422,8 @@ export default function HostedMinersList({
               // Use normalized hashrate (in H/s) for display with proper unit conversion
               hashRate: formatHashrate(apiHashrate),
               firmware: apiFirmware,
+              serialNumber: miner.serialNumber || "—",
+              macAddress: miner.macAddress || "—",
             };
           },
         );
@@ -442,6 +468,8 @@ export default function HostedMinersList({
     if (activeFilter === "INACTIVE") return miner.status === "Inactive";
     if (activeFilter === "DEPLOYMENT IN PROGRESS")
       return miner.status === "Deployment in Progress";
+    if (activeFilter === "UNDER MAINTENANCE")
+      return miner.status === "Under Maintenance";
     return true;
   });
 
@@ -452,8 +480,17 @@ export default function HostedMinersList({
   const deploymentCount = miners.filter(
     (m) => m.status === "Deployment in Progress",
   ).length;
+  const maintenanceCount = miners.filter(
+    (m) => m.status === "Under Maintenance",
+  ).length;
 
-  const filterCounts = [allCount, activeCount, inactiveCount, deploymentCount];
+  const filterCounts = [
+    allCount,
+    activeCount,
+    inactiveCount,
+    deploymentCount,
+    maintenanceCount,
+  ];
   const filterValuesWithCounts = FILTER_VALUES.map((value, index) => ({
     value,
     count: filterCounts[index],
@@ -469,6 +506,9 @@ export default function HostedMinersList({
     } else if (status === "Deployment in Progress") {
       bgColor = alpha(theme.palette.warning.main, 0.1);
       textColor = theme.palette.warning.main;
+    } else if (status === "Under Maintenance") {
+      bgColor = alpha(theme.palette.secondary.main, 0.1);
+      textColor = theme.palette.secondary.main;
     }
 
     return (
@@ -610,6 +650,40 @@ export default function HostedMinersList({
                       </Typography>
                       <Typography variant="body1" fontWeight="500">
                         {miner.firmware || "N/A"}
+                      </Typography>
+                    </Box>
+
+                    <Box>
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{ mb: 0.5 }}
+                      >
+                        Serial No.
+                      </Typography>
+                      <Typography
+                        variant="body1"
+                        fontWeight="500"
+                        sx={{ fontFamily: "monospace", fontSize: "0.9rem" }}
+                      >
+                        {miner.serialNumber || "—"}
+                      </Typography>
+                    </Box>
+
+                    <Box>
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{ mb: 0.5 }}
+                      >
+                        MAC Address
+                      </Typography>
+                      <Typography
+                        variant="body1"
+                        fontWeight="500"
+                        sx={{ fontFamily: "monospace", fontSize: "0.9rem" }}
+                      >
+                        {miner.macAddress || "—"}
                       </Typography>
                     </Box>
 

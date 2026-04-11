@@ -68,7 +68,7 @@ interface Hardware {
 interface Miner {
   id: string;
   name: string;
-  status: "AUTO" | "DEPLOYMENT_IN_PROGRESS";
+  status: "AUTO" | "DEPLOYMENT_IN_PROGRESS" | "UNDER_MAINTENANCE";
   hardwareId: string;
   userId: string;
   spaceId: string;
@@ -76,6 +76,8 @@ interface Miner {
   updatedAt: string;
   isDeleted: boolean;
   rate_per_kwh?: number;
+  serialNumber?: string | null;
+  macAddress?: string | null;
   user?: User;
   space?: Space;
   hardware?: Hardware;
@@ -97,6 +99,16 @@ interface Miner {
       email: string;
     };
     createdAt: string;
+  }>;
+  repairNotes?: Array<{
+    id: string;
+    note: string;
+    dateOfEntry: string;
+    createdAt: string;
+    createdBy: {
+      name: string | null;
+      email: string;
+    };
   }>;
 }
 

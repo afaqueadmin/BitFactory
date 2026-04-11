@@ -14,6 +14,7 @@ import {
   IconButton,
 } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
+import EditIcon from "@mui/icons-material/Edit";
 
 interface User {
   id: string;
@@ -35,6 +36,8 @@ interface RepairNotesModalProps {
   onClose: () => void;
   minerId: string | null;
   minerName: string;
+  serialNumber?: string | null;
+  macAddress?: string | null;
   readonly?: boolean;
 }
 
@@ -43,6 +46,8 @@ export default function RepairNotesModal({
   onClose,
   minerId,
   minerName,
+  serialNumber,
+  macAddress,
   readonly = false,
 }: RepairNotesModalProps) {
   const [notes, setNotes] = useState<RepairNote[]>([]);
@@ -50,6 +55,7 @@ export default function RepairNotesModal({
   const [error, setError] = useState<string | null>(null);
 
   // Form states
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [newNote, setNewNote] = useState("");
   const [dateOfEntry, setDateOfEntry] = useState(
     new Date().toISOString().split("T")[0],
@@ -60,6 +66,7 @@ export default function RepairNotesModal({
     if (open && minerId) {
       fetchNotes();
       // Reset form on open
+      setEditingNoteId(null);
       setNewNote("");
       setDateOfEntry(new Date().toISOString().split("T")[0]);
     }
@@ -90,8 +97,13 @@ export default function RepairNotesModal({
     setSubmitting(true);
     setError(null);
     try {
-      const response = await fetch(`/api/machine/${minerId}/repair-notes`, {
-        method: "POST",
+      const url = editingNoteId
+        ? `/api/machine/repair-notes/${editingNoteId}`
+        : `/api/machine/${minerId}/repair-notes`;
+      const method = editingNoteId ? "PUT" : "POST";
+
+      const response = await fetch(url, {
+        method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           note: newNote,
@@ -101,17 +113,27 @@ export default function RepairNotesModal({
 
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data.error || "Failed to add repair note");
+        throw new Error(data.error || "Failed to save repair note");
       }
 
-      // Add to list and clear form
-      setNotes([data.data, ...notes]);
+      if (editingNoteId) {
+        setNotes(notes.map((n) => (n.id === editingNoteId ? data.data : n)));
+        setEditingNoteId(null);
+      } else {
+        setNotes([data.data, ...notes]);
+      }
       setNewNote("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleEditNote = (note: RepairNote) => {
+    setEditingNoteId(note.id);
+    setNewNote(note.note);
+    setDateOfEntry(note.dateOfEntry.split("T")[0]);
   };
 
   const handleDeleteNote = async (noteId: string) => {
@@ -149,7 +171,39 @@ export default function RepairNotesModal({
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>Repair Notes - {minerName}</DialogTitle>
+      <DialogTitle sx={{ pb: 1 }}>
+        Repair Notes - {minerName}
+        {(serialNumber || macAddress) && (
+          <Box sx={{ mt: 1, display: "flex", gap: 3 }}>
+            {serialNumber && (
+              <Box>
+                <Typography variant="caption" color="text.secondary">
+                  Serial No.
+                </Typography>
+                <Typography
+                  variant="body2"
+                  sx={{ fontFamily: "monospace", fontWeight: 600 }}
+                >
+                  {serialNumber}
+                </Typography>
+              </Box>
+            )}
+            {macAddress && (
+              <Box>
+                <Typography variant="caption" color="text.secondary">
+                  MAC Address
+                </Typography>
+                <Typography
+                  variant="body2"
+                  sx={{ fontFamily: "monospace", fontWeight: 600 }}
+                >
+                  {macAddress}
+                </Typography>
+              </Box>
+            )}
+          </Box>
+        )}
+      </DialogTitle>
       <DialogContent sx={{ pt: 2 }}>
         {error && (
           <Alert severity="error" sx={{ mb: 2 }}>
@@ -175,7 +229,7 @@ export default function RepairNotesModal({
             }}
           >
             <Typography variant="subtitle2" sx={{ fontWeight: "bold" }}>
-              Add New Repair Note
+              {editingNoteId ? "Edit Repair Note" : "Add New Repair Note"}
             </Typography>
             <TextField
               label="Date of Entry"
@@ -198,15 +252,36 @@ export default function RepairNotesModal({
               fullWidth
               required
             />
-            <Button
-              type="submit"
-              variant="contained"
-              color="primary"
-              disabled={submitting || !newNote.trim()}
-              sx={{ alignSelf: "flex-end" }}
-            >
-              {submitting ? <CircularProgress size={24} /> : "Record Note"}
-            </Button>
+            <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 1 }}>
+              {editingNoteId && (
+                <Button
+                  variant="outlined"
+                  color="inherit"
+                  disabled={submitting}
+                  onClick={() => {
+                    setEditingNoteId(null);
+                    setNewNote("");
+                    setDateOfEntry(new Date().toISOString().split("T")[0]);
+                  }}
+                >
+                  Cancel
+                </Button>
+              )}
+              <Button
+                type="submit"
+                variant="contained"
+                color="primary"
+                disabled={submitting || !newNote.trim()}
+              >
+                {submitting ? (
+                  <CircularProgress size={24} />
+                ) : editingNoteId ? (
+                  "Update Note"
+                ) : (
+                  "Record Note"
+                )}
+              </Button>
+            </Box>
           </Box>
         )}
 
@@ -239,15 +314,33 @@ export default function RepairNotesModal({
                 }}
               >
                 {!readonly && (
-                  <IconButton
-                    size="small"
-                    color="error"
-                    onClick={() => handleDeleteNote(note.id)}
-                    sx={{ position: "absolute", top: 8, right: 8 }}
-                    title="Delete Note"
+                  <Box
+                    sx={{
+                      position: "absolute",
+                      top: 8,
+                      right: 8,
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 0.5,
+                    }}
                   >
-                    <DeleteIcon fontSize="small" />
-                  </IconButton>
+                    <IconButton
+                      size="small"
+                      color="error"
+                      onClick={() => handleDeleteNote(note.id)}
+                      title="Delete Note"
+                    >
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
+                    <IconButton
+                      size="small"
+                      color="primary"
+                      onClick={() => handleEditNote(note)}
+                      title="Edit Note"
+                    >
+                      <EditIcon fontSize="small" />
+                    </IconButton>
+                  </Box>
                 )}
                 <Box
                   sx={{

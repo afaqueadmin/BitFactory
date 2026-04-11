@@ -207,6 +207,23 @@ export async function GET(
             createdAt: "desc",
           },
         },
+        repairNotes: {
+          select: {
+            id: true,
+            note: true,
+            dateOfEntry: true,
+            createdAt: true,
+            createdBy: {
+              select: {
+                name: true,
+                email: true,
+              },
+            },
+          },
+          orderBy: {
+            dateOfEntry: "desc",
+          },
+        },
       },
       orderBy,
     });
@@ -258,7 +275,7 @@ export async function GET(
  *   hardwareId: string (required) - Hardware model ID
  *   userId: string (required) - ID of the user who owns this miner
  *   spaceId: string (required) - ID of the space where miner is located
- *   status: string (optional) - AUTO or DEPLOYMENT_IN_PROGRESS (default: DEPLOYMENT_IN_PROGRESS)
+ *   status: string (optional) - AUTO, DEPLOYMENT_IN_PROGRESS, or UNDER_MAINTENANCE (default: DEPLOYMENT_IN_PROGRESS)
  *   rate_per_kwh: number (required) - Electricity rate per kWh in USD (positive number)
  * }
  *
@@ -296,7 +313,16 @@ export async function POST(
     }
 
     const body = await request.json();
-    const { name, hardwareId, userId, spaceId, status, rate_per_kwh } = body;
+    const {
+      name,
+      hardwareId,
+      userId,
+      spaceId,
+      status,
+      rate_per_kwh,
+      serialNumber,
+      macAddress,
+    } = body;
 
     // Validate required fields
     if (!name || !hardwareId || !userId || !spaceId) {
@@ -453,6 +479,8 @@ export async function POST(
           userId,
           spaceId,
           status: status || "DEPLOYMENT_IN_PROGRESS",
+          ...(serialNumber && { serialNumber: serialNumber.trim() }),
+          ...(macAddress && { macAddress: macAddress.trim() }),
         },
         include: {
           user: {

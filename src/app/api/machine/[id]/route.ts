@@ -76,7 +76,7 @@ async function verifyAdminAuth(request: NextRequest) {
  *   hardwareId?: string
  *   userId?: string
  *   spaceId?: string
- *   status?: string (AUTO or DEPLOYMENT_IN_PROGRESS)
+ *   status?: string (AUTO, DEPLOYMENT_IN_PROGRESS, or UNDER_MAINTENANCE)
  *   rate_per_kwh?: number (positive number, creates new history entry if provided and different from latest)
  * }
  *
@@ -129,7 +129,16 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { name, hardwareId, userId, spaceId, status, rate_per_kwh } = body;
+    const {
+      name,
+      hardwareId,
+      userId,
+      spaceId,
+      status,
+      rate_per_kwh,
+      serialNumber,
+      macAddress,
+    } = body;
 
     // Validate rate_per_kwh if provided
     let ratePerKwhValue: number | null = null;
@@ -314,16 +323,29 @@ export async function PUT(
     }
 
     if (status !== undefined) {
-      if (!["AUTO", "DEPLOYMENT_IN_PROGRESS"].includes(status)) {
+      if (
+        !["AUTO", "DEPLOYMENT_IN_PROGRESS", "UNDER_MAINTENANCE"].includes(
+          status,
+        )
+      ) {
         return NextResponse.json<ApiResponse>(
           {
             success: false,
-            error: "status must be AUTO or DEPLOYMENT_IN_PROGRESS",
+            error:
+              "status must be AUTO, DEPLOYMENT_IN_PROGRESS, or UNDER_MAINTENANCE",
           },
           { status: 400 },
         );
       }
       updateData.status = status;
+    }
+
+    if (serialNumber !== undefined) {
+      updateData.serialNumber = serialNumber ? serialNumber.trim() : null;
+    }
+
+    if (macAddress !== undefined) {
+      updateData.macAddress = macAddress ? macAddress.trim() : null;
     }
 
     // If no fields to update, return error

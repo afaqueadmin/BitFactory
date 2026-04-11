@@ -35,6 +35,7 @@ import {
   Menu,
   FormControlLabel,
   Checkbox,
+  Tooltip,
 } from "@mui/material";
 import RepairNotesModal from "./RepairNotesModal";
 import {
@@ -92,7 +93,7 @@ interface Hardware {
 interface Miner {
   id: string;
   name: string;
-  status: "AUTO" | "DEPLOYMENT_IN_PROGRESS";
+  status: "AUTO" | "DEPLOYMENT_IN_PROGRESS" | "UNDER_MAINTENANCE";
   hardwareId: string;
   userId: string;
   spaceId: string;
@@ -100,6 +101,8 @@ interface Miner {
   updatedAt: string;
   isDeleted: boolean;
   rate_per_kwh?: number;
+  serialNumber?: string | null;
+  macAddress?: string | null;
   user?: User;
   space?: Space;
   hardware?: Hardware;
@@ -121,6 +124,16 @@ interface Miner {
       email: string;
     };
     createdAt: string;
+  }>;
+  repairNotes?: Array<{
+    id: string;
+    note: string;
+    dateOfEntry: string;
+    createdAt: string;
+    createdBy: {
+      name: string | null;
+      email: string;
+    };
   }>;
 }
 
@@ -275,9 +288,11 @@ export default function MinersTable({
    * Get status color based on value
    */
   const getStatusColor = (
-    status: "AUTO" | "DEPLOYMENT_IN_PROGRESS",
-  ): "success" | "default" => {
-    return status === "AUTO" ? "success" : "default";
+    status: "AUTO" | "DEPLOYMENT_IN_PROGRESS" | "UNDER_MAINTENANCE",
+  ): "success" | "default" | "warning" => {
+    if (status === "AUTO") return "success";
+    if (status === "UNDER_MAINTENANCE") return "warning";
+    return "default";
   };
 
   /**
@@ -637,7 +652,46 @@ export default function MinersTable({
                   hover
                   sx={{ "&:last-child td, &:last-child th": { border: 0 } }}
                 >
-                  <TableCell sx={{ fontWeight: "500" }}>{miner.name}</TableCell>
+                  <TableCell sx={{ fontWeight: "500", maxWidth: "200px" }}>
+                    <Tooltip
+                      title={
+                        miner.serialNumber || miner.macAddress ? (
+                          <Box sx={{ p: 0.5 }}>
+                            {miner.serialNumber && (
+                              <Typography variant="caption" display="block">
+                                SN: {miner.serialNumber}
+                              </Typography>
+                            )}
+                            {miner.macAddress && (
+                              <Typography variant="caption" display="block">
+                                MAC: {miner.macAddress}
+                              </Typography>
+                            )}
+                          </Box>
+                        ) : (
+                          ""
+                        )
+                      }
+                      placement="top"
+                      arrow
+                    >
+                      <Typography
+                        component="span"
+                        sx={{
+                          cursor:
+                            miner.serialNumber || miner.macAddress
+                              ? "help"
+                              : "auto",
+                          color: "info.main", // Info is usually a light/sky blue in MUI
+                          textDecoration: "underline",
+                          textUnderlineOffset: "3px",
+                          "&:hover": { color: "info.light" },
+                        }}
+                      >
+                        {miner.name}
+                      </Typography>
+                    </Tooltip>
+                  </TableCell>
                   <TableCell>{miner.hardware?.model || "—"}</TableCell>
                   <TableCell>
                     {miner.user?.name || miner.user?.email || "—"}
@@ -786,8 +840,12 @@ export default function MinersTable({
               const miner = memoizedRows.find((m) => m.id === selectedMinerId);
               const rateHistory = miner?.rateHistory || [];
               const ownershipHistory = miner?.ownershipHistory || [];
+              const repairHistory = miner?.repairNotes || [];
 
-              // Combine both histories
+              // Show miner hardware info at top of modal
+              const hasSNorMAC = miner?.serialNumber || miner?.macAddress;
+
+              // Combine all histories
               const combinedHistory = [
                 ...rateHistory.map((h) => ({
                   type: "rate",
@@ -799,172 +857,289 @@ export default function MinersTable({
                   createdAt: new Date(h.createdAt),
                   data: h,
                 })),
+                ...repairHistory.map((h) => ({
+                  type: "repair",
+                  createdAt: new Date(h.dateOfEntry),
+                  data: h,
+                })),
               ].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
-              return combinedHistory && combinedHistory.length > 0 ? (
-                <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                  {combinedHistory.map((activity, index: number) => (
+              return (
+                <>
+                  {hasSNorMAC && (
                     <Box
-                      key={index}
                       sx={{
-                        p: 1.5,
-                        border: "1px solid",
-                        borderColor: "divider",
-                        borderRadius: 1,
                         display: "flex",
-                        flexDirection: "column",
-                        gap: 0.5,
+                        gap: 3,
+                        p: 1.5,
+                        bgcolor: "action.hover",
+                        borderRadius: 1,
+                        mb: 1,
                       }}
                     >
-                      {activity.type === "rate" ? (
-                        <>
-                          <Box
-                            sx={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              alignItems: "center",
-                            }}
-                          >
-                            <Typography
-                              variant="body2"
-                              sx={{ fontWeight: "600" }}
-                            >
-                              Rate Update: $
-                              {Number(
-                                (activity.data as { rate_per_kwh: number })
-                                  .rate_per_kwh,
-                              ).toFixed(3)}
-                              /kWh
-                            </Typography>
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                            >
-                              {activity.createdAt.toLocaleDateString("en-CA")}{" "}
-                              {activity.createdAt.toLocaleTimeString("en-US", {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                                hour12: false,
-                              })}
-                            </Typography>
-                          </Box>
-                        </>
-                      ) : (
-                        <>
+                      {miner?.serialNumber && (
+                        <Box>
+                          <Typography variant="caption" color="text.secondary">
+                            Serial No.
+                          </Typography>
                           <Typography
                             variant="body2"
-                            sx={{ fontWeight: "600", color: "info.main" }}
+                            sx={{ fontFamily: "monospace", fontWeight: 600 }}
                           >
-                            Ownership Transfer
+                            {miner.serialNumber}
                           </Typography>
-                          <Box
-                            sx={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              alignItems: "flex-start",
-                            }}
+                        </Box>
+                      )}
+                      {miner?.macAddress && (
+                        <Box>
+                          <Typography variant="caption" color="text.secondary">
+                            MAC Address
+                          </Typography>
+                          <Typography
+                            variant="body2"
+                            sx={{ fontFamily: "monospace", fontWeight: 600 }}
                           >
-                            <Box sx={{ display: "flex", gap: 2, flex: 1 }}>
-                              <Box sx={{ flex: 1, minWidth: "150px" }}>
+                            {miner.macAddress}
+                          </Typography>
+                        </Box>
+                      )}
+                    </Box>
+                  )}
+                  {combinedHistory && combinedHistory.length > 0 ? (
+                    <Box
+                      sx={{ display: "flex", flexDirection: "column", gap: 1 }}
+                    >
+                      {combinedHistory.map((activity, index: number) => (
+                        <Box
+                          key={index}
+                          sx={{
+                            p: 1.5,
+                            border: "1px solid",
+                            borderColor: "divider",
+                            borderRadius: 1,
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 0.5,
+                          }}
+                        >
+                          {activity.type === "rate" ? (
+                            <>
+                              <Box
+                                sx={{
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  alignItems: "center",
+                                }}
+                              >
+                                <Typography
+                                  variant="body2"
+                                  sx={{ fontWeight: "600" }}
+                                >
+                                  Rate Update: $
+                                  {Number(
+                                    (activity.data as { rate_per_kwh: number })
+                                      .rate_per_kwh,
+                                  ).toFixed(3)}
+                                  /kWh
+                                </Typography>
                                 <Typography
                                   variant="caption"
                                   color="text.secondary"
                                 >
-                                  New Owner
-                                </Typography>
-                                <Typography variant="body2">
-                                  {(
-                                    activity.data as {
-                                      owner: {
-                                        name: string | null;
-                                        email: string;
-                                      };
-                                    }
-                                  ).owner?.name || "—"}
-                                </Typography>
-                                <Typography variant="body2">
-                                  (
-                                  {(
-                                    activity.data as {
-                                      owner: {
-                                        name: string | null;
-                                        email: string;
-                                      };
-                                    }
-                                  ).owner?.email || "—"}
-                                  )
+                                  {activity.createdAt.toLocaleDateString(
+                                    "en-CA",
+                                  )}{" "}
+                                  {activity.createdAt.toLocaleTimeString(
+                                    "en-US",
+                                    {
+                                      hour: "2-digit",
+                                      minute: "2-digit",
+                                      hour12: false,
+                                    },
+                                  )}
                                 </Typography>
                               </Box>
-                              <Box sx={{ flex: 1, minWidth: "150px" }}>
+                            </>
+                          ) : activity.type === "repair" ? (
+                            <>
+                              <Box
+                                sx={{
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  alignItems: "center",
+                                  mb: 0.5,
+                                }}
+                              >
+                                <Typography
+                                  variant="body2"
+                                  sx={{
+                                    fontWeight: "600",
+                                    color: "error.main",
+                                  }}
+                                >
+                                  🛠️ Repair Note
+                                </Typography>
                                 <Typography
                                   variant="caption"
                                   color="text.secondary"
                                 >
-                                  Changed By
-                                </Typography>
-                                <Typography variant="body2">
-                                  {(
-                                    activity.data as {
-                                      createdBy: {
-                                        name: string | null;
-                                        email: string;
-                                      };
-                                    }
-                                  ).createdBy?.name ||
-                                    (
-                                      activity.data as {
-                                        createdBy: {
-                                          name: string | null;
-                                          email: string;
-                                        };
-                                      }
-                                    ).createdBy?.email ||
-                                    "—"}
-                                </Typography>
-                                <Typography variant="body2">
-                                  (
-                                  {(
-                                    activity.data as {
-                                      createdBy: {
-                                        name: string | null;
-                                        email: string;
-                                      };
-                                    }
-                                  ).createdBy?.email || "—"}
-                                  )
+                                  {activity.createdAt.toLocaleDateString(
+                                    "en-CA",
+                                  )}{" "}
                                 </Typography>
                               </Box>
-                            </Box>
-                            <Box sx={{ minWidth: "150px", textAlign: "right" }}>
+                              <Typography
+                                variant="body2"
+                                sx={{ whiteSpace: "pre-wrap", mb: 0.5 }}
+                              >
+                                {(activity.data as { note: string }).note}
+                              </Typography>
                               <Typography
                                 variant="caption"
                                 color="text.secondary"
                               >
-                                {activity.createdAt.toLocaleDateString("en-CA")}{" "}
-                                {activity.createdAt.toLocaleTimeString(
-                                  "en-US",
-                                  {
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                    hour12: false,
-                                  },
-                                )}
+                                Logged by:{" "}
+                                {(
+                                  activity.data as {
+                                    createdBy?: {
+                                      name: string | null;
+                                      email: string;
+                                    };
+                                  }
+                                ).createdBy?.name ||
+                                  (
+                                    activity.data as {
+                                      createdBy?: {
+                                        name: string | null;
+                                        email: string;
+                                      };
+                                    }
+                                  ).createdBy?.email ||
+                                  "Unknown"}
                               </Typography>
-                            </Box>
-                          </Box>
-                        </>
-                      )}
+                            </>
+                          ) : (
+                            <>
+                              <Typography
+                                variant="body2"
+                                sx={{ fontWeight: "600", color: "info.main" }}
+                              >
+                                Ownership Transfer
+                              </Typography>
+                              <Box
+                                sx={{
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  alignItems: "flex-start",
+                                }}
+                              >
+                                <Box sx={{ display: "flex", gap: 2, flex: 1 }}>
+                                  <Box sx={{ flex: 1, minWidth: "150px" }}>
+                                    <Typography
+                                      variant="caption"
+                                      color="text.secondary"
+                                    >
+                                      New Owner
+                                    </Typography>
+                                    <Typography variant="body2">
+                                      {(
+                                        activity.data as {
+                                          owner: {
+                                            name: string | null;
+                                            email: string;
+                                          };
+                                        }
+                                      ).owner?.name || "—"}
+                                    </Typography>
+                                    <Typography variant="body2">
+                                      (
+                                      {(
+                                        activity.data as {
+                                          owner: {
+                                            name: string | null;
+                                            email: string;
+                                          };
+                                        }
+                                      ).owner?.email || "—"}
+                                      )
+                                    </Typography>
+                                  </Box>
+                                  <Box sx={{ flex: 1, minWidth: "150px" }}>
+                                    <Typography
+                                      variant="caption"
+                                      color="text.secondary"
+                                    >
+                                      Changed By
+                                    </Typography>
+                                    <Typography variant="body2">
+                                      {(
+                                        activity.data as {
+                                          createdBy: {
+                                            name: string | null;
+                                            email: string;
+                                          };
+                                        }
+                                      ).createdBy?.name ||
+                                        (
+                                          activity.data as {
+                                            createdBy: {
+                                              name: string | null;
+                                              email: string;
+                                            };
+                                          }
+                                        ).createdBy?.email ||
+                                        "—"}
+                                    </Typography>
+                                    <Typography variant="body2">
+                                      (
+                                      {(
+                                        activity.data as {
+                                          createdBy: {
+                                            name: string | null;
+                                            email: string;
+                                          };
+                                        }
+                                      ).createdBy?.email || "—"}
+                                      )
+                                    </Typography>
+                                  </Box>
+                                </Box>
+                                <Box
+                                  sx={{ minWidth: "150px", textAlign: "right" }}
+                                >
+                                  <Typography
+                                    variant="caption"
+                                    color="text.secondary"
+                                  >
+                                    {activity.createdAt.toLocaleDateString(
+                                      "en-CA",
+                                    )}{" "}
+                                    {activity.createdAt.toLocaleTimeString(
+                                      "en-US",
+                                      {
+                                        hour: "2-digit",
+                                        minute: "2-digit",
+                                        hour12: false,
+                                      },
+                                    )}
+                                  </Typography>
+                                </Box>
+                              </Box>
+                            </>
+                          )}
+                        </Box>
+                      ))}
                     </Box>
-                  ))}
-                </Box>
-              ) : (
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  sx={{ textAlign: "center", py: 2 }}
-                >
-                  No activity history available for this miner.
-                </Typography>
+                  ) : (
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{ textAlign: "center", py: 2 }}
+                    >
+                      No activity history available for this miner.
+                    </Typography>
+                  )}
+                </>
               );
             })()}
           </Box>
@@ -977,11 +1152,18 @@ export default function MinersTable({
       </Dialog>
 
       {/* Repair Notes Modal */}
+      {/* Repair Notes Modal */}
       <RepairNotesModal
         open={repairNotesOpen}
         onClose={() => setRepairNotesOpen(false)}
         minerId={selectedMinerId}
         minerName={selectedMinerName}
+        serialNumber={
+          memoizedRows.find((m) => m.id === selectedMinerId)?.serialNumber
+        }
+        macAddress={
+          memoizedRows.find((m) => m.id === selectedMinerId)?.macAddress
+        }
       />
     </Box>
   );

@@ -1,10 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  Invoice,
-  InvoiceStatus,
-  CostPayment,
-  AuditLog,
-} from "@prisma/client";
+import { Invoice, InvoiceStatus, CostPayment, AuditLog } from "@prisma/client";
 
 export interface AuditLogWithUser extends AuditLog {
   user?: {
@@ -216,7 +211,13 @@ export function useCustomers() {
 export interface Miner {
   id: string;
   name: string;
-  status: string;
+  hardwareId: string;
+  status: "AUTO" | "DEPLOYMENT_IN_PROGRESS" | "UNDER_MAINTENANCE" | string;
+  userId: string;
+  spaceId: string;
+  createdAt: string;
+  updatedAt: string;
+  isDeleted: boolean;
 }
 
 export function useCustomerMiners(customerId?: string) {

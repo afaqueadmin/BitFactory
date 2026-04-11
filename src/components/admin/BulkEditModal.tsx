@@ -16,7 +16,7 @@ interface BulkEditModalProps {
   onSubmit: (updates: {
     spaceId?: string;
     rate_per_kwh?: number;
-    status?: "AUTO" | "DEPLOYMENT_IN_PROGRESS";
+    status?: "AUTO" | "DEPLOYMENT_IN_PROGRESS" | "UNDER_MAINTENANCE";
   }) => Promise<void>;
 }
 
@@ -30,7 +30,7 @@ export function BulkEditModal({
   const [spaceId, setSpaceId] = useState<string>("");
   const [rate, setRate] = useState<string>("");
   const [status, setStatus] = useState<
-    "AUTO" | "DEPLOYMENT_IN_PROGRESS" | ""
+    "AUTO" | "DEPLOYMENT_IN_PROGRESS" | "UNDER_MAINTENANCE" | ""
   >();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>("");
@@ -137,7 +137,11 @@ export function BulkEditModal({
               value={status}
               onChange={(e) =>
                 setStatus(
-                  e.target.value as "AUTO" | "DEPLOYMENT_IN_PROGRESS" | "",
+                  e.target.value as
+                    | "AUTO"
+                    | "DEPLOYMENT_IN_PROGRESS"
+                    | "UNDER_MAINTENANCE"
+                    | "",
                 )
               }
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -147,6 +151,7 @@ export function BulkEditModal({
               <option value="DEPLOYMENT_IN_PROGRESS">
                 Deployment in Progress
               </option>
+              <option value="UNDER_MAINTENANCE">Under Maintenance</option>
             </select>
           </div>
 

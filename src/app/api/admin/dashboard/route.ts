@@ -484,7 +484,10 @@ export async function GET(request: NextRequest) {
     // Fetch inactive miners from local database (DEPLOYMENT_IN_PROGRESS status)
     try {
       inactiveMiners = await prisma.miner.count({
-        where: { status: "DEPLOYMENT_IN_PROGRESS", isDeleted: false },
+        where: {
+          status: { in: ["DEPLOYMENT_IN_PROGRESS", "UNDER_MAINTENANCE"] },
+          isDeleted: false,
+        },
       });
       console.log(
         `[Admin Dashboard] Inactive miners from DB: ${inactiveMiners}`,

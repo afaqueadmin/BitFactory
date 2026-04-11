@@ -48,8 +48,10 @@ interface MinerFormData {
   hardwareId: string;
   userId: string;
   spaceId: string;
-  status: "AUTO" | "DEPLOYMENT_IN_PROGRESS";
+  status: "AUTO" | "DEPLOYMENT_IN_PROGRESS" | "UNDER_MAINTENANCE";
   rate_per_kwh: string | number;
+  serialNumber: string;
+  macAddress: string;
 }
 
 /**
@@ -78,10 +80,12 @@ interface Miner {
   id: string;
   name: string;
   hardwareId: string;
-  status: "AUTO" | "DEPLOYMENT_IN_PROGRESS";
+  status: "AUTO" | "DEPLOYMENT_IN_PROGRESS" | "UNDER_MAINTENANCE";
   userId: string;
   spaceId: string;
   rate_per_kwh?: number;
+  serialNumber?: string | null;
+  macAddress?: string | null;
   createdAt: string;
   updatedAt: string;
   user?: User;
@@ -122,6 +126,8 @@ export default function MinerFormModal({
     spaceId: "",
     status: "DEPLOYMENT_IN_PROGRESS",
     rate_per_kwh: "",
+    serialNumber: "",
+    macAddress: "",
   });
 
   /**
@@ -160,6 +166,8 @@ export default function MinerFormModal({
         spaceId: miner.spaceId,
         status: miner.status,
         rate_per_kwh: miner.rate_per_kwh || "",
+        serialNumber: miner.serialNumber || "",
+        macAddress: miner.macAddress || "",
       });
       if (miner.hardware) {
         setSelectedHardware(miner.hardware);
@@ -172,6 +180,8 @@ export default function MinerFormModal({
         spaceId: "",
         status: "DEPLOYMENT_IN_PROGRESS",
         rate_per_kwh: "",
+        serialNumber: "",
+        macAddress: "",
       });
       setSelectedHardware(null);
     }
@@ -271,12 +281,16 @@ export default function MinerFormModal({
         spaceId: string;
         status: string;
         rate_per_kwh?: number;
+        serialNumber?: string;
+        macAddress?: string;
       } = {
         name: formData.name,
         hardwareId: formData.hardwareId,
         userId: formData.userId,
         spaceId: formData.spaceId,
         status: formData.status,
+        serialNumber: formData.serialNumber || undefined,
+        macAddress: formData.macAddress || undefined,
       };
 
       // Include rate_per_kwh if provided
@@ -465,6 +479,7 @@ export default function MinerFormModal({
                 Deployment in Progress
               </MenuItem>
               <MenuItem value="AUTO">Auto</MenuItem>
+              <MenuItem value="UNDER_MAINTENANCE">Under Maintenance</MenuItem>
             </Select>
           </FormControl>
 
@@ -488,6 +503,28 @@ export default function MinerFormModal({
                 ? "Optional: leave empty to keep current rate"
                 : "Required for cost calculation"
             }
+          />
+
+          <TextField
+            fullWidth
+            label="Serial Number"
+            name="serialNumber"
+            value={formData.serialNumber}
+            onChange={handleChange}
+            placeholder="e.g., SN123456789"
+            margin="normal"
+            disabled={loading || isLoading}
+          />
+
+          <TextField
+            fullWidth
+            label="MAC Address"
+            name="macAddress"
+            value={formData.macAddress}
+            onChange={handleChange}
+            placeholder="e.g., AA:BB:CC:DD:EE:FF"
+            margin="normal"
+            disabled={loading || isLoading}
           />
         </Box>
       </DialogContent>

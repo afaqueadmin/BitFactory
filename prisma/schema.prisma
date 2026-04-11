@@ -131,6 +131,8 @@ model Miner {
   isDeleted        Boolean                 @default(false)
   poolId           String?
   poolAuth         String?
+  serialNumber     String?
+  macAddress       String?
   ownershipHistory MinerOwnershipHistory[]
   rateHistory      MinerRateHistory[]
   hardware         Hardware                @relation(fields: [hardwareId], references: [id])

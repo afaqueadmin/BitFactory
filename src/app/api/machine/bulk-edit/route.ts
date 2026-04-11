@@ -8,7 +8,7 @@ interface BulkEditRequest {
   updates: {
     spaceId?: string;
     rate_per_kwh?: number | string;
-    status?: "AUTO" | "DEPLOYMENT_IN_PROGRESS";
+    status?: "AUTO" | "DEPLOYMENT_IN_PROGRESS" | "UNDER_MAINTENANCE";
   };
 }
 
@@ -106,11 +106,16 @@ export async function POST(
 
     // Validate status if provided
     if (updates.status !== undefined) {
-      if (!["AUTO", "DEPLOYMENT_IN_PROGRESS"].includes(updates.status)) {
+      if (
+        !["AUTO", "DEPLOYMENT_IN_PROGRESS", "UNDER_MAINTENANCE"].includes(
+          updates.status,
+        )
+      ) {
         return NextResponse.json(
           {
             success: false,
-            error: "status must be AUTO or DEPLOYMENT_IN_PROGRESS",
+            error:
+              "status must be AUTO, DEPLOYMENT_IN_PROGRESS, or UNDER_MAINTENANCE",
           },
           { status: 400 },
         );
