@@ -42,6 +42,11 @@ export async function GET(request: NextRequest) {
       },
     });
 
+    // Determine which pools are active (have at least one miner)
+    const activePoolNames: string[] = [];
+    if (miners.some(m => m.pool?.name === "Luxor")) activePoolNames.push("Luxor");
+    if (miners.some(m => m.pool?.name === "Braiins")) activePoolNames.push("Braiins");
+
     if (!miners || miners.length === 0) {
       console.log(`[Miners Summary API] User ${userId} has no miners`);
       return NextResponse.json(
@@ -52,6 +57,7 @@ export async function GET(request: NextRequest) {
             activeMiners: 0,
             totalRevenue: 0,
             hashprice: 0,
+            activePoolNames: [],
             pools: {
               luxor: {
                 miners: 0,
@@ -168,6 +174,7 @@ export async function GET(request: NextRequest) {
         // revenue_24h is an array of RevenueSummary objects, sum them up
         let revenue = 0;
         if (Array.isArray(summaryData.revenue_24h)) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           revenue = summaryData.revenue_24h.reduce((sum: number, item: any) => {
             return sum + (item.amount || item.revenue || 0);
           }, 0);
@@ -341,6 +348,7 @@ export async function GET(request: NextRequest) {
         hashprice: aggHashprice,
         efficiency_5m: avgEfficiency,
         uptime_24h: avgUptime,
+        activePoolNames: activePoolNames,
         pools: {
           luxor: {
             miners: poolStats.luxor.miners,

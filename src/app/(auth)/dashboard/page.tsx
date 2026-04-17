@@ -51,6 +51,7 @@ export default function DashboardPage() {
   const [workersStats, setWorkersStats] = React.useState<{
     activeWorkers: number;
     inactiveWorkers: number;
+    activePoolNames: string[];
     poolBreakdown?: {
       luxor: { activeWorkers: number; inactiveWorkers: number };
       braiins: { activeWorkers: number; inactiveWorkers: number };
@@ -58,6 +59,7 @@ export default function DashboardPage() {
   }>({
     activeWorkers: 0,
     inactiveWorkers: 0,
+    activePoolNames: [],
   });
   const [workersLoading, setWorkersLoading] = React.useState(true);
   const [workersError, setWorkersError] = React.useState<string | null>(null);
@@ -166,8 +168,16 @@ export default function DashboardPage() {
           setWorkersStats({
             activeWorkers: data.data.activeWorkers || 0,
             inactiveWorkers: data.data.inactiveWorkers || 0,
+            activePoolNames: data.data.activePoolNames || [],
             poolBreakdown: data.data.poolBreakdown,
           });
+          // Reset chart mode if not applicable
+          if (data.data.activePoolNames && !data.data.activePoolNames.includes("Luxor") && chartMode === "luxor") {
+            setChartMode("total");
+          }
+          if (data.data.activePoolNames && !data.data.activePoolNames.includes("Braiins") && chartMode === "braiins") {
+            setChartMode("total");
+          }
         } else {
           throw new Error(data.error || "Failed to fetch workers");
         }
@@ -176,7 +186,7 @@ export default function DashboardPage() {
         setWorkersError(
           err instanceof Error ? err.message : "Failed to fetch workers",
         );
-        setWorkersStats({ activeWorkers: 0, inactiveWorkers: 0 });
+        setWorkersStats({ activeWorkers: 0, inactiveWorkers: 0, activePoolNames: [] });
       } finally {
         setWorkersLoading(false);
       }
@@ -219,8 +229,16 @@ export default function DashboardPage() {
         setWorkersStats({
           activeWorkers: data.data.activeWorkers || 0,
           inactiveWorkers: data.data.inactiveWorkers || 0,
+          activePoolNames: data.data.activePoolNames || [],
           poolBreakdown: data.data.poolBreakdown,
         });
+        // Reset chart mode if not applicable
+        if (data.data.activePoolNames && !data.data.activePoolNames.includes("Luxor") && chartMode === "luxor") {
+          setChartMode("total");
+        }
+        if (data.data.activePoolNames && !data.data.activePoolNames.includes("Braiins") && chartMode === "braiins") {
+          setChartMode("total");
+        }
       } else {
         throw new Error(data.error || "Failed to fetch workers");
       }
@@ -278,6 +296,7 @@ export default function DashboardPage() {
               runningCount={hosted.runningCount}
               progress={hosted.progress}
               errorCount={hosted.errorCount}
+              activePoolNames={workersStats.activePoolNames}
               poolBreakdown={workersStats.poolBreakdown}
               loading={workersLoading}
               error={workersError}
@@ -352,115 +371,121 @@ export default function DashboardPage() {
               Daily Mining Performance
             </Typography>
 
-            {/* Chart View Mode Toggle Buttons */}
-            <Box
-              sx={{
-                display: "flex",
-                gap: 1,
-                flexWrap: "wrap",
-                justifyContent: { xs: "flex-start", sm: "flex-end" },
-              }}
-            >
-              <button
-                onClick={() => setChartMode("total")}
-                style={{
-                  padding: "8px 16px",
-                  borderRadius: "6px",
-                  border: "none",
-                  cursor: "pointer",
-                  fontWeight: chartMode === "total" ? 600 : 400,
-                  backgroundColor:
-                    chartMode === "total"
-                      ? theme.palette.primary.main
-                      : theme.palette.mode === "dark"
-                        ? "rgba(255,255,255,0.1)"
-                        : "rgba(0,0,0,0.05)",
-                  color:
-                    chartMode === "total"
-                      ? theme.palette.primary.contrastText
-                      : theme.palette.text.primary,
-                  transition: "all 0.2s",
+            {/* Chart View Mode Toggle Buttons - Only show if multiple pools */}
+            {workersStats.activePoolNames.length > 1 && (
+              <Box
+                sx={{
+                  display: "flex",
+                  gap: 1,
+                  flexWrap: "wrap",
+                  justifyContent: { xs: "flex-start", sm: "flex-end" },
                 }}
-                title="Show total earnings from all pools"
               >
-                Total
-              </button>
+                <button
+                  onClick={() => setChartMode("total")}
+                  style={{
+                    padding: "8px 16px",
+                    borderRadius: "6px",
+                    border: "none",
+                    cursor: "pointer",
+                    fontWeight: chartMode === "total" ? 600 : 400,
+                    backgroundColor:
+                      chartMode === "total"
+                        ? theme.palette.primary.main
+                        : theme.palette.mode === "dark"
+                          ? "rgba(255,255,255,0.1)"
+                          : "rgba(0,0,0,0.05)",
+                    color:
+                      chartMode === "total"
+                        ? theme.palette.primary.contrastText
+                        : theme.palette.text.primary,
+                    transition: "all 0.2s",
+                  }}
+                  title="Show total earnings from all pools"
+                >
+                  Total
+                </button>
 
-              <button
-                onClick={() => setChartMode("luxor")}
-                style={{
-                  padding: "8px 16px",
-                  borderRadius: "6px",
-                  border: "none",
-                  cursor: "pointer",
-                  fontWeight: chartMode === "luxor" ? 600 : 400,
-                  backgroundColor:
-                    chartMode === "luxor"
-                      ? "#1565C0"
-                      : theme.palette.mode === "dark"
-                        ? "rgba(255,255,255,0.1)"
-                        : "rgba(0,0,0,0.05)",
-                  color:
-                    chartMode === "luxor"
-                      ? "#FFFFFF"
-                      : theme.palette.text.primary,
-                  transition: "all 0.2s",
-                }}
-                title="Show Luxor pool earnings only"
-              >
-                🔷 Luxor
-              </button>
+                {workersStats.activePoolNames.includes("Luxor") && (
+                  <button
+                    onClick={() => setChartMode("luxor")}
+                    style={{
+                      padding: "8px 16px",
+                      borderRadius: "6px",
+                      border: "none",
+                      cursor: "pointer",
+                      fontWeight: chartMode === "luxor" ? 600 : 400,
+                      backgroundColor:
+                        chartMode === "luxor"
+                          ? "#1565C0"
+                          : theme.palette.mode === "dark"
+                            ? "rgba(255,255,255,0.1)"
+                            : "rgba(0,0,0,0.05)",
+                      color:
+                        chartMode === "luxor"
+                          ? "#FFFFFF"
+                          : theme.palette.text.primary,
+                      transition: "all 0.2s",
+                    }}
+                    title="Show Luxor pool earnings only"
+                  >
+                    🔷 Luxor
+                  </button>
+                )}
 
-              <button
-                onClick={() => setChartMode("braiins")}
-                style={{
-                  padding: "8px 16px",
-                  borderRadius: "6px",
-                  border: "none",
-                  cursor: "pointer",
-                  fontWeight: chartMode === "braiins" ? 600 : 400,
-                  backgroundColor:
-                    chartMode === "braiins"
-                      ? "#FFA500"
-                      : theme.palette.mode === "dark"
-                        ? "rgba(255,255,255,0.1)"
-                        : "rgba(0,0,0,0.05)",
-                  color:
-                    chartMode === "braiins"
-                      ? "#FFFFFF"
-                      : theme.palette.text.primary,
-                  transition: "all 0.2s",
-                }}
-                title="Show Braiins pool earnings only"
-              >
-                🔶 Braiins
-              </button>
+                {workersStats.activePoolNames.includes("Braiins") && (
+                  <button
+                    onClick={() => setChartMode("braiins")}
+                    style={{
+                      padding: "8px 16px",
+                      borderRadius: "6px",
+                      border: "none",
+                      cursor: "pointer",
+                      fontWeight: chartMode === "braiins" ? 600 : 400,
+                      backgroundColor:
+                        chartMode === "braiins"
+                          ? "#FFA500"
+                          : theme.palette.mode === "dark"
+                            ? "rgba(255,255,255,0.1)"
+                            : "rgba(0,0,0,0.05)",
+                      color:
+                        chartMode === "braiins"
+                          ? "#FFFFFF"
+                          : theme.palette.text.primary,
+                      transition: "all 0.2s",
+                    }}
+                    title="Show Braiins pool earnings only"
+                  >
+                    🔶 Braiins
+                  </button>
+                )}
 
-              <button
-                onClick={() => setChartMode("stacked")}
-                style={{
-                  padding: "8px 16px",
-                  borderRadius: "6px",
-                  border: "none",
-                  cursor: "pointer",
-                  fontWeight: chartMode === "stacked" ? 600 : 400,
-                  backgroundColor:
-                    chartMode === "stacked"
-                      ? theme.palette.success.main
-                      : theme.palette.mode === "dark"
-                        ? "rgba(255,255,255,0.1)"
-                        : "rgba(0,0,0,0.05)",
-                  color:
-                    chartMode === "stacked"
-                      ? theme.palette.success.contrastText
-                      : theme.palette.text.primary,
-                  transition: "all 0.2s",
-                }}
-                title="Show stacked view of both pools"
-              >
-                Stacked
-              </button>
-            </Box>
+                <button
+                  onClick={() => setChartMode("stacked")}
+                  style={{
+                    padding: "8px 16px",
+                    borderRadius: "6px",
+                    border: "none",
+                    cursor: "pointer",
+                    fontWeight: chartMode === "stacked" ? 600 : 400,
+                    backgroundColor:
+                      chartMode === "stacked"
+                        ? theme.palette.success.main
+                        : theme.palette.mode === "dark"
+                          ? "rgba(255,255,255,0.1)"
+                          : "rgba(0,0,0,0.05)",
+                    color:
+                      chartMode === "stacked"
+                        ? theme.palette.success.contrastText
+                        : theme.palette.text.primary,
+                    transition: "all 0.2s",
+                  }}
+                  title="Show stacked view of both pools"
+                >
+                  Stacked
+                </button>
+              </Box>
+            )}
           </Box>
 
           <MiningEarningsChart height={520} days={31} viewMode={chartMode} />

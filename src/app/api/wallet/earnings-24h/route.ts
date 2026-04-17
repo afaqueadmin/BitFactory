@@ -185,6 +185,11 @@ export async function GET(request: NextRequest) {
     totalRevenueBtc = luxorRevenueBtc + braiinsRevenueBtc;
     totalRevenueUsd = luxorRevenueUsd;
 
+    // Determine which pools have miners
+    const activePoolNames = [];
+    if (luxorGroups.length > 0) activePoolNames.push("Luxor");
+    if (braiinsGroups.length > 0) activePoolNames.push("Braiins");
+
     return NextResponse.json({
       revenue24h: {
         btc: Number(totalRevenueBtc.toFixed(8)),
@@ -193,6 +198,7 @@ export async function GET(request: NextRequest) {
       currency: "BTC",
       timestamp: new Date().toISOString(),
       dataSource: luxorGroups.length > 0 && braiinsGroups.length > 0 ? "both" : luxorGroups.length > 0 ? "luxor" : "braiins",
+      activePoolNames,
       poolBreakdown: {
         luxor: {
           btc: Number(luxorRevenueBtc.toFixed(8)),

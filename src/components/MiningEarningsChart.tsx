@@ -280,9 +280,10 @@ export default function MiningEarningsChart({
               />
 
               <Tooltip
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 formatter={(
-                  value: number | string | undefined,
-                  name?: string,
+                  value: any, // eslint-disable-line @typescript-eslint/no-explicit-any
+                  name?: any, // eslint-disable-line @typescript-eslint/no-explicit-any
                 ) => {
                   if (value == null || !name) {
                     return ["", ""];

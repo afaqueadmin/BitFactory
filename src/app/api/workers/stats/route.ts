@@ -9,6 +9,7 @@ interface WorkersStats {
   activeWorkers: number;
   inactiveWorkers: number;
   totalWorkers: number;
+  activePoolNames: string[];
   poolBreakdown?: {
     luxor: {
       activeWorkers: number;
@@ -47,6 +48,11 @@ export async function GET(request: NextRequest) {
       include: { pool: { select: { id: true, name: true } } },
     });
 
+    // Determine which pools are active (have at least one miner)
+    const activePoolNames: string[] = [];
+    if (miners.some(m => m.pool?.name === "Luxor")) activePoolNames.push("Luxor");
+    if (miners.some(m => m.pool?.name === "Braiins")) activePoolNames.push("Braiins");
+
     if (miners.length === 0) {
       console.log(`[Workers Stats API] User ${userId} has no miners configured`);
       return NextResponse.json({
@@ -55,6 +61,7 @@ export async function GET(request: NextRequest) {
           activeWorkers: 0,
           inactiveWorkers: 0,
           totalWorkers: 0,
+          activePoolNames: [],
         },
         timestamp: new Date().toISOString(),
       });
@@ -223,6 +230,7 @@ export async function GET(request: NextRequest) {
       activeWorkers: totalActiveWorkers,
       inactiveWorkers: totalInactiveWorkers,
       totalWorkers: totalActiveWorkers + totalInactiveWorkers,
+      activePoolNames: activePoolNames,
       poolBreakdown: {
         luxor: luxorStats,
         braiins: braiinsStats,
@@ -230,7 +238,7 @@ export async function GET(request: NextRequest) {
     };
 
     console.log(
-      `[Workers Stats API] Final stats - Active: ${totalActiveWorkers}, Inactive: ${totalInactiveWorkers}`,
+      `[Workers Stats API] Final stats - Active: ${totalActiveWorkers}, Inactive: ${totalInactiveWorkers}, Active Pools: ${activePoolNames.join(", ")}`,
     );
 
     return NextResponse.json({

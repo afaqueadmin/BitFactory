@@ -14,12 +14,14 @@ interface AdminStatCardProps {
   title: string;
   stats: StatItem[];
   total?: number;
+  borderColor?: string; // Color for left border (e.g., "#757575" for DB, "#1565C0" for Luxor, etc.)
 }
 
 export default function AdminStatCard({
   title,
   stats,
   total,
+  borderColor,
 }: AdminStatCardProps) {
   const theme = useTheme();
 
@@ -46,7 +48,9 @@ export default function AdminStatCard({
       sx={{
         borderRadius: 3,
         boxShadow: "0px 2px 8px rgba(0, 0, 0, 0.08)",
-        border: "none",
+        border: "1px solid",
+        borderColor: (theme) => theme.palette.divider,
+        borderLeft: borderColor ? `4px solid ${borderColor}` : "none",
         height: "100%",
         minHeight: 200,
         backgroundColor: theme.palette.mode === "dark" ? "#1e1e1e" : "#ffffff",

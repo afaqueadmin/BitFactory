@@ -56,6 +56,18 @@ interface Hardware {
 }
 
 /**
+ * Pool object from API
+ */
+interface Pool {
+  id: string;
+  name: string;
+  apiUrl: string;
+  description?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/**
  * Miner object from API
  */
 interface Miner {
@@ -65,6 +77,7 @@ interface Miner {
   hardwareId: string;
   userId: string;
   spaceId: string;
+  poolId?: string | null;
   createdAt: string;
   updatedAt: string;
   rate_per_kwh?: number;
@@ -74,6 +87,7 @@ interface Miner {
   user?: User;
   space?: Space;
   hardware?: Hardware;
+  pool?: Pool;
   ownershipHistory?: Array<{
     id: string;
     minerId?: string;
@@ -115,6 +129,7 @@ export default function MachinePage() {
   const [miners, setMiners] = useState<Miner[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [spaces, setSpaces] = useState<Space[]>([]);
+  const [pools, setPools] = useState<Pool[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -124,6 +139,7 @@ export default function MachinePage() {
   const [selectedSpaceFilter, setSelectedSpaceFilter] = useState<string>("");
   const [selectedModelFilter, setSelectedModelFilter] = useState<string>("");
   const [selectedRateFilter, setSelectedRateFilter] = useState<string>("");
+  const [selectedPoolFilter, setSelectedPoolFilter] = useState<string>("");
   const [showBulkEditModal, setShowBulkEditModal] = useState(false);
   const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
   const [showDeleted, setShowDeleted] = useState(false);
@@ -141,10 +157,11 @@ export default function MachinePage() {
       if (showDeleted) {
         minerUrl.searchParams.append("isDeleted", "true");
       }
-      const [minersRes, spacesRes, usersRes] = await Promise.all([
+      const [minersRes, spacesRes, usersRes, poolsRes] = await Promise.all([
         fetch(minerUrl),
         fetch("/api/spaces"),
         fetch("/api/user/all"),
+        fetch("/api/pools"),
       ]);
 
       if (!minersRes.ok) {
@@ -194,6 +211,15 @@ export default function MachinePage() {
           setUsers(transformedUsers);
         }
       }
+
+      // Fetch pools
+      if (poolsRes.ok) {
+        const poolsData: ApiResponse<Pool[]> = await poolsRes.json();
+        if (poolsData.success && poolsData.data) {
+          setPools(poolsData.data);
+        }
+      }
+
       // Fetch external resource link separately without blocking
       fetch("/api/external-resource?key=hosted-miners-sheet")
         .then((res) => res.json())
@@ -401,6 +427,13 @@ export default function MachinePage() {
   };
 
   /**
+   * Handle pool filter change
+   */
+  const handlePoolFilterChange = (event: SelectChangeEvent) => {
+    setSelectedPoolFilter(event.target.value);
+  };
+
+  /**
    * Get unique models from miners
    */
   const getUniqueModels = () => {
@@ -426,6 +459,30 @@ export default function MachinePage() {
     return Array.from(rates)
       .sort((a, b) => a - b)
       .map((rate) => rate.toString());
+  };
+
+  /**
+   * Get unique pools from miners (includes "Unassigned" option)
+   */
+  const getUniquePools = () => {
+    // Check if there are any unassigned miners
+    const hasUnassigned = miners.some((m) => !m.poolId);
+    
+    const poolOptions: Array<{ id: string; name: string }> = [];
+    
+    if (hasUnassigned) {
+      poolOptions.push({ id: "UNASSIGNED", name: "Unassigned" });
+    }
+    
+    // Add all available pools
+    poolOptions.push(
+      ...pools.map((pool) => ({
+        id: pool.id,
+        name: pool.name,
+      })),
+    );
+    
+    return poolOptions;
   };
 
   /**
@@ -459,6 +516,17 @@ export default function MachinePage() {
           m.rate_per_kwh &&
           Math.abs(Number(m.rate_per_kwh) - targetRate) < 0.0001,
       );
+    }
+
+    // Filter by selected pool
+    if (selectedPoolFilter) {
+      if (selectedPoolFilter === "UNASSIGNED") {
+        // Show only miners without a pool assignment
+        filtered = filtered.filter((m) => !m.poolId);
+      } else {
+        // Show only miners with the selected pool
+        filtered = filtered.filter((m) => m.poolId === selectedPoolFilter);
+      }
     }
 
     // Sort by user (grouped by userId, then by miner name within each user)
@@ -667,6 +735,24 @@ export default function MachinePage() {
                     ))}
                   </Select>
                 </FormControl>
+
+                <FormControl sx={{ minWidth: 250 }}>
+                  <InputLabel>Filter by Pool</InputLabel>
+                  <Select
+                    value={selectedPoolFilter}
+                    onChange={handlePoolFilterChange}
+                    label="Filter by Pool"
+                  >
+                    <MenuItem value="">
+                      <em>All Pools</em>
+                    </MenuItem>
+                    {getUniquePools().map((pool) => (
+                      <MenuItem key={pool.id} value={pool.id}>
+                        {pool.name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
               </Stack>
             </Box>
 
@@ -753,6 +839,7 @@ export default function MachinePage() {
         miner={selectedMiner}
         users={users}
         spaces={spaces}
+        pools={pools}
         isLoading={loading}
       />
 
@@ -762,6 +849,7 @@ export default function MachinePage() {
         onClose={() => setShowBulkEditModal(false)}
         minerCount={getSortedFilteredMiners().length}
         spaces={spaces}
+        pools={pools}
         onSubmit={handleBulkEdit}
       />
 

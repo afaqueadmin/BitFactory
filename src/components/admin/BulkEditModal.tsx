@@ -8,15 +8,24 @@ interface Space {
   location: string;
 }
 
+interface Pool {
+  id: string;
+  name: string;
+  apiUrl: string;
+  description?: string | null;
+}
+
 interface BulkEditModalProps {
   isOpen: boolean;
   onClose: () => void;
   minerCount: number;
   spaces: Space[];
+  pools: Pool[];
   onSubmit: (updates: {
     spaceId?: string;
     rate_per_kwh?: number;
     status?: "AUTO" | "DEPLOYMENT_IN_PROGRESS" | "UNDER_MAINTENANCE";
+    poolId?: string | null;
   }) => Promise<void>;
 }
 
@@ -25,10 +34,12 @@ export function BulkEditModal({
   onClose,
   minerCount,
   spaces,
+  pools,
   onSubmit,
 }: BulkEditModalProps) {
   const [spaceId, setSpaceId] = useState<string>("");
   const [rate, setRate] = useState<string>("");
+  const [poolId, setPoolId] = useState<string>("");
   const [status, setStatus] = useState<
     "AUTO" | "DEPLOYMENT_IN_PROGRESS" | "UNDER_MAINTENANCE" | ""
   >();
@@ -40,7 +51,7 @@ export function BulkEditModal({
     setError("");
 
     // Validate that at least one field is filled
-    if (!spaceId && !rate && !status) {
+    if (!spaceId && !rate && !status && !poolId) {
       setError("Please select at least one field to update");
       return;
     }
@@ -61,6 +72,7 @@ export function BulkEditModal({
       if (spaceId) updates.spaceId = spaceId;
       if (rate) updates.rate_per_kwh = Number(rate);
       if (status) updates.status = status;
+      if (poolId) updates.poolId = poolId;
 
       await onSubmit(updates);
 
@@ -68,6 +80,7 @@ export function BulkEditModal({
       setSpaceId("");
       setRate("");
       setStatus("");
+      setPoolId("");
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update miners");
@@ -152,6 +165,25 @@ export function BulkEditModal({
                 Deployment in Progress
               </option>
               <option value="UNDER_MAINTENANCE">Under Maintenance</option>
+            </select>
+          </div>
+
+          {/* Pool Field */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Pool (Optional)
+            </label>
+            <select
+              value={poolId}
+              onChange={(e) => setPoolId(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">No change</option>
+              {pools.map((pool) => (
+                <option key={pool.id} value={pool.id}>
+                  {pool.name}
+                </option>
+              ))}
             </select>
           </div>
 

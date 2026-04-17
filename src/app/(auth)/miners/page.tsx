@@ -17,6 +17,7 @@ interface MinersSummary {
   hashprice: number;
   efficiency_5m: number;
   uptime_24h: number;
+  activePoolNames: string[];
   pools: {
     luxor: {
       miners: number;
@@ -71,7 +72,21 @@ export default function Miners() {
 
   // Fetch miners summary using TanStack Query
   const {
-    data: minersSummary = { data: {} as MinersSummary },
+    data: minersSummary = { 
+      data: { 
+        totalHashrate: 0,
+        activeMiners: 0,
+        totalRevenue: 0,
+        hashprice: 0,
+        efficiency_5m: 0,
+        uptime_24h: 0,
+        activePoolNames: [],
+        pools: {
+          luxor: { miners: 0, hashrate: 0, activeWorkers: 0, hashprice: 0, efficiency_5m: 0, uptime_24h: 0 },
+          braiins: { miners: 0, hashrate: 0, activeWorkers: 0, hashprice: 0, efficiency_5m: 0, uptime_24h: 0 }
+        }
+      } as MinersSummary 
+    },
     isLoading: summaryLoading,
   } = useQuery({
     queryKey: ["miners-summary"],
@@ -85,7 +100,21 @@ export default function Miners() {
 
       if (!response.ok) {
         console.error("Failed to fetch miners summary");
-        return { data: {} };
+        return { 
+          data: { 
+            totalHashrate: 0,
+            activeMiners: 0,
+            totalRevenue: 0,
+            hashprice: 0,
+            efficiency_5m: 0,
+            uptime_24h: 0,
+            activePoolNames: [],
+            pools: {
+              luxor: { miners: 0, hashrate: 0, activeWorkers: 0, hashprice: 0, efficiency_5m: 0, uptime_24h: 0 },
+              braiins: { miners: 0, hashrate: 0, activeWorkers: 0, hashprice: 0, efficiency_5m: 0, uptime_24h: 0 }
+            }
+          } 
+        };
       }
 
       const result = await response.json();
@@ -95,6 +124,18 @@ export default function Miners() {
   });
 
   const data = minersSummary.data as MinersSummary;
+
+  // Reset poolMode if not applicable
+  useEffect(() => {
+    if (data.activePoolNames && data.activePoolNames.length > 0) {
+      if (!data.activePoolNames.includes("Luxor") && poolMode === "luxor") {
+        setPoolMode("total");
+      }
+      if (!data.activePoolNames.includes("Braiins") && poolMode === "braiins") {
+        setPoolMode("total");
+      }
+    }
+  }, [data.activePoolNames]);
 
   // Log current pool mode selection
   useEffect(() => {
@@ -193,83 +234,89 @@ export default function Miners() {
         </Alert>
       )}
 
-      {/* Pool Mode Toggle Buttons */}
-      <Box
-        sx={{
-          display: "flex",
-          gap: 1,
-          mb: 4,
-          flexWrap: "wrap",
-        }}
-      >
-        <button
-          onClick={() => setPoolMode("total")}
-          style={{
-            padding: "8px 16px",
-            borderRadius: "6px",
-            border: "none",
-            cursor: "pointer",
-            fontWeight: poolMode === "total" ? 600 : 400,
-            backgroundColor:
-              poolMode === "total"
-                ? theme.palette.primary.main
-                : theme.palette.mode === "dark"
-                  ? "rgba(255,255,255,0.1)"
-                  : "rgba(0,0,0,0.05)",
-            color:
-              poolMode === "total"
-                ? theme.palette.primary.contrastText
-                : theme.palette.text.primary,
-            transition: "all 0.2s",
+      {/* Pool Mode Toggle Buttons - Only show if multiple pools */}
+      {data.activePoolNames && data.activePoolNames.length > 1 && (
+        <Box
+          sx={{
+            display: "flex",
+            gap: 1,
+            mb: 4,
+            flexWrap: "wrap",
           }}
         >
-          Total
-        </button>
+          <button
+            onClick={() => setPoolMode("total")}
+            style={{
+              padding: "8px 16px",
+              borderRadius: "6px",
+              border: "none",
+              cursor: "pointer",
+              fontWeight: poolMode === "total" ? 600 : 400,
+              backgroundColor:
+                poolMode === "total"
+                  ? theme.palette.primary.main
+                  : theme.palette.mode === "dark"
+                    ? "rgba(255,255,255,0.1)"
+                    : "rgba(0,0,0,0.05)",
+              color:
+                poolMode === "total"
+                  ? theme.palette.primary.contrastText
+                  : theme.palette.text.primary,
+              transition: "all 0.2s",
+            }}
+          >
+            Total
+          </button>
 
-        <button
-          onClick={() => setPoolMode("luxor")}
-          style={{
-            padding: "8px 16px",
-            borderRadius: "6px",
-            border: "none",
-            cursor: "pointer",
-            fontWeight: poolMode === "luxor" ? 600 : 400,
-            backgroundColor:
-              poolMode === "luxor"
-                ? "#1565C0"
-                : theme.palette.mode === "dark"
-                  ? "rgba(255,255,255,0.1)"
-                  : "rgba(0,0,0,0.05)",
-            color:
-              poolMode === "luxor" ? "#FFFFFF" : theme.palette.text.primary,
-            transition: "all 0.2s",
-          }}
-        >
-          🔷 Luxor
-        </button>
+          {data.activePoolNames.includes("Luxor") && (
+            <button
+              onClick={() => setPoolMode("luxor")}
+              style={{
+                padding: "8px 16px",
+                borderRadius: "6px",
+                border: "none",
+                cursor: "pointer",
+                fontWeight: poolMode === "luxor" ? 600 : 400,
+                backgroundColor:
+                  poolMode === "luxor"
+                    ? "#1565C0"
+                    : theme.palette.mode === "dark"
+                      ? "rgba(255,255,255,0.1)"
+                      : "rgba(0,0,0,0.05)",
+                color:
+                  poolMode === "luxor" ? "#FFFFFF" : theme.palette.text.primary,
+                transition: "all 0.2s",
+              }}
+            >
+              🔷 Luxor
+            </button>
+          )}
 
-        <button
-          onClick={() => setPoolMode("braiins")}
-          style={{
-            padding: "8px 16px",
-            borderRadius: "6px",
-            border: "none",
-            cursor: "pointer",
-            fontWeight: poolMode === "braiins" ? 600 : 400,
-            backgroundColor:
-              poolMode === "braiins"
-                ? "#FFA500"
-                : theme.palette.mode === "dark"
-                  ? "rgba(255,255,255,0.1)"
-                  : "rgba(0,0,0,0.05)",
-            color:
-              poolMode === "braiins" ? "#FFFFFF" : theme.palette.text.primary,
-            transition: "all 0.2s",
-          }}
-        >
-          🔶 Braiins
-        </button>
-      </Box>
+          {data.activePoolNames.includes("Braiins") && (
+            <button
+              onClick={() => setPoolMode("braiins")}
+              style={{
+                padding: "8px 16px",
+                borderRadius: "6px",
+                border: "none",
+                cursor: "pointer",
+                fontWeight: poolMode === "braiins" ? 600 : 400,
+                backgroundColor:
+                  poolMode === "braiins"
+                    ? "#FFA500"
+                    : theme.palette.mode === "dark"
+                      ? "rgba(255,255,255,0.1)"
+                      : "rgba(0,0,0,0.05)",
+                color:
+                  poolMode === "braiins" ? "#FFFFFF" : theme.palette.text.primary,
+                transition: "all 0.2s",
+              }}
+            >
+              🔶 Braiins
+            </button>
+          )}
+        </Box>
+      )}
 
       {/* 4 gradient stat cards - Full width, 25% each */}
       <Box
@@ -321,8 +368,8 @@ export default function Miners() {
         </Box>
       </Box>
 
-      {/* Pool Comparison Cards */}
-      {poolMode === "total" && data.pools && (
+      {/* Pool Comparison Cards - Only show if multiple pools and in total mode */}
+      {poolMode === "total" && data.activePoolNames && data.activePoolNames.length > 1 && data.pools && (
         <Box
           sx={{
             display: "flex",
@@ -412,84 +459,90 @@ export default function Miners() {
         </Box>
       )}
 
-      {/* Miner Filter Buttons */}
-      <Box sx={{ display: "flex", gap: 1, mb: 3, flexWrap: "wrap" }}>
-        <button
-          onClick={() => setMinerFilter("all")}
-          style={{
-            padding: "6px 12px",
-            fontSize: "12px",
-            borderRadius: "4px",
-            border: "none",
-            cursor: "pointer",
-            fontWeight: minerFilter === "all" ? 600 : 400,
-            backgroundColor:
-              minerFilter === "all"
-                ? theme.palette.primary.main
-                : theme.palette.mode === "dark"
-                  ? "rgba(255,255,255,0.1)"
-                  : "rgba(0,0,0,0.05)",
-            color:
-              minerFilter === "all"
-                ? theme.palette.primary.contrastText
-                : theme.palette.text.primary,
-            transition: "all 0.2s",
-          }}
-        >
-          All Miners (
-          {(data.pools?.luxor?.miners || 0) +
-            (data.pools?.braiins?.miners || 0)}
-          )
-        </button>
+      {/* Miner Filter Buttons - Only show if multiple pools */}
+      {data.activePoolNames && data.activePoolNames.length > 1 && (
+        <Box sx={{ display: "flex", gap: 1, mb: 3, flexWrap: "wrap" }}>
+          <button
+            onClick={() => setMinerFilter("all")}
+            style={{
+              padding: "6px 12px",
+              fontSize: "12px",
+              borderRadius: "4px",
+              border: "none",
+              cursor: "pointer",
+              fontWeight: minerFilter === "all" ? 600 : 400,
+              backgroundColor:
+                minerFilter === "all"
+                  ? theme.palette.primary.main
+                  : theme.palette.mode === "dark"
+                    ? "rgba(255,255,255,0.1)"
+                    : "rgba(0,0,0,0.05)",
+              color:
+                minerFilter === "all"
+                  ? theme.palette.primary.contrastText
+                  : theme.palette.text.primary,
+              transition: "all 0.2s",
+            }}
+          >
+            All Miners (
+            {(data.pools?.luxor?.miners || 0) +
+              (data.pools?.braiins?.miners || 0)}
+            )
+          </button>
 
-        <button
-          onClick={() => setMinerFilter("luxor")}
-          style={{
-            padding: "6px 12px",
-            fontSize: "12px",
-            borderRadius: "4px",
-            border: "none",
-            cursor: "pointer",
-            fontWeight: minerFilter === "luxor" ? 600 : 400,
-            backgroundColor:
-              minerFilter === "luxor"
-                ? "#1565C0"
-                : theme.palette.mode === "dark"
-                  ? "rgba(255,255,255,0.1)"
-                  : "rgba(0,0,0,0.05)",
-            color:
-              minerFilter === "luxor" ? "#FFFFFF" : theme.palette.text.primary,
-            transition: "all 0.2s",
-          }}
-        >
-          🔷 Luxor ({data.pools?.luxor?.miners || 0})
-        </button>
+          {data.activePoolNames.includes("Luxor") && (
+            <button
+              onClick={() => setMinerFilter("luxor")}
+              style={{
+                padding: "6px 12px",
+                fontSize: "12px",
+                borderRadius: "4px",
+                border: "none",
+                cursor: "pointer",
+                fontWeight: minerFilter === "luxor" ? 600 : 400,
+                backgroundColor:
+                  minerFilter === "luxor"
+                    ? "#1565C0"
+                    : theme.palette.mode === "dark"
+                      ? "rgba(255,255,255,0.1)"
+                      : "rgba(0,0,0,0.05)",
+                color:
+                  minerFilter === "luxor" ? "#FFFFFF" : theme.palette.text.primary,
+                transition: "all 0.2s",
+              }}
+            >
+              🔷 Luxor ({data.pools?.luxor?.miners || 0})
+            </button>
+          )}
 
-        <button
-          onClick={() => setMinerFilter("braiins")}
-          style={{
-            padding: "6px 12px",
-            fontSize: "12px",
-            borderRadius: "4px",
-            border: "none",
-            cursor: "pointer",
-            fontWeight: minerFilter === "braiins" ? 600 : 400,
-            backgroundColor:
-              minerFilter === "braiins"
-                ? "#FFA500"
-                : theme.palette.mode === "dark"
-                  ? "rgba(255,255,255,0.1)"
-                  : "rgba(0,0,0,0.05)",
-            color:
-              minerFilter === "braiins"
-                ? "#FFFFFF"
-                : theme.palette.text.primary,
-            transition: "all 0.2s",
-          }}
-        >
-          🔶 Braiins ({data.pools?.braiins?.miners || 0})
-        </button>
-      </Box>
+          {data.activePoolNames.includes("Braiins") && (
+            <button
+              onClick={() => setMinerFilter("braiins")}
+              style={{
+                padding: "6px 12px",
+                fontSize: "12px",
+                borderRadius: "4px",
+                border: "none",
+                cursor: "pointer",
+                fontWeight: minerFilter === "braiins" ? 600 : 400,
+                backgroundColor:
+                  minerFilter === "braiins"
+                    ? "#FFA500"
+                    : theme.palette.mode === "dark"
+                      ? "rgba(255,255,255,0.1)"
+                      : "rgba(0,0,0,0.05)",
+                color:
+                  minerFilter === "braiins"
+                    ? "#FFFFFF"
+                    : theme.palette.text.primary,
+                transition: "all 0.2s",
+              }}
+            >
+              🔶 Braiins ({data.pools?.braiins?.miners || 0})
+            </button>
+          )}
+        </Box>
+      )}
 
       {/* Hosted Miners List with Pool Filter */}
       <HostedMinersList poolFilter={minerFilter} />

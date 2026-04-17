@@ -117,6 +117,16 @@ export default function HostedMinersList({
           return [];
         }
 
+        console.log("[HostedMinersList] Raw API Response - First miner details:", 
+          minerData.miners[0] ? {
+            id: minerData.miners[0].id,
+            name: minerData.miners[0].name,
+            serialNumber: minerData.miners[0].serialNumber,
+            macAddress: minerData.miners[0].macAddress,
+            status: minerData.miners[0].status,
+            pool: minerData.miners[0].pool,
+          } : "No miners");
+
         console.log("[HostedMinersList] Fetched miners from DB:", {
           count: minerData.miners.length,
           poolNames: minerData.miners.map(
@@ -127,11 +137,15 @@ export default function HostedMinersList({
               name: string;
               poolId?: string;
               pool?: { name?: string };
+              serialNumber?: string;
+              macAddress?: string;
             }) => ({
               name: m.name,
               poolId: m.poolId,
               poolName: m.pool?.name,
               hasPool: !!m.pool,
+              serialNumber: m.serialNumber,
+              macAddress: m.macAddress,
             }),
           ),
         });
@@ -355,6 +369,8 @@ export default function HostedMinersList({
               workerFound: !!workerData,
               workerStatus: workerData?.status,
               workerHashrate: workerData?.hashrate,
+              serialNumber: miner.serialNumber,
+              macAddress: miner.macAddress,
             });
 
             // Check if miner is in deployment
@@ -440,6 +456,8 @@ export default function HostedMinersList({
             connectedPool: m.connectedPool,
             status: m.status,
             hashRate: m.hashRate,
+            serialNumber: m.serialNumber,
+            macAddress: m.macAddress,
           })),
         });
 

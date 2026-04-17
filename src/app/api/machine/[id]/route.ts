@@ -78,6 +78,9 @@ async function verifyAdminAuth(request: NextRequest) {
  *   spaceId?: string
  *   status?: string (AUTO, DEPLOYMENT_IN_PROGRESS, or UNDER_MAINTENANCE)
  *   rate_per_kwh?: number (positive number, creates new history entry if provided and different from latest)
+ *   poolId?: string (ID of the mining pool, or null to unassign)
+ *   serialNumber?: string
+ *   macAddress?: string
  * }
  *
  * Response: Updated miner object
@@ -136,6 +139,7 @@ export async function PUT(
       spaceId,
       status,
       rate_per_kwh,
+      poolId,
       serialNumber,
       macAddress,
     } = body;
@@ -346,6 +350,34 @@ export async function PUT(
 
     if (macAddress !== undefined) {
       updateData.macAddress = macAddress ? macAddress.trim() : null;
+    }
+
+    if (poolId !== undefined) {
+      // Allow null to unassign from pool
+      if (poolId !== null) {
+        if (typeof poolId !== "string") {
+          return NextResponse.json<ApiResponse>(
+            { success: false, error: "poolId must be a string or null" },
+            { status: 400 },
+          );
+        }
+
+        // Verify pool exists
+        const poolExists = await prisma.pool.findUnique({
+          where: { id: poolId },
+          select: { id: true },
+        });
+
+        if (!poolExists) {
+          console.error(`[Miners API] PUT: Pool not found - ${poolId}`);
+          return NextResponse.json<ApiResponse>(
+            { success: false, error: "Pool not found" },
+            { status: 404 },
+          );
+        }
+      }
+
+      updateData.poolId = poolId;
     }
 
     // If no fields to update, return error

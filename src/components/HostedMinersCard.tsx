@@ -47,6 +47,7 @@ export interface HostedMinersCardProps {
   loading?: boolean;
   error?: string | null;
   onRefresh?: () => void;
+  activePoolNames?: string[];
   poolBreakdown?: {
     luxor: { activeWorkers: number; inactiveWorkers: number };
     braiins: { activeWorkers: number; inactiveWorkers: number };
@@ -61,6 +62,7 @@ export default function HostedMinersCard({
   loading = false,
   error = null,
   onRefresh,
+  activePoolNames = [],
   poolBreakdown,
 }: HostedMinersCardProps) {
   const theme = useTheme();
@@ -177,8 +179,8 @@ export default function HostedMinersCard({
               </Typography>
             </Box>
 
-            {/* Pool Breakdown Section */}
-            {poolBreakdown && (
+            {/* Pool Breakdown Section - Only show pools that have miners */}
+            {poolBreakdown && activePoolNames.length > 0 && (
               <Box
                 sx={{
                   display: "flex",
@@ -191,77 +193,81 @@ export default function HostedMinersCard({
                   borderRadius: 1,
                 }}
               >
-                {/* Luxor Stats */}
-                <Box sx={{ flex: 1 }}>
-                  <Typography
-                    variant="caption"
-                    sx={{
-                      fontWeight: 600,
-                      color: "primary.main",
-                      display: "block",
-                      mb: 0.5,
-                    }}
-                  >
-                    🔷 Luxor
-                  </Typography>
-                  <Box sx={{ display: "flex", gap: 1, alignItems: "baseline" }}>
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                      {poolBreakdown.luxor.activeWorkers}
+                {/* Luxor Stats - Only show if user has Luxor miners */}
+                {activePoolNames.includes("Luxor") && (
+                  <Box sx={{ flex: 1 }}>
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        fontWeight: 600,
+                        color: "primary.main",
+                        display: "block",
+                        mb: 0.5,
+                      }}
+                    >
+                      🔷 Luxor
                     </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      active
-                    </Typography>
-                  </Box>
-                  {poolBreakdown.luxor.inactiveWorkers > 0 && (
                     <Box sx={{ display: "flex", gap: 1, alignItems: "baseline" }}>
-                      <Typography
-                        variant="body2"
-                        sx={{ fontWeight: 600, color: "error.main" }}
-                      >
-                        {poolBreakdown.luxor.inactiveWorkers}
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        {poolBreakdown.luxor.activeWorkers}
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
-                        inactive
+                        active
                       </Typography>
                     </Box>
-                  )}
-                </Box>
+                    {poolBreakdown.luxor.inactiveWorkers > 0 && (
+                      <Box sx={{ display: "flex", gap: 1, alignItems: "baseline" }}>
+                        <Typography
+                          variant="body2"
+                          sx={{ fontWeight: 600, color: "error.main" }}
+                        >
+                          {poolBreakdown.luxor.inactiveWorkers}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          inactive
+                        </Typography>
+                      </Box>
+                    )}
+                  </Box>
+                )}
 
-                {/* Braiins Stats */}
-                <Box sx={{ flex: 1 }}>
-                  <Typography
-                    variant="caption"
-                    sx={{
-                      fontWeight: 600,
-                      color: "warning.main",
-                      display: "block",
-                      mb: 0.5,
-                    }}
-                  >
-                    🔶 Braiins
-                  </Typography>
-                  <Box sx={{ display: "flex", gap: 1, alignItems: "baseline" }}>
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                      {poolBreakdown.braiins.activeWorkers}
+                {/* Braiins Stats - Only show if user has Braiins miners */}
+                {activePoolNames.includes("Braiins") && (
+                  <Box sx={{ flex: 1 }}>
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        fontWeight: 600,
+                        color: "warning.main",
+                        display: "block",
+                        mb: 0.5,
+                      }}
+                    >
+                      🔶 Braiins
                     </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      active
-                    </Typography>
-                  </Box>
-                  {poolBreakdown.braiins.inactiveWorkers > 0 && (
                     <Box sx={{ display: "flex", gap: 1, alignItems: "baseline" }}>
-                      <Typography
-                        variant="body2"
-                        sx={{ fontWeight: 600, color: "error.main" }}
-                      >
-                        {poolBreakdown.braiins.inactiveWorkers}
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        {poolBreakdown.braiins.activeWorkers}
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
-                        inactive
+                        active
                       </Typography>
                     </Box>
-                  )}
-                </Box>
+                    {poolBreakdown.braiins.inactiveWorkers > 0 && (
+                      <Box sx={{ display: "flex", gap: 1, alignItems: "baseline" }}>
+                        <Typography
+                          variant="body2"
+                          sx={{ fontWeight: 600, color: "error.main" }}
+                        >
+                          {poolBreakdown.braiins.inactiveWorkers}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          inactive
+                        </Typography>
+                      </Box>
+                    )}
+                  </Box>
+                )}
               </Box>
             )}
 

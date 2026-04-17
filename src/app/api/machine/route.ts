@@ -224,6 +224,14 @@ export async function GET(
             dateOfEntry: "desc",
           },
         },
+        pool: {
+          select: {
+            id: true,
+            name: true,
+            apiUrl: true,
+            description: true,
+          },
+        },
       },
       orderBy,
     });
@@ -277,6 +285,9 @@ export async function GET(
  *   spaceId: string (required) - ID of the space where miner is located
  *   status: string (optional) - AUTO, DEPLOYMENT_IN_PROGRESS, or UNDER_MAINTENANCE (default: DEPLOYMENT_IN_PROGRESS)
  *   rate_per_kwh: number (required) - Electricity rate per kWh in USD (positive number)
+ *   poolId: string (optional) - ID of the mining pool
+ *   serialNumber: string (optional) - Hardware serial number
+ *   macAddress: string (optional) - Miner MAC address
  * }
  *
  * Response: Created miner object
@@ -320,6 +331,7 @@ export async function POST(
       spaceId,
       status,
       rate_per_kwh,
+      poolId,
       serialNumber,
       macAddress,
     } = body;
@@ -464,6 +476,30 @@ export async function POST(
       );
     }
 
+    // Verify pool exists if provided
+    if (poolId) {
+      if (typeof poolId !== "string") {
+        console.error("[Miners API] POST: Invalid poolId - must be a string");
+        return NextResponse.json<ApiResponse>(
+          { success: false, error: "poolId must be a string" },
+          { status: 400 },
+        );
+      }
+
+      const poolExists = await prisma.pool.findUnique({
+        where: { id: poolId },
+        select: { id: true },
+      });
+
+      if (!poolExists) {
+        console.error(`[Miners API] POST: Pool not found - ${poolId}`);
+        return NextResponse.json<ApiResponse>(
+          { success: false, error: "Pool not found" },
+          { status: 404 },
+        );
+      }
+    }
+
     // Get authenticated user ID from token
     const token = request.cookies.get("token")?.value;
     const decoded = await verifyJwtToken(token!);
@@ -479,6 +515,7 @@ export async function POST(
           userId,
           spaceId,
           status: status || "DEPLOYMENT_IN_PROGRESS",
+          ...(poolId && { poolId }),
           ...(serialNumber && { serialNumber: serialNumber.trim() }),
           ...(macAddress && { macAddress: macAddress.trim() }),
         },

@@ -30,6 +30,7 @@ interface EarningsSummary {
   dataSource: string;
   timestamp: string;
   subaccountCount: number;
+  activePoolNames?: string[];
   poolBreakdown?: {
     luxor: PoolBreakdown;
     braiins: PoolBreakdown;
@@ -41,6 +42,7 @@ interface Revenue24h {
   currency: string;
   timestamp: string;
   dataSource: string;
+  activePoolNames?: string[];
   poolBreakdown?: {
     luxor: { btc: number; usd: number };
     braiins: { btc: number; usd: number };
@@ -55,6 +57,7 @@ export default function WalletPage() {
   const [poolMode, setPoolMode] = useState<"total" | "luxor" | "braiins">(
     "total",
   );
+  const [activePoolNames, setActivePoolNames] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [revenue24hLoading, setRevenue24hLoading] = useState(false);
   const [walletLoading, setWalletLoading] = useState(false);
@@ -104,6 +107,7 @@ export default function WalletPage() {
 
         const data: EarningsSummary = await response.json();
         setSummary(data);
+        setActivePoolNames(data.activePoolNames || []);
         console.log("[Wallet] Earnings summary loaded:", data);
       } catch (error) {
         const errorMessage =
@@ -136,6 +140,7 @@ export default function WalletPage() {
 
         const data: Revenue24h = await response.json();
         setRevenue24h(data);
+        setActivePoolNames(data.activePoolNames || []);
         console.log("[Wallet] 24h revenue loaded:", data);
       } catch (error) {
         const errorMessage =
@@ -196,6 +201,13 @@ export default function WalletPage() {
       fetchWalletSettings();
     }
   }, [user?.id]);
+
+  // Auto-reset poolMode if selected pool is not in activePoolNames
+  useEffect(() => {
+    if (activePoolNames.length > 0 && poolMode !== "total" && !activePoolNames.includes(poolMode)) {
+      setPoolMode("total");
+    }
+  }, [activePoolNames]);
 
   const getPrimaryWalletAddress = (): string => {
     if (!walletSettings?.addresses || walletSettings.addresses.length === 0) {
@@ -358,20 +370,26 @@ export default function WalletPage() {
           </Typography>
         </Box>
         <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
-          <ToggleButtonGroup
-            value={poolMode}
-            exclusive
-            onChange={(e, newMode) => {
-              if (newMode !== null) {
-                setPoolMode(newMode);
-              }
-            }}
-            size="small"
-          >
-            <ToggleButton value="total">Total</ToggleButton>
-            <ToggleButton value="luxor">Luxor</ToggleButton>
-            <ToggleButton value="braiins">Braiins</ToggleButton>
-          </ToggleButtonGroup>
+          {activePoolNames.length > 1 && (
+            <ToggleButtonGroup
+              value={poolMode}
+              exclusive
+              onChange={(e, newMode) => {
+                if (newMode !== null) {
+                  setPoolMode(newMode);
+                }
+              }}
+              size="small"
+            >
+              <ToggleButton value="total">Total</ToggleButton>
+              {activePoolNames.includes("Luxor") && (
+                <ToggleButton value="luxor">Luxor</ToggleButton>
+              )}
+              {activePoolNames.includes("Braiins") && (
+                <ToggleButton value="braiins">Braiins</ToggleButton>
+              )}
+            </ToggleButtonGroup>
+          )}
           {BtcLivePriceComponent}
         </Box>
       </Box>

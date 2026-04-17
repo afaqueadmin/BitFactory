@@ -48,6 +48,7 @@ interface MinerFormData {
   hardwareId: string;
   userId: string;
   spaceId: string;
+  poolId: string;
   status: "AUTO" | "DEPLOYMENT_IN_PROGRESS" | "UNDER_MAINTENANCE";
   rate_per_kwh: string | number;
   serialNumber: string;
@@ -74,6 +75,16 @@ interface Space {
 }
 
 /**
+ * Pool object from API
+ */
+interface Pool {
+  id: string;
+  name: string;
+  apiUrl: string;
+  description?: string | null;
+}
+
+/**
  * Miner object (from API)
  */
 interface Miner {
@@ -83,6 +94,7 @@ interface Miner {
   status: "AUTO" | "DEPLOYMENT_IN_PROGRESS" | "UNDER_MAINTENANCE";
   userId: string;
   spaceId: string;
+  poolId?: string | null;
   rate_per_kwh?: number;
   serialNumber?: string | null;
   macAddress?: string | null;
@@ -91,6 +103,7 @@ interface Miner {
   user?: User;
   space?: Space;
   hardware?: Hardware;
+  pool?: Pool;
 }
 
 interface MinerFormModalProps {
@@ -100,6 +113,7 @@ interface MinerFormModalProps {
   miner?: Miner | null;
   users: User[];
   spaces: Space[];
+  pools: Pool[];
   isLoading?: boolean;
 }
 
@@ -110,6 +124,7 @@ export default function MinerFormModal({
   miner,
   users,
   spaces,
+  pools,
   isLoading = false,
 }: MinerFormModalProps) {
   const [loading, setLoading] = useState(false);
@@ -124,6 +139,7 @@ export default function MinerFormModal({
     hardwareId: "",
     userId: "",
     spaceId: "",
+    poolId: "",
     status: "DEPLOYMENT_IN_PROGRESS",
     rate_per_kwh: "",
     serialNumber: "",
@@ -164,6 +180,7 @@ export default function MinerFormModal({
         hardwareId: miner.hardwareId,
         userId: miner.userId,
         spaceId: miner.spaceId,
+        poolId: miner.poolId || "",
         status: miner.status,
         rate_per_kwh: miner.rate_per_kwh || "",
         serialNumber: miner.serialNumber || "",
@@ -178,6 +195,7 @@ export default function MinerFormModal({
         hardwareId: "",
         userId: "",
         spaceId: "",
+        poolId: "",
         status: "DEPLOYMENT_IN_PROGRESS",
         rate_per_kwh: "",
         serialNumber: "",
@@ -279,6 +297,7 @@ export default function MinerFormModal({
         hardwareId: string;
         userId: string;
         spaceId: string;
+        poolId?: string;
         status: string;
         rate_per_kwh?: number;
         serialNumber?: string;
@@ -292,6 +311,11 @@ export default function MinerFormModal({
         serialNumber: formData.serialNumber || undefined,
         macAddress: formData.macAddress || undefined,
       };
+
+      // Include poolId if provided
+      if (formData.poolId) {
+        body.poolId = formData.poolId;
+      }
 
       // Include rate_per_kwh if provided
       if (formData.rate_per_kwh) {
@@ -446,6 +470,29 @@ export default function MinerFormModal({
               {spaces.map((space) => (
                 <MenuItem key={space.id} value={space.id}>
                   {space.name} ({space.location})
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          <FormControl
+            fullWidth
+            margin="normal"
+            disabled={loading || isLoading}
+          >
+            <InputLabel>Pool (Optional)</InputLabel>
+            <Select
+              name="poolId"
+              value={formData.poolId}
+              onChange={handleChange}
+              label="Pool (Optional)"
+            >
+              <MenuItem value="">
+                <em>No pool assigned</em>
+              </MenuItem>
+              {pools.map((pool) => (
+                <MenuItem key={pool.id} value={pool.id}>
+                  {pool.name}
                 </MenuItem>
               ))}
             </Select>

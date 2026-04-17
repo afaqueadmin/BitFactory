@@ -36,7 +36,19 @@ export async function GET(request: NextRequest) {
     // Get all miners for this user from database
     const miners = await prisma.miner.findMany({
       where: { userId, isDeleted: false },
-      include: {
+      select: {
+        id: true,
+        name: true,
+        status: true,
+        serialNumber: true,
+        macAddress: true,
+        poolId: true,
+        poolAuth: true,
+        createdAt: true,
+        updatedAt: true,
+        spaceId: true,
+        hardwareId: true,
+        userId: true,
         hardware: {
           select: {
             id: true,
@@ -62,6 +74,14 @@ export async function GET(request: NextRequest) {
         createdAt: "desc",
       },
     });
+
+    console.log("[API /miners/user] Raw miners from DB:", JSON.stringify(miners.map(m => ({
+      id: m.id,
+      name: m.name,
+      serialNumber: m.serialNumber,
+      macAddress: m.macAddress,
+      status: m.status,
+    })), null, 2));
 
     return NextResponse.json({
       miners,

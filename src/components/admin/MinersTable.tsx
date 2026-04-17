@@ -88,6 +88,16 @@ interface Hardware {
 }
 
 /**
+ * Pool object from API
+ */
+interface Pool {
+  id: string;
+  name: string;
+  apiUrl: string;
+  description?: string | null;
+}
+
+/**
  * Miner object from API
  */
 interface Miner {
@@ -97,6 +107,7 @@ interface Miner {
   hardwareId: string;
   userId: string;
   spaceId: string;
+  poolId?: string | null;
   createdAt: string;
   updatedAt: string;
   isDeleted: boolean;
@@ -106,6 +117,7 @@ interface Miner {
   user?: User;
   space?: Space;
   hardware?: Hardware;
+  pool?: Pool;
   rateHistory?: Array<{
     rate_per_kwh: number;
     createdAt: string;
@@ -500,6 +512,9 @@ export default function MinersTable({
                     />
                   ))}
               </TableCell>
+              <TableCell sx={{ fontWeight: "bold", whiteSpace: "nowrap" }}>
+                Pool
+              </TableCell>
               <TableCell sx={{ fontWeight: "bold" }}>Space</TableCell>
               <TableCell
                 sx={{
@@ -698,6 +713,17 @@ export default function MinersTable({
                   </TableCell>
                   <TableCell>
                     {miner.user?.luxorSubaccountName || "—"}
+                  </TableCell>
+                  <TableCell>
+                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                    {(miner as any).pool?.name ? (
+                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                      (miner as any).pool.name
+                    ) : (
+                      <Typography variant="body2" color="text.secondary">
+                        Unassigned
+                      </Typography>
+                    )}
                   </TableCell>
                   <TableCell>
                     {miner.space ? (

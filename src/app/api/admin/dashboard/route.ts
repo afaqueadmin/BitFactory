@@ -2,6 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
 import { WorkersResponse, SummaryResponse } from "@/lib/luxor";
+import { BraiinsClient } from "@/lib/braiins";
+
+interface PoolData {
+  workers: {
+    activeWorkers: number;
+    inactiveWorkers: number;
+    totalWorkers: number;
+  };
+  hashrate_5m: number; // TH/s (5 minute average)
+  hashrate_24h: number; // TH/s (24 hour average)
+  uptime_24h: number; // percentage (0-100)
+  minedRevenue: number; // BTC
+}
 
 interface DashboardStats {
   // Database-backed stats
@@ -9,6 +22,20 @@ interface DashboardStats {
     active: number;
     inactive: number;
     actionRequired: number;
+    poolBreakdown?: {
+      luxor?: {
+        active: number;
+        inactive: number;
+        actionRequired: number;
+        dbCount: number;
+      };
+      braiins?: {
+        active: number;
+        inactive: number;
+        actionRequired: number;
+        dbCount: number;
+      };
+    };
   };
   spaces: {
     free: number;
@@ -20,20 +47,31 @@ interface DashboardStats {
     inactive: number;
   };
   // Luxor-backed stats
-  luxor: {
+  luxor: PoolData & {
     poolAccounts: {
       total: number;
       active: number;
       inactive: number;
     };
-    workers: {
-      activeWorkers: number;
-      inactiveWorkers: number;
-      totalWorkers: number;
+    power: {
+      totalPower: number; // kW from miners
+      availablePower: number; // kW from spaces
     };
-    hashrate_5m: number; // TH/s (5 minute average)
-    hashrate_24h: number; // TH/s (24 hour average)
-    uptime_24h: number; // percentage (0-100)
+  };
+  // Braiins-backed stats (single-user API, no pool accounts)
+  braiins?: PoolData & {
+    power: {
+      totalPower: number; // kW from miners
+      availablePower: number; // kW from spaces
+    };
+  };
+  // Combined stats (aggregated from all pools)
+  combined?: PoolData & {
+    poolAccounts?: {
+      total: number;
+      active: number;
+      inactive: number;
+    };
     power: {
       totalPower: number; // kW from miners
       availablePower: number; // kW from spaces
@@ -44,6 +82,8 @@ interface DashboardStats {
     totalCustomerBalance: number; // USD
     monthlyRevenue: number; // USD (from cost payments)
     totalMinedRevenue: number; // BTC from Luxor
+    braiinsMinedRevenue?: number; // BTC from Braiins
+    combinedMinedRevenue?: number; // Combined BTC from all pools
   };
   // Status
   warnings: string[];
@@ -285,14 +325,17 @@ async function fetchTotalRevenue(
   }
 
   try {
-    const today = new Intl.DateTimeFormat("en-CA").format(new Date()); // 'YYYY-MM-DD' format
+    // Use yesterday as end_date because Luxor API rejects dates that are not in the past
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const endDate = new Intl.DateTimeFormat("en-CA").format(yesterday); // 'YYYY-MM-DD' format
 
     // Build URL with proper query parameters
     const url = new URL("/api/luxor", request.url);
     url.searchParams.set("endpoint", "revenue");
     url.searchParams.set("currency", "BTC");
     url.searchParams.set("start_date", "2025-01-01");
-    url.searchParams.set("end_date", today);
+    url.searchParams.set("end_date", endDate);
     url.searchParams.set("site_id", process.env.LUXOR_FIXED_SITE_ID || "");
 
     const luxorRequest = new NextRequest(url, {
@@ -406,6 +449,239 @@ async function fetchSummary(
   return null;
 }
 
+/**
+ * Helper: Fetch Braiins data for a specific user (identified by authKey from PoolAuth)
+ * Braiins API is single-user (one token = one user)
+ */
+async function fetchBraiinsProfile(
+  braiinsApiToken: string,
+): Promise<{
+  hashrate_5m: number;
+  hashrate_24h: number;
+  activeWorkers: number;
+  inactiveWorkers: number;
+  totalWorkers: number;
+} | null> {
+  try {
+    if (!braiinsApiToken) {
+      console.warn("[Admin Dashboard] No Braiins API token provided");
+      return null;
+    }
+
+    const client = new BraiinsClient(braiinsApiToken, "admin-dashboard");
+    const profile = await client.getUserProfile();
+
+    if (profile?.btc) {
+      const btc = profile.btc;
+      const activeWorkers = btc.ok_workers || 0;
+      const inactiveWorkers = (btc.off_workers || 0) + (btc.dis_workers || 0) + (btc.low_workers || 0);
+      const totalWorkers = activeWorkers + inactiveWorkers;
+
+      return {
+        hashrate_5m: (btc.hash_rate_5m || 0) / 1000000, // Braiins returns in Gh/s, convert to PH/s
+        hashrate_24h: (btc.hash_rate_24h || 0) / 1000000, // Braiins returns in Gh/s, convert to PH/s
+        activeWorkers,
+        inactiveWorkers,
+        totalWorkers,
+      };
+    }
+  } catch (error) {
+    console.error("[Admin Dashboard] Error fetching Braiins profile:", error);
+  }
+  return null;
+}
+
+/**
+ * Helper: Fetch Braiins total revenue from daily rewards
+ */
+async function fetchBraiinsRevenue(
+  braiinsApiToken: string,
+): Promise<{ revenue: number } | null> {
+  try {
+    if (!braiinsApiToken) {
+      console.warn("[Admin Dashboard] No Braiins API token provided");
+      return null;
+    }
+
+    const client = new BraiinsClient(braiinsApiToken, "admin-dashboard");
+    
+    // Fetch last 30 days of rewards
+    const today = new Date();
+    const thirtyDaysAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+    
+    const fromDate = thirtyDaysAgo.toISOString().split('T')[0]; // YYYY-MM-DD
+    const toDate = today.toISOString().split('T')[0]; // YYYY-MM-DD
+
+    const rewards = await client.getDailyRewards({
+      from: fromDate,
+      to: toDate,
+    });
+
+    if (rewards?.btc?.daily_rewards) {
+      const totalRevenue = rewards.btc.daily_rewards.reduce((sum, day) => {
+        const reward = parseFloat(day.total_reward || "0");
+        return sum + reward;
+      }, 0);
+
+      return { revenue: totalRevenue };
+    }
+  } catch (error) {
+    console.error("[Admin Dashboard] Error fetching Braiins revenue:", error);
+  }
+  return null;
+}
+
+/**
+ * Helper: Fetch Luxor miners stats (pool-specific)
+ * Compares DB miners assigned to Luxor with actual Luxor API workers
+ */
+async function fetchLuxorMiners(
+  request: NextRequest,
+  subaccountNames: string[],
+): Promise<{
+  active: number;
+  inactive: number;
+  actionRequired: number;
+  dbCount: number;
+} | null> {
+  try {
+    // Step 1: Get Luxor database miners
+    const luxorDbMiners = await prisma.miner.count({
+      where: {
+        poolId: (await prisma.pool.findUnique({
+          where: { name: "Luxor" },
+          select: { id: true },
+        }))?.id,
+        status: "AUTO",
+        isDeleted: false,
+      },
+    });
+
+    console.log(`[Admin Dashboard] Luxor DB miners (AUTO): ${luxorDbMiners}`);
+
+    // Step 2: Get Luxor API workers (if subaccounts exist)
+    let apiActiveWorkers = 0;
+    let apiInactiveWorkers = 0;
+
+    if (subaccountNames.length > 0) {
+      const workersData = await fetchAllWorkers(request, subaccountNames);
+      if (workersData) {
+        apiActiveWorkers = workersData.active;
+        apiInactiveWorkers = workersData.inactive;
+        console.log(
+          `[Admin Dashboard] Luxor API workers - Active: ${apiActiveWorkers}, Inactive: ${apiInactiveWorkers}`,
+        );
+      }
+    } else {
+      console.warn("[Admin Dashboard] No Luxor subaccounts found for miners fetch");
+    }
+
+    // Step 3: Calculate action required (orphans)
+    const actionRequired = Math.max(0, luxorDbMiners - apiActiveWorkers);
+
+    return {
+      active: apiActiveWorkers,
+      inactive: apiInactiveWorkers,
+      actionRequired,
+      dbCount: luxorDbMiners,
+    };
+  } catch (error) {
+    console.error("[Admin Dashboard] Error fetching Luxor miners:", error);
+    return null;
+  }
+}
+
+/**
+ * Helper: Fetch Braiins miners stats (pool-specific)
+ * Gets all Braiins customers, aggregates their worker counts from API
+ * Compares with DB miners assigned to Braiins
+ */
+async function fetchBraiinsMiners(request: NextRequest): Promise<{
+  active: number;
+  inactive: number;
+  actionRequired: number;
+  dbCount: number;
+} | null> {
+  try {
+    // Step 1: Get Braiins pool ID
+    const braiinsPool = await prisma.pool.findUnique({
+      where: { name: "Braiins" },
+      select: { id: true },
+    });
+
+    if (!braiinsPool) {
+      console.log("[Admin Dashboard] Braiins pool not found");
+      return null;
+    }
+
+    // Step 2: Get Braiins database miners
+    const braiinsDbMiners = await prisma.miner.count({
+      where: {
+        poolId: braiinsPool.id,
+        status: "AUTO",
+        isDeleted: false,
+      },
+    });
+
+    console.log(`[Admin Dashboard] Braiins DB miners (AUTO): ${braiinsDbMiners}`);
+
+    // Step 3: Get all Braiins authKeys from PoolAuth
+    const braiinsAuthKeys = await prisma.poolAuth.findMany({
+      where: { poolId: braiinsPool.id },
+      select: { authKey: true },
+    });
+
+    console.log(
+      `[Admin Dashboard] Found ${braiinsAuthKeys.length} Braiins authKeys`,
+    );
+
+    if (braiinsAuthKeys.length === 0) {
+      console.log("[Admin Dashboard] No Braiins PoolAuth found");
+      return null;
+    }
+
+    // Step 4: Aggregate Braiins API data from all authKeys
+    let totalActiveWorkers = 0;
+    let totalInactiveWorkers = 0;
+
+    for (const { authKey } of braiinsAuthKeys) {
+      try {
+        const braiinsProfile = await fetchBraiinsProfile(authKey);
+        if (braiinsProfile) {
+          totalActiveWorkers += braiinsProfile.activeWorkers;
+          totalInactiveWorkers += braiinsProfile.inactiveWorkers;
+          console.log(
+            `[Admin Dashboard] Braiins authKey stats - Active: ${braiinsProfile.activeWorkers}, Inactive: ${braiinsProfile.inactiveWorkers}`,
+          );
+        }
+      } catch (error) {
+        console.error(
+          `[Admin Dashboard] Error fetching Braiins profile for authKey:`,
+          error,
+        );
+        continue; // Continue with next authKey on error
+      }
+    }
+
+    console.log(
+      `[Admin Dashboard] Braiins aggregated - Active: ${totalActiveWorkers}, Inactive: ${totalInactiveWorkers}`,
+    );
+
+    // Step 5: Calculate action required (orphans)
+    const actionRequired = Math.max(0, braiinsDbMiners - totalActiveWorkers);
+
+    return {
+      active: totalActiveWorkers,
+      inactive: totalInactiveWorkers,
+      actionRequired,
+      dbCount: braiinsDbMiners,
+    };
+  } catch (error) {
+    console.error("[Admin Dashboard] Error fetching Braiins miners:", error);
+    return null;
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
     const token = request.cookies.get("token")?.value;
@@ -449,72 +725,45 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // ========== MINERS (Luxor V2 API + Database) ==========
+    // ========== MINERS (Pool-Specific: Luxor + Braiins) ==========
 
-    // Active miners: Fetch from Luxor API V2 (workers endpoint)
-    // Inactive miners: Fetch from local database (DEPLOYMENT_IN_PROGRESS status)
-    let activeMinersCount = 0;
-    let inactiveMiners = 0;
-    let actionRequiredMiners = 0;
+    // Get Luxor miners stats (API + DB)
+    let luxorMinersStats: {
+      active: number;
+      inactive: number;
+      actionRequired: number;
+      dbCount: number;
+    } | null = null;
 
-    // Fetch active miners from Luxor API
-    if (subaccountNames.length > 0) {
-      try {
-        const workersData = await fetchAllWorkers(request, subaccountNames);
-        if (workersData) {
-          activeMinersCount = workersData.active;
-          console.log(
-            `[Admin Dashboard] Active miners from Luxor: ${activeMinersCount}`,
-          );
-        } else {
-          console.warn(
-            "[Admin Dashboard] Failed to fetch miners from Luxor, showing 0",
-          );
-        }
-      } catch (error) {
-        console.error(
-          "[Admin Dashboard] Error fetching miners from Luxor:",
-          error,
-        );
-      }
-    } else {
-      console.warn("[Admin Dashboard] No subaccounts found for miners fetch");
-    }
-
-    // Fetch inactive miners from local database (DEPLOYMENT_IN_PROGRESS status)
     try {
-      inactiveMiners = await prisma.miner.count({
-        where: {
-          status: { in: ["DEPLOYMENT_IN_PROGRESS", "UNDER_MAINTENANCE"] },
-          isDeleted: false,
-        },
-      });
-      console.log(
-        `[Admin Dashboard] Inactive miners from DB: ${inactiveMiners}`,
-      );
+      luxorMinersStats = await fetchLuxorMiners(request, subaccountNames);
     } catch (error) {
-      console.error(
-        "[Admin Dashboard] Error fetching inactive miners from DB:",
-        error,
-      );
+      console.error("[Admin Dashboard] Error fetching Luxor miners:", error);
+      warnings.push("Failed to fetch Luxor miners data");
     }
 
-    // Fetch all miners from local database (AUTO status)
+    // Get Braiins miners stats (API + DB)
+    let braiinsMinersStats: {
+      active: number;
+      inactive: number;
+      actionRequired: number;
+      dbCount: number;
+    } | null = null;
+
     try {
-      const allLocalActiveMiners = await prisma.miner.count({
-        where: { status: "AUTO", isDeleted: false },
-      });
-      console.log(
-        `[Admin Dashboard] Inactive miners from DB: ${inactiveMiners}`,
-      );
-
-      actionRequiredMiners = activeMinersCount - allLocalActiveMiners;
+      braiinsMinersStats = await fetchBraiinsMiners(request);
     } catch (error) {
-      console.error(
-        "[Admin Dashboard] Error fetching allMiners miners from DB:",
-        error,
-      );
+      console.error("[Admin Dashboard] Error fetching Braiins miners:", error);
+      warnings.push("Failed to fetch Braiins miners data");
     }
+
+    // Aggregate miners across all pools
+    const activeMinersCount =
+      (luxorMinersStats?.active || 0) + (braiinsMinersStats?.active || 0);
+    const inactiveMiners =
+      (luxorMinersStats?.inactive || 0) + (braiinsMinersStats?.inactive || 0);
+    const actionRequiredMiners =
+      (luxorMinersStats?.actionRequired || 0) + (braiinsMinersStats?.actionRequired || 0);
 
     console.log(
       `[Admin Dashboard] Total Miners: ${activeMinersCount} active, ${inactiveMiners} inactive, ${actionRequiredMiners} action required`,
@@ -622,6 +871,7 @@ export async function GET(request: NextRequest) {
       hashrate_5m: 0,
       hashrate_24h: 0,
       uptime_24h: 0,
+      minedRevenue: 0,
       power: {
         usedPower: usedMinersPower, // kW from active miners
         totalPower: totalPower, // kW from spaces
@@ -675,11 +925,159 @@ export async function GET(request: NextRequest) {
 
     const revenueStats = await fetchTotalRevenue(request, subaccountNames);
     console.log("revenueStats:", revenueStats);
+
+    // Add Luxor mined revenue to luxorStats
+    if (revenueStats) {
+      luxorStats.minedRevenue = revenueStats.revenue;
+      console.log(
+        `[Admin Dashboard] Luxor minedRevenue: ${revenueStats.revenue}`,
+      );
+    } else {
+      luxorStats.minedRevenue = 0;
+    }
+
+    // ========== BRAIINS STATS (Mining Pool - Aggregated across all customers) ==========
+    let braiinsStats: (PoolData & {
+      minedRevenue: number;
+      power: {
+        totalPower: number;
+        availablePower: number;
+      };
+    }) | undefined;
+    let braiinsRevenueStats: { revenue: number } | null = null;
+
+    try {
+      // Get all Braiins PoolAuth records (all customers)
+      const braiinsPoolAuths = await prisma.poolAuth.findMany({
+        where: {
+          pool: {
+            name: "Braiins",
+          },
+        },
+        select: {
+          authKey: true,
+        },
+      });
+
+      if (braiinsPoolAuths.length > 0) {
+        console.log(
+          `[Admin Dashboard] Fetching Braiins data from ${braiinsPoolAuths.length} authKey(s)`,
+        );
+
+        let totalActiveWorkers = 0;
+        let totalInactiveWorkers = 0;
+        let totalHashrate5m = 0;
+        let totalHashrate24h = 0;
+        let totalRevenue = 0;
+
+        // Aggregate data from all Braiins customers
+        for (const { authKey } of braiinsPoolAuths) {
+          try {
+            // Fetch profile for this Braiins customer
+            const braiinsProfile = await fetchBraiinsProfile(authKey);
+            if (braiinsProfile) {
+              totalActiveWorkers += braiinsProfile.activeWorkers;
+              totalInactiveWorkers += braiinsProfile.inactiveWorkers;
+              totalHashrate5m += braiinsProfile.hashrate_5m;
+              totalHashrate24h += braiinsProfile.hashrate_24h;
+              console.log(
+                `[Admin Dashboard] Braiins customer stats - Active: ${braiinsProfile.activeWorkers}, Inactive: ${braiinsProfile.inactiveWorkers}`,
+              );
+            }
+
+            // Fetch revenue for this Braiins customer
+            const braiinsRevenue = await fetchBraiinsRevenue(authKey);
+            if (braiinsRevenue) {
+              totalRevenue += braiinsRevenue.revenue;
+            }
+          } catch (error) {
+            console.error(
+              `[Admin Dashboard] Error fetching Braiins data for authKey:`,
+              error,
+            );
+            continue; // Continue with next authKey on error
+          }
+        }
+
+        if (totalActiveWorkers > 0 || totalInactiveWorkers > 0) {
+          braiinsStats = {
+            workers: {
+              activeWorkers: totalActiveWorkers,
+              inactiveWorkers: totalInactiveWorkers,
+              totalWorkers: totalActiveWorkers + totalInactiveWorkers,
+            },
+            hashrate_5m: totalHashrate5m,
+            hashrate_24h: totalHashrate24h,
+            uptime_24h: 0, // Braiins doesn't provide uptime metric
+            minedRevenue: totalRevenue,
+            power: {
+              totalPower: totalPower,
+              availablePower: totalPower,
+            },
+          };
+
+          braiinsRevenueStats = { revenue: totalRevenue };
+          console.log(
+            `[Admin Dashboard] Braiins aggregated - Active: ${totalActiveWorkers}, Inactive: ${totalInactiveWorkers}, Revenue: ${totalRevenue}`,
+          );
+        }
+      } else {
+        console.log("[Admin Dashboard] No Braiins PoolAuth found");
+      }
+    } catch (error) {
+      console.error("[Admin Dashboard] Error fetching Braiins stats:", error);
+      warnings.push("Failed to fetch Braiins statistics");
+    }
+
+    // ========== COMBINED STATS (aggregated from all pools) ==========
+    let combinedStats: (PoolData & {
+      power: {
+        totalPower: number;
+        availablePower: number;
+      };
+    }) | undefined;
+
+    if (braiinsStats) {
+      combinedStats = {
+        workers: {
+          activeWorkers: (luxorStats.workers?.activeWorkers || 0) + (braiinsStats.workers?.activeWorkers || 0),
+          inactiveWorkers: (luxorStats.workers?.inactiveWorkers || 0) + (braiinsStats.workers?.inactiveWorkers || 0),
+          totalWorkers: (luxorStats.workers?.totalWorkers || 0) + (braiinsStats.workers?.totalWorkers || 0),
+        },
+        hashrate_5m: (luxorStats.hashrate_5m || 0) + (braiinsStats.hashrate_5m || 0),
+        hashrate_24h: (luxorStats.hashrate_24h || 0) + (braiinsStats.hashrate_24h || 0),
+        uptime_24h: luxorStats.uptime_24h || 0, // Use Luxor uptime (Braiins doesn't provide)
+        minedRevenue: (luxorStats.minedRevenue || revenueStats?.revenue || 0) + (braiinsStats.minedRevenue || 0),
+        power: {
+          totalPower: totalPower,
+          availablePower: totalPower,
+        },
+      };
+    }
+
     const stats: DashboardStats = {
       miners: {
         active: activeMinersCount,
         inactive: inactiveMiners,
         actionRequired: actionRequiredMiners,
+        poolBreakdown: {
+          luxor: luxorMinersStats
+            ? {
+                active: luxorMinersStats.active,
+                inactive: luxorMinersStats.inactive,
+                actionRequired: luxorMinersStats.actionRequired,
+                dbCount: luxorMinersStats.dbCount,
+              }
+            : undefined,
+          braiins: braiinsMinersStats
+            ? {
+                active: braiinsMinersStats.active,
+                inactive: braiinsMinersStats.inactive,
+                actionRequired: braiinsMinersStats.actionRequired,
+                dbCount: braiinsMinersStats.dbCount,
+              }
+            : undefined,
+        },
       },
       spaces: {
         free: freeSpaces,
@@ -691,12 +1089,18 @@ export async function GET(request: NextRequest) {
         inactive: inactiveCustomerCount,
       },
       luxor: luxorStats,
+      braiins: braiinsStats,
+      combined: combinedStats,
       financial: {
         totalCustomerBalance: totalCustomerBalance._sum.amount || 0,
         monthlyRevenue: monthlyRevenue._sum.amount
           ? monthlyRevenue._sum.amount * -1
           : 0, // Multiply by -1 to show revenue as positive
         totalMinedRevenue: revenueStats?.revenue || 0,
+        braiinsMinedRevenue: braiinsRevenueStats?.revenue || 0,
+        combinedMinedRevenue: combinedStats
+          ? combinedStats.minedRevenue
+          : revenueStats?.revenue || 0,
       },
       warnings,
     };

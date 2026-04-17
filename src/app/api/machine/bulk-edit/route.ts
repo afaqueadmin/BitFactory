@@ -9,6 +9,7 @@ interface BulkEditRequest {
     spaceId?: string;
     rate_per_kwh?: number | string;
     status?: "AUTO" | "DEPLOYMENT_IN_PROGRESS" | "UNDER_MAINTENANCE";
+    poolId?: string | null;
   };
 }
 
@@ -122,6 +123,33 @@ export async function POST(
       }
     }
 
+    // Validate poolId if provided
+    if (updates.poolId !== undefined && updates.poolId !== null) {
+      if (typeof updates.poolId !== "string") {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "poolId must be a string or null",
+          },
+          { status: 400 },
+        );
+      }
+
+      const pool = await prisma.pool.findUnique({
+        where: { id: updates.poolId },
+      });
+
+      if (!pool) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Pool not found",
+          },
+          { status: 404 },
+        );
+      }
+    }
+
     // Verify all miners exist
     const existingMiners = await prisma.miner.findMany({
       where: {
@@ -166,6 +194,9 @@ export async function POST(
     }
     if (updates.status !== undefined) {
       updateData.status = updates.status;
+    }
+    if (updates.poolId !== undefined) {
+      updateData.poolId = updates.poolId;
     }
 
     // Update all miners
