@@ -211,7 +211,7 @@ export async function GET(request: NextRequest) {
             currency_amount: parseFloat(tx.currency_amount.toFixed(8)),
             usd_equivalent: parseFloat(tx.usd_equivalent.toFixed(2)),
             transaction_id: tx.transaction_id,
-            transaction_type: tx.transaction_type,
+            transaction_type: tx.transaction_type as "credit" | "debit",
           });
 
           if (tx.transaction_type === "credit") {
