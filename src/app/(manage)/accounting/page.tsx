@@ -33,7 +33,7 @@ import {
   Typography,
 } from "@mui/material";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useDashboardStats } from "@/lib/hooks/useDashboard";
 import {
   Customer,
@@ -60,6 +60,7 @@ type SortKey =
   | "issuedDate"
   | "paidDate"
   | "dueDate"
+  | "paidPastDue"
   | "daysUntilDue";
 
 type BulkStatusType = "ISSUED" | "PAID" | "OVERDUE" | "CANCELLED";
@@ -72,29 +73,6 @@ const calculateDaysUntilDue = (dueDate: Date) => {
   const diffTime = due.getTime() - today.getTime();
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   return diffDays;
-};
-
-const getSortValue = (invoice: InvoiceWithDetails, key: SortKey) => {
-  switch (key) {
-    case "invoiceNumber":
-      return invoice.invoiceNumber;
-    case "customer":
-      return invoice.user?.name || `Customer ${invoice.userId.slice(0, 8)}`;
-    case "amount":
-      return Number(invoice.totalAmount ?? 0);
-    case "status":
-      return invoice.status || "";
-    case "issuedDate":
-      return invoice.issuedDate ? new Date(invoice.issuedDate).getTime() : 0;
-    case "paidDate":
-      return invoice.paidDate ? new Date(invoice.paidDate).getTime() : 0;
-    case "dueDate":
-      return invoice.dueDate ? new Date(invoice.dueDate).getTime() : 0;
-    case "daysUntilDue":
-      return calculateDaysUntilDue(invoice.dueDate);
-    default:
-      return 0;
-  }
 };
 
 export default function AccountingDashboard() {
@@ -134,6 +112,8 @@ export default function AccountingDashboard() {
     customerFilter || undefined,
     statusFilter ? (statusFilter as InvoiceStatus) : undefined,
     "ELECTRICITY_CHARGES",
+    sortBy,
+    sortDirection,
   );
 
   const {
@@ -183,8 +163,13 @@ export default function AccountingDashboard() {
       setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
     } else {
       setSortBy(property);
-      setSortDirection("asc");
+      setSortDirection(
+        property === "paidPastDue" || property === "daysUntilDue"
+          ? "desc"
+          : "asc",
+      );
     }
+    setPage(1);
   };
 
   const handleToggleInvoiceSelection = (invoiceId: string) => {
@@ -290,48 +275,6 @@ export default function AccountingDashboard() {
       setBulkEmailProcessing(false);
     }
   };
-
-  const sortedInvoices = useMemo(() => {
-    const data = [...invoices];
-    data.sort((a, b) => {
-      // Special sorting for daysUntilDue: sort by status descending first, then by daysUntilDue
-      if (sortBy === "daysUntilDue") {
-        const aStatus = getSortValue(a, "status");
-        const bStatus = getSortValue(b, "status");
-
-        // Sort by status descending first
-        let statusCmp: number;
-        if (typeof aStatus === "string" && typeof bStatus === "string") {
-          statusCmp = bStatus.localeCompare(aStatus);
-        } else {
-          statusCmp = (aStatus as number) - (bStatus as number);
-        }
-
-        // If statuses are equal, sort by daysUntilDue
-        if (statusCmp !== 0) {
-          return -statusCmp; // Descending for status
-        }
-
-        const aVal = getSortValue(a, sortBy);
-        const bVal = getSortValue(b, sortBy);
-        const daysUntilDueCmp = (aVal as number) - (bVal as number);
-        return sortDirection === "asc" ? daysUntilDueCmp : -daysUntilDueCmp;
-      }
-
-      const aVal = getSortValue(a, sortBy);
-      const bVal = getSortValue(b, sortBy);
-
-      let cmp: number;
-      if (typeof aVal === "string" && typeof bVal === "string") {
-        cmp = aVal.localeCompare(bVal);
-      } else {
-        cmp = (aVal as number) - (bVal as number);
-      }
-
-      return sortDirection === "asc" ? cmp : -cmp;
-    });
-    return data;
-  }, [invoices, sortBy, sortDirection]);
 
   if (loading) {
     return (
@@ -669,15 +612,13 @@ export default function AccountingDashboard() {
                     <Checkbox
                       indeterminate={
                         selectedInvoiceIds.length > 0 &&
-                        selectedInvoiceIds.length < sortedInvoices.length
+                        selectedInvoiceIds.length < invoices.length
                       }
                       checked={
-                        sortedInvoices.length > 0 &&
-                        selectedInvoiceIds.length === sortedInvoices.length
+                        invoices.length > 0 &&
+                        selectedInvoiceIds.length === invoices.length
                       }
-                      onChange={(e) =>
-                        handleToggleAllInvoices(e, sortedInvoices)
-                      }
+                      onChange={(e) => handleToggleAllInvoices(e, invoices)}
                     />
                   </TableCell>
                   <TableCell
@@ -776,8 +717,21 @@ export default function AccountingDashboard() {
                       Due Date
                     </TableSortLabel>
                   </TableCell>
-                  <TableCell sx={{ fontWeight: "bold" }}>
-                    Paid Past Due
+                  <TableCell
+                    sx={{ fontWeight: "bold" }}
+                    sortDirection={
+                      sortBy === "paidPastDue" ? sortDirection : false
+                    }
+                  >
+                    <TableSortLabel
+                      active={sortBy === "paidPastDue"}
+                      direction={
+                        sortBy === "paidPastDue" ? sortDirection : "asc"
+                      }
+                      onClick={() => handleRequestSort("paidPastDue")}
+                    >
+                      Paid Past Due
+                    </TableSortLabel>
                   </TableCell>
                   <TableCell
                     sx={{ fontWeight: "bold" }}
@@ -798,7 +752,7 @@ export default function AccountingDashboard() {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {sortedInvoices.map((invoice: InvoiceWithDetails) => {
+                {invoices.map((invoice: InvoiceWithDetails) => {
                   const daysUntilDue = calculateDaysUntilDue(invoice.dueDate);
                   return (
                     <TableRow key={invoice.id} hover>

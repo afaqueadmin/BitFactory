@@ -3,6 +3,8 @@
 import React, { useState } from "react";
 import {
   AppBar,
+  Drawer,
+  Divider,
   Toolbar,
   IconButton,
   Menu,
@@ -12,6 +14,10 @@ import {
   Stack,
   CircularProgress,
   Badge,
+  List,
+  ListItemButton,
+  ListItemText,
+  useMediaQuery,
 } from "@mui/material";
 import { useAuth } from "@/lib/contexts/auth-context";
 // import SettingsIcon from "@mui/icons-material/Settings";
@@ -30,9 +36,11 @@ import { Invoice } from "@prisma/client";
 export default function AppBarComponent() {
   const { darkMode, toggleDarkMode } = useTheme();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const { logout } = useAuth();
   const pathname = usePathname(); // Get current path
+  const isMobile = useMediaQuery((theme) => theme.breakpoints.down("md"));
 
   const { user } = useUser();
 
@@ -66,6 +74,14 @@ export default function AppBarComponent() {
     setAnchorEl(null);
   };
 
+  const handleOpenMobileNav = () => {
+    setMobileNavOpen(true);
+  };
+
+  const handleCloseMobileNav = () => {
+    setMobileNavOpen(false);
+  };
+
   const handleLogout = async () => {
     try {
       setIsLoggingOut(true);
@@ -78,6 +94,39 @@ export default function AppBarComponent() {
     }
   };
 
+  const navLinks = [
+    { href: "/dashboard", label: "Dashboard" },
+    { href: "/miners", label: "Miners" },
+    { href: "/wallet", label: "Wallet" },
+    { href: "/invoices", label: "Invoices" },
+    { href: "/btc-price-history", label: "BTC Price" },
+    { href: "/btc-price-predictor", label: "BTC Predictor" },
+    { href: "/hashprice-history", label: "Hashprice" },
+    { href: "/payback-analysis", label: "Payback Analysis" },
+  ];
+
+  const linkButtonSx = (href: string) => ({
+    color: darkMode ? "white" : "black",
+    textTransform: "none",
+    fontWeight: 500,
+    px: 2,
+    position: "relative" as const,
+    "&:hover": {
+      backgroundColor: darkMode ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)",
+    },
+    "&::after": {
+      content: '""',
+      position: "absolute" as const,
+      bottom: 0,
+      left: 8,
+      right: 8,
+      height: 2,
+      backgroundColor: "primary.main",
+      transform: pathname === href ? "scaleX(1)" : "scaleX(0)",
+      transition: "transform 0.2s ease-in-out",
+    },
+  });
+
   return (
     <AppBar
       position="fixed"
@@ -88,297 +137,113 @@ export default function AppBarComponent() {
         boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
       }}
     >
-      <Toolbar>
+      <Toolbar
+        sx={{
+          minHeight: { xs: 56, sm: 64 },
+          px: { xs: 1.5, sm: 2, md: 3 },
+          gap: { xs: 1, md: 2 },
+        }}
+      >
         {/* Logo */}
-        <Box sx={{ mr: 4, pl: 5 }}>
+        <Box sx={{ mr: { xs: 0, md: 4 }, pl: { xs: 0, md: 5 }, flexShrink: 0 }}>
           <Link href="/dashboard">
             <Image
               src="/BitfactoryLogo.webp"
               alt="BitFactory Logo"
-              width={140}
-              height={40}
+              width={isMobile ? 110 : 140}
+              height={isMobile ? 32 : 40}
               priority
               style={{ cursor: "pointer", height: "auto" }}
             />
           </Link>
         </Box>
 
-        {/* Navigation Links - Centered */}
+        {/* Navigation Links - Desktop */}
         <Box
-          sx={{ flexGrow: 1, display: "flex", justifyContent: "left", pl: 5 }}
+          sx={{
+            flexGrow: 1,
+            display: { xs: "none", md: "flex" },
+            justifyContent: "left",
+            pl: 5,
+          }}
         >
-          <Stack direction="row" spacing={3}>
-            <Button
-              component={Link}
-              href="/dashboard"
-              sx={{
-                color: darkMode ? "white" : "black",
-                textTransform: "none",
-                fontWeight: 500,
-                px: 2,
-                position: "relative",
-                "&:hover": {
-                  backgroundColor: darkMode
-                    ? "rgba(255,255,255,0.1)"
-                    : "rgba(0,0,0,0.1)",
-                },
-                "&::after": {
-                  content: '""',
-                  position: "absolute",
-                  bottom: 0,
-                  left: 8,
-                  right: 8,
-                  height: 2,
-                  backgroundColor: "primary.main",
-                  transform:
-                    pathname === "/dashboard" ? "scaleX(1)" : "scaleX(0)",
-                  transition: "transform 0.2s ease-in-out",
-                },
-              }}
-            >
-              Dashboard
-            </Button>
-            <Button
-              component={Link}
-              href="/miners"
-              sx={{
-                color: darkMode ? "white" : "black",
-                textTransform: "none",
-                fontWeight: 500,
-                px: 2,
-                position: "relative",
-                "&:hover": {
-                  backgroundColor: darkMode
-                    ? "rgba(255,255,255,0.1)"
-                    : "rgba(0,0,0,0.1)",
-                },
-                "&::after": {
-                  content: '""',
-                  position: "absolute",
-                  bottom: 0,
-                  left: 8,
-                  right: 8,
-                  height: 2,
-                  backgroundColor: "primary.main",
-                  transform: pathname === "/miners" ? "scaleX(1)" : "scaleX(0)",
-                  transition: "transform 0.2s ease-in-out",
-                },
-              }}
-            >
-              Miners
-            </Button>
-            <Button
-              component={Link}
-              href="/wallet"
-              sx={{
-                color: darkMode ? "white" : "black",
-                textTransform: "none",
-                fontWeight: 500,
-                px: 2,
-                position: "relative",
-                "&:hover": {
-                  backgroundColor: darkMode
-                    ? "rgba(255,255,255,0.1)"
-                    : "rgba(0,0,0,0.1)",
-                },
-                "&::after": {
-                  content: '""',
-                  position: "absolute",
-                  bottom: 0,
-                  left: 8,
-                  right: 8,
-                  height: 2,
-                  backgroundColor: "primary.main",
-                  transform: pathname === "/wallet" ? "scaleX(1)" : "scaleX(0)",
-                  transition: "transform 0.2s ease-in-out",
-                },
-              }}
-            >
-              Wallet
-            </Button>
-            <Button
-              component={Link}
-              href="/invoices"
-              sx={{
-                color: darkMode ? "white" : "black",
-                textTransform: "none",
-                fontWeight: 500,
-                px: 2,
-                position: "relative",
-                "&:hover": {
-                  backgroundColor: darkMode
-                    ? "rgba(255,255,255,0.1)"
-                    : "rgba(0,0,0,0.1)",
-                },
-                "&::after": {
-                  content: '""',
-                  position: "absolute",
-                  bottom: 0,
-                  left: 8,
-                  right: 8,
-                  height: 2,
-                  backgroundColor: "primary.main",
-                  transform:
-                    pathname === "/invoices" ? "scaleX(1)" : "scaleX(0)",
-                  transition: "transform 0.2s ease-in-out",
-                },
-              }}
-            >
-              <Badge
-                color="error"
-                badgeContent={unpaidCount}
-                invisible={unpaidCount === 0}
-                anchorOrigin={{ vertical: "top", horizontal: "right" }}
-                sx={{
-                  "& .MuiBadge-badge": {
-                    fontSize: "0.65rem",
-                    minWidth: 16,
-                    height: 16,
-                    padding: "0 4px",
-                    borderRadius: 8,
-                    transform: "translate(12px, -7px)",
-                  },
-                }}
+          <Stack direction="row" spacing={3} sx={{ flexWrap: "nowrap" }}>
+            {navLinks.map((link) => (
+              <Button
+                key={link.href}
+                component={Link}
+                href={link.href}
+                sx={linkButtonSx(link.href)}
               >
-                <span>Invoices</span>
-              </Badge>
-            </Button>
-
-            <Button
-              component={Link}
-              href="/btc-price-history"
-              sx={{
-                color: darkMode ? "white" : "black",
-                textTransform: "none",
-                fontWeight: 500,
-                px: 2,
-                position: "relative",
-                "&:hover": {
-                  backgroundColor: darkMode
-                    ? "rgba(255,255,255,0.1)"
-                    : "rgba(0,0,0,0.1)",
-                },
-                "&::after": {
-                  content: '""',
-                  position: "absolute",
-                  bottom: 0,
-                  left: 8,
-                  right: 8,
-                  height: 2,
-                  backgroundColor: "primary.main",
-                  transform:
-                    pathname === "/btc-price-history"
-                      ? "scaleX(1)"
-                      : "scaleX(0)",
-                  transition: "transform 0.2s ease-in-out",
-                },
-              }}
-            >
-              BTC Price
-            </Button>
-            <Button
-              component={Link}
-              href="/btc-price-predictor"
-              sx={{
-                color: darkMode ? "white" : "black",
-                textTransform: "none",
-                fontWeight: 500,
-                px: 2,
-                position: "relative",
-                "&:hover": {
-                  backgroundColor: darkMode
-                    ? "rgba(255,255,255,0.1)"
-                    : "rgba(0,0,0,0.1)",
-                },
-                "&::after": {
-                  content: '""',
-                  position: "absolute",
-                  bottom: 0,
-                  left: 8,
-                  right: 8,
-                  height: 2,
-                  backgroundColor: "primary.main",
-                  transform:
-                    pathname === "/btc-price-predictor"
-                      ? "scaleX(1)"
-                      : "scaleX(0)",
-                  transition: "transform 0.2s ease-in-out",
-                },
-              }}
-            >
-              BTC Predictor
-            </Button>
-            <Button
-              component={Link}
-              href="/hashprice-history"
-              sx={{
-                color: darkMode ? "white" : "black",
-                textTransform: "none",
-                fontWeight: 500,
-                px: 2,
-                position: "relative",
-                "&:hover": {
-                  backgroundColor: darkMode
-                    ? "rgba(255,255,255,0.1)"
-                    : "rgba(0,0,0,0.1)",
-                },
-                "&::after": {
-                  content: '""',
-                  position: "absolute",
-                  bottom: 0,
-                  left: 8,
-                  right: 8,
-                  height: 2,
-                  backgroundColor: "primary.main",
-                  transform:
-                    pathname === "/hashprice-history"
-                      ? "scaleX(1)"
-                      : "scaleX(0)",
-                  transition: "transform 0.2s ease-in-out",
-                },
-              }}
-            >
-              Hashprice
-            </Button>
-            <Button
-              component={Link}
-              href="/payback-analysis"
-              sx={{
-                color: darkMode ? "white" : "black",
-                textTransform: "none",
-                fontWeight: 500,
-                px: 2,
-                position: "relative",
-                "&:hover": {
-                  backgroundColor: darkMode
-                    ? "rgba(255,255,255,0.1)"
-                    : "rgba(0,0,0,0.1)",
-                },
-                "&::after": {
-                  content: '""',
-                  position: "absolute",
-                  bottom: 0,
-                  left: 8,
-                  right: 8,
-                  height: 2,
-                  backgroundColor: "primary.main",
-                  transform:
-                    pathname === "/payback-analysis"
-                      ? "scaleX(1)"
-                      : "scaleX(0)",
-                  transition: "transform 0.2s ease-in-out",
-                },
-              }}
-            >
-              Payback Analysis
-            </Button>
+                {link.href === "/invoices" ? (
+                  <Badge
+                    color="error"
+                    badgeContent={unpaidCount}
+                    invisible={unpaidCount === 0}
+                    anchorOrigin={{ vertical: "top", horizontal: "right" }}
+                    sx={{
+                      "& .MuiBadge-badge": {
+                        fontSize: "0.65rem",
+                        minWidth: 16,
+                        height: 16,
+                        padding: "0 4px",
+                        borderRadius: 8,
+                        transform: "translate(12px, -7px)",
+                      },
+                    }}
+                  >
+                    <span>{link.label}</span>
+                  </Badge>
+                ) : (
+                  link.label
+                )}
+              </Button>
+            ))}
           </Stack>
+        </Box>
+
+        {/* Navigation toggle - Mobile */}
+        <Box
+          sx={{
+            display: { xs: "flex", md: "none" },
+            flexGrow: 1,
+            justifyContent: "flex-end",
+          }}
+        >
+          <IconButton
+            onClick={handleOpenMobileNav}
+            sx={{ color: darkMode ? "white" : "black" }}
+            aria-label="Open navigation menu"
+          >
+            <Box
+              component="span"
+              sx={{
+                width: 24,
+                height: 2,
+                bgcolor: "currentColor",
+                position: "relative",
+                display: "block",
+                borderRadius: 1,
+                "&::before, &::after": {
+                  content: '""',
+                  position: "absolute",
+                  left: 0,
+                  width: 24,
+                  height: 2,
+                  bgcolor: "currentColor",
+                  borderRadius: 1,
+                },
+                "&::before": { top: -7 },
+                "&::after": { top: 7 },
+              }}
+            />
+          </IconButton>
         </Box>
 
         {/* Dark Mode Toggle */}
         <IconButton
           onClick={toggleDarkMode}
-          sx={{ color: darkMode ? "white" : "black" }}
+          sx={{ color: darkMode ? "white" : "black", ml: { xs: 0, md: 1 } }}
         >
           {darkMode ? <LightModeIcon /> : <DarkModeIcon />}
         </IconButton>
@@ -441,6 +306,75 @@ export default function AppBarComponent() {
           </MenuItem>
         </Menu>
       </Toolbar>
+
+      <Drawer
+        anchor="top"
+        open={mobileNavOpen}
+        onClose={handleCloseMobileNav}
+        PaperProps={{
+          sx: {
+            pt: 1,
+            pb: 2,
+            backgroundColor: darkMode ? "grey.900" : "white",
+            color: darkMode ? "white" : "black",
+          },
+        }}
+      >
+        <Box sx={{ px: 2, pt: 1, pb: 1 }}>
+          <Stack
+            direction="row"
+            alignItems="center"
+            justifyContent="space-between"
+          >
+            <Box>
+              <Link href="/dashboard" onClick={handleCloseMobileNav}>
+                <Image
+                  src="/BitfactoryLogo.webp"
+                  alt="BitFactory Logo"
+                  width={120}
+                  height={34}
+                  priority
+                  style={{ cursor: "pointer", height: "auto" }}
+                />
+              </Link>
+            </Box>
+            <IconButton
+              onClick={handleCloseMobileNav}
+              sx={{ color: darkMode ? "white" : "black" }}
+              aria-label="Close navigation menu"
+            >
+              <span style={{ fontSize: 24, lineHeight: 1 }}>×</span>
+            </IconButton>
+          </Stack>
+        </Box>
+        <Divider />
+        <List>
+          {navLinks.map((link) => (
+            <ListItemButton
+              key={link.href}
+              component={Link}
+              href={link.href}
+              onClick={handleCloseMobileNav}
+              selected={pathname === link.href}
+              sx={{ px: 2 }}
+            >
+              <ListItemText
+                primary={link.label}
+                primaryTypographyProps={{ fontWeight: 500 }}
+              />
+            </ListItemButton>
+          ))}
+          <ListItemButton
+            onClick={() => {
+              toggleDarkMode();
+              handleCloseMobileNav();
+            }}
+            sx={{ px: 2 }}
+          >
+            <ListItemText primary={darkMode ? "Light Mode" : "Dark Mode"} />
+          </ListItemButton>
+        </List>
+      </Drawer>
     </AppBar>
   );
 }

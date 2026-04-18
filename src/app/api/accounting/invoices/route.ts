@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
-import { InvoiceStatus, AuditAction } from "@prisma/client";
+import { InvoiceStatus, AuditAction, Prisma } from "@prisma/client";
 
 export async function GET(request: NextRequest) {
   try {
@@ -33,6 +33,9 @@ export async function GET(request: NextRequest) {
 
     const status = searchParams.get("status");
     const invoiceType = searchParams.get("invoiceType");
+    const sortBy = searchParams.get("sortBy");
+    const sortDirection: Prisma.SortOrder =
+      searchParams.get("sortDirection") === "desc" ? "desc" : "asc";
     const page = parseInt(searchParams.get("page") || "1", 10);
     const limit = parseInt(searchParams.get("limit") || "10", 10);
 
@@ -53,6 +56,31 @@ export async function GET(request: NextRequest) {
     // They won't affect calculations (amount, outstanding, etc) as they're already excluded from those queries
 
     const skip = (page - 1) * limit;
+    const defaultSort: Prisma.SortOrder = "desc";
+
+    const orderBy: Prisma.InvoiceOrderByWithRelationInput[] = (() => {
+      switch (sortBy) {
+        case "invoiceNumber":
+          return [{ invoiceNumber: sortDirection }, { createdAt: defaultSort }];
+        case "customer":
+          return [
+            { user: { name: sortDirection } },
+            { createdAt: defaultSort },
+          ];
+        case "amount":
+          return [{ totalAmount: sortDirection }, { createdAt: defaultSort }];
+        case "status":
+          return [{ status: sortDirection }, { createdAt: defaultSort }];
+        case "issuedDate":
+          return [{ issuedDate: sortDirection }, { createdAt: defaultSort }];
+        case "paidDate":
+          return [{ paidDate: sortDirection }, { createdAt: defaultSort }];
+        case "dueDate":
+          return [{ dueDate: sortDirection }, { createdAt: defaultSort }];
+        default:
+          return [{ createdAt: defaultSort }];
+      }
+    })();
 
     const include: Record<string, unknown> = {
       user: { select: { id: true, email: true, name: true } },
@@ -64,16 +92,91 @@ export async function GET(request: NextRequest) {
       include.createdByUser = { select: { id: true, email: true, name: true } };
     }
 
-    const [invoices, total] = await Promise.all([
-      prisma.invoice.findMany({
+    const getPaidPastDueDays = (invoice: {
+      status: InvoiceStatus;
+      paidDate: Date | null;
+      dueDate: Date;
+    }) => {
+      if (invoice.status !== InvoiceStatus.PAID || !invoice.paidDate) {
+        return null;
+      }
+
+      const diffDays = Math.ceil(
+        (new Date(invoice.paidDate).getTime() -
+          new Date(invoice.dueDate).getTime()) /
+          (1000 * 60 * 60 * 24),
+      );
+
+      return Math.max(0, diffDays);
+    };
+
+    const getDaysUntilDue = (invoice: {
+      status: InvoiceStatus;
+      dueDate: Date;
+    }) => {
+      if (invoice.status === InvoiceStatus.PAID) {
+        return null;
+      }
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const due = new Date(invoice.dueDate);
+      due.setHours(0, 0, 0, 0);
+
+      return Math.ceil(
+        (due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
+      );
+    };
+
+    let invoices;
+    let total;
+
+    if (sortBy === "paidPastDue" || sortBy === "daysUntilDue") {
+      const allMatchingInvoices = await prisma.invoice.findMany({
         where,
         include,
-        orderBy: { createdAt: "desc" },
-        skip,
-        take: limit,
-      }),
-      prisma.invoice.count({ where }),
-    ]);
+        orderBy: [{ createdAt: "desc" }],
+      });
+
+      const sorted = [...allMatchingInvoices].sort((a, b) => {
+        if (sortBy === "daysUntilDue") {
+          const aIssuedPriority = a.status === InvoiceStatus.ISSUED ? 0 : 1;
+          const bIssuedPriority = b.status === InvoiceStatus.ISSUED ? 0 : 1;
+
+          if (aIssuedPriority !== bIssuedPriority) {
+            return aIssuedPriority - bIssuedPriority;
+          }
+        }
+
+        const aValue =
+          sortBy === "paidPastDue" ? getPaidPastDueDays(a) : getDaysUntilDue(a);
+        const bValue =
+          sortBy === "paidPastDue" ? getPaidPastDueDays(b) : getDaysUntilDue(b);
+
+        // Keep rows with no sortable value at the end for both directions.
+        if (aValue === null && bValue === null) return 0;
+        if (aValue === null) return 1;
+        if (bValue === null) return -1;
+
+        const cmp = aValue - bValue;
+        return sortDirection === "asc" ? cmp : -cmp;
+      });
+
+      total = sorted.length;
+      invoices = sorted.slice(skip, skip + limit);
+    } else {
+      [invoices, total] = await Promise.all([
+        prisma.invoice.findMany({
+          where,
+          include,
+          orderBy,
+          skip,
+          take: limit,
+        }),
+        prisma.invoice.count({ where }),
+      ]);
+    }
 
     return NextResponse.json({
       invoices,
