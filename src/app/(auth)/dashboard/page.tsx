@@ -66,7 +66,7 @@ export default function DashboardPage() {
 
   // Chart view mode state
   const [chartMode, setChartMode] = React.useState<
-    "total" | "luxor" | "braiins" | "stacked"
+    "total" | "luxor" | "braiins" | "sideBySide"
   >("total");
 
   const estimatedMonthlyCost = React.useMemo(() => {
@@ -461,28 +461,28 @@ export default function DashboardPage() {
                 )}
 
                 <button
-                  onClick={() => setChartMode("stacked")}
+                  onClick={() => setChartMode("sideBySide")}
                   style={{
                     padding: "8px 16px",
                     borderRadius: "6px",
                     border: "none",
                     cursor: "pointer",
-                    fontWeight: chartMode === "stacked" ? 600 : 400,
+                    fontWeight: chartMode === "sideBySide" ? 600 : 400,
                     backgroundColor:
-                      chartMode === "stacked"
+                      chartMode === "sideBySide"
                         ? theme.palette.success.main
                         : theme.palette.mode === "dark"
                           ? "rgba(255,255,255,0.1)"
                           : "rgba(0,0,0,0.05)",
                     color:
-                      chartMode === "stacked"
+                      chartMode === "sideBySide"
                         ? theme.palette.success.contrastText
                         : theme.palette.text.primary,
                     transition: "all 0.2s",
                   }}
-                  title="Show stacked view of both pools"
+                  title="Show side-by-side comparison of both pools"
                 >
-                  Stacked
+                  Side by Side
                 </button>
               </Box>
             )}

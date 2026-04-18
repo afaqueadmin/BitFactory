@@ -35,7 +35,7 @@ interface DailyPerformanceData {
 interface MiningEarningsChartProps {
   height?: number;
   days?: number;
-  viewMode?: "total" | "luxor" | "braiins" | "stacked";
+  viewMode?: "total" | "luxor" | "braiins" | "sideBySide";
 }
 
 export default function MiningEarningsChart({
@@ -55,8 +55,8 @@ export default function MiningEarningsChart({
 
     let values: number[] = [];
 
-    if (viewMode === "stacked") {
-      // In stacked mode, use both luxor and braiins values
+    if (viewMode === "sideBySide") {
+      // In side-by-side mode, use both luxor and braiins values
       values = miningData
         .flatMap((item) => [
           item.breakdown?.luxor || 0,
@@ -355,21 +355,19 @@ export default function MiningEarningsChart({
                 />
               )}
 
-              {/* Stacked view - both pools */}
-              {viewMode === "stacked" && (
+              {/* Side-by-side view - both pools */}
+              {viewMode === "sideBySide" && (
                 <>
                   <Bar
                     dataKey="breakdown.luxor"
                     name="Luxor"
-                    stackId="revenue"
                     radius={[6, 6, 0, 0]}
                     fill="#1565C0"
                   />
                   <Bar
                     dataKey="breakdown.braiins"
                     name="Braiins"
-                    stackId="revenue"
-                    radius={[0, 0, 6, 6]}
+                    radius={[6, 6, 0, 0]}
                     fill="#FFA500"
                   />
                 </>
