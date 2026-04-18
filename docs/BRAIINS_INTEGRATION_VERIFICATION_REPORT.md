@@ -1,9 +1,10 @@
 # Braiins Integration Feasibility Report
 
 **Date:** January 15, 2025  
+**Last Updated:** April 18, 2026 (UI/UX approach updated)  
 **Based On:** Code verification from actual implementation (NOT documentation)  
 **Verification Sources:**
-- `/src/app/(manage)/adminpanel/page.tsx` - UI cards
+- `/src/app/(manage)/adminpanel/page.tsx` - UI cards (verified April 18, 2026)
 - `/src/app/api/admin/dashboard/route.ts` - Data fetching
 - `/src/lib/braiins.ts` - Braiins API client
 - `BRAIINS_API_STRUCTURE_MISMATCH.md` - Actual API responses
@@ -19,6 +20,27 @@
 ✅ **Revenue:** Daily reward and block reward data available  
 
 **Recommendation:** Option B (Pool Selector Dropdown) is FEASIBLE but requires architectural adjustment for Pool Accounts.
+
+---
+
+## APRIL 18, 2026 UPDATE: UI/UX APPROACH CHANGE
+
+**Current Implementation Status (in code):**
+- ✅ Pool mode toggle exists (All Pools, Luxor, Braiins)
+- ✅ Cards conditionally hidden for Braiins mode using `shouldHideForBraiins()` function
+- ❌ 4 cards are hidden: Uptime (24h), Total/Active/Inactive Pool Accounts
+
+**Approved Change:**
+- Remove card hiding logic
+- Show all 24 cards regardless of pool mode
+- Display "N/A" as value for unavailable metrics in Braiins mode
+- This provides consistent layout and better user communication
+
+**Cards Affected:**
+1. Uptime (24 hours) → Show "N/A" for Braiins
+2. Total Pool Accounts → Show "N/A" for Braiins  
+3. Active Pool Accounts → Show "N/A" for Braiins
+4. Inactive Pool Accounts → Show "N/A" for Braiins
 
 ---
 
@@ -322,12 +344,13 @@ profile.btc.off_workers + dis_workers + low_workers;  // Inactive
 Option A: Hide these 3 cards when "Braiins" mode selected
   ├─ User sees only 21 cards in Braiins mode
   ├─ Shows 24 cards in Luxor/Total mode
-  └─ Clean but inconsistent
+  └─ Clean but inconsistent (Currently implemented in code)
 
-Option B: Show static text "N/A" for Braiins
+Option B: Show static text "N/A" for Braiins ✅ **SELECTED APPROACH**
   ├─ Keeps layout consistent (24 cards always)
   ├─ User understands Braiins doesn't have this
-  └─ Looks incomplete
+  ├─ Cleaner visual hierarchy (no layout shift)
+  └─ Implementation: Remove conditional hiding, set value to "NA" for these cards in Braiins mode
 
 Option C: Replace with "Mining Accounts" (just one user)
   ├─ "Total Mining Accounts: 1" (always)
@@ -417,13 +440,16 @@ interface DashboardStats {
    - Calculate combined values
 5. ⚠️ Handle errors for individual pools (one fails ≠  both fail)
 
-### Phase 2: Frontend
-1. Add poolMode state: `useState("total")`
-2. Add pool selector dropdown (3 options: Total/Luxor/Braiins)
-3. Conditionally render 10 affected cards based on poolMode
-4. For "Power" card: Keep DB-only (no pool switching)
-5. For "Uptime" card: Show "N/A" for Braiins mode
-6. For "Pool Accounts": Hide OR show "N/A" OR show "1" for Braiins
+### Phase 2: Frontend ✅ **UPDATED APPROACH**
+1. Add poolMode state: `useState("total")` ✅ (Already implemented)
+2. Add pool selector dropdown (3 options: Total/Luxor/Braiins) ✅ (Already implemented)
+3. Conditionally render 10 affected cards based on poolMode ✅ (Already implemented)
+4. **CHANGE**: Remove conditional hiding of unavailable cards (use `shouldHideForBraiins` removal)
+5. **CHANGE**: Modify card value logic to show "N/A" for Braiins mode:
+   - For Uptime card: Show `value="N/A"` when poolMode === "braiins"
+   - For 3 Pool Accounts cards: Show `value="N/A"` when poolMode === "braiins"
+6. For "Power" card: Keep DB-only (no pool switching)
+7. For all other cards: Use poolMode-based switching (current implementation)
 
 ### Phase 3: Testing
 1. Test with Luxor only (existing)
@@ -435,17 +461,17 @@ interface DashboardStats {
 
 ## RECOMMENDATIONS
 
-### ✅ RECOMMENDED APPROACH
-Use **Option B (Pool Selector Dropdown)** with these adjustments:
+### ✅ RECOMMENDED APPROACH ✅ **UPDATED: SHOW "NA" INSTEAD OF HIDING**
+Use **Option B (Pool Selector Dropdown with "NA" Display)** with these adjustments:
 
 1. **For Pool Accounts cards (3 cards):**
-   - Show as "1 / 1 / 0" (hardcoded) for Braiins mode
-   - Users understand Braiins doesn't have subaccounts
-   - Explanation in docs/UI tooltip
+   - Show as "N/A" for Braiins mode
+   - Users see all 24 cards always (no layout shift)
+   - Explanation tooltip: "Braiins uses single-user model, not subaccounts"
 
 2. **For Uptime card (1 card):**
    - Show "N/A" for Braiins mode
-   - Or calculate from last_share timestamp
+   - Alternative: Could calculate from last_share timestamp (estimated uptime)
    - Add note: "Braiins doesn't provide uptime metric"
 
 3. **For Power card (1 card):**
@@ -460,10 +486,11 @@ Use **Option B (Pool Selector Dropdown)** with these adjustments:
 - Architecture is compatible with Option B
 - No blocker issues, only minor adjustments needed
 
-### 🟡 NEEDS CLARIFICATION
-- Should Uptime show "N/A" or be calculated?
-- Should Pool Accounts show "1/1/0" or hide for Braiins?
-- Should we track which miners belong to which pool?
+### ✅ DECISION MADE
+- **Uptime card**: Show "N/A" for Braiins mode (no calculation needed)
+- **Pool Accounts cards**: Show "N/A" for Braiins mode (not hidden, visible but unavailable)
+- **Approach**: Show all 24 cards always, no layout shift when toggling pools
+- **Implementation**: Remove `shouldHideForBraiins` conditional rendering, replace values with "N/A" for Braiins mode
 
 ---
 

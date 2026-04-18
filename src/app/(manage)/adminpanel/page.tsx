@@ -110,7 +110,9 @@ interface HostingRevenueData {
 export default function AdminDashboard() {
   const router = useRouter();
   const theme = useTheme();
-  const [poolMode, setPoolMode] = useState<"total" | "luxor" | "braiins">("total");
+  const [poolMode, setPoolMode] = useState<"total" | "luxor" | "braiins">(
+    "total",
+  );
 
   const {
     data: stats,
@@ -269,17 +271,6 @@ export default function AdminDashboard() {
     return "#9C27B0"; // Purple - combined/aggregated
   };
 
-  // Check if a card should be hidden for Braiins mode
-  const shouldHideForBraiins = (cardTitle: string): boolean => {
-    const hiddenCards = [
-      "Total Pool Accounts",
-      "Active Pool Accounts",
-      "Inactive Pool Accounts",
-      "Uptime (24 hours)",
-    ];
-    return poolMode === "braiins" && hiddenCards.includes(cardTitle);
-  };
-
   const poolStats = useMemo(() => getPoolStats(poolMode), [poolMode, stats]);
   const minersStats = useMemo(
     () => getMinersStats(poolMode),
@@ -342,9 +333,7 @@ export default function AdminDashboard() {
                     ? "rgba(255,255,255,0.1)"
                     : "rgba(0,0,0,0.05)",
               color:
-                poolMode === "total"
-                  ? "#FFFFFF"
-                  : theme.palette.text.primary,
+                poolMode === "total" ? "#FFFFFF" : theme.palette.text.primary,
               transition: "all 0.2s",
             }}
           >
@@ -366,9 +355,7 @@ export default function AdminDashboard() {
                     ? "rgba(255,255,255,0.1)"
                     : "rgba(0,0,0,0.05)",
               color:
-                poolMode === "luxor"
-                  ? "#FFFFFF"
-                  : theme.palette.text.primary,
+                poolMode === "luxor" ? "#FFFFFF" : theme.palette.text.primary,
               transition: "all 0.2s",
             }}
           >
@@ -390,9 +377,7 @@ export default function AdminDashboard() {
                     ? "rgba(255,255,255,0.1)"
                     : "rgba(0,0,0,0.05)",
               color:
-                poolMode === "braiins"
-                  ? "#FFFFFF"
-                  : theme.palette.text.primary,
+                poolMode === "braiins" ? "#FFFFFF" : theme.palette.text.primary,
               transition: "all 0.2s",
             }}
           >
@@ -519,14 +504,16 @@ export default function AdminDashboard() {
             type="BTC"
           />
 
-          {/* Uptime 24h - From Luxor, hidden for Braiins */}
-          {!shouldHideForBraiins("Uptime (24 hours)") && (
-            <AdminValueCard
-              title="Uptime (24 hours)"
-              borderColor={getCardBorderColor("Uptime (24 hours)")}
-              value={`${(poolStats?.uptime_24h ?? 0).toFixed(2)}%`}
-            />
-          )}
+          {/* Uptime 24h - From Luxor, shows N/A for Braiins */}
+          <AdminValueCard
+            title="Uptime (24 hours)"
+            borderColor={getCardBorderColor("Uptime (24 hours)")}
+            value={
+              poolMode === "braiins"
+                ? "N/A"
+                : `${(poolStats?.uptime_24h ?? 0).toFixed(2)}%`
+            }
+          />
 
           {/* Hashrate 5 min - Available from both Luxor and Braiins */}
           <AdminValueCard
@@ -546,52 +533,76 @@ export default function AdminDashboard() {
 
           {/* === LUXOR POOL ACCOUNTS === */}
 
-          {/* Total Pool Accounts - Luxor only, Hidden for Braiins */}
-          {!shouldHideForBraiins("Total Pool Accounts") && (
-            <AdminValueCard
-              title="Total Pool Accounts"
-              borderColor={getCardBorderColor("Total Pool Accounts")}
-              value={stats?.luxor.poolAccounts.total ?? 0}
-            />
-          )}
+          {/* Total Pool Accounts - Luxor only, shows N/A for Braiins */}
+          <AdminValueCard
+            title="Total Pool Accounts"
+            borderColor={getCardBorderColor("Total Pool Accounts")}
+            value={
+              poolMode === "braiins"
+                ? "N/A"
+                : (stats?.luxor.poolAccounts.total ?? 0)
+            }
+          />
 
-          {/* Active Pool Accounts - Luxor only, Hidden for Braiins */}
-          {!shouldHideForBraiins("Active Pool Accounts") && (
-            <AdminValueCard
-              title="Active Pool Accounts"
-              borderColor={getCardBorderColor("Active Pool Accounts")}
-              value={stats?.luxor.poolAccounts.active ?? 0}
-            />
-          )}
+          {/* Active Pool Accounts - Luxor only, shows N/A for Braiins */}
+          <AdminValueCard
+            title="Active Pool Accounts"
+            borderColor={getCardBorderColor("Active Pool Accounts")}
+            value={
+              poolMode === "braiins"
+                ? "N/A"
+                : (stats?.luxor.poolAccounts.active ?? 0)
+            }
+          />
 
-          {/* Inactive Pool Accounts - Luxor only, Hidden for Braiins */}
-          {!shouldHideForBraiins("Inactive Pool Accounts") && (
-            <AdminValueCard
-              title="Inactive Pool Accounts"
-              borderColor={getCardBorderColor("Inactive Pool Accounts")}
-              value={stats?.luxor.poolAccounts.inactive ?? 0}
-            />
-          )}
+          {/* Inactive Pool Accounts - Luxor only, shows N/A for Braiins */}
+          <AdminValueCard
+            title="Inactive Pool Accounts"
+            borderColor={getCardBorderColor("Inactive Pool Accounts")}
+            value={
+              poolMode === "braiins"
+                ? "N/A"
+                : (stats?.luxor.poolAccounts.inactive ?? 0)
+            }
+          />
 
           {/* === WORKER STATISTICS FROM LUXOR === */}
 
           {/* Total Workers - Available from both Luxor and Braiins */}
           <AdminValueCard
-            title={poolMode === "braiins" ? "Total Workers (Braiins)" : poolMode === "total" ? "Total Workers" : "Total Workers (Luxor)"}
+            title={
+              poolMode === "braiins"
+                ? "Total Workers (Braiins)"
+                : poolMode === "total"
+                  ? "Total Workers"
+                  : "Total Workers (Luxor)"
+            }
             borderColor={getCardBorderColor("Total Workers")}
             value={poolStats?.workers.totalWorkers ?? 0}
           />
 
           {/* Active Workers - Available from both Luxor and Braiins */}
           <AdminValueCard
-            title={poolMode === "braiins" ? "Active Workers (Braiins)" : poolMode === "total" ? "Active Workers" : "Active Workers (Luxor)"}
+            title={
+              poolMode === "braiins"
+                ? "Active Workers (Braiins)"
+                : poolMode === "total"
+                  ? "Active Workers"
+                  : "Active Workers (Luxor)"
+            }
             borderColor={getCardBorderColor("Active Workers")}
             value={poolStats?.workers.activeWorkers ?? 0}
           />
 
           {/* Inactive Workers - Available from both Luxor and Braiins */}
           <AdminValueCard
-            title={poolMode === "braiins" ? "Inactive Workers (Braiins)" : poolMode === "total" ? "Inactive Workers" : "Inactive Workers (Luxor)"}
+            title={
+              poolMode === "braiins"
+                ? "Inactive Workers (Braiins)"
+                : poolMode === "total"
+                  ? "Inactive Workers"
+                  : "Inactive Workers (Luxor)"
+            }
             borderColor={getCardBorderColor("Inactive Workers")}
             value={poolStats?.workers.inactiveWorkers ?? 0}
           />
