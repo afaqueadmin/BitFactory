@@ -110,6 +110,33 @@ if (poolMode === "total") {
 btcAmount × btcLiveData.price = USD amount
 ```
 
+**API Calculation Details:**
+- **Luxor:** Uses `getTransactions()` API with `transaction_type: "credit"` → sums all earnings transactions (all-time)
+- **Braiins:** Uses `getPayouts()` API → sums payout amounts from on-chain payouts (historical, confirmed/queued)
+
+**Per Braiins Academy - Payouts API Response:**
+```
+Payouts API returns two arrays:
+- onchain: Array of on-chain Bitcoin transactions with fields:
+  - amount_sats: Amount in satoshis (converted to BTC by dividing by 100,000,000)
+  - status: "queued", "confirmed", or "failed"
+  - destination: Bitcoin address where payout was sent
+  - resolved_at_ts: When the payout was confirmed
+  
+- lightning: (Optional) Array of Lightning Network payouts with same structure
+```
+
+**Data Conversion:**
+- Braiins API returns amounts in **satoshis** (1 BTC = 100,000,000 sats)
+- Code converts to BTC: `amount_sats / 100,000,000 = BTC amount`
+- Example: 50,000 sats = 0.0005 BTC
+
+**⚠️ Important Data Source Differences:**
+- **Luxor:** Shows *all earnings credits* via transaction records (all-time transactions)
+- **Braiins:** Shows only *completed/queued payouts* via payout records
+- Payouts API only includes transactions that have been explicitly sent (status: confirmed/queued/failed)
+- **Known Limitation:** Braiins Total Earnings does NOT include earnings that haven't been confirmed as payouts yet
+
 ---
 
 ### Card 2: Primary Wallet Address 🟠
@@ -138,7 +165,11 @@ if (poolMode === "braiins") {
 ```
 
 **Why Luxor Only?**
-Braiins API does not provide wallet/payment settings equivalent to Luxor
+Braiins API does not provide a payment settings endpoint:
+- **Luxor:** Returns wallet addresses and revenue allocation via `getSubaccountPaymentSettings()` endpoint
+- **Braiins:** No equivalent endpoint for payment settings/wallet address configuration
+- Braiins Payouts API includes `destination` field (where payout was sent), but not as an editable user setting
+- Per Braiins Academy documentation, Braiins does not expose wallet/payment management APIs to end users
 
 ---
 
@@ -166,9 +197,24 @@ if (poolMode === "total") {
 ```
 
 **API Calculation Details:**
-- Queries transactions from last 24 hours
-- Sums all credit transactions for each pool
-- Aggregates across all subaccounts
+- **Luxor:** Uses `getTransactions()` API with `transaction_type: "credit"` → sums credit transactions in last 24h
+- **Braiins:** Uses `getDailyRewards()` API → sums `total_reward` field from daily reward records
+
+**Per Braiins Academy - Daily Reward API Response Structure:**
+```
+Fields in daily rewards:
+- total_reward: The sum of all reward types for the day
+- mining_reward: The standard mining reward
+- bos_plus_reward: The amount refunded (pool fee refund for mining with Braiins OS)
+- referral_bonus: Bonus received by being referred to Braiins OS
+- referral_reward: Reward earned by referring others to Braiins OS
+```
+
+**⚠️ Important Data Source Difference from Total Earnings:**
+- **Total Earnings** uses `getPayouts()` API (actual payout transactions)
+- **Revenue (24H)** uses `getDailyRewards()` API (earned rewards daily)
+- These are different APIs with different semantics: Payouts = paid out, Daily Rewards = earned (may not be paid yet)
+- **Why the difference?** Daily Rewards captures what was earned today; Payouts captures historical confirmed payments
 
 ---
 
@@ -196,8 +242,8 @@ if (poolMode === "total") {
 ```
 
 **API Calculation Details:**
-- **Luxor:** Fetches from `getSubaccountPaymentSettings()` returns current balance
-- **Braiins:** Calculated from unpaid earnings in account profile
+- **Luxor:** Fetches from `getSubaccountPaymentSettings()` which returns current pending balance
+- **Braiins:** Fetches from `getUserProfile()` → `btc.current_balance` field (current reward balance / pending payouts)
 
 ---
 
@@ -227,6 +273,14 @@ if (poolMode === "braiins") {
   }
 }
 ```
+
+**Why Luxor Only?**
+Braiins API does not expose payment scheduling configuration:
+- **Luxor:** Provides `payment_frequency` and `day_of_week` via `getSubaccountPaymentSettings()` endpoint
+- **Braiins:** No API endpoint for payment frequency settings
+- Braiins Pool uses automatic daily payouts (not configurable)
+- No equivalent scheduling endpoint in Braiins Pool API
+- Per Braiins Academy documentation, payment frequency is not user-manageable through the API
 
 ---
 
@@ -258,6 +312,14 @@ if (poolMode === "braiins") {
   timeStr = formatTime(payoutDate) + " - " + formatTime(window[1]);
 }
 ```
+
+**Why Luxor Only?**
+Braiins API does not provide next payout scheduling information:
+- **Luxor:** Provides `next_payout_at` timestamp via `getSubaccountPaymentSettings()` endpoint
+- **Braiins:** No API endpoint for next payout scheduling
+- Braiins processes automatic daily payouts but doesn't expose scheduled payout times to users
+- No way to determine "next payout" window via Braiins Pool API
+- Per Braiins Academy, scheduled payout information is not available through the API
 
 ---
 
@@ -364,20 +426,22 @@ const toProperCase = (text: string): string => {
 **Response:**
 ```json
 {
-  "success": true,
-  "data": {
-    "revenue24h": {
-      "btc": 0.00145234
+  "revenue24h": {
+    "btc": 0.00145234,
+    "usd": 45.67
+  },
+  "currency": "BTC",
+  "timestamp": "2026-04-10T14:32:45Z",
+  "dataSource": "both",
+  "activePoolNames": ["Luxor", "Braiins"],
+  "poolBreakdown": {
+    "luxor": {
+      "btc": 0.00089234,
+      "usd": 28.45
     },
-    "currency": "BTC",
-    "timestamp": "2026-04-10T14:32:45Z",
-    "poolBreakdown": {
-      "luxor": {
-        "btc": 0.00089234
-      },
-      "braiins": {
-        "btc": 0.00056000
-      }
+    "braiins": {
+      "btc": 0.00056000,
+      "usd": 0
     }
   }
 }
@@ -407,23 +471,34 @@ const toProperCase = (text: string): string => {
 {
   "success": true,
   "data": {
-    "addresses": [
-      {
-        "external_address": "bc1q...",
-        "revenue_allocation": 100,
-        "name": "Primary"
-      }
-    ],
+    "currency_type": "BTC",
+    "subaccount": {
+      "id": 12345,
+      "name": "my_subaccount",
+      "created_at": "2025-01-01T00:00:00Z",
+      "url": "https://app.luxor.tech/"
+    },
+    "balance": 0.15234567,
+    "status": "active",
+    "wallet_id": 999,
     "payment_frequency": "WEEKLY",
     "day_of_week": "MONDAY",
+    "addresses": [
+      {
+        "address_id": 1,
+        "address_name": "Primary",
+        "external_address": "bc1q...",
+        "revenue_allocation": 100
+      }
+    ],
     "next_payout_at": "2026-04-14T14:00:00Z",
-    "minimum_payout_threshold": 0.001,
-    "last_payout_at": "2026-04-07T14:15:32Z"
-  }
+    "frozen_until": null
+  },
+  "timestamp": "2026-04-10T14:32:45Z"
 }
 ```
 
-**Note:** Braiins API does not provide equivalent endpoint
+**Note:** Braiins API does not provide equivalent endpoint. This endpoint is Luxor-only.
 
 ---
 
@@ -459,17 +534,23 @@ const blob = await response.blob();
 ## Pool Mode Selector
 
 ### Toggle Button Group
-Located in page header next to BTC price:
+Located in page header next to BTC price (only visible when user has 2+ pools):
 
 ```
 [Total] [Luxor] [Braiins]
 ```
+
+**Visibility:**
+- Only appears if `activePoolNames.length > 1`
+- If user has only one pool (Luxor OR Braiins), no toggle is shown
+- If user has no miners, no toggle is shown
 
 **Behavior:**
 - Clicking updates `poolMode` state
 - All data-fetching helper functions respond to state change
 - Cards that support multiple pools update instantly
 - Cards with Luxor-only data disable (opacity 0.6) when Braiins selected
+- **Auto-reset:** If selected pool is removed (e.g., all Luxor miners deleted), poolMode automatically resets to "total"
 
 ---
 
@@ -581,6 +662,162 @@ setStatementError("Failed to generate statement");
 
 ---
 
+## Auto-Reset Behavior
+
+The page implements an auto-reset mechanism that ensures poolMode is always valid:
+
+```typescript
+// Auto-reset poolMode if selected pool is not in activePoolNames
+useEffect(() => {
+  if (activePoolNames.length > 0 && poolMode !== "total" && !activePoolNames.includes(poolMode)) {
+    setPoolMode("total");
+  }
+}, [activePoolNames]);
+```
+
+**When it triggers:**
+- User is viewing "Luxor" mode
+- All Luxor miners are removed/deleted from the system
+- `activePoolNames` no longer includes "Luxor"
+- Page automatically switches to "total" mode
+
+**Rationale:** Prevents displaying selected pool that no longer has data
+
+---
+
+## Braiins API Features
+
+### Pending Payouts Implementation
+
+**Status:** ✅ **Fully Implemented**
+
+**How it works:**
+
+Per **Braiins Academy** (https://academy.braiins.com/en/braiins-pool/monitoring/), the User Profile API provides:
+
+```
+| current_balance | string | current reward balance |
+```
+
+This field represents the **accumulated, unpaid mining rewards** - exactly what represents "pending payouts".
+
+**Implementation:**
+
+In the earnings-summary API endpoint:
+
+```typescript
+// Get user profile to fetch current pending balance
+const profile = await braiinsClient.getUserProfile();
+totalBraiinsPending += parseFloat(profile.btc.current_balance) || 0;
+```
+
+**Field Semantics:**
+- **Braiins `current_balance`** = Accumulated unconfirmed/unpaid rewards (pending payouts)
+- **Luxor `balance`** = Current pending payout balance (pending payouts)
+- Both represent the same thing: earned but not yet paid out
+
+**Comparison:**
+
+| Aspect | Luxor | Braiins |
+|--------|-------|---------|
+| API for pending | `getSubaccountPaymentSettings()` | `getUserProfile()` |
+| Field name | `balance` | `btc.current_balance` |
+| Status | ✅ Implemented | ✅ Implemented |
+| Data type | `number` | `string` (parsed to number) |
+
+---
+
+### Total Earnings vs Revenue 24h - API Differences
+
+**Important:** The wallet uses *different Braiins APIs* for different metrics:
+
+| Metric | API Used | Returns | Used For |
+|--------|----------|---------|----------|
+| **Total Earnings** | `getPayouts()` | Payout transaction records with `status` and `amount_sats` | Actual confirmed/queued payouts (historical) |
+| **Revenue 24h** | `getDailyRewards()` | Daily rewards summary with `total_reward`, `mining_reward`, `bos_plus_reward` | What was earned today (includes all reward types) |
+| **Pending Payouts** | `getUserProfile()` | Current balance with `btc.current_balance` | Unpaid accumulated rewards |
+
+**Design Rationale:**
+- **Total Earnings** = Historical payouts (what was actually paid out in transactions)
+- **Revenue 24h** = Today's earnings (what was earned, which may still be pending)
+- **Pending Payouts** = Current unpaid balance (what you have earned but not received)
+
+This design allows users to see:
+1. What they've been historically paid (Total Earnings)
+2. What they earned today (Revenue 24h)
+3. What they're waiting to receive (Pending Payouts)
+
+**Comparison with Luxor:**
+- Luxor uses `getTransactions()` for both Total Earnings and Revenue 24h (with different date ranges)
+- Braiins uses different APIs optimized for different use cases
+- Both approaches work; Braiins leverages pool-specific API designs
+
+---
+
+## Braiins Payouts API Implementation Details
+
+### Satoshis to BTC Conversion
+
+**Data Structure Change:**
+The Braiins Payouts API response was updated to match the actual API format:
+
+**Old (Incorrect) Structure:**
+```typescript
+payouts.btc.payouts[].amount // Field didn't exist in API
+```
+
+**New (Correct) Structure:**
+```typescript
+payouts.onchain[].amount_sats // Actual API response field
+// Convert: amount_sats / 100,000,000 = BTC amount
+```
+
+**Implementation in earnings-summary route:**
+```typescript
+const payouts = await braiinsClient.getPayouts({
+  from: formatDate(startDate),
+  to: formatDate(endDate),
+});
+
+// Process on-chain payouts
+if (payouts?.onchain) {
+  for (const payout of payouts.onchain) {
+    // Convert satoshis to BTC: 1 BTC = 100,000,000 satoshis
+    const btcAmount = payout.amount_sats / 100_000_000;
+    totalBraiinsEarnings += btcAmount;
+  }
+}
+
+// Also process Lightning payouts if present
+if (payouts?.lightning) {
+  for (const payout of payouts.lightning) {
+    const btcAmount = payout.amount_sats / 100_000_000;
+    totalBraiinsEarnings += btcAmount;
+  }
+}
+```
+
+**Why Both Onchain and Lightning?**
+- **Onchain:** Bitcoin blockchain transfers (most common)
+- **Lightning:** Lightning Network transfers (faster, lower fees)
+- Total earnings includes both payout types
+
+### API Response Fields Reference
+
+Per Braiins Academy, each payout record contains:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `amount_sats` | number | Payout amount in satoshis (1 BTC = 100M sats) |
+| `status` | string | "queued", "confirmed", or "failed" |
+| `requested_at_ts` | number | Unix timestamp when payout was initiated |
+| `resolved_at_ts` | number | Unix timestamp when payout completed |
+| `destination` | string | Bitcoin address or Lightning invoice address |
+| `tx_id` | string | On-chain transaction ID (on-chain only) |
+| `fee_sats` | number | Transaction fee in satoshis |
+
+---
+
 ## Responsive Design
 
 - **Mobile (xs):** Single column card layout, stacked statement inputs
@@ -602,10 +839,12 @@ setStatementError("Failed to generate statement");
 
 ### Example 1: User views earnings by pool
 1. Page loads → fetches earnings summary with poolBreakdown
-2. User clicks "Luxor" in toggle
-3. poolMode state → "luxor"
-4. getTotalEarnings() returns luxor.totalEarnings
-5. Card shows: "₿ 1.52847621 (LUXOR)"
+2. Toggle only appears because user has 2+ pools
+3. User clicks "Luxor" in toggle
+4. poolMode state → "luxor"
+5. getTotalEarnings() returns luxor.totalEarnings
+6. Card shows: "₿ 1.52847621 (LUXOR)"
+7. Wallet Address, Payment Frequency, Next Payout cards display Luxor data (not disabled)
 
 ### Example 2: User downloads account statement
 1. User selects dates: 2026-01-01 to 2026-03-31

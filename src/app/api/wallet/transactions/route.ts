@@ -2,8 +2,28 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyJwtToken } from "@/lib/jwt";
 import { createLuxorClient } from "@/lib/luxor";
 import { createBraiinsClient } from "@/lib/braiins";
-import { groupMinersByPool, getLuxorGroups, getBraiinsGroups } from "@/lib/poolAggregation";
+import {
+  groupMinersByPool,
+  getLuxorGroups,
+  getBraiinsGroups,
+} from "@/lib/poolAggregation";
 import { prisma } from "@/lib/prisma";
+
+/**
+ * Transaction object from unified transaction history
+ */
+interface WalletTransaction {
+  pool: "Luxor" | "Braiins";
+  currency_type: string;
+  date_time: string;
+  address_name: string;
+  subaccount_name: string;
+  transaction_category: string;
+  currency_amount: number;
+  usd_equivalent: number;
+  transaction_id: string;
+  transaction_type: "credit" | "debit";
+}
 
 /**
  * GET /api/wallet/transactions
@@ -137,9 +157,9 @@ export async function GET(request: NextRequest) {
     }
 
     // Collect all transactions from both pools
-    const allTransactions: Array<any> = [];
-    let luxorStats = { count: 0, totalCredits: 0, totalDebits: 0 };
-    let braiinsStats = { count: 0, totalCredits: 0, totalDebits: 0 };
+    const allTransactions: Array<WalletTransaction> = [];
+    const luxorStats = { count: 0, totalCredits: 0, totalDebits: 0 };
+    const braiinsStats = { count: 0, totalCredits: 0, totalDebits: 0 };
 
     // Fetch from Luxor groups
     for (const group of luxorGroups) {
@@ -243,28 +263,45 @@ export async function GET(request: NextRequest) {
           to: formatDate(endDate),
         });
 
-        for (const payout of braiinsResponse?.btc?.payouts || []) {
+        // Process on-chain payouts
+        const allPayouts = [
+          ...(braiinsResponse?.onchain || []),
+          ...(braiinsResponse?.lightning || []),
+        ];
+
+        for (const payout of allPayouts) {
+          // Convert satoshis to BTC: 1 BTC = 100,000,000 satoshis
+          const btcAmount = payout.amount_sats / 100_000_000;
+
+          // Convert Unix timestamp to ISO date string
+          const payoutDate = new Date(
+            payout.resolved_at_ts * 1000,
+          ).toISOString();
+
           allTransactions.push({
             pool: "Braiins",
             currency_type: "BTC",
-            date_time: payout.date,
-            address_name: payout.transaction_id || "N/A",
+            date_time: payoutDate,
+            address_name: payout.destination || "N/A",
             subaccount_name: authKey,
             transaction_category: "payout",
-            currency_amount: parseFloat(payout.amount) || 0,
+            currency_amount: btcAmount,
             usd_equivalent: 0, // Braiins API doesn't provide USD equivalent
-            transaction_id: payout.transaction_id,
+            transaction_id: payout.tx_id || "pending",
             transaction_type: "credit", // Payouts are always credits
           });
 
-          braiinsStats.totalCredits += parseFloat(payout.amount) || 0;
+          braiinsStats.totalCredits += btcAmount;
         }
-        braiinsStats.count += braiinsResponse?.btc?.payouts?.length ||0;
+        braiinsStats.count += allPayouts.length;
         console.log(
-          `[Transactions API] Got ${braiinsResponse?.btc?.payouts?.length || 0} Braiins payouts for auth key: ${authKey}`,
+          `[Transactions API] Got ${allPayouts.length} Braiins payouts for auth key: ${authKey}`,
         );
       } catch (error) {
-        console.error(`[Transactions API] Error fetching Braiins payouts:`, error);
+        console.error(
+          `[Transactions API] Error fetching Braiins payouts:`,
+          error,
+        );
       }
     }
 
@@ -284,10 +321,8 @@ export async function GET(request: NextRequest) {
     );
 
     // Calculate summary statistics
-    const totalCredits =
-      luxorStats.totalCredits + braiinsStats.totalCredits;
-    const totalDebits =
-      luxorStats.totalDebits + braiinsStats.totalDebits;
+    const totalCredits = luxorStats.totalCredits + braiinsStats.totalCredits;
+    const totalDebits = luxorStats.totalDebits + braiinsStats.totalDebits;
 
     const response = {
       transactions: paginatedTransactions,

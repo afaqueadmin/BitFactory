@@ -196,19 +196,31 @@ export interface Workers {
 // INTERFACE: Payouts
 // ============================================================================
 
-export interface PayoutData {
-  date: string;
-  transaction_id: string;
-  amount: string;
-  status: string;
+/**
+ * Represents a single on-chain Bitcoin payout transaction
+ * Per Braiins Academy: https://academy.braiins.com/en/braiins-pool/monitoring/
+ */
+export interface OnchainPayout {
+  financial_account_name: string; // e.g., "Bitcoin Account"
+  requested_at_ts: number; // Unix timestamp when payout was requested
+  resolved_at_ts: number; // Unix timestamp when payout was resolved
+  status: "queued" | "confirmed" | "failed"; // Payout status
+  amount_sats: number; // Amount in satoshis
+  fee_sats: number; // Fee in satoshis
+  destination: string; // Bitcoin address or Lightning invoice
+  tx_id?: string; // Transaction ID (onchain only)
+  invoice?: string; // Lightning invoice (lightning only)
+  preimage?: string; // Lightning preimage (lightning only)
+  trigger_type?: string; // "triggered" or "manual"
 }
 
-export interface PayoutsBTC {
-  payouts: PayoutData[];
-}
-
+/**
+ * Represents the complete payout response from Braiins API
+ * Returns on-chain and optional lightning payouts
+ */
 export interface Payouts {
-  btc: PayoutsBTC;
+  onchain: OnchainPayout[]; // Array of on-chain payouts
+  lightning?: OnchainPayout[]; // Optional array of Lightning payouts
 }
 
 // ============================================================================
@@ -336,9 +348,7 @@ export class BraiinsClient {
 
       const url = `/accounts/rewards/json/btc${queryParams.toString() ? "?" + queryParams.toString() : ""}`;
 
-      console.log(
-        `[BraiinsClient] GET ${url} - User: ${this.userIdentifier}`,
-      );
+      console.log(`[BraiinsClient] GET ${url} - User: ${this.userIdentifier}`);
       const response = await this.client.get<DailyRewards>(url);
       return response.data;
     } catch (error) {
@@ -380,9 +390,7 @@ export class BraiinsClient {
 
       const url = `/accounts/hash_rate_daily/json/btc${queryParams.toString() ? "?" + queryParams.toString() : ""}`;
 
-      console.log(
-        `[BraiinsClient] GET ${url} - User: ${this.userIdentifier}`,
-      );
+      console.log(`[BraiinsClient] GET ${url} - User: ${this.userIdentifier}`);
       const response = await this.client.get<DailyHashrate>(url);
       return response.data;
     } catch (error) {
@@ -417,9 +425,7 @@ export class BraiinsClient {
 
       const url = `/accounts/block_rewards/json/btc${queryParams.toString() ? "?" + queryParams.toString() : ""}`;
 
-      console.log(
-        `[BraiinsClient] GET ${url} - User: ${this.userIdentifier}`,
-      );
+      console.log(`[BraiinsClient] GET ${url} - User: ${this.userIdentifier}`);
       const response = await this.client.get<BlockRewards>(url);
       return response.data;
     } catch (error) {
@@ -438,7 +444,7 @@ export class BraiinsClient {
    * Returns: Array of all workers with their statistics
    * Note: Returns ALL workers for authenticated user (no filtering available)
    * Scope: Single user
-   * 
+   *
    * Converts the API's object format to array format for easier consumption
    */
   async getWorkers(): Promise<Array<{ name: string } & WorkerData>> {
@@ -449,14 +455,14 @@ export class BraiinsClient {
       const response = await this.client.get<Workers>(
         "/accounts/workers/json/btc",
       );
-      
+
       // Convert workers object to array format
       const workersObj = response.data.btc.workers;
       const workersArray = Object.entries(workersObj).map(([name, data]) => ({
         name,
         ...data,
       }));
-      
+
       return workersArray;
     } catch (error) {
       throw error;
@@ -490,9 +496,7 @@ export class BraiinsClient {
 
       const url = `/accounts/payouts/json/btc${queryParams.toString() ? "?" + queryParams.toString() : ""}`;
 
-      console.log(
-        `[BraiinsClient] GET ${url} - User: ${this.userIdentifier}`,
-      );
+      console.log(`[BraiinsClient] GET ${url} - User: ${this.userIdentifier}`);
       const response = await this.client.get<Payouts>(url);
       return response.data;
     } catch (error) {
@@ -509,7 +513,9 @@ export class BraiinsClient {
    */
   private handleError(error: AxiosError): BraiinsError {
     const statusCode = error.response?.status || 500;
-    const errorData = error.response?.data as Record<string, unknown> | undefined;
+    const errorData = error.response?.data as
+      | Record<string, unknown>
+      | undefined;
 
     let message = `Braiins API Error: ${error.message}`;
 

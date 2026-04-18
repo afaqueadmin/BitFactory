@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyJwtToken } from "@/lib/jwt";
 import { createLuxorClient } from "@/lib/luxor";
 import { createBraiinsClient } from "@/lib/braiins";
-import { groupMinersByPool, getLuxorGroups, getBraiinsGroups } from "@/lib/poolAggregation";
+import {
+  groupMinersByPool,
+  getLuxorGroups,
+  getBraiinsGroups,
+} from "@/lib/poolAggregation";
 import { prisma } from "@/lib/prisma";
 
 /**
@@ -65,9 +69,7 @@ export async function GET(request: NextRequest) {
     });
 
     if (!miners || miners.length === 0) {
-      console.log(
-        `[Earnings Summary API] User ${userId} has no miners`,
-      );
+      console.log(`[Earnings Summary API] User ${userId} has no miners`);
       return NextResponse.json(
         {
           totalEarnings: { btc: 0, usd: 0 },
@@ -206,9 +208,9 @@ export async function GET(request: NextRequest) {
         );
         const braiinsClient = createBraiinsClient(authKey);
 
-        // Get user profile (note: Braiins doesn't provide pending balance in profile)
+        // Get user profile to fetch current pending balance
         const profile = await braiinsClient.getUserProfile();
-        // totalBraiinsPending += profile.balance || 0; // Not available in Braiins API
+        totalBraiinsPending += parseFloat(profile.btc.current_balance) || 0;
 
         // Get all payouts to calculate total earnings
         const payouts = await braiinsClient.getPayouts({
@@ -216,9 +218,20 @@ export async function GET(request: NextRequest) {
           to: formatDate(endDate),
         });
 
-        if (payouts?.btc?.payouts) {
-          for (const payout of payouts.btc.payouts) {
-            totalBraiinsEarnings += parseFloat(payout.amount) || 0;
+        // Process on-chain payouts (Braiins returns amount_sats, convert to BTC)
+        if (payouts?.onchain) {
+          for (const payout of payouts.onchain) {
+            // Convert satoshis to BTC: 1 BTC = 100,000,000 satoshis
+            const btcAmount = payout.amount_sats / 100_000_000;
+            totalBraiinsEarnings += btcAmount;
+          }
+        }
+
+        // Process Lightning payouts if present
+        if (payouts?.lightning) {
+          for (const payout of payouts.lightning) {
+            const btcAmount = payout.amount_sats / 100_000_000;
+            totalBraiinsEarnings += btcAmount;
           }
         }
 
@@ -249,7 +262,12 @@ export async function GET(request: NextRequest) {
         btc: parseFloat(totalPending.toFixed(8)),
       },
       currency: "BTC",
-      dataSource: luxorGroups.length > 0 && braiinsGroups.length > 0 ? "both" : luxorGroups.length > 0 ? "luxor" : "braiins",
+      dataSource:
+        luxorGroups.length > 0 && braiinsGroups.length > 0
+          ? "both"
+          : luxorGroups.length > 0
+            ? "luxor"
+            : "braiins",
       timestamp: new Date().toISOString(),
       activePoolNames,
       poolBreakdown: {
