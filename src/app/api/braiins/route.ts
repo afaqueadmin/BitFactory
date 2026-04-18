@@ -308,7 +308,7 @@ export async function GET(
     let braiinsClient: BraiinsClient | undefined;
     interface MinerClientPair {
       client: BraiinsClient;
-      miner: { id: string; name: string; poolAuth?: string };
+      miner: { id: string; name: string; poolAuth: string | null };
     }
     const braiinsClients: Array<MinerClientPair> = []; // For workers endpoint without minerId
 
