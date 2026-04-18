@@ -77,7 +77,8 @@ interface MinersListData {
  */
 interface BraiinsWorker {
   name: string;
-  minerName?: string; // Added by proxy for identification
+  minerName?: string; // Miner display name for identification
+  minerId?: string; // Miner ID for identification
   state: "ok" | "dis" | "low" | "off";
   last_share: number; // Unix timestamp (seconds)
   hash_rate_unit: string;
@@ -238,98 +239,95 @@ export default function BraiinsWorkersPage() {
   /**
    * Fetch workers from selected miners
    */
-  const fetchWorkers = useCallback(
-    async (minerIds: string[]) => {
-      const validIds = minerIds.filter((id) => id && id.trim().length > 0);
+  const fetchWorkers = useCallback(async (minerIds: string[]) => {
+    const validIds = minerIds.filter((id) => id && id.trim().length > 0);
 
-      if (!validIds || validIds.length === 0) {
-        console.log("[Braiins Workers] No miners selected, clearing workers");
-        setState((prev) => ({
-          ...prev,
-          workers: [],
-          totalItems: 0,
-          currentPage: 1,
-          error: null,
-        }));
-        setStats({
-          totalWorkers: 0,
-          activeWorkers: 0,
-          inactiveWorkers: 0,
-          averageHashrate24h: 0,
-        });
-        return;
+    if (!validIds || validIds.length === 0) {
+      console.log("[Braiins Workers] No miners selected, clearing workers");
+      setState((prev) => ({
+        ...prev,
+        workers: [],
+        totalItems: 0,
+        currentPage: 1,
+        error: null,
+      }));
+      setStats({
+        totalWorkers: 0,
+        activeWorkers: 0,
+        inactiveWorkers: 0,
+        averageHashrate24h: 0,
+      });
+      return;
+    }
+
+    try {
+      setState((prev) => ({ ...prev, error: null }));
+
+      console.log("[Braiins Workers] Fetching workers for miners:", validIds);
+
+      // Use new admin endpoint that handles multiple miners
+      const params = new URLSearchParams({
+        minerIds: validIds.join(","),
+      });
+
+      const response = await fetch(
+        `/api/braiins-workers/all?${params.toString()}`,
+      );
+
+      if (!response.ok) {
+        throw new Error(`API returned status ${response.status}`);
       }
 
-      try {
-        setState((prev) => ({ ...prev, error: null }));
+      const data: ProxyResponse<WorkersData> = await response.json();
 
-        console.log("[Braiins Workers] Fetching workers for miners:", validIds);
-
-        const response = await fetch("/api/braiins?endpoint=workers");
-
-        if (!response.ok) {
-          throw new Error(`API returned status ${response.status}`);
-        }
-
-        const data: ProxyResponse<WorkersData> = await response.json();
-
-        if (!data.success) {
-          throw new Error(data.error || "Failed to fetch workers");
-        }
-
-        let workersList = (data.data as WorkersData)?.workers || [];
-
-        // Filter workers to only those from selected miners
-        workersList = workersList.filter((w) =>
-          validIds.some(
-            (id) => state.miners.find((m) => m.id === id)?.name === w.minerName,
-          ),
-        );
-
-        console.log(
-          `[Braiins Workers] Successfully fetched ${workersList.length} workers`,
-        );
-
-        // Calculate statistics
-        const activeCount = workersList.filter((w) =>
-          isWorkerActive(w.state),
-        ).length;
-        const inactiveCount = workersList.filter(
-          (w) => !isWorkerActive(w.state),
-        ).length;
-        const avgHashrate24h =
-          workersList.length > 0
-            ? workersList.reduce((sum, w) => sum + (w.hash_rate_24h || 0), 0) /
-              workersList.length
-            : 0;
-
-        setStats({
-          totalWorkers: workersList.length,
-          activeWorkers: activeCount,
-          inactiveWorkers: inactiveCount,
-          averageHashrate24h: avgHashrate24h,
-        });
-
-        setState((prev) => ({
-          ...prev,
-          workers: workersList,
-          totalItems: workersList.length,
-          currentPage: 1,
-          error: null,
-        }));
-      } catch (error) {
-        const errorMsg =
-          error instanceof Error ? error.message : "Unknown error occurred";
-        console.error("[Braiins Workers] Error fetching workers:", errorMsg);
-        setState((prev) => ({
-          ...prev,
-          workers: [],
-          error: errorMsg,
-        }));
+      if (!data.success) {
+        throw new Error(data.error || "Failed to fetch workers");
       }
-    },
-    [state.miners],
-  );
+
+      const workersList = (data.data as WorkersData)?.workers || [];
+
+      console.log(
+        `[Braiins Workers] Successfully fetched ${workersList.length} workers`,
+      );
+
+      // Calculate statistics
+      const activeCount = workersList.filter((w) =>
+        isWorkerActive(w.state),
+      ).length;
+      const inactiveCount = workersList.filter(
+        (w) => !isWorkerActive(w.state),
+      ).length;
+      const avgHashrate24h =
+        workersList.length > 0
+          ? workersList.reduce((sum, w) => sum + (w.hash_rate_24h || 0), 0) /
+            workersList.length
+          : 0;
+
+      setStats({
+        totalWorkers: workersList.length,
+        activeWorkers: activeCount,
+        inactiveWorkers: inactiveCount,
+        averageHashrate24h: avgHashrate24h,
+      });
+
+      setState((prev) => ({
+        ...prev,
+        workers: workersList,
+        totalItems: workersList.length,
+        currentPage: 1,
+        error: null,
+      }));
+    } catch (error) {
+      const errorMsg =
+        error instanceof Error ? error.message : "Unknown error occurred";
+      console.error("[Braiins Workers] Error fetching workers:", errorMsg);
+      setState((prev) => ({
+        ...prev,
+        workers: [],
+        error: errorMsg,
+      }));
+    }
+  }, []);
 
   /**
    * Initialize: Fetch miners on component mount
