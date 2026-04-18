@@ -125,6 +125,8 @@ export async function POST(
       luxorSubaccountName: invoice.user.luxorSubaccountName || undefined,
       hardwareModel: invoice.hardware?.model || undefined,
       billingMonth: invoice.billingMonth || undefined,
+      invoiceStatus: invoice.status,
+      paidDate: invoice.paidDate || undefined,
     };
 
     // Send invoice with PDF (mandatory - fails entire operation if PDF fails)

@@ -1,6 +1,6 @@
 "use client";
 
-import { Box, Typography, useTheme, Button, Alert } from "@mui/material";
+import { Box, Typography, useTheme } from "@mui/material";
 import HostedMinersList from "@/components/HostedMinersList";
 import React, { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -46,34 +46,11 @@ export default function Miners() {
   const [minerFilter, setMinerFilter] = useState<"all" | "luxor" | "braiins">(
     "all",
   );
-  const [externalLink, setExternalLink] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetch("/api/external-resource?key=hosted-miners-sheet")
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.resource?.url) {
-          setExternalLink(data.resource.url);
-        }
-      })
-      .catch((err) => console.error("Failed to fetch external resource:", err));
-  }, []);
-
-  const handleViewMinerList = () => {
-    if (externalLink) {
-      window.open(externalLink, "_blank");
-    } else {
-      setError(
-        "No external Google Sheet link has been configured for the Miner List yet. Please contact your administrator.",
-      );
-    }
-  };
 
   // Fetch miners summary using TanStack Query
   const {
-    data: minersSummary = { 
-      data: { 
+    data: minersSummary = {
+      data: {
         totalHashrate: 0,
         activeMiners: 0,
         totalRevenue: 0,
@@ -82,10 +59,24 @@ export default function Miners() {
         uptime_24h: 0,
         activePoolNames: [],
         pools: {
-          luxor: { miners: 0, hashrate: 0, activeWorkers: 0, hashprice: 0, efficiency_5m: 0, uptime_24h: 0 },
-          braiins: { miners: 0, hashrate: 0, activeWorkers: 0, hashprice: 0, efficiency_5m: 0, uptime_24h: 0 }
-        }
-      } as MinersSummary 
+          luxor: {
+            miners: 0,
+            hashrate: 0,
+            activeWorkers: 0,
+            hashprice: 0,
+            efficiency_5m: 0,
+            uptime_24h: 0,
+          },
+          braiins: {
+            miners: 0,
+            hashrate: 0,
+            activeWorkers: 0,
+            hashprice: 0,
+            efficiency_5m: 0,
+            uptime_24h: 0,
+          },
+        },
+      } as MinersSummary,
     },
     isLoading: summaryLoading,
   } = useQuery({
@@ -100,8 +91,8 @@ export default function Miners() {
 
       if (!response.ok) {
         console.error("Failed to fetch miners summary");
-        return { 
-          data: { 
+        return {
+          data: {
             totalHashrate: 0,
             activeMiners: 0,
             totalRevenue: 0,
@@ -110,10 +101,24 @@ export default function Miners() {
             uptime_24h: 0,
             activePoolNames: [],
             pools: {
-              luxor: { miners: 0, hashrate: 0, activeWorkers: 0, hashprice: 0, efficiency_5m: 0, uptime_24h: 0 },
-              braiins: { miners: 0, hashrate: 0, activeWorkers: 0, hashprice: 0, efficiency_5m: 0, uptime_24h: 0 }
-            }
-          } 
+              luxor: {
+                miners: 0,
+                hashrate: 0,
+                activeWorkers: 0,
+                hashprice: 0,
+                efficiency_5m: 0,
+                uptime_24h: 0,
+              },
+              braiins: {
+                miners: 0,
+                hashrate: 0,
+                activeWorkers: 0,
+                hashprice: 0,
+                efficiency_5m: 0,
+                uptime_24h: 0,
+              },
+            },
+          },
         };
       }
 
@@ -190,11 +195,11 @@ export default function Miners() {
 
   return (
     <Box sx={{ p: 3, mt: 2, minHeight: "100vh" }}>
-      {/* Page Heading and Action Button */}
+      {/* Page Heading */}
       <Box
         sx={{
           display: "flex",
-          justifyContent: "space-between",
+          justifyContent: "flex-start",
           alignItems: { xs: "center", md: "center" },
           mb: 4,
           flexDirection: { xs: "column", md: "row" },
@@ -212,27 +217,7 @@ export default function Miners() {
         >
           Miners
         </Typography>
-
-        <Button
-          variant="contained"
-          color="info"
-          onClick={handleViewMinerList}
-          sx={{
-            background: (theme) =>
-              `linear-gradient(45deg, ${theme.palette.info.main}, ${theme.palette.info.dark})`,
-            px: 3,
-            py: 1,
-          }}
-        >
-          View All Hosted Miner List
-        </Button>
       </Box>
-
-      {error && (
-        <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
-          {error}
-        </Alert>
-      )}
 
       {/* Pool Mode Toggle Buttons - Only show if multiple pools */}
       {data.activePoolNames && data.activePoolNames.length > 1 && (
@@ -308,7 +293,9 @@ export default function Miners() {
                       ? "rgba(255,255,255,0.1)"
                       : "rgba(0,0,0,0.05)",
                 color:
-                  poolMode === "braiins" ? "#FFFFFF" : theme.palette.text.primary,
+                  poolMode === "braiins"
+                    ? "#FFFFFF"
+                    : theme.palette.text.primary,
                 transition: "all 0.2s",
               }}
             >
@@ -369,95 +356,87 @@ export default function Miners() {
       </Box>
 
       {/* Pool Comparison Cards - Only show if multiple pools and in total mode */}
-      {poolMode === "total" && data.activePoolNames && data.activePoolNames.length > 1 && data.pools && (
-        <Box
-          sx={{
-            display: "flex",
-            gap: 3,
-            mb: 4,
-            flexDirection: { xs: "column", sm: "row" },
-          }}
-        >
-          {/* Luxor Comparison Card */}
+      {poolMode === "total" &&
+        data.activePoolNames &&
+        data.activePoolNames.length > 1 &&
+        data.pools && (
           <Box
             sx={{
-              flex: 1,
-              p: 3,
-              borderRadius: 2,
-              backgroundColor:
-                theme.palette.mode === "dark"
-                  ? "rgba(0, 102, 255, 0.1)"
-                  : "rgba(0, 102, 255, 0.05)",
-              border: "2px solid #1565C0",
+              display: "flex",
+              gap: 3,
+              mb: 4,
+              flexDirection: { xs: "column", sm: "row" },
             }}
           >
-            <Typography
-              variant="h6"
-              sx={{ fontWeight: 600, mb: 2, color: "#1565C0" }}
+            {/* Luxor Comparison Card */}
+            <Box
+              sx={{
+                flex: 1,
+                p: 3,
+                borderRadius: 2,
+                backgroundColor:
+                  theme.palette.mode === "dark"
+                    ? "rgba(0, 102, 255, 0.1)"
+                    : "rgba(0, 102, 255, 0.05)",
+                border: "2px solid #1565C0",
+              }}
             >
-              🔷 Luxor Pool
-            </Typography>
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-              <Typography variant="body2" color="text.secondary">
-                Miners: <strong>{data.pools.luxor.miners}</strong>
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Hashrate:{" "}
-                <strong>{formatHashrate(data.pools.luxor.hashrate)}</strong>
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Active:{" "}
-                <strong>{data.pools.luxor.activeWorkers} workers</strong>
-              </Typography>
-            </Box>
-          </Box>
-
-          {/* Braiins Comparison Card */}
-          <Box
-            sx={{
-              flex: 1,
-              p: 3,
-              borderRadius: 2,
-              backgroundColor:
-                theme.palette.mode === "dark"
-                  ? "rgba(255, 165, 0, 0.1)"
-                  : "rgba(255, 165, 0, 0.05)",
-              border: "2px solid #FFA500",
-            }}
-          >
-            <Typography
-              variant="h6"
-              sx={{ fontWeight: 600, mb: 2, color: "#FFA500" }}
-            >
-              🔶 Braiins Pool
-            </Typography>
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-              <Typography variant="body2" color="text.secondary">
-                Miners: <strong>{data.pools.braiins.miners}</strong>
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Hashrate:{" "}
-                <strong>{formatHashrate(data.pools.braiins.hashrate)}</strong>
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Active:{" "}
-                <strong>{data.pools.braiins.activeWorkers} workers</strong>
-              </Typography>
               <Typography
-                variant="caption"
-                sx={{
-                  color: "text.secondary",
-                  fontStyle: "italic",
-                  mt: 1,
-                  opacity: 0.7,
-                }}
+                variant="h6"
+                sx={{ fontWeight: 600, mb: 2, color: "#1565C0" }}
               >
-                ℹ️ Braiins API does not provide hashprice data
+                🔷 Luxor Pool
               </Typography>
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                <Typography variant="body2" color="text.secondary">
+                  Miners: <strong>{data.pools.luxor.miners}</strong>
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Hashrate:{" "}
+                  <strong>{formatHashrate(data.pools.luxor.hashrate)}</strong>
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Active:{" "}
+                  <strong>{data.pools.luxor.activeWorkers} workers</strong>
+                </Typography>
+              </Box>
+            </Box>
+
+            {/* Braiins Comparison Card */}
+            <Box
+              sx={{
+                flex: 1,
+                p: 3,
+                borderRadius: 2,
+                backgroundColor:
+                  theme.palette.mode === "dark"
+                    ? "rgba(255, 165, 0, 0.1)"
+                    : "rgba(255, 165, 0, 0.05)",
+                border: "2px solid #FFA500",
+              }}
+            >
+              <Typography
+                variant="h6"
+                sx={{ fontWeight: 600, mb: 2, color: "#FFA500" }}
+              >
+                🔶 Braiins Pool
+              </Typography>
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                <Typography variant="body2" color="text.secondary">
+                  Miners: <strong>{data.pools.braiins.miners}</strong>
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Hashrate:{" "}
+                  <strong>{formatHashrate(data.pools.braiins.hashrate)}</strong>
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Active:{" "}
+                  <strong>{data.pools.braiins.activeWorkers} workers</strong>
+                </Typography>
+              </Box>
             </Box>
           </Box>
-        </Box>
-      )}
+        )}
 
       {/* Miner Filter Buttons - Only show if multiple pools */}
       {data.activePoolNames && data.activePoolNames.length > 1 && (
@@ -507,7 +486,9 @@ export default function Miners() {
                       ? "rgba(255,255,255,0.1)"
                       : "rgba(0,0,0,0.05)",
                 color:
-                  minerFilter === "luxor" ? "#FFFFFF" : theme.palette.text.primary,
+                  minerFilter === "luxor"
+                    ? "#FFFFFF"
+                    : theme.palette.text.primary,
                 transition: "all 0.2s",
               }}
             >
@@ -545,7 +526,10 @@ export default function Miners() {
       )}
 
       {/* Hosted Miners List with Pool Filter */}
-      <HostedMinersList poolFilter={minerFilter} />
+      <HostedMinersList
+        poolFilter={minerFilter}
+        repairButtonLabel="Repair history"
+      />
     </Box>
   );
 }

@@ -24,6 +24,8 @@ export async function GET() {
       null, // cryptoPaymentUrl
       "Bitmain S21 Pro", // hardwareModel (sample)
       new Date("2026-03-01"), // billingMonth (sample)
+      "PAID", // invoiceStatus (sample)
+      new Date("2026-03-04"), // paidDate (sample)
     );
 
     console.log(

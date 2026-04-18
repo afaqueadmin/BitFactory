@@ -17,6 +17,8 @@ export interface InvoiceEmailPayload {
   luxorSubaccountName?: string | null;
   hardwareModel?: string | null;
   billingMonth?: Date | null;
+  invoiceStatus?: string | null;
+  paidDate?: Date | null;
 }
 
 export interface EmailSendResult {
@@ -145,6 +147,8 @@ export class InvoiceEmailService {
         cryptoPaymentUrl,
         payload.hardwareModel as string | null | undefined,
         payload.billingMonth,
+        payload.invoiceStatus,
+        payload.paidDate,
       );
 
       console.log(

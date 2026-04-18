@@ -104,6 +104,9 @@ export async function POST(
         luxorSubaccountName:
           result.invoice!.user?.luxorSubaccountName || undefined,
         hardwareModel: result.invoice!.hardware?.model || undefined,
+        billingMonth: result.invoice!.billingMonth || undefined,
+        invoiceStatus: result.invoice!.status,
+        paidDate: result.invoice!.paidDate || undefined,
       }));
 
     // Send all with service

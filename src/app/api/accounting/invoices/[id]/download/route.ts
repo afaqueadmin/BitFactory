@@ -82,6 +82,8 @@ export async function GET(
       null, // cryptoPaymentUrl
       hardwareModel,
       invoice.billingMonth,
+      invoice.status,
+      invoice.paidDate,
     );
 
     // Return PDF as file download

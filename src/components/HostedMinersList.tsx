@@ -67,11 +67,13 @@ export type FilterType = (typeof FILTER_VALUES)[number];
 interface HostedMinersListProps {
   customerId?: string;
   poolFilter?: "all" | "luxor" | "braiins";
+  repairButtonLabel?: string;
 }
 
 export default function HostedMinersList({
   customerId,
   poolFilter = "all",
+  repairButtonLabel = "🛠️ Previous Repair Notes",
 }: HostedMinersListProps) {
   const theme = useTheme();
   const [activeFilter, setActiveFilter] = useState<FilterType>("ALL MINERS");
@@ -117,15 +119,19 @@ export default function HostedMinersList({
           return [];
         }
 
-        console.log("[HostedMinersList] Raw API Response - First miner details:", 
-          minerData.miners[0] ? {
-            id: minerData.miners[0].id,
-            name: minerData.miners[0].name,
-            serialNumber: minerData.miners[0].serialNumber,
-            macAddress: minerData.miners[0].macAddress,
-            status: minerData.miners[0].status,
-            pool: minerData.miners[0].pool,
-          } : "No miners");
+        console.log(
+          "[HostedMinersList] Raw API Response - First miner details:",
+          minerData.miners[0]
+            ? {
+                id: minerData.miners[0].id,
+                name: minerData.miners[0].name,
+                serialNumber: minerData.miners[0].serialNumber,
+                macAddress: minerData.miners[0].macAddress,
+                status: minerData.miners[0].status,
+                pool: minerData.miners[0].pool,
+              }
+            : "No miners",
+        );
 
         console.log("[HostedMinersList] Fetched miners from DB:", {
           count: minerData.miners.length,
@@ -756,7 +762,7 @@ export default function HostedMinersList({
                         }
                         sx={{ textTransform: "none", borderRadius: 2 }}
                       >
-                        🛠️ Previous Repair Notes
+                        {repairButtonLabel}
                       </Button>
                     </Box>
                   </Stack>

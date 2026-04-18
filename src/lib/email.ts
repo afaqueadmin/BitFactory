@@ -410,6 +410,8 @@ export const generateInvoicePDF = async (
   cryptoPaymentUrl?: string | null,
   hardwareModel?: string | null,
   billingMonth?: Date | null,
+  invoiceStatus?: string | null,
+  paidDate?: Date | null,
 ): Promise<Buffer> => {
   try {
     // Load PDF template
@@ -427,6 +429,33 @@ export const generateInvoicePDF = async (
     } catch (dbError) {
       console.warn("Could not fetch PaymentDetails from database:", dbError);
       // Continue with null paymentDetails - template will use conditional rendering
+    }
+
+    const normalizedStatus = (invoiceStatus || "ISSUED").toUpperCase();
+    const isPaid = normalizedStatus === "PAID";
+    const paymentStatusLabel = isPaid ? "PAID" : "UNPAID";
+    const paymentStatusTone = isPaid ? "paid" : "unpaid";
+
+    let paidPastDueLabel = "N/A";
+    let paidPastDueTone = "neutral";
+
+    if (isPaid && paidDate) {
+      const daysPastDue = Math.ceil(
+        (new Date(paidDate).getTime() - new Date(dueDate).getTime()) /
+          (1000 * 60 * 60 * 24),
+      );
+
+      if (daysPastDue > 0) {
+        paidPastDueLabel = `${daysPastDue} day${daysPastDue === 1 ? "" : "s"} late`;
+        paidPastDueTone = "late";
+      } else if (daysPastDue === 0) {
+        paidPastDueLabel = "On time";
+        paidPastDueTone = "ontime";
+      } else {
+        const daysEarly = Math.abs(daysPastDue);
+        paidPastDueLabel = `${daysEarly} day${daysEarly === 1 ? "" : "s"} early`;
+        paidPastDueTone = "ontime";
+      }
     }
 
     // Render PDF template with invoice data and payment details
@@ -449,6 +478,10 @@ export const generateInvoicePDF = async (
       cryptoPaymentUrl: cryptoPaymentUrl || "",
       hasCryptoPayment: !!cryptoPaymentUrl,
       hardwareModel: hardwareModel || "",
+      paymentStatusLabel,
+      paymentStatusTone,
+      paidPastDueLabel,
+      paidPastDueTone,
       billingMonth: billingMonth
         ? new Date(billingMonth).toLocaleDateString("en-US", {
             year: "numeric",

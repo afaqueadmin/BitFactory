@@ -157,6 +157,16 @@ export default function InvoicesPage() {
                     py: 2,
                   }}
                 >
+                  Paid Past Due
+                </TableCell>
+                <TableCell
+                  sx={{
+                    fontWeight: "bold",
+                    borderBottom: "2px solid",
+                    borderBottomColor: "divider",
+                    py: 2,
+                  }}
+                >
                   Days Until Due
                 </TableCell>
               </TableRow>
@@ -257,6 +267,39 @@ export default function InvoicesPage() {
                             },
                           )}
                         </Typography>
+                      </TableCell>
+                      <TableCell sx={{ py: 2 }}>
+                        {invoice.status === "PAID" &&
+                        invoice.paidDate &&
+                        invoice.dueDate ? (
+                          <Box
+                            sx={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              px: 1,
+                              py: 0.25,
+                              borderRadius: "999px",
+                              backgroundColor: "#fdecea",
+                              border: "1px solid #f44336",
+                              color: "#c62828",
+                              fontSize: "0.75rem",
+                              fontWeight: 700,
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {Math.max(
+                              0,
+                              Math.ceil(
+                                (new Date(invoice.paidDate).getTime() -
+                                  new Date(invoice.dueDate).getTime()) /
+                                  (1000 * 60 * 60 * 24),
+                              ),
+                            )}{" "}
+                            days
+                          </Box>
+                        ) : (
+                          "-"
+                        )}
                       </TableCell>
                       <TableCell sx={{ py: 2 }}>
                         {invoice.status === "PAID" ? (

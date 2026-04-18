@@ -57,10 +57,10 @@
     .info-box {
       background-color: #e8e8e8;
       padding: 5px;
-      margin-bottom: 20px;
+      margin-bottom: 12px;
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 15px;
+      gap: 10px;
     }
     .info-row {
       display: flex;
@@ -75,10 +75,45 @@
     .info-value {
       flex: 1;
     }
+    .status-chip {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 10px;
+      font-weight: bold;
+      letter-spacing: 0.3px;
+      text-transform: uppercase;
+      line-height: 1.3;
+    }
+    .status-paid {
+      background-color: #e8f5e9;
+      border: 1px solid #4caf50;
+      color: #1b5e20;
+    }
+    .status-unpaid {
+      background-color: #fdecea;
+      border: 1px solid #f44336;
+      color: #b71c1c;
+    }
+    .status-late {
+      background-color: #fff3e0;
+      border: 1px solid #fb8c00;
+      color: #e65100;
+    }
+    .status-ontime {
+      background-color: #e8f5e9;
+      border: 1px solid #4caf50;
+      color: #1b5e20;
+    }
+    .status-neutral {
+      background-color: #f5f5f5;
+      border: 1px solid #9e9e9e;
+      color: #424242;
+    }
     .products-table {
       width: 100%;
       border-collapse: collapse;
-      margin: 20px 0;
+      margin: 12px 0;
     }
     .products-table thead {
       background-color: #1e5a96;
@@ -106,9 +141,9 @@
     }
     .payment-section {
       background-color: #e8e8e8;
-      padding: 20px;
-      margin: 20px 0;
-      min-height: 200px;
+      padding: 12px;
+      margin: 12px 0;
+      min-height: 0;
     }
     .payment-title {
       font-weight: bold;
@@ -121,7 +156,7 @@
       font-size: 12px;
     }
     .payment-option {
-      margin-bottom: 25px;
+      margin-bottom: 12px;
       font-size: 12px;
     }
     .payment-option-title {
@@ -155,8 +190,8 @@
       line-height: 1.4;
     }
     .footer-section {
-      margin-top: 20px;
-      padding-top: 20px;
+      margin-top: 12px;
+      padding-top: 12px;
       border-top: 1px solid #ddd;
       font-size: 11px;
       display: flex;
@@ -246,8 +281,20 @@
         <span class="info-value">{{customerEmail}}</span>
       </div>
       <div class="info-row">
+        <span class="info-label">PAYMENT STATUS:</span>
+        <span class="info-value">
+          <span class="status-chip status-{{paymentStatusTone}}">{{paymentStatusLabel}}</span>
+        </span>
+      </div>
+      <div class="info-row">
         <span class="info-label">BILLING MONTH:</span>
         <span class="info-value">{{billingMonth}}</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">PAID PAST DUE:</span>
+        <span class="info-value">
+          <span class="status-chip status-{{paidPastDueTone}}">{{paidPastDueLabel}}</span>
+        </span>
       </div>
     </div>
 

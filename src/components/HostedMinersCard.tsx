@@ -48,6 +48,7 @@ export interface HostedMinersCardProps {
   error?: string | null;
   onRefresh?: () => void;
   activePoolNames?: string[];
+  totalMinerCount?: number;
   poolBreakdown?: {
     luxor: { activeWorkers: number; inactiveWorkers: number };
     braiins: { activeWorkers: number; inactiveWorkers: number };
@@ -63,6 +64,7 @@ export default function HostedMinersCard({
   error = null,
   onRefresh,
   activePoolNames = [],
+  totalMinerCount,
   poolBreakdown,
 }: HostedMinersCardProps) {
   const theme = useTheme();
@@ -193,6 +195,27 @@ export default function HostedMinersCard({
                   borderRadius: 1,
                 }}
               >
+                {typeof totalMinerCount === "number" &&
+                  activePoolNames.includes("Luxor") &&
+                  activePoolNames.includes("Braiins") && (
+                    <Box sx={{ flex: 1 }}>
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          fontWeight: 600,
+                          color: "text.secondary",
+                          display: "block",
+                          mb: 0.5,
+                        }}
+                      >
+                        Total Miners
+                      </Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                        {totalMinerCount}
+                      </Typography>
+                    </Box>
+                  )}
+
                 {/* Luxor Stats - Only show if user has Luxor miners */}
                 {activePoolNames.includes("Luxor") && (
                   <Box sx={{ flex: 1 }}>
@@ -207,7 +230,9 @@ export default function HostedMinersCard({
                     >
                       🔷 Luxor
                     </Typography>
-                    <Box sx={{ display: "flex", gap: 1, alignItems: "baseline" }}>
+                    <Box
+                      sx={{ display: "flex", gap: 1, alignItems: "baseline" }}
+                    >
                       <Typography variant="body2" sx={{ fontWeight: 600 }}>
                         {poolBreakdown.luxor.activeWorkers}
                       </Typography>
@@ -216,7 +241,9 @@ export default function HostedMinersCard({
                       </Typography>
                     </Box>
                     {poolBreakdown.luxor.inactiveWorkers > 0 && (
-                      <Box sx={{ display: "flex", gap: 1, alignItems: "baseline" }}>
+                      <Box
+                        sx={{ display: "flex", gap: 1, alignItems: "baseline" }}
+                      >
                         <Typography
                           variant="body2"
                           sx={{ fontWeight: 600, color: "error.main" }}
@@ -245,7 +272,9 @@ export default function HostedMinersCard({
                     >
                       🔶 Braiins
                     </Typography>
-                    <Box sx={{ display: "flex", gap: 1, alignItems: "baseline" }}>
+                    <Box
+                      sx={{ display: "flex", gap: 1, alignItems: "baseline" }}
+                    >
                       <Typography variant="body2" sx={{ fontWeight: 600 }}>
                         {poolBreakdown.braiins.activeWorkers}
                       </Typography>
@@ -254,7 +283,9 @@ export default function HostedMinersCard({
                       </Typography>
                     </Box>
                     {poolBreakdown.braiins.inactiveWorkers > 0 && (
-                      <Box sx={{ display: "flex", gap: 1, alignItems: "baseline" }}>
+                      <Box
+                        sx={{ display: "flex", gap: 1, alignItems: "baseline" }}
+                      >
                         <Typography
                           variant="body2"
                           sx={{ fontWeight: 600, color: "error.main" }}

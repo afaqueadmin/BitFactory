@@ -46,6 +46,20 @@ export default function DashboardPage() {
   const [balanceLoading, setBalanceLoading] = React.useState(true);
   const [dailyCost, setDailyCost] = React.useState<number>(0);
   const [dailyCostLoading, setDailyCostLoading] = React.useState(true);
+  const [minersSummary, setMinersSummary] = React.useState<{
+    activePoolNames: string[];
+    pools: {
+      luxor: { miners: number };
+      braiins: { miners: number };
+    };
+  }>({
+    activePoolNames: [],
+    pools: {
+      luxor: { miners: 0 },
+      braiins: { miners: 0 },
+    },
+  });
+  const [minersSummaryLoading, setMinersSummaryLoading] = React.useState(true);
 
   // Workers stats state
   const [workersStats, setWorkersStats] = React.useState<{
@@ -172,10 +186,18 @@ export default function DashboardPage() {
             poolBreakdown: data.data.poolBreakdown,
           });
           // Reset chart mode if not applicable
-          if (data.data.activePoolNames && !data.data.activePoolNames.includes("Luxor") && chartMode === "luxor") {
+          if (
+            data.data.activePoolNames &&
+            !data.data.activePoolNames.includes("Luxor") &&
+            chartMode === "luxor"
+          ) {
             setChartMode("total");
           }
-          if (data.data.activePoolNames && !data.data.activePoolNames.includes("Braiins") && chartMode === "braiins") {
+          if (
+            data.data.activePoolNames &&
+            !data.data.activePoolNames.includes("Braiins") &&
+            chartMode === "braiins"
+          ) {
             setChartMode("total");
           }
         } else {
@@ -186,7 +208,11 @@ export default function DashboardPage() {
         setWorkersError(
           err instanceof Error ? err.message : "Failed to fetch workers",
         );
-        setWorkersStats({ activeWorkers: 0, inactiveWorkers: 0, activePoolNames: [] });
+        setWorkersStats({
+          activeWorkers: 0,
+          inactiveWorkers: 0,
+          activePoolNames: [],
+        });
       } finally {
         setWorkersLoading(false);
       }
@@ -195,12 +221,64 @@ export default function DashboardPage() {
     fetchWorkersStats();
   }, []);
 
+  // Fetch miner summary counts on component mount
+  React.useEffect(() => {
+    const fetchMinersSummary = async () => {
+      try {
+        setMinersSummaryLoading(true);
+
+        const response = await fetch("/api/miners/summary", {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to fetch miners summary");
+        }
+
+        if (data.success) {
+          setMinersSummary({
+            activePoolNames: data.data.activePoolNames || [],
+            pools: {
+              luxor: { miners: data.data.pools?.luxor?.miners || 0 },
+              braiins: { miners: data.data.pools?.braiins?.miners || 0 },
+            },
+          });
+        }
+      } catch (err) {
+        console.error("Error fetching miners summary:", err);
+        setMinersSummary({
+          activePoolNames: [],
+          pools: {
+            luxor: { miners: 0 },
+            braiins: { miners: 0 },
+          },
+        });
+      } finally {
+        setMinersSummaryLoading(false);
+      }
+    };
+
+    fetchMinersSummary();
+  }, []);
+
   // ...existing code...
   const hosted = {
     runningCount: workersStats.activeWorkers,
     progress: 66,
     errorCount: workersStats.inactiveWorkers,
   };
+
+  const showTotalMinersHeading =
+    minersSummary.activePoolNames.includes("Luxor") &&
+    minersSummary.activePoolNames.includes("Braiins");
+
+  const combinedMinerCount =
+    minersSummary.pools.luxor.miners + minersSummary.pools.braiins.miners;
 
   const marketplace = {
     runningCount: 0,
@@ -233,10 +311,18 @@ export default function DashboardPage() {
           poolBreakdown: data.data.poolBreakdown,
         });
         // Reset chart mode if not applicable
-        if (data.data.activePoolNames && !data.data.activePoolNames.includes("Luxor") && chartMode === "luxor") {
+        if (
+          data.data.activePoolNames &&
+          !data.data.activePoolNames.includes("Luxor") &&
+          chartMode === "luxor"
+        ) {
           setChartMode("total");
         }
-        if (data.data.activePoolNames && !data.data.activePoolNames.includes("Braiins") && chartMode === "braiins") {
+        if (
+          data.data.activePoolNames &&
+          !data.data.activePoolNames.includes("Braiins") &&
+          chartMode === "braiins"
+        ) {
           setChartMode("total");
         }
       } else {
@@ -298,6 +384,9 @@ export default function DashboardPage() {
               errorCount={hosted.errorCount}
               activePoolNames={workersStats.activePoolNames}
               poolBreakdown={workersStats.poolBreakdown}
+              totalMinerCount={
+                showTotalMinersHeading ? combinedMinerCount : undefined
+              }
               loading={workersLoading}
               error={workersError}
               onRefresh={handleRefreshWorkers}
