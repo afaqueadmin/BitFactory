@@ -618,7 +618,8 @@ export async function GET(
                 if (Array.isArray(workers)) {
                   // Tag workers with miner name for reference
                   workers.forEach((w) => {
-                    (w as { [key: string]: unknown }).minerName = miner.name;
+                    (w as unknown as { [key: string]: unknown }).minerName =
+                      miner.name;
                   });
                   allWorkers.push(...workers);
                   console.log(
