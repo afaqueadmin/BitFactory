@@ -617,8 +617,8 @@ export async function GET(
                 const workers = await client.getWorkers();
                 if (Array.isArray(workers)) {
                   // Tag workers with miner name for reference
-                  workers.forEach((w: { [key: string]: unknown }) => {
-                    w.minerName = miner.name;
+                  workers.forEach((w) => {
+                    (w as { [key: string]: unknown }).minerName = miner.name;
                   });
                   allWorkers.push(...workers);
                   console.log(
