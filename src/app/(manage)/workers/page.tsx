@@ -34,6 +34,7 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  TableSortLabel,
   Chip,
   IconButton,
   Tooltip,
@@ -120,6 +121,12 @@ export default function WorkersPage() {
   // UI-only pagination for table display (show 20 rows per page)
   const [tableCurrentPage, setTableCurrentPage] = useState(1);
   const tableRowsPerPage = 20;
+
+  // Sort state
+  const [sortField, setSortField] = useState<
+    "name" | "subaccount" | "hashrate" | "efficiency" | "status" | "lastShare"
+  >("name");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
 
   /**
    * Fetch all subaccounts from workspace
@@ -503,6 +510,78 @@ export default function WorkersPage() {
     }
   };
 
+  /**
+   * Handle table column sorting
+   */
+  const handleSort = (
+    field: "name" | "subaccount" | "hashrate" | "efficiency" | "status" | "lastShare",
+  ) => {
+    if (sortField === field) {
+      // Toggle sort order if clicking the same column
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+    } else {
+      // Set new sort field and default to ascending
+      setSortField(field);
+      setSortOrder("asc");
+    }
+  };
+
+  /**
+   * Sort workers based on current sort field and order
+   */
+  const getSortedWorkers = () => {
+    const sorted = [...state.workers].sort((a, b) => {
+      let compareA: string | number = "";
+      let compareB: string | number = "";
+
+      switch (sortField) {
+        case "name":
+          compareA = a.name || "";
+          compareB = b.name || "";
+          break;
+        case "subaccount":
+          compareA = a.subaccount_name || "";
+          compareB = b.subaccount_name || "";
+          break;
+        case "hashrate":
+          compareA = a.hashrate || 0;
+          compareB = b.hashrate || 0;
+          break;
+        case "efficiency":
+          compareA = a.efficiency || 0;
+          compareB = b.efficiency || 0;
+          break;
+        case "status":
+          compareA = a.status || "";
+          compareB = b.status || "";
+          break;
+        case "lastShare":
+          compareA = new Date(a.last_share_time).getTime();
+          compareB = new Date(b.last_share_time).getTime();
+          break;
+        default:
+          compareA = "";
+          compareB = "";
+      }
+
+      // Handle string comparison
+      if (typeof compareA === "string" && typeof compareB === "string") {
+        return sortOrder === "asc"
+          ? compareA.localeCompare(compareB)
+          : compareB.localeCompare(compareA);
+      }
+
+      // Handle number comparison
+      if (typeof compareA === "number" && typeof compareB === "number") {
+        return sortOrder === "asc" ? compareA - compareB : compareB - compareA;
+      }
+
+      return 0;
+    });
+
+    return sorted;
+  };
+
   const totalPages = Math.ceil(state.totalItems / state.pageSize);
 
   if (state.loading) {
@@ -799,16 +878,64 @@ export default function WorkersPage() {
                 >
                   <TableHead>
                     <TableRow>
-                      <TableCell>Worker Name</TableCell>
-                      <TableCell>Subaccount</TableCell>
-                      <TableCell align="right">Hashrate (TH/s)</TableCell>
-                      <TableCell align="right">Efficiency (%)</TableCell>
-                      <TableCell align="center">Status</TableCell>
-                      <TableCell>Last Share</TableCell>
+                      <TableCell>
+                        <TableSortLabel
+                          active={sortField === "name"}
+                          direction={sortField === "name" ? sortOrder : "asc"}
+                          onClick={() => handleSort("name")}
+                        >
+                          Worker Name
+                        </TableSortLabel>
+                      </TableCell>
+                      <TableCell>
+                        <TableSortLabel
+                          active={sortField === "subaccount"}
+                          direction={sortField === "subaccount" ? sortOrder : "asc"}
+                          onClick={() => handleSort("subaccount")}
+                        >
+                          Subaccount
+                        </TableSortLabel>
+                      </TableCell>
+                      <TableCell align="right">
+                        <TableSortLabel
+                          active={sortField === "hashrate"}
+                          direction={sortField === "hashrate" ? sortOrder : "asc"}
+                          onClick={() => handleSort("hashrate")}
+                        >
+                          Hashrate (TH/s)
+                        </TableSortLabel>
+                      </TableCell>
+                      <TableCell align="right">
+                        <TableSortLabel
+                          active={sortField === "efficiency"}
+                          direction={sortField === "efficiency" ? sortOrder : "asc"}
+                          onClick={() => handleSort("efficiency")}
+                        >
+                          Efficiency (%)
+                        </TableSortLabel>
+                      </TableCell>
+                      <TableCell align="center">
+                        <TableSortLabel
+                          active={sortField === "status"}
+                          direction={sortField === "status" ? sortOrder : "asc"}
+                          onClick={() => handleSort("status")}
+                        >
+                          Status
+                        </TableSortLabel>
+                      </TableCell>
+                      <TableCell>
+                        <TableSortLabel
+                          active={sortField === "lastShare"}
+                          direction={sortField === "lastShare" ? sortOrder : "asc"}
+                          onClick={() => handleSort("lastShare")}
+                        >
+                          Last Share
+                        </TableSortLabel>
+                      </TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {state.workers
+                    {getSortedWorkers()
                       .slice(
                         (tableCurrentPage - 1) * tableRowsPerPage,
                         tableCurrentPage * tableRowsPerPage,
