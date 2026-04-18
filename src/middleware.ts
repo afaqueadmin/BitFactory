@@ -39,6 +39,7 @@ const securePaths = {
     "/admin/payback-analysis",
     "/admin/payback-analysis-settings",
     "/accounting",
+    "/braiins",
     "/external-resource",
     "/hardware-purchase",
     "/customers/overview",
