@@ -63,8 +63,7 @@ async function extractUserFromToken(
   request: NextRequest,
 ): Promise<{ userId: string; role: string } | null> {
   try {
-    const authHeader = request.headers.get("Authorization");
-    const token = authHeader?.replace("Bearer ", "");
+    const token = request.cookies.get("token")?.value;
 
     if (!token) {
       console.log("[Braiins Workers All] GET: No authorization token provided");
@@ -225,6 +224,12 @@ export async function GET(request: NextRequest) {
           allWorkers.push(...workersWithMinerInfo);
           console.log(
             `[Braiins Workers All] GET: Added ${workersWithMinerInfo.length} workers from miner ${miner.name}`,
+          );
+        } else {
+          console.warn(
+            `[Braiins Workers All] GET: Proxy returned error for miner ${miner.name}: ${
+              data.error || "Unknown error"
+            }`,
           );
         }
       } catch (error) {

@@ -29,7 +29,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyJwtToken } from "@/lib/jwt";
 import { prisma } from "@/lib/prisma";
-import { createBraiinsClient, BraiinsClient, BraiinsError } from "@/lib/braiins";
+import {
+  createBraiinsClient,
+  BraiinsClient,
+  BraiinsError,
+} from "@/lib/braiins";
 
 // ✅ Ensure this runs on Node.js runtime (required for async operations)
 export const runtime = "nodejs";
@@ -99,7 +103,8 @@ const endpointMap: Record<
   workers: {
     method: "GET",
     requiresMiner: false, // Changed: Can fetch workers from all miners or specific miner
-    description: "Get all workers for this user (optionally filtered by minerId)",
+    description:
+      "Get all workers for this user (optionally filtered by minerId)",
   },
   payouts: {
     method: "GET",
@@ -183,7 +188,9 @@ async function getMinerWithPoolAuth(minerId: string, userId: string) {
   }
 
   if (miner.userId !== userId) {
-    throw new Error("Unauthorized: Miner does not belong to authenticated user");
+    throw new Error(
+      "Unauthorized: Miner does not belong to authenticated user",
+    );
   }
 
   if (!miner.poolAuth) {
@@ -299,12 +306,16 @@ export async function GET(
 
     // ✅ STEP 3: Validate and fetch miner (if required for this endpoint)
     let braiinsClient: BraiinsClient | undefined;
-    let braiinsClients: Array<{ client: BraiinsClient; miner: any }> = []; // For workers endpoint without minerId
+    interface MinerClientPair {
+      client: BraiinsClient;
+      miner: { id: string; name: string; poolAuth?: string };
+    }
+    const braiinsClients: Array<MinerClientPair> = []; // For workers endpoint without minerId
 
     // Special case: workers endpoint without minerId - fetch from all Braiins miners
     if (endpoint === "workers" && !searchParams.get("minerId")) {
       console.log(
-        "[Braiins Proxy] GET: Workers endpoint without minerId - fetching from all miners"
+        "[Braiins Proxy] GET: Workers endpoint without minerId - fetching from all miners",
       );
       try {
         // Fetch all Braiins miners for this user
@@ -314,12 +325,12 @@ export async function GET(
         });
 
         const braiinsMinersList = miners.filter(
-          (m) => m.pool?.name === "Braiins" && m.poolAuth
+          (m) => m.pool?.name === "Braiins" && m.poolAuth,
         );
 
         if (braiinsMinersList.length === 0) {
           console.log(
-            "[Braiins Proxy] GET: No Braiins miners with auth configured"
+            "[Braiins Proxy] GET: No Braiins miners with auth configured",
           );
           return NextResponse.json<ProxyResponse>(
             {
@@ -327,12 +338,12 @@ export async function GET(
               data: { workers: [] },
               timestamp: new Date().toISOString(),
             },
-            { status: 200 }
+            { status: 200 },
           );
         }
 
         console.log(
-          `[Braiins Proxy] GET: Found ${braiinsMinersList.length} Braiins miners`
+          `[Braiins Proxy] GET: Found ${braiinsMinersList.length} Braiins miners`,
         );
 
         // Initialize clients for all miners
@@ -340,9 +351,9 @@ export async function GET(
           try {
             const client = createBraiinsClient(miner.poolAuth!, user.userId);
             braiinsClients.push({ client, miner });
-          } catch (e) {
+          } catch (error) {
             console.warn(
-              `[Braiins Proxy] GET: Failed to initialize client for miner ${miner.name}`
+              `[Braiins Proxy] GET: Failed to initialize client for miner ${miner.name}`,
             );
           }
         }
@@ -354,7 +365,7 @@ export async function GET(
               error:
                 "Failed to initialize Braiins clients for any miner. Please contact support.",
             },
-            { status: 500 }
+            { status: 500 },
           );
         }
       } catch (error) {
@@ -365,7 +376,70 @@ export async function GET(
         console.error(`[Braiins Proxy] GET: ${errorMsg}`);
         return NextResponse.json<ProxyResponse>(
           { success: false, error: errorMsg },
-          { status: 500 }
+          { status: 500 },
+        );
+      }
+    } else if (endpoint === "workers" && searchParams.get("minerId")) {
+      // Handle workers endpoint with specific minerId
+      console.log(
+        "[Braiins Proxy] GET: Workers endpoint with specific minerId",
+      );
+      const minerId = searchParams.get("minerId")!;
+
+      let miner;
+      try {
+        miner = await getMinerWithPoolAuth(minerId, user.userId);
+        console.log(
+          `[Braiins Proxy] GET: Miner validated: ${miner.name} (${minerId})`,
+        );
+      } catch (minerError) {
+        const errorMsg =
+          minerError instanceof Error
+            ? minerError.message
+            : "Failed to fetch miner";
+        console.error(`[Braiins Proxy] GET: ${errorMsg}`);
+        return NextResponse.json<ProxyResponse>(
+          { success: false, error: errorMsg },
+          { status: 403 },
+        );
+      }
+
+      // Verify poolAuth is set
+      if (!miner.poolAuth) {
+        console.error(
+          `[Braiins Proxy] GET: Miner ${minerId} (${miner.name}) has NO poolAuth configured - cannot fetch workers`,
+        );
+        return NextResponse.json<ProxyResponse>(
+          {
+            success: false,
+            error: `Miner "${miner.name}" does not have Braiins API credentials configured. Please add Braiins API token to this miner.`,
+          },
+          { status: 400 },
+        );
+      }
+
+      console.log(
+        `[Braiins Proxy] GET: Miner ${miner.name} has poolAuth configured, initializing client`,
+      );
+
+      // Initialize Braiins client with miner's token
+      try {
+        braiinsClient = createBraiinsClient(miner.poolAuth, user.userId);
+        console.log(
+          `[Braiins Proxy] GET: BraiinsClient initialized for miner: ${miner.name}`,
+        );
+      } catch (clientError) {
+        const errorMsg =
+          clientError instanceof Error
+            ? clientError.message
+            : "Failed to initialize Braiins client";
+        console.error(`[Braiins Proxy] GET: ${errorMsg}`);
+        return NextResponse.json<ProxyResponse>(
+          {
+            success: false,
+            error: "Service configuration error. Please contact support.",
+          },
+          { status: 500 },
         );
       }
     } else if (endpointConfig.requiresMiner) {
@@ -377,7 +451,7 @@ export async function GET(
             success: false,
             error: `minerId parameter is required for ${endpoint} endpoint`,
           },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
@@ -385,7 +459,7 @@ export async function GET(
       try {
         miner = await getMinerWithPoolAuth(minerId, user.userId);
         console.log(
-          `[Braiins Proxy] GET: Miner validated: ${miner.name} (${minerId})`
+          `[Braiins Proxy] GET: Miner validated: ${miner.name} (${minerId})`,
         );
       } catch (minerError) {
         const errorMsg =
@@ -395,21 +469,21 @@ export async function GET(
         console.error(`[Braiins Proxy] GET: ${errorMsg}`);
         return NextResponse.json<ProxyResponse>(
           { success: false, error: errorMsg },
-          { status: 403 }
+          { status: 403 },
         );
       }
 
       // Verify poolAuth is set
       if (!miner.poolAuth) {
         console.error(
-          `[Braiins Proxy] GET: Miner ${minerId} has no poolAuth configured`
+          `[Braiins Proxy] GET: Miner ${minerId} has no poolAuth configured`,
         );
         return NextResponse.json<ProxyResponse>(
           {
             success: false,
             error: "Miner does not have Braiins API credentials configured",
           },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
@@ -427,7 +501,7 @@ export async function GET(
             success: false,
             error: "Service configuration error. Please contact support.",
           },
-          { status: 500 }
+          { status: 500 },
         );
       }
     } else {
@@ -445,7 +519,7 @@ export async function GET(
             success: false,
             error: "Service configuration error. Please contact support.",
           },
-          { status: 500 }
+          { status: 500 },
         );
       }
     }
@@ -470,7 +544,7 @@ export async function GET(
             success: false,
             error: "Service configuration error. Please contact support.",
           },
-          { status: 500 }
+          { status: 500 },
         );
       }
 
@@ -535,34 +609,40 @@ export async function GET(
           if (braiinsClients && braiinsClients.length > 0) {
             // Multi-miner case: aggregate workers from all clients
             console.log(
-              `[Braiins Proxy] GET: Aggregating workers from ${braiinsClients.length} miners`
+              `[Braiins Proxy] GET: Aggregating workers from ${braiinsClients.length} miners`,
             );
-            const allWorkers: any[] = [];
+            const allWorkers: Array<{ [key: string]: unknown }> = [];
             for (const { client, miner } of braiinsClients) {
               try {
                 const workers = await client.getWorkers();
                 if (Array.isArray(workers)) {
                   // Tag workers with miner name for reference
-                  workers.forEach((w: any) => {
+                  workers.forEach((w: { [key: string]: unknown }) => {
                     w.minerName = miner.name;
                   });
                   allWorkers.push(...workers);
                   console.log(
-                    `[Braiins Proxy] GET: Got ${workers.length} workers from ${miner.name}`
+                    `[Braiins Proxy] GET: Got ${workers.length} workers from ${miner.name}`,
                   );
                 }
               } catch (e) {
                 console.warn(
                   `[Braiins Proxy] GET: Failed to get workers from ${miner.name}: ${
                     e instanceof Error ? e.message : String(e)
-                  }`
+                  }`,
                 );
               }
             }
             data = { workers: allWorkers };
           } else {
             // Single-miner case - wrap in object for consistent format
+            console.log("[Braiins Proxy] GET: Single miner workers case");
             const workers = await braiinsClient!.getWorkers();
+            console.log(
+              `[Braiins Proxy] GET: Braiins API returned ${
+                Array.isArray(workers) ? workers.length : 0
+              } workers`,
+            );
             data = { workers };
           }
           break;

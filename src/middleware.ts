@@ -39,7 +39,7 @@ const securePaths = {
     "/admin/payback-analysis",
     "/admin/payback-analysis-settings",
     "/accounting",
-    "/braiins",
+
     "/external-resource",
     "/hardware-purchase",
     "/customers/overview",
@@ -51,6 +51,7 @@ const securePaths = {
     "/space",
     "/subaccounts",
     "/workers",
+    "/braiins-workers",
     // Add admin-specific public paths if any
   ]),
 }; // Add admin-specific public paths if any

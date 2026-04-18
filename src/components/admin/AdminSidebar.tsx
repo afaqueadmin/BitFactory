@@ -98,7 +98,7 @@ const sidebarItems: SidebarItem[] = [
   {
     title: "Braiins Workers",
     icon: <MinersIcon />,
-    path: "/braiins",
+    path: "/braiins-workers",
   },
 
   {
