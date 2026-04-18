@@ -611,7 +611,7 @@ export async function GET(
             console.log(
               `[Braiins Proxy] GET: Aggregating workers from ${braiinsClients.length} miners`,
             );
-            const allWorkers: Array<{ [key: string]: unknown }> = [];
+            const allWorkers: unknown[] = [];
             for (const { client, miner } of braiinsClients) {
               try {
                 const workers = await client.getWorkers();
