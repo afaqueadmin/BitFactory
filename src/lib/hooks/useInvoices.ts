@@ -35,9 +35,20 @@ export function useInvoices(
   customerId?: string,
   status?: InvoiceStatus,
   invoiceType?: string,
+  sortBy?: string,
+  sortDirection?: "asc" | "desc",
 ) {
   const { data, isLoading, error } = useQuery({
-    queryKey: ["invoices", page, limit, customerId, status, invoiceType],
+    queryKey: [
+      "invoices",
+      page,
+      limit,
+      customerId,
+      status,
+      invoiceType,
+      sortBy,
+      sortDirection,
+    ],
     queryFn: async () => {
       const params = new URLSearchParams();
       params.append("page", page.toString());
@@ -45,6 +56,8 @@ export function useInvoices(
       if (customerId) params.append("customerId", customerId);
       if (status) params.append("status", status);
       if (invoiceType) params.append("invoiceType", invoiceType);
+      if (sortBy) params.append("sortBy", sortBy);
+      if (sortDirection) params.append("sortDirection", sortDirection);
 
       const res = await fetch(`/api/accounting/invoices?${params}`, {
         method: "GET",
