@@ -98,6 +98,7 @@ export default function AppBarComponent() {
     { href: "/dashboard", label: "Dashboard" },
     { href: "/miners", label: "Miners" },
     { href: "/wallet", label: "Wallet" },
+    { href: "/transaction", label: "Transactions" },
     { href: "/invoices", label: "Invoices" },
     { href: "/btc-price-history", label: "BTC Price" },
     { href: "/btc-price-predictor", label: "BTC Predictor" },

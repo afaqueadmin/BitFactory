@@ -34,6 +34,8 @@ interface WalletTransaction {
  *   - limit: Number of transactions per page (default: 50, max: 100)
  *   - page: Page number for pagination (default: 1)
  *   - type: Filter by transaction type - 'all', 'credit', 'debit' (default: 'all')
+ *   - start_date: ISO date string for transaction start (optional, default: 2020-01-01)
+ *   - end_date: ISO date string for transaction end (optional, default: today)
  *
  * Response:
  * {
@@ -82,6 +84,10 @@ export async function GET(request: NextRequest) {
     const page = Math.max(parseInt(searchParams.get("page") || "1"), 1);
     const typeFilter = (searchParams.get("type") || "all").toLowerCase();
 
+    // Import start_date and end_date from query params (Option 3: Hybrid)
+    const userStartDate = searchParams.get("start_date");
+    const userEndDate = searchParams.get("end_date");
+
     if (!["all", "credit", "debit"].includes(typeFilter)) {
       return NextResponse.json(
         { error: "Invalid type filter. Must be 'all', 'credit', or 'debit'" },
@@ -115,10 +121,29 @@ export async function GET(request: NextRequest) {
             totalCredits: 0,
             totalDebits: 0,
             netAmount: 0,
+            totalCreditsUsd: 0,
+            totalDebitsUsd: 0,
+            netAmountUsd: 0,
           },
           poolBreakdown: {
-            luxor: { count: 0, totalCredits: 0, totalDebits: 0 },
-            braiins: { count: 0, totalCredits: 0, totalDebits: 0 },
+            luxor: {
+              count: 0,
+              totalCredits: 0,
+              totalDebits: 0,
+              netAmount: 0,
+              totalCreditsUsd: 0,
+              totalDebitsUsd: 0,
+              netAmountUsd: 0,
+            },
+            braiins: {
+              count: 0,
+              totalCredits: 0,
+              totalDebits: 0,
+              netAmount: 0,
+              totalCreditsUsd: 0,
+              totalDebitsUsd: 0,
+              netAmountUsd: 0,
+            },
           },
           message: "No miners assigned",
         },
@@ -143,10 +168,28 @@ export async function GET(request: NextRequest) {
     const luxorGroups = getLuxorGroups(aggregation);
     const braiinsGroups = getBraiinsGroups(aggregation);
 
-    // Calculate date range - default to last 30 days
-    const endDate = new Date();
-    const startDate = new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000);
+    // Calculate date range (Option 3: Hybrid Smart Default)
+    // If no dates provided, default to all-time history
+    let endDate: Date;
+    let startDate: Date;
+
+    if (userEndDate) {
+      endDate = new Date(userEndDate);
+    } else {
+      endDate = new Date();
+    }
+
+    if (userStartDate) {
+      startDate = new Date(userStartDate);
+    } else {
+      // Default: fetch all transaction history from 2020-01-01
+      startDate = new Date("2020-01-01");
+    }
+
     const formatDate = (date: Date) => date.toISOString().split("T")[0];
+    console.log(
+      `[Transactions API] Date range: ${formatDate(startDate)} to ${formatDate(endDate)}`,
+    );
 
     // Build transaction type filter for Luxor API
     let transactionType: string | undefined;
@@ -158,8 +201,20 @@ export async function GET(request: NextRequest) {
 
     // Collect all transactions from both pools
     const allTransactions: Array<WalletTransaction> = [];
-    const luxorStats = { count: 0, totalCredits: 0, totalDebits: 0 };
-    const braiinsStats = { count: 0, totalCredits: 0, totalDebits: 0 };
+    const luxorStats = {
+      count: 0,
+      totalCredits: 0,
+      totalDebits: 0,
+      totalCreditsUsd: 0,
+      totalDebitsUsd: 0,
+    };
+    const braiinsStats = {
+      count: 0,
+      totalCredits: 0,
+      totalDebits: 0,
+      totalCreditsUsd: 0,
+      totalDebitsUsd: 0,
+    };
 
     // Fetch from Luxor groups
     for (const group of luxorGroups) {
@@ -200,6 +255,14 @@ export async function GET(request: NextRequest) {
 
         const luxorResponse = await client.getTransactions("BTC", params);
 
+        // Debug logging
+        if (luxorResponse.transactions.length > 0) {
+          console.log(
+            `[Transactions API] Sample Luxor transaction:`,
+            JSON.stringify(luxorResponse.transactions[0], null, 2),
+          );
+        }
+
         for (const tx of luxorResponse.transactions) {
           allTransactions.push({
             pool: "Luxor",
@@ -216,8 +279,10 @@ export async function GET(request: NextRequest) {
 
           if (tx.transaction_type === "credit") {
             luxorStats.totalCredits += tx.currency_amount;
+            luxorStats.totalCreditsUsd += tx.usd_equivalent;
           } else if (tx.transaction_type === "debit") {
             luxorStats.totalDebits += tx.currency_amount;
+            luxorStats.totalDebitsUsd += tx.usd_equivalent;
           }
         }
         luxorStats.count += luxorResponse.transactions.length;
@@ -292,6 +357,7 @@ export async function GET(request: NextRequest) {
           });
 
           braiinsStats.totalCredits += btcAmount;
+          braiinsStats.totalCreditsUsd += 0; // Braiins API doesn't provide USD equivalent
         }
         braiinsStats.count += allPayouts.length;
         console.log(
@@ -323,6 +389,10 @@ export async function GET(request: NextRequest) {
     // Calculate summary statistics
     const totalCredits = luxorStats.totalCredits + braiinsStats.totalCredits;
     const totalDebits = luxorStats.totalDebits + braiinsStats.totalDebits;
+    const totalCreditsUsd =
+      luxorStats.totalCreditsUsd + braiinsStats.totalCreditsUsd;
+    const totalDebitsUsd =
+      luxorStats.totalDebitsUsd + braiinsStats.totalDebitsUsd;
 
     const response = {
       transactions: paginatedTransactions,
@@ -338,6 +408,9 @@ export async function GET(request: NextRequest) {
         totalCredits: parseFloat(totalCredits.toFixed(8)),
         totalDebits: parseFloat(totalDebits.toFixed(8)),
         netAmount: parseFloat((totalCredits - totalDebits).toFixed(8)),
+        totalCreditsUsd: parseFloat(totalCreditsUsd.toFixed(2)),
+        totalDebitsUsd: parseFloat(totalDebitsUsd.toFixed(2)),
+        netAmountUsd: parseFloat((totalCreditsUsd - totalDebitsUsd).toFixed(2)),
       },
       poolBreakdown: {
         luxor: {
@@ -347,6 +420,11 @@ export async function GET(request: NextRequest) {
           netAmount: parseFloat(
             (luxorStats.totalCredits - luxorStats.totalDebits).toFixed(8),
           ),
+          totalCreditsUsd: parseFloat(luxorStats.totalCreditsUsd.toFixed(2)),
+          totalDebitsUsd: parseFloat(luxorStats.totalDebitsUsd.toFixed(2)),
+          netAmountUsd: parseFloat(
+            (luxorStats.totalCreditsUsd - luxorStats.totalDebitsUsd).toFixed(2),
+          ),
         },
         braiins: {
           count: braiinsStats.count,
@@ -354,6 +432,13 @@ export async function GET(request: NextRequest) {
           totalDebits: parseFloat(braiinsStats.totalDebits.toFixed(8)),
           netAmount: parseFloat(
             (braiinsStats.totalCredits - braiinsStats.totalDebits).toFixed(8),
+          ),
+          totalCreditsUsd: parseFloat(braiinsStats.totalCreditsUsd.toFixed(2)),
+          totalDebitsUsd: parseFloat(braiinsStats.totalDebitsUsd.toFixed(2)),
+          netAmountUsd: parseFloat(
+            (
+              braiinsStats.totalCreditsUsd - braiinsStats.totalDebitsUsd
+            ).toFixed(2),
           ),
         },
       },

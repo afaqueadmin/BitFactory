@@ -30,6 +30,7 @@ const securePaths = {
     "/miners",
     "/payback-analysis",
     "/security-setting",
+    "/transaction",
     "/wallet",
     // Add client-specific public paths if any
   ]),
