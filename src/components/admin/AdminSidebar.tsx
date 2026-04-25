@@ -26,6 +26,7 @@ import {
   Assignment as AccountingIcon,
   Description as DocumentIcon,
   Settings as SettingsIcon,
+  History as ActivityLogIcon,
   ChevronLeft,
   ChevronRight,
   Lock as LockIcon,
@@ -48,6 +49,11 @@ const sidebarItems: SidebarItem[] = [
     // items: [
     //   { title: "Dashboard", icon: <DashboardIcon />, path: "/dashboard" },
     // ],
+  },
+  {
+    title: "Activity Log",
+    icon: <ActivityLogIcon />,
+    path: "/activity-log",
   },
   {
     title: "Customers",

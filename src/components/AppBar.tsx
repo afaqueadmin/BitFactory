@@ -94,6 +94,16 @@ export default function AppBarComponent() {
     }
   };
 
+  const trackTab = (href: string, label: string) => {
+    const tabKey = href.replace(/^\//, "") || "dashboard";
+    fetch("/api/activity/tab-visit", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tabKey, tabName: label }),
+    }).catch(() => {});
+  };
+
   const navLinks = [
     { href: "/dashboard", label: "Dashboard" },
     { href: "/miners", label: "Miners" },
@@ -175,6 +185,7 @@ export default function AppBarComponent() {
                 component={Link}
                 href={link.href}
                 sx={linkButtonSx(link.href)}
+                onClick={() => trackTab(link.href, link.label)}
               >
                 {link.href === "/invoices" ? (
                   <Badge
@@ -355,7 +366,10 @@ export default function AppBarComponent() {
               key={link.href}
               component={Link}
               href={link.href}
-              onClick={handleCloseMobileNav}
+              onClick={() => {
+                trackTab(link.href, link.label);
+                handleCloseMobileNav();
+              }}
               selected={pathname === link.href}
               sx={{ px: 2 }}
             >

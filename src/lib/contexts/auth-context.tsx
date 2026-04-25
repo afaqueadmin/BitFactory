@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { createContext, useContext, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 interface User {
   id: string;
@@ -12,6 +12,7 @@ interface User {
 
 interface AuthContextType {
   user: User | null;
+  sessionId: string | null;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   isLoading: boolean;
@@ -22,8 +23,15 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
+
+  // Restore sessionId from localStorage on mount
+  useEffect(() => {
+    const stored = localStorage.getItem("bf_session_id");
+    if (stored) setSessionId(stored);
+  }, []);
 
   // Check authentication status when component mounts
   useEffect(() => {
@@ -47,12 +55,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // First check auth status with no-cache headers
       console.log("Checking auth status...");
-      const authCheck = await fetch('/api/auth/check', {
-        credentials: 'include',
+      const authCheck = await fetch("/api/auth/check", {
+        credentials: "include",
         headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache'
-        }
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+          Pragma: "no-cache",
+        },
       });
 
       const authData = await authCheck.json();
@@ -62,14 +70,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // If token expired but we have refresh token, it will be handled by the check endpoint
         if (authCheck.status === 401 && retryCount < MAX_RETRIES) {
           // Wait before retry
-          await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+          await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY));
           return checkAuth(retryCount + 1);
         }
 
         setUser(null);
         // Only redirect to login if we're not already there and not on the public home page
-        if (!window.location.pathname.startsWith('/login') && window.location.pathname !== '/') {
-          router.replace('/login');
+        if (
+          !window.location.pathname.startsWith("/login") &&
+          window.location.pathname !== "/"
+        ) {
+          router.replace("/login");
         }
         return;
       }
@@ -79,17 +90,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(authData.user);
       } else {
         // This shouldn't happen, but handle it just in case
-        console.error('No user data in successful auth check response');
+        console.error("No user data in successful auth check response");
         setUser(null);
-        if (!window.location.pathname.startsWith('/login') && window.location.pathname !== '/') {
-          router.replace('/login');
+        if (
+          !window.location.pathname.startsWith("/login") &&
+          window.location.pathname !== "/"
+        ) {
+          router.replace("/login");
         }
       }
     } catch (error) {
-      console.error('Auth check failed:', error);
+      console.error("Auth check failed:", error);
       setUser(null);
-      if (!window.location.pathname.startsWith('/login') && window.location.pathname !== '/') {
-        router.replace('/login');
+      if (
+        !window.location.pathname.startsWith("/login") &&
+        window.location.pathname !== "/"
+      ) {
+        router.replace("/login");
       }
     } finally {
       setIsLoading(false);
@@ -99,16 +116,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (email: string, password: string) => {
     setIsLoading(true);
     try {
-      const response = await fetch('/api/login', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
+      const response = await fetch("/api/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
           // Prevent caching of login requests
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache'
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+          Pragma: "no-cache",
         },
         body: JSON.stringify({ email, password }),
-        credentials: 'include'
+        credentials: "include",
       });
 
       const data = await response.json();
@@ -116,28 +133,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!response.ok) {
         // Handle specific error types
         if (response.status === 401) {
-          throw new Error('Invalid email or password');
+          throw new Error("Invalid email or password");
         } else if (response.status === 429) {
-          throw new Error('Too many login attempts. Please try again later.');
+          throw new Error("Too many login attempts. Please try again later.");
         } else {
-          throw new Error(data.error || 'Login failed');
+          throw new Error(data.error || "Login failed");
         }
       }
 
       setUser(data.user);
-      
+
+      if (data.sessionId) {
+        setSessionId(data.sessionId);
+        localStorage.setItem("bf_session_id", data.sessionId);
+      }
+
       // Update router state and navigation
       router.refresh();
-      
+
       // Use replace instead of push to prevent back navigation to login
-      router.replace(data.redirectUrl || '/dashboard');
+      router.replace(data.redirectUrl || "/dashboard");
     } catch (error) {
-      console.error('Login error:', error);
+      console.error("Login error:", error);
       // Only throw user-facing errors
       if (error instanceof Error) {
         throw error;
       } else {
-        throw new Error('An unexpected error occurred during login');
+        throw new Error("An unexpected error occurred during login");
       }
     } finally {
       setIsLoading(false);
@@ -154,18 +176,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       router.refresh();
 
       // Attempt server-side logout
-      const response = await fetch('/api/auth/signout', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache'
+      const response = await fetch("/api/auth/signout", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+          Pragma: "no-cache",
         },
-        credentials: 'include'
+        credentials: "include",
       });
-      
+
       if (!response.ok) {
-        console.error('Server-side logout failed:', response.status);
+        console.error("Server-side logout failed:", response.status);
         // Continue with client-side logout even if server-side fails
       }
 
@@ -174,21 +196,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       sessionStorage.clear();
 
       // Wait for state updates and storage clearing to complete
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Force a hard navigation to login to clear all React state
-      window.location.href = '/login';
+      window.location.href = "/login";
     } catch (error) {
-      console.error('Logout error:', error);
+      console.error("Logout error:", error);
       // Even if there's an error, ensure the user is logged out client-side
-      window.location.href = '/login';
+      window.location.href = "/login";
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, isLoading, checkAuth }}>
+    <AuthContext.Provider
+      value={{ user, sessionId, login, logout, isLoading, checkAuth }}
+    >
       {children}
     </AuthContext.Provider>
   );
@@ -197,7 +221,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 }

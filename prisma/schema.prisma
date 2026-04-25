@@ -52,6 +52,7 @@ model User {
   recurringInvoices          RecurringInvoice[]           @relation("recurringInvoices")
   blacklisted                TokenBlacklist[]
   activities                 UserActivity[]
+  sessions                   UserSession[]
   paymentDetailsUpdates      PaymentDetails[]
   poolAuths                  PoolAuth[]
   invoicedAmount             Decimal                      @default(4250) @db.Decimal(12, 2)
@@ -84,6 +85,36 @@ model UserActivity {
 
   @@index([userId])
   @@map("user_activities")
+}
+
+model UserSession {
+  id        String     @id @default(cuid())
+  userId    String
+  user      User       @relation(fields: [userId], references: [id])
+  loginAt   DateTime   @default(now())
+  logoutAt  DateTime?
+  duration  Int?
+  ipAddress String?
+  userAgent String?
+  tabVisits TabVisit[]
+  createdAt DateTime   @default(now())
+
+  @@index([userId])
+  @@map("user_sessions")
+}
+
+model TabVisit {
+  id        String      @id @default(cuid())
+  sessionId String
+  session   UserSession @relation(fields: [sessionId], references: [id])
+  userId    String
+  tabKey    String
+  tabName   String
+  visitedAt DateTime    @default(now())
+
+  @@index([sessionId])
+  @@index([userId])
+  @@map("tab_visits")
 }
 
 model PaybackConfig {

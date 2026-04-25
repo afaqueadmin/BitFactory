@@ -53,6 +53,7 @@ const securePaths = {
     "/subaccounts",
     "/workers",
     "/braiins-workers",
+    "/activity-log",
     // Add admin-specific public paths if any
   ]),
 }; // Add admin-specific public paths if any

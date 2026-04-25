@@ -60,6 +60,26 @@ export async function POST(request: NextRequest) {
               userAgent: request.headers.get("user-agent") || "unknown",
             },
           });
+
+          // Close the most recent open session and record duration
+          try {
+            const openSession = await prisma.userSession.findFirst({
+              where: { userId, logoutAt: null },
+              orderBy: { loginAt: "desc" },
+            });
+            if (openSession) {
+              const logoutAt = new Date();
+              const duration = Math.floor(
+                (logoutAt.getTime() - openSession.loginAt.getTime()) / 1000,
+              );
+              await prisma.userSession.update({
+                where: { id: openSession.id },
+                data: { logoutAt, duration },
+              });
+            }
+          } catch (e) {
+            console.error("Failed to close user session:", e);
+          }
         }
       } catch (e) {
         // Token might be invalid, but we still want to clear cookies
