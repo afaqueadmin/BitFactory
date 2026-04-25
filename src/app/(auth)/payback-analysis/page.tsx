@@ -28,6 +28,7 @@ const columns = [
   "Scenario: 2",
   "Scenario: 3",
   "Scenario: 4",
+  "Scenario: 5",
   "BREAKEVEN (Hosting Charges)",
 ];
 
@@ -42,7 +43,7 @@ const FALLBACK_BTC_PRICE = 67953.35; // USD
 const FALLBACK_REWARD_BTC_PER_PH_DAY = 0.00044827;
 
 // Scenario BTC prices (first 4 are fixed, last one comes from DB)
-const FIXED_SCENARIO_PRICES = [100000, 125000, 150000, 200000];
+const FIXED_SCENARIO_PRICES = [100000, 125000, 150000, 200000, 250000];
 
 // Interface for config data from API
 interface PaybackConfigData {
@@ -452,13 +453,14 @@ export default function PaybackAnalysisPage() {
       "$125,000",
       "$150,000",
       "$200,000",
+      "$250,000",
       formatValue(selectedBreakevenPrice, "currency"),
     ],
   };
 
   const rewardRow = {
     label: "Reward (BTC/PH/Day)",
-    values: Array.from({ length: 6 }, () =>
+    values: Array.from({ length: 7 }, () =>
       resolvedRewardBtcPerPhDay.toFixed(8),
     ),
   };
@@ -472,19 +474,19 @@ export default function PaybackAnalysisPage() {
         {
           label: "Pool Commission",
           values: Array.from(
-            { length: 6 },
+            { length: 7 },
             () => `${config.poolCommission.toFixed(2)}%`,
           ),
         },
         {
           label: "S21Pro Hashrate (TH) (Stock OS)",
-          values: Array.from({ length: 6 }, () =>
+          values: Array.from({ length: 7 }, () =>
             config.s21proHashrateStockOs.toFixed(2),
           ),
         },
         {
           label: "S21Pro Hashrate (TH) (Custom OS)",
-          values: Array.from({ length: 6 }, () =>
+          values: Array.from({ length: 7 }, () =>
             config.s21proHashrateLuxos.toFixed(2),
           ),
         },
@@ -521,7 +523,7 @@ export default function PaybackAnalysisPage() {
     allDynamicRows.push({
       label: "Electricity & Hosting Charges",
       values: Array.from(
-        { length: 6 },
+        { length: 7 },
         () => `$${monthlyElectricityHosting.toFixed(2)}`,
       ),
     });
@@ -540,7 +542,7 @@ export default function PaybackAnalysisPage() {
     allDynamicRows.push({
       label: "Payback Months (Stock OS)",
       values: calculatedValues.map((calc, index) =>
-        index === 5 // BREAKEVEN column
+        index === 6 // BREAKEVEN column
           ? "--"
           : calc.paybackMonthsStock === Infinity
             ? "∞"
@@ -550,7 +552,7 @@ export default function PaybackAnalysisPage() {
     allDynamicRows.push({
       label: "Payback Months (Custom OS)",
       values: calculatedValues.map((calc, index) =>
-        index === 5 // BREAKEVEN column
+        index === 6 // BREAKEVEN column
           ? "--"
           : calc.paybackMonthsLux === Infinity
             ? "∞"
