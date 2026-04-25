@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { verifyJwtToken } from "@/lib/jwt";
 import { prisma } from "@/lib/prisma";
 import { createLuxorClient } from "@/lib/luxor";
@@ -131,12 +132,12 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch all customers (or filter to specific IDs)
-    let customerWhere: { role: string; id?: { in: string[] } } = {
+    const customerWhere: Prisma.UserWhereInput = {
       role: "CLIENT",
     };
     if (customerIdsParam) {
       const customerIds = customerIdsParam.split(",").filter((id) => id.trim());
-      customerWhere = { role: "CLIENT", id: { in: customerIds } };
+      customerWhere.id = { in: customerIds };
     }
 
     const customers = await prisma.user.findMany({
