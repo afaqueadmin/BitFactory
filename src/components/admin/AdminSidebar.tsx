@@ -143,6 +143,11 @@ const sidebarItems: SidebarItem[] = [
         path: "/accounting/statements",
       },
       {
+        title: "Client Transaction History",
+        icon: <DocumentIcon />,
+        path: "/accounting/client-transaction-history",
+      },
+      {
         title: "Pricing",
         icon: <HostingPricesIcon />,
         path: "/accounting/pricing",
