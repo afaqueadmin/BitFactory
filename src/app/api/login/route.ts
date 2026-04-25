@@ -101,22 +101,36 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    const ipAddress =
+      request.headers.get("x-forwarded-for") ||
+      request.headers.get("x-real-ip") ||
+      "unknown";
+    const userAgent = request.headers.get("user-agent") || "unknown";
+
     // Log successful login attempt
     try {
       await prisma.userActivity.create({
         data: {
           userId: user.id,
           type: "LOGIN",
-          ipAddress:
-            request.headers.get("x-forwarded-for") ||
-            request.headers.get("x-real-ip") ||
-            "unknown",
-          userAgent: request.headers.get("user-agent") || "unknown",
+          ipAddress,
+          userAgent,
         },
       });
     } catch (e) {
       // Don't fail the login if activity logging fails
       console.error("Failed to log login activity:", e);
+    }
+
+    // Create a session record for tracking
+    let sessionId: string | null = null;
+    try {
+      const session = await prisma.userSession.create({
+        data: { userId: user.id, ipAddress, userAgent },
+      });
+      sessionId = session.id;
+    } catch (e) {
+      console.error("Failed to create user session:", e);
     }
 
     // Generate tokens with role
@@ -139,6 +153,7 @@ export async function POST(request: NextRequest) {
           role: user.role,
         },
         redirectUrl,
+        sessionId,
       },
       { status: 200 },
     );
