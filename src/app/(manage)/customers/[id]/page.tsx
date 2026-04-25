@@ -14,6 +14,7 @@ import { ArrowBack as ArrowBackIcon } from "@mui/icons-material";
 import { useQuery } from "@tanstack/react-query";
 import ElectricityCostTable from "@/components/ElectricityCostTable";
 import HostedMinersList from "@/components/HostedMinersList";
+import TransactionHistorySection from "@/components/TransactionHistorySection";
 import BalanceCard from "@/components/dashboardCards/BalanceCard";
 import CostsCard from "@/components/dashboardCards/CostsCard";
 import EstimatedMiningDaysLeftCard from "@/components/dashboardCards/EstimatedMiningDaysLeftCard";
@@ -705,6 +706,24 @@ export default function CustomerDetailPage() {
             }}
           >
             <ElectricityCostTable customerId={customerId} />
+          </Paper>
+
+          {/* Transaction History Section */}
+          <Paper
+            elevation={3}
+            sx={{
+              p: 3,
+              mb: 4,
+              borderRadius: 2,
+              background: (theme) =>
+                theme.palette.mode === "dark"
+                  ? "linear-gradient(145deg, rgba(40,40,40,0.9), rgba(30,30,30,0.9))"
+                  : "linear-gradient(145deg, rgba(255,255,255,0.9), rgba(250,250,250,0.9))",
+              backdropFilter: "blur(10px)",
+              border: (theme) => `1px solid ${theme.palette.divider}`,
+            }}
+          >
+            <TransactionHistorySection customerId={customerId} />
           </Paper>
         </>
       )}

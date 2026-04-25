@@ -72,8 +72,25 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const userId = decoded.userId;
+    let userId = decoded.userId;
+    const userRole = decoded.role;
     console.log(`[Transactions API] Fetching transactions for user: ${userId}`);
+
+    // Check for customerId in query params (for admin access)
+    const url = new URL(request.url);
+    const customerId = url.searchParams.get("customerId");
+    if (customerId) {
+      if (userRole !== "ADMIN" && userRole !== "SUPER_ADMIN") {
+        return NextResponse.json(
+          { error: "Only administrators can search by customerId" },
+          { status: 403 },
+        );
+      }
+      userId = customerId;
+      console.log(
+        `[Transactions API] Admin override - fetching for customer: ${customerId}`,
+      );
+    }
 
     // Get pagination and filter parameters
     const searchParams = request.nextUrl.searchParams;
