@@ -13,6 +13,7 @@ import {
   DialogTitle,
   FormControlLabel,
   FormGroup,
+  MenuItem,
   Paper,
   Stack,
   TextField,
@@ -35,6 +36,30 @@ interface CustomerMinersState {
   error?: string | null;
 }
 
+const getDefaultBillingMonth = () => {
+  const now = new Date();
+  const nextMonth = now.getMonth() + 1;
+  if (nextMonth > 11) {
+    return { month: 0, year: now.getFullYear() + 1 };
+  }
+  return { month: nextMonth, year: now.getFullYear() };
+};
+
+const MONTH_NAMES = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
 export default function BulkInvoicesPage() {
   const router = useRouter();
   const { customers, loading: customersLoading } = useCustomers();
@@ -44,11 +69,17 @@ export default function BulkInvoicesPage() {
     error: createError,
   } = useCreateInvoice();
 
+  const defaultBilling = getDefaultBillingMonth();
+
   const [selectedCustomerIds, setSelectedCustomerIds] = useState<string[]>([]);
   const [unitPrice, setUnitPrice] = useState<number>(0);
   const [dueDate, setDueDate] = useState(
     new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
   );
+  const [billingMonth, setBillingMonth] = useState<number>(
+    defaultBilling.month,
+  );
+  const [billingYear, setBillingYear] = useState<number>(defaultBilling.year);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
   const [customerMiners, setCustomerMiners] = useState<
@@ -191,6 +222,8 @@ export default function BulkInvoicesPage() {
     }
 
     try {
+      const billingMonthDate = new Date(billingYear, billingMonth, 1);
+
       for (const customerId of selectedCustomerIds) {
         const minersCount = customerMiners[customerId]?.count ?? 0;
 
@@ -200,6 +233,7 @@ export default function BulkInvoicesPage() {
           unitPrice,
           dueDate,
           invoiceType: "ELECTRICITY_CHARGES",
+          billingMonth: billingMonthDate.toISOString(),
         });
       }
 
@@ -347,6 +381,29 @@ export default function BulkInvoicesPage() {
                   helperText="Price per miner unit (applied to all selected customers)"
                   required
                 />
+                <TextField
+                  select
+                  label="Billing Month"
+                  value={billingMonth}
+                  onChange={(e) => {
+                    const selected = Number(e.target.value);
+                    setBillingMonth(selected);
+                    setBillingYear(
+                      selected === 11
+                        ? new Date().getFullYear() + 1
+                        : new Date().getFullYear(),
+                    );
+                  }}
+                  fullWidth
+                  helperText={`Year: ${billingYear} (auto-calculated)`}
+                  required
+                >
+                  {MONTH_NAMES.map((name, idx) => (
+                    <MenuItem key={idx} value={idx}>
+                      {name}
+                    </MenuItem>
+                  ))}
+                </TextField>
                 <TextField
                   label="Due Date"
                   type="date"

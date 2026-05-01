@@ -498,6 +498,21 @@ export default function InvoiceDetailPage() {
                     </Box>
                   </Box>
                 ) : null}
+
+                {/* Billing Month */}
+                <Box>
+                  <Typography color="textSecondary" variant="body2">
+                    Billing Month
+                  </Typography>
+                  <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
+                    {invoice.billingMonth
+                      ? new Date(invoice.billingMonth).toLocaleDateString(
+                          "en-US",
+                          { year: "numeric", month: "long" },
+                        )
+                      : "N/A"}
+                  </Typography>
+                </Box>
               </Box>
             </CardContent>
           </Card>
