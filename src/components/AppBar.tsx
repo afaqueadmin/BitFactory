@@ -151,12 +151,18 @@ export default function AppBarComponent() {
       <Toolbar
         sx={{
           minHeight: { xs: 56, sm: 64 },
-          px: { xs: 1.5, sm: 2, md: 3 },
-          gap: { xs: 1, md: 2 },
+          px: { xs: 1, sm: 1.5, md: 3 },
+          gap: { xs: 0.5, sm: 1, md: 2 },
         }}
       >
         {/* Logo */}
-        <Box sx={{ mr: { xs: 0, md: 4 }, pl: { xs: 0, md: 5 }, flexShrink: 0 }}>
+        <Box
+          sx={{
+            mr: { xs: 0.5, sm: 1, md: 4 },
+            pl: { xs: 0, md: 5 },
+            flexShrink: 0,
+          }}
+        >
           <Link href="/dashboard">
             <Image
               src="/BitfactoryLogo.webp"
@@ -320,13 +326,13 @@ export default function AppBarComponent() {
       </Toolbar>
 
       <Drawer
-        anchor="top"
+        anchor="left"
         open={mobileNavOpen}
         onClose={handleCloseMobileNav}
         PaperProps={{
           sx: {
-            pt: 1,
-            pb: 2,
+            width: "100%",
+            maxWidth: 280,
             backgroundColor: darkMode ? "grey.900" : "white",
             color: darkMode ? "white" : "black",
           },
@@ -373,21 +379,43 @@ export default function AppBarComponent() {
               selected={pathname === link.href}
               sx={{ px: 2 }}
             >
-              <ListItemText
-                primary={link.label}
-                primaryTypographyProps={{ fontWeight: 500 }}
-              />
+              {link.href === "/invoices" ? (
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    width: "100%",
+                  }}
+                >
+                  <ListItemText
+                    primary={link.label}
+                    primaryTypographyProps={{ fontWeight: 500 }}
+                  />
+                  {unpaidCount > 0 && (
+                    <Badge
+                      color="error"
+                      badgeContent={unpaidCount}
+                      sx={{
+                        "& .MuiBadge-badge": {
+                          fontSize: "0.7rem",
+                          minWidth: 18,
+                          height: 18,
+                          padding: "0 4px",
+                          borderRadius: 9,
+                        },
+                      }}
+                    />
+                  )}
+                </Box>
+              ) : (
+                <ListItemText
+                  primary={link.label}
+                  primaryTypographyProps={{ fontWeight: 500 }}
+                />
+              )}
             </ListItemButton>
           ))}
-          <ListItemButton
-            onClick={() => {
-              toggleDarkMode();
-              handleCloseMobileNav();
-            }}
-            sx={{ px: 2 }}
-          >
-            <ListItemText primary={darkMode ? "Light Mode" : "Dark Mode"} />
-          </ListItemButton>
         </List>
       </Drawer>
     </AppBar>
