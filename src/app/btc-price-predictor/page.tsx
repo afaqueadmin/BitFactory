@@ -10,16 +10,38 @@ export default function BTCPricePredictorPage() {
     <Box>
       <AppBarComponent />
 
-      <Container maxWidth={false} sx={{ mt: "90px", px: 0, mb: 6 }}>
-        <Paper elevation={2} sx={{ p: { xs: 2, md: 4 } }}>
-          <Typography variant="h4" component="h1" gutterBottom>
+      <Container
+        maxWidth="lg"
+        sx={{
+          mt: { xs: "72px", sm: "90px" },
+          px: { xs: 1.5, sm: 2, md: 3 },
+          mb: 6,
+        }}
+      >
+        <Paper elevation={2} sx={{ p: { xs: 2, sm: 3, md: 4 } }}>
+          <Typography
+            variant="h4"
+            component="h1"
+            gutterBottom
+            sx={{
+              fontSize: { xs: "1.6rem", sm: "2rem", md: "2.125rem" },
+              fontWeight: "bold",
+            }}
+          >
             BTC Price Analysis
           </Typography>
 
-          <Typography variant="h5" sx={{ mb: 3 }}>
+          <Typography
+            variant="h6"
+            sx={{ mb: 1.5, fontSize: { xs: "1rem", sm: "1.25rem" } }}
+          >
             Polymarket BTC Price Prediction Charts
           </Typography>
-          <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+          <Typography
+            variant="body2"
+            color="text.secondary"
+            sx={{ mb: { xs: 2, md: 3 } }}
+          >
             Polymarket is a community-driven prediction market — this chart
             shows aggregated market probabilities for Bitcoin price outcomes.
           </Typography>
@@ -27,20 +49,32 @@ export default function BTCPricePredictorPage() {
           <Box
             sx={{
               width: "100%",
-              mx: 0,
-              pt: 2,
-              textAlign: "center",
-              minHeight: "70vh",
+              pt: 1,
+              overflow: "hidden",
+              borderRadius: 1,
             }}
           >
-            <iframe
-              title="polymarket-market-iframe"
-              src="https://embed.polymarket.com/market?event=what-price-will-bitcoin-hit-before-2027&rotate=true&theme=dark&buttons=false&border=true&height=500&width=700"
-              width="700"
-              height="500"
-              frameBorder="0"
-              style={{ display: "block", margin: "0 auto" }}
-            />
+            <Box
+              sx={{
+                position: "relative",
+                width: "100%",
+                height: { xs: "600px", sm: "550px", md: "500px" },
+                maxWidth: 700,
+                mx: "auto",
+              }}
+            >
+              <iframe
+                title="polymarket-market-iframe"
+                src="https://embed.polymarket.com/market?event=what-price-will-bitcoin-hit-before-2027&rotate=true&theme=dark&buttons=false&border=true&height=500&width=700"
+                frameBorder="0"
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  border: "none",
+                  display: "block",
+                }}
+              />
+            </Box>
           </Box>
         </Paper>
       </Container>

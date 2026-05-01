@@ -27,6 +27,7 @@ import {
   CircularProgress,
   Alert,
   useTheme,
+  useMediaQuery,
 } from "@mui/material";
 import DashboardHeader from "@/components/DashboardHeader";
 import HostedMinersCard from "@/components/HostedMinersCard";
@@ -42,6 +43,7 @@ import { getDaysInCurrentMonth } from "@/lib/helpers/getDaysInCurrentMonth";
 export default function DashboardPage() {
   const { loading, error } = useUser();
   const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const [balance, setBalance] = React.useState<number>(0);
   const [balanceLoading, setBalanceLoading] = React.useState(true);
   const [dailyCost, setDailyCost] = React.useState<number>(0);
@@ -362,7 +364,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <Box component="main" sx={{ pt: 2, pb: 4 }}>
+    <Box component="main" sx={{ pt: { xs: 1, md: 2 }, pb: { xs: 3, md: 4 } }}>
       <Container maxWidth="xl">
         {/* Header */}
         <DashboardHeader />
@@ -407,42 +409,30 @@ export default function DashboardPage() {
           </Box> */}
         </Box>
 
-        {/* 4 gradient stat cards - Full width, 25% each */}
+        {/* 4 gradient stat cards - 2-col on mobile, 4-col on desktop */}
         <Box
           sx={{
-            display: "flex",
-            gap: 3,
+            display: "grid",
+            gridTemplateColumns: { xs: "1fr 1fr", md: "1fr 1fr 1fr 1fr" },
+            gap: { xs: 1.5, sm: 2, md: 3 },
             mb: 2,
-            flexDirection: { xs: "column", sm: "row" },
-            flexWrap: { xs: "nowrap", sm: "wrap", md: "nowrap" },
           }}
         >
-          <Box sx={{ flex: { xs: 1, md: "1 1 25%" }, minWidth: 0 }}>
-            <BalanceCard value={balanceLoading ? 0 : balance} />
-          </Box>
-
-          <Box sx={{ flex: { xs: 1, md: "1 1 25%" }, minWidth: 0 }}>
-            <CostsCard value={dailyCostLoading ? 0 : dailyCost} />
-          </Box>
-
-          <Box sx={{ flex: { xs: 1, md: "1 1 25%" }, minWidth: 0 }}>
-            <EstimatedMiningDaysLeftCard days={daysLeft} />
-          </Box>
-
-          <Box sx={{ flex: { xs: 1, md: "1 1 25%" }, minWidth: 0 }}>
-            <EstimatedMonthlyCostCard value={estimatedMonthlyCost} />
-          </Box>
+          <BalanceCard value={balanceLoading ? 0 : balance} />
+          <CostsCard value={dailyCostLoading ? 0 : dailyCost} />
+          <EstimatedMiningDaysLeftCard days={daysLeft} />
+          <EstimatedMonthlyCostCard value={estimatedMonthlyCost} />
         </Box>
 
         {/* Chart Section with Main Heading */}
-        <Box sx={{ mt: 4 }}>
+        <Box sx={{ mt: { xs: 2, md: 4 } }}>
           <Box
             sx={{
               display: "flex",
               justifyContent: "space-between",
-              alignItems: "center",
-              mb: 3,
-              gap: 2,
+              alignItems: { xs: "flex-start", sm: "center" },
+              mb: { xs: 2, md: 3 },
+              gap: { xs: 1, md: 2 },
               flexDirection: { xs: "column", sm: "row" },
             }}
           >
@@ -453,7 +443,7 @@ export default function DashboardPage() {
                 background: theme.palette.text.primary,
                 WebkitBackgroundClip: "text",
                 WebkitTextFillColor: "transparent",
-                fontSize: { xs: "1.5rem", md: "2rem" },
+                fontSize: { xs: "1.25rem", sm: "1.6rem", md: "2rem" },
                 textAlign: "left",
               }}
             >
@@ -473,10 +463,11 @@ export default function DashboardPage() {
                 <button
                   onClick={() => setChartMode("total")}
                   style={{
-                    padding: "8px 16px",
+                    padding: "6px 12px",
                     borderRadius: "6px",
                     border: "none",
                     cursor: "pointer",
+                    fontSize: "0.8rem",
                     fontWeight: chartMode === "total" ? 600 : 400,
                     backgroundColor:
                       chartMode === "total"
@@ -499,10 +490,11 @@ export default function DashboardPage() {
                   <button
                     onClick={() => setChartMode("luxor")}
                     style={{
-                      padding: "8px 16px",
+                      padding: "6px 12px",
                       borderRadius: "6px",
                       border: "none",
                       cursor: "pointer",
+                      fontSize: "0.8rem",
                       fontWeight: chartMode === "luxor" ? 600 : 400,
                       backgroundColor:
                         chartMode === "luxor"
@@ -526,10 +518,11 @@ export default function DashboardPage() {
                   <button
                     onClick={() => setChartMode("braiins")}
                     style={{
-                      padding: "8px 16px",
+                      padding: "6px 12px",
                       borderRadius: "6px",
                       border: "none",
                       cursor: "pointer",
+                      fontSize: "0.8rem",
                       fontWeight: chartMode === "braiins" ? 600 : 400,
                       backgroundColor:
                         chartMode === "braiins"
@@ -552,10 +545,11 @@ export default function DashboardPage() {
                 <button
                   onClick={() => setChartMode("sideBySide")}
                   style={{
-                    padding: "8px 16px",
+                    padding: "6px 12px",
                     borderRadius: "6px",
                     border: "none",
                     cursor: "pointer",
+                    fontSize: "0.8rem",
                     fontWeight: chartMode === "sideBySide" ? 600 : 400,
                     backgroundColor:
                       chartMode === "sideBySide"
@@ -577,7 +571,11 @@ export default function DashboardPage() {
             )}
           </Box>
 
-          <MiningEarningsChart height={520} days={31} viewMode={chartMode} />
+          <MiningEarningsChart
+            height={isMobile ? 340 : 520}
+            days={31}
+            viewMode={chartMode}
+          />
         </Box>
       </Container>
     </Box>

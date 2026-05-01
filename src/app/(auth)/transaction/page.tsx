@@ -245,110 +245,73 @@ export default function TransactionPage() {
   }
 
   return (
-    <Box sx={{ p: 3, maxWidth: "1400px", mx: "auto" }}>
-      {/* Header */}
+    <Box sx={{ p: { xs: 1.5, sm: 2, md: 3 }, maxWidth: "1400px", mx: "auto" }}>
       {/* Header Section */}
-      <Box
-        sx={{
-          mb: 4,
-        }}
-      >
+      <Box sx={{ mb: { xs: 2, md: 4 } }}>
         <Typography
           variant="h3"
           component="h1"
-          sx={{ fontWeight: "bold", mb: 2 }}
+          sx={{
+            fontWeight: "bold",
+            mb: { xs: 1.5, md: 2 },
+            fontSize: { xs: "1.6rem", sm: "2rem", md: "3rem" },
+          }}
         >
           Transaction History
         </Typography>
 
-        {/* Pool Mode Toggle - Below Title */}
+        {/* Pool Mode Toggle */}
         <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-          <button
-            onClick={() => {
-              setPoolMode("total");
-              setCurrentPage(1);
-            }}
-            style={{
-              padding: "8px 16px",
-              borderRadius: "6px",
-              border: "none",
-              cursor: "pointer",
-              fontWeight: poolMode === "total" ? 600 : 400,
-              backgroundColor:
-                poolMode === "total"
-                  ? theme.palette.primary.main
-                  : theme.palette.mode === "dark"
-                    ? "rgba(255,255,255,0.1)"
-                    : "rgba(0,0,0,0.05)",
-              color:
-                poolMode === "total"
-                  ? theme.palette.primary.contrastText
-                  : theme.palette.text.primary,
-              transition: "all 0.2s",
-            }}
-          >
-            Total
-          </button>
-
-          <button
-            onClick={() => {
-              setPoolMode("luxor");
-              setCurrentPage(1);
-            }}
-            style={{
-              padding: "8px 16px",
-              borderRadius: "6px",
-              border: "none",
-              cursor: "pointer",
-              fontWeight: poolMode === "luxor" ? 600 : 400,
-              backgroundColor:
-                poolMode === "luxor"
-                  ? "#1565C0"
-                  : theme.palette.mode === "dark"
-                    ? "rgba(255,255,255,0.1)"
-                    : "rgba(0,0,0,0.05)",
-              color:
-                poolMode === "luxor" ? "#FFFFFF" : theme.palette.text.primary,
-              transition: "all 0.2s",
-            }}
-          >
-            🔷 Luxor
-          </button>
-
-          <button
-            onClick={() => {
-              setPoolMode("braiins");
-              setCurrentPage(1);
-            }}
-            style={{
-              padding: "8px 16px",
-              borderRadius: "6px",
-              border: "none",
-              cursor: "pointer",
-              fontWeight: poolMode === "braiins" ? 600 : 400,
-              backgroundColor:
-                poolMode === "braiins"
-                  ? "#FFA500"
-                  : theme.palette.mode === "dark"
-                    ? "rgba(255,255,255,0.1)"
-                    : "rgba(0,0,0,0.05)",
-              color:
-                poolMode === "braiins" ? "#FFFFFF" : theme.palette.text.primary,
-              transition: "all 0.2s",
-            }}
-          >
-            🟧 Braiins
-          </button>
+          {(["total", "luxor", "braiins"] as const).map((mode) => (
+            <button
+              key={mode}
+              onClick={() => {
+                setPoolMode(mode);
+                setCurrentPage(1);
+              }}
+              style={{
+                padding: "6px 12px",
+                borderRadius: "6px",
+                border: "none",
+                cursor: "pointer",
+                fontSize: "0.8rem",
+                fontWeight: poolMode === mode ? 600 : 400,
+                backgroundColor:
+                  poolMode === mode
+                    ? mode === "luxor"
+                      ? "#1565C0"
+                      : mode === "braiins"
+                        ? "#FFA500"
+                        : theme.palette.primary.main
+                    : theme.palette.mode === "dark"
+                      ? "rgba(255,255,255,0.1)"
+                      : "rgba(0,0,0,0.05)",
+                color:
+                  poolMode === mode
+                    ? mode === "total"
+                      ? theme.palette.primary.contrastText
+                      : "#FFFFFF"
+                    : theme.palette.text.primary,
+                transition: "all 0.2s",
+              }}
+            >
+              {mode === "total"
+                ? "Total"
+                : mode === "luxor"
+                  ? "🔷 Luxor"
+                  : "🟧 Braiins"}
+            </button>
+          ))}
         </Box>
       </Box>
 
       {/* Date Range Filter */}
-      <Paper sx={{ p: 3, mb: 3 }}>
+      <Paper sx={{ p: { xs: 2, sm: 3 }, mb: { xs: 2, md: 3 } }}>
         <Box
           sx={{
             display: "flex",
             alignItems: "center",
-            gap: 2,
+            gap: { xs: 1, sm: 2 },
             mb: 2,
             flexWrap: "wrap",
           }}
@@ -394,58 +357,52 @@ export default function TransactionPage() {
           </Box>
         )}
 
-        {/* Custom Date Range - Same Row */}
+        {/* Custom Date Range */}
         {dateMode === "custom" && (
           <Box
             sx={{
-              display: "flex",
-              gap: 2,
-              flexWrap: "wrap",
-              alignItems: "center",
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
+              gap: { xs: 1.5, sm: 2 },
             }}
           >
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-              <Typography variant="body2">Start Date:</Typography>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                style={{
-                  padding: "8px 12px",
-                  borderRadius: "4px",
-                  border:
-                    theme.palette.mode === "dark"
-                      ? "1px solid #444"
-                      : "1px solid #ccc",
-                  backgroundColor:
-                    theme.palette.mode === "dark" ? "#333" : "#fff",
-                  color: theme.palette.mode === "dark" ? "#fff" : "#000",
-                  fontFamily: "inherit",
-                  fontSize: "0.875rem",
-                }}
-              />
-            </Box>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-              <Typography variant="body2">End Date:</Typography>
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                style={{
-                  padding: "8px 12px",
-                  borderRadius: "4px",
-                  border:
-                    theme.palette.mode === "dark"
-                      ? "1px solid #444"
-                      : "1px solid #ccc",
-                  backgroundColor:
-                    theme.palette.mode === "dark" ? "#333" : "#fff",
-                  color: theme.palette.mode === "dark" ? "#fff" : "#000",
-                  fontFamily: "inherit",
-                  fontSize: "0.875rem",
-                }}
-              />
-            </Box>
+            {[
+              { label: "Start Date", value: startDate, setter: setStartDate },
+              { label: "End Date", value: endDate, setter: setEndDate },
+            ].map(({ label, value, setter }) => (
+              <Box
+                key={label}
+                sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}
+              >
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ fontWeight: 600 }}
+                >
+                  {label}
+                </Typography>
+                <input
+                  type="date"
+                  value={value}
+                  onChange={(e) => setter(e.target.value)}
+                  style={{
+                    padding: "8px 10px",
+                    borderRadius: "4px",
+                    border:
+                      theme.palette.mode === "dark"
+                        ? "1px solid #444"
+                        : "1px solid #ccc",
+                    backgroundColor:
+                      theme.palette.mode === "dark" ? "#333" : "#fff",
+                    color: theme.palette.mode === "dark" ? "#fff" : "#000",
+                    fontFamily: "inherit",
+                    fontSize: "0.875rem",
+                    width: "100%",
+                    boxSizing: "border-box",
+                  }}
+                />
+              </Box>
+            ))}
           </Box>
         )}
       </Paper>
@@ -472,20 +429,78 @@ export default function TransactionPage() {
               </Typography>
             </Box>
           ) : (
-            <Table>
-              <TableHead sx={{ backgroundColor: theme.palette.grey[100] }}>
+            <Table size="small">
+              <TableHead
+                sx={{
+                  backgroundColor:
+                    theme.palette.mode === "dark"
+                      ? theme.palette.grey[800]
+                      : theme.palette.grey[100],
+                }}
+              >
                 <TableRow>
-                  <TableCell sx={{ fontWeight: 600 }}>Date</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Pool</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Category</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Type</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 600 }}>
+                  <TableCell
+                    sx={{
+                      fontWeight: 600,
+                      fontSize: { xs: "0.75rem", sm: "0.875rem" },
+                    }}
+                  >
+                    Date
+                  </TableCell>
+                  <TableCell
+                    sx={{
+                      fontWeight: 600,
+                      fontSize: { xs: "0.75rem", sm: "0.875rem" },
+                      display: { xs: "none", sm: "table-cell" },
+                    }}
+                  >
+                    Pool
+                  </TableCell>
+                  <TableCell
+                    sx={{
+                      fontWeight: 600,
+                      fontSize: { xs: "0.75rem", sm: "0.875rem" },
+                      display: { xs: "none", md: "table-cell" },
+                    }}
+                  >
+                    Category
+                  </TableCell>
+                  <TableCell
+                    sx={{
+                      fontWeight: 600,
+                      fontSize: { xs: "0.75rem", sm: "0.875rem" },
+                    }}
+                  >
+                    Type
+                  </TableCell>
+                  <TableCell
+                    align="right"
+                    sx={{
+                      fontWeight: 600,
+                      fontSize: { xs: "0.75rem", sm: "0.875rem" },
+                    }}
+                  >
                     Amount (BTC)
                   </TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 600 }}>
-                    USD Equivalent
+                  <TableCell
+                    align="right"
+                    sx={{
+                      fontWeight: 600,
+                      fontSize: { xs: "0.75rem", sm: "0.875rem" },
+                      display: { xs: "none", sm: "table-cell" },
+                    }}
+                  >
+                    USD
                   </TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>TX ID</TableCell>
+                  <TableCell
+                    sx={{
+                      fontWeight: 600,
+                      fontSize: { xs: "0.75rem", sm: "0.875rem" },
+                      display: { xs: "none", md: "table-cell" },
+                    }}
+                  >
+                    TX ID
+                  </TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -493,14 +508,22 @@ export default function TransactionPage() {
                   <TableRow
                     key={`${tx.transaction_id}-${idx}`}
                     hover
-                    sx={{
-                      "&:last-child td, &:last-child th": { border: 0 },
-                    }}
+                    sx={{ "&:last-child td, &:last-child th": { border: 0 } }}
                   >
-                    <TableCell sx={{ fontSize: "0.875rem" }}>
+                    <TableCell
+                      sx={{
+                        fontSize: { xs: "0.75rem", sm: "0.875rem" },
+                        py: { xs: 1, sm: 1.5 },
+                      }}
+                    >
                       {formatDate(tx.date_time)}
                     </TableCell>
-                    <TableCell>
+                    <TableCell
+                      sx={{
+                        display: { xs: "none", sm: "table-cell" },
+                        py: { xs: 1, sm: 1.5 },
+                      }}
+                    >
                       <Chip
                         label={tx.pool}
                         size="small"
@@ -508,35 +531,59 @@ export default function TransactionPage() {
                         variant="outlined"
                       />
                     </TableCell>
-                    <TableCell sx={{ fontSize: "0.875rem" }}>
+                    <TableCell
+                      sx={{
+                        fontSize: "0.875rem",
+                        display: { xs: "none", md: "table-cell" },
+                        py: { xs: 1, sm: 1.5 },
+                      }}
+                    >
                       {tx.transaction_category}
                     </TableCell>
-                    <TableCell>
+                    <TableCell sx={{ py: { xs: 1, sm: 1.5 } }}>
                       <Chip
-                        label={getTransactionLabel(tx.transaction_type)}
+                        label={
+                          tx.transaction_type === "credit"
+                            ? "+ Credit"
+                            : "- Debit"
+                        }
                         size="small"
                         color={getTransactionColor(tx.transaction_type)}
                         variant="outlined"
+                        sx={{ fontSize: { xs: "0.65rem", sm: "0.75rem" } }}
                       />
                     </TableCell>
                     <TableCell
                       align="right"
                       sx={{
-                        fontSize: "0.875rem",
+                        fontSize: { xs: "0.75rem", sm: "0.875rem" },
                         fontWeight: 500,
                         color:
                           tx.transaction_type === "credit"
                             ? "success.main"
                             : "error.main",
+                        py: { xs: 1, sm: 1.5 },
                       }}
                     >
                       {formatValue(tx.currency_amount, "BTC")}
                     </TableCell>
-                    <TableCell align="right" sx={{ fontSize: "0.875rem" }}>
+                    <TableCell
+                      align="right"
+                      sx={{
+                        fontSize: "0.875rem",
+                        display: { xs: "none", sm: "table-cell" },
+                        py: { xs: 1, sm: 1.5 },
+                      }}
+                    >
                       ${formatValue(tx.usd_equivalent, "number")}
                     </TableCell>
                     <TableCell
-                      sx={{ fontSize: "0.75rem", fontFamily: "monospace" }}
+                      sx={{
+                        fontSize: "0.75rem",
+                        fontFamily: "monospace",
+                        display: { xs: "none", md: "table-cell" },
+                        py: { xs: 1, sm: 1.5 },
+                      }}
                     >
                       <span
                         title={
@@ -575,12 +622,21 @@ export default function TransactionPage() {
 
         {/* Pagination */}
         {!isLoading && data && data.pagination.totalPages > 1 && (
-          <Box sx={{ p: 2, display: "flex", justifyContent: "center" }}>
+          <Box
+            sx={{
+              p: { xs: 1.5, sm: 2 },
+              display: "flex",
+              justifyContent: "center",
+            }}
+          >
             <Pagination
               count={data.pagination.totalPages}
               page={currentPage}
               onChange={(e, page) => setCurrentPage(page)}
               color="primary"
+              size="small"
+              siblingCount={0}
+              boundaryCount={1}
             />
           </Box>
         )}
@@ -590,7 +646,7 @@ export default function TransactionPage() {
       {data && (
         <Typography
           variant="caption"
-          sx={{ display: "block", mt: 2, color: "text.secondary" }}
+          sx={{ display: "block", mt: 1.5, color: "text.secondary" }}
         >
           Showing {(currentPage - 1) * pageSize + 1}-
           {Math.min(currentPage * pageSize, data.pagination.totalItems)} of{" "}

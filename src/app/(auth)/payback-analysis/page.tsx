@@ -2,7 +2,6 @@
 
 import {
   Box,
-  Container,
   Paper,
   Typography,
   Button,
@@ -18,6 +17,8 @@ import {
   InputAdornment,
   ToggleButtonGroup,
   ToggleButton,
+  useTheme,
+  useMediaQuery,
 } from "@mui/material";
 import { useCallback, useEffect, useState } from "react";
 import { formatValue } from "@/lib/helpers/formatValue";
@@ -172,6 +173,9 @@ const calculateAllValues = (
 };
 
 export default function PaybackAnalysisPage() {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+
   // Config state
   const [config, setConfig] = useState<PaybackConfigData | null>(null);
   const [configLoading, setConfigLoading] = useState(true);
@@ -583,7 +587,7 @@ export default function PaybackAnalysisPage() {
   // Show loading state
   if (configLoading) {
     return (
-      <Container maxWidth="lg" sx={{ py: 4 }}>
+      <Box sx={{ p: { xs: 1.5, sm: 2, md: 3 }, mt: { xs: 1, md: 2 } }}>
         <Box
           sx={{
             display: "flex",
@@ -594,26 +598,26 @@ export default function PaybackAnalysisPage() {
         >
           <CircularProgress />
         </Box>
-      </Container>
+      </Box>
     );
   }
 
   // Show error state
   if (configError || !config) {
     return (
-      <Container maxWidth="lg" sx={{ py: 4 }}>
+      <Box sx={{ p: { xs: 1.5, sm: 2, md: 3 }, mt: { xs: 1, md: 2 } }}>
         <Alert severity="error" sx={{ mb: 3 }}>
           {configError || "Failed to load configuration"}
         </Alert>
         <Button variant="contained" onClick={fetchConfig}>
           Retry
         </Button>
-      </Container>
+      </Box>
     );
   }
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
+    <Box sx={{ p: { xs: 1.5, sm: 2, md: 3 }, mt: { xs: 1, md: 2 } }}>
       {/* Success/Error messages for invoiced amount update */}
       {invoicedUpdateSuccess && (
         <Alert
@@ -634,18 +638,25 @@ export default function PaybackAnalysisPage() {
         </Alert>
       )}
 
-      <Box sx={{ mb: 3 }}>
+      <Box sx={{ mb: { xs: 2, md: 3 } }}>
+        {/* Title + OS Toggle */}
         <Box
           sx={{
             display: "flex",
-            alignItems: "center",
+            alignItems: { xs: "flex-start", sm: "center" },
+            flexDirection: { xs: "column", sm: "row" },
             justifyContent: "space-between",
-            gap: 2,
-            flexWrap: "wrap",
-            mb: 3,
+            gap: { xs: 1.5, sm: 2 },
+            mb: { xs: 2, md: 3 },
           }}
         >
-          <Typography variant="h4" sx={{ fontWeight: 700 }}>
+          <Typography
+            variant="h4"
+            sx={{
+              fontWeight: 700,
+              fontSize: { xs: "1.6rem", sm: "2rem", md: "2.125rem" },
+            }}
+          >
             Payback Analysis
           </Typography>
           <ToggleButtonGroup
@@ -655,59 +666,52 @@ export default function PaybackAnalysisPage() {
               if (newValue !== null) setSelectedOS(newValue);
             }}
             aria-label="OS selector"
-            size="medium"
+            size={isMobile ? "small" : "medium"}
           >
             <ToggleButton value="STOCK" aria-label="Stock OS">
-              Stock OS
+              {isMobile ? "Stock" : "Stock OS"}
             </ToggleButton>
             <ToggleButton value="CUSTOM" aria-label="Custom OS">
-              Custom OS
+              {isMobile ? "Custom" : "Custom OS"}
             </ToggleButton>
             <ToggleButton value="COMPARISON" aria-label="COMPARISON">
-              Comparison
+              {isMobile ? "Compare" : "Comparison"}
             </ToggleButton>
           </ToggleButtonGroup>
         </Box>
 
+        {/* Controls row */}
         <Box
           sx={{
             display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 2,
+            alignItems: { xs: "stretch", sm: "center" },
+            flexDirection: { xs: "column", sm: "row" },
+            gap: { xs: 1.5, sm: 2 },
             flexWrap: "wrap",
           }}
         >
-          <Box sx={{ flex: 1 }} />
-
-          <Box
-            sx={{
-              display: "flex",
-              gap: 2,
-              alignItems: "center",
-              flexWrap: "wrap",
+          <TextField
+            label="Invoiced Amount"
+            type="number"
+            value={editableInvoicedAmount}
+            onChange={(e) => setEditableInvoicedAmount(e.target.value)}
+            size="small"
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">$</InputAdornment>
+              ),
             }}
-          >
-            <TextField
-              label="Invoiced Amount"
-              type="number"
-              value={editableInvoicedAmount}
-              onChange={(e) => setEditableInvoicedAmount(e.target.value)}
-              size="small"
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">$</InputAdornment>
-                ),
-              }}
-              inputProps={{ step: "0.01", min: "0" }}
-              sx={{ width: "180px" }}
-            />
+            inputProps={{ step: "0.01", min: "0" }}
+            sx={{ width: { xs: "100%", sm: "180px" } }}
+          />
 
+          <Box sx={{ display: "flex", gap: 1.5, flex: { xs: "none", sm: 1 } }}>
             <Button
               variant="contained"
               onClick={handleUpdateInvoicedAmount}
               disabled={isUpdatingInvoiced}
-              size="medium"
+              size="small"
+              fullWidth={isMobile}
             >
               {isUpdatingInvoiced ? "Updating..." : "Update"}
             </Button>
@@ -716,13 +720,15 @@ export default function PaybackAnalysisPage() {
               variant="outlined"
               onClick={handleRefresh}
               disabled={isRefreshing}
+              size="small"
+              fullWidth={isMobile}
             >
               {isRefreshing ? "Refreshing..." : "Refresh"}
             </Button>
           </Box>
         </Box>
 
-        <Typography color="text.secondary" sx={{ mt: 1 }}>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
           Updated:{" "}
           {lastUpdated
             ? lastUpdated.toLocaleString(undefined, {
@@ -736,31 +742,32 @@ export default function PaybackAnalysisPage() {
         </Typography>
       </Box>
 
-      <Paper sx={{ p: 3, mb: 3 }}>
+      {/* Config summary card */}
+      <Paper sx={{ p: { xs: 2, sm: 3 }, mb: { xs: 2, md: 3 } }}>
         <Box
           sx={{
             display: "grid",
-            gridTemplateColumns: { xs: "1fr", md: "1fr 1fr 1fr" },
-            gap: 2,
+            gridTemplateColumns: { xs: "1fr 1fr", md: "1fr 1fr 1fr" },
+            gap: { xs: 2, sm: 2 },
           }}
         >
           <Box>
             <Typography variant="subtitle2" color="text.secondary">
               Document
             </Typography>
-            <Typography>Payback Analysis</Typography>
+            <Typography variant="body2">Payback Analysis</Typography>
           </Box>
           <Box>
             <Typography variant="subtitle2" color="text.secondary">
               Hosting Charges
             </Typography>
-            <Typography>{`$${config.hostingCharges.toFixed(5)}`}</Typography>
+            <Typography variant="body2">{`$${config.hostingCharges.toFixed(5)}`}</Typography>
           </Box>
           <Box>
             <Typography variant="subtitle2" color="text.secondary">
-              Monthly Invoicing Amount
+              Monthly Invoicing
             </Typography>
-            <Typography>
+            <Typography variant="body2">
               {formatValue(config.monthlyInvoicingAmount, "currency")}
             </Typography>
           </Box>
@@ -768,13 +775,13 @@ export default function PaybackAnalysisPage() {
             <Typography variant="subtitle2" color="text.secondary">
               Power Consumption
             </Typography>
-            <Typography>{`${config.powerConsumption.toFixed(4)} KWH`}</Typography>
+            <Typography variant="body2">{`${config.powerConsumption.toFixed(4)} KWH`}</Typography>
           </Box>
           <Box>
             <Typography variant="subtitle2" color="text.secondary">
               Invoiced Amount
             </Typography>
-            <Typography>
+            <Typography variant="body2">
               {formatValue(
                 parseFloat(editableInvoicedAmount || "0"),
                 "currency",
@@ -783,24 +790,50 @@ export default function PaybackAnalysisPage() {
           </Box>
           <Box>
             <Typography variant="subtitle2" color="text.secondary">
-              Machine/Capital Cost
+              Machine Cost
             </Typography>
-            <Typography>{formatValue(machineCost, "currency")}</Typography>
+            <Typography variant="body2">
+              {formatValue(machineCost, "currency")}
+            </Typography>
           </Box>
           <Box>
             <Typography variant="subtitle2" color="text.secondary">
               Current OS
             </Typography>
-            <Typography>Stock OS</Typography>
+            <Typography variant="body2">Stock OS</Typography>
           </Box>
         </Box>
       </Paper>
 
-      <TableContainer component={Paper}>
-        <Table>
-          <TableHead>
+      {/* Data table — horizontally scrollable on mobile */}
+      <TableContainer
+        component={Paper}
+        sx={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}
+      >
+        <Table size="small" sx={{ minWidth: 800 }}>
+          <TableHead
+            sx={{
+              backgroundColor:
+                theme.palette.mode === "dark"
+                  ? "rgba(255,255,255,0.05)"
+                  : "rgba(0,0,0,0.03)",
+            }}
+          >
             <TableRow>
-              <TableCell sx={{ fontWeight: 700, minWidth: 256 }}>
+              <TableCell
+                sx={{
+                  fontWeight: 700,
+                  minWidth: { xs: 160, sm: 256 },
+                  fontSize: { xs: "0.75rem", sm: "0.875rem" },
+                  position: "sticky",
+                  left: 0,
+                  zIndex: 1,
+                  backgroundColor:
+                    theme.palette.mode === "dark"
+                      ? theme.palette.grey[900]
+                      : theme.palette.background.paper,
+                }}
+              >
                 Metric
               </TableCell>
               {columns.map((column) => (
@@ -808,7 +841,9 @@ export default function PaybackAnalysisPage() {
                   key={column}
                   sx={{
                     fontWeight: 700,
-                    borderLeft: (theme) => `1px solid ${theme.palette.divider}`,
+                    fontSize: { xs: "0.7rem", sm: "0.875rem" },
+                    borderLeft: `1px solid ${theme.palette.divider}`,
+                    whiteSpace: "nowrap",
                   }}
                   align="right"
                 >
@@ -828,15 +863,33 @@ export default function PaybackAnalysisPage() {
                     : undefined
                 }
               >
-                <TableCell sx={{ fontWeight: 600 }}>{row.label}</TableCell>
+                <TableCell
+                  sx={{
+                    fontWeight: 600,
+                    fontSize: { xs: "0.7rem", sm: "0.875rem" },
+                    whiteSpace: "nowrap",
+                    position: "sticky",
+                    left: 0,
+                    zIndex: 1,
+                    backgroundColor:
+                      row.label === "Reward (BTC/PH/Day)"
+                        ? "rgba(103, 177, 42, 0.35)"
+                        : theme.palette.mode === "dark"
+                          ? theme.palette.grey[900]
+                          : theme.palette.background.paper,
+                  }}
+                >
+                  {row.label}
+                </TableCell>
                 {row.values.map((value, index) => (
                   <TableCell
                     key={`${row.label}-${index}`}
                     align="right"
                     sx={{
                       fontWeight: 400,
-                      borderLeft: (theme) =>
-                        `1px solid ${theme.palette.divider}`,
+                      fontSize: { xs: "0.7rem", sm: "0.875rem" },
+                      whiteSpace: "nowrap",
+                      borderLeft: `1px solid ${theme.palette.divider}`,
                       ...(row.label === "BTC Price (USD)" && index === 0
                         ? { backgroundColor: "rgba(103, 177, 42, 0.35)" }
                         : {}),
@@ -850,6 +903,6 @@ export default function PaybackAnalysisPage() {
           </TableBody>
         </Table>
       </TableContainer>
-    </Container>
+    </Box>
   );
 }

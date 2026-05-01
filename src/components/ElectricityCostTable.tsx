@@ -172,6 +172,10 @@ function EnhancedTableHead(props: EnhancedTableHeadProps) {
               borderBottom: "2px solid",
               borderBottomColor: "divider",
               py: 2,
+              display:
+                headCell.id === "consumption" || headCell.id === "narration"
+                  ? { xs: "none", sm: "table-cell" }
+                  : "table-cell",
             }}
           >
             <TableSortLabel
@@ -325,12 +329,14 @@ export default function ElectricityCostTable({
   };
 
   return (
-    <Box sx={{ width: "100%", mt: 3 }}>
+    <Box sx={{ width: "100%", mt: { xs: 2, md: 3 } }}>
       <Box
         sx={{
           display: "flex",
           justifyContent: "space-between",
-          alignItems: "center",
+          alignItems: { xs: "flex-start", sm: "center" },
+          flexDirection: { xs: "column", sm: "row" },
+          gap: 1.5,
           mb: 2,
         }}
       >
@@ -342,8 +348,9 @@ export default function ElectricityCostTable({
           placeholder="Search transactions..."
           value={searchTerm}
           onChange={handleSearchChange}
+          fullWidth
           sx={{
-            minWidth: 250,
+            maxWidth: { sm: 280 },
             "& .MuiOutlinedInput-root": {
               backgroundColor: theme.palette.background.paper,
             },
@@ -386,9 +393,9 @@ export default function ElectricityCostTable({
           <>
             <TableContainer>
               <Table
-                sx={{ minWidth: 750 }}
+                sx={{ minWidth: { xs: 320, sm: 750 } }}
                 aria-labelledby="tableTitle"
-                size="medium"
+                size="small"
               >
                 <EnhancedTableHead
                   order={order}
@@ -408,20 +415,43 @@ export default function ElectricityCostTable({
                           },
                         }}
                       >
-                        <TableCell component="th" scope="row" sx={{ py: 2 }}>
+                        <TableCell
+                          component="th"
+                          scope="row"
+                          sx={{
+                            py: { xs: 1.5, sm: 2 },
+                            px: { xs: 1.5, sm: 2 },
+                          }}
+                        >
                           <Typography variant="body2" fontWeight="medium">
                             {row.date}
                           </Typography>
                         </TableCell>
-                        <TableCell sx={{ py: 2 }}>
+                        <TableCell
+                          sx={{
+                            py: { xs: 1.5, sm: 2 },
+                            px: { xs: 1.5, sm: 2 },
+                          }}
+                        >
                           <Typography variant="body2">{row.type}</Typography>
                         </TableCell>
-                        <TableCell sx={{ py: 2 }}>
+                        <TableCell
+                          sx={{
+                            py: { xs: 1.5, sm: 2 },
+                            display: { xs: "none", sm: "table-cell" },
+                          }}
+                        >
                           <Typography variant="body2">
                             {row.consumption}
                           </Typography>
                         </TableCell>
-                        <TableCell align="right" sx={{ py: 2 }}>
+                        <TableCell
+                          align="right"
+                          sx={{
+                            py: { xs: 1.5, sm: 2 },
+                            px: { xs: 1.5, sm: 2 },
+                          }}
+                        >
                           <Typography
                             variant="body2"
                             fontWeight="medium"
@@ -430,7 +460,13 @@ export default function ElectricityCostTable({
                             {row.amount}
                           </Typography>
                         </TableCell>
-                        <TableCell align="right" sx={{ py: 2 }}>
+                        <TableCell
+                          align="right"
+                          sx={{
+                            py: { xs: 1.5, sm: 2 },
+                            px: { xs: 1.5, sm: 2 },
+                          }}
+                        >
                           <Typography
                             variant="body2"
                             fontWeight="medium"
@@ -439,7 +475,12 @@ export default function ElectricityCostTable({
                             {row.balance}
                           </Typography>
                         </TableCell>
-                        <TableCell sx={{ py: 2 }}>
+                        <TableCell
+                          sx={{
+                            py: { xs: 1.5, sm: 2 },
+                            display: { xs: "none", sm: "table-cell" },
+                          }}
+                        >
                           <Typography
                             variant="body2"
                             sx={{

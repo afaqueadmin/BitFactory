@@ -24,8 +24,8 @@ export default function DashboardHeader() {
       aria-labelledby="dashboard-greeting"
       sx={{
         display: "flex",
-        mb: { xs: 2, md: 3 },
-        mt: { xs: 2, md: 2 },
+        mb: { xs: 1.5, md: 3 },
+        mt: { xs: 1, md: 2 },
       }}
     >
       {/* Greeting box - top right, compact */}
@@ -42,7 +42,7 @@ export default function DashboardHeader() {
           component="span"
           sx={{
             fontWeight: 600,
-            fontSize: { xs: "1.6rem", sm: "2.75rem", md: "3.25rem" },
+            fontSize: { xs: "1.4rem", sm: "2.25rem", md: "3.25rem" },
           }}
         >
           {loading ? (

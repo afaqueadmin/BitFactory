@@ -68,21 +68,35 @@ export default function GradientStatCard({
         overflow: "hidden",
         boxShadow: "0px 6px 18px rgba(2,6,23,0.06)",
         color: "#fff",
-        p: 2,
+        p: { xs: 1.5, sm: 2 },
         height: "100%",
         display: "flex",
         flexDirection: "column",
         justifyContent: "flex-start",
-        gap: 1.5,
+        gap: { xs: 1, sm: 1.5 },
         background: `${overlay} ${baseGradient}`,
       }}
     >
       {/* Title */}
-      <Box sx={{ display: "flex", alignItems: "center" }}>
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
         {icon && (
-          <SvgIcon sx={{ color: "rgba(255,255,255,0.9)" }}>{icon}</SvgIcon>
+          <SvgIcon
+            sx={{
+              color: "rgba(255,255,255,0.9)",
+              fontSize: { xs: 18, sm: 20 },
+            }}
+          >
+            {icon}
+          </SvgIcon>
         )}
-        <Typography variant="subtitle2" sx={{ opacity: 0.95 }}>
+        <Typography
+          variant="subtitle2"
+          sx={{
+            opacity: 0.95,
+            fontSize: { xs: "0.75rem", sm: "0.8rem" },
+            lineHeight: 1.3,
+          }}
+        >
           {title}
         </Typography>
       </Box>
@@ -94,7 +108,13 @@ export default function GradientStatCard({
       ) : (
         <div>
           <Box>
-            <Typography variant="h5" sx={{ fontWeight: 800 }}>
+            <Typography
+              variant="h5"
+              sx={{
+                fontWeight: 800,
+                fontSize: { xs: "1.1rem", sm: "1.3rem", md: "1.5rem" },
+              }}
+            >
               {value} {tag && <span>{tag}</span>}
             </Typography>
           </Box>

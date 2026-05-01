@@ -194,25 +194,22 @@ export default function Miners() {
   };
 
   return (
-    <Box sx={{ p: 3, mt: 2, minHeight: "100vh" }}>
+    <Box
+      sx={{
+        p: { xs: 1.5, sm: 2, md: 3 },
+        mt: { xs: 1, md: 2 },
+        minHeight: "100vh",
+      }}
+    >
       {/* Page Heading */}
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "flex-start",
-          alignItems: { xs: "center", md: "center" },
-          mb: 4,
-          flexDirection: { xs: "column", md: "row" },
-          gap: 2,
-        }}
-      >
+      <Box sx={{ mb: { xs: 2, md: 4 } }}>
         <Typography
           variant="h3"
           component="h1"
           sx={{
             fontWeight: "bold",
             color: "text.primary",
-            textAlign: { xs: "center", md: "left" },
+            fontSize: { xs: "1.75rem", sm: "2.5rem", md: "3rem" },
           }}
         >
           Miners
@@ -225,14 +222,14 @@ export default function Miners() {
           sx={{
             display: "flex",
             gap: 1,
-            mb: 4,
+            mb: { xs: 2, md: 4 },
             flexWrap: "wrap",
           }}
         >
           <button
             onClick={() => setPoolMode("total")}
             style={{
-              padding: "8px 16px",
+              padding: "6px 12px",
               borderRadius: "6px",
               border: "none",
               cursor: "pointer",
@@ -257,7 +254,7 @@ export default function Miners() {
             <button
               onClick={() => setPoolMode("luxor")}
               style={{
-                padding: "8px 16px",
+                padding: "6px 12px",
                 borderRadius: "6px",
                 border: "none",
                 cursor: "pointer",
@@ -281,7 +278,7 @@ export default function Miners() {
             <button
               onClick={() => setPoolMode("braiins")}
               style={{
-                padding: "8px 16px",
+                padding: "6px 12px",
                 borderRadius: "6px",
                 border: "none",
                 cursor: "pointer",
@@ -305,54 +302,34 @@ export default function Miners() {
         </Box>
       )}
 
-      {/* 4 gradient stat cards - Full width, 25% each */}
+      {/* 4 gradient stat cards — 2-col on mobile, 4-col on desktop */}
       <Box
         sx={{
-          display: "flex",
-          gap: 3,
-          mb: 4,
-          flexDirection: { xs: "column", sm: "row" },
-          flexWrap: { xs: "nowrap", sm: "wrap", md: "nowrap" },
+          display: "grid",
+          gridTemplateColumns: { xs: "1fr 1fr", md: "1fr 1fr 1fr 1fr" },
+          gap: { xs: 1.5, sm: 2, md: 3 },
+          mb: { xs: 2, md: 4 },
         }}
       >
-        <Box
-          sx={{ flex: { xs: 1, md: "1 1 25%" }, minWidth: 0, minHeight: 200 }}
-        >
-          <ShareEfficiencyCard
-            value={getMetric("efficiency_5m") || 0}
-            loading={summaryLoading}
-            poolMode={poolMode}
-          />
-        </Box>
-
-        <Box
-          sx={{ flex: { xs: 1, md: "1 1 25%" }, minWidth: 0, minHeight: 200 }}
-        >
-          <HashRate24HoursCard
-            value={getMetric("hashrate") || 0}
-            loading={summaryLoading}
-          />
-        </Box>
-
-        <Box
-          sx={{ flex: { xs: 1, md: "1 1 25%" }, minWidth: 0, minHeight: 200 }}
-        >
-          <Uptime24HoursCard
-            value={getMetric("uptime_24h") || 0}
-            loading={summaryLoading}
-            poolMode={poolMode}
-          />
-        </Box>
-
-        <Box
-          sx={{ flex: { xs: 1, md: "1 1 25%" }, minWidth: 0, minHeight: 200 }}
-        >
-          <HashpriceCard
-            value={getMetric("hashprice") || 0}
-            loading={summaryLoading}
-            poolMode={poolMode}
-          />
-        </Box>
+        <ShareEfficiencyCard
+          value={getMetric("efficiency_5m") || 0}
+          loading={summaryLoading}
+          poolMode={poolMode}
+        />
+        <HashRate24HoursCard
+          value={getMetric("hashrate") || 0}
+          loading={summaryLoading}
+        />
+        <Uptime24HoursCard
+          value={getMetric("uptime_24h") || 0}
+          loading={summaryLoading}
+          poolMode={poolMode}
+        />
+        <HashpriceCard
+          value={getMetric("hashprice") || 0}
+          loading={summaryLoading}
+          poolMode={poolMode}
+        />
       </Box>
 
       {/* Pool Comparison Cards - Only show if multiple pools and in total mode */}
@@ -363,8 +340,8 @@ export default function Miners() {
           <Box
             sx={{
               display: "flex",
-              gap: 3,
-              mb: 4,
+              gap: { xs: 2, md: 3 },
+              mb: { xs: 2, md: 4 },
               flexDirection: { xs: "column", sm: "row" },
             }}
           >
@@ -372,7 +349,7 @@ export default function Miners() {
             <Box
               sx={{
                 flex: 1,
-                p: 3,
+                p: { xs: 2, sm: 3 },
                 borderRadius: 2,
                 backgroundColor:
                   theme.palette.mode === "dark"
@@ -406,7 +383,7 @@ export default function Miners() {
             <Box
               sx={{
                 flex: 1,
-                p: 3,
+                p: { xs: 2, sm: 3 },
                 borderRadius: 2,
                 backgroundColor:
                   theme.palette.mode === "dark"

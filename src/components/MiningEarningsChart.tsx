@@ -17,6 +17,7 @@ import {
   Typography,
   Box,
   useTheme,
+  useMediaQuery,
   CircularProgress,
   Alert,
 } from "@mui/material";
@@ -44,6 +45,7 @@ export default function MiningEarningsChart({
   viewMode = "total",
 }: MiningEarningsChartProps) {
   const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const [miningData, setMiningData] = useState<DailyPerformanceData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -156,17 +158,19 @@ export default function MiningEarningsChart({
   return (
     <Paper
       sx={{
-        p: 3,
+        p: { xs: 1.5, sm: 3 },
         width: "100%",
-        minHeight: height + 120,
+        minHeight: height + (isMobile ? 80 : 120),
         display: "flex",
         flexDirection: "column",
+        alignItems: "center",
         background:
           theme.palette.mode === "dark"
             ? "linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%)"
             : "linear-gradient(135deg, rgba(0,198,255,0.02) 0%, rgba(0,114,255,0.02) 100%)",
         backdropFilter: "blur(10px)",
         border: `1px solid ${theme.palette.mode === "dark" ? "rgba(255,255,255,0.1)" : "rgba(0,198,255,0.1)"}`,
+        borderRadius: 3,
       }}
     >
       {/* Loading State */}
@@ -212,7 +216,12 @@ export default function MiningEarningsChart({
           <ResponsiveContainer width="100%" height={height}>
             <BarChart
               data={miningData}
-              margin={{ top: 20, right: 30, left: 60, bottom: 0 }}
+              margin={{
+                top: 20,
+                right: isMobile ? 8 : 30,
+                left: isMobile ? 10 : 60,
+                bottom: 0,
+              }}
             >
               <defs>
                 <linearGradient
@@ -238,7 +247,10 @@ export default function MiningEarningsChart({
 
               <XAxis
                 dataKey="date"
-                tick={{ fontSize: 11, fill: theme.palette.text.secondary }}
+                tick={{
+                  fontSize: isMobile ? 9 : 11,
+                  fill: theme.palette.text.secondary,
+                }}
                 tickFormatter={(value: string | number) => {
                   try {
                     const date = new Date(value);
@@ -252,24 +264,32 @@ export default function MiningEarningsChart({
                 }}
                 angle={-45}
                 textAnchor="end"
-                height={80}
+                height={isMobile ? 50 : 80}
               />
 
               <YAxis
-                tick={{ fontSize: 11, fill: theme.palette.text.secondary }}
-                domain={[yMin, yMax]}
-                tickCount={12}
-                label={{
-                  value: "Revenue (BTC)",
-                  angle: -90,
-                  position: "left",
-                  offset: 24,
-                  style: {
-                    textAnchor: "middle",
-                    fill: theme.palette.text.secondary,
-                    fontSize: 12,
-                  },
+                tick={{
+                  fontSize: isMobile ? 8 : 11,
+                  fill: theme.palette.text.secondary,
                 }}
+                domain={[yMin, yMax]}
+                tickCount={isMobile ? 6 : 12}
+                width={isMobile ? 58 : 80}
+                label={
+                  isMobile
+                    ? undefined
+                    : {
+                        value: "Revenue (BTC)",
+                        angle: -90,
+                        position: "left",
+                        offset: 24,
+                        style: {
+                          textAnchor: "middle",
+                          fill: theme.palette.text.secondary,
+                          fontSize: 12,
+                        },
+                      }
+                }
                 tickFormatter={(value) => {
                   if (value === 0) return "0";
                   if (value < 0.00009) {
@@ -280,7 +300,6 @@ export default function MiningEarningsChart({
               />
 
               <Tooltip
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 formatter={(
                   value: any, // eslint-disable-line @typescript-eslint/no-explicit-any
                   name?: any, // eslint-disable-line @typescript-eslint/no-explicit-any

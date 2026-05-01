@@ -36,9 +36,8 @@ import {
   CircularProgress,
   Alert,
   Button,
-  Stack,
   useTheme,
-  Container,
+  useMediaQuery,
 } from "@mui/material";
 import {
   AreaChart,
@@ -156,41 +155,46 @@ export default function HashpriceHistoryPage() {
     return { current, high, low, change, changePercent };
   }, [hashpriceData, statistics, liveHashprice]);
 
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const isDark = theme.palette.mode === "dark";
   const chartColor = "#f7b923"; // Binance-style gold
   const gridColor = isDark ? "#444" : "#e0e0e0";
   const textColor = isDark ? "#fff" : "#000";
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
+    <Box sx={{ p: { xs: 1.5, sm: 2, md: 3 }, mt: { xs: 1, md: 2 } }}>
       {/* Header */}
-      <Box sx={{ mb: 4 }}>
+      <Box sx={{ mb: { xs: 2, md: 4 } }}>
         <Typography
           variant="h4"
           component="h1"
-          sx={{ fontWeight: "bold", mb: 1 }}
+          sx={{
+            fontWeight: "bold",
+            mb: 0.5,
+            fontSize: { xs: "1.6rem", sm: "2rem", md: "2.125rem" },
+          }}
         >
           Hashprice History
         </Typography>
         <Typography variant="body2" color="textSecondary">
-          Pool-wide hashprice data from Luxor Mining (BTC per PH/s per day) •
-          Current: LIVE real-time (Luxor summary) • Chart: Historical calculated
-          from daily revenue ÷ daily hashrate
+          {isMobile
+            ? "Pool-wide BTC hashprice from Luxor Mining"
+            : "Pool-wide hashprice data from Luxor Mining (BTC per PH/s per day) • Current: LIVE real-time • Chart: Historical"}
         </Typography>
       </Box>
 
-      {/* Statistics Cards Section */}
-      {/*
-        These cards show key metrics:
-        1. Current Hashprice: Live real-time hashprice from Luxor API
-        2. Period Change: Hashprice change from start to end of selected timeframe
-        3. High/Low: Price range during entire selected period
-      */}
-      <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ mb: 4 }}>
+      {/* Statistics Cards */}
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: { xs: "1fr 1fr", sm: "1fr 1fr 1fr" },
+          gap: { xs: 1.5, sm: 2 },
+          mb: { xs: 2, md: 4 },
+        }}
+      >
         <Paper
           sx={{
-            p: 2,
-            flex: 1,
+            p: { xs: 1.5, sm: 2 },
             backgroundColor: isDark ? theme.palette.grey[800] : "#f5f5f5",
             borderRadius: 2,
           }}
@@ -198,7 +202,14 @@ export default function HashpriceHistoryPage() {
           <Typography variant="caption" color="textSecondary">
             Current Hashprice
           </Typography>
-          <Typography variant="h6" sx={{ fontWeight: "bold", mt: 0.5 }}>
+          <Typography
+            variant="h6"
+            sx={{
+              fontWeight: "bold",
+              mt: 0.5,
+              fontSize: { xs: "0.8rem", sm: "1.1rem" },
+            }}
+          >
             {isLiveLoading ? (
               <CircularProgress size={20} />
             ) : (
@@ -209,8 +220,7 @@ export default function HashpriceHistoryPage() {
 
         <Paper
           sx={{
-            p: 2,
-            flex: 1,
+            p: { xs: 1.5, sm: 2 },
             backgroundColor: isDark ? theme.palette.grey[800] : "#f5f5f5",
             borderRadius: 2,
           }}
@@ -223,19 +233,21 @@ export default function HashpriceHistoryPage() {
             sx={{
               fontWeight: "bold",
               mt: 0.5,
+              fontSize: { xs: "0.85rem", sm: "1.1rem" },
               color: cardStatistics.change >= 0 ? "#4caf50" : "#f44336",
             }}
           >
             {cardStatistics.change >= 0 ? "+" : ""}
-            {formatHashprice(cardStatistics.change)} (
-            {cardStatistics.changePercent.toFixed(2)}%)
+            {isMobile
+              ? `${cardStatistics.changePercent.toFixed(2)}%`
+              : `${formatHashprice(cardStatistics.change)} (${cardStatistics.changePercent.toFixed(2)}%)`}
           </Typography>
         </Paper>
 
         <Paper
           sx={{
-            p: 2,
-            flex: 1,
+            p: { xs: 1.5, sm: 2 },
+            gridColumn: { xs: "1 / -1", sm: "auto" },
             backgroundColor: isDark ? theme.palette.grey[800] : "#f5f5f5",
             borderRadius: 2,
           }}
@@ -243,12 +255,19 @@ export default function HashpriceHistoryPage() {
           <Typography variant="caption" color="textSecondary">
             High / Low
           </Typography>
-          <Typography variant="body2" sx={{ fontWeight: "bold", mt: 0.5 }}>
+          <Typography
+            variant="body2"
+            sx={{
+              fontWeight: "bold",
+              mt: 0.5,
+              fontSize: { xs: "0.75rem", sm: "0.875rem" },
+            }}
+          >
             {formatHashprice(cardStatistics.high)} /{" "}
             {formatHashprice(cardStatistics.low)}
           </Typography>
         </Paper>
-      </Stack>
+      </Box>
 
       {/* Chart Section */}
       {/*
@@ -258,18 +277,20 @@ export default function HashpriceHistoryPage() {
       */}
       <Paper
         sx={{
-          p: 3,
+          p: { xs: 1.5, sm: 3 },
           borderRadius: 2,
           backgroundColor: isDark ? theme.palette.grey[900] : "#ffffff",
         }}
       >
         {/* Timeframe Selector Buttons */}
-        {/*
-          Users can switch between 4 different timeframes:
-          - 1D (1 day), 7D (7 days), 30D (30 days)
-          - 45D (max Luxor API history limit)
-        */}
-        <Box sx={{ mb: 3, display: "flex", gap: 1, flexWrap: "wrap" }}>
+        <Box
+          sx={{
+            mb: { xs: 2, sm: 3 },
+            display: "flex",
+            gap: 0.75,
+            flexWrap: "wrap",
+          }}
+        >
           {TIMEFRAMES.map((timeframe) => (
             <Button
               key={timeframe.label}
@@ -279,8 +300,9 @@ export default function HashpriceHistoryPage() {
               }
               size="small"
               sx={{
-                minWidth: "60px",
-                fontSize: "0.8rem",
+                minWidth: { xs: "40px", sm: "60px" },
+                px: { xs: 1, sm: 1.5 },
+                fontSize: { xs: "0.7rem", sm: "0.8rem" },
                 textTransform: "uppercase",
               }}
             >
@@ -343,8 +365,11 @@ export default function HashpriceHistoryPage() {
           Updates automatically every 5 minutes
         */}
         {!isLoading && !isError && hasChartValues && (
-          <ResponsiveContainer width="100%" height={400}>
-            <AreaChart data={chartData}>
+          <ResponsiveContainer width="100%" height={isMobile ? 260 : 400}>
+            <AreaChart
+              data={chartData}
+              margin={{ left: isMobile ? 0 : 10, right: isMobile ? 4 : 10 }}
+            >
               <defs>
                 <linearGradient id="colorHashprice" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor={chartColor} stopOpacity={0.4} />
@@ -360,18 +385,20 @@ export default function HashpriceHistoryPage() {
               <XAxis
                 dataKey="date"
                 stroke={textColor}
-                style={{ fontSize: "0.8rem" }}
+                tick={{ fontSize: isMobile ? 9 : 12 }}
+                interval="preserveStartEnd"
               />
               <YAxis
                 stroke={textColor}
-                style={{ fontSize: "0.75rem" }}
+                tick={{ fontSize: isMobile ? 8 : 11 }}
                 tickFormatter={(value) => {
                   if (value === 0) return "0";
+                  if (isMobile) return value.toExponential(1);
                   if (value < 0.00000001) return "<0.00000001";
                   return value.toFixed(8);
                 }}
                 domain={["dataMin", "dataMax"]}
-                width={110}
+                width={isMobile ? 56 : 110}
               />
               <Tooltip
                 contentStyle={{
@@ -451,18 +478,19 @@ export default function HashpriceHistoryPage() {
       */}
       <Paper
         sx={{
-          p: 2,
-          mt: 3,
+          p: { xs: 1.5, sm: 2 },
+          mt: { xs: 2, md: 3 },
           borderRadius: 2,
           backgroundColor: isDark ? theme.palette.grey[800] : "#f5f5f5",
         }}
       >
         <Typography variant="body2" color="textSecondary">
-          <strong>Data Source:</strong> Luxor Mining Pool (pool-specific
-          hashprice) • Calculated from: Daily Revenue ÷ Daily Hashrate • Updated
-          every 5 minutes • All values in BTC/PH/s/Day
+          <strong>Data Source:</strong> Luxor Mining Pool •{" "}
+          {isMobile
+            ? "BTC/PH/s/Day • Updates every 5 min"
+            : "Calculated from: Daily Revenue ÷ Daily Hashrate • Updated every 5 minutes • All values in BTC/PH/s/Day"}
         </Typography>
       </Paper>
-    </Container>
+    </Box>
   );
 }

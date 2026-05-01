@@ -13,7 +13,6 @@ import {
   TableHead,
   TableRow,
   useTheme,
-  Container,
 } from "@mui/material";
 import { useQuery } from "@tanstack/react-query";
 import { useUser } from "@/lib/hooks/useUser";
@@ -59,14 +58,26 @@ export default function InvoicesPage() {
     enabled: !!user?.id,
   });
 
+  const headerCellSx = {
+    fontWeight: "bold",
+    borderBottom: "2px solid",
+    borderBottomColor: "divider",
+    py: { xs: 1.5, sm: 2 },
+    px: { xs: 1.5, sm: 2 },
+  };
+
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
+    <Box sx={{ p: { xs: 1.5, sm: 2, md: 3 }, mt: { xs: 1, md: 2 } }}>
       {/* Header */}
-      <Box sx={{ mb: 4 }}>
+      <Box sx={{ mb: { xs: 2, md: 4 } }}>
         <Typography
           variant="h4"
           component="h1"
-          sx={{ fontWeight: "bold", mb: 1 }}
+          sx={{
+            fontWeight: "bold",
+            mb: 0.5,
+            fontSize: { xs: "1.6rem", sm: "2rem", md: "2.125rem" },
+          }}
         >
           Invoices
         </Typography>
@@ -85,86 +96,57 @@ export default function InvoicesPage() {
         }}
       >
         <TableContainer>
-          <Table sx={{ minWidth: 750 }} size="medium">
-            <TableHead>
+          <Table sx={{ minWidth: { xs: 320, sm: 600 } }} size="small">
+            <TableHead
+              sx={{
+                backgroundColor:
+                  theme.palette.mode === "dark"
+                    ? "rgba(255,255,255,0.05)"
+                    : "rgba(0,0,0,0.03)",
+              }}
+            >
               <TableRow>
-                <TableCell
-                  sx={{
-                    fontWeight: "bold",
-                    borderBottom: "2px solid",
-                    borderBottomColor: "divider",
-                    py: 2,
-                  }}
-                >
-                  Invoice
-                </TableCell>
-                <TableCell
-                  align="right"
-                  sx={{
-                    fontWeight: "bold",
-                    borderBottom: "2px solid",
-                    borderBottomColor: "divider",
-                    py: 2,
-                  }}
-                >
+                <TableCell sx={headerCellSx}>Invoice</TableCell>
+                <TableCell align="right" sx={headerCellSx}>
                   Amount
                 </TableCell>
+                <TableCell sx={headerCellSx}>Status</TableCell>
                 <TableCell
                   sx={{
-                    fontWeight: "bold",
-                    borderBottom: "2px solid",
-                    borderBottomColor: "divider",
-                    py: 2,
-                  }}
-                >
-                  Status
-                </TableCell>
-                <TableCell
-                  sx={{
-                    fontWeight: "bold",
-                    borderBottom: "2px solid",
-                    borderBottomColor: "divider",
-                    py: 2,
+                    ...headerCellSx,
+                    display: { xs: "none", sm: "table-cell" },
                   }}
                 >
                   Issued Date
                 </TableCell>
                 <TableCell
                   sx={{
-                    fontWeight: "bold",
-                    borderBottom: "2px solid",
-                    borderBottomColor: "divider",
-                    py: 2,
-                  }}
-                >
-                  Paid Date
-                </TableCell>
-                <TableCell
-                  sx={{
-                    fontWeight: "bold",
-                    borderBottom: "2px solid",
-                    borderBottomColor: "divider",
-                    py: 2,
+                    ...headerCellSx,
+                    display: { xs: "none", sm: "table-cell" },
                   }}
                 >
                   Due Date
                 </TableCell>
                 <TableCell
                   sx={{
-                    fontWeight: "bold",
-                    borderBottom: "2px solid",
-                    borderBottomColor: "divider",
-                    py: 2,
+                    ...headerCellSx,
+                    display: { xs: "none", md: "table-cell" },
+                  }}
+                >
+                  Paid Date
+                </TableCell>
+                <TableCell
+                  sx={{
+                    ...headerCellSx,
+                    display: { xs: "none", md: "table-cell" },
                   }}
                 >
                   Paid Past Due
                 </TableCell>
                 <TableCell
                   sx={{
-                    fontWeight: "bold",
-                    borderBottom: "2px solid",
-                    borderBottomColor: "divider",
-                    py: 2,
+                    ...headerCellSx,
+                    display: { xs: "none", md: "table-cell" },
                   }}
                 >
                   Days Until Due
@@ -174,14 +156,14 @@ export default function InvoicesPage() {
             <TableBody>
               {invoicesLoading ? (
                 <TableRow>
-                  <TableCell colSpan={5} sx={{ textAlign: "center", py: 3 }}>
+                  <TableCell colSpan={8} sx={{ textAlign: "center", py: 3 }}>
                     <CircularProgress size={24} />
                   </TableCell>
                 </TableRow>
               ) : invoicesError ? (
                 <TableRow>
                   <TableCell
-                    colSpan={5}
+                    colSpan={8}
                     sx={{ textAlign: "center", py: 3, color: "error.main" }}
                   >
                     <Typography variant="body2">
@@ -208,29 +190,40 @@ export default function InvoicesPage() {
                       }}
                       onClick={() => router.push(`/invoices/${invoice.id}`)}
                     >
-                      <TableCell sx={{ py: 2 }}>
+                      <TableCell
+                        sx={{ py: { xs: 1, sm: 1.5 }, px: { xs: 1.5, sm: 2 } }}
+                      >
                         <Typography
                           variant="body2"
                           fontWeight="medium"
                           sx={{
                             color: "primary.main",
-                            "&:hover": {
-                              textDecoration: "underline",
-                            },
+                            "&:hover": { textDecoration: "underline" },
                           }}
                         >
                           {invoice.invoiceNumber}
                         </Typography>
                       </TableCell>
-                      <TableCell align="right" sx={{ py: 2 }}>
+                      <TableCell
+                        align="right"
+                        sx={{ py: { xs: 1, sm: 1.5 }, px: { xs: 1.5, sm: 2 } }}
+                      >
                         <Typography variant="body2" fontWeight="medium">
                           ${Number(invoice.totalAmount).toFixed(2)}
                         </Typography>
                       </TableCell>
-                      <TableCell sx={{ py: 2 }}>
+                      <TableCell
+                        sx={{ py: { xs: 1, sm: 1.5 }, px: { xs: 1.5, sm: 2 } }}
+                      >
                         <StatusBadge status={invoice.status} />
                       </TableCell>
-                      <TableCell sx={{ py: 2 }}>
+                      <TableCell
+                        sx={{
+                          py: { xs: 1, sm: 1.5 },
+                          px: { xs: 1.5, sm: 2 },
+                          display: { xs: "none", sm: "table-cell" },
+                        }}
+                      >
                         <Typography variant="body2">
                           {invoice.issuedDate &&
                             new Date(invoice.issuedDate).toLocaleDateString(
@@ -243,7 +236,27 @@ export default function InvoicesPage() {
                             )}
                         </Typography>
                       </TableCell>
-                      <TableCell sx={{ py: 2 }}>
+                      <TableCell
+                        sx={{
+                          py: { xs: 1, sm: 1.5 },
+                          px: { xs: 1.5, sm: 2 },
+                          display: { xs: "none", sm: "table-cell" },
+                        }}
+                      >
+                        <Typography variant="body2">
+                          {new Date(invoice.dueDate).toLocaleDateString(
+                            "en-US",
+                            { year: "numeric", month: "short", day: "numeric" },
+                          )}
+                        </Typography>
+                      </TableCell>
+                      <TableCell
+                        sx={{
+                          py: { xs: 1, sm: 1.5 },
+                          px: { xs: 1.5, sm: 2 },
+                          display: { xs: "none", md: "table-cell" },
+                        }}
+                      >
                         <Typography variant="body2">
                           {invoice.paidDate &&
                             new Date(invoice.paidDate).toLocaleDateString(
@@ -256,19 +269,13 @@ export default function InvoicesPage() {
                             )}
                         </Typography>
                       </TableCell>
-                      <TableCell sx={{ py: 2 }}>
-                        <Typography variant="body2">
-                          {new Date(invoice.dueDate).toLocaleDateString(
-                            "en-US",
-                            {
-                              year: "numeric",
-                              month: "short",
-                              day: "numeric",
-                            },
-                          )}
-                        </Typography>
-                      </TableCell>
-                      <TableCell sx={{ py: 2 }}>
+                      <TableCell
+                        sx={{
+                          py: { xs: 1, sm: 1.5 },
+                          px: { xs: 1.5, sm: 2 },
+                          display: { xs: "none", md: "table-cell" },
+                        }}
+                      >
                         {invoice.status === "PAID" &&
                         invoice.paidDate &&
                         invoice.dueDate ? (
@@ -301,11 +308,18 @@ export default function InvoicesPage() {
                           "-"
                         )}
                       </TableCell>
-                      <TableCell sx={{ py: 2 }}>
+                      <TableCell
+                        sx={{
+                          py: { xs: 1, sm: 1.5 },
+                          px: { xs: 1.5, sm: 2 },
+                          display: { xs: "none", md: "table-cell" },
+                        }}
+                      >
                         {invoice.status === "PAID" ? (
                           "-"
                         ) : (
                           <Typography
+                            variant="body2"
                             sx={{
                               color:
                                 daysUntilDue < 0
@@ -331,7 +345,7 @@ export default function InvoicesPage() {
                 })
               ) : (
                 <TableRow>
-                  <TableCell colSpan={5} sx={{ textAlign: "center", py: 3 }}>
+                  <TableCell colSpan={8} sx={{ textAlign: "center", py: 3 }}>
                     <Typography variant="body2">No invoices found</Typography>
                   </TableCell>
                 </TableRow>
@@ -340,6 +354,6 @@ export default function InvoicesPage() {
           </Table>
         </TableContainer>
       </Paper>
-    </Container>
+    </Box>
   );
 }

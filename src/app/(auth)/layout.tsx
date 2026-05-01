@@ -24,7 +24,7 @@ export default function AuthLayout({
         style={{
           flexGrow: 1,
           padding: "clamp(12px, 5vw, 24px)",
-          marginTop: "56px",
+          marginTop: "64px",
           overflow: "auto",
         }}
       >

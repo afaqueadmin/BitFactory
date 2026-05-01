@@ -6,7 +6,6 @@ import {
   Typography,
   Button,
   Chip,
-  Stack,
   Accordion,
   AccordionSummary,
   AccordionDetails,
@@ -551,42 +550,42 @@ export default function HostedMinersList({
 
   return (
     <Box sx={{ width: "100%" }}>
-      {/* Header */}
+      {/* Header — Filter Buttons */}
       <Box
         sx={{
           display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
+          flexWrap: "wrap",
+          gap: 1,
           mb: 3,
         }}
       >
-        {/* Filter Buttons */}
-        <Stack direction="row" spacing={1}>
-          {filterValuesWithCounts.map(({ value, count }) => (
-            <Button
-              key={value}
-              variant={"contained"}
-              onClick={() => setActiveFilter(value)}
-              size="small"
-              sx={{
-                minWidth: "100px",
-                textTransform: "none",
-                fontWeight: 500,
-                ...(activeFilter === value && {
-                  backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                  color: theme.palette.primary.main,
-                  borderColor: theme.palette.primary.main,
-                }),
-              }}
-            >
-              {value} ({count})
-            </Button>
-          ))}
-        </Stack>
+        {filterValuesWithCounts.map(({ value, count }) => (
+          <Button
+            key={value}
+            variant="contained"
+            onClick={() => setActiveFilter(value)}
+            size="small"
+            sx={{
+              textTransform: "none",
+              fontWeight: 500,
+              fontSize: { xs: "0.7rem", sm: "0.8rem" },
+              px: { xs: 1, sm: 1.5 },
+              py: { xs: 0.5, sm: 0.75 },
+              minWidth: 0,
+              ...(activeFilter === value && {
+                backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                color: theme.palette.primary.main,
+                borderColor: theme.palette.primary.main,
+              }),
+            }}
+          >
+            {value} ({count})
+          </Button>
+        ))}
       </Box>
 
       {/* Miners List */}
-      <Box sx={{ mt: 4 }}>
+      <Box sx={{ mt: { xs: 2, md: 4 } }}>
         {loading ? (
           <Box
             sx={{
@@ -623,47 +622,105 @@ export default function HostedMinersList({
               <AccordionSummary
                 expandIcon={<ExpandMoreIcon />}
                 sx={{
-                  px: 3,
-                  py: 2,
+                  px: { xs: 2, sm: 3 },
+                  py: { xs: 1.5, sm: 2 },
                   "& .MuiAccordionSummary-content": {
-                    alignItems: "center",
+                    alignItems: "flex-start",
                     justifyContent: "space-between",
+                    gap: 1,
                   },
                 }}
               >
-                <Box sx={{ flex: 1 }}>
-                  <Typography variant="h6" fontWeight="600" sx={{ mb: 1 }}>
-                    {miner.model}
-                  </Typography>
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    sx={{ mb: 0.5 }}
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Box
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 1,
+                      mb: 0.75,
+                      flexWrap: "wrap",
+                    }}
                   >
-                    <strong>Worker Name:</strong> {miner.workerName}{" "}
-                    &nbsp;&nbsp;
-                    <strong>Location:</strong> {miner.location} &nbsp;&nbsp;
-                    <strong>Connected Pool:</strong> {miner.connectedPool}
-                  </Typography>
+                    <Typography
+                      variant="h6"
+                      fontWeight="600"
+                      sx={{
+                        fontSize: { xs: "0.95rem", sm: "1.1rem" },
+                        lineHeight: 1.3,
+                      }}
+                    >
+                      {miner.model}
+                    </Typography>
+                    <Box sx={{ display: { xs: "block", sm: "none" } }}>
+                      {getStatusChip(miner.status)}
+                    </Box>
+                  </Box>
+                  <Box
+                    sx={{
+                      display: "flex",
+                      flexDirection: { xs: "column", sm: "row" },
+                      gap: { xs: 0.25, sm: 0 },
+                    }}
+                  >
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{ mr: { sm: 2 } }}
+                    >
+                      <strong>Worker:</strong> {miner.workerName}
+                    </Typography>
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{ mr: { sm: 2 } }}
+                    >
+                      <strong>Location:</strong> {miner.location}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      <strong>Pool:</strong> {miner.connectedPool}
+                    </Typography>
+                  </Box>
                 </Box>
 
-                <Box sx={{ ml: 2 }}>{getStatusChip(miner.status)}</Box>
+                <Box
+                  sx={{
+                    ml: 1,
+                    flexShrink: 0,
+                    display: { xs: "none", sm: "block" },
+                  }}
+                >
+                  {getStatusChip(miner.status)}
+                </Box>
               </AccordionSummary>
 
-              <AccordionDetails sx={{ px: 3, py: 2, pt: 0 }}>
+              <AccordionDetails sx={{ px: { xs: 1.5, sm: 3 }, py: 2, pt: 0 }}>
                 <Box
                   sx={{
                     backgroundColor: alpha(theme.palette.background.paper, 0.5),
                     borderRadius: 2,
-                    p: 3,
+                    p: { xs: 2, sm: 3 },
                     border: `1px solid ${alpha(theme.palette.divider, 0.08)}`,
                   }}
                 >
-                  <Typography variant="h6" fontWeight="600" sx={{ mb: 2 }}>
+                  <Typography
+                    variant="h6"
+                    fontWeight="600"
+                    sx={{ mb: 2, fontSize: { xs: "0.9rem", sm: "1.1rem" } }}
+                  >
                     Miner Details
                   </Typography>
 
-                  <Stack direction="row" spacing={6} flexWrap="wrap">
+                  <Box
+                    sx={{
+                      display: "grid",
+                      gridTemplateColumns: {
+                        xs: "1fr 1fr",
+                        sm: "repeat(3, 1fr)",
+                        md: "repeat(6, auto)",
+                      },
+                      gap: { xs: 2, sm: 3 },
+                    }}
+                  >
                     <Box>
                       <Typography
                         variant="body2"
@@ -672,7 +729,7 @@ export default function HostedMinersList({
                       >
                         Firmware
                       </Typography>
-                      <Typography variant="body1" fontWeight="500">
+                      <Typography variant="body2" fontWeight="500">
                         {miner.firmware || "N/A"}
                       </Typography>
                     </Box>
@@ -686,9 +743,9 @@ export default function HostedMinersList({
                         Serial No.
                       </Typography>
                       <Typography
-                        variant="body1"
+                        variant="body2"
                         fontWeight="500"
-                        sx={{ fontFamily: "monospace", fontSize: "0.9rem" }}
+                        sx={{ fontFamily: "monospace", wordBreak: "break-all" }}
                       >
                         {miner.serialNumber || "—"}
                       </Typography>
@@ -703,9 +760,9 @@ export default function HostedMinersList({
                         MAC Address
                       </Typography>
                       <Typography
-                        variant="body1"
+                        variant="body2"
                         fontWeight="500"
-                        sx={{ fontFamily: "monospace", fontSize: "0.9rem" }}
+                        sx={{ fontFamily: "monospace", wordBreak: "break-all" }}
                       >
                         {miner.macAddress || "—"}
                       </Typography>
@@ -717,9 +774,9 @@ export default function HostedMinersList({
                         color="text.secondary"
                         sx={{ mb: 0.5 }}
                       >
-                        Hash Rate (Instant)
+                        Hash Rate
                       </Typography>
-                      <Typography variant="body1" fontWeight="500">
+                      <Typography variant="body2" fontWeight="500">
                         {miner.hashRate || "N/A"}
                       </Typography>
                     </Box>
@@ -733,7 +790,7 @@ export default function HostedMinersList({
                         Status
                       </Typography>
                       <Typography
-                        variant="body1"
+                        variant="body2"
                         fontWeight="500"
                         sx={{
                           color:
@@ -760,12 +817,16 @@ export default function HostedMinersList({
                         onClick={() =>
                           handleOpenNotes(miner.id, miner.workerName)
                         }
-                        sx={{ textTransform: "none", borderRadius: 2 }}
+                        sx={{
+                          textTransform: "none",
+                          borderRadius: 2,
+                          fontSize: { xs: "0.7rem", sm: "0.8rem" },
+                        }}
                       >
                         {repairButtonLabel}
                       </Button>
                     </Box>
-                  </Stack>
+                  </Box>
                 </Box>
               </AccordionDetails>
             </Accordion>

@@ -204,7 +204,11 @@ export default function WalletPage() {
 
   // Auto-reset poolMode if selected pool is not in activePoolNames
   useEffect(() => {
-    if (activePoolNames.length > 0 && poolMode !== "total" && !activePoolNames.includes(poolMode)) {
+    if (
+      activePoolNames.length > 0 &&
+      poolMode !== "total" &&
+      !activePoolNames.includes(poolMode)
+    ) {
       setPoolMode("total");
     }
   }, [activePoolNames]);
@@ -255,8 +259,7 @@ export default function WalletPage() {
   const getRevenue24h = (): number => {
     if (!revenue24h) return 0;
     if (poolMode === "total") return revenue24h.revenue24h.btc;
-    if (poolMode === "luxor")
-      return revenue24h.poolBreakdown?.luxor.btc ?? 0;
+    if (poolMode === "luxor") return revenue24h.poolBreakdown?.luxor.btc ?? 0;
     if (poolMode === "braiins")
       return revenue24h.poolBreakdown?.braiins.btc ?? 0;
     return 0;
@@ -346,8 +349,8 @@ export default function WalletPage() {
       component="main"
       sx={{
         flexGrow: 1,
-        p: 3,
-        mt: 2,
+        p: { xs: 1.5, sm: 2, md: 3 },
+        mt: { xs: 1, md: 2 },
         backgroundColor: (theme) =>
           theme.palette.mode === "light" ? "#f5f5f5" : theme.palette.grey[900],
         minHeight: "100vh",
@@ -357,19 +360,33 @@ export default function WalletPage() {
         sx={{
           display: "flex",
           justifyContent: "space-between",
-          alignItems: "flex-start",
-          mb: 3,
+          alignItems: { xs: "flex-start", sm: "flex-start" },
+          flexDirection: { xs: "column", sm: "row" },
+          gap: { xs: 1.5, sm: 0 },
+          mb: { xs: 2, md: 3 },
         }}
       >
         <Box>
-          <Typography variant="h4" fontWeight="bold" gutterBottom>
+          <Typography
+            variant="h4"
+            fontWeight="bold"
+            gutterBottom
+            sx={{ fontSize: { xs: "1.6rem", sm: "2rem", md: "2.125rem" } }}
+          >
             Wallet
           </Typography>
-          <Typography variant="body1" color="text.secondary" gutterBottom>
+          <Typography variant="body2" color="text.secondary">
             Overview of your mining earnings and transactions.
           </Typography>
         </Box>
-        <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
+        <Box
+          sx={{
+            display: "flex",
+            gap: 1.5,
+            alignItems: "center",
+            flexWrap: "wrap",
+          }}
+        >
           {activePoolNames.length > 1 && (
             <ToggleButtonGroup
               value={poolMode}
@@ -413,8 +430,8 @@ export default function WalletPage() {
       <Box
         sx={{
           display: "grid",
-          gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
-          gap: 3,
+          gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
+          gap: { xs: 1.5, sm: 2, md: 3 },
           mt: 2,
         }}
       >
@@ -422,14 +439,14 @@ export default function WalletPage() {
         <Box>
           <Paper
             sx={{
-              p: 3,
+              p: { xs: 2, sm: 3 },
               borderRadius: 2,
               backgroundColor: (theme) =>
                 theme.palette.mode === "light" ? "#2196f3" : "#1565c0",
               color: "white",
             }}
           >
-            <Typography variant="subtitle1">
+            <Typography variant="subtitle2" sx={{ opacity: 0.9 }}>
               Total Earnings
               {poolMode !== "total" && ` (${poolMode.toUpperCase()})`}
             </Typography>
@@ -437,21 +454,26 @@ export default function WalletPage() {
               <Box
                 sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1 }}
               >
-                <CircularProgress size={24} sx={{ color: "white" }} />
+                <CircularProgress size={20} sx={{ color: "white" }} />
                 <Typography variant="body2">Loading...</Typography>
               </Box>
             ) : (
-              <Box
-                sx={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                }}
-              >
-                <Typography variant="h5" fontWeight="bold">
+              <Box sx={{ mt: 0.5 }}>
+                <Typography
+                  sx={{
+                    fontWeight: 800,
+                    fontSize: { xs: "1.1rem", sm: "1.3rem" },
+                  }}
+                >
                   ₿ {getTotalEarnings().toFixed(8)}
                 </Typography>
-                <Typography variant="h5" fontWeight="bold">
+                <Typography
+                  sx={{
+                    fontWeight: 600,
+                    fontSize: { xs: "0.95rem", sm: "1.1rem" },
+                    opacity: 0.9,
+                  }}
+                >
                   $
                   {getTotalEarnings() && btcLiveData?.price
                     ? (getTotalEarnings() * btcLiveData.price).toFixed(2)
@@ -465,7 +487,7 @@ export default function WalletPage() {
         <Box>
           <Paper
             sx={{
-              p: 3,
+              p: { xs: 2, sm: 3 },
               borderRadius: 2,
               backgroundColor: (theme) =>
                 theme.palette.mode === "light" ? "#ffb300" : "#ff8f00",
@@ -473,15 +495,13 @@ export default function WalletPage() {
               opacity: poolMode === "braiins" ? 0.6 : 1,
             }}
           >
-            <Typography variant="subtitle1">Primary Wallet Address</Typography>
+            <Typography variant="subtitle2" sx={{ opacity: 0.9 }}>
+              Primary Wallet Address
+            </Typography>
             {poolMode === "braiins" ? (
               <Typography
                 variant="body2"
-                sx={{
-                  mt: 1,
-                  fontFamily: "monospace",
-                  fontSize: "0.9rem",
-                }}
+                sx={{ mt: 1, fontFamily: "monospace" }}
               >
                 Not available for Braiins
               </Typography>
@@ -503,7 +523,7 @@ export default function WalletPage() {
                   wordBreak: "break-all",
                   mt: 1,
                   fontFamily: "monospace",
-                  fontSize: "0.9rem",
+                  fontSize: { xs: "0.75rem", sm: "0.875rem" },
                 }}
               >
                 {getPrimaryWalletAddress()}
@@ -516,14 +536,14 @@ export default function WalletPage() {
         <Box>
           <Paper
             sx={{
-              p: 3,
+              p: { xs: 2, sm: 3 },
               borderRadius: 2,
               backgroundColor: (theme) =>
                 theme.palette.mode === "light" ? "#9c27b0" : "#6a1b9a",
               color: "white",
             }}
           >
-            <Typography variant="subtitle1">
+            <Typography variant="subtitle2" sx={{ opacity: 0.9 }}>
               Revenue (24 Hours)
               {poolMode !== "total" && ` (${poolMode.toUpperCase()})`}
             </Typography>
@@ -531,25 +551,30 @@ export default function WalletPage() {
               <Box
                 sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1 }}
               >
-                <CircularProgress size={24} sx={{ color: "white" }} />
+                <CircularProgress size={20} sx={{ color: "white" }} />
                 <Typography variant="body2">Loading...</Typography>
               </Box>
             ) : revenue24hError ? (
-              <Typography variant="body2" sx={{ mt: 1, fontSize: "0.9rem" }}>
+              <Typography variant="body2" sx={{ mt: 1 }}>
                 {revenue24hError}
               </Typography>
             ) : (
-              <Box
-                sx={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                }}
-              >
-                <Typography variant="h5" fontWeight="bold">
+              <Box sx={{ mt: 0.5 }}>
+                <Typography
+                  sx={{
+                    fontWeight: 800,
+                    fontSize: { xs: "1.1rem", sm: "1.3rem" },
+                  }}
+                >
                   ₿ {getRevenue24h().toFixed(8)}
                 </Typography>
-                <Typography variant="h5" fontWeight="bold">
+                <Typography
+                  sx={{
+                    fontWeight: 600,
+                    fontSize: { xs: "0.95rem", sm: "1.1rem" },
+                    opacity: 0.9,
+                  }}
+                >
                   $
                   {getRevenue24h() && btcLiveData?.price
                     ? (getRevenue24h() * btcLiveData.price).toFixed(2)
@@ -563,14 +588,14 @@ export default function WalletPage() {
         <Box>
           <Paper
             sx={{
-              p: 3,
+              p: { xs: 2, sm: 3 },
               borderRadius: 2,
               backgroundColor: (theme) =>
                 theme.palette.mode === "light" ? "#4caf50" : "#2e7d32",
               color: "white",
             }}
           >
-            <Typography variant="subtitle1">
+            <Typography variant="subtitle2" sx={{ opacity: 0.9 }}>
               Pending Payouts
               {poolMode !== "total" && ` (${poolMode.toUpperCase()})`}
             </Typography>
@@ -578,21 +603,26 @@ export default function WalletPage() {
               <Box
                 sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1 }}
               >
-                <CircularProgress size={24} sx={{ color: "white" }} />
+                <CircularProgress size={20} sx={{ color: "white" }} />
                 <Typography variant="body2">Loading...</Typography>
               </Box>
             ) : (
-              <Box
-                sx={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                }}
-              >
-                <Typography variant="h5" fontWeight="bold">
+              <Box sx={{ mt: 0.5 }}>
+                <Typography
+                  sx={{
+                    fontWeight: 800,
+                    fontSize: { xs: "1.1rem", sm: "1.3rem" },
+                  }}
+                >
                   ₿ {getPendingPayouts().toFixed(8)}
                 </Typography>
-                <Typography variant="h5" fontWeight="bold">
+                <Typography
+                  sx={{
+                    fontWeight: 600,
+                    fontSize: { xs: "0.95rem", sm: "1.1rem" },
+                    opacity: 0.9,
+                  }}
+                >
                   $
                   {getPendingPayouts() && btcLiveData?.price
                     ? (getPendingPayouts() * btcLiveData.price).toFixed(2)
@@ -607,12 +637,12 @@ export default function WalletPage() {
         <Box>
           <Paper
             sx={{
-              p: 3,
+              p: { xs: 2, sm: 3 },
               borderRadius: 2,
               backgroundColor: (theme) =>
                 theme.palette.mode === "light" ? "#ff6f00" : "#e65100",
               color: "white",
-              minHeight: minCardHeight,
+              minHeight: { xs: "auto", sm: minCardHeight },
               opacity: poolMode === "braiins" ? 0.6 : 1,
             }}
           >
@@ -652,12 +682,12 @@ export default function WalletPage() {
         <Box>
           <Paper
             sx={{
-              p: 3,
+              p: { xs: 2, sm: 3 },
               borderRadius: 2,
               backgroundColor: (theme) =>
                 theme.palette.mode === "light" ? "#00796b" : "#004d40",
               color: "white",
-              minHeight: minCardHeight,
+              minHeight: { xs: "auto", sm: minCardHeight },
               opacity: poolMode === "braiins" ? 0.6 : 1,
             }}
           >
@@ -717,10 +747,10 @@ export default function WalletPage() {
       </Box>
 
       {/* Statement Download Section */}
-      <Box sx={{ width: "100%", mt: 4 }}>
+      <Box sx={{ width: "100%", mt: { xs: 2, md: 4 } }}>
         <Paper
           sx={{
-            p: 3,
+            p: { xs: 2, sm: 3 },
             borderRadius: 2,
             backgroundColor: (theme) =>
               theme.palette.mode === "light"
@@ -792,7 +822,8 @@ export default function WalletPage() {
               disabled={
                 statementDownloading || !statementStartDate || !statementEndDate
               }
-              sx={{ whiteSpace: "nowrap", minWidth: "150px" }}
+              fullWidth
+              sx={{ whiteSpace: "nowrap" }}
             >
               {statementDownloading ? (
                 <>

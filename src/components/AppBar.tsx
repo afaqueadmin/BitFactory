@@ -150,7 +150,7 @@ export default function AppBarComponent() {
     >
       <Toolbar
         sx={{
-          minHeight: { xs: 56, sm: 64 },
+          minHeight: { xs: 64, sm: 68 },
           px: { xs: 1, sm: 1.5, md: 3 },
           gap: { xs: 0.5, sm: 1, md: 2 },
         }}
@@ -167,8 +167,8 @@ export default function AppBarComponent() {
             <Image
               src="/BitfactoryLogo.webp"
               alt="BitFactory Logo"
-              width={isMobile ? 110 : 140}
-              height={isMobile ? 32 : 40}
+              width={isMobile ? 150 : 160}
+              height={isMobile ? 44 : 46}
               priority
               style={{ cursor: "pointer", height: "auto" }}
             />

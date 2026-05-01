@@ -47,9 +47,8 @@ import {
   CircularProgress,
   Alert,
   Button,
-  Stack,
   useTheme,
-  Container,
+  useMediaQuery,
 } from "@mui/material";
 import {
   Line,
@@ -212,6 +211,7 @@ export default function BtcPriceHistoryPage() {
     };
   }, [chartData, currentPrice, change24h, changePercent24h]);
 
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const isDark = theme.palette.mode === "dark";
   // Binance-style golden/yellow color for close price
   const chartColor = "#f7b923";
@@ -219,13 +219,17 @@ export default function BtcPriceHistoryPage() {
   const textColor = isDark ? "#fff" : "#000";
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
+    <Box sx={{ p: { xs: 1.5, sm: 2, md: 3 }, mt: { xs: 1, md: 2 } }}>
       {/* Header */}
-      <Box sx={{ mb: 4 }}>
+      <Box sx={{ mb: { xs: 2, md: 4 } }}>
         <Typography
           variant="h4"
           component="h1"
-          sx={{ fontWeight: "bold", mb: 1 }}
+          sx={{
+            fontWeight: "bold",
+            mb: 0.5,
+            fontSize: { xs: "1.6rem", sm: "2rem", md: "2.125rem" },
+          }}
         >
           Bitcoin Price History
         </Typography>
@@ -234,18 +238,18 @@ export default function BtcPriceHistoryPage() {
         </Typography>
       </Box>
 
-      {/* Statistics Cards Section */}
-      {/* 
-        These cards show key metrics:
-        1. Current Price: Latest live market price from Binance (fixed regardless of timeframe)
-        2. 24h Change: Price change in last 24 hours (green/red colored)
-        3. High/Low: Range of prices during the entire selected timeframe period
-      */}
-      <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ mb: 4 }}>
+      {/* Statistics Cards */}
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: { xs: "1fr 1fr", sm: "1fr 1fr 1fr" },
+          gap: { xs: 1.5, sm: 2 },
+          mb: { xs: 2, md: 4 },
+        }}
+      >
         <Paper
           sx={{
-            p: 2,
-            flex: 1,
+            p: { xs: 1.5, sm: 2 },
             backgroundColor: isDark ? theme.palette.grey[800] : "#f5f5f5",
             borderRadius: 2,
           }}
@@ -253,15 +257,21 @@ export default function BtcPriceHistoryPage() {
           <Typography variant="caption" color="textSecondary">
             Current Price
           </Typography>
-          <Typography variant="h6" sx={{ fontWeight: "bold", mt: 0.5 }}>
+          <Typography
+            variant="h6"
+            sx={{
+              fontWeight: "bold",
+              mt: 0.5,
+              fontSize: { xs: "1rem", sm: "1.25rem" },
+            }}
+          >
             {formatCurrency(statistics.current)}
           </Typography>
         </Paper>
 
         <Paper
           sx={{
-            p: 2,
-            flex: 1,
+            p: { xs: 1.5, sm: 2 },
             backgroundColor: isDark ? theme.palette.grey[800] : "#f5f5f5",
             borderRadius: 2,
           }}
@@ -274,31 +284,40 @@ export default function BtcPriceHistoryPage() {
             sx={{
               fontWeight: "bold",
               mt: 0.5,
+              fontSize: { xs: "0.85rem", sm: "1.25rem" },
               color: statistics.change >= 0 ? "#4caf50" : "#f44336",
             }}
           >
             {statistics.change >= 0 ? "+" : ""}
-            {formatCurrency(statistics.change)} (
-            {statistics.changePercent.toFixed(2)}%)
+            {isMobile
+              ? `${statistics.changePercent.toFixed(2)}%`
+              : `${formatCurrency(statistics.change)} (${statistics.changePercent.toFixed(2)}%)`}
           </Typography>
         </Paper>
 
         <Paper
           sx={{
-            p: 2,
-            flex: 1,
+            p: { xs: 1.5, sm: 2 },
+            gridColumn: { xs: "1 / -1", sm: "auto" },
             backgroundColor: isDark ? theme.palette.grey[800] : "#f5f5f5",
             borderRadius: 2,
           }}
         >
           <Typography variant="caption" color="textSecondary">
-            High / Low
+            {isMobile ? `High / Low (${selectedTimeframe})` : "High / Low"}
           </Typography>
-          <Typography variant="body2" sx={{ fontWeight: "bold", mt: 0.5 }}>
+          <Typography
+            variant="body2"
+            sx={{
+              fontWeight: "bold",
+              mt: 0.5,
+              fontSize: { xs: "0.85rem", sm: "0.875rem" },
+            }}
+          >
             {formatCurrency(statistics.high)} / {formatCurrency(statistics.low)}
           </Typography>
         </Paper>
-      </Stack>
+      </Box>
 
       {/* Chart Section */}
       {/* 
@@ -309,7 +328,7 @@ export default function BtcPriceHistoryPage() {
       */}
       <Paper
         sx={{
-          p: 3,
+          p: { xs: 1.5, sm: 3 },
           borderRadius: 2,
           backgroundColor: isDark ? theme.palette.grey[900] : "#ffffff",
         }}
@@ -319,7 +338,7 @@ export default function BtcPriceHistoryPage() {
           sx={{
             mb: 2,
             display: "flex",
-            gap: 2,
+            gap: { xs: 1, sm: 2 },
             alignItems: "center",
             flexWrap: "wrap",
           }}
@@ -327,11 +346,11 @@ export default function BtcPriceHistoryPage() {
           <Typography
             variant="caption"
             color="textSecondary"
-            sx={{ fontWeight: 600 }}
+            sx={{ fontWeight: 600, display: { xs: "none", sm: "block" } }}
           >
             ⏰ All times in UTC
           </Typography>
-          <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+          <Box sx={{ display: "flex", gap: 0.75, flexWrap: "wrap" }}>
             {TIMEFRAMES.map((timeframe) => (
               <Button
                 key={timeframe}
@@ -341,8 +360,9 @@ export default function BtcPriceHistoryPage() {
                 }
                 size="small"
                 sx={{
-                  minWidth: "60px",
-                  fontSize: "0.8rem",
+                  minWidth: { xs: "40px", sm: "60px" },
+                  px: { xs: 1, sm: 1.5 },
+                  fontSize: { xs: "0.7rem", sm: "0.8rem" },
                   textTransform: "uppercase",
                 }}
               >
@@ -391,8 +411,11 @@ export default function BtcPriceHistoryPage() {
           without requiring manual page refresh
         */}
         {!isLoading && !isError && chartData.length > 0 && (
-          <ResponsiveContainer width="100%" height={400}>
-            <AreaChart data={chartData}>
+          <ResponsiveContainer width="100%" height={isMobile ? 260 : 400}>
+            <AreaChart
+              data={chartData}
+              margin={{ left: isMobile ? 0 : 10, right: isMobile ? 4 : 10 }}
+            >
               <defs>
                 <linearGradient id="colorClose" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor={chartColor} stopOpacity={0.3} />
@@ -403,12 +426,14 @@ export default function BtcPriceHistoryPage() {
               <XAxis
                 dataKey="date"
                 stroke={textColor}
-                style={{ fontSize: "0.8rem" }}
+                tick={{ fontSize: isMobile ? 9 : 12 }}
+                interval={isMobile ? "preserveStartEnd" : "preserveStartEnd"}
               />
               <YAxis
                 yAxisId="left"
                 stroke={textColor}
-                style={{ fontSize: "0.8rem" }}
+                tick={{ fontSize: isMobile ? 9 : 12 }}
+                width={isMobile ? 52 : 70}
                 tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
                 domain={["dataMin", "dataMax"]}
               />
@@ -509,8 +534,8 @@ export default function BtcPriceHistoryPage() {
       */}
       <Paper
         sx={{
-          p: 2,
-          mt: 3,
+          p: { xs: 1.5, sm: 2 },
+          mt: { xs: 2, md: 3 },
           borderRadius: 2,
           backgroundColor: isDark ? theme.palette.grey[800] : "#f5f5f5",
         }}
@@ -520,6 +545,6 @@ export default function BtcPriceHistoryPage() {
           prices in USDT
         </Typography>
       </Paper>
-    </Container>
+    </Box>
   );
 }
