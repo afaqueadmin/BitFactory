@@ -265,12 +265,16 @@ export async function verifyWebAuthnRegistration(
       credentialIDType: credentialData?.credentialID
         ? typeof credentialData.credentialID
         : "undefined",
-      credentialIDLength: credentialData?.credentialID?.length,
+      credentialIDLength: (
+        credentialData?.credentialID as string | Uint8Array | undefined
+      )?.length,
       hasCredentialPublicKey: !!credentialData?.credentialPublicKey,
       publicKeyType: credentialData?.credentialPublicKey
         ? typeof credentialData.credentialPublicKey
         : "undefined",
-      publicKeyLength: credentialData?.credentialPublicKey?.length,
+      publicKeyLength: (
+        credentialData?.credentialPublicKey as string | Uint8Array | undefined
+      )?.length,
       counter: credentialData?.counter,
     });
 
@@ -279,17 +283,19 @@ export async function verifyWebAuthnRegistration(
     }
 
     const normalizedCredentialID = toUint8Array(
-      credentialData.credentialID || credentialData.id,
+      (credentialData.credentialID ||
+        credentialData.id) as string | ArrayBuffer | Uint8Array,
     );
     const normalizedPublicKey = toUint8Array(
-      credentialData.credentialPublicKey || credentialData.publicKey,
+      (credentialData.credentialPublicKey ||
+        credentialData.publicKey) as string | ArrayBuffer | Uint8Array,
     );
 
     return {
       verified: true,
       credentialID: normalizedCredentialID,
       credentialPublicKey: normalizedPublicKey,
-      counter: credentialData.counter || 0,
+      counter: (credentialData.counter as number) || 0,
     };
   } catch (error) {
     console.error("Registration verification error details:", error);

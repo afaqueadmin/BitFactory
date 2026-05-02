@@ -90,6 +90,7 @@ export async function registerPasskey(credentialName?: string): Promise<{
 
     // Start registration ceremony - wrap options in optionsJSON property
     let attResp: unknown;
+    let attestResp: Record<string, unknown>;
     try {
       console.log("Starting WebAuthn registration ceremony", {
         timeout: options.timeout,
@@ -101,10 +102,14 @@ export async function registerPasskey(credentialName?: string): Promise<{
 
       attResp = await startRegistration({ optionsJSON: options });
 
-      const attestResp = attResp as Record<string, unknown>;
+      attestResp = attResp as Record<string, unknown>;
       console.log("WebAuthn registration ceremony completed successfully", {
-        hasAttestationObject: !!attestResp?.response?.attestationObject,
-        hasClientDataJSON: !!attestResp?.response?.clientDataJSON,
+        hasAttestationObject: !!(
+          (attestResp.response as Record<string, unknown>)?.attestationObject
+        ),
+        hasClientDataJSON: !!(
+          (attestResp.response as Record<string, unknown>)?.clientDataJSON
+        ),
       });
     } catch (error: unknown) {
       const errorDetails = getErrorDetails(error);
@@ -185,31 +190,22 @@ export async function registerPasskey(credentialName?: string): Promise<{
       },
       credentials: "include",
       body: JSON.stringify({
-        id: (attestResp as Record<string, unknown>).id,
-        rawId: (attestResp as Record<string, unknown>).rawId,
+        id: attestResp.id,
+        rawId: attestResp.rawId,
         response: {
           clientDataJSON: (
-            (attestResp as Record<string, unknown>).response as Record<
-              string,
-              unknown
-            >
+            attestResp.response as Record<string, unknown>
           ).clientDataJSON,
           attestationObject: (
-            (attestResp as Record<string, unknown>).response as Record<
-              string,
-              unknown
-            >
+            attestResp.response as Record<string, unknown>
           ).attestationObject,
         },
-        type: (attestResp as Record<string, unknown>).type,
+        type: attestResp.type,
         credentialName: credentialName || "My Passkey",
         transports:
-          (
-            (attestResp as Record<string, unknown>).response as Record<
-              string,
-              unknown
-            >
-          ).transports || [],
+          ((attestResp.response as Record<string, unknown>).transports as
+            | string[]
+            | undefined) || [],
       }),
     });
 
