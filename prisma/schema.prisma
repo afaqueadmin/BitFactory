@@ -55,6 +55,7 @@ model User {
   sessions                   UserSession[]
   paymentDetailsUpdates      PaymentDetails[]
   poolAuths                  PoolAuth[]
+  webauthnCredentials        WebAuthnCredential[]
   invoicedAmount             Decimal                      @default(4250) @db.Decimal(12, 2)
   createdRepairNotes         MinerRepairNote[]            @relation("CreatedRepairNotes")
 
@@ -72,6 +73,26 @@ model TokenBlacklist {
 
   @@index([token])
   @@map("token_blacklist")
+}
+
+model WebAuthnCredential {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  credentialId   Bytes    @unique
+  publicKey      Bytes
+  counter        Int      @default(0)
+  
+  transports     String[] @default([])
+  aaguid         String?
+  
+  credentialName String?
+  createdAt      DateTime @default(now())
+  lastUsedAt     DateTime?
+
+  @@index([userId])
+  @@map("webauthn_credentials")
 }
 
 model UserActivity {

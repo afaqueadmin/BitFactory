@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   Box,
@@ -13,11 +13,19 @@ import {
   IconButton,
   CircularProgress,
   Alert,
+  Tabs,
+  Tab,
+  Card,
+  CardContent,
 } from "@mui/material";
 import Visibility from "@mui/icons-material/Visibility";
 import VisibilityOff from "@mui/icons-material/VisibilityOff";
+import LockIcon from "@mui/icons-material/Lock";
+import FingerprintIcon from "@mui/icons-material/Fingerprint";
 import TwoFactorVerification from "@/components/TwoFactorVerification";
 import ForgotPasswordModal from "@/components/ForgotPasswordModal";
+import { authenticateWithPasskey } from "@/lib/webauthn/authentication";
+import { isWebAuthnSupported } from "@/lib/webauthn/utils";
 
 export default function Login() {
   const router = useRouter();
@@ -30,6 +38,17 @@ export default function Login() {
   const [error, setError] = useState("");
   const [showTwoFactor, setShowTwoFactor] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [activeTab, setActiveTab] = useState(0); // 0: Password, 1: Passkey
+  const [webAuthnSupported, setWebAuthnSupported] = useState(false);
+  const [passKeyEmail, setPassKeyEmail] = useState("");
+  const [passKeyLoading, setPassKeyLoading] = useState(false);
+
+  // Check WebAuthn support on component mount
+  useEffect(() => {
+    if (isWebAuthnSupported()) {
+      setWebAuthnSupported(true);
+    }
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -75,6 +94,39 @@ export default function Login() {
   const handleForgotPassword = () => {
     // Open forgot password modal
     setShowForgotPassword(true);
+  };
+
+  const handlePasskeyLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!passKeyEmail) {
+      setError("Please enter your email address");
+      return;
+    }
+    setPassKeyLoading(true);
+    setError("");
+
+    try {
+      const result = await authenticateWithPasskey(passKeyEmail);
+
+      if (result.success && result.redirectUrl) {
+        // Successful login
+        router.refresh();
+        router.replace(result.redirectUrl);
+      } else if (result.requiresMfa) {
+        // Need 2FA verification
+        setFormData({ ...formData, email: passKeyEmail });
+        setShowTwoFactor(true);
+      } else {
+        // Authentication failed
+        setError(result.error || "Passkey authentication failed");
+      }
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "An error occurred during passkey login"
+      );
+    } finally {
+      setPassKeyLoading(false);
+    }
   };
 
   const handleTwoFactorVerified = (redirectUrl: string) => {
@@ -139,8 +191,34 @@ export default function Login() {
             </Alert>
           )}
 
-          {/* Form */}
-          <Box component="form" onSubmit={handleSubmit} noValidate>
+          {/* Authentication Method Tabs */}
+          {webAuthnSupported && (
+            <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 3 }}>
+              <Tabs
+                value={activeTab}
+                onChange={(e, newValue) => {
+                  setActiveTab(newValue);
+                  setError("");
+                }}
+                variant="fullWidth"
+              >
+                <Tab
+                  label="Password"
+                  icon={<LockIcon />}
+                  iconPosition="start"
+                />
+                <Tab
+                  label="Passkey"
+                  icon={<FingerprintIcon />}
+                  iconPosition="start"
+                />
+              </Tabs>
+            </Box>
+          )}
+
+          {/* Password Authentication Form */}
+          {activeTab === 0 && (
+            <Box component="form" onSubmit={handleSubmit} noValidate>
             <TextField
               fullWidth
               required
@@ -226,6 +304,86 @@ export default function Login() {
               </Button>
             </Box>
           </Box>
+          )}
+
+          {/* Passkey Authentication Form */}
+          {activeTab === 1 && (
+            <Box component="form" onSubmit={handlePasskeyLogin} noValidate>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Use your registered passkey to log in securely.
+              </Typography>
+
+              <TextField
+                fullWidth
+                required
+                name="email"
+                label="Email Address"
+                type="email"
+                value={passKeyEmail}
+                onChange={(e) => setPassKeyEmail(e.target.value)}
+                margin="normal"
+                disabled={passKeyLoading}
+              />
+
+              <Button
+                type="submit"
+                fullWidth
+                variant="contained"
+                color="primary"
+                sx={{ mt: 3, mb: 1 }}
+                disabled={passKeyLoading || !passKeyEmail}
+                startIcon={
+                  passKeyLoading ? (
+                    <CircularProgress size={20} />
+                  ) : (
+                    <FingerprintIcon />
+                  )
+                }
+              >
+                {passKeyLoading ? "Authenticating..." : "Login with Passkey"}
+              </Button>
+
+              {/* Signup prompt for passkey tab */}
+              <Box
+                mt={2}
+                display="flex"
+                justifyContent="center"
+                alignItems="center"
+              >
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  component="span"
+                  sx={{ mr: 0 }}
+                >
+                  Don&apos;t have an account?
+                </Typography>
+                <Button
+                  component="a"
+                  href="https://www.bitfactory.ae"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  variant="text"
+                  size="medium"
+                  sx={{ textTransform: "none", ml: 0 }}
+                >
+                  Sign up
+                </Button>
+              </Box>
+            </Box>
+          )}
+
+          {/* Passkey unavailable notice */}
+          {!webAuthnSupported && (
+            <Card sx={{ mt: 2, bgcolor: "info.lighter" }}>
+              <CardContent>
+                <Typography variant="caption" color="info.main">
+                  ℹ️ Passkey authentication is not available in your browser.
+                  Please update your browser or use the password login method.
+                </Typography>
+              </CardContent>
+            </Card>
+          )}
 
           {/*
                     Test User Info (commented out to hide credentials)

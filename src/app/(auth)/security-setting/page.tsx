@@ -11,6 +11,7 @@ import {
 } from "@mui/material";
 import ChangePasswordModal from "@/components/ChangePasswordModal";
 import TwoFactorSettings from "@/components/TwoFactorSettings";
+import PasskeySettings from "@/components/PasskeySettings";
 
 interface UserData {
   id?: string;
@@ -184,6 +185,11 @@ export default function SecuritySettingsPage() {
       {/* Two Factor Authentication Section */}
       <Box sx={{ mt: 4 }}>
         <TwoFactorSettings twoFactorEnabled={userData.twoFactorEnabled} />
+      </Box>
+
+      {/* Passkey Settings Section */}
+      <Box sx={{ mt: 4 }}>
+        <PasskeySettings userId={userData.id} />
       </Box>
 
       {/* Change Password Modal */}
