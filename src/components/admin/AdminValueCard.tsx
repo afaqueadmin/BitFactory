@@ -34,7 +34,7 @@ export default function AdminValueCard({
             : "linear-gradient(145deg, rgba(255,255,255,0.9), rgba(250,250,250,0.9))",
         backdropFilter: "blur(10px)",
         border: (theme) => `1px solid ${theme.palette.divider}`,
-        borderLeft: borderColor ? `4px solid ${borderColor}` : "none",
+        borderLeft: borderColor ? `6px solid ${borderColor}` : "none",
         boxShadow: "0 8px 32px rgba(0, 0, 0, 0.08)",
         borderRadius: 2,
         transition: "transform 0.2s, box-shadow 0.2s",

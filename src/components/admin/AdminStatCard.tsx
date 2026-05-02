@@ -50,7 +50,7 @@ export default function AdminStatCard({
         boxShadow: "0px 2px 8px rgba(0, 0, 0, 0.08)",
         border: "1px solid",
         borderColor: (theme) => theme.palette.divider,
-        borderLeft: borderColor ? `4px solid ${borderColor}` : "none",
+        borderLeft: borderColor ? `6px solid ${borderColor}` : "none",
         height: "100%",
         minHeight: 200,
         backgroundColor: theme.palette.mode === "dark" ? "#1e1e1e" : "#ffffff",

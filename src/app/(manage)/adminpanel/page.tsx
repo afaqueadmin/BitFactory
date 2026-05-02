@@ -309,10 +309,11 @@ export default function AdminDashboard() {
           </Alert>
         )}
 
-        {/* Pool Mode Toggle Buttons */}
+        {/* Pool Mode Toggle Buttons + Color Legend */}
         <Box
           sx={{
             display: "flex",
+            alignItems: "center",
             gap: 2,
             mb: 4,
             flexWrap: "wrap",
@@ -383,6 +384,47 @@ export default function AdminDashboard() {
           >
             🟧 Braiins
           </button>
+
+          {/* Divider */}
+          <Box
+            sx={{
+              width: "1px",
+              height: 28,
+              backgroundColor: theme.palette.divider,
+              mx: 1,
+            }}
+          />
+
+          {/* Color Legend */}
+          {[
+            { color: "#757575", label: "DB value" },
+            { color: "#9C27B0", label: "Luxor + Braiins combined" },
+            { color: "#1565C0", label: "Luxor only" },
+            { color: "#FFA500", label: "Braiins only" },
+          ].map(({ color, label }) => (
+            <Box
+              key={color}
+              sx={{ display: "flex", alignItems: "center", gap: 0.75 }}
+            >
+              <Box
+                sx={{
+                  width: 12,
+                  height: 12,
+                  borderRadius: "2px",
+                  backgroundColor: color,
+                  flexShrink: 0,
+                }}
+              />
+              <span
+                style={{
+                  fontSize: "0.75rem",
+                  color: theme.palette.text.secondary,
+                }}
+              >
+                {label}
+              </span>
+            </Box>
+          ))}
         </Box>
 
         <Box
