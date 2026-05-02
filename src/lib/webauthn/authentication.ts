@@ -5,6 +5,24 @@ import {
 import type { PublicKeyCredentialRequestOptionsJSON } from "@simplewebauthn/types";
 
 /**
+ * Type guard and error extractor for unknown caught errors
+ */
+function getErrorDetails(error: unknown): { name: string; message: string } {
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+    };
+  }
+
+  const errorObj = error as Record<string, unknown>;
+  return {
+    name: String(errorObj?.name ?? "Unknown"),
+    message: String(errorObj?.message ?? String(error)),
+  };
+}
+
+/**
  * Client-side WebAuthn authentication (passkey login)
  * Called from login page
  */
@@ -24,7 +42,7 @@ export async function authenticateWithPasskey(email: string): Promise<{
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ email }),
-      }
+      },
     );
 
     if (!optionsResponse.ok) {
@@ -34,39 +52,44 @@ export async function authenticateWithPasskey(email: string): Promise<{
       };
     }
 
-    const options: PublicKeyCredentialRequestOptionsJSON = await optionsResponse.json();
+    const options: PublicKeyCredentialRequestOptionsJSON =
+      await optionsResponse.json();
 
     // Start authentication ceremony - wrap options in optionsJSON property
     let assertionResponse: unknown;
     try {
       assertionResponse = await startAuthentication({ optionsJSON: options });
     } catch (error: unknown) {
-      const errorMsg = (error as any)?.message || "Authentication ceremony failed";
-      
+      const errorDetails = getErrorDetails(error);
+      const errorMsg = errorDetails.message || "Authentication ceremony failed";
+
       // Specific handling for NotAllowedError (mobile timeout/user gesture issues)
-      if ((error as any)?.name === "NotAllowedError") {
+      if (errorDetails.name === "NotAllowedError") {
         console.error("WebAuthn authentication NotAllowedError:", error);
         return {
           success: false,
           error: `Authentication timed out or was not allowed. Please try again. ${errorMsg}`,
         };
       }
-      
+
       // Specific handling for user cancellation
-      if ((error as any)?.name === "AbortError") {
+      if (errorDetails.name === "AbortError") {
         console.error("WebAuthn authentication was cancelled");
         return {
           success: false,
           error: "Authentication was cancelled. Please try again.",
         };
       }
-      
+
       console.error("WebAuthn authentication ceremony error:", error);
       return {
         success: false,
         error: errorMsg || "Authentication ceremony failed",
       };
     }
+
+    // Type assertion for assertionResponse from WebAuthn API
+    const assertion = assertionResponse as Record<string, unknown>;
 
     // Verify assertion on server
     const verifyResponse = await fetch(
@@ -79,18 +102,18 @@ export async function authenticateWithPasskey(email: string): Promise<{
         body: JSON.stringify({
           email,
           assertion: {
-            id: assertionResponse.id,
-            rawId: assertionResponse.rawId,
+            id: assertion.id,
+            rawId: assertion.rawId,
             response: {
-              clientDataJSON: assertionResponse.response.clientDataJSON,
-              authenticatorData: assertionResponse.response.authenticatorData,
-              signature: assertionResponse.response.signature,
-              userHandle: assertionResponse.response.userHandle,
+              clientDataJSON: assertion.response.clientDataJSON,
+              authenticatorData: assertion.response.authenticatorData,
+              signature: assertion.response.signature,
+              userHandle: assertion.response.userHandle,
             },
-            type: assertionResponse.type,
+            type: assertion.type,
           },
         }),
-      }
+      },
     );
 
     if (!verifyResponse.ok) {
@@ -138,9 +161,7 @@ export async function supportsWebAuthnAutofill(): Promise<boolean> {
 /**
  * Helper to decode authenticator data for debugging
  */
-export function decodeAuthenticatorData(
-  authenticatorData: ArrayBuffer
-): {
+export function decodeAuthenticatorData(authenticatorData: ArrayBuffer): {
   rpIdHash: string;
   userPresent: boolean;
   userVerified: boolean;

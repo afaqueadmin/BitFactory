@@ -38,11 +38,7 @@ interface Credential {
   aaguid?: string;
 }
 
-interface PasskeySettingsProps {
-  // Component for managing WebAuthn passkeys
-}
-
-export default function PasskeySettings(): JSX.Element {
+export default function PasskeySettings(): React.ReactNode {
   const [credentials, setCredentials] = useState<Credential[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -53,7 +49,8 @@ export default function PasskeySettings(): JSX.Element {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [selectedCredential, setSelectedCredential] = useState<Credential | null>(null);
+  const [selectedCredential, setSelectedCredential] =
+    useState<Credential | null>(null);
   const [newCredentialName, setNewCredentialName] = useState("");
   const [registering, setRegistering] = useState(false);
   const [renaming, setRenaming] = useState(false);
@@ -76,9 +73,7 @@ export default function PasskeySettings(): JSX.Element {
         setError(result.error || "Failed to load passkeys");
       }
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to load passkeys"
-      );
+      setError(err instanceof Error ? err.message : "Failed to load passkeys");
     } finally {
       setLoading(false);
     }
@@ -108,7 +103,9 @@ export default function PasskeySettings(): JSX.Element {
       }
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "An error occurred during registration"
+        err instanceof Error
+          ? err.message
+          : "An error occurred during registration",
       );
     } finally {
       setRegistering(false);
@@ -146,7 +143,7 @@ export default function PasskeySettings(): JSX.Element {
       await loadCredentials();
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to rename credential"
+        err instanceof Error ? err.message : "Failed to rename credential",
       );
     } finally {
       setRenaming(false);
@@ -162,7 +159,7 @@ export default function PasskeySettings(): JSX.Element {
     try {
       const response = await fetch(
         `/api/auth/webauthn/credentials?id=${selectedCredential.id}`,
-        { method: "DELETE" }
+        { method: "DELETE" },
       );
 
       if (!response.ok) {
@@ -176,7 +173,7 @@ export default function PasskeySettings(): JSX.Element {
       await loadCredentials();
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to delete credential"
+        err instanceof Error ? err.message : "Failed to delete credential",
       );
     } finally {
       setDeleting(false);
@@ -218,8 +215,8 @@ export default function PasskeySettings(): JSX.Element {
           </Typography>
         </Box>
         <Alert severity="info">
-          Passkey login is not supported in your browser. Please use the
-          latest version of Chrome, Firefox, Safari, or Edge.
+          Passkey login is not supported in your browser. Please use the latest
+          version of Chrome, Firefox, Safari, or Edge.
         </Alert>
       </Paper>
     );
@@ -240,7 +237,14 @@ export default function PasskeySettings(): JSX.Element {
         border: (theme) => `1px solid ${theme.palette.divider}`,
       }}
     >
-      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 3 }}>
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          mb: 3,
+        }}
+      >
         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
           <FingerprintIcon />
           <Typography variant="h6" fontWeight="medium">
@@ -261,7 +265,8 @@ export default function PasskeySettings(): JSX.Element {
       </Box>
 
       <Typography variant="body2" color="textSecondary" sx={{ mb: 3 }}>
-        Manage your passkeys for secure, passwordless login using biometrics or security keys.
+        Manage your passkeys for secure, passwordless login using biometrics or
+        security keys.
       </Typography>
 
       {error && (
@@ -341,7 +346,12 @@ export default function PasskeySettings(): JSX.Element {
       )}
 
       {/* Add Passkey Dialog */}
-      <Dialog open={addDialogOpen} onClose={() => setAddDialogOpen(false)} maxWidth="sm" fullWidth>
+      <Dialog
+        open={addDialogOpen}
+        onClose={() => setAddDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
         <DialogTitle>Add New Passkey</DialogTitle>
         <DialogContent>
           <Box sx={{ pt: 2 }}>
@@ -363,7 +373,10 @@ export default function PasskeySettings(): JSX.Element {
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setAddDialogOpen(false)} disabled={registering}>
+          <Button
+            onClick={() => setAddDialogOpen(false)}
+            disabled={registering}
+          >
             Cancel
           </Button>
           <Button
@@ -377,7 +390,12 @@ export default function PasskeySettings(): JSX.Element {
       </Dialog>
 
       {/* Rename Passkey Dialog */}
-      <Dialog open={editDialogOpen} onClose={() => setEditDialogOpen(false)} maxWidth="sm" fullWidth>
+      <Dialog
+        open={editDialogOpen}
+        onClose={() => setEditDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
         <DialogTitle>Rename Passkey</DialogTitle>
         <DialogContent>
           <Box sx={{ pt: 2 }}>
@@ -406,15 +424,23 @@ export default function PasskeySettings(): JSX.Element {
       </Dialog>
 
       {/* Delete Passkey Dialog */}
-      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+      >
         <DialogTitle>Delete Passkey</DialogTitle>
         <DialogContent>
           <Typography>
-            Are you sure you want to delete &quot;{selectedCredential?.credentialName}&quot;? This action cannot be undone.
+            Are you sure you want to delete &quot;
+            {selectedCredential?.credentialName}&quot;? This action cannot be
+            undone.
           </Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDeleteDialogOpen(false)} disabled={deleting}>
+          <Button
+            onClick={() => setDeleteDialogOpen(false)}
+            disabled={deleting}
+          >
             Cancel
           </Button>
           <Button

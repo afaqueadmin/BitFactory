@@ -189,7 +189,7 @@ export default function SecuritySettingsPage() {
 
       {/* Passkey Settings Section */}
       <Box sx={{ mt: 4 }}>
-        <PasskeySettings userId={userData.id} />
+        <PasskeySettings />
       </Box>
 
       {/* Change Password Modal */}

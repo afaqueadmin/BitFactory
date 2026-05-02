@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
 import { verifyWebAuthnRegistration } from "@/lib/webauthn/server";
 import { WebAuthnAttestationResponse } from "@/types/webauthn";
+import type { RegistrationResponseJSON } from "@simplewebauthn/types";
 
 export const runtime = "nodejs";
 
@@ -24,7 +25,10 @@ export async function POST(request: NextRequest) {
       const decoded = await verifyJwtToken(token);
       userId = decoded.userId;
     } catch (tokenError) {
-      console.error("WebAuthn register verify: Token verification failed", tokenError);
+      console.error(
+        "WebAuthn register verify: Token verification failed",
+        tokenError,
+      );
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
 
@@ -42,10 +46,12 @@ export async function POST(request: NextRequest) {
     });
 
     if (!response || !response.id) {
-      console.warn("WebAuthn register verify: Invalid attestation response", { body });
+      console.warn("WebAuthn register verify: Invalid attestation response", {
+        body,
+      });
       return NextResponse.json(
         { error: "Invalid attestation response" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -57,36 +63,48 @@ export async function POST(request: NextRequest) {
 
     if (!user) {
       console.error("WebAuthn register verify: User not found", { userId });
-      return NextResponse.json(
-        { error: "User not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    const expectedChallenge = request.cookies.get("webauthn_reg_challenge")?.value;
+    const expectedChallenge = request.cookies.get(
+      "webauthn_reg_challenge",
+    )?.value;
 
     if (!expectedChallenge) {
-      console.warn("WebAuthn register verify: No registration challenge cookie", { userId });
+      console.warn(
+        "WebAuthn register verify: No registration challenge cookie",
+        { userId },
+      );
       return NextResponse.json(
         { error: "Challenge not found or expired" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     // Verify the attestation
     let verified;
     try {
-      console.log("WebAuthn register verify: Starting verification", { userId, credentialId: response.id });
-      verified = await verifyWebAuthnRegistration(user, response as WebAuthnAttestationResponse, expectedChallenge);
-      console.log("WebAuthn register verify: Verification successful", { 
+      console.log("WebAuthn register verify: Starting verification", {
+        userId,
+        credentialId: response.id,
+      });
+      verified = await verifyWebAuthnRegistration(
+        user,
+        response as RegistrationResponseJSON,
+        expectedChallenge,
+      );
+      console.log("WebAuthn register verify: Verification successful", {
         credentialIDLength: verified.credentialID?.length,
         counter: verified.counter,
       });
     } catch (error: unknown) {
-      console.error("WebAuthn register verify: Verification failed", { error: error.message });
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.error("WebAuthn register verify: Verification failed", {
+        error: errorMsg,
+      });
       const errorResponse = NextResponse.json(
-        { error: errorMessage || "Attestation verification failed" },
-        { status: 400 }
+        { error: errorMsg || "Attestation verification failed" },
+        { status: 400 },
       );
       errorResponse.cookies.set("webauthn_reg_challenge", "", {
         httpOnly: true,
@@ -123,7 +141,7 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      console.log("WebAuthn register verify: Credential stored successfully", { 
+      console.log("WebAuthn register verify: Credential stored successfully", {
         credentialId: credential.id,
         storedCredentialIdLength: credential.credentialId.length,
       });
@@ -146,7 +164,7 @@ export async function POST(request: NextRequest) {
           credentialId: credential.id,
           credentialName: credential.credentialName,
         },
-        { status: 201 }
+        { status: 201 },
       );
       successResponse.cookies.set("webauthn_reg_challenge", "", {
         httpOnly: true,
@@ -157,15 +175,14 @@ export async function POST(request: NextRequest) {
       });
       return successResponse;
     } catch (dbError: unknown) {
-      const errorMsg = dbError instanceof Error ? dbError.message : 'Unknown database error';
-      console.error("WebAuthn register verify: Database error", { 
+      const errorMsg =
+        dbError instanceof Error ? dbError.message : "Unknown database error";
+      console.error("WebAuthn register verify: Database error", {
         message: errorMsg,
-        code: dbError.code,
-        meta: dbError.meta,
       });
       const errorResponse = NextResponse.json(
-        { error: "Failed to store credential: " + dbError.message },
-        { status: 500 }
+        { error: "Failed to store credential: " + errorMsg },
+        { status: 500 },
       );
       errorResponse.cookies.set("webauthn_reg_challenge", "", {
         httpOnly: true,
@@ -179,8 +196,11 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("WebAuthn registration verification error:", error);
     return NextResponse.json(
-      { error: "Registration verification failed", details: error instanceof Error ? error.message : "Unknown error" },
-      { status: 500 }
+      {
+        error: "Registration verification failed",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 },
     );
   }
 }

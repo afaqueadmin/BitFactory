@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { verifyWebAuthnAuthentication } from "@/lib/webauthn/server";
 import { WebAuthnAssertionResponse } from "@/types/webauthn";
 import { generateTokens } from "@/lib/jwt";
+import type { AuthenticationResponseJSON } from "@simplewebauthn/types";
 
 export const runtime = "nodejs";
 
@@ -18,7 +19,7 @@ export async function POST(request: NextRequest) {
       console.warn("WebAuthn authenticate verify: Missing email or assertion");
       return NextResponse.json(
         { error: "Email and assertion required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -28,7 +29,7 @@ export async function POST(request: NextRequest) {
       console.warn("WebAuthn authenticate verify: Invalid assertion response");
       return NextResponse.json(
         { error: "Invalid assertion response" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -48,51 +49,60 @@ export async function POST(request: NextRequest) {
 
     if (!user) {
       console.warn("WebAuthn authenticate verify: User not found", { email });
-      return NextResponse.json(
-        { error: "User not found" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "User not found" }, { status: 401 });
     }
 
     // Check if user has any credentials
     if (!user.webauthnCredentials || user.webauthnCredentials.length === 0) {
-      console.warn("WebAuthn authenticate verify: User has no credentials", { userId: user.id });
+      console.warn("WebAuthn authenticate verify: User has no credentials", {
+        userId: user.id,
+      });
       return NextResponse.json(
         { error: "User has no passkeys registered" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
-    const expectedChallenge = request.cookies.get("webauthn_auth_challenge")?.value;
+    const expectedChallenge = request.cookies.get(
+      "webauthn_auth_challenge",
+    )?.value;
 
     if (!expectedChallenge) {
-      console.warn("WebAuthn authenticate verify: No authentication challenge cookie", { userId: user.id });
+      console.warn(
+        "WebAuthn authenticate verify: No authentication challenge cookie",
+        { userId: user.id },
+      );
       return NextResponse.json(
         { error: "Challenge not found or expired" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     // Verify the assertion
     let verified;
     try {
-      console.log("WebAuthn authenticate verify: Starting verification", { 
-        userId: user.id, 
+      console.log("WebAuthn authenticate verify: Starting verification", {
+        userId: user.id,
         credentialId: response.id,
       });
-      verified = await verifyWebAuthnAuthentication(user.id, response as WebAuthnAssertionResponse, expectedChallenge);
-      console.log("WebAuthn authenticate verify: Verification successful", { 
+      verified = await verifyWebAuthnAuthentication(
+        user.id,
+        response as AuthenticationResponseJSON,
+        expectedChallenge,
+      );
+      console.log("WebAuthn authenticate verify: Verification successful", {
         userId: user.id,
         credentialId: verified.credentialID,
       });
     } catch (error: unknown) {
-      console.error("WebAuthn authenticate verify: Verification failed", { 
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.error("WebAuthn authenticate verify: Verification failed", {
         userId: user.id,
-        error: error.message 
+        error: errorMsg,
       });
       const errorResponse = NextResponse.json(
-        { error: errorMessage || "Assertion verification failed" },
-        { status: 401 }
+        { error: errorMsg || "Assertion verification failed" },
+        { status: 401 },
       );
       errorResponse.cookies.set("webauthn_auth_challenge", "", {
         httpOnly: true,
@@ -105,10 +115,13 @@ export async function POST(request: NextRequest) {
     }
 
     if (!verified.verified) {
-      console.error("WebAuthn authenticate verify: Verification returned false", { userId: user.id });
+      console.error(
+        "WebAuthn authenticate verify: Verification returned false",
+        { userId: user.id },
+      );
       return NextResponse.json(
         { error: "Assertion verification failed" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -138,12 +151,15 @@ export async function POST(request: NextRequest) {
           requiresMfa: true,
           message: "Please enter your 2FA code",
         },
-        { status: 200 }
+        { status: 200 },
       );
     }
 
     // Generate tokens
-    const { accessToken, refreshToken } = await generateTokens(user.id, user.role);
+    const { accessToken, refreshToken } = await generateTokens(
+      user.id,
+      user.role,
+    );
 
     // Create session
     const userSession = await prisma.userSession.create({
@@ -170,7 +186,7 @@ export async function POST(request: NextRequest) {
         },
         redirectUrl,
       },
-      { status: 200 }
+      { status: 200 },
     );
 
     // Set secure, httpOnly cookies
@@ -211,7 +227,7 @@ export async function POST(request: NextRequest) {
     console.error("WebAuthn authentication verification error:", error);
     return NextResponse.json(
       { error: "Authentication verification failed" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

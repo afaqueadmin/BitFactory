@@ -9,6 +9,32 @@ import {
 } from "@/lib/webauthn/utils";
 
 /**
+ * Type guard and error extractor for unknown caught errors
+ */
+function getErrorDetails(error: unknown): {
+  name: string;
+  message: string;
+  code?: string;
+  stack?: string;
+} {
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+    };
+  }
+
+  const errorObj = error as Record<string, unknown>;
+  return {
+    name: String(errorObj?.name ?? "Unknown"),
+    message: String(errorObj?.message ?? String(error)),
+    code: String(errorObj?.code ?? ""),
+    stack: String(errorObj?.stack ?? ""),
+  };
+}
+
+/**
  * Client-side WebAuthn registration (passkey setup)
  * Called from security settings page
  */
@@ -27,7 +53,8 @@ export async function registerPasskey(credentialName?: string): Promise<{
 
     const platformAuthenticatorAvailable =
       await isPlatformAuthenticatorAvailable();
-    const browserInfo = typeof navigator === "undefined" ? "unknown" : navigator.userAgent;
+    const browserInfo =
+      typeof navigator === "undefined" ? "unknown" : navigator.userAgent;
 
     console.log("WebAuthn registration environment", {
       platformAuthenticatorAvailable,
@@ -52,9 +79,10 @@ export async function registerPasskey(credentialName?: string): Promise<{
       };
     }
 
-    const options: PublicKeyCredentialCreationOptionsJSON = await optionsResponse.json();
-    
-    console.log("Registration options received", { 
+    const options: PublicKeyCredentialCreationOptionsJSON =
+      await optionsResponse.json();
+
+    console.log("Registration options received", {
       rpId: options.rp?.id,
       userId: options.user?.id,
       challenge: options.challenge.substring(0, 20) + "...",
@@ -70,26 +98,28 @@ export async function registerPasskey(credentialName?: string): Promise<{
         authenticatorSelection: options.authenticatorSelection,
         platformAuthenticatorAvailable,
       });
-      
+
       attResp = await startRegistration({ optionsJSON: options });
-      
+
+      const attestResp = attResp as Record<string, unknown>;
       console.log("WebAuthn registration ceremony completed successfully", {
-        hasAttestationObject: !!(attResp as any)?.response?.attestationObject,
-        hasClientDataJSON: !!(attResp as any)?.response?.clientDataJSON,
+        hasAttestationObject: !!attestResp?.response?.attestationObject,
+        hasClientDataJSON: !!attestResp?.response?.clientDataJSON,
       });
     } catch (error: unknown) {
-      const errorMsg = (error as any)?.message || "Registration ceremony failed";
-      
+      const errorDetails = getErrorDetails(error);
+      const errorMsg = errorDetails.message || "Registration ceremony failed";
+
       console.error("WebAuthn registration ceremony detailed error:", {
-        errorName: (error as any)?.name,
-        errorCode: (error as any)?.code,
-        errorMessage: (error as any)?.message,
-        errorStack: (error as any)?.stack,
+        errorName: errorDetails.name,
+        errorCode: errorDetails.code,
+        errorMessage: errorDetails.message,
+        errorStack: errorDetails.stack,
         timestamp: new Date().toISOString(),
       });
-      
+
       // Specific handling for NotAllowedError (mobile timeout/user gesture issues)
-      if ((error as any)?.name === "NotAllowedError") {
+      if (errorDetails.name === "NotAllowedError") {
         console.error("WebAuthn NotAllowedError Details:", {
           possibleCauses: [
             "User canceled the biometric prompt",
@@ -98,33 +128,35 @@ export async function registerPasskey(credentialName?: string): Promise<{
             "Authenticator doesn't support the requested options",
             "Browser lost focus during authentication",
           ],
-          message: error.message,
+          message: errorMsg,
         });
         return {
           success: false,
           error: `Registration canceled or timeout: ${errorMsg}. Please ensure:\n• Your device is unlocked\n• You complete the biometric prompt promptly\n• The app stays in focus during authentication`,
         };
       }
-      
+
       // Specific handling for other security errors
-      if ((error as any)?.name === "SecurityError") {
+      if (errorDetails.name === "SecurityError") {
         console.error("WebAuthn SecurityError:", error);
         return {
           success: false,
-          error: "Security error: Make sure you're accessing from a secure context (HTTPS) or localhost.",
-        };
-      }
-      
-      // Specific handling for unsupported authenticator
-      if ((error as any)?.name === "NotSupportedError") {
-        console.error("WebAuthn NotSupportedError:", error);
-        return {
-          success: false,
-          error: "Your authenticator doesn't support this operation. Your device may not have biometric authentication configured.",
+          error:
+            "Security error: Make sure you're accessing from a secure context (HTTPS) or localhost.",
         };
       }
 
-      if ((error as any)?.name === "UnknownError") {
+      // Specific handling for unsupported authenticator
+      if (errorDetails.name === "NotSupportedError") {
+        console.error("WebAuthn NotSupportedError:", error);
+        return {
+          success: false,
+          error:
+            "Your authenticator doesn't support this operation. Your device may not have biometric authentication configured.",
+        };
+      }
+
+      if (errorDetails.name === "UnknownError") {
         const isFirefox = /firefox/i.test(browserInfo);
         const platformHint = !platformAuthenticatorAvailable
           ? " No platform authenticator is available in this browser profile or OS setup."
@@ -137,7 +169,7 @@ export async function registerPasskey(credentialName?: string): Promise<{
             : `The authenticator could not create a new credential.${platformHint} Check that a biometric or security-key authenticator is configured for this browser.`,
         };
       }
-      
+
       console.error("WebAuthn registration ceremony error:", error);
       return {
         success: false,
@@ -153,15 +185,31 @@ export async function registerPasskey(credentialName?: string): Promise<{
       },
       credentials: "include",
       body: JSON.stringify({
-        id: (attResp as any).id,
-        rawId: (attResp as any).rawId,
+        id: (attestResp as Record<string, unknown>).id,
+        rawId: (attestResp as Record<string, unknown>).rawId,
         response: {
-          clientDataJSON: (attResp as any).response.clientDataJSON,
-          attestationObject: (attResp as any).response.attestationObject,
+          clientDataJSON: (
+            (attestResp as Record<string, unknown>).response as Record<
+              string,
+              unknown
+            >
+          ).clientDataJSON,
+          attestationObject: (
+            (attestResp as Record<string, unknown>).response as Record<
+              string,
+              unknown
+            >
+          ).attestationObject,
         },
-        type: (attResp as any).type,
+        type: (attestResp as Record<string, unknown>).type,
         credentialName: credentialName || "My Passkey",
-        transports: (attResp as any).response.transports || [],
+        transports:
+          (
+            (attestResp as Record<string, unknown>).response as Record<
+              string,
+              unknown
+            >
+          ).transports || [],
       }),
     });
 
@@ -172,14 +220,14 @@ export async function registerPasskey(credentialName?: string): Promise<{
     });
 
     if (!verifyResponse.ok) {
-      let errorData: any = {};
+      let errorData: Record<string, unknown> = {};
       try {
         errorData = await verifyResponse.json();
         console.error("Registration verification failed response:", {
           status: verifyResponse.status,
           body: errorData,
         });
-      } catch (_parseError: unknown) {
+      } catch {
         const text = await verifyResponse.text();
         console.error("Registration verification failed (non-JSON response):", {
           status: verifyResponse.status,
@@ -191,10 +239,10 @@ export async function registerPasskey(credentialName?: string): Promise<{
         };
       }
 
-      const errorMessage = 
-        (errorData as any)?.error || 
-        (errorData as any)?.message || 
-        (errorData as any)?.details ||
+      const errorMessage =
+        (errorData.error as string) ||
+        (errorData.message as string) ||
+        (errorData.details as string) ||
         `Server error (${verifyResponse.status})`;
 
       return {
@@ -203,11 +251,13 @@ export async function registerPasskey(credentialName?: string): Promise<{
       };
     }
 
-    const verified = await verifyResponse.json();
-    console.log("Passkey registered successfully", { credentialId: (verified as any).credentialId });
+    const verified = (await verifyResponse.json()) as Record<string, unknown>;
+    console.log("Passkey registered successfully", {
+      credentialId: verified.credentialId,
+    });
     return {
       success: true,
-      credentialId: (verified as any).credentialId,
+      credentialId: verified.credentialId as string,
     };
   } catch (error: unknown) {
     console.error("Passkey registration error:", error);
@@ -242,7 +292,7 @@ export async function deletePasskey(credentialId: string): Promise<{
       `/api/auth/webauthn/credentials?id=${credentialId}`,
       {
         method: "DELETE",
-      }
+      },
     );
 
     if (!response.ok) {
@@ -255,10 +305,10 @@ export async function deletePasskey(credentialId: string): Promise<{
 
     return {
       success: true,
-      credential: response.data,
     };
   } catch (error: unknown) {
-    const errorMsg = error instanceof Error ? error.message : "Failed to delete passkey";
+    const errorMsg =
+      error instanceof Error ? error.message : "Failed to delete passkey";
     return {
       success: false,
       error: errorMsg,
@@ -271,7 +321,7 @@ export async function deletePasskey(credentialId: string): Promise<{
  */
 export async function renamePasskey(
   credentialId: string,
-  newName: string
+  newName: string,
 ): Promise<{
   success: boolean;
   error?: string;
@@ -295,13 +345,15 @@ export async function renamePasskey(
         error: error.error || "Failed to rename passkey",
       };
     }
-unknown) {
+
+    return {
+      success: true,
+    };
+  } catch (error: unknown) {
     const errorMsg = error instanceof Error ? error.message : String(error);
     return {
       success: false,
-      error: errorMsg
-      success: false,
-      error: error.message || "Failed to rename passkey",
+      error: errorMsg,
     };
   }
 }
@@ -332,16 +384,16 @@ export async function getPasskeys(): Promise<{
       };
     }
 
-    const data = aw(data as any).credentials,
+    const data = await response.json();
+    return {
+      success: true,
+      credentials: data.credentials,
     };
   } catch (error: unknown) {
     const errorMsg = error instanceof Error ? error.message : String(error);
     return {
       success: false,
-      error: errorMsg
-    return {
-      success: false,
-      error: error.message || "Failed to get passkeys",
+      error: errorMsg,
     };
   }
 }
