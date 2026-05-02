@@ -7,6 +7,16 @@ import type { RegistrationResponseJSON } from "@simplewebauthn/types";
 
 export const runtime = "nodejs";
 
+function getWebAuthnConfig(request: NextRequest): {
+  origin: string;
+  rpId: string;
+} {
+  return {
+    origin: request.nextUrl.origin,
+    rpId: request.nextUrl.hostname,
+  };
+}
+
 /**
  * POST /api/auth/webauthn/register/verify
  * Verify attestation response and store credential
@@ -92,6 +102,7 @@ export async function POST(request: NextRequest) {
         user,
         response as RegistrationResponseJSON,
         expectedChallenge,
+        getWebAuthnConfig(request),
       );
       console.log("WebAuthn register verify: Verification successful", {
         credentialIDLength: verified.credentialID?.length,

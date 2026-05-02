@@ -156,7 +156,11 @@ export function storeChallenge(userId: string, challenge: string): void {
  * Get expected origin for WebAuthn verification
  */
 function getExpectedOrigin(): string {
-  const url = process.env.NEXTAUTH_URL || "http://localhost:3000";
+  const url =
+    process.env.NEXTAUTH_URL ||
+    (process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : "http://localhost:3000");
   return new URL(url).origin;
 }
 
@@ -164,18 +168,31 @@ function getExpectedOrigin(): string {
  * Get RP ID for WebAuthn
  */
 function getWebAuthnRpId(): string {
-  return process.env.WEBAUTHN_RP_ID || "localhost";
+  if (process.env.WEBAUTHN_RP_ID) {
+    return process.env.WEBAUTHN_RP_ID;
+  }
+
+  const origin = getExpectedOrigin();
+  return new URL(origin).hostname;
 }
+
+type WebAuthnRuntimeConfig = {
+  origin?: string;
+  rpId?: string;
+};
 
 /**
  * Generate registration options for passkey setup
  */
-export async function generateWebAuthnRegistrationOptions(user: {
-  id: string;
-  email: string;
-}): Promise<PublicKeyCredentialCreationOptionsJSON> {
-  const rpId = getWebAuthnRpId();
-  const origin = getExpectedOrigin();
+export async function generateWebAuthnRegistrationOptions(
+  user: {
+    id: string;
+    email: string;
+  },
+  config: WebAuthnRuntimeConfig = {},
+): Promise<PublicKeyCredentialCreationOptionsJSON> {
+  const rpId = config.rpId || getWebAuthnRpId();
+  const origin = config.origin || getExpectedOrigin();
 
   console.log("Generating registration options", {
     userId: user.id,
@@ -219,6 +236,7 @@ export async function verifyWebAuthnRegistration(
   user: { id: string; email: string },
   credential: RegistrationResponseJSON,
   expectedChallenge?: string,
+  config: WebAuthnRuntimeConfig = {},
 ): Promise<{
   verified: boolean;
   credentialID: Uint8Array;
@@ -234,8 +252,8 @@ export async function verifyWebAuthnRegistration(
     const verified = await verifyRegistrationResponse({
       response: credential,
       expectedChallenge: challenge,
-      expectedRPID: getWebAuthnRpId(),
-      expectedOrigin: getExpectedOrigin(),
+      expectedRPID: config.rpId || getWebAuthnRpId(),
+      expectedOrigin: config.origin || getExpectedOrigin(),
       requireUserVerification: false,
       supportedAlgorithmIDs: [-7, -257],
     });
@@ -283,12 +301,16 @@ export async function verifyWebAuthnRegistration(
     }
 
     const normalizedCredentialID = toUint8Array(
-      (credentialData.credentialID ||
-        credentialData.id) as string | ArrayBuffer | Uint8Array,
+      (credentialData.credentialID || credentialData.id) as
+        | string
+        | ArrayBuffer
+        | Uint8Array,
     );
     const normalizedPublicKey = toUint8Array(
-      (credentialData.credentialPublicKey ||
-        credentialData.publicKey) as string | ArrayBuffer | Uint8Array,
+      (credentialData.credentialPublicKey || credentialData.publicKey) as
+        | string
+        | ArrayBuffer
+        | Uint8Array,
     );
 
     return {
@@ -310,6 +332,7 @@ export async function verifyWebAuthnRegistration(
  */
 export async function generateWebAuthnAuthenticationOptions(
   email: string,
+  config: WebAuthnRuntimeConfig = {},
 ): Promise<PublicKeyCredentialRequestOptionsJSON> {
   const user = await prisma.user.findUnique({
     where: { email: email.toLowerCase() },
@@ -337,7 +360,7 @@ export async function generateWebAuthnAuthenticationOptions(
   }
 
   const options = await generateAuthenticationOptions({
-    rpID: getWebAuthnRpId(),
+    rpID: config.rpId || getWebAuthnRpId(),
     timeout: 120000, // Extended from 60s to 120s for mobile reliability
     allowCredentials,
     userVerification: "preferred",
@@ -360,6 +383,7 @@ export async function verifyWebAuthnAuthentication(
   userId: string,
   credential: AuthenticationResponseJSON,
   expectedChallenge?: string,
+  config: WebAuthnRuntimeConfig = {},
 ): Promise<{
   verified: boolean;
   credentialID: string;
@@ -425,8 +449,8 @@ export async function verifyWebAuthnAuthentication(
     const verified = await verifyAuthenticationResponse({
       response: credential,
       expectedChallenge: challenge,
-      expectedRPID: getWebAuthnRpId(),
-      expectedOrigin: getExpectedOrigin(),
+      expectedRPID: config.rpId || getWebAuthnRpId(),
+      expectedOrigin: config.origin || getExpectedOrigin(),
       requireUserVerification: false,
       credential: {
         id: credential.id,

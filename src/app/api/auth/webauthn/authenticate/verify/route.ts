@@ -7,6 +7,16 @@ import type { AuthenticationResponseJSON } from "@simplewebauthn/types";
 
 export const runtime = "nodejs";
 
+function getWebAuthnConfig(request: NextRequest): {
+  origin: string;
+  rpId: string;
+} {
+  return {
+    origin: request.nextUrl.origin,
+    rpId: request.nextUrl.hostname,
+  };
+}
+
 /**
  * POST /api/auth/webauthn/authenticate/verify
  * Verify assertion response and authenticate user
@@ -89,6 +99,7 @@ export async function POST(request: NextRequest) {
         user.id,
         response as AuthenticationResponseJSON,
         expectedChallenge,
+        getWebAuthnConfig(request),
       );
       console.log("WebAuthn authenticate verify: Verification successful", {
         userId: user.id,

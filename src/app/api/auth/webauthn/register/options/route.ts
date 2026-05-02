@@ -5,6 +5,16 @@ import { generateWebAuthnRegistrationOptions } from "@/lib/webauthn/server";
 
 export const runtime = "nodejs";
 
+function getWebAuthnConfig(request: NextRequest): {
+  origin: string;
+  rpId: string;
+} {
+  return {
+    origin: request.nextUrl.origin,
+    rpId: request.nextUrl.hostname,
+  };
+}
+
 /**
  * POST /api/auth/webauthn/register/options
  * Get registration options for passkey setup
@@ -16,7 +26,10 @@ export async function POST(request: NextRequest) {
 
     if (!token) {
       console.error("WebAuthn register options: No token found in cookies");
-      return NextResponse.json({ error: "Unauthorized - no token" }, { status: 401 });
+      return NextResponse.json(
+        { error: "Unauthorized - no token" },
+        { status: 401 },
+      );
     }
 
     let userId: string;
@@ -24,8 +37,14 @@ export async function POST(request: NextRequest) {
       const decoded = await verifyJwtToken(token);
       userId = decoded.userId;
     } catch (tokenError) {
-      console.error("WebAuthn register options: Token verification failed", tokenError);
-      return NextResponse.json({ error: "Unauthorized - invalid token" }, { status: 401 });
+      console.error(
+        "WebAuthn register options: Token verification failed",
+        tokenError,
+      );
+      return NextResponse.json(
+        { error: "Unauthorized - invalid token" },
+        { status: 401 },
+      );
     }
 
     // Get user
@@ -40,12 +59,16 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate registration options
-    const options = await generateWebAuthnRegistrationOptions(user);
-    
+    const webAuthnConfig = getWebAuthnConfig(request);
+    const options = await generateWebAuthnRegistrationOptions(
+      user,
+      webAuthnConfig,
+    );
+
     console.log("WebAuthn registration options generated successfully", {
       userId: user.id,
-      rpId: process.env.WEBAUTHN_RP_ID || "localhost",
-      origin: process.env.NEXTAUTH_URL || "http://localhost:3000",
+      rpId: webAuthnConfig.rpId,
+      origin: webAuthnConfig.origin,
     });
 
     const response = NextResponse.json(options, { status: 200 });
@@ -62,8 +85,11 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("WebAuthn registration options error:", error);
     return NextResponse.json(
-      { error: "Failed to generate registration options", details: error instanceof Error ? error.message : "Unknown error" },
-      { status: 500 }
+      {
+        error: "Failed to generate registration options",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 },
     );
   }
 }

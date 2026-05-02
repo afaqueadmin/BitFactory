@@ -4,6 +4,16 @@ import { generateWebAuthnAuthenticationOptions } from "@/lib/webauthn/server";
 
 export const runtime = "nodejs";
 
+function getWebAuthnConfig(request: NextRequest): {
+  origin: string;
+  rpId: string;
+} {
+  return {
+    origin: request.nextUrl.origin,
+    rpId: request.nextUrl.hostname,
+  };
+}
+
 /**
  * POST /api/auth/webauthn/authenticate/options
  * Get authentication options for passkey login
@@ -14,10 +24,7 @@ export async function POST(request: NextRequest) {
     const { email } = await request.json();
 
     if (!email || typeof email !== "string") {
-      return NextResponse.json(
-        { error: "Email is required" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Email is required" }, { status: 400 });
     }
 
     // Get user
@@ -33,6 +40,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (!user) {
+      const webAuthnConfig = getWebAuthnConfig(request);
       // Don't reveal if user exists, but still provide options
       // (allows for user enumeration attack mitigation - return empty options)
       return NextResponse.json(
@@ -40,17 +48,21 @@ export async function POST(request: NextRequest) {
           publicKey: {
             challenge: await generateRandomChallenge(),
             timeout: 60000,
-            rpId: process.env.WEBAUTHN_RP_ID || new URL(process.env.NEXTAUTH_URL || "http://localhost:3000").hostname,
+            rpId: webAuthnConfig.rpId,
             userVerification: "preferred",
             allowCredentials: [],
           },
         },
-        { status: 200 }
+        { status: 200 },
       );
     }
 
     // User has credentials, generate authentication options
-    const options = await generateWebAuthnAuthenticationOptions(email);
+    const webAuthnConfig = getWebAuthnConfig(request);
+    const options = await generateWebAuthnAuthenticationOptions(
+      email,
+      webAuthnConfig,
+    );
 
     const response = NextResponse.json(options, { status: 200 });
 
@@ -67,7 +79,7 @@ export async function POST(request: NextRequest) {
     console.error("WebAuthn authentication options error:", error);
     return NextResponse.json(
       { error: "Failed to generate authentication options" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
