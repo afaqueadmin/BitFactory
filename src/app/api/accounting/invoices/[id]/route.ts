@@ -103,7 +103,7 @@ export async function PATCH(
     }
 
     const body = await request.json();
-    const { totalMiners, unitPrice, dueDate } = body;
+    const { totalMiners, unitPrice, dueDate, billingMonth } = body;
 
     const currentInvoice = await prisma.invoice.findUnique({
       where: { id },
@@ -138,6 +138,13 @@ export async function PATCH(
     if (dueDate) {
       updateData.dueDate = new Date(dueDate);
       changes.dueDate = dueDate;
+    }
+    if (billingMonth) {
+      updateData.billingMonth = new Date(billingMonth);
+      changes.billingMonth = {
+        from: currentInvoice.billingMonth,
+        to: billingMonth,
+      };
     }
 
     // Recalculate totalAmount if totalMiners or unitPrice changed

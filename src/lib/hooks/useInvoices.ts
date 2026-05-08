@@ -275,6 +275,7 @@ export function useUpdateInvoice() {
         totalMiners: number;
         unitPrice: number;
         dueDate: string;
+        billingMonth?: string;
       };
     }) => {
       const res = await fetch(`/api/accounting/invoices/${invoiceId}`, {
@@ -303,6 +304,7 @@ export function useUpdateInvoice() {
         totalMiners: number;
         unitPrice: number;
         dueDate: string;
+        billingMonth?: string;
       },
     ) => mutation.mutateAsync({ invoiceId, data }),
     loading: mutation.isPending,

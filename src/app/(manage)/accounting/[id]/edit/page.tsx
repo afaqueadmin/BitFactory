@@ -9,6 +9,7 @@ import {
   TextField,
   CircularProgress,
   Alert,
+  MenuItem,
 } from "@mui/material";
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
@@ -33,6 +34,8 @@ export default function EditInvoicePage() {
     totalMiners: 0,
     unitPrice: 0,
     dueDate: "",
+    billingMonth: 0,
+    billingYear: new Date().getFullYear(),
   });
 
   const [loading, setLoading] = useState(false);
@@ -41,10 +44,15 @@ export default function EditInvoicePage() {
   // Populate form when invoice loads
   useEffect(() => {
     if (invoice) {
+      const billingDate = invoice.billingMonth
+        ? new Date(invoice.billingMonth)
+        : new Date();
       setFormData({
         totalMiners: invoice.totalMiners,
         unitPrice: Number(invoice.unitPrice),
         dueDate: new Date(invoice.dueDate).toISOString().split("T")[0],
+        billingMonth: billingDate.getMonth(),
+        billingYear: billingDate.getFullYear(),
       });
     }
   }, [invoice]);
@@ -59,6 +67,19 @@ export default function EditInvoicePage() {
     setFormData((prev) => ({
       ...prev,
       [name]: numValue,
+    }));
+  };
+
+  const handleBillingMonthChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedMonth = Number(e.target.value);
+    const now = new Date();
+    // If December is selected, use next year
+    const year =
+      selectedMonth === 11 ? now.getFullYear() + 1 : now.getFullYear();
+    setFormData((prev) => ({
+      ...prev,
+      billingMonth: selectedMonth,
+      billingYear: year,
     }));
   };
 
@@ -81,11 +102,19 @@ export default function EditInvoicePage() {
         throw new Error("Due date must be in the future");
       }
 
+      // Build billingMonth as ISO date string (first day of selected month)
+      const billingMonthDate = new Date(
+        formData.billingYear,
+        formData.billingMonth,
+        1,
+      );
+
       // Call API to update invoice
       await updateInvoice(invoiceId, {
         totalMiners: formData.totalMiners,
         unitPrice: formData.unitPrice,
         dueDate: formData.dueDate,
+        billingMonth: billingMonthDate.toISOString(),
       });
 
       // Redirect back to invoice detail
@@ -187,6 +216,37 @@ export default function EditInvoicePage() {
                   helperText="When payment is due"
                   required
                 />
+              </Stack>
+            </Box>
+
+            {/* Billing Month */}
+            <Box>
+              <h3 style={{ marginTop: 0, marginBottom: 16 }}>
+                Additional Information
+              </h3>
+              <Stack spacing={2}>
+                <TextField
+                  select
+                  label="Billing Month"
+                  value={formData.billingMonth}
+                  onChange={handleBillingMonthChange}
+                  fullWidth
+                  helperText={`Year: ${formData.billingYear} (auto-calculated)`}
+                  required
+                >
+                  <MenuItem value={0}>January</MenuItem>
+                  <MenuItem value={1}>February</MenuItem>
+                  <MenuItem value={2}>March</MenuItem>
+                  <MenuItem value={3}>April</MenuItem>
+                  <MenuItem value={4}>May</MenuItem>
+                  <MenuItem value={5}>June</MenuItem>
+                  <MenuItem value={6}>July</MenuItem>
+                  <MenuItem value={7}>August</MenuItem>
+                  <MenuItem value={8}>September</MenuItem>
+                  <MenuItem value={9}>October</MenuItem>
+                  <MenuItem value={10}>November</MenuItem>
+                  <MenuItem value={11}>December</MenuItem>
+                </TextField>
               </Stack>
             </Box>
 
