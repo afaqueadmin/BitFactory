@@ -165,7 +165,7 @@ export default function RecurringInvoicesPage() {
         }}
       >
         <Box>
-          <h1 style={{ margin: 0 }}>Customer Bulk Invoices</h1>
+          <h1 style={{ margin: 0 }}>Customer Recurring Invoices</h1>
           <p style={{ margin: "8px 0 0 0", color: "#666" }}>
             Manage monthly billing templates
           </p>
