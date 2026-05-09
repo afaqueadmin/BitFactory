@@ -19,6 +19,7 @@ import {
   ListItemText,
   useMediaQuery,
 } from "@mui/material";
+import MoreVertIcon from "@mui/icons-material/MoreVert";
 import { useAuth } from "@/lib/contexts/auth-context";
 // import SettingsIcon from "@mui/icons-material/Settings";
 import AccountCircle from "@mui/icons-material/AccountCircle";
@@ -41,6 +42,7 @@ export default function AppBarComponent() {
   const { logout } = useAuth();
   const pathname = usePathname(); // Get current path
   const isMobile = useMediaQuery((theme) => theme.breakpoints.down("md"));
+  const isLarge = useMediaQuery((theme) => theme.breakpoints.up("lg"));
 
   const { user } = useUser();
 
@@ -116,6 +118,16 @@ export default function AppBarComponent() {
     { href: "/payback-analysis", label: "Payback Analysis" },
   ];
 
+  // Determine how many links to show inline before collapsing into "More".
+  // On large screens show all; on medium show a limited number.
+  const visibleCount = isLarge ? navLinks.length : 5;
+  const visibleLinks = navLinks.slice(0, visibleCount);
+  const overflowLinks = navLinks.slice(visibleCount);
+  const [moreAnchorEl, setMoreAnchorEl] = useState<null | HTMLElement>(null);
+  const handleMoreOpen = (e: React.MouseEvent<HTMLElement>) =>
+    setMoreAnchorEl(e.currentTarget);
+  const handleMoreClose = () => setMoreAnchorEl(null);
+
   const linkButtonSx = (href: string) => ({
     color: darkMode ? "white" : "black",
     textTransform: "none",
@@ -151,7 +163,9 @@ export default function AppBarComponent() {
       <Toolbar
         sx={{
           minHeight: { xs: 64, sm: 68 },
-          px: { xs: 1, sm: 1.5, md: 3 },
+          pl: { xs: 1, sm: 1.5, md: 3 },
+          pr: { xs: 1.5, sm: 2, md: 6 },
+          scrollbarGutter: "stable",
           gap: { xs: 0.5, sm: 1, md: 2 },
         }}
       >
@@ -184,8 +198,12 @@ export default function AppBarComponent() {
             pl: 5,
           }}
         >
-          <Stack direction="row" spacing={3} sx={{ flexWrap: "nowrap" }}>
-            {navLinks.map((link) => (
+          <Stack
+            direction="row"
+            spacing={3}
+            sx={{ flexWrap: "nowrap", alignItems: "center" }}
+          >
+            {visibleLinks.map((link) => (
               <Button
                 key={link.href}
                 component={Link}
@@ -217,6 +235,37 @@ export default function AppBarComponent() {
                 )}
               </Button>
             ))}
+
+            {overflowLinks.length > 0 && (
+              <>
+                <IconButton
+                  aria-label="more"
+                  onClick={handleMoreOpen}
+                  sx={{ color: darkMode ? "white" : "black" }}
+                >
+                  <MoreVertIcon />
+                </IconButton>
+                <Menu
+                  anchorEl={moreAnchorEl}
+                  open={Boolean(moreAnchorEl)}
+                  onClose={handleMoreClose}
+                >
+                  {overflowLinks.map((link) => (
+                    <MenuItem
+                      key={link.href}
+                      component={Link}
+                      href={link.href}
+                      onClick={() => {
+                        trackTab(link.href, link.label);
+                        handleMoreClose();
+                      }}
+                    >
+                      {link.label}
+                    </MenuItem>
+                  ))}
+                </Menu>
+              </>
+            )}
           </Stack>
         </Box>
 
@@ -278,10 +327,17 @@ export default function AppBarComponent() {
         {/* Account Menu */}
         <IconButton
           onClick={handleMenu}
-          sx={{ color: darkMode ? "white" : "black" }}
+          sx={{
+            color: darkMode ? "white" : "black",
+            mr: { xs: 1, md: 2 },
+            position: "relative",
+          }}
         >
           <AccountCircle />
         </IconButton>
+
+        {/* Spacer to keep icons clear of overlay scrollbars */}
+        <Box sx={{ width: { xs: 8, sm: 12, md: 20 }, flexShrink: 0 }} />
         <Menu
           anchorEl={anchorEl}
           open={Boolean(anchorEl)}

@@ -173,14 +173,6 @@ export default function AdminHeader() {
 
             <MenuItem
               onClick={() => {
-                router.push("/adminpanel/settings");
-                handleClose();
-              }}
-            >
-              General Settings
-            </MenuItem>
-            <MenuItem
-              onClick={() => {
                 router.push("/external-resource");
                 handleClose();
               }}
