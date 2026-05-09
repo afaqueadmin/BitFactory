@@ -301,9 +301,7 @@ export default function InvoiceDetailPage() {
             startIcon={<EditIcon />}
             variant="outlined"
             disabled={invoice.status !== "DRAFT"}
-            onClick={() =>
-              router.push(`/hardware-purchase/invoices/${invoice.id}/edit`)
-            }
+            onClick={() => router.push(`/hardware-purchase/${invoice.id}/edit`)}
           >
             Edit
           </Button>
