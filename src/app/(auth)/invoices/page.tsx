@@ -13,6 +13,7 @@ import {
   TableHead,
   TableRow,
   useTheme,
+  Button,
 } from "@mui/material";
 import { useQuery } from "@tanstack/react-query";
 import { useUser } from "@/lib/hooks/useUser";
@@ -20,6 +21,8 @@ import { StatusBadge } from "@/components/accounting/common/StatusBadge";
 import { Invoice } from "@prisma/client";
 import { useRouter } from "next/navigation";
 import { calculateDaysUntilDue } from "@/lib/mocks/invoiceMocks";
+import DownloadIcon from "@mui/icons-material/Download";
+import { useState } from "react";
 
 interface InvoicesResponse {
   pagination: {
@@ -35,6 +38,7 @@ export default function InvoicesPage() {
   const theme = useTheme();
   const { user } = useUser();
   const router = useRouter();
+  const [statementDownloading, setStatementDownloading] = useState(false);
 
   // Fetch invoices using TanStack Query
   const {
@@ -66,21 +70,84 @@ export default function InvoicesPage() {
     px: { xs: 1.5, sm: 2 },
   };
 
+  const handleDownloadStatement = async () => {
+    try {
+      setStatementDownloading(true);
+
+      const response = await fetch("/api/accounting/invoices/statement", {
+        method: "GET",
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to download statement");
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+
+      const contentDisposition = response.headers.get("content-disposition");
+      let filename = "statement.pdf";
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
+        if (filenameMatch && filenameMatch[1]) {
+          filename = filenameMatch[1];
+        }
+      }
+
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Error downloading statement:", error);
+      alert("Failed to download statement. Please try again.");
+    } finally {
+      setStatementDownloading(false);
+    }
+  };
+
   return (
     <Box sx={{ p: { xs: 1.5, sm: 2, md: 3 }, mt: { xs: 1, md: 2 } }}>
       {/* Header */}
       <Box sx={{ mb: { xs: 2, md: 4 } }}>
-        <Typography
-          variant="h4"
-          component="h1"
+        <Box
           sx={{
-            fontWeight: "bold",
-            mb: 0.5,
-            fontSize: { xs: "1.6rem", sm: "2rem", md: "2.125rem" },
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: { xs: "flex-start", sm: "center" },
+            gap: 2,
+            flexDirection: { xs: "column", sm: "row" },
+            mb: 1,
           }}
         >
-          Invoices
-        </Typography>
+          <Typography
+            variant="h4"
+            component="h1"
+            sx={{
+              fontWeight: "bold",
+              mb: 0.5,
+              fontSize: { xs: "1.6rem", sm: "2rem", md: "2.125rem" },
+            }}
+          >
+            Invoices
+          </Typography>
+          <Button
+            variant="outlined"
+            startIcon={<DownloadIcon />}
+            onClick={handleDownloadStatement}
+            disabled={statementDownloading || !user?.id || invoicesLoading}
+            sx={{
+              whiteSpace: "nowrap",
+              minWidth: { xs: "100%", sm: "auto" },
+            }}
+          >
+            {statementDownloading ? "Downloading..." : "Download Statement"}
+          </Button>
+        </Box>
         <Typography variant="body2" color="textSecondary">
           View and manage your invoices
         </Typography>

@@ -10,6 +10,7 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  TableSortLabel,
   CircularProgress,
   Alert,
   Stack,
@@ -29,7 +30,7 @@ import {
   Radio,
 } from "@mui/material";
 import { useParams } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useAccountStatement } from "@/lib/hooks/useStatements";
 import { StatusBadge } from "@/components/accounting/common/StatusBadge";
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
@@ -71,6 +72,16 @@ export default function CustomerStatementPage() {
   );
   const [downloadLoading, setDownloadLoading] = useState(false);
   const [printLoading, setPrintLoading] = useState(false);
+  const [sortBy, setSortBy] = useState<
+    | "invoiceNumber"
+    | "issuedDate"
+    | "dueDate"
+    | "amount"
+    | "paidDate"
+    | "status"
+    | "daysUntilDue"
+  >("issuedDate");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
   const [emailLoading, setEmailLoading] = useState(false);
   const [emailTone, setEmailTone] = useState<"normal" | "reminder" | "final">(
@@ -224,6 +235,72 @@ export default function CustomerStatementPage() {
   const customer = statement?.customer;
   const totals = statement?.stats;
 
+  const sortedInvoices = useMemo(() => {
+    const arr = [...invoices];
+    arr.sort((a, b) => {
+      let compareA: string | number = "";
+      let compareB: string | number = "";
+
+      switch (sortBy) {
+        case "invoiceNumber":
+          compareA = a.invoiceNumber || "";
+          compareB = b.invoiceNumber || "";
+          break;
+        case "issuedDate":
+          compareA = new Date(a.issuedDate || a.invoiceGeneratedDate).getTime();
+          compareB = new Date(b.issuedDate || b.invoiceGeneratedDate).getTime();
+          break;
+        case "dueDate":
+          compareA = new Date(a.dueDate).getTime();
+          compareB = new Date(b.dueDate).getTime();
+          break;
+        case "amount":
+          compareA = Number(a.totalAmount || 0);
+          compareB = Number(b.totalAmount || 0);
+          break;
+        case "paidDate":
+          compareA = a.paidDate ? new Date(a.paidDate).getTime() : 0;
+          compareB = b.paidDate ? new Date(b.paidDate).getTime() : 0;
+          break;
+        case "status":
+          compareA = a.status || "";
+          compareB = b.status || "";
+          break;
+        case "daysUntilDue":
+          compareA = calculateDaysUntilDue(new Date(a.dueDate));
+          compareB = calculateDaysUntilDue(new Date(b.dueDate));
+          break;
+        default:
+          compareA = 0;
+          compareB = 0;
+      }
+
+      if (typeof compareA === "string" && typeof compareB === "string") {
+        return sortDirection === "asc"
+          ? compareA.localeCompare(compareB)
+          : compareB.localeCompare(compareA);
+      }
+
+      if (typeof compareA === "number" && typeof compareB === "number") {
+        return sortDirection === "asc"
+          ? compareA - compareB
+          : compareB - compareA;
+      }
+
+      return 0;
+    });
+    return arr;
+  }, [invoices, sortBy, sortDirection]);
+
+  const handleRequestSort = (property: typeof sortBy) => {
+    if (sortBy === property) {
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortBy(property);
+      setSortDirection("asc");
+    }
+  };
+
   if (loading) {
     return (
       <Container maxWidth="lg">
@@ -341,20 +418,76 @@ export default function CustomerStatementPage() {
         <Table>
           <TableHead sx={{ backgroundColor: "#f5f5f5" }}>
             <TableRow>
-              <TableCell sx={{ fontWeight: "bold" }}>Invoice #</TableCell>
-              <TableCell sx={{ fontWeight: "bold" }}>Issued Date</TableCell>
-              <TableCell sx={{ fontWeight: "bold" }}>Due Date</TableCell>
+              <TableCell sx={{ fontWeight: "bold" }}>
+                <TableSortLabel
+                  active={sortBy === "invoiceNumber"}
+                  direction={sortDirection}
+                  onClick={() => handleRequestSort("invoiceNumber")}
+                >
+                  Invoice #
+                </TableSortLabel>
+              </TableCell>
+              <TableCell sx={{ fontWeight: "bold" }}>
+                <TableSortLabel
+                  active={sortBy === "issuedDate"}
+                  direction={sortDirection}
+                  onClick={() => handleRequestSort("issuedDate")}
+                >
+                  Issued Date
+                </TableSortLabel>
+              </TableCell>
+              <TableCell sx={{ fontWeight: "bold" }}>
+                <TableSortLabel
+                  active={sortBy === "dueDate"}
+                  direction={sortDirection}
+                  onClick={() => handleRequestSort("dueDate")}
+                >
+                  Due Date
+                </TableSortLabel>
+              </TableCell>
               <TableCell sx={{ fontWeight: "bold" }}>Type</TableCell>
-              <TableCell sx={{ fontWeight: "bold" }}>Amount</TableCell>
-              <TableCell sx={{ fontWeight: "bold" }}>Paid</TableCell>
+              <TableCell sx={{ fontWeight: "bold" }}>
+                <TableSortLabel
+                  active={sortBy === "amount"}
+                  direction={sortDirection}
+                  onClick={() => handleRequestSort("amount")}
+                >
+                  Amount
+                </TableSortLabel>
+              </TableCell>
+              <TableCell sx={{ fontWeight: "bold" }}>
+                <TableSortLabel
+                  active={sortBy === "paidDate"}
+                  direction={sortDirection}
+                  onClick={() => handleRequestSort("paidDate")}
+                >
+                  Paid
+                </TableSortLabel>
+              </TableCell>
               <TableCell sx={{ fontWeight: "bold" }}>Outstanding</TableCell>
-              <TableCell sx={{ fontWeight: "bold" }}>Status</TableCell>
+              <TableCell sx={{ fontWeight: "bold" }}>
+                <TableSortLabel
+                  active={sortBy === "status"}
+                  direction={sortDirection}
+                  onClick={() => handleRequestSort("status")}
+                >
+                  Status
+                </TableSortLabel>
+              </TableCell>
               <TableCell sx={{ fontWeight: "bold" }}>Paid Past Due</TableCell>
-              <TableCell sx={{ fontWeight: "bold" }}>Days Until Due</TableCell>
+              <TableCell sx={{ fontWeight: "bold" }}>
+                <TableSortLabel
+                  active={sortBy === "daysUntilDue"}
+                  direction={sortDirection}
+                  onClick={() => handleRequestSort("daysUntilDue")}
+                >
+                  Days Until Due
+                </TableSortLabel>
+              </TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {invoices.map((invoice) => {
+            {sortedInvoices.map((invoice) => {
               const daysUntilDue = calculateDaysUntilDue(
                 new Date(invoice.dueDate),
               );

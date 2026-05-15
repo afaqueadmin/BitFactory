@@ -492,16 +492,6 @@ export default function AccountingDashboard() {
             <Typography variant="h6" sx={{ fontWeight: "bold" }}>
               All Invoices
             </Typography>
-            <Stack direction="row" spacing={2}>
-              <Link href="/accounting/bulk-invoices">
-                <Button variant="outlined">Bulk Create Invoices</Button>
-              </Link>
-              <Link href="/accounting/create">
-                <Button variant="contained" startIcon={<AddIcon />}>
-                  Create Invoice
-                </Button>
-              </Link>
-            </Stack>
           </Box>
           <Box
             sx={{
