@@ -3,6 +3,13 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
+const PASSKEY_OFFER_FLAG = "bf_offer_passkey_setup";
+
+function setPasskeyOfferFlag() {
+  if (typeof window === "undefined") return;
+  sessionStorage.setItem(PASSKEY_OFFER_FLAG, "1");
+}
+
 interface User {
   id: string;
   email: string;
@@ -24,7 +31,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
   // Restore sessionId from localStorage on mount
@@ -149,6 +156,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       setUser(data.user);
+
+      setPasskeyOfferFlag();
 
       if (data.sessionId) {
         setSessionId(data.sessionId);

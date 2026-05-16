@@ -176,7 +176,7 @@ export async function GET(request: NextRequest) {
           payment.type === "PAYMENT"
             ? "Payment"
             : payment.type === "ELECTRICITY_CHARGES"
-              ? "Electricity Charges"
+              ? "Hosting & electricity charges"
               : payment.type === "ADJUSTMENT"
                 ? "Adjustment"
                 : payment.type;

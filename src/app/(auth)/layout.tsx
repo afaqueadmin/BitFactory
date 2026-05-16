@@ -3,6 +3,7 @@
 import React from "react";
 import AppBarComponent from "@/components/AppBar";
 import UserFooter from "@/components/UserFooter";
+import PasskeySetupPrompt from "@/components/PasskeySetupPrompt";
 import { useAuth } from "@/lib/contexts/auth-context";
 import { useTheme } from "@/app/theme-provider";
 
@@ -20,6 +21,7 @@ export default function AuthLayout({
       style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}
     >
       <AppBarComponent />
+      <PasskeySetupPrompt />
       <main
         style={{
           flexGrow: 1,

@@ -8,6 +8,8 @@ import {
   Paper,
 } from "@mui/material";
 
+const PASSKEY_OFFER_FLAG = "bf_offer_passkey_setup";
+
 interface TwoFactorVerificationProps {
   email: string;
   onVerified: (redirectUrl: string) => void;
@@ -34,12 +36,18 @@ export default function TwoFactorVerification({
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ email, token }),
+        credentials: "include",
       });
       const data = await response.json();
 
-      if (data.error) {
-        setError(data.error);
+      if (!response.ok || data.error) {
+        setError(data.error || "Invalid 2FA token");
         return;
+      }
+
+      // Only set the passkey offer flag after the server has set auth cookies
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem(PASSKEY_OFFER_FLAG, "1");
       }
 
       onVerified(data.redirectUrl);

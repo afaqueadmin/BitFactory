@@ -42,6 +42,7 @@ export async function authenticateWithPasskey(email: string): Promise<{
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ email }),
+        credentials: "include",
       },
     );
 
@@ -105,14 +106,19 @@ export async function authenticateWithPasskey(email: string): Promise<{
             id: assertion.id,
             rawId: assertion.rawId,
             response: {
-              clientDataJSON: (assertion.response as Record<string, unknown>).clientDataJSON,
-              authenticatorData: (assertion.response as Record<string, unknown>).authenticatorData,
-              signature: (assertion.response as Record<string, unknown>).signature,
-              userHandle: (assertion.response as Record<string, unknown>).userHandle,
+              clientDataJSON: (assertion.response as Record<string, unknown>)
+                .clientDataJSON,
+              authenticatorData: (assertion.response as Record<string, unknown>)
+                .authenticatorData,
+              signature: (assertion.response as Record<string, unknown>)
+                .signature,
+              userHandle: (assertion.response as Record<string, unknown>)
+                .userHandle,
             },
             type: assertion.type,
           },
         }),
+        credentials: "include",
       },
     );
 

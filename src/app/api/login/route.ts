@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { generateTokens } from "@/lib/jwt";
-import normalizeEmailUsername from "@/lib/helpers/normailizeEmailUsername";
 
 // Add runtime config for Node.js runtime
 export const runtime = "nodejs";
@@ -45,8 +44,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Find all users and match by normalizing their stored email usernames
-    const allUsers = await prisma.user.findMany({
+    // Match the exact account by email, case-insensitively.
+    // Avoid dot-stripping normalization here because it can route login to
+    // the wrong account when multiple emails normalize to the same value.
+    const user = await prisma.user.findFirst({
+      where: {
+        isDeleted: false,
+        email: {
+          equals: email,
+          mode: "insensitive",
+        },
+      },
       select: {
         id: true,
         email: true,
@@ -55,14 +63,7 @@ export async function POST(request: NextRequest) {
         role: true,
         twoFactorEnabled: true,
       },
-      where: { isDeleted: false },
     });
-
-    // Find user by comparing normalized email usernames
-    const normalizedUsername = normalizeEmailUsername(email);
-    const user = allUsers.find(
-      (u) => normalizeEmailUsername(u.email) === normalizedUsername,
-    );
 
     if (!user) {
       return NextResponse.json(

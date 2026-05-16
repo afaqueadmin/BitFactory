@@ -13,24 +13,23 @@ import {
   IconButton,
   CircularProgress,
   Alert,
-  Tabs,
-  Tab,
   Card,
   CardContent,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogContentText,
-  DialogActions,
 } from "@mui/material";
 import Visibility from "@mui/icons-material/Visibility";
 import VisibilityOff from "@mui/icons-material/VisibilityOff";
-import LockIcon from "@mui/icons-material/Lock";
 import FingerprintIcon from "@mui/icons-material/Fingerprint";
 import TwoFactorVerification from "@/components/TwoFactorVerification";
 import ForgotPasswordModal from "@/components/ForgotPasswordModal";
 import { authenticateWithPasskey } from "@/lib/webauthn/authentication";
 import { isWebAuthnSupported } from "@/lib/webauthn/utils";
+
+const PASSKEY_OFFER_FLAG = "bf_offer_passkey_setup";
+
+function setPasskeyOfferFlag() {
+  if (typeof window === "undefined") return;
+  sessionStorage.setItem(PASSKEY_OFFER_FLAG, "1");
+}
 
 export default function Login() {
   const router = useRouter();
@@ -45,11 +44,6 @@ export default function Login() {
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [webAuthnSupported, setWebAuthnSupported] = useState(false);
   const [passKeyLoading, setPassKeyLoading] = useState(false);
-  const [showPasskeyPrompt, setShowPasskeyPrompt] = useState(false);
-  const [pendingRedirectUrl, setPendingRedirectUrl] = useState<string | null>(
-    null,
-  );
-
   // Check WebAuthn support on component mount
   useEffect(() => {
     if (isWebAuthnSupported()) {
@@ -74,6 +68,7 @@ export default function Login() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
+        credentials: "include",
       });
 
       const data = await response.json();
@@ -89,41 +84,13 @@ export default function Login() {
           return;
         }
 
-        // Otherwise, if browser supports WebAuthn, check whether user already
-        // has passkeys registered. Only prompt to set up a passkey when none
-        // exist for this account.
+        // Full login is complete. Offer passkey setup only after navigation.
         if (webAuthnSupported) {
-          try {
-            const credsRes = await fetch("/api/auth/webauthn/credentials", {
-              method: "GET",
-              credentials: "include",
-            });
-
-            if (credsRes.ok) {
-              const credsData = await credsRes.json();
-              const credentials = credsData.credentials || [];
-              if (!credentials || credentials.length === 0) {
-                setPendingRedirectUrl(data.redirectUrl);
-                setShowPasskeyPrompt(true);
-              } else {
-                router.refresh();
-                router.replace(data.redirectUrl);
-              }
-            } else {
-              // If we couldn't determine credentials, avoid prompting every
-              // time — just redirect the user.
-              router.refresh();
-              router.replace(data.redirectUrl);
-            }
-          } catch (err) {
-            console.error("Failed to check existing passkeys:", err);
-            router.refresh();
-            router.replace(data.redirectUrl);
-          }
-        } else {
-          router.refresh(); // Refresh router cache
-          router.replace(data.redirectUrl); // Use replace instead of push
+          setPasskeyOfferFlag();
         }
+
+        router.refresh();
+        router.replace(data.redirectUrl);
       } else {
         // ❌ Login failed
         setError(data.error || "Login failed");
@@ -176,10 +143,8 @@ export default function Login() {
   };
 
   const handleTwoFactorVerified = (redirectUrl: string) => {
-    router.refresh(); // Refresh router cache
-    // router.replace(data.redirectUrl); // Use replace instead of push
-
-    router.replace(redirectUrl);
+    // Use a full navigation to ensure cookies are set and auth state is fully initialized
+    window.location.href = redirectUrl;
   };
 
   return (
@@ -342,69 +307,6 @@ export default function Login() {
                 Sign up
               </Button>
             </Box>
-
-            {/* Passkey setup prompt after password login */}
-            <Dialog
-              open={showPasskeyPrompt}
-              onClose={() => setShowPasskeyPrompt(false)}
-              maxWidth="xs"
-              fullWidth
-            >
-              <DialogTitle>Set up a passkey?</DialogTitle>
-              <DialogContent>
-                <DialogContentText>
-                  For faster and safer logins, would you like to set up a
-                  passkey (Face ID / Touch ID / Windows Hello) on this device?
-                </DialogContentText>
-              </DialogContent>
-              <DialogActions>
-                <Button
-                  onClick={() => {
-                    setShowPasskeyPrompt(false);
-                    if (pendingRedirectUrl) router.replace(pendingRedirectUrl);
-                  }}
-                >
-                  No thanks
-                </Button>
-                <Button
-                  onClick={async () => {
-                    setShowPasskeyPrompt(false);
-                    // Trigger registration (user is authenticated via cookie)
-                    try {
-                      const res = await fetch(
-                        "/api/auth/webauthn/register/options",
-                        {
-                          method: "POST",
-                          credentials: "include",
-                        },
-                      );
-                      if (!res.ok) {
-                        console.error("Failed to get registration options");
-                      } else {
-                        // Use existing helper to run registration
-                        const { registerPasskey } =
-                          await import("@/lib/webauthn/registration");
-                        const regResult = await registerPasskey();
-                        if (!regResult.success) {
-                          console.error(
-                            "Passkey registration failed:",
-                            regResult.error,
-                          );
-                        }
-                      }
-                    } catch (err) {
-                      console.error("Passkey setup error:", err);
-                    } finally {
-                      if (pendingRedirectUrl)
-                        router.replace(pendingRedirectUrl);
-                    }
-                  }}
-                  variant="contained"
-                >
-                  Set up passkey
-                </Button>
-              </DialogActions>
-            </Dialog>
           </Box>
 
           {/* Passkey unavailable notice */}

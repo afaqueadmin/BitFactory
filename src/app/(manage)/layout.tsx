@@ -2,6 +2,7 @@
 import React from "react";
 import AdminHeader from "@/components/admin/AdminHeader";
 import AdminSidebar from "@/components/admin/AdminSidebar";
+import PasskeySetupPrompt from "@/components/PasskeySetupPrompt";
 import { Box } from "@mui/material";
 
 export default function ManageLayout({
@@ -12,6 +13,7 @@ export default function ManageLayout({
   return (
     <>
       <AdminHeader />
+      <PasskeySetupPrompt />
       <Box sx={{ display: "flex" }}>
         <AdminSidebar />
         <Box
