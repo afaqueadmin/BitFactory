@@ -8,7 +8,11 @@ import {
   LuxorError,
 } from "@/lib/luxor";
 import { createBraiinsClient } from "@/lib/braiins";
-import { groupMinersByPool, getLuxorGroups, getBraiinsGroups } from "@/lib/poolAggregation";
+import {
+  groupMinersByPool,
+  getLuxorGroups,
+  getBraiinsGroups,
+} from "@/lib/poolAggregation";
 
 interface DailyPerformanceData {
   date: string;
@@ -71,12 +75,26 @@ export async function GET(request: NextRequest) {
     });
 
     if (!miners || miners.length === 0) {
-      console.error(
+      console.warn(
         `[Mining Performance API] User ${userId} has no miners configured`,
       );
+      // Return empty successful response so frontend components can render
+      // a friendly 'no data' message instead of an error.
       return NextResponse.json(
-        { error: "No miners configured for user" },
-        { status: 404 },
+        {
+          success: true,
+          data: [],
+          summary: {
+            daysReturned: 0,
+            totalEarnings: 0,
+            averageDailyEarnings: 0,
+            currency: "BTC",
+            dataSource: "none",
+            poolBreakdown: { luxor: 0, braiins: 0 },
+          },
+          timestamp: new Date().toISOString(),
+        },
+        { status: 200 },
       );
     }
 
@@ -157,7 +175,7 @@ export async function GET(request: NextRequest) {
           for (const item of revenueResponse.revenue) {
             if (item && typeof item === "object") {
               const dateStr =
-                item.date_time &&  typeof item.date_time === "string"
+                item.date_time && typeof item.date_time === "string"
                   ? item.date_time.split("T")[0]
                   : null;
 
@@ -221,8 +239,8 @@ export async function GET(request: NextRequest) {
             // Convert Unix timestamp to ISO date string
             const date = new Date(reward.date * 1000);
             const year = date.getFullYear();
-            const month = String(date.getMonth() + 1).padStart(2, '0');
-            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, "0");
+            const day = String(date.getDate()).padStart(2, "0");
             const dateStr = `${year}-${month}-${day}`;
             const amount = parseFloat(reward.total_reward) || 0;
 

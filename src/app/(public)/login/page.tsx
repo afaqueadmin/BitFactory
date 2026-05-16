@@ -17,6 +17,11 @@ import {
   Tab,
   Card,
   CardContent,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
 } from "@mui/material";
 import Visibility from "@mui/icons-material/Visibility";
 import VisibilityOff from "@mui/icons-material/VisibilityOff";
@@ -38,10 +43,12 @@ export default function Login() {
   const [error, setError] = useState("");
   const [showTwoFactor, setShowTwoFactor] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
-  const [activeTab, setActiveTab] = useState(0); // 0: Password, 1: Passkey
   const [webAuthnSupported, setWebAuthnSupported] = useState(false);
-  const [passKeyEmail, setPassKeyEmail] = useState("");
   const [passKeyLoading, setPassKeyLoading] = useState(false);
+  const [showPasskeyPrompt, setShowPasskeyPrompt] = useState(false);
+  const [pendingRedirectUrl, setPendingRedirectUrl] = useState<string | null>(
+    null,
+  );
 
   // Check WebAuthn support on component mount
   useEffect(() => {
@@ -74,11 +81,48 @@ export default function Login() {
       if (response.ok) {
         // ✅ Login successful
         console.log("Login successful, redirecting to:", data.redirectUrl);
-        router.refresh(); // Refresh router cache
-        router.replace(data.redirectUrl); // Use replace instead of push
+
+        // If the server says 2FA is required for this login, go to 2FA flow.
         if (data.requiresTwoFactor) {
           setShowTwoFactor(true);
-          router.replace("/two-factor-authentication"); // Navigate to 2FA page
+          router.replace("/two-factor-authentication");
+          return;
+        }
+
+        // Otherwise, if browser supports WebAuthn, check whether user already
+        // has passkeys registered. Only prompt to set up a passkey when none
+        // exist for this account.
+        if (webAuthnSupported) {
+          try {
+            const credsRes = await fetch("/api/auth/webauthn/credentials", {
+              method: "GET",
+              credentials: "include",
+            });
+
+            if (credsRes.ok) {
+              const credsData = await credsRes.json();
+              const credentials = credsData.credentials || [];
+              if (!credentials || credentials.length === 0) {
+                setPendingRedirectUrl(data.redirectUrl);
+                setShowPasskeyPrompt(true);
+              } else {
+                router.refresh();
+                router.replace(data.redirectUrl);
+              }
+            } else {
+              // If we couldn't determine credentials, avoid prompting every
+              // time — just redirect the user.
+              router.refresh();
+              router.replace(data.redirectUrl);
+            }
+          } catch (err) {
+            console.error("Failed to check existing passkeys:", err);
+            router.refresh();
+            router.replace(data.redirectUrl);
+          }
+        } else {
+          router.refresh(); // Refresh router cache
+          router.replace(data.redirectUrl); // Use replace instead of push
         }
       } else {
         // ❌ Login failed
@@ -98,7 +142,7 @@ export default function Login() {
 
   const handlePasskeyLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!passKeyEmail) {
+    if (!formData.email) {
       setError("Please enter your email address");
       return;
     }
@@ -106,7 +150,7 @@ export default function Login() {
     setError("");
 
     try {
-      const result = await authenticateWithPasskey(passKeyEmail);
+      const result = await authenticateWithPasskey(formData.email);
 
       if (result.success && result.redirectUrl) {
         // Successful login
@@ -114,7 +158,7 @@ export default function Login() {
         router.replace(result.redirectUrl);
       } else if (result.requiresMfa) {
         // Need 2FA verification
-        setFormData({ ...formData, email: passKeyEmail });
+        setFormData({ ...formData, email: formData.email });
         setShowTwoFactor(true);
       } else {
         // Authentication failed
@@ -122,7 +166,9 @@ export default function Login() {
       }
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "An error occurred during passkey login"
+        err instanceof Error
+          ? err.message
+          : "An error occurred during passkey login",
       );
     } finally {
       setPassKeyLoading(false);
@@ -191,34 +237,7 @@ export default function Login() {
             </Alert>
           )}
 
-          {/* Authentication Method Tabs */}
-          {webAuthnSupported && (
-            <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 3 }}>
-              <Tabs
-                value={activeTab}
-                onChange={(e, newValue) => {
-                  setActiveTab(newValue);
-                  setError("");
-                }}
-                variant="fullWidth"
-              >
-                <Tab
-                  label="Password"
-                  icon={<LockIcon />}
-                  iconPosition="start"
-                />
-                <Tab
-                  label="Passkey"
-                  icon={<FingerprintIcon />}
-                  iconPosition="start"
-                />
-              </Tabs>
-            </Box>
-          )}
-
-          {/* Password Authentication Form */}
-          {activeTab === 0 && (
-            <Box component="form" onSubmit={handleSubmit} noValidate>
+          <Box component="form" onSubmit={handleSubmit} noValidate>
             <TextField
               fullWidth
               required
@@ -276,6 +295,26 @@ export default function Login() {
               {isLoading ? "Loading..." : "Continue"}
             </Button>
 
+            {webAuthnSupported && (
+              <Button
+                fullWidth
+                variant="outlined"
+                color="secondary"
+                sx={{ mt: 1 }}
+                onClick={handlePasskeyLogin}
+                disabled={passKeyLoading || !formData.email}
+                startIcon={
+                  passKeyLoading ? (
+                    <CircularProgress size={20} />
+                  ) : (
+                    <FingerprintIcon />
+                  )
+                }
+              >
+                {passKeyLoading ? "Authenticating..." : "Login with Passkey"}
+              </Button>
+            )}
+
             {/* Signup prompt (inline, no gap) */}
             <Box
               mt={2}
@@ -303,75 +342,70 @@ export default function Login() {
                 Sign up
               </Button>
             </Box>
-          </Box>
-          )}
 
-          {/* Passkey Authentication Form */}
-          {activeTab === 1 && (
-            <Box component="form" onSubmit={handlePasskeyLogin} noValidate>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Use your registered passkey to log in securely.
-              </Typography>
-
-              <TextField
-                fullWidth
-                required
-                name="email"
-                label="Email Address"
-                type="email"
-                value={passKeyEmail}
-                onChange={(e) => setPassKeyEmail(e.target.value)}
-                margin="normal"
-                disabled={passKeyLoading}
-              />
-
-              <Button
-                type="submit"
-                fullWidth
-                variant="contained"
-                color="primary"
-                sx={{ mt: 3, mb: 1 }}
-                disabled={passKeyLoading || !passKeyEmail}
-                startIcon={
-                  passKeyLoading ? (
-                    <CircularProgress size={20} />
-                  ) : (
-                    <FingerprintIcon />
-                  )
-                }
-              >
-                {passKeyLoading ? "Authenticating..." : "Login with Passkey"}
-              </Button>
-
-              {/* Signup prompt for passkey tab */}
-              <Box
-                mt={2}
-                display="flex"
-                justifyContent="center"
-                alignItems="center"
-              >
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  component="span"
-                  sx={{ mr: 0 }}
-                >
-                  Don&apos;t have an account?
-                </Typography>
+            {/* Passkey setup prompt after password login */}
+            <Dialog
+              open={showPasskeyPrompt}
+              onClose={() => setShowPasskeyPrompt(false)}
+              maxWidth="xs"
+              fullWidth
+            >
+              <DialogTitle>Set up a passkey?</DialogTitle>
+              <DialogContent>
+                <DialogContentText>
+                  For faster and safer logins, would you like to set up a
+                  passkey (Face ID / Touch ID / Windows Hello) on this device?
+                </DialogContentText>
+              </DialogContent>
+              <DialogActions>
                 <Button
-                  component="a"
-                  href="https://www.bitfactory.ae"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  variant="text"
-                  size="medium"
-                  sx={{ textTransform: "none", ml: 0 }}
+                  onClick={() => {
+                    setShowPasskeyPrompt(false);
+                    if (pendingRedirectUrl) router.replace(pendingRedirectUrl);
+                  }}
                 >
-                  Sign up
+                  No thanks
                 </Button>
-              </Box>
-            </Box>
-          )}
+                <Button
+                  onClick={async () => {
+                    setShowPasskeyPrompt(false);
+                    // Trigger registration (user is authenticated via cookie)
+                    try {
+                      const res = await fetch(
+                        "/api/auth/webauthn/register/options",
+                        {
+                          method: "POST",
+                          credentials: "include",
+                        },
+                      );
+                      if (!res.ok) {
+                        console.error("Failed to get registration options");
+                      } else {
+                        // Use existing helper to run registration
+                        const { registerPasskey } =
+                          await import("@/lib/webauthn/registration");
+                        const regResult = await registerPasskey();
+                        if (!regResult.success) {
+                          console.error(
+                            "Passkey registration failed:",
+                            regResult.error,
+                          );
+                        }
+                      }
+                    } catch (err) {
+                      console.error("Passkey setup error:", err);
+                    } finally {
+                      if (pendingRedirectUrl)
+                        router.replace(pendingRedirectUrl);
+                    }
+                  }}
+                  variant="contained"
+                >
+                  Set up passkey
+                </Button>
+              </DialogActions>
+            </Dialog>
+          </Box>
 
           {/* Passkey unavailable notice */}
           {!webAuthnSupported && (

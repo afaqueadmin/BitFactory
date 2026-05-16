@@ -155,16 +155,9 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // If 2FA is enabled, return partial auth (require 2FA verification)
-    if (user.twoFactorEnabled) {
-      return NextResponse.json(
-        {
-          requiresMfa: true,
-          message: "Please enter your 2FA code",
-        },
-        { status: 200 },
-      );
-    }
+    // NOTE: Passkey (WebAuthn) logins are considered a strong authentication
+    // method. Do NOT require separate 2FA when authentication succeeds
+    // via a verified assertion.
 
     // Generate tokens
     const { accessToken, refreshToken } = await generateTokens(
