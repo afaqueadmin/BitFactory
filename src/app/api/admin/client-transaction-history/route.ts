@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { verifyJwtToken } from "@/lib/jwt";
 import { prisma } from "@/lib/prisma";
-import { createLuxorClient } from "@/lib/luxor";
+import { createLuxorClient, Transaction } from "@/lib/luxor";
 import { createBraiinsClient } from "@/lib/braiins";
 
 /**
@@ -236,6 +236,11 @@ export async function GET(request: NextRequest) {
     });
 
     const allTransactions: ClientTransaction[] = [];
+
+    // Debug tracking
+    const transactionTypeTracker: Record<string, number> = {};
+    const statsIncludedTracker: Record<string, number> = {};
+
     const summaryStats = {
       totalCredits: 0,
       totalDebits: 0,
@@ -275,36 +280,65 @@ export async function GET(request: NextRequest) {
         const luxorSubaccountNames = luxorAuths.map((auth) => auth.authKey);
 
         console.log(
-          `[Client Transaction History API] Fetching Luxor transactions for ${luxorSubaccountNames.length} subaccounts in ONE API call`,
+          `[Client Transaction History API] Fetching Luxor transactions for ${luxorSubaccountNames.length} subaccounts`,
         );
 
         // Use first auth's pool ID to create Luxor client
         const luxorPoolId = luxorAuths[0].poolId;
         const luxorClient = createLuxorClient(luxorPoolId);
 
-        const luxorParams: Record<string, string | number> = {
-          subaccount_names: luxorSubaccountNames.join(","),
-          start_date: startDateParam,
-          end_date: endDateParam,
-          page_number: 1,
-          page_size: 500, // Fetch more to get complete history
-        };
+        // Fetch ALL pages to avoid data loss (Luxor API returns pagination info)
+        let allLuxorTransactions: Transaction[] = [];
+        let currentPage = 1;
+        let hasMorePages = true;
 
-        if (typeFilter !== "all") {
-          luxorParams.transaction_type = typeFilter;
+        while (hasMorePages) {
+          const luxorParams: Record<string, string | number> = {
+            subaccount_names: luxorSubaccountNames.join(","),
+            start_date: startDateParam,
+            end_date: endDateParam,
+            page_number: currentPage,
+            page_size: 500,
+          };
+
+          if (typeFilter !== "all") {
+            luxorParams.transaction_type = typeFilter;
+          }
+
+          console.log(
+            `[Client Transaction History API] Fetching Luxor page ${currentPage}...`,
+          );
+
+          const luxorResponse = await luxorClient.getTransactions(
+            "BTC",
+            luxorParams as Record<string, unknown>,
+          );
+
+          allLuxorTransactions = allLuxorTransactions.concat(
+            luxorResponse.transactions,
+          );
+
+          // Check if there are more pages (Luxor returns pagination info)
+          const paginationInfo = luxorResponse.pagination;
+          hasMorePages = Boolean(paginationInfo?.next_page_url);
+          currentPage++;
+
+          console.log(
+            `[Client Transaction History API] Got ${luxorResponse.transactions.length} transactions on page ${currentPage - 1}. Total so far: ${allLuxorTransactions.length}`,
+          );
         }
 
-        const luxorResponse = await luxorClient.getTransactions(
-          "BTC",
-          luxorParams as Record<string, unknown>,
-        );
-
         console.log(
-          `[Client Transaction History API] Got ${luxorResponse.transactions.length} Luxor transactions`,
+          `[Client Transaction History API] Fetched ${allLuxorTransactions.length} total Luxor transactions across ${currentPage - 1} pages`,
         );
 
         // Process Luxor transactions
-        for (const tx of luxorResponse.transactions) {
+        for (const tx of allLuxorTransactions) {
+          // Track all transaction types for debugging
+          const typeKey = tx.transaction_type || "undefined";
+          transactionTypeTracker[typeKey] =
+            (transactionTypeTracker[typeKey] || 0) + 1;
+
           // Find the customer for this transaction via subaccount_name
           const customerId = subaccountToCustomer[tx.subaccount_name];
           if (!customerId) {
@@ -344,21 +378,34 @@ export async function GET(request: NextRequest) {
 
           allTransactions.push(clientTx);
 
-          // Update summary stats
-          if (tx.transaction_type === "credit") {
+          // Update summary stats and track what gets counted
+          const normalizedType =
+            tx.transaction_type?.toLowerCase().trim() || "undefined";
+          if (normalizedType === "credit") {
             summaryStats.totalCredits += tx.currency_amount;
             summaryStats.totalCreditsUsd += tx.usd_equivalent;
-          } else if (tx.transaction_type === "debit") {
+            statsIncludedTracker["credit"] =
+              (statsIncludedTracker["credit"] || 0) + 1;
+          } else if (normalizedType === "debit") {
             summaryStats.totalDebits += tx.currency_amount;
             summaryStats.totalDebitsUsd += tx.usd_equivalent;
+            statsIncludedTracker["debit"] =
+              (statsIncludedTracker["debit"] || 0) + 1;
+          } else {
+            console.warn(
+              `[Client Transaction History API] WARNING: Unhandled transaction_type "${tx.transaction_type}" for transaction ${tx.transaction_id}. Amount: ${tx.currency_amount} BTC`,
+            );
+            if (!statsIncludedTracker["unhandled"])
+              statsIncludedTracker["unhandled"] = 0;
+            statsIncludedTracker["unhandled"]++;
           }
 
           // Update pool-specific stats
           poolStats.luxor.count++;
-          if (tx.transaction_type === "credit") {
+          if (normalizedType === "credit") {
             poolStats.luxor.totalCredits += tx.currency_amount;
             poolStats.luxor.totalCreditsUsd += tx.usd_equivalent;
-          } else if (tx.transaction_type === "debit") {
+          } else if (normalizedType === "debit") {
             poolStats.luxor.totalDebits += tx.currency_amount;
             poolStats.luxor.totalDebitsUsd += tx.usd_equivalent;
           }
@@ -448,9 +495,10 @@ export async function GET(request: NextRequest) {
 
             allTransactions.push(clientTx);
 
-            // Update summary stats
+            // Update summary stats (Braiins payouts are always credits)
             summaryStats.totalCredits += btcAmount;
-            // Note: totalCreditsUsd remains at prior value as Braiins API doesn't provide USD
+            statsIncludedTracker["credit_braiins"] =
+              (statsIncludedTracker["credit_braiins"] || 0) + 1;
 
             // Update pool-specific stats
             poolStats.braiins.count++;
@@ -485,6 +533,30 @@ export async function GET(request: NextRequest) {
     console.log(
       `[Client Transaction History API] Fetched ${allTransactions.length} total transactions`,
     );
+
+    // Debug: Log transaction type breakdown
+    console.log(
+      `[Client Transaction History API] DEBUG - Transaction Type Breakdown (in API response):`,
+      transactionTypeTracker,
+    );
+    console.log(
+      `[Client Transaction History API] DEBUG - Stats Included Count:`,
+      statsIncludedTracker,
+    );
+    console.log(`[Client Transaction History API] DEBUG - Summary Stats:`, {
+      totalCredits: summaryStats.totalCredits,
+      totalDebits: summaryStats.totalDebits,
+      netAmount: summaryStats.netAmount,
+    });
+
+    if (
+      statsIncludedTracker["unhandled"] &&
+      statsIncludedTracker["unhandled"] > 0
+    ) {
+      console.warn(
+        `[Client Transaction History API] ⚠️  WARNING: ${statsIncludedTracker["unhandled"]} transactions had unhandled transaction_type values and were excluded from stats but included in table`,
+      );
+    }
 
     return NextResponse.json(
       {

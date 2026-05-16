@@ -453,9 +453,7 @@ async function fetchSummary(
  * Helper: Fetch Braiins data for a specific user (identified by authKey from PoolAuth)
  * Braiins API is single-user (one token = one user)
  */
-async function fetchBraiinsProfile(
-  braiinsApiToken: string,
-): Promise<{
+async function fetchBraiinsProfile(braiinsApiToken: string): Promise<{
   hashrate_5m: number;
   hashrate_24h: number;
   activeWorkers: number;
@@ -474,7 +472,10 @@ async function fetchBraiinsProfile(
     if (profile?.btc) {
       const btc = profile.btc;
       const activeWorkers = btc.ok_workers || 0;
-      const inactiveWorkers = (btc.off_workers || 0) + (btc.dis_workers || 0) + (btc.low_workers || 0);
+      const inactiveWorkers =
+        (btc.off_workers || 0) +
+        (btc.dis_workers || 0) +
+        (btc.low_workers || 0);
       const totalWorkers = activeWorkers + inactiveWorkers;
 
       return {
@@ -504,13 +505,13 @@ async function fetchBraiinsRevenue(
     }
 
     const client = new BraiinsClient(braiinsApiToken, "admin-dashboard");
-    
+
     // Fetch last 30 days of rewards
     const today = new Date();
     const thirtyDaysAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
-    
-    const fromDate = thirtyDaysAgo.toISOString().split('T')[0]; // YYYY-MM-DD
-    const toDate = today.toISOString().split('T')[0]; // YYYY-MM-DD
+
+    const fromDate = thirtyDaysAgo.toISOString().split("T")[0]; // YYYY-MM-DD
+    const toDate = today.toISOString().split("T")[0]; // YYYY-MM-DD
 
     const rewards = await client.getDailyRewards({
       from: fromDate,
@@ -548,10 +549,12 @@ async function fetchLuxorMiners(
     // Step 1: Get Luxor database miners
     const luxorDbMiners = await prisma.miner.count({
       where: {
-        poolId: (await prisma.pool.findUnique({
-          where: { name: "Luxor" },
-          select: { id: true },
-        }))?.id,
+        poolId: (
+          await prisma.pool.findUnique({
+            where: { name: "Luxor" },
+            select: { id: true },
+          })
+        )?.id,
         status: "AUTO",
         isDeleted: false,
       },
@@ -573,7 +576,9 @@ async function fetchLuxorMiners(
         );
       }
     } else {
-      console.warn("[Admin Dashboard] No Luxor subaccounts found for miners fetch");
+      console.warn(
+        "[Admin Dashboard] No Luxor subaccounts found for miners fetch",
+      );
     }
 
     // Step 3: Calculate action required (orphans)
@@ -596,7 +601,7 @@ async function fetchLuxorMiners(
  * Gets all Braiins customers, aggregates their worker counts from API
  * Compares with DB miners assigned to Braiins
  */
-async function fetchBraiinsMiners(request: NextRequest): Promise<{
+async function fetchBraiinsMiners(_request: NextRequest): Promise<{
   active: number;
   inactive: number;
   actionRequired: number;
@@ -623,7 +628,9 @@ async function fetchBraiinsMiners(request: NextRequest): Promise<{
       },
     });
 
-    console.log(`[Admin Dashboard] Braiins DB miners (AUTO): ${braiinsDbMiners}`);
+    console.log(
+      `[Admin Dashboard] Braiins DB miners (AUTO): ${braiinsDbMiners}`,
+    );
 
     // Step 3: Get all Braiins authKeys from PoolAuth
     const braiinsAuthKeys = await prisma.poolAuth.findMany({
@@ -763,7 +770,8 @@ export async function GET(request: NextRequest) {
     const inactiveMiners =
       (luxorMinersStats?.inactive || 0) + (braiinsMinersStats?.inactive || 0);
     const actionRequiredMiners =
-      (luxorMinersStats?.actionRequired || 0) + (braiinsMinersStats?.actionRequired || 0);
+      (luxorMinersStats?.actionRequired || 0) +
+      (braiinsMinersStats?.actionRequired || 0);
 
     console.log(
       `[Admin Dashboard] Total Miners: ${activeMinersCount} active, ${inactiveMiners} inactive, ${actionRequiredMiners} action required`,
@@ -873,7 +881,6 @@ export async function GET(request: NextRequest) {
       uptime_24h: 0,
       minedRevenue: 0,
       power: {
-        usedPower: usedMinersPower, // kW from active miners
         totalPower: totalPower, // kW from spaces
         availablePower: Number((totalPower - usedMinersPower).toFixed(2)), // available power
       },
@@ -937,13 +944,15 @@ export async function GET(request: NextRequest) {
     }
 
     // ========== BRAIINS STATS (Mining Pool - Aggregated across all customers) ==========
-    let braiinsStats: (PoolData & {
-      minedRevenue: number;
-      power: {
-        totalPower: number;
-        availablePower: number;
-      };
-    }) | undefined;
+    let braiinsStats:
+      | (PoolData & {
+          minedRevenue: number;
+          power: {
+            totalPower: number;
+            availablePower: number;
+          };
+        })
+      | undefined;
     let braiinsRevenueStats: { revenue: number } | null = null;
 
     try {
@@ -1012,7 +1021,7 @@ export async function GET(request: NextRequest) {
             minedRevenue: totalRevenue,
             power: {
               totalPower: totalPower,
-              availablePower: totalPower,
+              availablePower: Number((totalPower - usedMinersPower).toFixed(2)),
             },
           };
 
@@ -1030,27 +1039,39 @@ export async function GET(request: NextRequest) {
     }
 
     // ========== COMBINED STATS (aggregated from all pools) ==========
-    let combinedStats: (PoolData & {
-      power: {
-        totalPower: number;
-        availablePower: number;
-      };
-    }) | undefined;
+    let combinedStats:
+      | (PoolData & {
+          power: {
+            totalPower: number;
+            availablePower: number;
+          };
+        })
+      | undefined;
 
     if (braiinsStats) {
       combinedStats = {
         workers: {
-          activeWorkers: (luxorStats.workers?.activeWorkers || 0) + (braiinsStats.workers?.activeWorkers || 0),
-          inactiveWorkers: (luxorStats.workers?.inactiveWorkers || 0) + (braiinsStats.workers?.inactiveWorkers || 0),
-          totalWorkers: (luxorStats.workers?.totalWorkers || 0) + (braiinsStats.workers?.totalWorkers || 0),
+          activeWorkers:
+            (luxorStats.workers?.activeWorkers || 0) +
+            (braiinsStats.workers?.activeWorkers || 0),
+          inactiveWorkers:
+            (luxorStats.workers?.inactiveWorkers || 0) +
+            (braiinsStats.workers?.inactiveWorkers || 0),
+          totalWorkers:
+            (luxorStats.workers?.totalWorkers || 0) +
+            (braiinsStats.workers?.totalWorkers || 0),
         },
-        hashrate_5m: (luxorStats.hashrate_5m || 0) + (braiinsStats.hashrate_5m || 0),
-        hashrate_24h: (luxorStats.hashrate_24h || 0) + (braiinsStats.hashrate_24h || 0),
+        hashrate_5m:
+          (luxorStats.hashrate_5m || 0) + (braiinsStats.hashrate_5m || 0),
+        hashrate_24h:
+          (luxorStats.hashrate_24h || 0) + (braiinsStats.hashrate_24h || 0),
         uptime_24h: luxorStats.uptime_24h || 0, // Use Luxor uptime (Braiins doesn't provide)
-        minedRevenue: (luxorStats.minedRevenue || revenueStats?.revenue || 0) + (braiinsStats.minedRevenue || 0),
+        minedRevenue:
+          (luxorStats.minedRevenue || revenueStats?.revenue || 0) +
+          (braiinsStats.minedRevenue || 0),
         power: {
           totalPower: totalPower,
-          availablePower: totalPower,
+          availablePower: Number((totalPower - usedMinersPower).toFixed(2)),
         },
       };
     }
