@@ -90,14 +90,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Require 2FA for this login if the user has 2FA enabled.
-    // (Keep a global toggle optional, but per-user setting takes precedence.)
-    const globalTwoFactorEnabled = process.env.TWO_FACTOR_ENABLED === "true";
-    if (user.twoFactorEnabled || globalTwoFactorEnabled) {
+    // Require 2FA only when this specific user has 2FA enabled.
+    if (user.twoFactorEnabled) {
       return NextResponse.json({
         requiresTwoFactor: true,
         message: "Please enter your 2FA code",
-        env: process.env,
       });
     }
 
