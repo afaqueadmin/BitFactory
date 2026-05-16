@@ -248,24 +248,21 @@ export default function Login() {
               </Button>
             </Box>
 
-            <Button
-              type="submit"
-              fullWidth
-              variant="contained"
-              color="primary"
-              sx={{ mt: 3, mb: 1 }}
-              disabled={isLoading}
-              startIcon={isLoading ? <CircularProgress size={20} /> : null}
-            >
-              {isLoading ? "Loading..." : "Continue"}
-            </Button>
-
             {webAuthnSupported && (
               <Button
                 fullWidth
-                variant="outlined"
-                color="secondary"
-                sx={{ mt: 1 }}
+                variant="contained"
+                sx={{
+                  mt: 3,
+                  mb: 1,
+                  bgcolor: "#0f766e",
+                  color: "#ffffff",
+                  boxShadow: "0 8px 24px rgba(15, 118, 110, 0.28)",
+                  "&:hover": {
+                    bgcolor: "#115e59",
+                    boxShadow: "0 10px 28px rgba(15, 118, 110, 0.34)",
+                  },
+                }}
                 onClick={handlePasskeyLogin}
                 disabled={passKeyLoading || !formData.email}
                 startIcon={
@@ -279,6 +276,18 @@ export default function Login() {
                 {passKeyLoading ? "Authenticating..." : "Login with Passkey"}
               </Button>
             )}
+
+            <Button
+              type="submit"
+              fullWidth
+              variant="contained"
+              color="primary"
+              sx={{ mt: 1, mb: 1 }}
+              disabled={isLoading || !formData.password}
+              startIcon={isLoading ? <CircularProgress size={20} /> : null}
+            >
+              {isLoading ? "Loading..." : "Login with Password"}
+            </Button>
 
             {/* Signup prompt (inline, no gap) */}
             <Box

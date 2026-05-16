@@ -69,7 +69,8 @@ export async function authenticateWithPasskey(email: string): Promise<{
         console.error("WebAuthn authentication NotAllowedError:", error);
         return {
           success: false,
-          error: `Authentication timed out or was not allowed. Please try again. ${errorMsg}`,
+          error:
+            "Passkey sign-in was canceled or took too long. Please try again.",
         };
       }
 
