@@ -86,7 +86,7 @@ export async function GET(request: NextRequest) {
         const invoiceType =
           invoice.invoiceType === "HARDWARE_PURCHASE"
             ? "Hardware"
-            : "Hosting & Electricity";
+            : "Hosting & Electricity charges";
 
         const statusClass = `status-${invoice.status}`;
 

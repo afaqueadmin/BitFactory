@@ -55,6 +55,7 @@ interface DashboardStats {
     };
     power: {
       totalPower: number; // kW from miners
+      usedPower: number; // kW from used miners
       availablePower: number; // kW from spaces
     };
   };
@@ -62,6 +63,7 @@ interface DashboardStats {
   braiins?: PoolData & {
     power: {
       totalPower: number; // kW from miners
+      usedPower: number; // kW from used miners
       availablePower: number; // kW from spaces
     };
   };
@@ -74,6 +76,7 @@ interface DashboardStats {
     };
     power: {
       totalPower: number; // kW from miners
+      usedPower: number; // kW from used miners
       availablePower: number; // kW from spaces
     };
   };
@@ -787,45 +790,23 @@ export async function GET(request: NextRequest) {
       where: { status: "OCCUPIED" },
     });
 
-    // Calculate total power - fetch spaces power capacity
-    const totalSpacePower = await prisma.space.aggregate({
-      _sum: { powerCapacity: true },
-    });
+    const POWER_PER_MINER = 3.55;
+    const MAX_MINERS = 120;
 
-    // Calculate power usage: Sum of (hardware.powerUsage * count of AUTO miners using that hardware)
     let usedMinersPower = 0;
+    let autoMinersCount = 0;
     try {
-      // Get all hardware with count of AUTO miners using it
-      const hardwareWithMinerCounts = await prisma.hardware.findMany({
-        where: { isDeleted: false },
-        select: {
-          id: true,
-          powerUsage: true,
-          miners: {
-            where: {
-              status: "AUTO",
-              isDeleted: false,
-            },
-            select: {
-              id: true,
-            },
-          },
+      autoMinersCount = await prisma.miner.count({
+        where: {
+          status: "AUTO",
+          isDeleted: false,
         },
       });
 
-      // Calculate total power: sum of (powerUsage * number of AUTO miners)
-      usedMinersPower = Number(
-        hardwareWithMinerCounts
-          .reduce((total, hw) => {
-            const minerCount = hw.miners.length;
-            const powerForThisHardware = hw.powerUsage * minerCount;
-            return total + powerForThisHardware;
-          }, 0)
-          .toFixed(2),
-      );
+      usedMinersPower = Number((autoMinersCount * POWER_PER_MINER).toFixed(2));
 
       console.log(
-        `[Admin Dashboard] Total power from AUTO miners: ${usedMinersPower} kW (from ${hardwareWithMinerCounts.length} hardware types)`,
+        `[Admin Dashboard] Total power from AUTO miners: ${usedMinersPower} kW (from ${autoMinersCount} miners)`,
       );
     } catch (error) {
       console.error(
@@ -869,9 +850,7 @@ export async function GET(request: NextRequest) {
 
     // ========== LUXOR STATS (Mining Pool) ==========
 
-    const totalPower = Number(
-      (totalSpacePower._sum.powerCapacity || 0).toFixed(2),
-    );
+    const totalPower = Number((MAX_MINERS * POWER_PER_MINER).toFixed(2));
 
     const luxorStats = {
       poolAccounts: { total: 0, active: 0, inactive: 0 },
@@ -881,8 +860,9 @@ export async function GET(request: NextRequest) {
       uptime_24h: 0,
       minedRevenue: 0,
       power: {
-        totalPower: totalPower, // kW from spaces
-        availablePower: Number((totalPower - usedMinersPower).toFixed(2)), // available power
+        totalPower: totalPower,
+        usedPower: usedMinersPower,
+        availablePower: Number((totalPower - usedMinersPower).toFixed(2)),
       },
     };
 
@@ -949,6 +929,7 @@ export async function GET(request: NextRequest) {
           minedRevenue: number;
           power: {
             totalPower: number;
+            usedPower: number;
             availablePower: number;
           };
         })
@@ -1021,6 +1002,7 @@ export async function GET(request: NextRequest) {
             minedRevenue: totalRevenue,
             power: {
               totalPower: totalPower,
+              usedPower: usedMinersPower,
               availablePower: Number((totalPower - usedMinersPower).toFixed(2)),
             },
           };
@@ -1043,6 +1025,7 @@ export async function GET(request: NextRequest) {
       | (PoolData & {
           power: {
             totalPower: number;
+            usedPower: number;
             availablePower: number;
           };
         })
@@ -1071,6 +1054,7 @@ export async function GET(request: NextRequest) {
           (braiinsStats.minedRevenue || 0),
         power: {
           totalPower: totalPower,
+          usedPower: usedMinersPower,
           availablePower: Number((totalPower - usedMinersPower).toFixed(2)),
         },
       };

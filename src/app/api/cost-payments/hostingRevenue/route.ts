@@ -29,7 +29,9 @@ export async function GET(request: NextRequest) {
 
     const costPayments = await prisma.costPayment.aggregate({
       where: {
-        type: "ELECTRICITY_CHARGES",
+        type: {
+          in: ["ELECTRICITY_CHARGES", "ADJUSTMENT"],
+        },
       },
       _sum: {
         amount: true,

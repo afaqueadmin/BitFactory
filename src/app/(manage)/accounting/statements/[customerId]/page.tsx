@@ -337,9 +337,6 @@ export default function CustomerStatementPage() {
       >
         <Box>
           <h1 style={{ margin: 0 }}>{customer.name} - Statement</h1>
-          <p style={{ margin: "8px 0 0 0", color: "#666" }}>
-            Customer ID: {customer.id}
-          </p>
         </Box>
         <Stack direction="row" spacing={1}>
           <Button
