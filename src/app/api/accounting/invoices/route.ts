@@ -13,22 +13,18 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const customerId = searchParams.get("customerId");
+    const decoded = await verifyJwtToken(token);
+    const userRole = decoded.role;
 
-    if (!customerId) {
-      const decoded = await verifyJwtToken(token);
-      const userId = decoded.userId;
+    if (customerId && userRole === "CLIENT" && customerId != decoded.userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
-      const user = await prisma.user.findUnique({
-        where: { id: userId },
-        select: { role: true },
-      });
-
-      if (user?.role !== "ADMIN" && user?.role !== "SUPER_ADMIN") {
-        return NextResponse.json(
-          { error: "Only administrators can access invoices" },
-          { status: 403 },
-        );
-      }
+    if (!customerId && userRole !== "ADMIN" && userRole !== "SUPER_ADMIN") {
+      return NextResponse.json(
+        { error: "Only administrators can access invoices" },
+        { status: 403 },
+      );
     }
 
     const status = searchParams.get("status");
