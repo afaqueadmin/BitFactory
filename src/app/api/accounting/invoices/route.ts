@@ -3,6 +3,18 @@ import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
 import { InvoiceStatus, AuditAction, Prisma } from "@prisma/client";
 
+function normalizeBillingMonth(billingMonth: string | Date): Date {
+  const parsedBillingMonth = new Date(billingMonth);
+
+  return new Date(
+    Date.UTC(
+      parsedBillingMonth.getUTCFullYear(),
+      parsedBillingMonth.getUTCMonth(),
+      1,
+    ),
+  );
+}
+
 export async function GET(request: NextRequest) {
   try {
     const token = request.cookies.get("token")?.value;
@@ -319,7 +331,9 @@ export async function POST(request: NextRequest) {
         invoiceType: invoiceType || "ELECTRICITY_CHARGES",
         invoiceGeneratedDate: timestamp,
         dueDate: new Date(dueDate),
-        billingMonth: billingMonth ? new Date(billingMonth) : undefined,
+        billingMonth: billingMonth
+          ? normalizeBillingMonth(billingMonth)
+          : undefined,
         createdBy: userId,
       },
       include: {

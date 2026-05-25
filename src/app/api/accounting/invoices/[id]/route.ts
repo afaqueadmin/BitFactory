@@ -4,6 +4,18 @@ import { verifyJwtToken } from "@/lib/jwt";
 import { AuditAction, InvoiceStatus } from "@prisma/client";
 import { sendInvoiceCancellationEmail } from "@/lib/email";
 
+function normalizeBillingMonth(billingMonth: string | Date): Date {
+  const parsedBillingMonth = new Date(billingMonth);
+
+  return new Date(
+    Date.UTC(
+      parsedBillingMonth.getUTCFullYear(),
+      parsedBillingMonth.getUTCMonth(),
+      1,
+    ),
+  );
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -140,7 +152,7 @@ export async function PATCH(
       changes.dueDate = dueDate;
     }
     if (billingMonth) {
-      updateData.billingMonth = new Date(billingMonth);
+      updateData.billingMonth = normalizeBillingMonth(billingMonth);
       changes.billingMonth = {
         from: currentInvoice.billingMonth,
         to: billingMonth,
