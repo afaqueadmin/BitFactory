@@ -6,7 +6,6 @@ import {
   Typography,
   Paper,
   CircularProgress,
-  useTheme,
   Button,
   TextField,
   Alert,
@@ -444,6 +443,7 @@ export default function WalletPage() {
               backgroundColor: (theme) =>
                 theme.palette.mode === "light" ? "#2196f3" : "#1565c0",
               color: "white",
+              minHeight: { xs: "auto", sm: minCardHeight },
             }}
           >
             <Typography variant="subtitle2" sx={{ opacity: 0.9 }}>
@@ -493,6 +493,7 @@ export default function WalletPage() {
                 theme.palette.mode === "light" ? "#ffb300" : "#ff8f00",
               color: "white",
               opacity: poolMode === "braiins" ? 0.6 : 1,
+              minHeight: { xs: "auto", sm: minCardHeight },
             }}
           >
             <Typography variant="subtitle2" sx={{ opacity: 0.9 }}>
