@@ -36,14 +36,8 @@ interface CustomerMinersState {
   error?: string | null;
 }
 
-const getDefaultBillingMonth = () => {
-  const now = new Date();
-  const nextMonth = now.getMonth() + 1;
-  if (nextMonth > 11) {
-    return { month: 0, year: now.getFullYear() + 1 };
-  }
-  return { month: nextMonth, year: now.getFullYear() };
-};
+// Default to current month/year — user must select billing month from dropdown
+const now = new Date();
 
 const MONTH_NAMES = [
   "January",
@@ -69,13 +63,11 @@ export default function BulkInvoicesPage() {
     error: createError,
   } = useCreateInvoice();
 
-  const defaultBilling = getDefaultBillingMonth();
+  const defaultBilling = { month: now.getMonth(), year: now.getFullYear() };
 
   const [selectedCustomerIds, setSelectedCustomerIds] = useState<string[]>([]);
   const [unitPrice, setUnitPrice] = useState<number>(0);
-  const [dueDate, setDueDate] = useState(
-    new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-  );
+  const [dueDate, setDueDate] = useState("");
   const [billingMonth, setBillingMonth] = useState<number>(
     defaultBilling.month,
   );
@@ -194,6 +186,11 @@ export default function BulkInvoicesPage() {
 
     if (!unitPrice || unitPrice <= 0) {
       setSubmitError("Unit price must be greater than 0.");
+      return;
+    }
+
+    if (!dueDate) {
+      setSubmitError("Due date is required.");
       return;
     }
 
@@ -388,14 +385,9 @@ export default function BulkInvoicesPage() {
                   onChange={(e) => {
                     const selected = Number(e.target.value);
                     setBillingMonth(selected);
-                    setBillingYear(
-                      selected === 11
-                        ? new Date().getFullYear() + 1
-                        : new Date().getFullYear(),
-                    );
                   }}
                   fullWidth
-                  helperText={`Year: ${billingYear} (auto-calculated)`}
+                  helperText={`Year: ${billingYear}`}
                   required
                 >
                   {MONTH_NAMES.map((name, idx) => (
@@ -411,7 +403,7 @@ export default function BulkInvoicesPage() {
                   onChange={(e) => setDueDate(e.target.value)}
                   fullWidth
                   InputLabelProps={{ shrink: true }}
-                  helperText="When payment is due (defaults to 30 days from today)"
+                  helperText="Select the due date for these invoices"
                   required
                 />
               </Stack>
@@ -460,7 +452,8 @@ export default function BulkInvoicesPage() {
                   creating ||
                   customersLoading ||
                   selectedCustomerIds.length === 0 ||
-                  !unitPrice
+                  !unitPrice ||
+                  !dueDate
                 }
               >
                 {creating ? "Creating Invoices..." : "Create Draft Invoices"}

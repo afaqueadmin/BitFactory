@@ -31,32 +31,19 @@ export default function CreateInvoicePage() {
   const { create: createInvoice, error: createError } = useCreateInvoice();
   const { customers, loading: customersLoading } = useCustomers();
 
-  // Auto-calculate billing month: next month from today
-  const getDefaultBillingMonth = () => {
-    const now = new Date();
-    const nextMonth = now.getMonth() + 1; // 0-indexed, so +1 gives next month
-    if (nextMonth > 11) {
-      // December wraps to January next year
-      return { month: 0, year: now.getFullYear() + 1 };
-    }
-    return { month: nextMonth, year: now.getFullYear() };
-  };
-
-  const defaultBilling = getDefaultBillingMonth();
+  const now = new Date();
 
   const [formData, setFormData] = useState({
     customerId: "",
     totalMiners: 0,
     unitPrice: 0,
     totalAmount: 0,
-    dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-      .toISOString()
-      .split("T")[0],
+    dueDate: "",
     status: InvoiceStatus.DRAFT,
     invoiceType: "ELECTRICITY_CHARGES",
     hardwareId: "",
-    billingMonth: defaultBilling.month,
-    billingYear: defaultBilling.year,
+    billingMonth: now.getMonth(),
+    billingYear: now.getFullYear(),
   });
 
   // Fetch miners only when customerId changes
@@ -217,6 +204,9 @@ export default function CreateInvoicePage() {
       }
       if (formData.totalMiners <= 0 || formData.unitPrice <= 0) {
         throw new Error("Miners count and unit price must be greater than 0");
+      }
+      if (!formData.dueDate) {
+        throw new Error("Due date is required");
       }
 
       // Validate due date is not in the past
@@ -465,20 +455,13 @@ export default function CreateInvoicePage() {
                     value={formData.billingMonth}
                     onChange={(e) => {
                       const selectedMonth = Number(e.target.value);
-                      const now = new Date();
-                      // If December is selected, use next year
-                      const year =
-                        selectedMonth === 11
-                          ? now.getFullYear() + 1
-                          : now.getFullYear();
                       setFormData((prev) => ({
                         ...prev,
                         billingMonth: selectedMonth,
-                        billingYear: year,
                       }));
                     }}
                     fullWidth
-                    helperText={`Year: ${formData.billingYear} (auto-calculated)`}
+                    helperText={`Year: ${formData.billingYear}`}
                     required
                   >
                     <MenuItem value={0}>January</MenuItem>
@@ -503,7 +486,7 @@ export default function CreateInvoicePage() {
                   onChange={handleInputChange}
                   fullWidth
                   InputLabelProps={{ shrink: true }}
-                  helperText="When payment is due (defaults to 30 days from today)"
+                  helperText="Select the due date for this invoice"
                   required
                 />
                 <TextField
@@ -545,7 +528,8 @@ export default function CreateInvoicePage() {
                   loading ||
                   !formData.customerId ||
                   !formData.totalMiners ||
-                  !formData.unitPrice
+                  !formData.unitPrice ||
+                  !formData.dueDate
                 }
               >
                 {loading ? "Creating..." : "Create Invoice"}
