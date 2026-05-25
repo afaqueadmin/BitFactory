@@ -506,7 +506,7 @@ export default function InvoiceDetailPage() {
                     {invoice.billingMonth
                       ? new Date(invoice.billingMonth).toLocaleDateString(
                           "en-US",
-                          { year: "numeric", month: "long" },
+                          { timeZone: "UTC", year: "numeric", month: "long" },
                         )
                       : "N/A"}
                   </Typography>

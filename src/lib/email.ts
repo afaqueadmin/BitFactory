@@ -484,6 +484,7 @@ export const generateInvoicePDF = async (
       paidPastDueTone,
       billingMonth: billingMonth
         ? new Date(billingMonth).toLocaleDateString("en-US", {
+            timeZone: "UTC",
             year: "numeric",
             month: "long",
           })

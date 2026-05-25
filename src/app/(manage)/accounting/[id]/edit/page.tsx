@@ -97,11 +97,9 @@ export default function EditInvoicePage() {
         throw new Error("Due date must be in the future");
       }
 
-      // Build billingMonth as ISO date string (first day of selected month)
+      // Build billingMonth as UTC midnight on the first day of the selected month
       const billingMonthDate = new Date(
-        formData.billingYear,
-        formData.billingMonth,
-        1,
+        Date.UTC(formData.billingYear, formData.billingMonth, 1),
       );
 
       // Call API to update invoice

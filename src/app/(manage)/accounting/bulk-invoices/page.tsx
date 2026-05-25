@@ -219,7 +219,7 @@ export default function BulkInvoicesPage() {
     }
 
     try {
-      const billingMonthDate = new Date(billingYear, billingMonth, 1);
+      const billingMonthDate = new Date(Date.UTC(billingYear, billingMonth, 1));
 
       for (const customerId of selectedCustomerIds) {
         const minersCount = customerMiners[customerId]?.count ?? 0;
