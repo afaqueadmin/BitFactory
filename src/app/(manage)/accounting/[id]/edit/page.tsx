@@ -72,14 +72,9 @@ export default function EditInvoicePage() {
 
   const handleBillingMonthChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedMonth = Number(e.target.value);
-    const now = new Date();
-    // If December is selected, use next year
-    const year =
-      selectedMonth === 11 ? now.getFullYear() + 1 : now.getFullYear();
     setFormData((prev) => ({
       ...prev,
       billingMonth: selectedMonth,
-      billingYear: year,
     }));
   };
 
