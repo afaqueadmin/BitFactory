@@ -446,7 +446,10 @@ export default function WalletPage() {
               minHeight: { xs: "auto", sm: minCardHeight },
             }}
           >
-            <Typography variant="subtitle2" sx={{ opacity: 0.9 }}>
+            <Typography
+              variant="subtitle2"
+              sx={{ opacity: 0.9, fontSize: { xs: "0.85rem", sm: "0.95rem" } }}
+            >
               Total Earnings
               {poolMode !== "total" && ` (${poolMode.toUpperCase()})`}
             </Typography>
@@ -462,7 +465,7 @@ export default function WalletPage() {
                 <Typography
                   sx={{
                     fontWeight: 800,
-                    fontSize: { xs: "1.1rem", sm: "1.3rem" },
+                    fontSize: { xs: "1.25rem", sm: "1.5rem" },
                   }}
                 >
                   ₿ {getTotalEarnings().toFixed(8)}
@@ -470,7 +473,7 @@ export default function WalletPage() {
                 <Typography
                   sx={{
                     fontWeight: 600,
-                    fontSize: { xs: "0.95rem", sm: "1.1rem" },
+                    fontSize: { xs: "1.05rem", sm: "1.2rem" },
                     opacity: 0.9,
                   }}
                 >
@@ -496,7 +499,10 @@ export default function WalletPage() {
               minHeight: { xs: "auto", sm: minCardHeight },
             }}
           >
-            <Typography variant="subtitle2" sx={{ opacity: 0.9 }}>
+            <Typography
+              variant="subtitle2"
+              sx={{ opacity: 0.9, fontSize: { xs: "0.85rem", sm: "0.95rem" } }}
+            >
               Primary Wallet Address
             </Typography>
             {poolMode === "braiins" ? (
@@ -524,7 +530,7 @@ export default function WalletPage() {
                   wordBreak: "break-all",
                   mt: 1,
                   fontFamily: "monospace",
-                  fontSize: { xs: "0.75rem", sm: "0.875rem" },
+                  fontSize: { xs: "0.85rem", sm: "1rem" },
                 }}
               >
                 {getPrimaryWalletAddress()}
@@ -544,7 +550,10 @@ export default function WalletPage() {
               color: "white",
             }}
           >
-            <Typography variant="subtitle2" sx={{ opacity: 0.9 }}>
+            <Typography
+              variant="subtitle2"
+              sx={{ opacity: 0.9, fontSize: { xs: "0.85rem", sm: "0.95rem" } }}
+            >
               Revenue (24 Hours)
               {poolMode !== "total" && ` (${poolMode.toUpperCase()})`}
             </Typography>
@@ -564,7 +573,7 @@ export default function WalletPage() {
                 <Typography
                   sx={{
                     fontWeight: 800,
-                    fontSize: { xs: "1.1rem", sm: "1.3rem" },
+                    fontSize: { xs: "1.25rem", sm: "1.5rem" },
                   }}
                 >
                   ₿ {getRevenue24h().toFixed(8)}
@@ -572,7 +581,7 @@ export default function WalletPage() {
                 <Typography
                   sx={{
                     fontWeight: 600,
-                    fontSize: { xs: "0.95rem", sm: "1.1rem" },
+                    fontSize: { xs: "1.05rem", sm: "1.2rem" },
                     opacity: 0.9,
                   }}
                 >
@@ -596,7 +605,10 @@ export default function WalletPage() {
               color: "white",
             }}
           >
-            <Typography variant="subtitle2" sx={{ opacity: 0.9 }}>
+            <Typography
+              variant="subtitle2"
+              sx={{ opacity: 0.9, fontSize: { xs: "0.85rem", sm: "0.95rem" } }}
+            >
               Pending Payouts
               {poolMode !== "total" && ` (${poolMode.toUpperCase()})`}
             </Typography>
@@ -612,7 +624,7 @@ export default function WalletPage() {
                 <Typography
                   sx={{
                     fontWeight: 800,
-                    fontSize: { xs: "1.1rem", sm: "1.3rem" },
+                    fontSize: { xs: "1.25rem", sm: "1.5rem" },
                   }}
                 >
                   ₿ {getPendingPayouts().toFixed(8)}
@@ -620,7 +632,7 @@ export default function WalletPage() {
                 <Typography
                   sx={{
                     fontWeight: 600,
-                    fontSize: { xs: "0.95rem", sm: "1.1rem" },
+                    fontSize: { xs: "1.05rem", sm: "1.2rem" },
                     opacity: 0.9,
                   }}
                 >
