@@ -113,7 +113,7 @@ export async function middleware(request: NextRequest) {
           console.error("Token verification failed at /login:", error);
         }
       }
-      return NextResponse.next();
+      // return NextResponse.next();
     }
     return NextResponse.next();
   }
