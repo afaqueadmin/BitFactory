@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
     const refreshToken = request.cookies.get("refresh_token")?.value;
 
     if (!accessToken && !refreshToken) {
-      return NextResponse.json({ isAuthenticated: false }, { status: 402 });
+      return NextResponse.json({ isAuthenticated: false }, { status: 401 });
     }
 
     // Try to verify the access token first
@@ -98,8 +98,8 @@ export async function GET(request: NextRequest) {
 
     // If both tokens are invalid
     const response = NextResponse.json(
-      { isAuthenticated: true },
-      { status: 403 },
+      { isAuthenticated: false },
+      { status: 401 },
     );
 
     // Clear invalid cookies
