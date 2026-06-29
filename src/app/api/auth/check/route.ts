@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
       } catch (error) {
         console.error("Access token verification failed:", error);
         // Fall through to refresh token check
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        // return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         // Do not fall through to refresh token if access token is invalid, just return 401
       }
     }
