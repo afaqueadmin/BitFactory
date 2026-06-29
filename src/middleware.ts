@@ -105,12 +105,15 @@ export async function middleware(request: NextRequest) {
       if (token) {
         try {
           const decoded = await verifyJwtToken(token);
-          const redirectPath = getDefaultPathForRole(decoded.role);
-          return NextResponse.redirect(new URL(redirectPath, request.url));
+          if (decoded.exp && Date.now() <= decoded.exp * 1000) {
+            const redirectPath = getDefaultPathForRole(decoded.role);
+            return NextResponse.redirect(new URL(redirectPath, request.url));
+          }
         } catch (error) {
           console.error("Token verification failed at /login:", error);
         }
       }
+      return NextResponse.next();
     }
     return NextResponse.next();
   }

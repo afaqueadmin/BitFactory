@@ -10,7 +10,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const { id } = await params;
+    const { id: invoiceId } = await params;
     const token = request.cookies.get("token")?.value;
 
     if (!token) {
@@ -18,8 +18,6 @@ export async function GET(
     }
 
     const userId = await verifyJwtToken(token);
-
-    const invoiceId = id;
 
     // Fetch invoice from database
     const invoice = await prisma.invoice.findUnique({
