@@ -37,10 +37,8 @@ export async function verifyJwtToken(token: string): Promise<JwtPayload> {
 
 export async function signJwtToken(
   payload: Omit<JwtPayload, "exp">,
-  duration: "1h" | "7d" = "1h",
+  expiresIn: "1h" | "7d" | "2m" = "1h",
 ): Promise<string> {
-  const expiresIn = duration === "7d" ? "7d" : "1h";
-
   return await new SignJWT(payload)
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
