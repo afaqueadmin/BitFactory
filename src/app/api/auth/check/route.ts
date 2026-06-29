@@ -99,7 +99,7 @@ export async function GET(request: NextRequest) {
     // If both tokens are invalid
     const response = NextResponse.json(
       { isAuthenticated: false },
-      { status: 401 },
+      { status: 200 },
     );
 
     // Clear invalid cookies
