@@ -13,8 +13,6 @@ import {
   TableRow,
   CircularProgress,
   Alert,
-  TextField,
-  InputAdornment,
   ToggleButtonGroup,
   ToggleButton,
   Tabs,
@@ -48,8 +46,6 @@ const columns = [
 // Data Sources:
 // - BTC Price: CoinGecko API (live market price)
 // - Hashprice: Live pool-wide Luxor API (/api/pool-hashprice-live - real-time summary)
-// Note: Using live pool-wide hashprice ensures CLIENT and ADMIN see identical values
-// Note: Same live endpoint as hashprice history page for consistency
 
 // Interface for config data from API
 interface PaybackConfigData {
@@ -64,10 +60,9 @@ interface PaybackConfigData {
   s21xpHashrateStockOs: number;
   s21xpHashrateLuxos: number;
   breakevenBtcPrice: number;
-  invoicedAmount: number;
 }
 
-export default function PaybackAnalysisPage() {
+export default function PaybackAnalysisCompanyPage() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
@@ -75,18 +70,6 @@ export default function PaybackAnalysisPage() {
   const [config, setConfig] = useState<PaybackConfigData | null>(null);
   const [configLoading, setConfigLoading] = useState(true);
   const [configError, setConfigError] = useState<string | null>(null);
-
-  // User role and invoiced amount state
-  const [userRole, setUserRole] = useState<string | null>(null);
-  const [editableInvoicedAmount, setEditableInvoicedAmount] =
-    useState<string>("4250");
-  const [isUpdatingInvoiced, setIsUpdatingInvoiced] = useState(false);
-  const [invoicedUpdateSuccess, setInvoicedUpdateSuccess] = useState<
-    string | null
-  >(null);
-  const [invoicedUpdateError, setInvoicedUpdateError] = useState<string | null>(
-    null,
-  );
 
   // Price and reward state
   const [liveBtcPrice, setLiveBtcPrice] = useState<string | null>(null);
@@ -117,23 +100,13 @@ export default function PaybackAnalysisPage() {
     try {
       setConfigLoading(true);
       setConfigError(null);
-      const response = await fetch("/api/payback-config");
+      const response = await fetch("/api/payback-config-company");
       if (!response.ok) {
         throw new Error("Failed to fetch configuration");
       }
       const data = await response.json();
       if (data.success && data.data) {
         setConfig(data.data);
-        setUserRole(data.userRole || null);
-
-        // Set editable invoiced amount based on user role
-        if (data.userRole === "ADMIN") {
-          // Admin default: 4250
-          setEditableInvoicedAmount("4250");
-        } else {
-          // Client: use value from database
-          setEditableInvoicedAmount(String(data.data.invoicedAmount || "4250"));
-        }
       } else {
         throw new Error(data.error || "Invalid configuration data");
       }
@@ -141,7 +114,7 @@ export default function PaybackAnalysisPage() {
       const errorMsg =
         error instanceof Error ? error.message : "Failed to load configuration";
       setConfigError(errorMsg);
-      console.error("[Payback Analysis] Config fetch error:", error);
+      console.error("[Company Payback Analysis] Config fetch error:", error);
     } finally {
       setConfigLoading(false);
     }
@@ -175,7 +148,6 @@ export default function PaybackAnalysisPage() {
   const fetchLuxorReward = useCallback(async () => {
     try {
       // Use live pool-wide hashprice API to get real-time value for all users
-      // Same endpoint as hashprice history page for consistency
       const response = await fetch("/api/pool-hashprice-live", {
         method: "GET",
         headers: { "Content-Type": "application/json" },
@@ -190,7 +162,6 @@ export default function PaybackAnalysisPage() {
         };
       };
 
-      // Get the live pool-wide hashprice (today's real-time value)
       if (!data.success || !data.data || !Number.isFinite(data.data.hashprice))
         return;
 
@@ -202,72 +173,15 @@ export default function PaybackAnalysisPage() {
     }
   }, []);
 
-  // Handle invoiced amount update
-  const handleUpdateInvoicedAmount = useCallback(async () => {
-    try {
-      setIsUpdatingInvoiced(true);
-      setInvoicedUpdateError(null);
-      setInvoicedUpdateSuccess(null);
-
-      const numValue = parseFloat(editableInvoicedAmount);
-      if (isNaN(numValue) || numValue < 0) {
-        setInvoicedUpdateError("Please enter a valid amount");
-        return;
-      }
-
-      // For ADMIN: just use the value temporarily (no API call)
-      if (userRole === "ADMIN") {
-        setInvoicedUpdateSuccess("Invoiced amount updated for this session");
-        setTimeout(() => setInvoicedUpdateSuccess(null), 3000);
-        return;
-      }
-
-      // For CLIENT: save to database
-      const response = await fetch("/api/user/invoiced-amount", {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ invoicedAmount: numValue }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to update invoiced amount");
-      }
-
-      if (data.success) {
-        setInvoicedUpdateSuccess("Invoiced amount saved successfully!");
-        // Update the config with new value
-        if (config) {
-          setConfig({
-            ...config,
-            invoicedAmount: numValue,
-          });
-        }
-        setTimeout(() => setInvoicedUpdateSuccess(null), 3000);
-      }
-    } catch (error) {
-      const errorMsg =
-        error instanceof Error
-          ? error.message
-          : "Failed to update invoiced amount";
-      setInvoicedUpdateError(errorMsg);
-    } finally {
-      setIsUpdatingInvoiced(false);
-    }
-  }, [editableInvoicedAmount, userRole, config]);
-
   const resolvedBtcPriceValue = liveBtcPriceValue ?? FALLBACK_BTC_PRICE;
   const resolvedRewardBtcPerPhDay =
     liveRewardBtcPerPhDay ?? FALLBACK_REWARD_BTC_PER_PH_DAY;
 
   // Calculate derived values from config
   const monthlyElectricityHosting = config ? config.monthlyInvoicingAmount : 0;
-  const machineCost = config
-    ? parseFloat(editableInvoicedAmount || "0") - config.monthlyInvoicingAmount
-    : 0;
+  // Company self-mining: machine cost is the machine's own capital cost,
+  // there is no client invoice to offset against.
+  const machineCost = config ? config.machineCapitalCost : 0;
 
   // Resolve hashrate for the currently selected miner model
   const activeHashrateStockOs = config
@@ -542,26 +456,6 @@ export default function PaybackAnalysisPage() {
 
   return (
     <Box sx={{ p: { xs: 1.5, sm: 2, md: 3 }, mt: { xs: 1, md: 2 } }}>
-      {/* Success/Error messages for invoiced amount update */}
-      {invoicedUpdateSuccess && (
-        <Alert
-          severity="success"
-          sx={{ mb: 2 }}
-          onClose={() => setInvoicedUpdateSuccess(null)}
-        >
-          {invoicedUpdateSuccess}
-        </Alert>
-      )}
-      {invoicedUpdateError && (
-        <Alert
-          severity="error"
-          sx={{ mb: 2 }}
-          onClose={() => setInvoicedUpdateError(null)}
-        >
-          {invoicedUpdateError}
-        </Alert>
-      )}
-
       <Box sx={{ mb: { xs: 2, md: 3 } }}>
         {/* Title + OS Toggle */}
         <Box
@@ -581,7 +475,7 @@ export default function PaybackAnalysisPage() {
               fontSize: { xs: "1.6rem", sm: "2rem", md: "2.125rem" },
             }}
           >
-            Payback Analysis
+            Company Payback Analysis
           </Typography>
           <ToggleButtonGroup
             value={selectedOS}
@@ -633,42 +527,15 @@ export default function PaybackAnalysisPage() {
             flexWrap: "wrap",
           }}
         >
-          <TextField
-            label="Invoiced Amount"
-            type="number"
-            value={editableInvoicedAmount}
-            onChange={(e) => setEditableInvoicedAmount(e.target.value)}
+          <Button
+            variant="outlined"
+            onClick={handleRefresh}
+            disabled={isRefreshing}
             size="small"
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">$</InputAdornment>
-              ),
-            }}
-            inputProps={{ step: "0.01", min: "0" }}
-            sx={{ width: { xs: "100%", sm: "180px" } }}
-          />
-
-          <Box sx={{ display: "flex", gap: 1.5, flex: { xs: "none", sm: 1 } }}>
-            <Button
-              variant="contained"
-              onClick={handleUpdateInvoicedAmount}
-              disabled={isUpdatingInvoiced}
-              size="small"
-              fullWidth={isMobile}
-            >
-              {isUpdatingInvoiced ? "Updating..." : "Update"}
-            </Button>
-
-            <Button
-              variant="outlined"
-              onClick={handleRefresh}
-              disabled={isRefreshing}
-              size="small"
-              fullWidth={isMobile}
-            >
-              {isRefreshing ? "Refreshing..." : "Refresh"}
-            </Button>
-          </Box>
+            fullWidth={isMobile}
+          >
+            {isRefreshing ? "Refreshing..." : "Refresh"}
+          </Button>
         </Box>
 
         <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
@@ -698,7 +565,9 @@ export default function PaybackAnalysisPage() {
             <Typography variant="subtitle2" color="text.secondary">
               Document
             </Typography>
-            <Typography variant="body2">Payback Analysis</Typography>
+            <Typography variant="body2">
+              Company Payback Analysis (Self-Mining)
+            </Typography>
           </Box>
           <Box>
             <Typography variant="subtitle2" color="text.secondary">
@@ -708,7 +577,7 @@ export default function PaybackAnalysisPage() {
           </Box>
           <Box>
             <Typography variant="subtitle2" color="text.secondary">
-              Monthly Invoicing
+              Monthly Hosting Cost
             </Typography>
             <Typography variant="body2">
               {formatValue(config.monthlyInvoicingAmount, "currency")}
@@ -722,18 +591,7 @@ export default function PaybackAnalysisPage() {
           </Box>
           <Box>
             <Typography variant="subtitle2" color="text.secondary">
-              Invoiced Amount
-            </Typography>
-            <Typography variant="body2">
-              {formatValue(
-                parseFloat(editableInvoicedAmount || "0"),
-                "currency",
-              )}
-            </Typography>
-          </Box>
-          <Box>
-            <Typography variant="subtitle2" color="text.secondary">
-              Machine Cost
+              Machine Capital Cost
             </Typography>
             <Typography variant="body2">
               {formatValue(machineCost, "currency")}

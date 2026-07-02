@@ -35,7 +35,7 @@ interface PaybackConfig {
   updatedAt: string;
 }
 
-export default function PaybackAnalysisSettingsPage() {
+export default function PaybackAnalysisCompanySettingsPage() {
   const [config, setConfig] = useState<PaybackConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -47,6 +47,7 @@ export default function PaybackAnalysisSettingsPage() {
     hostingCharges: "",
     monthlyInvoicingAmount: "",
     powerConsumption: "",
+    machineCapitalCost: "",
     poolCommissionStockOs: "",
     poolCommissionLuxos: "",
     s21proHashrateStockOs: "",
@@ -62,7 +63,7 @@ export default function PaybackAnalysisSettingsPage() {
       setLoading(true);
       setError(null);
 
-      const response = await fetch("/api/admin/payback-config");
+      const response = await fetch("/api/admin/payback-config-company");
       const data = await response.json();
 
       if (!response.ok) {
@@ -76,6 +77,7 @@ export default function PaybackAnalysisSettingsPage() {
           hostingCharges: data.data.hostingCharges,
           monthlyInvoicingAmount: data.data.monthlyInvoicingAmount,
           powerConsumption: data.data.powerConsumption,
+          machineCapitalCost: data.data.machineCapitalCost,
           poolCommissionStockOs: data.data.poolCommissionStockOs,
           poolCommissionLuxos: data.data.poolCommissionLuxos,
           s21proHashrateStockOs: data.data.s21proHashrateStockOs,
@@ -101,7 +103,7 @@ export default function PaybackAnalysisSettingsPage() {
       setError(null);
       setSuccess(null);
 
-      const response = await fetch("/api/admin/payback-config", {
+      const response = await fetch("/api/admin/payback-config-company", {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -173,7 +175,7 @@ export default function PaybackAnalysisSettingsPage() {
         }}
       >
         <Typography variant="h4" component="h1">
-          Payback Analysis Settings
+          Company Payback Analysis Settings
         </Typography>
         <Button
           variant="outlined"
@@ -206,8 +208,9 @@ export default function PaybackAnalysisSettingsPage() {
           Configuration Parameters
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-          Edit the values below to update payback analysis calculations across
-          the platform.
+          Edit the values below to update the company self-mining payback
+          analysis calculations. These values are separate from the client
+          payback configuration.
         </Typography>
 
         <Divider sx={{ mb: 3 }} />
@@ -230,11 +233,11 @@ export default function PaybackAnalysisSettingsPage() {
           <Grid item xs={12} md={6}>
             <TextField
               fullWidth
-              label="Monthly Invoicing Amount ($)"
+              label="Monthly Hosting/Operating Cost ($)"
               type="number"
               value={formData.monthlyInvoicingAmount}
               onChange={handleChange("monthlyInvoicingAmount")}
-              helperText="Total monthly invoice amount"
+              helperText="Total monthly hosting/electricity cost for company-owned miners"
               inputProps={{ step: "0.01", min: "0" }}
             />
           </Grid>
@@ -249,6 +252,19 @@ export default function PaybackAnalysisSettingsPage() {
               onChange={handleChange("powerConsumption")}
               helperText="Power consumption per miner"
               inputProps={{ step: "0.0001", min: "0" }}
+            />
+          </Grid>
+
+          {/* Machine Capital Cost */}
+          <Grid item xs={12} md={6}>
+            <TextField
+              fullWidth
+              label="Machine Capital Cost ($)"
+              type="number"
+              value={formData.machineCapitalCost}
+              onChange={handleChange("machineCapitalCost")}
+              helperText="Upfront cost of company-owned mining hardware"
+              inputProps={{ step: "0.01", min: "0" }}
             />
           </Grid>
 

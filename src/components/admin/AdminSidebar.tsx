@@ -185,6 +185,16 @@ const sidebarItems: SidebarItem[] = [
     icon: <SettingsIcon />,
     path: "/admin/payback-analysis-settings",
   },
+  {
+    title: "Company Payback Analysis",
+    icon: <SelfMiningIcon />,
+    path: "/admin/payback-analysis-company",
+  },
+  {
+    title: "Company Payback Settings",
+    icon: <SettingsIcon />,
+    path: "/admin/payback-analysis-company-settings",
+  },
 
   {
     title: "Hardware Purchases",

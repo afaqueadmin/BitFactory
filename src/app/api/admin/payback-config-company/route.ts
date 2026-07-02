@@ -6,10 +6,11 @@ import {
 } from "@/lib/paybackConfigHelpers";
 
 /**
- * GET /api/admin/payback-config
+ * GET /api/admin/payback-config-company
  *
- * Fetches the current payback configuration values for the CLIENT profile.
- * Returns the first config record or creates a default one if none exists.
+ * Fetches the current payback configuration values for the COMPANY
+ * (self-mining) profile. Returns the first config record or creates a
+ * default one if none exists.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -34,7 +35,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const config = await getOrCreatePaybackConfig("CLIENT");
+    const config = await getOrCreatePaybackConfig("COMPANY");
 
     return NextResponse.json({
       success: true,
@@ -54,10 +55,10 @@ export async function GET(request: NextRequest) {
 }
 
 /**
- * PATCH /api/admin/payback-config
+ * PATCH /api/admin/payback-config-company
  *
- * Updates the payback configuration values for the CLIENT profile.
- * Only admin users can update these values.
+ * Updates the payback configuration values for the COMPANY (self-mining)
+ * profile. Only admin users can update these values.
  */
 export async function PATCH(request: NextRequest) {
   try {
@@ -85,9 +86,11 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json();
-    const config = await updatePaybackConfig("CLIENT", body);
+    const config = await updatePaybackConfig("COMPANY", body);
 
-    console.log(`[Payback Config API] Config updated by admin ${userId}`);
+    console.log(
+      `[Payback Config API] Company config updated by admin ${userId}`,
+    );
 
     return NextResponse.json({
       success: true,

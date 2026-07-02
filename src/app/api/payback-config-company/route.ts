@@ -4,10 +4,11 @@ import { prisma } from "@/lib/prisma";
 import { serializePaybackConfig } from "@/lib/paybackConfigHelpers";
 
 /**
- * GET /api/payback-config
+ * GET /api/payback-config-company
  *
- * Fetches the CLIENT payback configuration and user's invoiced amount
- * for payback analysis calculations.
+ * Fetches the COMPANY (self-mining) payback configuration for payback
+ * analysis calculations. Admin-only, since this is internal company data
+ * rather than a client-facing profile.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -17,51 +18,36 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Verify token and extract user ID
-    let userId: string;
     let userRole: string;
     try {
       const decoded = await verifyJwtToken(token);
-      userId = decoded.userId;
       userRole = decoded.role;
     } catch (error) {
       console.error("[Payback Config API] Token verification failed:", error);
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
 
-    // Fetch the CLIENT payback config
+    if (userRole !== "ADMIN" && userRole !== "SUPER_ADMIN") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
     const config = await prisma.paybackConfig.findFirst({
-      where: { profileType: "CLIENT" },
+      where: { profileType: "COMPANY" },
     });
 
     if (!config) {
       return NextResponse.json(
         {
           error:
-            "Payback configuration not found. Please contact administrator.",
+            "Company payback configuration not found. Please contact administrator.",
         },
         { status: 404 },
       );
     }
 
-    // Fetch user's invoiced amount
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { invoicedAmount: true },
-    });
-
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
-
-    const responseData = {
-      ...serializePaybackConfig(config),
-      invoicedAmount: Number(user.invoicedAmount),
-    };
-
     return NextResponse.json({
       success: true,
-      data: responseData,
+      data: serializePaybackConfig(config),
       userRole: userRole,
     });
   } catch (error) {
