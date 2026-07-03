@@ -23,7 +23,8 @@ interface PaybackConfig {
   hostingCharges: string;
   monthlyInvoicingAmount: string;
   powerConsumption: string;
-  machineCapitalCost: string;
+  s21proMachineCost: string;
+  s21xpMachineCost: string;
   poolCommissionStockOs: string;
   poolCommissionLuxos: string;
   s21proHashrateStockOs: string;
@@ -47,7 +48,8 @@ export default function PaybackAnalysisCompanySettingsPage() {
     hostingCharges: "",
     monthlyInvoicingAmount: "",
     powerConsumption: "",
-    machineCapitalCost: "",
+    s21proMachineCost: "",
+    s21xpMachineCost: "",
     poolCommissionStockOs: "",
     poolCommissionLuxos: "",
     s21proHashrateStockOs: "",
@@ -77,7 +79,8 @@ export default function PaybackAnalysisCompanySettingsPage() {
           hostingCharges: data.data.hostingCharges,
           monthlyInvoicingAmount: data.data.monthlyInvoicingAmount,
           powerConsumption: data.data.powerConsumption,
-          machineCapitalCost: data.data.machineCapitalCost,
+          s21proMachineCost: data.data.s21proMachineCost,
+          s21xpMachineCost: data.data.s21xpMachineCost,
           poolCommissionStockOs: data.data.poolCommissionStockOs,
           poolCommissionLuxos: data.data.poolCommissionLuxos,
           s21proHashrateStockOs: data.data.s21proHashrateStockOs,
@@ -255,16 +258,31 @@ export default function PaybackAnalysisCompanySettingsPage() {
             />
           </Grid>
 
-          {/* Machine Capital Cost */}
+          {/* S21 Pro Machine Cost */}
           <Grid item xs={12} md={6}>
             <TextField
               fullWidth
-              label="Machine Capital Cost ($)"
+              label="S21 Pro Machine Cost ($)"
               type="number"
-              value={formData.machineCapitalCost}
-              onChange={handleChange("machineCapitalCost")}
-              helperText="Upfront cost of company-owned mining hardware"
+              value={formData.s21proMachineCost}
+              onChange={handleChange("s21proMachineCost")}
+              helperText="Upfront cost of a company-owned S21 Pro miner"
               inputProps={{ step: "0.01", min: "0" }}
+              InputLabelProps={{ sx: { color: "#1565c0" } }}
+            />
+          </Grid>
+
+          {/* S21 XP Machine Cost */}
+          <Grid item xs={12} md={6}>
+            <TextField
+              fullWidth
+              label="S21 XP Machine Cost ($)"
+              type="number"
+              value={formData.s21xpMachineCost}
+              onChange={handleChange("s21xpMachineCost")}
+              helperText="Upfront cost of a company-owned S21 XP miner"
+              inputProps={{ step: "0.01", min: "0" }}
+              InputLabelProps={{ sx: { color: "#e65100" } }}
             />
           </Grid>
 

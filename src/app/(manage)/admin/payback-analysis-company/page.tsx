@@ -13,6 +13,8 @@ import {
   TableRow,
   CircularProgress,
   Alert,
+  TextField,
+  InputAdornment,
   ToggleButtonGroup,
   ToggleButton,
   Tabs,
@@ -40,7 +42,9 @@ const columns = [
   "Scenario: 3",
   "Scenario: 4",
   "Scenario: 5",
-  "BREAKEVEN (Hosting Charges)",
+  "Scenario: 6",
+  "Scenario: 7",
+  "BREAKEVEN\n(Hosting Charges)",
 ];
 
 // Data Sources:
@@ -52,7 +56,8 @@ interface PaybackConfigData {
   hostingCharges: number;
   monthlyInvoicingAmount: number;
   powerConsumption: number;
-  machineCapitalCost: number;
+  s21proMachineCost: number;
+  s21xpMachineCost: number;
   poolCommissionStockOs: number;
   poolCommissionLuxos: number;
   s21proHashrateStockOs: number;
@@ -70,6 +75,19 @@ export default function PaybackAnalysisCompanyPage() {
   const [config, setConfig] = useState<PaybackConfigData | null>(null);
   const [configLoading, setConfigLoading] = useState(true);
   const [configError, setConfigError] = useState<string | null>(null);
+
+  // Editable machine cost (per miner model) / operating cost state
+  const [editableS21ProMachineCost, setEditableS21ProMachineCost] =
+    useState<string>("");
+  const [editableS21XpMachineCost, setEditableS21XpMachineCost] =
+    useState<string>("");
+  const [editableOperatingCost, setEditableOperatingCost] =
+    useState<string>("");
+  const [isSavingCosts, setIsSavingCosts] = useState(false);
+  const [costsUpdateSuccess, setCostsUpdateSuccess] = useState<string | null>(
+    null,
+  );
+  const [costsUpdateError, setCostsUpdateError] = useState<string | null>(null);
 
   // Price and reward state
   const [liveBtcPrice, setLiveBtcPrice] = useState<string | null>(null);
@@ -107,6 +125,9 @@ export default function PaybackAnalysisCompanyPage() {
       const data = await response.json();
       if (data.success && data.data) {
         setConfig(data.data);
+        setEditableS21ProMachineCost(String(data.data.s21proMachineCost));
+        setEditableS21XpMachineCost(String(data.data.s21xpMachineCost));
+        setEditableOperatingCost(String(data.data.monthlyInvoicingAmount));
       } else {
         throw new Error(data.error || "Invalid configuration data");
       }
@@ -119,6 +140,74 @@ export default function PaybackAnalysisCompanyPage() {
       setConfigLoading(false);
     }
   }, []);
+
+  // Save machine costs (per miner model) & operating cost to the database
+  const handleSaveCosts = useCallback(async () => {
+    const s21proMachineCostValue = parseFloat(editableS21ProMachineCost);
+    const s21xpMachineCostValue = parseFloat(editableS21XpMachineCost);
+    const operatingCostValue = parseFloat(editableOperatingCost);
+
+    if (
+      !Number.isFinite(s21proMachineCostValue) ||
+      s21proMachineCostValue < 0
+    ) {
+      setCostsUpdateError("Please enter a valid S21 Pro machine cost");
+      return;
+    }
+    if (!Number.isFinite(s21xpMachineCostValue) || s21xpMachineCostValue < 0) {
+      setCostsUpdateError("Please enter a valid S21 XP machine cost");
+      return;
+    }
+    if (!Number.isFinite(operatingCostValue) || operatingCostValue < 0) {
+      setCostsUpdateError("Please enter a valid operating cost");
+      return;
+    }
+
+    try {
+      setIsSavingCosts(true);
+      setCostsUpdateError(null);
+      setCostsUpdateSuccess(null);
+
+      const response = await fetch("/api/admin/payback-config-company", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          s21proMachineCost: s21proMachineCostValue,
+          s21xpMachineCost: s21xpMachineCostValue,
+          monthlyInvoicingAmount: operatingCostValue,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || "Failed to save configuration");
+      }
+
+      setConfig((prev) =>
+        prev
+          ? {
+              ...prev,
+              s21proMachineCost: s21proMachineCostValue,
+              s21xpMachineCost: s21xpMachineCostValue,
+              monthlyInvoicingAmount: operatingCostValue,
+            }
+          : prev,
+      );
+      setCostsUpdateSuccess("Costs saved successfully!");
+      setTimeout(() => setCostsUpdateSuccess(null), 3000);
+    } catch (error) {
+      const errorMsg =
+        error instanceof Error ? error.message : "Failed to save configuration";
+      setCostsUpdateError(errorMsg);
+    } finally {
+      setIsSavingCosts(false);
+    }
+  }, [
+    editableS21ProMachineCost,
+    editableS21XpMachineCost,
+    editableOperatingCost,
+  ]);
 
   const fetchLivePrice = useCallback(async () => {
     try {
@@ -177,11 +266,25 @@ export default function PaybackAnalysisCompanyPage() {
   const resolvedRewardBtcPerPhDay =
     liveRewardBtcPerPhDay ?? FALLBACK_REWARD_BTC_PER_PH_DAY;
 
-  // Calculate derived values from config
-  const monthlyElectricityHosting = config ? config.monthlyInvoicingAmount : 0;
+  // Calculate derived values from config, using the editable fields so the
+  // table recalculates live as the user types before saving.
+  const monthlyElectricityHosting = config
+    ? parseFloat(editableOperatingCost) || 0
+    : 0;
+
+  // The machine cost input tracks whichever miner model tab is active
+  const editableActiveMachineCost =
+    selectedMiner === "S21XP"
+      ? editableS21XpMachineCost
+      : editableS21ProMachineCost;
+  const setEditableActiveMachineCost =
+    selectedMiner === "S21XP"
+      ? setEditableS21XpMachineCost
+      : setEditableS21ProMachineCost;
+
   // Company self-mining: machine cost is the machine's own capital cost,
   // there is no client invoice to offset against.
-  const machineCost = config ? config.machineCapitalCost : 0;
+  const machineCost = config ? parseFloat(editableActiveMachineCost) || 0 : 0;
 
   // Resolve hashrate for the currently selected miner model
   const activeHashrateStockOs = config
@@ -290,13 +393,15 @@ export default function PaybackAnalysisCompanyPage() {
       "$150,000",
       "$200,000",
       "$250,000",
+      "$300,000",
+      "$350,000",
       formatValue(selectedBreakevenPrice, "currency"),
     ],
   };
 
   const rewardRow = {
     label: "Reward (BTC/PH/Day)",
-    values: Array.from({ length: 7 }, () =>
+    values: Array.from({ length: 9 }, () =>
       resolvedRewardBtcPerPhDay.toFixed(8),
     ),
   };
@@ -310,26 +415,26 @@ export default function PaybackAnalysisCompanyPage() {
         {
           label: "Pool Commission (Stock OS)",
           values: Array.from(
-            { length: 7 },
+            { length: 9 },
             () => `${config.poolCommissionStockOs.toFixed(2)}%`,
           ),
         },
         {
           label: "Pool Commission (Custom OS)",
           values: Array.from(
-            { length: 7 },
+            { length: 9 },
             () => `${config.poolCommissionLuxos.toFixed(2)}%`,
           ),
         },
         {
           label: `${MINER_LABELS[selectedMiner]} Hashrate (TH) (Stock OS)`,
-          values: Array.from({ length: 7 }, () =>
+          values: Array.from({ length: 9 }, () =>
             activeHashrateStockOs.toFixed(2),
           ),
         },
         {
           label: `${MINER_LABELS[selectedMiner]} Hashrate (TH) (Custom OS)`,
-          values: Array.from({ length: 7 }, () =>
+          values: Array.from({ length: 9 }, () =>
             activeHashrateLuxos.toFixed(2),
           ),
         },
@@ -366,7 +471,7 @@ export default function PaybackAnalysisCompanyPage() {
     allDynamicRows.push({
       label: "Electricity & Hosting Charges",
       values: Array.from(
-        { length: 7 },
+        { length: 9 },
         () => `$${monthlyElectricityHosting.toFixed(2)}`,
       ),
     });
@@ -385,7 +490,7 @@ export default function PaybackAnalysisCompanyPage() {
     allDynamicRows.push({
       label: "Payback Months (Stock OS)",
       values: calculatedValues.map((calc, index) =>
-        index === 6 // BREAKEVEN column
+        index === 8 // BREAKEVEN column
           ? "--"
           : calc.paybackMonthsStock === Infinity
             ? "∞"
@@ -395,7 +500,7 @@ export default function PaybackAnalysisCompanyPage() {
     allDynamicRows.push({
       label: "Payback Months (Custom OS)",
       values: calculatedValues.map((calc, index) =>
-        index === 6 // BREAKEVEN column
+        index === 8 // BREAKEVEN column
           ? "--"
           : calc.paybackMonthsLux === Infinity
             ? "∞"
@@ -456,6 +561,26 @@ export default function PaybackAnalysisCompanyPage() {
 
   return (
     <Box sx={{ p: { xs: 1.5, sm: 2, md: 3 }, mt: { xs: 1, md: 2 } }}>
+      {/* Success/Error messages for cost update */}
+      {costsUpdateSuccess && (
+        <Alert
+          severity="success"
+          sx={{ mb: 2 }}
+          onClose={() => setCostsUpdateSuccess(null)}
+        >
+          {costsUpdateSuccess}
+        </Alert>
+      )}
+      {costsUpdateError && (
+        <Alert
+          severity="error"
+          sx={{ mb: 2 }}
+          onClose={() => setCostsUpdateError(null)}
+        >
+          {costsUpdateError}
+        </Alert>
+      )}
+
       <Box sx={{ mb: { xs: 2, md: 3 } }}>
         {/* Title + OS Toggle */}
         <Box
@@ -527,6 +652,46 @@ export default function PaybackAnalysisCompanyPage() {
             flexWrap: "wrap",
           }}
         >
+          <TextField
+            label={`${MINER_LABELS[selectedMiner]} Machine Cost`}
+            type="number"
+            value={editableActiveMachineCost}
+            onChange={(e) => setEditableActiveMachineCost(e.target.value)}
+            size="small"
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">$</InputAdornment>
+              ),
+            }}
+            inputProps={{ step: "0.01", min: "0" }}
+            sx={{ width: { xs: "100%", sm: "200px" } }}
+          />
+
+          <TextField
+            label="Operating Cost (Monthly)"
+            type="number"
+            value={editableOperatingCost}
+            onChange={(e) => setEditableOperatingCost(e.target.value)}
+            size="small"
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">$</InputAdornment>
+              ),
+            }}
+            inputProps={{ step: "0.01", min: "0" }}
+            sx={{ width: { xs: "100%", sm: "200px" } }}
+          />
+
+          <Button
+            variant="contained"
+            onClick={handleSaveCosts}
+            disabled={isSavingCosts}
+            size="small"
+            fullWidth={isMobile}
+          >
+            {isSavingCosts ? "Saving..." : "Save Costs"}
+          </Button>
+
           <Button
             variant="outlined"
             onClick={handleRefresh}
@@ -577,10 +742,10 @@ export default function PaybackAnalysisCompanyPage() {
           </Box>
           <Box>
             <Typography variant="subtitle2" color="text.secondary">
-              Monthly Hosting Cost
+              Operating Cost (Monthly)
             </Typography>
             <Typography variant="body2">
-              {formatValue(config.monthlyInvoicingAmount, "currency")}
+              {formatValue(monthlyElectricityHosting, "currency")}
             </Typography>
           </Box>
           <Box>
@@ -591,7 +756,7 @@ export default function PaybackAnalysisCompanyPage() {
           </Box>
           <Box>
             <Typography variant="subtitle2" color="text.secondary">
-              Machine Capital Cost
+              {MINER_LABELS[selectedMiner]} Machine Cost
             </Typography>
             <Typography variant="body2">
               {formatValue(machineCost, "currency")}
@@ -619,7 +784,7 @@ export default function PaybackAnalysisCompanyPage() {
         component={Paper}
         sx={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}
       >
-        <Table size="small" sx={{ minWidth: 800 }}>
+        <Table size="small" sx={{ minWidth: 920 }}>
           <TableHead
             sx={{
               backgroundColor:
@@ -632,8 +797,9 @@ export default function PaybackAnalysisCompanyPage() {
               <TableCell
                 sx={{
                   fontWeight: 700,
-                  minWidth: { xs: 160, sm: 256 },
-                  fontSize: { xs: "0.75rem", sm: "0.875rem" },
+                  minWidth: { xs: 140, sm: 220 },
+                  fontSize: { xs: "0.7rem", sm: "0.8rem" },
+                  px: { xs: 0.75, sm: 1.25 },
                   position: "sticky",
                   left: 0,
                   zIndex: 1,
@@ -650,9 +816,11 @@ export default function PaybackAnalysisCompanyPage() {
                   key={column}
                   sx={{
                     fontWeight: 700,
-                    fontSize: { xs: "0.7rem", sm: "0.875rem" },
+                    fontSize: { xs: "0.6rem", sm: "0.75rem" },
+                    lineHeight: 1.25,
+                    px: { xs: 0.5, sm: 1 },
                     borderLeft: `1px solid ${theme.palette.divider}`,
-                    whiteSpace: "nowrap",
+                    whiteSpace: "pre-line",
                   }}
                   align="right"
                 >
@@ -675,8 +843,9 @@ export default function PaybackAnalysisCompanyPage() {
                 <TableCell
                   sx={{
                     fontWeight: 600,
-                    fontSize: { xs: "0.7rem", sm: "0.875rem" },
+                    fontSize: { xs: "0.65rem", sm: "0.8rem" },
                     whiteSpace: "nowrap",
+                    px: { xs: 0.75, sm: 1.25 },
                     position: "sticky",
                     left: 0,
                     zIndex: 1,
@@ -696,8 +865,9 @@ export default function PaybackAnalysisCompanyPage() {
                     align="right"
                     sx={{
                       fontWeight: 400,
-                      fontSize: { xs: "0.7rem", sm: "0.875rem" },
+                      fontSize: { xs: "0.65rem", sm: "0.8rem" },
                       whiteSpace: "nowrap",
+                      px: { xs: 0.5, sm: 1 },
                       borderLeft: `1px solid ${theme.palette.divider}`,
                       ...(row.label === "BTC Price (USD)" && index === 0
                         ? { backgroundColor: "rgba(103, 177, 42, 0.35)" }

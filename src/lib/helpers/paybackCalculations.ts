@@ -9,8 +9,10 @@ export const MINER_LABELS: Record<MinerModel, string> = {
 export const FALLBACK_BTC_PRICE = 67953.35; // USD
 export const FALLBACK_REWARD_BTC_PER_PH_DAY = 0.00044827;
 
-// Scenario BTC prices (first 4 are fixed, last one comes from DB)
-export const FIXED_SCENARIO_PRICES = [100000, 125000, 150000, 200000, 250000];
+// Scenario BTC prices (fixed steps; breakeven price comes from DB separately)
+export const FIXED_SCENARIO_PRICES = [
+  100000, 125000, 150000, 200000, 250000, 300000, 350000,
+];
 
 export interface CalculationValues {
   dailyBtcStock: number;

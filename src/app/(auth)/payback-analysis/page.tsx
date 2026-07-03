@@ -42,7 +42,9 @@ const columns = [
   "Scenario: 3",
   "Scenario: 4",
   "Scenario: 5",
-  "BREAKEVEN (Hosting Charges)",
+  "Scenario: 6",
+  "Scenario: 7",
+  "BREAKEVEN\n(Hosting Charges)",
 ];
 
 // Data Sources:
@@ -56,7 +58,8 @@ interface PaybackConfigData {
   hostingCharges: number;
   monthlyInvoicingAmount: number;
   powerConsumption: number;
-  machineCapitalCost: number;
+  s21proMachineCost: number;
+  s21xpMachineCost: number;
   poolCommissionStockOs: number;
   poolCommissionLuxos: number;
   s21proHashrateStockOs: number;
@@ -127,8 +130,8 @@ export default function PaybackAnalysisPage() {
         setUserRole(data.userRole || null);
 
         // Set editable invoiced amount based on user role
-        if (data.userRole === "ADMIN") {
-          // Admin default: 4250
+        if (data.userRole === "ADMIN" || data.userRole === "SUPER_ADMIN") {
+          // Admin/Super Admin default: 4250 (session-only, not persisted)
           setEditableInvoicedAmount("4250");
         } else {
           // Client: use value from database
@@ -215,8 +218,8 @@ export default function PaybackAnalysisPage() {
         return;
       }
 
-      // For ADMIN: just use the value temporarily (no API call)
-      if (userRole === "ADMIN") {
+      // For ADMIN/SUPER_ADMIN: just use the value temporarily (no API call)
+      if (userRole === "ADMIN" || userRole === "SUPER_ADMIN") {
         setInvoicedUpdateSuccess("Invoiced amount updated for this session");
         setTimeout(() => setInvoicedUpdateSuccess(null), 3000);
         return;
@@ -376,13 +379,15 @@ export default function PaybackAnalysisPage() {
       "$150,000",
       "$200,000",
       "$250,000",
+      "$300,000",
+      "$350,000",
       formatValue(selectedBreakevenPrice, "currency"),
     ],
   };
 
   const rewardRow = {
     label: "Reward (BTC/PH/Day)",
-    values: Array.from({ length: 7 }, () =>
+    values: Array.from({ length: 9 }, () =>
       resolvedRewardBtcPerPhDay.toFixed(8),
     ),
   };
@@ -396,26 +401,26 @@ export default function PaybackAnalysisPage() {
         {
           label: "Pool Commission (Stock OS)",
           values: Array.from(
-            { length: 7 },
+            { length: 9 },
             () => `${config.poolCommissionStockOs.toFixed(2)}%`,
           ),
         },
         {
           label: "Pool Commission (Custom OS)",
           values: Array.from(
-            { length: 7 },
+            { length: 9 },
             () => `${config.poolCommissionLuxos.toFixed(2)}%`,
           ),
         },
         {
           label: `${MINER_LABELS[selectedMiner]} Hashrate (TH) (Stock OS)`,
-          values: Array.from({ length: 7 }, () =>
+          values: Array.from({ length: 9 }, () =>
             activeHashrateStockOs.toFixed(2),
           ),
         },
         {
           label: `${MINER_LABELS[selectedMiner]} Hashrate (TH) (Custom OS)`,
-          values: Array.from({ length: 7 }, () =>
+          values: Array.from({ length: 9 }, () =>
             activeHashrateLuxos.toFixed(2),
           ),
         },
@@ -452,7 +457,7 @@ export default function PaybackAnalysisPage() {
     allDynamicRows.push({
       label: "Electricity & Hosting Charges",
       values: Array.from(
-        { length: 7 },
+        { length: 9 },
         () => `$${monthlyElectricityHosting.toFixed(2)}`,
       ),
     });
@@ -471,7 +476,7 @@ export default function PaybackAnalysisPage() {
     allDynamicRows.push({
       label: "Payback Months (Stock OS)",
       values: calculatedValues.map((calc, index) =>
-        index === 6 // BREAKEVEN column
+        index === 8 // BREAKEVEN column
           ? "--"
           : calc.paybackMonthsStock === Infinity
             ? "∞"
@@ -481,7 +486,7 @@ export default function PaybackAnalysisPage() {
     allDynamicRows.push({
       label: "Payback Months (Custom OS)",
       values: calculatedValues.map((calc, index) =>
-        index === 6 // BREAKEVEN column
+        index === 8 // BREAKEVEN column
           ? "--"
           : calc.paybackMonthsLux === Infinity
             ? "∞"
@@ -761,7 +766,7 @@ export default function PaybackAnalysisPage() {
         component={Paper}
         sx={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}
       >
-        <Table size="small" sx={{ minWidth: 800 }}>
+        <Table size="small" sx={{ minWidth: 920 }}>
           <TableHead
             sx={{
               backgroundColor:
@@ -774,8 +779,9 @@ export default function PaybackAnalysisPage() {
               <TableCell
                 sx={{
                   fontWeight: 700,
-                  minWidth: { xs: 160, sm: 256 },
-                  fontSize: { xs: "0.75rem", sm: "0.875rem" },
+                  minWidth: { xs: 140, sm: 220 },
+                  fontSize: { xs: "0.7rem", sm: "0.8rem" },
+                  px: { xs: 0.75, sm: 1.25 },
                   position: "sticky",
                   left: 0,
                   zIndex: 1,
@@ -792,9 +798,11 @@ export default function PaybackAnalysisPage() {
                   key={column}
                   sx={{
                     fontWeight: 700,
-                    fontSize: { xs: "0.7rem", sm: "0.875rem" },
+                    fontSize: { xs: "0.6rem", sm: "0.75rem" },
+                    lineHeight: 1.25,
+                    px: { xs: 0.5, sm: 1 },
                     borderLeft: `1px solid ${theme.palette.divider}`,
-                    whiteSpace: "nowrap",
+                    whiteSpace: "pre-line",
                   }}
                   align="right"
                 >
@@ -817,8 +825,9 @@ export default function PaybackAnalysisPage() {
                 <TableCell
                   sx={{
                     fontWeight: 600,
-                    fontSize: { xs: "0.7rem", sm: "0.875rem" },
+                    fontSize: { xs: "0.65rem", sm: "0.8rem" },
                     whiteSpace: "nowrap",
+                    px: { xs: 0.75, sm: 1.25 },
                     position: "sticky",
                     left: 0,
                     zIndex: 1,
@@ -838,8 +847,9 @@ export default function PaybackAnalysisPage() {
                     align="right"
                     sx={{
                       fontWeight: 400,
-                      fontSize: { xs: "0.7rem", sm: "0.875rem" },
+                      fontSize: { xs: "0.65rem", sm: "0.8rem" },
                       whiteSpace: "nowrap",
+                      px: { xs: 0.5, sm: 1 },
                       borderLeft: `1px solid ${theme.palette.divider}`,
                       ...(row.label === "BTC Price (USD)" && index === 0
                         ? { backgroundColor: "rgba(103, 177, 42, 0.35)" }

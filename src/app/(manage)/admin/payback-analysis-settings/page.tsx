@@ -23,7 +23,8 @@ interface PaybackConfig {
   hostingCharges: string;
   monthlyInvoicingAmount: string;
   powerConsumption: string;
-  machineCapitalCost: string;
+  s21proMachineCost: string;
+  s21xpMachineCost: string;
   poolCommissionStockOs: string;
   poolCommissionLuxos: string;
   s21proHashrateStockOs: string;

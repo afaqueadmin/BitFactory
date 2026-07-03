@@ -6,7 +6,8 @@ const DEFAULT_VALUES = {
   hostingCharges: "0.06300",
   monthlyInvoicingAmount: "199.05",
   powerConsumption: "3.5000",
-  machineCapitalCost: "4050.95",
+  s21proMachineCost: "4050.95",
+  s21xpMachineCost: "4050.95",
   poolCommissionStockOs: "2.50",
   poolCommissionLuxos: "2.50",
   s21proHashrateStockOs: "236.00",
@@ -44,9 +45,11 @@ const buildDefaultData = (
     new Decimal(DEFAULT_VALUES.monthlyInvoicingAmount),
   powerConsumption:
     overrides.powerConsumption ?? new Decimal(DEFAULT_VALUES.powerConsumption),
-  machineCapitalCost:
-    overrides.machineCapitalCost ??
-    new Decimal(DEFAULT_VALUES.machineCapitalCost),
+  s21proMachineCost:
+    overrides.s21proMachineCost ??
+    new Decimal(DEFAULT_VALUES.s21proMachineCost),
+  s21xpMachineCost:
+    overrides.s21xpMachineCost ?? new Decimal(DEFAULT_VALUES.s21xpMachineCost),
   poolCommissionStockOs:
     overrides.poolCommissionStockOs ??
     new Decimal(DEFAULT_VALUES.poolCommissionStockOs),
@@ -116,7 +119,8 @@ export function serializePaybackConfig(config: PaybackConfig) {
     hostingCharges: Number(config.hostingCharges),
     monthlyInvoicingAmount: Number(config.monthlyInvoicingAmount),
     powerConsumption: Number(config.powerConsumption),
-    machineCapitalCost: Number(config.machineCapitalCost),
+    s21proMachineCost: Number(config.s21proMachineCost),
+    s21xpMachineCost: Number(config.s21xpMachineCost),
     poolCommissionStockOs: Number(config.poolCommissionStockOs),
     poolCommissionLuxos: Number(config.poolCommissionLuxos),
     s21proHashrateStockOs: Number(config.s21proHashrateStockOs),
