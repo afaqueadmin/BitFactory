@@ -148,10 +148,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
-      // If server indicates 2FA is required for this user/session, redirect
-      // to the 2FA verification flow instead of treating login as complete.
+      // If server indicates 2FA is required for this user/session, stop here
+      // and let the caller render the 2FA verification UI.
       if (data.requiresTwoFactor) {
-        router.replace("/two-factor-authentication");
         return;
       }
 

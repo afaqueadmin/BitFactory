@@ -80,7 +80,6 @@ export default function Login() {
         // If the server says 2FA is required for this login, go to 2FA flow.
         if (data.requiresTwoFactor) {
           setShowTwoFactor(true);
-          router.replace("/two-factor-authentication");
           return;
         }
 
@@ -329,21 +328,6 @@ export default function Login() {
               </CardContent>
             </Card>
           )}
-
-          {/*
-                    Test User Info (commented out to hide credentials)
-                    <Box mt={2} fontSize={14} color="text.secondary">
-                        <Typography>
-                            💡 Test user created in database:
-                        </Typography>
-                        <Typography>
-                            Email: <code>admin@example.com</code>
-                        </Typography>
-                        <Typography>
-                            Password: <code>123456</code>
-                        </Typography>
-                    </Box>
-                    */}
         </Paper>
       )}
     </Box>
