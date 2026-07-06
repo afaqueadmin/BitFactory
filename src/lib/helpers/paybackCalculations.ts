@@ -77,6 +77,26 @@ export const calculateBreakevenBtcPrice = (
   }
 };
 
+// Strategy 2: machine's bills are paid from an outside funding source (not
+// by selling mined BTC), so BTC accumulates untouched over a fixed machine
+// life and the whole thing is evaluated as a lump-sum return at the end.
+export const MACHINE_LIFE_YEARS = 5;
+
+export interface Strategy2Values extends CalculationValues {
+  lifetimeRevenueStock: number;
+  lifetimeRevenueLux: number;
+  lifetimeElectricityHostingCharges: number;
+  machineDepreciation: number;
+  netProfitLifetimeStock: number;
+  netProfitLifetimeLux: number;
+  returnMultipleStock: number;
+  returnMultipleLux: number;
+  roiLifetimeStock: number;
+  roiLifetimeLux: number;
+  roiPerYearStock: number;
+  roiPerYearLux: number;
+}
+
 export const calculateAllValues = (
   btcPrice: number,
   rewardBtcPerPhDay: number,
@@ -125,5 +145,78 @@ export const calculateAllValues = (
     netRevenueLux,
     paybackMonthsStock,
     paybackMonthsLux,
+  };
+};
+
+export const calculateStrategy2Values = (
+  btcPrice: number,
+  rewardBtcPerPhDay: number,
+  hashrateStockOs: number,
+  hashrateLuxos: number,
+  poolCommissionStockOs: number,
+  poolCommissionLuxos: number,
+  monthlyElectricityHosting: number,
+  machineCost: number,
+  machineLifeYears: number = MACHINE_LIFE_YEARS,
+): Strategy2Values => {
+  const base = calculateAllValues(
+    btcPrice,
+    rewardBtcPerPhDay,
+    hashrateStockOs,
+    hashrateLuxos,
+    poolCommissionStockOs,
+    poolCommissionLuxos,
+    monthlyElectricityHosting,
+    machineCost,
+  );
+
+  const lifetimeMonths = machineLifeYears * 12;
+  const lifetimeRevenueStock = base.monthlyRevenueStock * lifetimeMonths;
+  const lifetimeRevenueLux = base.monthlyRevenueLux * lifetimeMonths;
+  const lifetimeElectricityHostingCharges =
+    monthlyElectricityHosting * lifetimeMonths;
+  const machineDepreciation = machineCost;
+
+  const netProfitLifetimeStock =
+    lifetimeRevenueStock -
+    machineDepreciation -
+    lifetimeElectricityHostingCharges;
+  const netProfitLifetimeLux =
+    lifetimeRevenueLux -
+    machineDepreciation -
+    lifetimeElectricityHostingCharges;
+
+  const totalLifetimeCost =
+    machineDepreciation + lifetimeElectricityHostingCharges;
+  const returnMultipleStock =
+    totalLifetimeCost > 0 ? lifetimeRevenueStock / totalLifetimeCost : 0;
+  const returnMultipleLux =
+    totalLifetimeCost > 0 ? lifetimeRevenueLux / totalLifetimeCost : 0;
+
+  // ROI is measured against average capital employed: the full machine cost
+  // (paid upfront) plus half the lifetime hosting bill (paid gradually).
+  const roiBasis = machineDepreciation + lifetimeElectricityHostingCharges / 2;
+  const roiLifetimeStock =
+    roiBasis > 0 ? (netProfitLifetimeStock / roiBasis) * 100 : 0;
+  const roiLifetimeLux =
+    roiBasis > 0 ? (netProfitLifetimeLux / roiBasis) * 100 : 0;
+
+  const roiPerYearStock = roiLifetimeStock / machineLifeYears;
+  const roiPerYearLux = roiLifetimeLux / machineLifeYears;
+
+  return {
+    ...base,
+    lifetimeRevenueStock,
+    lifetimeRevenueLux,
+    lifetimeElectricityHostingCharges,
+    machineDepreciation,
+    netProfitLifetimeStock,
+    netProfitLifetimeLux,
+    returnMultipleStock,
+    returnMultipleLux,
+    roiLifetimeStock,
+    roiLifetimeLux,
+    roiPerYearStock,
+    roiPerYearLux,
   };
 };

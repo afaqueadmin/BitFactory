@@ -30,10 +30,20 @@ import {
   FALLBACK_BTC_PRICE,
   FALLBACK_REWARD_BTC_PER_PH_DAY,
   FIXED_SCENARIO_PRICES,
-  CalculationValues,
+  MACHINE_LIFE_YEARS,
+  Strategy2Values,
   calculateBreakevenBtcPrice,
-  calculateAllValues,
+  calculateStrategy2Values,
 } from "@/lib/helpers/paybackCalculations";
+
+type PaybackStrategy = "STRATEGY_1" | "STRATEGY_2";
+
+const STRATEGY_DESCRIPTIONS: Record<PaybackStrategy, string> = {
+  STRATEGY_1:
+    "Strategy 1: Where the miner pays for its bills by selling the earned BTC on a monthly basis.",
+  STRATEGY_2:
+    "Strategy 2: Where the miner pays for its bills by NOT selling the earned BTC; instead, by paying the bills through another funding source.",
+};
 
 const columns = [
   "CURRENT",
@@ -102,6 +112,10 @@ export default function PaybackAnalysisPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
+  // Strategy selector state
+  const [selectedStrategy, setSelectedStrategy] =
+    useState<PaybackStrategy>("STRATEGY_1");
+
   // OS selector state
   const [selectedOS, setSelectedOS] = useState<
     "STOCK" | "CUSTOM" | "COMPARISON"
@@ -111,7 +125,7 @@ export default function PaybackAnalysisPage() {
   const [selectedMiner, setSelectedMiner] = useState<MinerModel>("S21PRO");
 
   // Calculated values for all scenarios
-  const [calculatedValues, setCalculatedValues] = useState<CalculationValues[]>(
+  const [calculatedValues, setCalculatedValues] = useState<Strategy2Values[]>(
     [],
   );
 
@@ -317,7 +331,7 @@ export default function PaybackAnalysisPage() {
     const scenarioPrices = [...FIXED_SCENARIO_PRICES, selectedBreakevenPrice];
 
     // Calculate for CURRENT (index 0)
-    const currentCalc = calculateAllValues(
+    const currentCalc = calculateStrategy2Values(
       resolvedBtcPriceValue,
       resolvedRewardBtcPerPhDay,
       activeHashrateStockOs,
@@ -330,7 +344,7 @@ export default function PaybackAnalysisPage() {
 
     // Calculate for each scenario with different BTC price
     const scenarioCalcs = scenarioPrices.map((price) =>
-      calculateAllValues(
+      calculateStrategy2Values(
         price,
         resolvedRewardBtcPerPhDay,
         activeHashrateStockOs,
@@ -493,6 +507,81 @@ export default function PaybackAnalysisPage() {
             : Math.round(calc.paybackMonthsLux),
       ),
     });
+
+    if (selectedStrategy === "STRATEGY_2") {
+      allDynamicRows.push({
+        label: "Lifetime Machine Revenue (Stock OS)",
+        values: calculatedValues.map(
+          (calc) => `$${calc.lifetimeRevenueStock.toFixed(2)}`,
+        ),
+      });
+      allDynamicRows.push({
+        label: "Lifetime Machine Revenue (Custom OS)",
+        values: calculatedValues.map(
+          (calc) => `$${calc.lifetimeRevenueLux.toFixed(2)}`,
+        ),
+      });
+      allDynamicRows.push({
+        label: "Machine Depreciation",
+        values: calculatedValues.map(
+          (calc) => `$${calc.machineDepreciation.toFixed(2)}`,
+        ),
+      });
+      allDynamicRows.push({
+        label: "Lifetime Electricity & Hosting Charges",
+        values: calculatedValues.map(
+          (calc) => `$${calc.lifetimeElectricityHostingCharges.toFixed(2)}`,
+        ),
+      });
+      allDynamicRows.push({
+        label: "Net Profit over Lifetime (Stock OS)",
+        values: calculatedValues.map((calc, index) =>
+          index === 8 ? "--" : `$${calc.netProfitLifetimeStock.toFixed(2)}`,
+        ),
+      });
+      allDynamicRows.push({
+        label: "Net Profit over Lifetime (Custom OS)",
+        values: calculatedValues.map((calc, index) =>
+          index === 8 ? "--" : `$${calc.netProfitLifetimeLux.toFixed(2)}`,
+        ),
+      });
+      allDynamicRows.push({
+        label: "Return Multiple (X) (Stock OS)",
+        values: calculatedValues.map((calc, index) =>
+          index === 8 ? "--" : calc.returnMultipleStock.toFixed(2),
+        ),
+      });
+      allDynamicRows.push({
+        label: "Return Multiple (X) (Custom OS)",
+        values: calculatedValues.map((calc, index) =>
+          index === 8 ? "--" : calc.returnMultipleLux.toFixed(2),
+        ),
+      });
+      allDynamicRows.push({
+        label: "ROI over Lifetime (Stock OS)",
+        values: calculatedValues.map((calc, index) =>
+          index === 8 ? "--" : `${calc.roiLifetimeStock.toFixed(0)}%`,
+        ),
+      });
+      allDynamicRows.push({
+        label: "ROI over Lifetime (Custom OS)",
+        values: calculatedValues.map((calc, index) =>
+          index === 8 ? "--" : `${calc.roiLifetimeLux.toFixed(0)}%`,
+        ),
+      });
+      allDynamicRows.push({
+        label: "ROI/Year (Stock OS)",
+        values: calculatedValues.map((calc, index) =>
+          index === 8 ? "--" : `${calc.roiPerYearStock.toFixed(0)}%`,
+        ),
+      });
+      allDynamicRows.push({
+        label: "ROI/Year (Custom OS)",
+        values: calculatedValues.map((calc, index) =>
+          index === 8 ? "--" : `${calc.roiPerYearLux.toFixed(0)}%`,
+        ),
+      });
+    }
   }
 
   // Filter rows based on selected OS
@@ -505,7 +594,12 @@ export default function PaybackAnalysisPage() {
 
   const dynamicRows = allDynamicRows.filter((row) => {
     if (selectedOS === "COMPARISON") return true;
-    if (row.label === "Electricity & Hosting Charges") return true;
+    if (
+      row.label === "Electricity & Hosting Charges" ||
+      row.label === "Machine Depreciation" ||
+      row.label === "Lifetime Electricity & Hosting Charges"
+    )
+      return true;
     if (selectedOS === "STOCK" && row.label.includes("Stock OS")) return true;
     if (selectedOS === "CUSTOM" && row.label.includes("Custom OS")) return true;
     return false;
@@ -568,6 +662,25 @@ export default function PaybackAnalysisPage() {
       )}
 
       <Box sx={{ mb: { xs: 2, md: 3 } }}>
+        {/* Strategy tabs */}
+        <Tabs
+          value={selectedStrategy}
+          onChange={(e, newValue) => setSelectedStrategy(newValue)}
+          aria-label="Strategy selector"
+          sx={{ mb: { xs: 1.5, sm: 2 }, minHeight: 36 }}
+        >
+          <Tab
+            value="STRATEGY_1"
+            label="Strategy 1"
+            sx={{ minHeight: 36, py: 0.5 }}
+          />
+          <Tab
+            value="STRATEGY_2"
+            label="Strategy 2"
+            sx={{ minHeight: 36, py: 0.5 }}
+          />
+        </Tabs>
+
         {/* Title + OS Toggle */}
         <Box
           sx={{
@@ -607,6 +720,30 @@ export default function PaybackAnalysisPage() {
               {isMobile ? "Compare" : "Comparison"}
             </ToggleButton>
           </ToggleButtonGroup>
+        </Box>
+
+        <Box
+          sx={{
+            borderLeft: `4px solid ${theme.palette.primary.main}`,
+            backgroundColor:
+              theme.palette.mode === "dark"
+                ? "rgba(255,255,255,0.05)"
+                : "rgba(0,0,0,0.03)",
+            borderRadius: 1,
+            px: { xs: 1.5, sm: 2 },
+            py: { xs: 1, sm: 1.25 },
+            mb: { xs: 1.5, sm: 2 },
+          }}
+        >
+          <Typography
+            variant="body2"
+            sx={{
+              fontWeight: 500,
+              fontSize: { xs: "0.8rem", sm: "0.9rem" },
+            }}
+          >
+            {STRATEGY_DESCRIPTIONS[selectedStrategy]}
+          </Typography>
         </Box>
 
         {/* Miner model tabs */}
@@ -758,6 +895,14 @@ export default function PaybackAnalysisPage() {
             </Typography>
             <Typography variant="body2">Stock OS</Typography>
           </Box>
+          {selectedStrategy === "STRATEGY_2" && (
+            <Box>
+              <Typography variant="subtitle2" color="text.secondary">
+                Machine Life
+              </Typography>
+              <Typography variant="body2">{`${MACHINE_LIFE_YEARS} Years`}</Typography>
+            </Box>
+          )}
         </Box>
       </Paper>
 
