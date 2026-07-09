@@ -82,6 +82,12 @@ export const calculateBreakevenBtcPrice = (
 // life and the whole thing is evaluated as a lump-sum return at the end.
 export const MACHINE_LIFE_YEARS = 5;
 
+// Strategy 3: same lump-sum-at-end-of-life model as Strategy 2, except the
+// bills are funded via a loan collateralized by the accumulating BTC rather
+// than an outside funding source. The lifetime figures use the same formula
+// (calculateStrategy2Values) — this rate is informational/display only.
+export const BORROWING_RATE_APR = 3.5; // % — USDT/(BTC Collateral) borrowing rate
+
 export interface Strategy2Values extends CalculationValues {
   lifetimeRevenueStock: number;
   lifetimeRevenueLux: number;

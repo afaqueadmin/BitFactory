@@ -31,18 +31,20 @@ import {
   FALLBACK_REWARD_BTC_PER_PH_DAY,
   FIXED_SCENARIO_PRICES,
   MACHINE_LIFE_YEARS,
+  BORROWING_RATE_APR,
   Strategy2Values,
   calculateBreakevenBtcPrice,
   calculateStrategy2Values,
 } from "@/lib/helpers/paybackCalculations";
 
-type PaybackStrategy = "STRATEGY_1" | "STRATEGY_2";
+type PaybackStrategy = "STRATEGY_1" | "STRATEGY_2" | "STRATEGY_3";
 
 const STRATEGY_DESCRIPTIONS: Record<PaybackStrategy, string> = {
   STRATEGY_1:
     "Strategy 1: Where the miner pays for its bills by selling the earned BTC on a monthly basis.",
   STRATEGY_2:
     "Strategy 2: Where the miner pays for its bills by NOT selling the earned BTC; instead, by paying the bills through another funding source.",
+  STRATEGY_3: `Strategy 3: Where the miner pays for its bills by NOT selling the earned BTC; instead, by taking a ${BORROWING_RATE_APR}% APR loan against collateralizing the earned BTC.`,
 };
 
 const columns = [
@@ -522,7 +524,10 @@ export default function PaybackAnalysisCompanyPage() {
       ),
     });
 
-    if (selectedStrategy === "STRATEGY_2") {
+    if (
+      selectedStrategy === "STRATEGY_2" ||
+      selectedStrategy === "STRATEGY_3"
+    ) {
       allDynamicRows.push({
         label: "Lifetime Machine Revenue (Stock OS)",
         values: calculatedValues.map(
@@ -691,6 +696,11 @@ export default function PaybackAnalysisCompanyPage() {
           <Tab
             value="STRATEGY_2"
             label="Strategy 2"
+            sx={{ minHeight: 36, py: 0.5 }}
+          />
+          <Tab
+            value="STRATEGY_3"
+            label="Strategy 3"
             sx={{ minHeight: 36, py: 0.5 }}
           />
         </Tabs>
@@ -913,12 +923,21 @@ export default function PaybackAnalysisCompanyPage() {
             </Typography>
             <Typography variant="body2">Stock OS</Typography>
           </Box>
-          {selectedStrategy === "STRATEGY_2" && (
+          {(selectedStrategy === "STRATEGY_2" ||
+            selectedStrategy === "STRATEGY_3") && (
             <Box>
               <Typography variant="subtitle2" color="text.secondary">
                 Machine Life
               </Typography>
               <Typography variant="body2">{`${MACHINE_LIFE_YEARS} Years`}</Typography>
+            </Box>
+          )}
+          {selectedStrategy === "STRATEGY_3" && (
+            <Box>
+              <Typography variant="subtitle2" color="text.secondary">
+                USDT/(BTC Collateral) Borrowing Rate
+              </Typography>
+              <Typography variant="body2">{`${BORROWING_RATE_APR.toFixed(2)}%`}</Typography>
             </Box>
           )}
         </Box>
