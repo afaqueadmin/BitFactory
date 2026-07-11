@@ -78,6 +78,15 @@ const formatDate = (timestamp: number): string => {
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 };
 
+const formatAdjustmentDate = (timestamp: number): string => {
+  const date = new Date(timestamp);
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+};
+
 export default function HashpriceHistoryPage() {
   const theme = useTheme();
   const [selectedTimeframe, setSelectedTimeframe] = useState("30D");
@@ -102,6 +111,24 @@ export default function HashpriceHistoryPage() {
   });
 
   const liveHashprice = liveData?.data?.hashprice || 0;
+
+  // Fetch network difficulty adjustment estimate (from mempool.space, since
+  // Luxor's pool API does not expose network-wide difficulty data)
+  const { data: difficultyData, isLoading: isDifficultyLoading } = useQuery({
+    queryKey: ["difficulty-adjustment"],
+    queryFn: async () => {
+      const response = await fetch("/api/difficulty-adjustment");
+      if (!response.ok) throw new Error("Failed to fetch");
+      return response.json();
+    },
+    staleTime: 10 * 60 * 1000,
+    refetchInterval: 10 * 60 * 1000,
+  });
+
+  const estimatedChangePercent: number | undefined =
+    difficultyData?.data?.estimatedChangePercent;
+  const estimatedRetargetDate: number | undefined =
+    difficultyData?.data?.estimatedRetargetDate;
 
   // Fetch historical pool-wide hashprice data from API (for chart and period statistics)
   const { hashpriceData, statistics, isLoading, isError, error } =
@@ -265,6 +292,68 @@ export default function HashpriceHistoryPage() {
           >
             {formatHashprice(cardStatistics.high)} /{" "}
             {formatHashprice(cardStatistics.low)}
+          </Typography>
+        </Paper>
+
+        <Paper
+          sx={{
+            p: { xs: 1.5, sm: 2 },
+            backgroundColor: isDark ? theme.palette.grey[800] : "#f5f5f5",
+            borderRadius: 2,
+          }}
+        >
+          <Typography variant="caption" color="textSecondary">
+            Est. Difficulty Adjustment
+          </Typography>
+          <Typography
+            variant="h6"
+            sx={{
+              fontWeight: "bold",
+              mt: 0.5,
+              fontSize: { xs: "0.8rem", sm: "1.1rem" },
+              color:
+                estimatedChangePercent == null
+                  ? "inherit"
+                  : estimatedChangePercent > 0
+                    ? "#f44336"
+                    : "#4caf50",
+            }}
+          >
+            {isDifficultyLoading ? (
+              <CircularProgress size={20} />
+            ) : estimatedChangePercent == null ? (
+              "N/A"
+            ) : (
+              `${estimatedChangePercent >= 0 ? "+" : ""}${estimatedChangePercent.toFixed(2)}%`
+            )}
+          </Typography>
+        </Paper>
+
+        <Paper
+          sx={{
+            p: { xs: 1.5, sm: 2 },
+            backgroundColor: isDark ? theme.palette.grey[800] : "#f5f5f5",
+            borderRadius: 2,
+          }}
+        >
+          <Typography variant="caption" color="textSecondary">
+            Difficulty Adjustment Date Estimate
+          </Typography>
+          <Typography
+            variant="h6"
+            sx={{
+              fontWeight: "bold",
+              mt: 0.5,
+              fontSize: { xs: "0.8rem", sm: "1.1rem" },
+            }}
+          >
+            {isDifficultyLoading ? (
+              <CircularProgress size={20} />
+            ) : estimatedRetargetDate == null ? (
+              "N/A"
+            ) : (
+              formatAdjustmentDate(estimatedRetargetDate)
+            )}
           </Typography>
         </Paper>
       </Box>
@@ -489,6 +578,10 @@ export default function HashpriceHistoryPage() {
           {isMobile
             ? "BTC/PH/s/Day • Updates every 5 min"
             : "Calculated from: Daily Revenue ÷ Daily Hashrate • Updated every 5 minutes • All values in BTC/PH/s/Day"}
+        </Typography>
+        <Typography variant="body2" color="textSecondary" sx={{ mt: 0.5 }}>
+          <strong>Difficulty Data:</strong> mempool.space (Bitcoin network) •
+          Updated every 10 minutes
         </Typography>
       </Paper>
     </Box>
