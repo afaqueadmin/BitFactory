@@ -131,7 +131,7 @@ export default function HashpriceHistoryPage() {
     difficultyData?.data?.estimatedRetargetDate;
 
   // Fetch historical pool-wide hashprice data from API (for chart and period statistics)
-  const { hashpriceData, statistics, isLoading, isError, error } =
+  const { hashpriceData, statistics, isLoading, isError, error, rawResponse } =
     useHashpriceHistory(queryDays);
 
   // Transform API data for chart
@@ -552,7 +552,8 @@ export default function HashpriceHistoryPage() {
             }}
           >
             <Typography color="textSecondary">
-              No data available. Please check your connection and try again.
+              {rawResponse?.message ||
+                "No data available. Please check your connection and try again."}
             </Typography>
           </Box>
         )}
