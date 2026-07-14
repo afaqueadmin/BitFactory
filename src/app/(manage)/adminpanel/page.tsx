@@ -282,7 +282,8 @@ export default function AdminDashboard() {
       <Box
         sx={{
           p: 4,
-          backgroundColor: "#f5f5f7",
+          backgroundColor:
+            theme.palette.mode === "dark" ? "#242426" : "#f5f5f7",
           minHeight: "calc(100vh - 64px)",
           display: "flex",
           justifyContent: "center",
@@ -299,7 +300,8 @@ export default function AdminDashboard() {
       <Box
         sx={{
           p: 4,
-          backgroundColor: "#f5f5f7",
+          backgroundColor:
+            theme.palette.mode === "dark" ? "#242426" : "#f5f5f7",
           minHeight: "calc(100vh - 64px)",
         }}
       >

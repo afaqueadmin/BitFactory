@@ -46,6 +46,7 @@ const securePaths = {
     "/external-resource",
     "/hardware-purchase",
     "/customers/overview",
+    "/franchisees",
     "/groups",
     "/hardware",
     "/machine",

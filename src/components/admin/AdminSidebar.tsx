@@ -30,6 +30,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Lock as LockIcon,
+  People as FranchiseesIcon,
 } from "@mui/icons-material";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -54,6 +55,11 @@ const sidebarItems: SidebarItem[] = [
     title: "Activity Log",
     icon: <ActivityLogIcon />,
     path: "/activity-log",
+  },
+  {
+    title: "Franchisees",
+    icon: <FranchiseesIcon />,
+    path: "/franchisees",
   },
   {
     title: "Customers",
