@@ -80,6 +80,10 @@ const transporter = nodemailer.createTransport({
 const CC_INVOICE_EMAIL =
   process.env.INVOICE_CC_EMAIL || "invoices@bitfactory.ae";
 
+// Reply-To email for all invoice communications
+const REPLY_TO_INVOICE_EMAIL =
+  process.env.INVOICE_REPLY_TO_EMAIL || "invoices@bitfactory.ae";
+
 export const sendWelcomeEmail = async (email: string, tempPassword: string) => {
   const mailOptions = {
     from:
@@ -157,6 +161,7 @@ export const sendInvoiceEmail = async (
   const mailOptions = {
     from:
       `BitFactory Admin <${process.env.SMTP_FROM}>` || "noreply@bitfactory.com",
+    replyTo: REPLY_TO_INVOICE_EMAIL,
     to: email,
     cc: ccList,
     subject: `Invoice ${invoiceNumber} from BitFactory`,
@@ -252,6 +257,7 @@ export const sendInvoiceCancellationEmail = async (
   const mailOptions = {
     from:
       `BitFactory Admin <${process.env.SMTP_FROM}>` || "noreply@bitfactory.com",
+    replyTo: REPLY_TO_INVOICE_EMAIL,
     to: email,
     cc: ccEmail,
     subject: `Invoice ${invoiceNumber} - Cancellation Notice`,
@@ -323,6 +329,7 @@ export const sendInvoiceEmailWithPDF = async (
       from:
         `BitFactory Accounts <${process.env.SMTP_FROM}>` ||
         "noreply@bitfactory.com",
+      replyTo: REPLY_TO_INVOICE_EMAIL,
       to: email,
       cc: ccList,
       subject: `Invoice ${invoiceNumber} - BitFactory`,
