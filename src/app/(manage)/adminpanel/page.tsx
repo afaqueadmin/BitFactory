@@ -283,7 +283,9 @@ export default function AdminDashboard() {
         sx={{
           p: 4,
           backgroundColor:
-            theme.palette.mode === "dark" ? "#242426" : "#f5f5f7",
+            theme.palette.mode === "dark"
+              ? theme.palette.background.default
+              : "#f5f5f7",
           minHeight: "calc(100vh - 64px)",
           display: "flex",
           justifyContent: "center",
@@ -301,7 +303,9 @@ export default function AdminDashboard() {
         sx={{
           p: 4,
           backgroundColor:
-            theme.palette.mode === "dark" ? "#242426" : "#f5f5f7",
+            theme.palette.mode === "dark"
+              ? theme.palette.background.default
+              : "#f5f5f7",
           minHeight: "calc(100vh - 64px)",
         }}
       >
@@ -380,7 +384,9 @@ export default function AdminDashboard() {
                     ? "rgba(255,255,255,0.1)"
                     : "rgba(0,0,0,0.05)",
               color:
-                poolMode === "braiins" ? "#FFFFFF" : theme.palette.text.primary,
+                poolMode === "braiins"
+                  ? "rgba(0,0,0,0.87)"
+                  : theme.palette.text.primary,
               transition: "all 0.2s",
             }}
           >
