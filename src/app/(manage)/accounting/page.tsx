@@ -40,6 +40,7 @@ import {
   InvoiceWithDetails,
   useCustomers,
   useChangeInvoiceStatus,
+  useCheckAlreadyPaidCustomers,
   useDeleteInvoice,
   useSendInvoiceEmail,
   useBulkSendInvoiceEmail,
@@ -101,6 +102,10 @@ export default function AccountingDashboard() {
   const [bulkEmailFailureCount, setBulkEmailFailureCount] = useState<number>(0);
   const [bulkEmailError, setBulkEmailError] = useState<string | null>(null);
   const [bulkEmailRunId, setBulkEmailRunId] = useState<string | null>(null);
+  const [confirmAlreadyPaidOpen, setConfirmAlreadyPaidOpen] = useState(false);
+  const [alreadyPaidInvoices, setAlreadyPaidInvoices] = useState<
+    { invoiceId: string; customerName: string }[]
+  >([]);
   const {
     invoices,
     total,
@@ -129,6 +134,7 @@ export default function AccountingDashboard() {
   } = useDeleteInvoice();
 
   const { bulkSendEmail } = useBulkSendInvoiceEmail();
+  const { checkAlreadyPaid } = useCheckAlreadyPaidCustomers();
 
   const handleChangePage = (event: unknown, newPage: number) => {
     setPage(newPage + 1);
@@ -233,12 +239,12 @@ export default function AccountingDashboard() {
     }
   };
 
-  const handleIssueAndSendSelected = async () => {
-    if (selectedInvoiceIds.length === 0) return;
+  const performIssueAndSend = async (invoiceIds: string[]) => {
+    if (invoiceIds.length === 0) return;
 
     setBulkEmailError(null);
     setBulkEmailRunId(null);
-    setBulkEmailTotal(selectedInvoiceIds.length);
+    setBulkEmailTotal(invoiceIds.length);
     setBulkEmailProcessed(0);
     setBulkEmailSuccessCount(0);
     setBulkEmailFailureCount(0);
@@ -247,7 +253,7 @@ export default function AccountingDashboard() {
 
     try {
       // First, change status of DRAFT invoices to ISSUED
-      for (const id of selectedInvoiceIds) {
+      for (const id of invoiceIds) {
         const invoice = invoices.find(
           (inv: InvoiceWithDetails) => inv.id === id,
         );
@@ -258,7 +264,7 @@ export default function AccountingDashboard() {
       }
 
       // Then send emails in bulk
-      const response = await bulkSendEmail(selectedInvoiceIds);
+      const response = await bulkSendEmail(invoiceIds);
 
       if (response.success && response.runId) {
         setBulkEmailRunId(response.runId);
@@ -267,6 +273,8 @@ export default function AccountingDashboard() {
       }
 
       setSelectedInvoiceIds([]);
+      setConfirmAlreadyPaidOpen(false);
+      setAlreadyPaidInvoices([]);
     } catch (err) {
       setBulkEmailError(
         err instanceof Error ? err.message : "Failed to send bulk emails.",
@@ -274,6 +282,69 @@ export default function AccountingDashboard() {
     } finally {
       setBulkEmailProcessing(false);
     }
+  };
+
+  const handleIssueAndSendSelected = async (
+    options: {
+      bypassPaidCheck?: boolean;
+      excludeInvoiceIds?: string[];
+    } = {},
+  ) => {
+    const { bypassPaidCheck = false, excludeInvoiceIds = [] } = options;
+
+    if (selectedInvoiceIds.length === 0) return;
+
+    const targetInvoiceIds = selectedInvoiceIds.filter(
+      (id) => !excludeInvoiceIds.includes(id),
+    );
+
+    if (targetInvoiceIds.length === 0) return;
+
+    if (!bypassPaidCheck) {
+      const relevantInvoices = targetInvoiceIds
+        .map((id) => invoices.find((inv: InvoiceWithDetails) => inv.id === id))
+        .filter(
+          (inv): inv is InvoiceWithDetails => !!inv && !!inv.billingMonth,
+        );
+
+      if (relevantInvoices.length > 0) {
+        try {
+          const alreadyPaid = await checkAlreadyPaid(
+            relevantInvoices.map((inv) => ({
+              customerId: inv.userId,
+              billingMonth: new Date(
+                inv.billingMonth as unknown as string,
+              ).toISOString(),
+            })),
+          );
+
+          if (alreadyPaid.length > 0) {
+            const paidCustomerIds = new Set(
+              alreadyPaid.map((c) => c.customerId),
+            );
+            const affectedInvoices = relevantInvoices.filter((inv) =>
+              paidCustomerIds.has(inv.userId),
+            );
+
+            setAlreadyPaidInvoices(
+              affectedInvoices.map((inv) => ({
+                invoiceId: inv.id,
+                customerName: inv.user?.name || inv.user?.email || inv.userId,
+              })),
+            );
+            setConfirmAlreadyPaidOpen(true);
+            return;
+          }
+        } catch (err) {
+          setBulkEmailError(
+            err instanceof Error ? err.message : "Failed to check paid status.",
+          );
+          return;
+        }
+      }
+    }
+
+    await performIssueAndSend(targetInvoiceIds);
   };
 
   if (loading) {
@@ -378,6 +449,52 @@ export default function AccountingDashboard() {
             disabled={bulkEmailProcessing}
           >
             Close
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={confirmAlreadyPaidOpen}
+        onClose={() => setConfirmAlreadyPaidOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Some customers have already paid in advance</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ mb: 1 }}>
+            The following customers have already paid in advance:
+          </Typography>
+          <Box component="ul" sx={{ pl: 3, mb: 2 }}>
+            {alreadyPaidInvoices.map(({ invoiceId, customerName }) => (
+              <li key={invoiceId}>
+                <Typography variant="body2">{customerName}</Typography>
+              </li>
+            ))}
+          </Box>
+          <Typography variant="body2">
+            Do you still want to send them an invoice?
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() =>
+              void handleIssueAndSendSelected({
+                bypassPaidCheck: true,
+                excludeInvoiceIds: alreadyPaidInvoices.map((i) => i.invoiceId),
+              })
+            }
+            disabled={bulkEmailProcessing}
+          >
+            No, skip them
+          </Button>
+          <Button
+            variant="contained"
+            onClick={() =>
+              void handleIssueAndSendSelected({ bypassPaidCheck: true })
+            }
+            disabled={bulkEmailProcessing}
+          >
+            Yes, send anyway
           </Button>
         </DialogActions>
       </Dialog>
@@ -572,7 +689,7 @@ export default function AccountingDashboard() {
             <Button
               variant="contained"
               size="small"
-              onClick={handleIssueAndSendSelected}
+              onClick={() => void handleIssueAndSendSelected()}
               disabled={selectedInvoiceIds.length === 0 || bulkEmailProcessing}
             >
               Issue &amp; Send Emails

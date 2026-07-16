@@ -26,9 +26,12 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import SaveIcon from "@mui/icons-material/Save";
 import {
   Customer,
+  useCheckAlreadyPaidCustomers,
   useCreateInvoice,
+  useCustomerBalances,
   useCustomers,
 } from "@/lib/hooks/useInvoices";
+import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
 
 interface CustomerMinersState {
   count: number;
@@ -38,6 +41,12 @@ interface CustomerMinersState {
 
 // Default to current month/year — user must select billing month from dropdown
 const now = new Date();
+
+function getBalanceColor(balance: number): "error" | "warning" | "success" {
+  if (balance < 0) return "error";
+  if (balance < 200) return "warning";
+  return "success";
+}
 
 const MONTH_NAMES = [
   "January",
@@ -57,11 +66,13 @@ const MONTH_NAMES = [
 export default function BulkInvoicesPage() {
   const router = useRouter();
   const { customers, loading: customersLoading } = useCustomers();
+  const { balances } = useCustomerBalances();
   const {
     create: createInvoice,
     loading: creating,
     error: createError,
   } = useCreateInvoice();
+  const { checkAlreadyPaid } = useCheckAlreadyPaidCustomers();
 
   const defaultBilling = { month: now.getMonth(), year: now.getFullYear() };
 
@@ -81,6 +92,11 @@ export default function BulkInvoicesPage() {
   const [customersWithNoMinersNames, setCustomersWithNoMinersNames] = useState<
     string[]
   >([]);
+  const [confirmAlreadyPaidOpen, setConfirmAlreadyPaidOpen] = useState(false);
+  const [alreadyPaidCustomers, setAlreadyPaidCustomers] = useState<
+    { id: string; name: string }[]
+  >([]);
+  const [excludedCustomerIds, setExcludedCustomerIds] = useState<string[]>([]);
 
   const allCustomerIds = useMemo(
     () => customers.map((c: Customer) => c.id),
@@ -175,7 +191,19 @@ export default function BulkInvoicesPage() {
 
   const estimatedTotalAmount = totalMinersAllSelected * (unitPrice || 0);
 
-  const submitBulkInvoices = async (allowZeroMiners: boolean) => {
+  const submitBulkInvoices = async (
+    options: {
+      allowZeroMiners?: boolean;
+      bypassPaidCheck?: boolean;
+      excludeCustomerIds?: string[];
+    } = {},
+  ) => {
+    const {
+      allowZeroMiners = false,
+      bypassPaidCheck = false,
+      excludeCustomerIds = excludedCustomerIds,
+    } = options;
+
     setSubmitError(null);
     setSubmitSuccess(null);
 
@@ -202,9 +230,59 @@ export default function BulkInvoicesPage() {
       return;
     }
 
+    const targetCustomerIds = selectedCustomerIds.filter(
+      (id) => !excludeCustomerIds.includes(id),
+    );
+
+    if (targetCustomerIds.length === 0) {
+      setConfirmAlreadyPaidOpen(false);
+      setConfirmZeroMinersOpen(false);
+      setAlreadyPaidCustomers([]);
+      setCustomersWithNoMinersNames([]);
+      setExcludedCustomerIds([]);
+      setSubmitError(
+        "No customers left to invoice after removing already-paid customers.",
+      );
+      return;
+    }
+
+    const billingMonthDate = new Date(Date.UTC(billingYear, billingMonth, 1));
+
+    // Check for customers who already paid in advance for this billing month
+    if (!bypassPaidCheck) {
+      try {
+        const alreadyPaid = await checkAlreadyPaid(
+          targetCustomerIds.map((id) => ({
+            customerId: id,
+            billingMonth: billingMonthDate.toISOString(),
+          })),
+        );
+
+        if (alreadyPaid.length > 0) {
+          setAlreadyPaidCustomers(
+            alreadyPaid.map(({ customerId }) => ({
+              id: customerId,
+              name:
+                customers.find((c: Customer) => c.id === customerId)
+                  ?.displayName || customerId,
+            })),
+          );
+          setConfirmAlreadyPaidOpen(true);
+          return;
+        }
+      } catch (error) {
+        setSubmitError(
+          error instanceof Error
+            ? error.message
+            : "Failed to check paid status.",
+        );
+        return;
+      }
+    }
+
     // Check for customers with zero miners
     const customersWithNoMiners: string[] = [];
-    selectedCustomerIds.forEach((id) => {
+    targetCustomerIds.forEach((id) => {
       const minersCount = customerMiners[id]?.count ?? 0;
       if (minersCount <= 0) {
         const customer = customers.find((c: Customer) => c.id === id);
@@ -219,9 +297,7 @@ export default function BulkInvoicesPage() {
     }
 
     try {
-      const billingMonthDate = new Date(Date.UTC(billingYear, billingMonth, 1));
-
-      for (const customerId of selectedCustomerIds) {
+      for (const customerId of targetCustomerIds) {
         const minersCount = customerMiners[customerId]?.count ?? 0;
 
         await createInvoice({
@@ -235,10 +311,13 @@ export default function BulkInvoicesPage() {
       }
 
       setSubmitSuccess(
-        `Successfully created ${totalInvoices} draft invoice(s) for selected customers.`,
+        `Successfully created ${targetCustomerIds.length} draft invoice(s) for selected customers.`,
       );
       setConfirmZeroMinersOpen(false);
       setCustomersWithNoMinersNames([]);
+      setConfirmAlreadyPaidOpen(false);
+      setAlreadyPaidCustomers([]);
+      setExcludedCustomerIds([]);
       // After success, navigate back to accounting dashboard
       router.push("/accounting");
     } catch (error) {
@@ -250,7 +329,7 @@ export default function BulkInvoicesPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await submitBulkInvoices(false);
+    await submitBulkInvoices();
   };
 
   return (
@@ -336,9 +415,30 @@ export default function BulkInvoicesPage() {
                               flexDirection: "column",
                             }}
                           >
-                            <Typography variant="body2">
-                              {customer.displayName}
-                            </Typography>
+                            <Stack
+                              direction="row"
+                              spacing={1}
+                              alignItems="baseline"
+                            >
+                              <Typography variant="body2">
+                                {customer.displayName}
+                              </Typography>
+                              <Typography
+                                variant="caption"
+                                color="textSecondary"
+                              >
+                                Balance:{" "}
+                                <CurrencyDisplay
+                                  value={balances[customer.id] ?? 0}
+                                  color={getBalanceColor(
+                                    balances[customer.id] ?? 0,
+                                  )}
+                                  fontWeight="bold"
+                                  variant="caption"
+                                  standalone
+                                />
+                              </Typography>
+                            </Stack>
                             {isSelected && (
                               <Typography
                                 variant="caption"
@@ -491,15 +591,77 @@ export default function BulkInvoicesPage() {
           </Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setConfirmZeroMinersOpen(false)}>
+          <Button
+            onClick={() => {
+              setConfirmZeroMinersOpen(false);
+              setExcludedCustomerIds([]);
+            }}
+          >
             Cancel
           </Button>
           <Button
             variant="contained"
-            onClick={() => void submitBulkInvoices(true)}
+            onClick={() =>
+              void submitBulkInvoices({
+                allowZeroMiners: true,
+                bypassPaidCheck: true,
+              })
+            }
             disabled={creating}
           >
             {creating ? "Creating Invoices..." : "Proceed"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={confirmAlreadyPaidOpen}
+        onClose={() => setConfirmAlreadyPaidOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Some customers have already paid in advance</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ mb: 1 }}>
+            The following customers have already paid in advance:
+          </Typography>
+          <Box component="ul" sx={{ pl: 3, mb: 2 }}>
+            {alreadyPaidCustomers.map(({ id, name }) => (
+              <li key={id}>
+                <Typography variant="body2">{name}</Typography>
+              </li>
+            ))}
+          </Box>
+          <Typography variant="body2">
+            Do you still want to send them an invoice?
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => {
+              const idsToExclude = alreadyPaidCustomers.map((c) => c.id);
+              setExcludedCustomerIds(idsToExclude);
+              void submitBulkInvoices({
+                bypassPaidCheck: true,
+                excludeCustomerIds: idsToExclude,
+              });
+            }}
+            disabled={creating}
+          >
+            No, skip them
+          </Button>
+          <Button
+            variant="contained"
+            onClick={() => {
+              setExcludedCustomerIds([]);
+              void submitBulkInvoices({
+                bypassPaidCheck: true,
+                excludeCustomerIds: [],
+              });
+            }}
+            disabled={creating}
+          >
+            {creating ? "Creating Invoices..." : "Yes, send anyway"}
           </Button>
         </DialogActions>
       </Dialog>
