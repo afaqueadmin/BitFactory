@@ -72,6 +72,7 @@ interface ApiResponse<T = Record<string, unknown>> {
 export default function FranchiseesPage() {
   const { user } = useUser();
   const isSuperAdmin = user?.role === "SUPER_ADMIN";
+  const isAdmin = user?.role === "ADMIN" || user?.role === "SUPER_ADMIN";
 
   const [franchises, setFranchises] = useState<Franchise[]>([]);
   const [loading, setLoading] = useState(true);
@@ -266,7 +267,7 @@ export default function FranchiseesPage() {
                   <TableCell sx={{ fontWeight: "bold" }} align="center">
                     Status
                   </TableCell>
-                  {isSuperAdmin && (
+                  {isAdmin && (
                     <TableCell sx={{ fontWeight: "bold" }} align="right">
                       Actions
                     </TableCell>
@@ -324,7 +325,7 @@ export default function FranchiseesPage() {
                         size="small"
                       />
                     </TableCell>
-                    {isSuperAdmin && (
+                    {isAdmin && (
                       <TableCell align="right">
                         <Stack
                           direction="row"
@@ -340,18 +341,20 @@ export default function FranchiseesPage() {
                               <EditIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
-                          <Tooltip title="Delete Franchisee">
-                            <IconButton
-                              size="small"
-                              color="error"
-                              onClick={() => {
-                                setDeleteError("");
-                                setDeletingFranchise(franchise);
-                              }}
-                            >
-                              <DeleteIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
+                          {isSuperAdmin && (
+                            <Tooltip title="Delete Franchisee">
+                              <IconButton
+                                size="small"
+                                color="error"
+                                onClick={() => {
+                                  setDeleteError("");
+                                  setDeletingFranchise(franchise);
+                                }}
+                              >
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          )}
                         </Stack>
                       </TableCell>
                     )}

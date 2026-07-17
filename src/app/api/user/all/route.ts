@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 import { verifyJwtToken } from "@/lib/jwt";
+import { franchiseeUserFilter } from "@/lib/franchiseeScope";
 
 export async function GET(request: NextRequest) {
   try {
@@ -36,13 +37,18 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get user from database and check if admin
+    // Get user from database and check if admin/franchisee
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { role: true },
+      select: { id: true, role: true },
     });
 
-    if (user && user.role !== "ADMIN" && user.role !== "SUPER_ADMIN") {
+    if (
+      user &&
+      user.role !== "ADMIN" &&
+      user.role !== "SUPER_ADMIN" &&
+      user.role !== "FRANCHISEE"
+    ) {
       return NextResponse.json(
         { error: "Only administrators can view all users" },
         { status: 403 },
@@ -53,7 +59,10 @@ export async function GET(request: NextRequest) {
 
     // Build where clause for filtering
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const where: any = includeDeleted ? {} : { isDeleted: false };
+    const where: any = {
+      ...(includeDeleted ? {} : { isDeleted: false }),
+      ...(user ? franchiseeUserFilter(user) : {}),
+    };
 
     // Fetch all users (excluding passwords)
     const users = await prisma.user.findMany({
@@ -71,6 +80,7 @@ export async function GET(request: NextRequest) {
         streetAddress: true,
         createdAt: true,
         isDeleted: true,
+        franchiseeId: true,
         miners: {
           select: {
             id: true,
@@ -109,6 +119,7 @@ export async function GET(request: NextRequest) {
         miners: user.miners.length,
         status: user.isDeleted ? "deleted" : "active",
         isDeleted: user.isDeleted,
+        franchiseeId: user.franchiseeId,
         balance: aggregateAmount,
       };
     });

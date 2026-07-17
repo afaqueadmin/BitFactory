@@ -51,6 +51,7 @@ interface Customer {
   miners: number;
   status: "active" | "inactive";
   balance: string;
+  franchiseeId: string | null;
 }
 
 /**

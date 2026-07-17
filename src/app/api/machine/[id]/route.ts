@@ -553,7 +553,11 @@ export async function DELETE(
     // Check if miner exists and get its hardware ID
     const existingMiner = await prisma.miner.findUnique({
       where: { id },
-      select: { id: true, hardwareId: true },
+      select: {
+        id: true,
+        hardwareId: true,
+        user: { select: { franchiseeId: true } },
+      },
     });
 
     if (!existingMiner) {
@@ -561,6 +565,19 @@ export async function DELETE(
       return NextResponse.json<ApiResponse>(
         { success: false, error: "Miner not found" },
         { status: 404 },
+      );
+    }
+
+    // A miner owned by a customer assigned to a franchisee cannot be deleted
+    // until that customer is unassigned first.
+    if (existingMiner.user.franchiseeId) {
+      return NextResponse.json<ApiResponse>(
+        {
+          success: false,
+          error:
+            "Cannot delete a miner owned by a customer assigned to a franchisee. Unassign the customer first.",
+        },
+        { status: 400 },
       );
     }
 

@@ -75,6 +75,7 @@ interface FetchedUser {
   miners: number;
   status: "active" | "inactive";
   balance: string;
+  franchiseeId: string | null;
 }
 
 interface FilterColumns {

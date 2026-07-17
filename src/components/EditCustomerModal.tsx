@@ -27,6 +27,12 @@ interface Group {
   isActive: boolean;
 }
 
+interface Franchise {
+  id: string;
+  businessName: string;
+  isActive: boolean;
+}
+
 interface EditCustomerModalProps {
   open: boolean;
   onClose: () => void;
@@ -44,6 +50,7 @@ interface EditCustomerModalProps {
     companyUrl?: string;
     luxorSubaccountName?: string;
     groupId?: string;
+    franchiseeId?: string | null;
   };
 }
 
@@ -62,6 +69,8 @@ export default function EditCustomerModal({
     Array<{ name: string; id: number }>
   >([]);
   const [groups, setGroups] = useState<Group[]>([]);
+  const [franchises, setFranchises] = useState<Franchise[]>([]);
+  const [fetchingFranchises, setFetchingFranchises] = useState(false);
   const [formData, setFormData] = useState(
     initialData || {
       id: "",
@@ -75,6 +84,7 @@ export default function EditCustomerModal({
       companyUrl: "",
       luxorSubaccountName: "",
       groupId: "",
+      franchiseeId: "",
     },
   );
   const [error, setError] = useState("");
@@ -82,14 +92,39 @@ export default function EditCustomerModal({
 
   useEffect(() => {
     if (initialData && open) {
-      setFormData(initialData);
+      setFormData({
+        ...initialData,
+        franchiseeId: initialData.franchiseeId || "",
+      });
       setError("");
       setSuccess("");
       fetchSubaccounts();
       // Pass the subaccount name directly to avoid stale state issues
       fetchGroups(initialData.luxorSubaccountName || "");
+      fetchFranchises();
     }
   }, [initialData, open]);
+
+  const fetchFranchises = async () => {
+    try {
+      setFetchingFranchises(true);
+      const response = await fetch("/api/franchisees");
+      if (!response.ok) {
+        setFranchises([]);
+        return;
+      }
+      const data = await response.json();
+      const franchisesList: Franchise[] = Array.isArray(data.data)
+        ? data.data
+        : [];
+      setFranchises(franchisesList.filter((f) => f.isActive));
+    } catch (err) {
+      console.error("[EditCustomerModal] Error fetching franchises:", err);
+      setFranchises([]);
+    } finally {
+      setFetchingFranchises(false);
+    }
+  };
 
   const fetchSubaccounts = async () => {
     try {
@@ -324,6 +359,7 @@ export default function EditCustomerModal({
           companyUrl: formData.companyUrl,
           luxorSubaccountName: formData.luxorSubaccountName || null,
           groupId: formData.groupId || null,
+          franchiseeId: formData.franchiseeId || null,
         }),
       });
 
@@ -512,6 +548,26 @@ export default function EditCustomerModal({
                 {groups.map((group) => (
                   <MenuItem key={group.id} value={group.id}>
                     {group.name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <FormControl fullWidth disabled={fetchingFranchises}>
+              <InputLabel>Franchisee (Optional)</InputLabel>
+              <Select
+                value={formData.franchiseeId || ""}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    franchiseeId: e.target.value,
+                  }))
+                }
+                label="Franchisee (Optional)"
+              >
+                <MenuItem value="">Direct BitFactory Customer</MenuItem>
+                {franchises.map((franchise) => (
+                  <MenuItem key={franchise.id} value={franchise.id}>
+                    {franchise.businessName}
                   </MenuItem>
                 ))}
               </Select>

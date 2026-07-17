@@ -59,6 +59,14 @@ const securePaths = {
     "/activity-log",
     // Add admin-specific public paths if any
   ]),
+  // Franchisee: reuses the admin panel/customers/machine pages, which are
+  // scoped server-side to the franchisee's own customers/miners. Kept
+  // deliberately minimal — expand as more franchisee-facing pages ship.
+  FRANCHISEE: new Set<string>([
+    "/adminpanel",
+    "/customers/overview",
+    "/machine",
+  ]),
 }; // Add admin-specific public paths if any
 
 const dynamicPatternsPaths = {
@@ -69,6 +77,7 @@ const dynamicPatternsPaths = {
     new URLPattern({ pathname: "/customers/:id*" }),
     new URLPattern({ pathname: "/groups/:id*" }),
   ],
+  FRANCHISEE: [new URLPattern({ pathname: "/customers/:id*" })],
 };
 
 // Role-based default redirects
@@ -79,13 +88,18 @@ const getDefaultPathForRole = (role: string) => {
       return "/adminpanel";
     case "CLIENT":
       return "/dashboard";
+    case "FRANCHISEE":
+      return "/adminpanel";
     default:
       return "/login";
   }
 };
 
 // Check if a path is inside a route group folder like (auth) or (manage)
-const isInRouteGroup = (pathname: string, role: "CLIENT" | "ADMIN") => {
+const isInRouteGroup = (
+  pathname: string,
+  role: "CLIENT" | "ADMIN" | "FRANCHISEE",
+) => {
   return (
     securePaths[role].has(pathname) ||
     dynamicPatternsPaths[role].some((p) => p.test({ pathname }))
@@ -163,6 +177,13 @@ export async function middleware(request: NextRequest) {
       // Prevent client from accessing admin routes
       if (!isInRouteGroup(pathname, userRole)) {
         return NextResponse.redirect(new URL("/dashboard", request.url));
+      }
+    }
+
+    if (userRole === "FRANCHISEE") {
+      // Prevent franchisee from accessing routes outside their scoped set
+      if (!isInRouteGroup(pathname, userRole)) {
+        return NextResponse.redirect(new URL("/adminpanel", request.url));
       }
     }
 

@@ -34,12 +34,16 @@ import {
 } from "@mui/icons-material";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useUser } from "@/lib/hooks";
 
 interface SidebarItem {
   title: string;
   icon: React.ReactNode;
   path?: string;
   items?: SidebarItem[];
+  // Roles allowed to see this item. Defaults to ADMIN/SUPER_ADMIN (today's
+  // behavior) when omitted, so existing items don't need to be touched.
+  roles?: Array<"ADMIN" | "SUPER_ADMIN" | "FRANCHISEE">;
 }
 
 const sidebarItems: SidebarItem[] = [
@@ -65,6 +69,7 @@ const sidebarItems: SidebarItem[] = [
     title: "Customers",
     icon: <CustomersIcon />,
     path: "/customers/overview",
+    roles: ["ADMIN", "SUPER_ADMIN", "FRANCHISEE"],
     // items: [
     //   {
     //     title: "Overview",
@@ -99,6 +104,7 @@ const sidebarItems: SidebarItem[] = [
     title: "All Miners",
     icon: <MinersIcon />,
     path: "/machine",
+    roles: ["ADMIN", "SUPER_ADMIN", "FRANCHISEE"],
   },
 
   {
@@ -226,6 +232,12 @@ export default function AdminSidebar() {
   const [isHovered, setIsHovered] = React.useState(false);
   const pathname = usePathname();
   const [expandedItems, setExpandedItems] = React.useState<string[]>([]);
+  const { user } = useUser();
+
+  const visibleSidebarItems = sidebarItems.filter((item) => {
+    const allowedRoles = item.roles ?? ["ADMIN", "SUPER_ADMIN"];
+    return user ? (allowedRoles as string[]).includes(user.role) : false;
+  });
 
   const handleExpandClick = (title: string) => {
     if (!sideBarOpen && !isHovered) return;
@@ -464,7 +476,7 @@ export default function AdminSidebar() {
         </IconButton>
       </Box>
       <List sx={{ px: sideBarOpen || isHovered ? 2 : 1 }}>
-        {renderSidebarItems(sidebarItems)}
+        {renderSidebarItems(visibleSidebarItems)}
       </List>
     </Box>
   );

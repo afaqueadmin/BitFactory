@@ -72,6 +72,7 @@ export async function POST(request: NextRequest) {
       initialDeposit,
       luxorSubaccountName,
       groupId,
+      franchiseeId,
     } = await request.json();
 
     // Validate input
@@ -91,6 +92,21 @@ export async function POST(request: NextRequest) {
       if (!luxorSubaccountName || luxorSubaccountName.trim().length === 0) {
         return NextResponse.json(
           { error: "A Luxor subaccount must be selected for CLIENT users" },
+          { status: 400 },
+        );
+      }
+    }
+
+    // franchiseeId is only applicable to CLIENT users (null = direct BitFactory
+    // customer). Ignore it for any other role rather than silently accepting it.
+    if (franchiseeId && role === "CLIENT") {
+      const franchise = await prisma.franchise.findUnique({
+        where: { id: franchiseeId },
+        select: { id: true, isActive: true, deletedAt: true },
+      });
+      if (!franchise || !franchise.isActive || franchise.deletedAt) {
+        return NextResponse.json(
+          { error: "Invalid or inactive franchise selected" },
           { status: 400 },
         );
       }
@@ -134,6 +150,7 @@ export async function POST(request: NextRequest) {
           email,
           password: hashedPassword,
           role,
+          franchiseeId: role === "CLIENT" ? franchiseeId || null : null,
         },
       });
       console.log(`[User Create API] User created in DB: ${newUser.id}`);

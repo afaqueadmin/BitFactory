@@ -138,7 +138,16 @@ export async function POST(request: NextRequest) {
     );
 
     // Determine redirect URL based on role
-    const redirectUrl = user.role === "ADMIN" ? "/adminpanel" : "/dashboard";
+    let redirectUrl: string;
+    switch (user.role) {
+      case "ADMIN":
+      case "SUPER_ADMIN":
+      case "FRANCHISEE":
+        redirectUrl = "/adminpanel";
+        break;
+      default:
+        redirectUrl = "/dashboard";
+    }
 
     // Create response
     const response = NextResponse.json(

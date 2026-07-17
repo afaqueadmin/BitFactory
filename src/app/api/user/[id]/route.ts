@@ -45,6 +45,27 @@ export async function PUT(
       select: { luxorSubaccountName: true, role: true },
     });
 
+    // franchiseeId is only applicable to CLIENT users (null = direct BitFactory
+    // customer). Ignore any attempt to set it on a non-CLIENT user.
+    let franchiseeIdUpdate: string | null | undefined = undefined;
+    if (body.franchiseeId !== undefined && currentUser?.role === "CLIENT") {
+      if (body.franchiseeId === null) {
+        franchiseeIdUpdate = null;
+      } else {
+        const franchise = await prisma.franchise.findUnique({
+          where: { id: body.franchiseeId },
+          select: { id: true, isActive: true, deletedAt: true },
+        });
+        if (!franchise || !franchise.isActive || franchise.deletedAt) {
+          return NextResponse.json(
+            { error: "Invalid or inactive franchise selected" },
+            { status: 400 },
+          );
+        }
+        franchiseeIdUpdate = body.franchiseeId;
+      }
+    }
+
     // Update user with provided fields
     const updatedUser = await prisma.user.update({
       where: { id },
@@ -62,6 +83,7 @@ export async function PUT(
           body.luxorSubaccountName !== undefined
             ? body.luxorSubaccountName
             : undefined,
+        franchiseeId: franchiseeIdUpdate,
       },
     });
 
@@ -172,6 +194,23 @@ export async function DELETE(
       return NextResponse.json(
         {
           error: `Cannot delete user with ${minerCount} linked miner(s). Please remove all miners first.`,
+        },
+        { status: 400 },
+      );
+    }
+
+    // A customer assigned to a franchisee cannot be deleted until unassigned
+    // (set franchiseeId back to null / direct BitFactory customer) first.
+    const targetUser = await prisma.user.findUnique({
+      where: { id },
+      select: { franchiseeId: true },
+    });
+
+    if (targetUser?.franchiseeId) {
+      return NextResponse.json(
+        {
+          error:
+            "Cannot delete a customer assigned to a franchisee. Unassign them first.",
         },
         { status: 400 },
       );

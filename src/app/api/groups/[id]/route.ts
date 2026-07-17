@@ -13,6 +13,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
+import { franchiseeUserFilter } from "@/lib/franchiseeScope";
 
 /**
  * API Response Type
@@ -67,7 +68,11 @@ export async function GET(
     }
 
     // Check authorization
-    if (user.role !== "ADMIN" && user.role !== "SUPER_ADMIN") {
+    if (
+      user.role !== "ADMIN" &&
+      user.role !== "SUPER_ADMIN" &&
+      user.role !== "FRANCHISEE"
+    ) {
       console.warn("[Groups API] GET[id] - Forbidden: User role is", user.role);
       return NextResponse.json(
         {
@@ -114,6 +119,7 @@ export async function GET(
       where: {
         isDeleted: false,
         luxorSubaccountName: { not: null },
+        ...franchiseeUserFilter({ id: user.userId, role: user.role }),
       },
       select: {
         id: true,
