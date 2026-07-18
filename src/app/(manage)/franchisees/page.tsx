@@ -26,7 +26,10 @@ import {
   Chip,
   Snackbar,
   IconButton,
-  Tooltip,
+  Menu,
+  MenuItem,
+  ListItemIcon,
+  ListItemText,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -37,6 +40,7 @@ import {
   Refresh as RefreshIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
+  MoreVert as MoreVertIcon,
 } from "@mui/icons-material";
 import StorefrontIcon from "@mui/icons-material/Storefront";
 import AdminValueCard from "@/components/admin/AdminValueCard";
@@ -88,6 +92,21 @@ export default function FranchiseesPage() {
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
   const [notification, setNotification] = useState("");
+  const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
+  const [menuFranchise, setMenuFranchise] = useState<Franchise | null>(null);
+
+  const handleMenuOpen = (
+    event: React.MouseEvent<HTMLElement>,
+    franchise: Franchise,
+  ) => {
+    setMenuAnchor(event.currentTarget);
+    setMenuFranchise(franchise);
+  };
+
+  const handleMenuClose = () => {
+    setMenuAnchor(null);
+    setMenuFranchise(null);
+  };
 
   const fetchFranchisees = useCallback(async () => {
     try {
@@ -327,35 +346,13 @@ export default function FranchiseesPage() {
                     </TableCell>
                     {isAdmin && (
                       <TableCell align="right">
-                        <Stack
-                          direction="row"
-                          spacing={1}
-                          justifyContent="flex-end"
+                        <IconButton
+                          size="small"
+                          onClick={(e) => handleMenuOpen(e, franchise)}
+                          aria-label="Franchisee actions"
                         >
-                          <Tooltip title="Edit Franchisee">
-                            <IconButton
-                              size="small"
-                              color="primary"
-                              onClick={() => setEditingFranchise(franchise)}
-                            >
-                              <EditIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                          {isSuperAdmin && (
-                            <Tooltip title="Delete Franchisee">
-                              <IconButton
-                                size="small"
-                                color="error"
-                                onClick={() => {
-                                  setDeleteError("");
-                                  setDeletingFranchise(franchise);
-                                }}
-                              >
-                                <DeleteIcon fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                          )}
-                        </Stack>
+                          <MoreVertIcon fontSize="small" />
+                        </IconButton>
                       </TableCell>
                     )}
                   </TableRow>
@@ -381,6 +378,41 @@ export default function FranchiseesPage() {
             </Typography>
           </Paper>
         )}
+
+        <Menu
+          anchorEl={menuAnchor}
+          open={Boolean(menuAnchor)}
+          onClose={handleMenuClose}
+          anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+          transformOrigin={{ vertical: "top", horizontal: "right" }}
+        >
+          <MenuItem
+            onClick={() => {
+              setEditingFranchise(menuFranchise);
+              handleMenuClose();
+            }}
+          >
+            <ListItemIcon>
+              <EditIcon fontSize="small" />
+            </ListItemIcon>
+            <ListItemText>Edit</ListItemText>
+          </MenuItem>
+          {isSuperAdmin && (
+            <MenuItem
+              onClick={() => {
+                setDeleteError("");
+                setDeletingFranchise(menuFranchise);
+                handleMenuClose();
+              }}
+              sx={{ color: "error.main" }}
+            >
+              <ListItemIcon>
+                <DeleteIcon fontSize="small" color="error" />
+              </ListItemIcon>
+              <ListItemText>Delete</ListItemText>
+            </MenuItem>
+          )}
+        </Menu>
 
         <CreateFranchiseeModal
           open={createModalOpen}
