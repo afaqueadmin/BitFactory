@@ -142,8 +142,10 @@ export async function POST(request: NextRequest) {
     switch (user.role) {
       case "ADMIN":
       case "SUPER_ADMIN":
-      case "FRANCHISEE":
         redirectUrl = "/adminpanel";
+        break;
+      case "FRANCHISEE":
+        redirectUrl = "/customers/overview";
         break;
       default:
         redirectUrl = "/dashboard";

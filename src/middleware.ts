@@ -59,14 +59,10 @@ const securePaths = {
     "/activity-log",
     // Add admin-specific public paths if any
   ]),
-  // Franchisee: reuses the admin panel/customers/machine pages, which are
-  // scoped server-side to the franchisee's own customers/miners. Kept
-  // deliberately minimal — expand as more franchisee-facing pages ship.
-  FRANCHISEE: new Set<string>([
-    "/adminpanel",
-    "/customers/overview",
-    "/machine",
-  ]),
+  // Franchisee: reuses the customers/machine pages (not the admin panel
+  // itself), scoped server-side to the franchisee's own customers/miners.
+  // Kept deliberately minimal — expand as more franchisee-facing pages ship.
+  FRANCHISEE: new Set<string>(["/customers/overview", "/machine"]),
 }; // Add admin-specific public paths if any
 
 const dynamicPatternsPaths = {
@@ -89,7 +85,7 @@ const getDefaultPathForRole = (role: string) => {
     case "CLIENT":
       return "/dashboard";
     case "FRANCHISEE":
-      return "/adminpanel";
+      return "/customers/overview";
     default:
       return "/login";
   }
@@ -182,8 +178,11 @@ export async function middleware(request: NextRequest) {
 
     if (userRole === "FRANCHISEE") {
       // Prevent franchisee from accessing routes outside their scoped set
+      // (including /adminpanel itself, which franchisees should never see)
       if (!isInRouteGroup(pathname, userRole)) {
-        return NextResponse.redirect(new URL("/adminpanel", request.url));
+        return NextResponse.redirect(
+          new URL("/customers/overview", request.url),
+        );
       }
     }
 
