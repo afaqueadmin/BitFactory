@@ -169,6 +169,7 @@ export async function GET(
             name: true,
             email: true,
             luxorSubaccountName: true,
+            segment: true,
           },
         },
         space: {
@@ -538,6 +539,7 @@ export async function POST(
               name: true,
               email: true,
               luxorSubaccountName: true,
+              segment: true,
             },
           },
           space: {

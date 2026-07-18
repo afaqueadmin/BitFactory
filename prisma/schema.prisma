@@ -32,6 +32,7 @@ model User {
   isDeleted                  Boolean                      @default(false)
   franchiseeId               String?
   franchisee                 Franchise?                   @relation("FranchiseUsers", fields: [franchiseeId], references: [id])
+  segment                    Segment?
   auditLogs                  AuditLog[]                   @relation("auditLogs")
   costPayments               CostPayment[]
   pricingCreated             CustomerPricingConfig[]      @relation("pricingConfigsCreated")
@@ -65,6 +66,7 @@ model User {
 
   @@index([isDeleted])
   @@index([franchiseeId])
+  @@index([segment])
   @@map("users")
 }
 
@@ -537,6 +539,13 @@ enum Role {
   CLIENT
   SUPER_ADMIN
   FRANCHISEE
+}
+
+enum Segment {
+  CORPORATE
+  SME
+  FRANCHISEE
+  RETAIL
 }
 
 enum PaymentType {

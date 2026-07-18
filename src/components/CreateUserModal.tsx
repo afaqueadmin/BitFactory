@@ -78,6 +78,7 @@ export default function CreateUserModal({
     groupId: "",
     initialDeposit: 0,
     franchiseeId: "",
+    segment: "",
   });
   const { user } = useUser();
   const [error, setError] = useState("");
@@ -322,6 +323,17 @@ export default function CreateUserModal({
         setLoading(false);
         return;
       }
+
+      // Segment is required unless a franchise is assigned (which implies Retail)
+      if (
+        !formData.franchiseeId &&
+        formData.segment !== "CORPORATE" &&
+        formData.segment !== "SME"
+      ) {
+        setError("Please select a Type (Corporate or SME)");
+        setLoading(false);
+        return;
+      }
     }
 
     try {
@@ -356,6 +368,7 @@ export default function CreateUserModal({
         groupId: "",
         initialDeposit: 0,
         franchiseeId: "",
+        segment: "",
       });
       setEmailError("");
     } catch (err) {
@@ -497,6 +510,40 @@ export default function CreateUserModal({
                         {franchise.businessName}
                       </MenuItem>
                     ))
+                  )}
+                </Select>
+              </FormControl>
+            )}
+
+            {/* Type (segment) - Only for CLIENT role. Disabled/forced to Retail when a franchisee is assigned */}
+            {formData.role === "CLIENT" && (
+              <FormControl
+                fullWidth
+                disabled={!!formData.franchiseeId}
+                required
+              >
+                <InputLabel>Type</InputLabel>
+                <Select
+                  value={formData.franchiseeId ? "RETAIL" : formData.segment}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      segment: e.target.value,
+                    }))
+                  }
+                  label="Type"
+                >
+                  {formData.franchiseeId ? (
+                    <MenuItem value="RETAIL">Retail (via franchise)</MenuItem>
+                  ) : (
+                    [
+                      <MenuItem key="CORPORATE" value="CORPORATE">
+                        Corporate
+                      </MenuItem>,
+                      <MenuItem key="SME" value="SME">
+                        SME
+                      </MenuItem>,
+                    ]
                   )}
                 </Select>
               </FormControl>

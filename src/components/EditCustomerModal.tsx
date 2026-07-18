@@ -51,6 +51,7 @@ interface EditCustomerModalProps {
     luxorSubaccountName?: string;
     groupId?: string;
     franchiseeId?: string | null;
+    segment?: string | null;
   };
 }
 
@@ -85,6 +86,7 @@ export default function EditCustomerModal({
       luxorSubaccountName: "",
       groupId: "",
       franchiseeId: "",
+      segment: "",
     },
   );
   const [error, setError] = useState("");
@@ -95,6 +97,7 @@ export default function EditCustomerModal({
       setFormData({
         ...initialData,
         franchiseeId: initialData.franchiseeId || "",
+        segment: initialData.segment || "",
       });
       setError("");
       setSuccess("");
@@ -342,6 +345,17 @@ export default function EditCustomerModal({
     setError("");
     setSuccess("");
 
+    // Segment is required unless a franchise is assigned (which implies Retail)
+    if (
+      !formData.franchiseeId &&
+      formData.segment !== "CORPORATE" &&
+      formData.segment !== "SME"
+    ) {
+      setError("Please select a Type (Corporate or SME)");
+      setLoading(false);
+      return;
+    }
+
     try {
       const response = await fetch(`/api/user/${customerId}`, {
         method: "PUT",
@@ -360,6 +374,7 @@ export default function EditCustomerModal({
           luxorSubaccountName: formData.luxorSubaccountName || null,
           groupId: formData.groupId || null,
           franchiseeId: formData.franchiseeId || null,
+          segment: formData.franchiseeId ? undefined : formData.segment,
         }),
       });
 
@@ -570,6 +585,34 @@ export default function EditCustomerModal({
                     {franchise.businessName}
                   </MenuItem>
                 ))}
+              </Select>
+            </FormControl>
+            <FormControl fullWidth disabled={!!formData.franchiseeId} required>
+              <InputLabel>Type</InputLabel>
+              <Select
+                value={
+                  formData.franchiseeId ? "RETAIL" : formData.segment || ""
+                }
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    segment: e.target.value,
+                  }))
+                }
+                label="Type"
+              >
+                {formData.franchiseeId ? (
+                  <MenuItem value="RETAIL">Retail (via franchise)</MenuItem>
+                ) : (
+                  [
+                    <MenuItem key="CORPORATE" value="CORPORATE">
+                      Corporate
+                    </MenuItem>,
+                    <MenuItem key="SME" value="SME">
+                      SME
+                    </MenuItem>,
+                  ]
+                )}
               </Select>
             </FormControl>
           </Box>

@@ -12,6 +12,7 @@ export type CustomerSortField =
   | "name"
   | "email"
   | "role"
+  | "segment"
   | "luxorSubaccount"
   | "miners"
   | "status"
@@ -52,6 +53,7 @@ interface Customer {
   status: "active" | "inactive";
   balance: string;
   franchiseeId: string | null;
+  segment: string | null;
 }
 
 /**
@@ -70,6 +72,9 @@ function getSortValue(
 
     case "role":
       return customer.role.toLowerCase();
+
+    case "segment":
+      return (customer.segment || "").toLowerCase();
 
     case "luxorSubaccount":
       return (customer.luxorSubaccountName || "").toLowerCase();
@@ -154,6 +159,7 @@ export function getSortFieldLabel(field: CustomerSortField): string {
     name: "Customer",
     email: "Email",
     role: "Role",
+    segment: "Type",
     luxorSubaccount: "Luxor Subaccount",
     miners: "Miners",
     status: "Status",
@@ -174,6 +180,7 @@ export function getAllSortFields(): CustomerSortField[] {
     "name",
     "email",
     "role",
+    "segment",
     "luxorSubaccount",
     "miners",
     "status",

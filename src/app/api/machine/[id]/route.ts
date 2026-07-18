@@ -466,6 +466,7 @@ export async function PUT(
               name: true,
               email: true,
               luxorSubaccountName: true,
+              segment: true,
             },
           },
           space: {

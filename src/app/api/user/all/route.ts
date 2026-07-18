@@ -81,6 +81,7 @@ export async function GET(request: NextRequest) {
         createdAt: true,
         isDeleted: true,
         franchiseeId: true,
+        segment: true,
         miners: {
           select: {
             id: true,
@@ -120,6 +121,7 @@ export async function GET(request: NextRequest) {
         status: user.isDeleted ? "deleted" : "active",
         isDeleted: user.isDeleted,
         franchiseeId: user.franchiseeId,
+        segment: user.segment,
         balance: aggregateAmount,
       };
     });

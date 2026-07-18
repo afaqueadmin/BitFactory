@@ -230,6 +230,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           email: email.trim(),
           password: hashedPassword,
           role: "FRANCHISEE",
+          segment: "FRANCHISEE",
         },
       });
 

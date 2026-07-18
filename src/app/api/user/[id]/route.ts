@@ -42,7 +42,7 @@ export async function PUT(
     // First get the current user to check if they have a luxor subaccount
     const currentUser = await prisma.user.findUnique({
       where: { id },
-      select: { luxorSubaccountName: true, role: true },
+      select: { luxorSubaccountName: true, role: true, franchiseeId: true },
     });
 
     // franchiseeId is only applicable to CLIENT users (null = direct BitFactory
@@ -66,6 +66,42 @@ export async function PUT(
       }
     }
 
+    // segment is only applicable to CLIENT users. A franchise assignment
+    // (new or pre-existing) forces RETAIL regardless of what was submitted;
+    // clearing/staying-clear of a franchise requires a Corporate/SME choice
+    // whenever segment is being touched.
+    let segmentUpdate: "CORPORATE" | "SME" | "RETAIL" | undefined = undefined;
+    if (currentUser?.role === "CLIENT") {
+      const resultingFranchiseeId =
+        franchiseeIdUpdate !== undefined
+          ? franchiseeIdUpdate
+          : currentUser.franchiseeId;
+
+      if (resultingFranchiseeId) {
+        segmentUpdate = "RETAIL";
+      } else if (body.franchiseeId === null) {
+        // Franchise is being cleared this request - Corporate/SME is required.
+        if (body.segment !== "CORPORATE" && body.segment !== "SME") {
+          return NextResponse.json(
+            {
+              error:
+                "Segment (Corporate or SME) is required when unassigning a franchise",
+            },
+            { status: 400 },
+          );
+        }
+        segmentUpdate = body.segment;
+      } else if (body.segment !== undefined) {
+        if (body.segment !== "CORPORATE" && body.segment !== "SME") {
+          return NextResponse.json(
+            { error: "Segment must be Corporate or SME" },
+            { status: 400 },
+          );
+        }
+        segmentUpdate = body.segment;
+      }
+    }
+
     // Update user with provided fields
     const updatedUser = await prisma.user.update({
       where: { id },
@@ -84,6 +120,7 @@ export async function PUT(
             ? body.luxorSubaccountName
             : undefined,
         franchiseeId: franchiseeIdUpdate,
+        segment: segmentUpdate,
       },
     });
 
