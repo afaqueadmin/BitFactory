@@ -49,6 +49,12 @@ interface Group {
   isActive: boolean;
 }
 
+interface Franchise {
+  id: string;
+  businessName: string;
+  isActive: boolean;
+}
+
 interface CreateUserModalProps {
   open: boolean;
   onClose: () => void;
@@ -71,6 +77,8 @@ export default function CreateUserModal({
     luxorSubaccountName: "",
     groupId: "",
     initialDeposit: 0,
+    franchiseeId: "",
+    segment: "",
   });
   const { user } = useUser();
   const [error, setError] = useState("");
@@ -80,6 +88,8 @@ export default function CreateUserModal({
   const [subaccountsError, setSubaccountsError] = useState<string | null>(null);
   const [groups, setGroups] = useState<Group[]>([]);
   const [groupsError, setGroupsError] = useState<string | null>(null);
+  const [franchises, setFranchises] = useState<Franchise[]>([]);
+  const [fetchingFranchises, setFetchingFranchises] = useState(true);
 
   /**
    * Check if email already exists in database
@@ -125,8 +135,36 @@ export default function CreateUserModal({
     if (open) {
       fetchSubaccounts();
       fetchGroups();
+      fetchFranchises();
     }
   }, [open]);
+
+  /**
+   * Fetch active franchises from API (for the optional franchisee picker,
+   * CLIENT role only)
+   */
+  const fetchFranchises = async () => {
+    try {
+      setFetchingFranchises(true);
+
+      const response = await fetch("/api/franchisees");
+      if (!response.ok) {
+        setFranchises([]);
+        return;
+      }
+
+      const data = await response.json();
+      const franchisesList: Franchise[] = Array.isArray(data.data)
+        ? data.data
+        : [];
+      setFranchises(franchisesList.filter((f) => f.isActive));
+    } catch (err) {
+      console.error("[CreateUserModal] Error fetching franchises:", err);
+      setFranchises([]);
+    } finally {
+      setFetchingFranchises(false);
+    }
+  };
 
   /**
    * Fetch subaccounts from V2 Luxor API
@@ -285,6 +323,17 @@ export default function CreateUserModal({
         setLoading(false);
         return;
       }
+
+      // Segment is required unless a franchise is assigned (which implies Retail)
+      if (
+        !formData.franchiseeId &&
+        formData.segment !== "CORPORATE" &&
+        formData.segment !== "SME"
+      ) {
+        setError("Please select a Type (Corporate or SME)");
+        setLoading(false);
+        return;
+      }
     }
 
     try {
@@ -318,6 +367,8 @@ export default function CreateUserModal({
         luxorSubaccountName: "",
         groupId: "",
         initialDeposit: 0,
+        franchiseeId: "",
+        segment: "",
       });
       setEmailError("");
     } catch (err) {
@@ -432,6 +483,71 @@ export default function CreateUserModal({
                 )}
               </Select>
             </FormControl>
+
+            {/* Franchisee - Only for CLIENT role. Empty = direct BitFactory customer */}
+            {formData.role === "CLIENT" && (
+              <FormControl fullWidth disabled={fetchingFranchises}>
+                <InputLabel>Franchisee (Optional)</InputLabel>
+                <Select
+                  value={formData.franchiseeId}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      franchiseeId: e.target.value,
+                    }))
+                  }
+                  label="Franchisee (Optional)"
+                >
+                  <MenuItem value="">Direct BitFactory Customer</MenuItem>
+                  {fetchingFranchises ? (
+                    <MenuItem disabled>
+                      <CircularProgress size={20} sx={{ mr: 1 }} />
+                      Loading franchisees...
+                    </MenuItem>
+                  ) : (
+                    franchises.map((franchise) => (
+                      <MenuItem key={franchise.id} value={franchise.id}>
+                        {franchise.businessName}
+                      </MenuItem>
+                    ))
+                  )}
+                </Select>
+              </FormControl>
+            )}
+
+            {/* Type (segment) - Only for CLIENT role. Disabled/forced to Retail when a franchisee is assigned */}
+            {formData.role === "CLIENT" && (
+              <FormControl
+                fullWidth
+                disabled={!!formData.franchiseeId}
+                required
+              >
+                <InputLabel>Type</InputLabel>
+                <Select
+                  value={formData.franchiseeId ? "RETAIL" : formData.segment}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      segment: e.target.value,
+                    }))
+                  }
+                  label="Type"
+                >
+                  {formData.franchiseeId ? (
+                    <MenuItem value="RETAIL">Retail (via franchise)</MenuItem>
+                  ) : (
+                    [
+                      <MenuItem key="CORPORATE" value="CORPORATE">
+                        Corporate
+                      </MenuItem>,
+                      <MenuItem key="SME" value="SME">
+                        SME
+                      </MenuItem>,
+                    ]
+                  )}
+                </Select>
+              </FormControl>
+            )}
 
             {/* Initial Deposit - Only for CLIENT role */}
             {formData.role === "CLIENT" && (

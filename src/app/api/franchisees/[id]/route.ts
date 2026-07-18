@@ -65,11 +65,11 @@ export async function PUT(
       );
     }
 
-    if (user.role !== "SUPER_ADMIN") {
+    if (user.role !== "ADMIN" && user.role !== "SUPER_ADMIN") {
       return NextResponse.json(
         {
           success: false,
-          error: "Forbidden: Only Super Admin can edit franchisees",
+          error: "Forbidden: Only Admin/Super Admin can edit franchisees",
         } as ApiResponse,
         { status: 403 },
       );

@@ -63,6 +63,7 @@ interface User {
   name: string | null;
   email: string;
   luxorSubaccountName?: string | null;
+  segment?: string | null;
 }
 
 /**

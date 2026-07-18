@@ -233,6 +233,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           password: hashedPassword,
           role: "FRANCHISEE",
           invoicedAmount: defaultInvoicedAmount,
+          segment: "FRANCHISEE",
         },
       });
 

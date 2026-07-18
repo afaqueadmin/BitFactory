@@ -79,7 +79,10 @@ export async function POST(
       where: {
         id: { in: minerIds },
       },
-      include: { hardware: { select: { id: true } } },
+      include: {
+        hardware: { select: { id: true } },
+        user: { select: { id: true, name: true, franchiseeId: true } },
+      },
     });
 
     if (existingMiners.length !== minerIds.length) {
@@ -89,6 +92,24 @@ export async function POST(
           error: "One or more miners not found",
         },
         { status: 404 },
+      );
+    }
+
+    // Miners owned by a customer assigned to a franchisee cannot be deleted
+    // until that customer is unassigned first.
+    const franchiseLinkedMiners = existingMiners.filter(
+      (m) => m.user.franchiseeId,
+    );
+    if (franchiseLinkedMiners.length > 0) {
+      const customerNames = [
+        ...new Set(franchiseLinkedMiners.map((m) => m.user.name || m.user.id)),
+      ];
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Cannot delete miner(s) owned by customer(s) assigned to a franchisee (${customerNames.join(", ")}). Unassign the customer(s) first.`,
+        },
+        { status: 400 },
       );
     }
 

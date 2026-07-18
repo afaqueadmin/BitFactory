@@ -184,8 +184,9 @@ export default function AdminDashboard() {
     });
 
   const { vendorInvoices } = useVendorInvoices(1, 100000, undefined);
-  const vendorInvoicesTotalAmount = Number(
-    vendorInvoices.reduce((sum, invoice) => sum + invoice.totalAmount, 0),
+  const vendorInvoicesTotalAmount = vendorInvoices.reduce(
+    (sum, invoice) => sum + Number(invoice.totalAmount),
+    0,
   );
 
   const hostingProfit = hostingRevenueData?.hostingRevenue

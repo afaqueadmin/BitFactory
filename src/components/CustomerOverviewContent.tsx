@@ -75,12 +75,15 @@ interface FetchedUser {
   miners: number;
   status: "active" | "inactive";
   balance: string;
+  franchiseeId: string | null;
+  segment: string | null;
 }
 
 interface FilterColumns {
   name: string;
   email: string;
   role: string;
+  segment: string;
   luxorSubaccountName: string;
   miners: string;
   status: string;
@@ -271,6 +274,7 @@ export default function CustomerOverviewContent() {
     name: "",
     email: "",
     role: "",
+    segment: "",
     luxorSubaccountName: "",
     miners: "",
     status: "",
@@ -311,7 +315,10 @@ export default function CustomerOverviewContent() {
           }
 
           const searchValue = filters[column].toLowerCase();
-          return row[column].toString().toLowerCase().includes(searchValue);
+          return (row[column] ?? "")
+            .toString()
+            .toLowerCase()
+            .includes(searchValue);
         }),
       ),
     [filters, users],
@@ -692,6 +699,30 @@ export default function CustomerOverviewContent() {
                       "&:hover": { backgroundColor: "action.selected" },
                       whiteSpace: "nowrap",
                     }}
+                    onClick={() => handleHeaderClick("segment")}
+                  >
+                    Type{" "}
+                    {sortConfig.field === "segment" &&
+                      (sortConfig.direction === "asc" ? (
+                        <ArrowUpwardIcon
+                          fontSize="small"
+                          sx={{ verticalAlign: "middle", ml: 0.5 }}
+                        />
+                      ) : (
+                        <ArrowDownwardIcon
+                          fontSize="small"
+                          sx={{ verticalAlign: "middle", ml: 0.5 }}
+                        />
+                      ))}
+                  </TableCell>
+                  <TableCell
+                    sx={{
+                      fontWeight: "bold",
+                      cursor: "pointer",
+                      userSelect: "none",
+                      "&:hover": { backgroundColor: "action.selected" },
+                      whiteSpace: "nowrap",
+                    }}
                     onClick={() => handleHeaderClick("luxorSubaccount")}
                   >
                     Luxor Subaccount{" "}
@@ -880,6 +911,7 @@ export default function CustomerOverviewContent() {
                     </TableCell>
                     <TableCell>{customer.email}</TableCell>
                     <TableCell>{customer.role}</TableCell>
+                    <TableCell>{customer.segment ?? "—"}</TableCell>
                     <TableCell>
                       {customer.luxorSubaccountName ?? "Not Set"}
                     </TableCell>

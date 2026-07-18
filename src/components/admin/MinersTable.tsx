@@ -63,6 +63,7 @@ interface User {
   name: string | null;
   email: string;
   luxorSubaccountName?: string | null;
+  segment?: string | null;
 }
 
 /**
@@ -512,6 +513,30 @@ export default function MinersTable({
                     />
                   ))}
               </TableCell>
+              <TableCell
+                sx={{
+                  fontWeight: "bold",
+                  cursor: "pointer",
+                  userSelect: "none",
+                  "&:hover": { backgroundColor: "action.selected" },
+                  whiteSpace: "nowrap",
+                }}
+                onClick={() => handleHeaderClick("segment")}
+              >
+                Type{" "}
+                {sortConfig.field === "segment" &&
+                  (sortConfig.direction === "asc" ? (
+                    <ArrowUpwardIcon
+                      fontSize="small"
+                      sx={{ verticalAlign: "middle", ml: 0.5 }}
+                    />
+                  ) : (
+                    <ArrowDownwardIcon
+                      fontSize="small"
+                      sx={{ verticalAlign: "middle", ml: 0.5 }}
+                    />
+                  ))}
+              </TableCell>
               <TableCell sx={{ fontWeight: "bold", whiteSpace: "nowrap" }}>
                 Pool
               </TableCell>
@@ -648,13 +673,13 @@ export default function MinersTable({
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={11} align="center" sx={{ py: 4 }}>
+                <TableCell colSpan={12} align="center" sx={{ py: 4 }}>
                   <CircularProgress />
                 </TableCell>
               </TableRow>
             ) : memoizedRows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={11} align="center" sx={{ py: 4 }}>
+                <TableCell colSpan={12} align="center" sx={{ py: 4 }}>
                   <Typography color="text.secondary">
                     No miners found. Create one to get started.
                   </Typography>
@@ -714,6 +739,7 @@ export default function MinersTable({
                   <TableCell>
                     {miner.user?.luxorSubaccountName || "—"}
                   </TableCell>
+                  <TableCell>{miner.user?.segment || "—"}</TableCell>
                   <TableCell>
                     {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                     {(miner as any).pool?.name ? (

@@ -22,7 +22,7 @@ interface UserData {
   companyUrl: string | null;
   profileImage: string | null;
   profileImageId: string | null;
-  role: "ADMIN" | "SUPER_ADMIN" | "CLIENT";
+  role: "ADMIN" | "SUPER_ADMIN" | "CLIENT" | "FRANCHISEE";
 }
 
 interface UserResponse {

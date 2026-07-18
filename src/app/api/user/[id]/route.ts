@@ -42,8 +42,65 @@ export async function PUT(
     // First get the current user to check if they have a luxor subaccount
     const currentUser = await prisma.user.findUnique({
       where: { id },
-      select: { luxorSubaccountName: true, role: true },
+      select: { luxorSubaccountName: true, role: true, franchiseeId: true },
     });
+
+    // franchiseeId is only applicable to CLIENT users (null = direct BitFactory
+    // customer). Ignore any attempt to set it on a non-CLIENT user.
+    let franchiseeIdUpdate: string | null | undefined = undefined;
+    if (body.franchiseeId !== undefined && currentUser?.role === "CLIENT") {
+      if (body.franchiseeId === null) {
+        franchiseeIdUpdate = null;
+      } else {
+        const franchise = await prisma.franchise.findUnique({
+          where: { id: body.franchiseeId },
+          select: { id: true, isActive: true, deletedAt: true },
+        });
+        if (!franchise || !franchise.isActive || franchise.deletedAt) {
+          return NextResponse.json(
+            { error: "Invalid or inactive franchise selected" },
+            { status: 400 },
+          );
+        }
+        franchiseeIdUpdate = body.franchiseeId;
+      }
+    }
+
+    // segment is only applicable to CLIENT users. A franchise assignment
+    // (new or pre-existing) forces RETAIL regardless of what was submitted;
+    // clearing/staying-clear of a franchise requires a Corporate/SME choice
+    // whenever segment is being touched.
+    let segmentUpdate: "CORPORATE" | "SME" | "RETAIL" | undefined = undefined;
+    if (currentUser?.role === "CLIENT") {
+      const resultingFranchiseeId =
+        franchiseeIdUpdate !== undefined
+          ? franchiseeIdUpdate
+          : currentUser.franchiseeId;
+
+      if (resultingFranchiseeId) {
+        segmentUpdate = "RETAIL";
+      } else if (body.franchiseeId === null) {
+        // Franchise is being cleared this request - Corporate/SME is required.
+        if (body.segment !== "CORPORATE" && body.segment !== "SME") {
+          return NextResponse.json(
+            {
+              error:
+                "Segment (Corporate or SME) is required when unassigning a franchise",
+            },
+            { status: 400 },
+          );
+        }
+        segmentUpdate = body.segment;
+      } else if (body.segment !== undefined) {
+        if (body.segment !== "CORPORATE" && body.segment !== "SME") {
+          return NextResponse.json(
+            { error: "Segment must be Corporate or SME" },
+            { status: 400 },
+          );
+        }
+        segmentUpdate = body.segment;
+      }
+    }
 
     // Update user with provided fields
     const updatedUser = await prisma.user.update({
@@ -62,6 +119,8 @@ export async function PUT(
           body.luxorSubaccountName !== undefined
             ? body.luxorSubaccountName
             : undefined,
+        franchiseeId: franchiseeIdUpdate,
+        segment: segmentUpdate,
       },
     });
 
@@ -172,6 +231,23 @@ export async function DELETE(
       return NextResponse.json(
         {
           error: `Cannot delete user with ${minerCount} linked miner(s). Please remove all miners first.`,
+        },
+        { status: 400 },
+      );
+    }
+
+    // A customer assigned to a franchisee cannot be deleted until unassigned
+    // (set franchiseeId back to null / direct BitFactory customer) first.
+    const targetUser = await prisma.user.findUnique({
+      where: { id },
+      select: { franchiseeId: true },
+    });
+
+    if (targetUser?.franchiseeId) {
+      return NextResponse.json(
+        {
+          error:
+            "Cannot delete a customer assigned to a franchisee. Unassign them first.",
         },
         { status: 400 },
       );
