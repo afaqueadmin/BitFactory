@@ -15,6 +15,7 @@ import { verifyJwtToken } from "@/lib/jwt";
 import { hash } from "bcrypt";
 import { sendWelcomeEmail } from "@/lib/email";
 import normalizeEmailUsername from "@/lib/helpers/normailizeEmailUsername";
+import { getOrCreatePaybackConfig } from "@/lib/paybackConfigHelpers";
 
 interface ApiResponse<T = Record<string, unknown>> {
   success: boolean;
@@ -222,6 +223,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     const tempPassword = Math.random().toString(36).slice(-8);
     const hashedPassword = await hash(tempPassword, 12);
+    const { defaultInvoicedAmount } = await getOrCreatePaybackConfig("CLIENT");
 
     const { franchisee, franchise } = await prisma.$transaction(async (tx) => {
       const franchisee = await tx.user.create({
@@ -230,6 +232,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           email: email.trim(),
           password: hashedPassword,
           role: "FRANCHISEE",
+          invoicedAmount: defaultInvoicedAmount,
         },
       });
 

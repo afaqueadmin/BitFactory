@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyJwtToken } from "@/lib/jwt";
 import { sendWelcomeEmail } from "@/lib/email";
 import normalizeEmailUsername from "@/lib/helpers/normailizeEmailUsername";
+import { getOrCreatePaybackConfig } from "@/lib/paybackConfigHelpers";
 
 /**
  * Response structure from /api/luxor proxy route
@@ -126,6 +127,8 @@ export async function POST(request: NextRequest) {
     const hashedPassword = await hash(tempPassword, 12);
 
     // Create the user in database
+    const { defaultInvoicedAmount } = await getOrCreatePaybackConfig("CLIENT");
+
     let newUser;
     try {
       newUser = await prisma.user.create({
@@ -134,6 +137,7 @@ export async function POST(request: NextRequest) {
           email,
           password: hashedPassword,
           role,
+          invoicedAmount: defaultInvoicedAmount,
         },
       });
       console.log(`[User Create API] User created in DB: ${newUser.id}`);

@@ -14,6 +14,7 @@
 import React from "react";
 import { Box, Typography, Skeleton } from "@mui/material";
 import { useUser } from "@/lib/hooks/useUser";
+import BtcPriceLabel from "@/components/BtcPriceLabel";
 
 export default function DashboardHeader() {
   const { user, loading } = useUser();
@@ -24,6 +25,10 @@ export default function DashboardHeader() {
       aria-labelledby="dashboard-greeting"
       sx={{
         display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        flexWrap: "wrap",
+        gap: 1.5,
         mb: { xs: 1.5, md: 3 },
         mt: { xs: 1, md: 2 },
       }}
@@ -64,6 +69,8 @@ export default function DashboardHeader() {
           )}
         </Typography>
       </Box>
+
+      <BtcPriceLabel />
 
       {/* Centered chip filters */}
       {/* commented to hide these for now will be removed soon */}
