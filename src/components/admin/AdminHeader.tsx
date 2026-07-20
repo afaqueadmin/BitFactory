@@ -61,7 +61,7 @@ export default function AdminHeader() {
 
   const handleLogoClick = () => {
     router.push(
-      user?.role === "FRANCHISEE" ? "/customers/overview" : "/adminpanel",
+      user?.role === "FRANCHISEE" ? "/franchisee-dashboard" : "/adminpanel",
     );
   };
 
