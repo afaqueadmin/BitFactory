@@ -56,6 +56,12 @@ const sidebarItems: SidebarItem[] = [
     // ],
   },
   {
+    title: "Dashboard",
+    icon: <DashboardIcon />,
+    path: "/franchisee-dashboard",
+    roles: ["FRANCHISEE"],
+  },
+  {
     title: "Activity Log",
     icon: <ActivityLogIcon />,
     path: "/activity-log",

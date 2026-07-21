@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
         redirectUrl = "/adminpanel";
         break;
       case "FRANCHISEE":
-        redirectUrl = "/customers/overview";
+        redirectUrl = "/franchisee-dashboard";
         break;
       default:
         redirectUrl = "/dashboard";

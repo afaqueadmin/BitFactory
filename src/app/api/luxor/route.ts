@@ -25,6 +25,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyJwtToken } from "@/lib/jwt";
 import { createLuxorClient, LuxorError } from "@/lib/luxor";
 import { prisma } from "@/lib/prisma";
+import { franchiseeUserFilter } from "@/lib/franchiseeScope";
 
 // ✅ Ensure this runs on Node.js runtime (required for async operations)
 export const runtime = "nodejs";
@@ -260,6 +261,37 @@ function checkAdminAccess(
     );
   }
   return null;
+}
+
+/**
+ * Helper: Resolve a FRANCHISEE user's own customers' Luxor subaccount names
+ *
+ * Server-side derived only — never trusts a client-supplied subaccount list,
+ * matching the same security posture as the existing CLIENT branch (which
+ * only ever uses the caller's own DB-stored `luxorSubaccountName`, never a
+ * client-supplied value).
+ *
+ * @param franchiseeUserId - the authenticated FRANCHISEE user's id
+ * @returns comma-joined subaccount names (empty string if none)
+ */
+async function getFranchiseeSubaccountNames(
+  franchiseeUserId: string,
+): Promise<string> {
+  const customers = await prisma.user.findMany({
+    where: {
+      role: "CLIENT",
+      isDeleted: false,
+      luxorSubaccountName: { not: null },
+      NOT: { luxorSubaccountName: { contains: "_test" } },
+      ...franchiseeUserFilter({ id: franchiseeUserId, role: "FRANCHISEE" }),
+    },
+    select: { luxorSubaccountName: true },
+  });
+
+  return customers
+    .map((c) => c.luxorSubaccountName)
+    .filter((name): name is string => !!name)
+    .join(",");
 }
 
 /**
@@ -602,7 +634,10 @@ export async function GET(
             subaccount_names:
               user.role === "CLIENT" && user.luxorSubaccountName
                 ? user.luxorSubaccountName
-                : undefined,
+                : user.role === "FRANCHISEE"
+                  ? (await getFranchiseeSubaccountNames(user.userId)) ||
+                    undefined
+                  : undefined,
             site_id: ["ADMIN", "SUPER_ADMIN"].includes(user.role)
               ? siteId
               : undefined,
@@ -627,9 +662,13 @@ export async function GET(
             );
           }
           console.log(`[Luxor Proxy V2] GET: Getting revenue for ${currency}`);
+          // Luxor's pool-scoped endpoints require exactly ONE of
+          // subaccount_names or site_id, not both. site_id has an implicit
+          // env-var fallback below, so it must be suppressed whenever a
+          // caller-supplied subaccount_name is present.
           data = await luxorClient.getRevenue(currency, {
             subaccount_names: subaccountName,
-            site_id: siteId || undefined,
+            site_id: subaccountName ? undefined : siteId || undefined,
             start_date: searchParams.get("start_date") || undefined,
             end_date: searchParams.get("end_date") || undefined,
           });
@@ -803,7 +842,9 @@ export async function GET(
               user.role === "CLIENT" && user.luxorSubaccountName
                 ? user.luxorSubaccountName
                 : undefined,
-            site_id: ["ADMIN", "SUPER_ADMIN"].includes(user.role)
+            // FRANCHISEE intentionally gets the same site-wide summary as
+            // ADMIN/SUPER_ADMIN (uptime/hashrate are not per-customer scoped).
+            site_id: ["ADMIN", "SUPER_ADMIN", "FRANCHISEE"].includes(user.role)
               ? siteId
               : undefined,
           });
