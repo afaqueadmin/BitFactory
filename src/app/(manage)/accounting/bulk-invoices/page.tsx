@@ -29,6 +29,7 @@ import {
   useCheckAlreadyPaidCustomers,
   useCreateInvoice,
   useCustomerBalances,
+  useCustomerMonthlyBills,
   useCustomers,
 } from "@/lib/hooks/useInvoices";
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
@@ -42,9 +43,12 @@ interface CustomerMinersState {
 // Default to current month/year — user must select billing month from dropdown
 const now = new Date();
 
-function getBalanceColor(balance: number): "error" | "warning" | "success" {
+function getBalanceColor(
+  balance: number,
+  monthlyBill: number,
+): "error" | "warning" | "success" {
   if (balance < 0) return "error";
-  if (balance < 200) return "warning";
+  if (balance < monthlyBill) return "warning";
   return "success";
 }
 
@@ -67,6 +71,7 @@ export default function BulkInvoicesPage() {
   const router = useRouter();
   const { customers, loading: customersLoading } = useCustomers();
   const { balances } = useCustomerBalances();
+  const { monthlyBills } = useCustomerMonthlyBills();
   const {
     create: createInvoice,
     loading: creating,
@@ -371,9 +376,42 @@ export default function BulkInvoicesPage() {
           <Stack spacing={4}>
             {/* Customer selection */}
             <Box>
-              <Typography variant="h6" sx={{ mb: 2 }}>
+              <Typography variant="h6" sx={{ mb: 1 }}>
                 Select Customers
               </Typography>
+              <Stack
+                direction="row"
+                spacing={2.5}
+                flexWrap="wrap"
+                sx={{ mb: 2 }}
+              >
+                {(
+                  [
+                    ["success", "Balance covers monthly bill"],
+                    ["warning", "Balance below monthly bill"],
+                    ["error", "Negative balance"],
+                  ] as const
+                ).map(([color, label]) => (
+                  <Stack
+                    key={color}
+                    direction="row"
+                    spacing={0.75}
+                    alignItems="center"
+                  >
+                    <Box
+                      sx={{
+                        width: 10,
+                        height: 10,
+                        borderRadius: "50%",
+                        backgroundColor: `${color}.main`,
+                      }}
+                    />
+                    <Typography variant="caption" color="textSecondary">
+                      {label}
+                    </Typography>
+                  </Stack>
+                ))}
+              </Stack>
               {customersLoading ? (
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                   <CircularProgress size={20} />
@@ -432,6 +470,7 @@ export default function BulkInvoicesPage() {
                                   value={balances[customer.id] ?? 0}
                                   color={getBalanceColor(
                                     balances[customer.id] ?? 0,
+                                    monthlyBills[customer.id] ?? 0,
                                   )}
                                   fontWeight="bold"
                                   variant="caption"

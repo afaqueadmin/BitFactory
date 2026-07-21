@@ -246,6 +246,31 @@ export function useCustomerBalances() {
   };
 }
 
+export function useCustomerMonthlyBills() {
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["customerMonthlyBills"],
+    queryFn: async () => {
+      const res = await fetch("/api/accounting/customers/monthly-bill", {
+        method: "GET",
+        credentials: "include",
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to fetch customer monthly bills");
+      }
+
+      return res.json();
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
+  return {
+    monthlyBills: (data?.monthlyBills || {}) as Record<string, number>,
+    loading: isLoading,
+    error: error instanceof Error ? error.message : null,
+  };
+}
+
 export interface Miner {
   id: string;
   name: string;
