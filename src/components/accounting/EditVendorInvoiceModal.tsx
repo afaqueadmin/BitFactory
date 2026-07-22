@@ -364,7 +364,7 @@ export default function EditVendorInvoiceModal({
                   value={formData.miscellaneousCharges || 0}
                   onChange={handleInputChange}
                   slotProps={{
-                    htmlInput: { min: 0, step: 0.01 },
+                    htmlInput: { step: 0.01 },
                   }}
                   disabled={saving}
                   size="small"
