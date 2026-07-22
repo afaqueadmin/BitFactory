@@ -94,7 +94,7 @@ export default function RecordPaymentPage() {
       });
 
       // Redirect back to invoice detail
-      router.push(`/hardware-purchase/${invoiceId}`);
+      router.push(`/hardware-sales/${invoiceId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to record payment");
     } finally {
@@ -131,7 +131,7 @@ export default function RecordPaymentPage() {
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
       <Stack direction="row" spacing={2} sx={{ mb: 4 }}>
-        <Link href={`/hardware-purchase/${invoiceId}`}>
+        <Link href={`/hardware-sales/${invoiceId}`}>
           <Button startIcon={<ArrowBackIcon />}>Back to Invoice</Button>
         </Link>
         <Box flex={1}>

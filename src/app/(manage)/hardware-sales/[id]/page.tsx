@@ -1,8 +1,8 @@
 /**
- * src/app/(manage)/hardware-purchase/[id]/page.tsx
- * Hardware Purchase Invoice Detail Page
+ * src/app/(manage)/hardware-sales/[id]/page.tsx
+ * Hardware Sales Invoice Detail Page
  *
- * Display full invoice details for hardware purchase invoices
+ * Display full invoice details for hardware sales invoices
  */
 "use client";
 
@@ -162,7 +162,7 @@ export default function InvoiceDetailPage() {
       await deleteInvoice(invoice!.id);
       setDeleteDialogOpen(false);
       // Redirect to invoices list
-      router.push("/hardware-purchase");
+      router.push("/hardware-sales");
     } catch (err) {
       setDeleteDialogError(
         err instanceof Error ? err.message : "Failed to delete invoice",
@@ -284,7 +284,7 @@ export default function InvoiceDetailPage() {
           <Button
             startIcon={<ArrowBackIcon />}
             variant="text"
-            onClick={() => router.push("/hardware-purchase")}
+            onClick={() => router.push("/hardware-sales")}
             sx={{ mb: 2 }}
           >
             Back to Invoices
@@ -301,7 +301,7 @@ export default function InvoiceDetailPage() {
             startIcon={<EditIcon />}
             variant="outlined"
             disabled={invoice.status !== "DRAFT"}
-            onClick={() => router.push(`/hardware-purchase/${invoice.id}/edit`)}
+            onClick={() => router.push(`/hardware-sales/${invoice.id}/edit`)}
           >
             Edit
           </Button>
@@ -543,9 +543,7 @@ export default function InvoiceDetailPage() {
                   fullWidth
                   size="large"
                   onClick={() =>
-                    router.push(
-                      `/hardware-purchase/${invoice.id}/record-payment`,
-                    )
+                    router.push(`/hardware-sales/${invoice.id}/record-payment`)
                   }
                   disabled={
                     invoice.status === "PAID" || invoice.status === "CANCELLED"

@@ -155,9 +155,9 @@ const sidebarItems: SidebarItem[] = [
         path: "/accounting",
       },
       {
-        title: "Hardware Dashboard",
+        title: "Hardware Sales Dashboard",
         icon: <DashboardIcon />,
-        path: "/hardware-purchase",
+        path: "/hardware-sales",
       },
       // {
       //   title: "Invoices",

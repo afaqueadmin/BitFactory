@@ -1,7 +1,7 @@
 /**
- * Hardware Purchase Dashboard
+ * Hardware Sales Dashboard
  *
- * Main dashboard showing hardware purchase invoices overview
+ * Main dashboard showing hardware sales invoices overview
  */
 
 "use client";
@@ -32,7 +32,7 @@ import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay"
 import { DateDisplay } from "@/components/accounting/common/DateDisplay";
 import AddIcon from "@mui/icons-material/Add";
 
-export default function HardwarePurchaseDashboard() {
+export default function HardwareSalesDashboard() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const {
@@ -40,7 +40,7 @@ export default function HardwarePurchaseDashboard() {
     total,
     loading: invoicesLoading,
     error: invoicesError,
-  } = useInvoices(page, pageSize, undefined, undefined, "HARDWARE_PURCHASE");
+  } = useInvoices(page, pageSize, undefined, undefined, "HARDWARE_SALES");
 
   const handleChangePage = (event: unknown, newPage: number) => {
     setPage(newPage + 1);
@@ -115,13 +115,13 @@ export default function HardwarePurchaseDashboard() {
       >
         <div>
           <Typography variant="h4" sx={{ fontWeight: "bold" }}>
-            Hardware Purchase Dashboard
+            Hardware Sales Dashboard
           </Typography>
           <Typography color="textSecondary" sx={{ mt: 0.5 }}>
-            Overview of hardware purchase invoices and payments
+            Overview of hardware sales invoices and payments
           </Typography>
         </div>
-        <Link href="/hardware-purchase/create">
+        <Link href="/hardware-sales/create">
           <Button variant="contained" startIcon={<AddIcon />}>
             Create Invoice
           </Button>
@@ -184,9 +184,9 @@ export default function HardwarePurchaseDashboard() {
             }}
           >
             <Typography variant="h6" sx={{ fontWeight: "bold" }}>
-              All Hardware Purchase Invoices
+              All Hardware Sales Invoices
             </Typography>
-            <Link href="/hardware-purchase/create">
+            <Link href="/hardware-sales/create">
               <Button variant="contained" startIcon={<AddIcon />}>
                 Create Invoice
               </Button>
@@ -215,7 +215,7 @@ export default function HardwarePurchaseDashboard() {
                     <TableRow key={invoice.id} hover>
                       <TableCell>
                         <Link
-                          href={`/hardware-purchase/${invoice.id}`}
+                          href={`/hardware-sales/${invoice.id}`}
                           style={{ color: "#1976d2", textDecoration: "none" }}
                         >
                           {invoice.invoiceNumber}

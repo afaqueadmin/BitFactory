@@ -567,6 +567,7 @@ enum InvoiceStatus {
 enum InvoiceType {
   ELECTRICITY_CHARGES
   HARDWARE_PURCHASE
+  HARDWARE_SALES
 }
 
 enum AuditAction {

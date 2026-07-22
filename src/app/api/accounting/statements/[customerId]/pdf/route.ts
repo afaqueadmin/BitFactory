@@ -103,7 +103,7 @@ export async function GET(
             : 0;
 
         const invoiceType =
-          invoice.invoiceType === "HARDWARE_PURCHASE"
+          invoice.invoiceType === "HARDWARE_SALES"
             ? "Hardware"
             : "Hosting & Electricity";
 

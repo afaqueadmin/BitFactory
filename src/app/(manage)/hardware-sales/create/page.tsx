@@ -24,7 +24,7 @@ import {
   Customer,
 } from "@/lib/hooks/useInvoices";
 
-export default function CreateHardwarePurchaseInvoicePage() {
+export default function CreateHardwareSalesInvoicePage() {
   const router = useRouter();
   const { create: createInvoice, error: createError } = useCreateInvoice();
   const { customers, loading: customersLoading } = useCustomers();
@@ -38,7 +38,7 @@ export default function CreateHardwarePurchaseInvoicePage() {
       .toISOString()
       .split("T")[0],
     status: InvoiceStatus.DRAFT,
-    invoiceType: "HARDWARE_PURCHASE",
+    invoiceType: "HARDWARE_SALES",
     hardwareId: "",
   });
 
@@ -163,8 +163,8 @@ export default function CreateHardwarePurchaseInvoicePage() {
         hardwareId: formData.hardwareId || undefined,
       });
 
-      // Redirect to hardware-purchase dashboard
-      router.push("/hardware-purchase");
+      // Redirect to hardware-sales dashboard
+      router.push("/hardware-sales");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create invoice");
     } finally {
@@ -175,15 +175,15 @@ export default function CreateHardwarePurchaseInvoicePage() {
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
       <Stack direction="row" spacing={2} sx={{ mb: 4 }}>
-        <Link href="/hardware-purchase">
+        <Link href="/hardware-sales">
           <Button startIcon={<ArrowBackIcon />}>
-            Back to Hardware Purchase Dashboard
+            Back to Hardware Sales Dashboard
           </Button>
         </Link>
         <Box flex={1}>
-          <h1 style={{ margin: 0 }}>Create New Hardware Purchase Invoice</h1>
+          <h1 style={{ margin: 0 }}>Create New Hardware Sales Invoice</h1>
           <p style={{ margin: "8px 0 0 0", color: "#666" }}>
-            Create a new hardware purchase invoice and send it to a customer
+            Create a new hardware sales invoice and send it to a customer
           </p>
         </Box>
       </Stack>
