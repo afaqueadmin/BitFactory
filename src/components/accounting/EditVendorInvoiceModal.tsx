@@ -5,6 +5,7 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
+  DialogContentText,
   DialogActions,
   TextField,
   Button,
@@ -17,7 +18,11 @@ import {
 } from "@mui/material";
 import { Close as CloseIcon } from "@mui/icons-material";
 import SaveIcon from "@mui/icons-material/Save";
-import { VendorInvoice } from "@/lib/hooks/useVendorInvoices";
+import DeleteIcon from "@mui/icons-material/Delete";
+import {
+  VendorInvoice,
+  useDeleteVendorInvoice,
+} from "@/lib/hooks/useVendorInvoices";
 import { VendorInvoiceFormData } from "@/app/(manage)/accounting/vendor-invoices/create/page";
 
 // export interface VendorInvoice {
@@ -66,6 +71,9 @@ export default function EditVendorInvoiceModal({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const deleteVendorInvoice = useDeleteVendorInvoice();
 
   // Fetch invoice details when modal opens
   useEffect(() => {
@@ -128,6 +136,13 @@ export default function EditVendorInvoiceModal({
       setLoading(false);
     }
   }, [open, invoiceId, invoiceData]);
+
+  useEffect(() => {
+    if (open) {
+      setDeleteConfirmOpen(false);
+      setDeleteError(null);
+    }
+  }, [open, invoiceId]);
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
@@ -236,6 +251,23 @@ export default function EditVendorInvoiceModal({
       );
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!invoiceId) return;
+
+    setDeleteError(null);
+
+    try {
+      await deleteVendorInvoice.mutateAsync(invoiceId);
+      setDeleteConfirmOpen(false);
+      onSuccess();
+      onClose();
+    } catch (err) {
+      setDeleteError(
+        err instanceof Error ? err.message : "Failed to delete invoice",
+      );
     }
   };
 
@@ -444,19 +476,65 @@ export default function EditVendorInvoiceModal({
         )}
       </DialogContent>
 
-      <DialogActions sx={{ p: 2 }}>
-        <Button onClick={onClose} disabled={saving || loading}>
-          Cancel
-        </Button>
+      <DialogActions sx={{ p: 2, justifyContent: "space-between" }}>
         <Button
-          onClick={handleSubmit}
-          variant="contained"
-          startIcon={saving ? <CircularProgress size={20} /> : <SaveIcon />}
-          disabled={saving || loading}
+          onClick={() => setDeleteConfirmOpen(true)}
+          color="error"
+          startIcon={<DeleteIcon />}
+          disabled={saving || loading || !invoiceId}
         >
-          {saving ? "Updating..." : "Update Invoice"}
+          Delete Invoice
         </Button>
+        <Box sx={{ display: "flex", gap: 1 }}>
+          <Button onClick={onClose} disabled={saving || loading}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSubmit}
+            variant="contained"
+            startIcon={saving ? <CircularProgress size={20} /> : <SaveIcon />}
+            disabled={saving || loading}
+          >
+            {saving ? "Updating..." : "Update Invoice"}
+          </Button>
+        </Box>
       </DialogActions>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={deleteConfirmOpen}
+        onClose={() => setDeleteConfirmOpen(false)}
+      >
+        <DialogTitle>Delete Invoice</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Are you sure you want to delete invoice{" "}
+            <strong>{formData.invoiceNumber}</strong>? This action cannot be
+            undone.
+          </DialogContentText>
+          {deleteError && (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              {deleteError}
+            </Alert>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => setDeleteConfirmOpen(false)}
+            disabled={deleteVendorInvoice.isPending}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleDeleteConfirm}
+            color="error"
+            variant="contained"
+            disabled={deleteVendorInvoice.isPending}
+          >
+            {deleteVendorInvoice.isPending ? "Deleting..." : "Delete"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Dialog>
   );
 }

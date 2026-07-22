@@ -22,6 +22,7 @@ import {
   TableHead,
   TableRow,
   TablePagination,
+  TableSortLabel,
   IconButton,
   Tooltip,
 } from "@mui/material";
@@ -49,6 +50,8 @@ export default function FarmTariffs() {
   } = useDashboardStats();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [sortBy, setSortBy] = useState("createdAt");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(
     null,
@@ -61,7 +64,17 @@ export default function FarmTariffs() {
     loading: invoicesLoading,
     error: invoicesError,
     refetch,
-  } = useVendorInvoices(page, pageSize, undefined);
+  } = useVendorInvoices(page, pageSize, undefined, sortBy, sortOrder);
+
+  const handleSort = (field: string) => {
+    if (sortBy === field) {
+      setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortBy(field);
+      setSortOrder("asc");
+    }
+    setPage(1);
+  };
 
   const handleEditClick = (invoiceId: string, invoiceData: VendorInvoice) => {
     setSelectedInvoiceId(invoiceId);
@@ -254,15 +267,69 @@ export default function FarmTariffs() {
             <Table>
               <TableHead sx={{ backgroundColor: "#f5f5f5" }}>
                 <TableRow>
-                  <TableCell sx={{ fontWeight: "bold" }}>Invoice</TableCell>
-                  {/*<TableCell sx={{ fontWeight: "bold" }}>Customer</TableCell>*/}
-                  <TableCell sx={{ fontWeight: "bold" }}>Amount</TableCell>
-                  <TableCell sx={{ fontWeight: "bold" }}>Status</TableCell>
-                  <TableCell sx={{ fontWeight: "bold" }}>Issued Date</TableCell>
-                  <TableCell sx={{ fontWeight: "bold" }}>Paid Date</TableCell>
-                  <TableCell sx={{ fontWeight: "bold" }}>Due Date</TableCell>
                   <TableCell sx={{ fontWeight: "bold" }}>
-                    Days Until Due
+                    <TableSortLabel
+                      active={sortBy === "invoiceNumber"}
+                      direction={sortBy === "invoiceNumber" ? sortOrder : "asc"}
+                      onClick={() => handleSort("invoiceNumber")}
+                    >
+                      Invoice
+                    </TableSortLabel>
+                  </TableCell>
+                  {/*<TableCell sx={{ fontWeight: "bold" }}>Customer</TableCell>*/}
+                  <TableCell sx={{ fontWeight: "bold" }}>
+                    <TableSortLabel
+                      active={sortBy === "totalAmount"}
+                      direction={sortBy === "totalAmount" ? sortOrder : "asc"}
+                      onClick={() => handleSort("totalAmount")}
+                    >
+                      Amount
+                    </TableSortLabel>
+                  </TableCell>
+                  <TableCell sx={{ fontWeight: "bold" }}>
+                    <TableSortLabel
+                      active={sortBy === "paymentStatus"}
+                      direction={sortBy === "paymentStatus" ? sortOrder : "asc"}
+                      onClick={() => handleSort("paymentStatus")}
+                    >
+                      Status
+                    </TableSortLabel>
+                  </TableCell>
+                  <TableCell sx={{ fontWeight: "bold" }}>
+                    <TableSortLabel
+                      active={sortBy === "billingDate"}
+                      direction={sortBy === "billingDate" ? sortOrder : "asc"}
+                      onClick={() => handleSort("billingDate")}
+                    >
+                      Issued Date
+                    </TableSortLabel>
+                  </TableCell>
+                  <TableCell sx={{ fontWeight: "bold" }}>
+                    <TableSortLabel
+                      active={sortBy === "paidDate"}
+                      direction={sortBy === "paidDate" ? sortOrder : "asc"}
+                      onClick={() => handleSort("paidDate")}
+                    >
+                      Paid Date
+                    </TableSortLabel>
+                  </TableCell>
+                  <TableCell sx={{ fontWeight: "bold" }}>
+                    <TableSortLabel
+                      active={sortBy === "dueDate"}
+                      direction={sortBy === "dueDate" ? sortOrder : "asc"}
+                      onClick={() => handleSort("dueDate")}
+                    >
+                      Due Date
+                    </TableSortLabel>
+                  </TableCell>
+                  <TableCell sx={{ fontWeight: "bold" }}>
+                    <TableSortLabel
+                      active={sortBy === "dueDate"}
+                      direction={sortBy === "dueDate" ? sortOrder : "asc"}
+                      onClick={() => handleSort("dueDate")}
+                    >
+                      Days Until Due
+                    </TableSortLabel>
                   </TableCell>
                   <TableCell sx={{ fontWeight: "bold", textAlign: "center" }}>
                     Actions

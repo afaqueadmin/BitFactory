@@ -247,3 +247,59 @@ export async function PUT(
     );
   }
 }
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    const { id: invoiceId } = await params;
+    const token = request.cookies.get("token")?.value;
+
+    if (!token) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const decoded = await verifyJwtToken(token);
+    const userId = decoded.userId;
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    });
+
+    if (user?.role !== "ADMIN" && user?.role !== "SUPER_ADMIN") {
+      return NextResponse.json(
+        { error: "Only administrators can delete vendor invoices" },
+        { status: 403 },
+      );
+    }
+
+    const existingInvoice = await prisma.vendorInvoice.findUnique({
+      where: { id: invoiceId },
+    });
+
+    if (!existingInvoice) {
+      return NextResponse.json(
+        { error: "Vendor invoice not found" },
+        { status: 404 },
+      );
+    }
+
+    await prisma.vendorInvoice.delete({ where: { id: invoiceId } });
+
+    return NextResponse.json(
+      {
+        success: true,
+        message: "Vendor invoice deleted successfully",
+      },
+      { status: 200 },
+    );
+  } catch (error) {
+    console.error("Error deleting vendor invoice:", error);
+    return NextResponse.json(
+      { error: "Failed to delete vendor invoice" },
+      { status: 500 },
+    );
+  }
+}

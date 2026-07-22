@@ -41,9 +41,11 @@ export const useVendorInvoices = (
   page: number = 1,
   limit: number = 10,
   paymentStatus?: string,
+  sortBy?: string,
+  sortOrder?: "asc" | "desc",
 ) => {
   const { data, isLoading, error, refetch } = useQuery<VendorInvoicesResponse>({
-    queryKey: ["vendorInvoices", page, limit, paymentStatus],
+    queryKey: ["vendorInvoices", page, limit, paymentStatus, sortBy, sortOrder],
     queryFn: async () => {
       const params = new URLSearchParams({
         page: page.toString(),
@@ -51,6 +53,10 @@ export const useVendorInvoices = (
       });
       if (paymentStatus) {
         params.append("paymentStatus", paymentStatus);
+      }
+      if (sortBy) {
+        params.append("sortBy", sortBy);
+        params.append("sortOrder", sortOrder || "asc");
       }
 
       const response = await fetch(`/api/vendor-invoices?${params}`);
@@ -99,6 +105,28 @@ export const useCreateVendorInvoice = () => {
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.error || "Failed to create vendor invoice");
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vendorInvoices"] });
+    },
+  });
+};
+
+export const useDeleteVendorInvoice = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (invoiceId: string) => {
+      const response = await fetch(`/api/vendor-invoices/${invoiceId}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to delete vendor invoice");
       }
 
       return response.json();
