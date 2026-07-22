@@ -356,7 +356,7 @@ export default function CreateVendorInvoicePage() {
                 value={formData.miscellaneousCharges}
                 onChange={handleInputChange}
                 slotProps={{
-                  htmlInput: { min: 0, step: 0.01 },
+                  htmlInput: { step: 0.01 },
                   input: {
                     startAdornment: "$",
                   },
