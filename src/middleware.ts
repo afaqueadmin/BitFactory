@@ -17,23 +17,29 @@ const publicPaths = new Set([
   "/favicon.svg",
 ]);
 
+// CLIENT paths, extracted so FRANCHISEE (who can also act as a client for
+// their own personal mining operation, in addition to managing their
+// onboarded customers) can reuse the exact same set below.
+const clientPaths = [
+  "/account-settings",
+  "/btc-price-history",
+  "/btc-price-predictor",
+  "/clientworkers",
+  "/dashboard",
+  "/hashprice-history",
+  "/invoices",
+  "/luxor",
+  "/miners",
+  "/payback-analysis",
+  "/security-setting",
+  "/transaction",
+  "/wallet",
+  // Add client-specific public paths if any
+];
+const clientDynamicPatterns = [new URLPattern({ pathname: "/invoices/:id*" })];
+
 const securePaths = {
-  CLIENT: new Set<string>([
-    "/account-settings",
-    "/btc-price-history",
-    "/btc-price-predictor",
-    "/clientworkers",
-    "/dashboard",
-    "/hashprice-history",
-    "/invoices",
-    "/luxor",
-    "/miners",
-    "/payback-analysis",
-    "/security-setting",
-    "/transaction",
-    "/wallet",
-    // Add client-specific public paths if any
-  ]),
+  CLIENT: new Set<string>(clientPaths),
   ADMIN: new Set<string>([
     "/admin-profile",
     "/adminpanel",
@@ -61,24 +67,28 @@ const securePaths = {
   ]),
   // Franchisee: their own dashboard plus the customers/machine pages (not
   // the admin panel itself), scoped server-side to the franchisee's own
-  // customers/miners. Kept deliberately minimal — expand as more
-  // franchisee-facing pages ship.
+  // customers/miners — PLUS the full CLIENT page set, since a franchisee
+  // can also act as a client for their own personal mining operation.
   FRANCHISEE: new Set<string>([
     "/franchisee-dashboard",
     "/customers/overview",
     "/machine",
+    ...clientPaths,
   ]),
 }; // Add admin-specific public paths if any
 
 const dynamicPatternsPaths = {
-  CLIENT: [new URLPattern({ pathname: "/invoices/:id*" })],
+  CLIENT: clientDynamicPatterns,
   ADMIN: [
     new URLPattern({ pathname: "/accounting/:path*" }),
     new URLPattern({ pathname: "/hardware-purchase/:path*" }),
     new URLPattern({ pathname: "/customers/:id*" }),
     new URLPattern({ pathname: "/groups/:id*" }),
   ],
-  FRANCHISEE: [new URLPattern({ pathname: "/customers/:id*" })],
+  FRANCHISEE: [
+    new URLPattern({ pathname: "/customers/:id*" }),
+    ...clientDynamicPatterns,
+  ],
 };
 
 // Role-based default redirects

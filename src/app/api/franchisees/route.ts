@@ -91,7 +91,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       where: { deletedAt: null },
       include: {
         franchisee: {
-          select: { id: true, name: true, email: true },
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            luxorSubaccountName: true,
+          },
         },
         createdBy: {
           select: { id: true, name: true, email: true },
@@ -169,6 +174,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       city,
       state,
       postalCode,
+      luxorSubaccountName,
     } = body;
 
     const requiredFields: Record<string, unknown> = {
@@ -234,6 +240,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           role: "FRANCHISEE",
           invoicedAmount: defaultInvoicedAmount,
           segment: "FRANCHISEE",
+          luxorSubaccountName: luxorSubaccountName
+            ? luxorSubaccountName.trim()
+            : null,
         },
       });
 

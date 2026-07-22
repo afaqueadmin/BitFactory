@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -16,6 +16,10 @@ import {
   Alert,
   Typography,
   Divider,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
 } from "@mui/material";
 import { Close as CloseIcon } from "@mui/icons-material";
 
@@ -23,6 +27,19 @@ interface CreateFranchiseeModalProps {
   open: boolean;
   onClose: () => void;
   onSuccess: (text: string) => void;
+}
+
+interface Subaccount {
+  id: number;
+  name: string;
+  created_at: string;
+  url: string;
+}
+
+interface ProxyResponse<T = Record<string, unknown>> {
+  success: boolean;
+  data?: T;
+  error?: string;
 }
 
 const initialFormData = {
@@ -36,6 +53,7 @@ const initialFormData = {
   city: "",
   state: "",
   postalCode: "",
+  luxorSubaccountName: "",
 };
 
 export default function CreateFranchiseeModal({
@@ -48,6 +66,74 @@ export default function CreateFranchiseeModal({
   const [error, setError] = useState("");
   const [emailError, setEmailError] = useState("");
   const [checkingEmail, setCheckingEmail] = useState(false);
+  const [subaccounts, setSubaccounts] = useState<Subaccount[]>([]);
+  const [fetchingSubaccounts, setFetchingSubaccounts] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      fetchSubaccounts();
+    }
+  }, [open]);
+
+  /**
+   * Fetch subaccounts from Luxor, excluding ones already assigned to a user
+   * — same pattern as CreateUserModal's franchisee-personal-account picker.
+   * Optional for a franchisee (unlike CLIENT, where it's required).
+   */
+  const fetchSubaccounts = async () => {
+    try {
+      setFetchingSubaccounts(true);
+      setSubaccounts([]);
+
+      const luxorResponse = await fetch("/api/luxor?endpoint=subaccounts");
+      if (!luxorResponse.ok) {
+        throw new Error(`Luxor API returned status ${luxorResponse.status}`);
+      }
+
+      const luxorData: ProxyResponse<Record<string, unknown>> =
+        await luxorResponse.json();
+      if (!luxorData.success) {
+        throw new Error(luxorData.error || "Failed to fetch subaccounts");
+      }
+
+      const responseData = luxorData.data as Record<string, unknown>;
+      let luxorSubaccountsList: Subaccount[] = [];
+      if (responseData && Array.isArray(responseData.subaccounts)) {
+        luxorSubaccountsList = (
+          responseData.subaccounts as Array<Record<string, unknown>>
+        ).map(
+          (sub: Record<string, unknown>) =>
+            ({
+              id: Number(sub.id || 0),
+              name: String(sub.name || ""),
+              created_at: String(sub.created_at || ""),
+              url: String(sub.url || ""),
+            }) as Subaccount,
+        );
+      }
+
+      const dbResponse = await fetch("/api/user/subaccounts/existing");
+      let assignedSubaccountNames: string[] = [];
+      if (dbResponse.ok) {
+        const dbData = await dbResponse.json();
+        if (dbData.success && Array.isArray(dbData.data)) {
+          assignedSubaccountNames = dbData.data.map(
+            (item: { luxorSubaccountName: string }) => item.luxorSubaccountName,
+          );
+        }
+      }
+
+      const unassignedSubaccounts = luxorSubaccountsList.filter(
+        (sub) => !assignedSubaccountNames.includes(sub.name),
+      );
+      setSubaccounts(unassignedSubaccounts);
+    } catch (err) {
+      console.error("[CreateFranchiseeModal] Error fetching subaccounts:", err);
+      setSubaccounts([]);
+    } finally {
+      setFetchingSubaccounts(false);
+    }
+  };
 
   const checkEmailExists = async (email: string) => {
     if (!email || !email.includes("@")) {
@@ -242,6 +328,34 @@ export default function CreateFranchiseeModal({
                 </Typography>
               )}
             </Box>
+
+            <FormControl fullWidth disabled={fetchingSubaccounts}>
+              <InputLabel>Luxor Subaccount (Optional)</InputLabel>
+              <Select
+                value={formData.luxorSubaccountName}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    luxorSubaccountName: e.target.value,
+                  }))
+                }
+                label="Luxor Subaccount (Optional)"
+              >
+                <MenuItem value="">None</MenuItem>
+                {fetchingSubaccounts ? (
+                  <MenuItem disabled>
+                    <CircularProgress size={20} sx={{ mr: 1 }} />
+                    Loading subaccounts...
+                  </MenuItem>
+                ) : (
+                  subaccounts.map((subaccount) => (
+                    <MenuItem key={subaccount.name} value={subaccount.name}>
+                      {subaccount.name}
+                    </MenuItem>
+                  ))
+                )}
+              </Select>
+            </FormControl>
 
             <Divider sx={{ my: 1 }} />
             <Typography variant="subtitle2" color="text.secondary">

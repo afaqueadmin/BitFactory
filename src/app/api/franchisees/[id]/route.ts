@@ -47,6 +47,7 @@ async function getAuthenticatedUser(request: NextRequest) {
  *   state?: string
  *   postalCode?: string
  *   isActive?: boolean
+ *   luxorSubaccountName?: string | null
  * }
  */
 export async function PUT(
@@ -97,6 +98,7 @@ export async function PUT(
       state,
       postalCode,
       isActive,
+      luxorSubaccountName,
     } = body;
 
     const stringFields: Record<string, unknown> = {
@@ -150,11 +152,29 @@ export async function PUT(
       updateData.isActive = isActive;
     }
 
+    if (luxorSubaccountName !== undefined) {
+      await prisma.user.update({
+        where: { id: existingFranchise.franchiseeId },
+        data: {
+          luxorSubaccountName: luxorSubaccountName
+            ? String(luxorSubaccountName).trim()
+            : null,
+        },
+      });
+    }
+
     const updatedFranchise = await prisma.franchise.update({
       where: { id },
       data: updateData,
       include: {
-        franchisee: { select: { id: true, name: true, email: true } },
+        franchisee: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            luxorSubaccountName: true,
+          },
+        },
         createdBy: { select: { id: true, name: true, email: true } },
         _count: { select: { users: true } },
       },

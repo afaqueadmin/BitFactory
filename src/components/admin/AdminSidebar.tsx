@@ -44,6 +44,7 @@ interface SidebarItem {
   // Roles allowed to see this item. Defaults to ADMIN/SUPER_ADMIN (today's
   // behavior) when omitted, so existing items don't need to be touched.
   roles?: Array<"ADMIN" | "SUPER_ADMIN" | "FRANCHISEE">;
+  openInNewTab?: boolean;
 }
 
 const sidebarItems: SidebarItem[] = [
@@ -60,6 +61,13 @@ const sidebarItems: SidebarItem[] = [
     icon: <DashboardIcon />,
     path: "/franchisee-dashboard",
     roles: ["FRANCHISEE"],
+  },
+  {
+    title: "My Account",
+    icon: <DashboardIcon />,
+    path: "/dashboard",
+    roles: ["FRANCHISEE"],
+    openInNewTab: true,
   },
   {
     title: "Activity Log",
@@ -284,6 +292,8 @@ export default function AdminSidebar() {
             <ListItemButton
               component={item.path ? Link : "div"}
               href={item.path || "#"}
+              target={item.openInNewTab ? "_blank" : undefined}
+              rel={item.openInNewTab ? "noopener noreferrer" : undefined}
               onClick={() => item.items && handleExpandClick(item.title)}
               selected={item.path === pathname}
               sx={{

@@ -61,7 +61,12 @@ interface Franchise {
   franchiseCode: string;
   isActive: boolean;
   createdAt: string;
-  franchisee: { id: string; name: string; email: string };
+  franchisee: {
+    id: string;
+    name: string;
+    email: string;
+    luxorSubaccountName: string | null;
+  };
   createdBy: { id: string; name: string; email: string };
   _count?: { users: number };
 }

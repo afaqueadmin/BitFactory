@@ -80,7 +80,15 @@ export async function GET(request: NextRequest) {
     const url = new URL(request.url);
     const customerId = url.searchParams.get("customerId");
     if (customerId) {
-      if (userRole !== "ADMIN" && userRole !== "SUPER_ADMIN") {
+      if (userRole === "FRANCHISEE") {
+        const owned = await prisma.user.findFirst({
+          where: { id: customerId, franchisee: { franchiseeId: userId } },
+          select: { id: true },
+        });
+        if (!owned) {
+          return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        }
+      } else if (userRole !== "ADMIN" && userRole !== "SUPER_ADMIN") {
         return NextResponse.json(
           { error: "Only administrators can search by customerId" },
           { status: 403 },
@@ -88,7 +96,7 @@ export async function GET(request: NextRequest) {
       }
       userId = customerId;
       console.log(
-        `[Transactions API] Admin override - fetching for customer: ${customerId}`,
+        `[Transactions API] Override - fetching for customer: ${customerId}`,
       );
     }
 

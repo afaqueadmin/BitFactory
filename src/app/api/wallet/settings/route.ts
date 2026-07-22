@@ -94,9 +94,30 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    // 2.5. Handle customerId parameter (admin only)
+    // 2.5. Handle customerId parameter (admin, or franchisee for their own customer)
     if (customerId) {
-      if (userRole !== "ADMIN" && userRole !== "SUPER_ADMIN") {
+      if (userRole === "FRANCHISEE") {
+        const owned = await prisma.user.findFirst({
+          where: { id: customerId, franchisee: { franchiseeId: userId } },
+          select: { id: true },
+        });
+        if (!owned) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: "Forbidden",
+              code: "FORBIDDEN",
+              timestamp: new Date().toISOString(),
+            } as WalletErrorResponse,
+            {
+              status: 403,
+              headers: {
+                "Cache-Control": "no-store, no-cache, must-revalidate",
+              },
+            },
+          );
+        }
+      } else if (userRole !== "ADMIN" && userRole !== "SUPER_ADMIN") {
         console.warn(
           `[Wallet API] Non-admin user ${userId} attempted to access customerId ${customerId}`,
         );
@@ -118,7 +139,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       }
       userId = customerId;
       console.log(
-        `[Wallet API] Admin ${userRole} accessing wallet settings for user: ${customerId}`,
+        `[Wallet API] ${userRole} accessing wallet settings for user: ${customerId}`,
       );
     }
 
