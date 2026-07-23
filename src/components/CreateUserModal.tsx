@@ -328,9 +328,10 @@ export default function CreateUserModal({
       if (
         !formData.franchiseeId &&
         formData.segment !== "CORPORATE" &&
-        formData.segment !== "SME"
+        formData.segment !== "SME" &&
+        formData.segment !== "SELF_MINING"
       ) {
-        setError("Please select a Type (Corporate or SME)");
+        setError("Please select a Type (Corporate, SME, or Self Mining)");
         setLoading(false);
         return;
       }
@@ -542,6 +543,9 @@ export default function CreateUserModal({
                       </MenuItem>,
                       <MenuItem key="SME" value="SME">
                         SME
+                      </MenuItem>,
+                      <MenuItem key="SELF_MINING" value="SELF_MINING">
+                        Self Mining
                       </MenuItem>,
                     ]
                   )}

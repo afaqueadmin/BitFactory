@@ -116,19 +116,24 @@ export async function POST(request: NextRequest) {
 
     // segment is only applicable to CLIENT users. A franchise assignment
     // forces RETAIL server-side regardless of what was submitted (mutually
-    // exclusive with the Corporate/SME picker); otherwise a Corporate/SME
+    // exclusive with the direct-segment picker); otherwise a direct segment
     // selection is required.
-    let resolvedSegment: "CORPORATE" | "SME" | "RETAIL" | null = null;
+    let resolvedSegment: "CORPORATE" | "SME" | "SELF_MINING" | "RETAIL" | null =
+      null;
     if (role === "CLIENT") {
       if (franchiseeId) {
         resolvedSegment = "RETAIL";
-      } else if (segment === "CORPORATE" || segment === "SME") {
+      } else if (
+        segment === "CORPORATE" ||
+        segment === "SME" ||
+        segment === "SELF_MINING"
+      ) {
         resolvedSegment = segment;
       } else {
         return NextResponse.json(
           {
             error:
-              "Segment (Corporate or SME) is required for CLIENT users without a franchise",
+              "Segment (Corporate, SME, or Self Mining) is required for CLIENT users without a franchise",
           },
           { status: 400 },
         );
