@@ -16,6 +16,7 @@ import { useRouter } from "next/navigation";
 import SaveIcon from "@mui/icons-material/Save";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import Link from "next/link";
+import { useCreateHardwarePurchase } from "@/lib/hooks/useHardwarePurchases";
 
 export interface HardwarePurchaseFormData {
   invoiceNumber: string;
@@ -48,6 +49,7 @@ export default function CreateHardwarePurchasePage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const createHardwarePurchase = useCreateHardwarePurchase();
 
   // Calculate total amount
   const calculateTotalAmount = (): number => {
@@ -130,39 +132,31 @@ export default function CreateHardwarePurchasePage() {
 
       const totalAmount = calculateTotalAmount();
 
-      const response = await fetch("/api/hardware-purchases", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          invoiceNumber: formData.invoiceNumber,
-          vendorName: formData.vendorName,
-          hardwareDescription: formData.hardwareDescription,
-          billingDate: formData.billingDate,
-          dueDate: formData.dueDate,
-          quantity: Number(formData.quantity) || 0,
-          unitPrice: Number(formData.unitPrice) || 0,
-          miscellaneousCharges: Number(formData.miscellaneousCharges) || 0,
-          totalAmount: totalAmount,
-          notes: formData.notes || null,
-          paymentStatus: "Pending",
-        }),
+      await createHardwarePurchase.mutateAsync({
+        invoiceNumber: formData.invoiceNumber,
+        vendorName: formData.vendorName,
+        hardwareDescription: formData.hardwareDescription,
+        billingDate: formData.billingDate,
+        dueDate: formData.dueDate,
+        quantity: Number(formData.quantity) || 0,
+        unitPrice: Number(formData.unitPrice) || 0,
+        miscellaneousCharges: Number(formData.miscellaneousCharges) || 0,
+        totalAmount: totalAmount,
+        notes: formData.notes || undefined,
+        paymentStatus: "Pending",
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        setError(
-          errorData.error || "Failed to create hardware purchase invoice",
-        );
-        return;
-      }
 
       setSuccess(true);
       // Redirect after a short delay
       setTimeout(() => {
         router.push("/accounting/hardware-purchases");
       }, 1500);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Failed to create hardware purchase invoice",
+      );
     } finally {
       setSaving(false);
     }
