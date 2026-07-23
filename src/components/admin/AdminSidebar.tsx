@@ -155,9 +155,19 @@ const sidebarItems: SidebarItem[] = [
         path: "/accounting",
       },
       {
+        title: "Farm Tariffs",
+        icon: <DocumentIcon />,
+        path: "/accounting/farm-tariffs",
+      },
+      {
         title: "Hardware Sales Dashboard",
         icon: <DashboardIcon />,
         path: "/hardware-sales",
+      },
+      {
+        title: "Hardware Purchase Invoices",
+        icon: <DocumentIcon />,
+        path: "/accounting/hardware-purchases",
       },
       // {
       //   title: "Invoices",
@@ -188,16 +198,6 @@ const sidebarItems: SidebarItem[] = [
         title: "Invoice PDF Settings",
         icon: <DocumentIcon />,
         path: "/accounting/pdf-invoice-settings",
-      },
-      {
-        title: "Farm Tariffs",
-        icon: <DocumentIcon />,
-        path: "/accounting/farm-tariffs",
-      },
-      {
-        title: "Hardware Purchase Invoices",
-        icon: <DocumentIcon />,
-        path: "/accounting/hardware-purchases",
       },
       {
         title: "Email Reports",
