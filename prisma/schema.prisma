@@ -47,6 +47,8 @@ model User {
   invoices                   Invoice[]                    @relation("invoices")
   vendorInvoicesCreated      VendorInvoice[]              @relation("vendorInvoicesCreated")
   vendorInvoicesUpdated      VendorInvoice[]              @relation("vendorInvoicesUpdated")
+  hardwarePurchasesCreated   HardwarePurchaseInvoice[]    @relation("hardwarePurchasesCreated")
+  hardwarePurchasesUpdated   HardwarePurchaseInvoice[]    @relation("hardwarePurchasesUpdated")
   createdMinerHistory        MinerOwnershipHistory[]      @relation("createdBy")
   ownedMinerHistory          MinerOwnershipHistory[]      @relation("owner")
   miners                     Miner[]
@@ -443,6 +445,36 @@ model VendorInvoice {
   @@index([createdAt])
   @@index([isDeleted])
   @@map("vendor_invoices")
+}
+
+model HardwarePurchaseInvoice {
+  id                   String              @id @default(cuid())
+  invoiceNumber        String              @unique
+  vendorName           String
+  hardwareDescription  String
+  billingDate          DateTime            @db.Date
+  paidDate             DateTime?
+  dueDate              DateTime
+  quantity             Int
+  isDeleted            Boolean             @default(false)
+  unitPrice            Decimal             @db.Decimal(10, 2)
+  miscellaneousCharges Decimal             @default(0.00) @db.Decimal(10, 2)
+  totalAmount          Decimal             @db.Decimal(12, 2)
+  paymentStatus        VendorPaymentStatus @default(Pending)
+  notes                String?
+  createdBy            String
+  updatedBy            String?
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+  createdByUser        User                @relation("hardwarePurchasesCreated", fields: [createdBy], references: [id])
+  updatedByUser        User?               @relation("hardwarePurchasesUpdated", fields: [updatedBy], references: [id])
+
+  @@index([paymentStatus])
+  @@index([billingDate])
+  @@index([dueDate])
+  @@index([createdAt])
+  @@index([isDeleted])
+  @@map("hardware_purchase_invoices")
 }
 
 model RecurringInvoice {

@@ -195,6 +195,11 @@ const sidebarItems: SidebarItem[] = [
         path: "/accounting/farm-tariffs",
       },
       {
+        title: "Hardware Purchase Invoices",
+        icon: <DocumentIcon />,
+        path: "/accounting/hardware-purchases",
+      },
+      {
         title: "Email Reports",
         icon: <DocumentIcon />,
         path: "/accounting/email-report",
