@@ -128,9 +128,9 @@ export async function PUT(
     const body: UpdateVendorInvoiceRequest = await request.json();
 
     // Validate required fields if they are being updated
-    if (body.totalMiners !== undefined && body.totalMiners <= 0) {
+    if (body.totalMiners !== undefined && body.totalMiners < 0) {
       return NextResponse.json(
-        { error: "Total miners must be greater than 0" },
+        { error: "Total miners cannot be negative" },
         { status: 400 },
       );
     }

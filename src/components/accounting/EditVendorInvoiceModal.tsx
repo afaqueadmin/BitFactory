@@ -157,7 +157,7 @@ export default function EditVendorInvoiceModal({
       ) {
         return {
           ...prev,
-          [name]: parseFloat(value) || 0,
+          [name]: value === "" ? "" : value,
         };
       } else {
         return {
@@ -169,8 +169,10 @@ export default function EditVendorInvoiceModal({
   };
 
   const calculateTotalAmount = (): number => {
-    const unitTotal = (formData.totalMiners || 0) * (formData.unitPrice || 0);
-    return unitTotal + (formData.miscellaneousCharges || 0);
+    const totalMiners = Number(formData.totalMiners) || 0;
+    const unitPrice = Number(formData.unitPrice) || 0;
+    const miscellaneousCharges = Number(formData.miscellaneousCharges) || 0;
+    return totalMiners * unitPrice + miscellaneousCharges;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -198,11 +200,11 @@ export default function EditVendorInvoiceModal({
         setError("Due date is required");
         return;
       }
-      if ((formData.totalMiners || 0) <= 0) {
-        setError("Total miners must be greater than 0");
+      if ((Number(formData.totalMiners) || 0) < 0) {
+        setError("Total miners cannot be negative");
         return;
       }
-      if ((formData.unitPrice || 0) < 0) {
+      if ((Number(formData.unitPrice) || 0) < 0) {
         setError("Unit price cannot be negative");
         return;
       }
@@ -227,9 +229,9 @@ export default function EditVendorInvoiceModal({
           invoiceNumber: formData.invoiceNumber,
           billingDate: formData.billingDate,
           dueDate: formData.dueDate,
-          totalMiners: formData.totalMiners,
-          unitPrice: formData.unitPrice,
-          miscellaneousCharges: formData.miscellaneousCharges,
+          totalMiners: Number(formData.totalMiners) || 0,
+          unitPrice: Number(formData.unitPrice) || 0,
+          miscellaneousCharges: Number(formData.miscellaneousCharges) || 0,
           totalAmount: totalAmount,
           notes: formData.notes || null,
           paymentStatus: invoiceData?.paymentStatus,
@@ -282,7 +284,7 @@ export default function EditVendorInvoiceModal({
           alignItems: "center",
         }}
       >
-        <Typography variant="h6" sx={{ fontWeight: "bold" }}>
+        <Typography variant="h6" component="span" sx={{ fontWeight: "bold" }}>
           Edit Vendor Invoice
         </Typography>
         <IconButton
@@ -362,10 +364,10 @@ export default function EditVendorInvoiceModal({
                     label="Total Miners"
                     name="totalMiners"
                     type="number"
-                    value={formData.totalMiners || 0}
+                    value={formData.totalMiners}
                     onChange={handleInputChange}
                     slotProps={{
-                      htmlInput: { min: 1, step: 1 },
+                      htmlInput: { min: 0, step: 1 },
                     }}
                     required
                     disabled={saving}
@@ -376,7 +378,7 @@ export default function EditVendorInvoiceModal({
                     label="Unit Price"
                     name="unitPrice"
                     type="number"
-                    value={formData.unitPrice || 0}
+                    value={formData.unitPrice}
                     onChange={handleInputChange}
                     slotProps={{
                       htmlInput: { min: 0, step: 0.01 },
@@ -393,7 +395,7 @@ export default function EditVendorInvoiceModal({
                   label="Miscellaneous Charges"
                   name="miscellaneousCharges"
                   type="number"
-                  value={formData.miscellaneousCharges || 0}
+                  value={formData.miscellaneousCharges}
                   onChange={handleInputChange}
                   slotProps={{
                     htmlInput: { step: 0.01 },
@@ -435,8 +437,8 @@ export default function EditVendorInvoiceModal({
                       <Typography variant="body2">
                         $
                         {(
-                          (formData.totalMiners || 0) *
-                          (formData.unitPrice || 0)
+                          (Number(formData.totalMiners) || 0) *
+                          (Number(formData.unitPrice) || 0)
                         ).toFixed(2)}
                       </Typography>
                     </Box>
@@ -447,7 +449,10 @@ export default function EditVendorInvoiceModal({
                         Miscellaneous:
                       </Typography>
                       <Typography variant="body2">
-                        ${formData.miscellaneousCharges || 0}
+                        $
+                        {(Number(formData.miscellaneousCharges) || 0).toFixed(
+                          2,
+                        )}
                       </Typography>
                     </Box>
                     <Box

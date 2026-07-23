@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
       !body.invoiceNumber ||
       !body.billingDate ||
       !body.dueDate ||
-      body.totalMiners <= 0 ||
+      body.totalMiners < 0 ||
       body.unitPrice < 0
     ) {
       return NextResponse.json(

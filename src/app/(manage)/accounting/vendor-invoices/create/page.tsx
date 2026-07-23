@@ -22,9 +22,9 @@ export interface VendorInvoiceFormData {
   invoiceNumber: string;
   billingDate: string;
   dueDate: string;
-  totalMiners: number;
-  unitPrice: number;
-  miscellaneousCharges: number;
+  totalMiners: number | string;
+  unitPrice: number | string;
+  miscellaneousCharges: number | string;
   notes: string;
 }
 
@@ -106,8 +106,10 @@ export default function CreateVendorInvoicePage() {
 
   // Calculate total amount
   const calculateTotalAmount = (): number => {
-    const unitTotal = formData.totalMiners * formData.unitPrice;
-    return unitTotal + formData.miscellaneousCharges;
+    const totalMiners = Number(formData.totalMiners) || 0;
+    const unitPrice = Number(formData.unitPrice) || 0;
+    const miscellaneousCharges = Number(formData.miscellaneousCharges) || 0;
+    return totalMiners * unitPrice + miscellaneousCharges;
   };
 
   const handleInputChange = (
@@ -123,7 +125,7 @@ export default function CreateVendorInvoicePage() {
       ) {
         return {
           ...prev,
-          [name]: parseFloat(value) || 0,
+          [name]: value === "" ? "" : value,
         };
       } else {
         return {
@@ -155,11 +157,11 @@ export default function CreateVendorInvoicePage() {
         setError("Due date is required");
         return;
       }
-      if (formData.totalMiners <= 0) {
-        setError("Total miners must be greater than 0");
+      if ((Number(formData.totalMiners) || 0) < 0) {
+        setError("Total miners cannot be negative");
         return;
       }
-      if (formData.unitPrice < 0) {
+      if ((Number(formData.unitPrice) || 0) < 0) {
         setError("Unit price cannot be negative");
         return;
       }
@@ -216,9 +218,9 @@ export default function CreateVendorInvoicePage() {
           invoiceNumber: formData.invoiceNumber,
           billingDate: formData.billingDate,
           dueDate: formData.dueDate,
-          totalMiners: formData.totalMiners,
-          unitPrice: formData.unitPrice,
-          miscellaneousCharges: formData.miscellaneousCharges,
+          totalMiners: Number(formData.totalMiners) || 0,
+          unitPrice: Number(formData.unitPrice) || 0,
+          miscellaneousCharges: Number(formData.miscellaneousCharges) || 0,
           totalAmount: totalAmount,
           notes: formData.notes || null,
           paymentStatus: "Pending",
@@ -323,7 +325,7 @@ export default function CreateVendorInvoicePage() {
                 value={formData.totalMiners}
                 onChange={handleInputChange}
                 slotProps={{
-                  htmlInput: { min: 1, step: 1 },
+                  htmlInput: { min: 0, step: 1 },
                 }}
                 required
                 disabled={saving}
@@ -395,7 +397,11 @@ export default function CreateVendorInvoicePage() {
                   Unit Total:
                 </Typography>
                 <Typography variant="body1">
-                  ${(formData.totalMiners * formData.unitPrice).toFixed(2)}
+                  $
+                  {(
+                    (Number(formData.totalMiners) || 0) *
+                    (Number(formData.unitPrice) || 0)
+                  ).toFixed(2)}
                 </Typography>
               </Box>
               <Box sx={{ display: "flex", justifyContent: "space-between" }}>
@@ -403,7 +409,7 @@ export default function CreateVendorInvoicePage() {
                   Miscellaneous:
                 </Typography>
                 <Typography variant="body1">
-                  ${formData.miscellaneousCharges.toFixed(2)}
+                  ${(Number(formData.miscellaneousCharges) || 0).toFixed(2)}
                 </Typography>
               </Box>
               <Box
