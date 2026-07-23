@@ -545,6 +545,7 @@ enum Role {
 enum Segment {
   CORPORATE
   SME
+  SELF_MINING
   FRANCHISEE
   RETAIL
 }

@@ -783,6 +783,7 @@ export default function MachinePage() {
                     </MenuItem>
                     <MenuItem value="CORPORATE">Corporate</MenuItem>
                     <MenuItem value="SME">SME</MenuItem>
+                    <MenuItem value="SELF_MINING">Self Mining</MenuItem>
                     <MenuItem value="FRANCHISEE">Franchisee</MenuItem>
                     <MenuItem value="RETAIL">Retail</MenuItem>
                   </Select>

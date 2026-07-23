@@ -68,9 +68,14 @@ export async function PUT(
 
     // segment is only applicable to CLIENT users. A franchise assignment
     // (new or pre-existing) forces RETAIL regardless of what was submitted;
-    // clearing/staying-clear of a franchise requires a Corporate/SME choice
+    // clearing/staying-clear of a franchise requires a direct segment choice
     // whenever segment is being touched.
-    let segmentUpdate: "CORPORATE" | "SME" | "RETAIL" | undefined = undefined;
+    let segmentUpdate:
+      | "CORPORATE"
+      | "SME"
+      | "SELF_MINING"
+      | "RETAIL"
+      | undefined = undefined;
     if (currentUser?.role === "CLIENT") {
       const resultingFranchiseeId =
         franchiseeIdUpdate !== undefined
@@ -80,21 +85,29 @@ export async function PUT(
       if (resultingFranchiseeId) {
         segmentUpdate = "RETAIL";
       } else if (body.franchiseeId === null) {
-        // Franchise is being cleared this request - Corporate/SME is required.
-        if (body.segment !== "CORPORATE" && body.segment !== "SME") {
+        // Franchise is being cleared this request - a direct segment is required.
+        if (
+          body.segment !== "CORPORATE" &&
+          body.segment !== "SME" &&
+          body.segment !== "SELF_MINING"
+        ) {
           return NextResponse.json(
             {
               error:
-                "Segment (Corporate or SME) is required when unassigning a franchise",
+                "Segment (Corporate, SME, or Self Mining) is required when unassigning a franchise",
             },
             { status: 400 },
           );
         }
         segmentUpdate = body.segment;
       } else if (body.segment !== undefined) {
-        if (body.segment !== "CORPORATE" && body.segment !== "SME") {
+        if (
+          body.segment !== "CORPORATE" &&
+          body.segment !== "SME" &&
+          body.segment !== "SELF_MINING"
+        ) {
           return NextResponse.json(
-            { error: "Segment must be Corporate or SME" },
+            { error: "Segment must be Corporate, SME, or Self Mining" },
             { status: 400 },
           );
         }
