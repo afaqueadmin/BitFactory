@@ -74,13 +74,6 @@ export default function EditInvoicePage() {
         throw new Error("Miners count and unit price must be greater than 0");
       }
 
-      const selectedDate = new Date(formData.dueDate);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      if (selectedDate < today) {
-        throw new Error("Due date must be in the future");
-      }
-
       // Call API to update invoice
       await updateInvoice(invoiceId, {
         totalMiners: formData.totalMiners,

@@ -6,6 +6,7 @@ export interface HardwarePurchaseInvoice {
   vendorName: string;
   hardwareDescription: string;
   billingDate: Date;
+  issuedDate: Date | null;
   paidDate: Date | null;
   dueDate: Date;
   quantity: number;
@@ -99,6 +100,7 @@ export const useCreateHardwarePurchase = () => {
       vendorName: string;
       hardwareDescription: string;
       billingDate: string;
+      issuedDate?: string;
       dueDate: string;
       quantity: number;
       unitPrice: number;

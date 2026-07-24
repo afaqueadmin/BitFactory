@@ -33,6 +33,7 @@ interface HardwarePurchaseDetail {
   vendorName: string;
   hardwareDescription: string;
   billingDate: string;
+  issuedDate: string | null;
   paidDate: string | null;
   dueDate: string;
   quantity: number;
@@ -296,13 +297,34 @@ export default function HardwarePurchaseDetailPage() {
                 color="textSecondary"
                 sx={{ fontWeight: "600", mb: 0.5 }}
               >
-                Issued Date
+                Billing Date
               </Typography>
               <Typography variant="body1">
                 <DateDisplay
                   date={new Date(invoice.billingDate)}
                   format="date"
                 />
+              </Typography>
+            </Box>
+
+            {/* Issue Date */}
+            <Box>
+              <Typography
+                variant="subtitle2"
+                color="textSecondary"
+                sx={{ fontWeight: "600", mb: 0.5 }}
+              >
+                Issue Date
+              </Typography>
+              <Typography variant="body1">
+                {invoice.issuedDate ? (
+                  <DateDisplay
+                    date={new Date(invoice.issuedDate)}
+                    format="date"
+                  />
+                ) : (
+                  "-"
+                )}
               </Typography>
             </Box>
 

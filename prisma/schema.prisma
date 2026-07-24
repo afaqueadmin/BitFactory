@@ -453,6 +453,7 @@ model HardwarePurchaseInvoice {
   vendorName           String
   hardwareDescription  String
   billingDate          DateTime            @db.Date
+  issuedDate           DateTime?           @db.Date
   paidDate             DateTime?
   dueDate              DateTime
   quantity             Int

@@ -8,6 +8,7 @@ interface UpdateHardwarePurchaseRequest {
   vendorName?: string;
   hardwareDescription?: string;
   billingDate?: string;
+  issuedDate?: string | null;
   dueDate?: string;
   quantity?: number;
   unitPrice?: number;
@@ -168,6 +169,7 @@ export async function PUT(
       vendorName?: string;
       hardwareDescription?: string;
       billingDate?: Date;
+      issuedDate?: Date | null;
       dueDate?: Date;
       quantity?: number;
       unitPrice?: Decimal;
@@ -193,6 +195,11 @@ export async function PUT(
     }
     if (body.billingDate !== undefined) {
       updateData.billingDate = new Date(body.billingDate);
+    }
+    if (body.issuedDate !== undefined) {
+      updateData.issuedDate = body.issuedDate
+        ? new Date(body.issuedDate)
+        : null;
     }
     if (body.dueDate !== undefined) {
       updateData.dueDate = new Date(body.dueDate);

@@ -7,6 +7,8 @@ import AdminStatCard from "@/components/admin/AdminStatCard";
 import AdminValueCard from "@/components/admin/AdminValueCard";
 import { Box, CircularProgress, Alert, useTheme } from "@mui/material";
 import { useVendorInvoices } from "@/lib/hooks/useVendorInvoices";
+import { useHardwarePurchases } from "@/lib/hooks/useHardwarePurchases";
+import { useInvoices } from "@/lib/hooks/useInvoices";
 
 interface PoolData {
   workers: {
@@ -193,6 +195,27 @@ export default function AdminDashboard() {
     ? hostingRevenueData.hostingRevenue - vendorInvoicesTotalAmount
     : 0;
 
+  // Hardware Revenue - all Paid hardware sales invoices
+  const { invoices: hardwareSalesInvoices, loading: hardwareRevenueLoading } =
+    useInvoices(1, 100000, undefined, "PAID", "HARDWARE_SALES");
+  const hardwareRevenue = hardwareSalesInvoices.reduce(
+    (sum: number, invoice: { totalAmount: number }) =>
+      sum + Number(invoice.totalAmount),
+    0,
+  );
+
+  // Hardware Cost - all Paid hardware purchase invoices
+  const {
+    hardwarePurchases: paidHardwarePurchases,
+    loading: hardwareCostLoading,
+  } = useHardwarePurchases(1, 100000, "Paid");
+  const hardwareCost = paidHardwarePurchases.reduce(
+    (sum, invoice) => sum + Number(invoice.totalAmount),
+    0,
+  );
+
+  const hardwareProfit = hardwareRevenue - hardwareCost;
+
   // Get pool stats based on poolMode
   const getPoolStats = (mode: "total" | "luxor" | "braiins") => {
     if (mode === "braiins" && stats?.braiins) {
@@ -278,7 +301,13 @@ export default function AdminDashboard() {
     [poolMode, stats?.miners],
   );
 
-  if (loading || customerBalanceLoading || hostingRevenueLoading) {
+  if (
+    loading ||
+    customerBalanceLoading ||
+    hostingRevenueLoading ||
+    hardwareRevenueLoading ||
+    hardwareCostLoading
+  ) {
     return (
       <Box
         sx={{
@@ -690,6 +719,30 @@ export default function AdminDashboard() {
             title="Hosting Profit"
             borderColor="#757575"
             value={hostingProfit}
+            type="currency"
+          />
+
+          {/* Hardware Revenue - all Paid hardware sales invoices */}
+          <AdminValueCard
+            title="Hardware Revenue"
+            borderColor="#757575"
+            value={hardwareRevenue}
+            type="currency"
+          />
+
+          {/* Hardware Cost - all Paid hardware purchase invoices */}
+          <AdminValueCard
+            title="Hardware Cost"
+            borderColor="#757575"
+            value={hardwareCost}
+            type="currency"
+          />
+
+          {/* Hardware Profit - revenue minus cost */}
+          <AdminValueCard
+            title="Hardware Profit"
+            borderColor="#757575"
+            value={hardwareProfit}
             type="currency"
           />
 

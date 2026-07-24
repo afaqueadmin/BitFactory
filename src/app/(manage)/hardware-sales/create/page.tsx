@@ -34,6 +34,7 @@ export default function CreateHardwareSalesInvoicePage() {
     totalMiners: 0,
     unitPrice: 0,
     totalAmount: 0,
+    issueDate: new Date().toISOString().split("T")[0],
     dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
       .toISOString()
       .split("T")[0],
@@ -144,14 +145,6 @@ export default function CreateHardwareSalesInvoicePage() {
         throw new Error("Quantity and unit price must be greater than 0");
       }
 
-      // Validate due date is not in the past
-      const selectedDate = new Date(formData.dueDate);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0); // Reset time to start of day for fair comparison
-      if (selectedDate < today) {
-        throw new Error("Due date must be in the future (not a past date)");
-      }
-
       // Call API to create invoice
       await createInvoice({
         customerId: formData.customerId,
@@ -161,6 +154,7 @@ export default function CreateHardwareSalesInvoicePage() {
         status: formData.status,
         invoiceType: formData.invoiceType,
         hardwareId: formData.hardwareId || undefined,
+        invoiceGeneratedDate: formData.issueDate || undefined,
       });
 
       // Redirect to hardware-sales dashboard
@@ -322,6 +316,17 @@ export default function CreateHardwareSalesInvoicePage() {
                 Additional Information
               </h3>
               <Stack spacing={2}>
+                <TextField
+                  label="Issue Date"
+                  name="issueDate"
+                  type="date"
+                  value={formData.issueDate}
+                  onChange={handleInputChange}
+                  fullWidth
+                  InputLabelProps={{ shrink: true }}
+                  helperText="When the invoice was issued (defaults to today)"
+                  required
+                />
                 <TextField
                   label="Due Date"
                   name="dueDate"

@@ -45,6 +45,7 @@ export default function EditHardwarePurchaseModal({
     vendorName: "",
     hardwareDescription: "",
     billingDate: "",
+    issuedDate: "",
     dueDate: "",
     quantity: 0,
     unitPrice: 0,
@@ -82,6 +83,9 @@ export default function EditHardwarePurchaseModal({
             vendorName: invoice.vendorName,
             hardwareDescription: invoice.hardwareDescription,
             billingDate: invoice.billingDate.split("T")[0],
+            issuedDate: invoice.issuedDate
+              ? new Date(invoice.issuedDate).toISOString().split("T")[0]
+              : "",
             dueDate: new Date(invoice.dueDate).toISOString().split("T")[0],
             quantity: invoice.quantity,
             unitPrice: invoice.unitPrice,
@@ -107,6 +111,9 @@ export default function EditHardwarePurchaseModal({
         billingDate: new Date(invoiceData.billingDate)
           .toISOString()
           .split("T")[0],
+        issuedDate: invoiceData.issuedDate
+          ? new Date(invoiceData.issuedDate).toISOString().split("T")[0]
+          : "",
         dueDate: new Date(invoiceData.dueDate).toISOString().split("T")[0],
         quantity: invoiceData.quantity,
         unitPrice: invoiceData.unitPrice,
@@ -197,15 +204,6 @@ export default function EditHardwarePurchaseModal({
         return;
       }
 
-      // Validate dates
-      const billingDate = new Date(formData.billingDate);
-      const dueDate = new Date(formData.dueDate);
-
-      if (dueDate < billingDate) {
-        setError("Due date must be after billing date");
-        return;
-      }
-
       const totalAmount = calculateTotalAmount();
 
       const response = await fetch(`/api/hardware-purchases/${invoiceId}`, {
@@ -218,6 +216,7 @@ export default function EditHardwarePurchaseModal({
           vendorName: formData.vendorName,
           hardwareDescription: formData.hardwareDescription,
           billingDate: formData.billingDate,
+          issuedDate: formData.issuedDate || null,
           dueDate: formData.dueDate,
           quantity: Number(formData.quantity) || 0,
           unitPrice: Number(formData.unitPrice) || 0,
@@ -343,7 +342,7 @@ export default function EditHardwarePurchaseModal({
                   size="small"
                 />
 
-                {/* Row 3: Billing Date and Due Date */}
+                {/* Row 3: Billing Date and Issue Date */}
                 <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
                   <TextField
                     fullWidth
@@ -361,12 +360,11 @@ export default function EditHardwarePurchaseModal({
                   />
                   <TextField
                     fullWidth
-                    label="Due Date"
-                    name="dueDate"
+                    label="Issue Date"
+                    name="issuedDate"
                     type="date"
-                    value={formData.dueDate || ""}
+                    value={formData.issuedDate || ""}
                     onChange={handleInputChange}
-                    required
                     disabled={saving}
                     slotProps={{
                       inputLabel: { shrink: true },
@@ -374,6 +372,22 @@ export default function EditHardwarePurchaseModal({
                     size="small"
                   />
                 </Stack>
+
+                {/* Row 3b: Due Date */}
+                <TextField
+                  fullWidth
+                  label="Due Date"
+                  name="dueDate"
+                  type="date"
+                  value={formData.dueDate || ""}
+                  onChange={handleInputChange}
+                  required
+                  disabled={saving}
+                  slotProps={{
+                    inputLabel: { shrink: true },
+                  }}
+                  size="small"
+                />
 
                 {/* Row 4: Quantity and Unit Price */}
                 <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>

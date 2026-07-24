@@ -162,6 +162,7 @@ export function useCreateInvoice() {
       invoiceType?: string;
       hardwareId?: string;
       billingMonth?: string;
+      invoiceGeneratedDate?: string;
     }) => {
       const res = await fetch("/api/accounting/invoices", {
         method: "POST",
