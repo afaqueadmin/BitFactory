@@ -8,7 +8,6 @@ import AdminValueCard from "@/components/admin/AdminValueCard";
 import { Box, CircularProgress, Alert, useTheme } from "@mui/material";
 import { useVendorInvoices } from "@/lib/hooks/useVendorInvoices";
 import { useHardwarePurchases } from "@/lib/hooks/useHardwarePurchases";
-import { useInvoices } from "@/lib/hooks/useInvoices";
 
 interface PoolData {
   workers: {
@@ -109,6 +108,10 @@ interface HostingRevenueData {
   hostingRevenue: number;
 }
 
+interface HardwareRevenueData {
+  hardwareRevenue: number;
+}
+
 export default function AdminDashboard() {
   const router = useRouter();
   const theme = useTheme();
@@ -195,26 +198,37 @@ export default function AdminDashboard() {
     ? hostingRevenueData.hostingRevenue - vendorInvoicesTotalAmount
     : 0;
 
-  // Hardware Revenue - all Paid hardware sales invoices
-  const { invoices: hardwareSalesInvoices, loading: hardwareRevenueLoading } =
-    useInvoices(1, 100000, undefined, "PAID", "HARDWARE_SALES");
-  const hardwareRevenue = hardwareSalesInvoices.reduce(
-    (sum: number, invoice: { totalAmount: number }) =>
-      sum + Number(invoice.totalAmount),
-    0,
-  );
+  const { data: hardwareRevenueData, isLoading: hardwareRevenueLoading } =
+    useQuery<HardwareRevenueData>({
+      queryKey: ["hardwareRevenue"],
+      queryFn: async () => {
+        const response = await fetch("/api/cost-payments/hardwareRevenue");
 
-  // Hardware Cost - all Paid hardware purchase invoices
-  const {
-    hardwarePurchases: paidHardwarePurchases,
-    loading: hardwareCostLoading,
-  } = useHardwarePurchases(1, 100000, "Paid");
-  const hardwareCost = paidHardwarePurchases.reduce(
+        if (!response.ok) {
+          throw new Error("Failed to fetch hardware revenue");
+        }
+
+        const data = await response.json();
+
+        if (!data.success) {
+          throw new Error(data.error || "Failed to fetch hardware revenue");
+        }
+
+        return data;
+      },
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      retry: 2,
+    });
+
+  const { hardwarePurchases } = useHardwarePurchases(1, 100000, undefined);
+  const hardwarePurchasesTotalAmount = hardwarePurchases.reduce(
     (sum, invoice) => sum + Number(invoice.totalAmount),
     0,
   );
 
-  const hardwareProfit = hardwareRevenue - hardwareCost;
+  const hardwareProfit = hardwareRevenueData?.hardwareRevenue
+    ? hardwareRevenueData.hardwareRevenue - hardwarePurchasesTotalAmount
+    : 0;
 
   // Get pool stats based on poolMode
   const getPoolStats = (mode: "total" | "luxor" | "braiins") => {
@@ -276,6 +290,9 @@ export default function AdminDashboard() {
       "Hosting Revenue (Electricity)",
       "Hosting Cost",
       "Hosting Profit",
+      "Hardware Revenue",
+      "Hardware Cost",
+      "Hardware Profit",
       "Positive Customer Balance",
       "Negative Customer Balance",
       "Positive Balance Customers",
@@ -305,8 +322,7 @@ export default function AdminDashboard() {
     loading ||
     customerBalanceLoading ||
     hostingRevenueLoading ||
-    hardwareRevenueLoading ||
-    hardwareCostLoading
+    hardwareRevenueLoading
   ) {
     return (
       <Box
@@ -722,23 +738,23 @@ export default function AdminDashboard() {
             type="currency"
           />
 
-          {/* Hardware Revenue - all Paid hardware sales invoices */}
+          {/* Hardware Revenue - From Cost Payments (HARDWARE_SALES payments) */}
           <AdminValueCard
             title="Hardware Revenue"
             borderColor="#757575"
-            value={hardwareRevenue}
+            value={hardwareRevenueData?.hardwareRevenue ?? 0}
             type="currency"
           />
 
-          {/* Hardware Cost - all Paid hardware purchase invoices */}
+          {/* Hardware Cost - From Hardware Purchase Invoices */}
           <AdminValueCard
             title="Hardware Cost"
             borderColor="#757575"
-            value={hardwareCost}
+            value={hardwarePurchasesTotalAmount}
             type="currency"
           />
 
-          {/* Hardware Profit - revenue minus cost */}
+          {/* Hardware Profit - Hardware Revenue minus Hardware Cost */}
           <AdminValueCard
             title="Hardware Profit"
             borderColor="#757575"

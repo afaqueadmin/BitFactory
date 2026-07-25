@@ -90,7 +90,10 @@ export async function POST(
         userId: invoice.userId,
         invoiceId: id,
         amount: amountPaid,
-        type: "PAYMENT",
+        type:
+          invoice.invoiceType === "HARDWARE_SALES"
+            ? "HARDWARE_SALES"
+            : "PAYMENT",
         consumption: 0,
         narration: notes || null,
       },

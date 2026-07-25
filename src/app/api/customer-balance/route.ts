@@ -35,6 +35,7 @@ export async function GET(request: NextRequest) {
     // Query cost_payments table and aggregate by userId
     const costPayments = await prisma.costPayment.groupBy({
       by: ["userId"],
+      where: { type: { not: "HARDWARE_SALES" } },
       _sum: {
         amount: true,
       },

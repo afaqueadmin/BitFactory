@@ -586,6 +586,7 @@ enum PaymentType {
   PAYMENT
   ELECTRICITY_CHARGES
   ADJUSTMENT
+  HARDWARE_SALES
 }
 
 enum InvoiceStatus {

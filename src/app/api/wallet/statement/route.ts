@@ -104,11 +104,12 @@ export async function GET(request: NextRequest) {
     let runningBalance = 0;
 
     for (const payment of allPayments) {
-      if (payment.type === "PAYMENT") {
-        runningBalance += Number(payment.amount);
-      } else if (payment.type === "ELECTRICITY_CHARGES") {
-        runningBalance += Number(payment.amount);
-      } else if (payment.type === "ADJUSTMENT") {
+      if (
+        payment.type === "PAYMENT" ||
+        payment.type === "ELECTRICITY_CHARGES" ||
+        payment.type === "ADJUSTMENT" ||
+        payment.type === "HARDWARE_SALES"
+      ) {
         runningBalance += Number(payment.amount);
       }
       balanceMap.set(payment.id, runningBalance);
@@ -179,11 +180,15 @@ export async function GET(request: NextRequest) {
               ? "Hosting & electricity charges"
               : payment.type === "ADJUSTMENT"
                 ? "Adjustment"
-                : payment.type;
+                : payment.type === "HARDWARE_SALES"
+                  ? "Hardware sales payment"
+                  : payment.type;
 
         // Format amount with sign
         const amountSign =
-          payment.type === "PAYMENT" || payment.type === "ADJUSTMENT"
+          payment.type === "PAYMENT" ||
+          payment.type === "ADJUSTMENT" ||
+          payment.type === "HARDWARE_SALES"
             ? payment.amount >= 0
               ? "+ "
               : "- "
