@@ -861,6 +861,21 @@ export default function AccountingDashboard() {
               <TableBody>
                 {invoices.map((invoice: InvoiceWithDetails) => {
                   const daysUntilDue = calculateDaysUntilDue(invoice.dueDate);
+                  const showPaidPastDue =
+                    invoice.status === "PAID" &&
+                    invoice.paidDate &&
+                    invoice.dueDate;
+                  const paidPastDue = showPaidPastDue
+                    ? Math.max(
+                        0,
+                        Math.ceil(
+                          // @ts-expect-error - TypeScript is complaining about the check on invoice.paidDate and invoice.dueDate, but we already checked that they exist with showPaidPastDue
+                          (new Date(invoice.paidDate).getTime() -
+                            new Date(invoice.dueDate).getTime()) /
+                            (1000 * 60 * 60 * 24),
+                        ),
+                      )
+                    : null;
                   return (
                     <TableRow key={invoice.id} hover>
                       <TableCell padding="checkbox">
@@ -910,9 +925,7 @@ export default function AccountingDashboard() {
                         <DateDisplay date={invoice.dueDate} format="date" />
                       </TableCell>
                       <TableCell>
-                        {invoice.status === "PAID" &&
-                        invoice.paidDate &&
-                        invoice.dueDate ? (
+                        {showPaidPastDue ? (
                           <Box
                             sx={{
                               display: "inline-flex",
@@ -928,15 +941,7 @@ export default function AccountingDashboard() {
                               whiteSpace: "nowrap",
                             }}
                           >
-                            {Math.max(
-                              0,
-                              Math.ceil(
-                                (new Date(invoice.paidDate).getTime() -
-                                  new Date(invoice.dueDate).getTime()) /
-                                  (1000 * 60 * 60 * 24),
-                              ),
-                            )}{" "}
-                            days
+                            {paidPastDue} {paidPastDue === 1 ? "day" : "days"}
                           </Box>
                         ) : (
                           "-"
