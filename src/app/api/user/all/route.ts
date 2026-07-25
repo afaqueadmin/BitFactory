@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 import { verifyJwtToken } from "@/lib/jwt";
 import { franchiseeUserFilter } from "@/lib/franchiseeScope";
+import { PaymentType } from "@prisma/client";
 
 export async function GET(request: NextRequest) {
   try {
@@ -88,6 +89,11 @@ export async function GET(request: NextRequest) {
           },
         },
         costPayments: {
+          where: {
+            type: {
+              not: PaymentType.HARDWARE_SALES, // Exclude hardware sales from the running balance amount
+            },
+          },
           select: {
             amount: true,
           },
