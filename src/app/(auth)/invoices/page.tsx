@@ -292,15 +292,16 @@ export default function InvoicesPage() {
                         }}
                       >
                         <Typography variant="body2">
-                          {invoice.issuedDate &&
-                            new Date(invoice.issuedDate).toLocaleDateString(
-                              "en-US",
-                              {
-                                year: "numeric",
-                                month: "short",
-                                day: "numeric",
-                              },
-                            )}
+                          {(invoice.issuedDate ||
+                            invoice.invoiceGeneratedDate) &&
+                            new Date(
+                              invoice.issuedDate ||
+                                invoice.invoiceGeneratedDate,
+                            ).toLocaleDateString("en-US", {
+                              year: "numeric",
+                              month: "short",
+                              day: "numeric",
+                            })}
                         </Typography>
                       </TableCell>
                       <TableCell
