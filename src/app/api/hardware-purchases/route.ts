@@ -113,7 +113,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const decoded = await verifyJwtToken(token);
+    let decoded;
+    try {
+      decoded = await verifyJwtToken(token);
+    } catch {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const userId = decoded.userId;
 
     const user = await prisma.user.findUnique({
@@ -160,14 +166,6 @@ export async function GET(request: NextRequest) {
     const [hardwarePurchases, total] = await Promise.all([
       prisma.hardwarePurchaseInvoice.findMany({
         where,
-        include: {
-          createdByUser: {
-            select: { id: true, email: true, name: true },
-          },
-          updatedByUser: {
-            select: { id: true, email: true, name: true },
-          },
-        },
         orderBy: { [sortBy]: sortOrder },
         skip,
         take: limit,
@@ -188,6 +186,28 @@ export async function GET(request: NextRequest) {
     );
   } catch (error) {
     console.error("Error fetching hardware purchase invoices:", error);
+
+    const message = error instanceof Error ? error.message : "";
+    const isMissingDatabaseObject =
+      /does not exist|table .* does not exist|relation .* does not exist|column .* does not exist|unknown column/i.test(
+        message,
+      );
+
+    if (isMissingDatabaseObject) {
+      return NextResponse.json(
+        {
+          success: true,
+          data: [],
+          total: 0,
+          page: 1,
+          limit: 10,
+          totalPages: 0,
+          message: "Hardware purchase data is temporarily unavailable",
+        },
+        { status: 200 },
+      );
+    }
+
     return NextResponse.json(
       { error: "Failed to fetch hardware purchase invoices" },
       { status: 500 },

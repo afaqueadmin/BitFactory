@@ -47,22 +47,6 @@ export async function GET(
     }
     const invoice = await prisma.hardwarePurchaseInvoice.findUnique({
       where: { id: invoiceId },
-      include: {
-        createdByUser: {
-          select: {
-            id: true,
-            email: true,
-            name: true,
-          },
-        },
-        updatedByUser: {
-          select: {
-            id: true,
-            email: true,
-            name: true,
-          },
-        },
-      },
     });
 
     if (!invoice) {
@@ -223,22 +207,6 @@ export async function PUT(
     const updatedInvoice = await prisma.hardwarePurchaseInvoice.update({
       where: { id: invoiceId },
       data: updateData,
-      include: {
-        createdByUser: {
-          select: {
-            id: true,
-            email: true,
-            name: true,
-          },
-        },
-        updatedByUser: {
-          select: {
-            id: true,
-            email: true,
-            name: true,
-          },
-        },
-      },
     });
 
     return NextResponse.json(
