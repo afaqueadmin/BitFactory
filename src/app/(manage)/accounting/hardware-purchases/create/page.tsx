@@ -23,7 +23,6 @@ export interface HardwarePurchaseFormData {
   vendorName: string;
   hardwareDescription: string;
   billingDate: string;
-  issuedDate: string;
   dueDate: string;
   quantity: number | string;
   unitPrice: number | string;
@@ -38,7 +37,6 @@ export default function CreateHardwarePurchasePage() {
     vendorName: "",
     hardwareDescription: "",
     billingDate: new Date().toISOString().split("T")[0],
-    issuedDate: "",
     dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
       .toISOString()
       .split("T")[0],
@@ -130,7 +128,6 @@ export default function CreateHardwarePurchasePage() {
         vendorName: formData.vendorName,
         hardwareDescription: formData.hardwareDescription,
         billingDate: formData.billingDate,
-        issuedDate: formData.issuedDate || undefined,
         dueDate: formData.dueDate,
         quantity: Number(formData.quantity) || 0,
         unitPrice: Number(formData.unitPrice) || 0,
@@ -224,7 +221,7 @@ export default function CreateHardwarePurchasePage() {
               disabled={saving}
             />
 
-            {/* Row 3: Billing Date and Issue Date */}
+            {/* Row 3: Billing Date and Due Date */}
             <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
               <TextField
                 fullWidth
@@ -241,32 +238,18 @@ export default function CreateHardwarePurchasePage() {
               />
               <TextField
                 fullWidth
-                label="Issue Date"
-                name="issuedDate"
+                label="Due Date"
+                name="dueDate"
                 type="date"
-                value={formData.issuedDate}
+                value={formData.dueDate}
                 onChange={handleInputChange}
+                required
                 disabled={saving}
                 slotProps={{
                   inputLabel: { shrink: true },
                 }}
               />
             </Stack>
-
-            {/* Row 4: Due Date */}
-            <TextField
-              fullWidth
-              label="Due Date"
-              name="dueDate"
-              type="date"
-              value={formData.dueDate}
-              onChange={handleInputChange}
-              required
-              disabled={saving}
-              slotProps={{
-                inputLabel: { shrink: true },
-              }}
-            />
 
             {/* Row 4: Quantity and Unit Price */}
             <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>

@@ -8,7 +8,6 @@ interface CreateHardwarePurchaseRequest {
   vendorName: string;
   hardwareDescription: string;
   billingDate: string;
-  issuedDate?: string;
   dueDate: string;
   quantity: number;
   unitPrice: number;
@@ -78,7 +77,6 @@ export async function POST(request: NextRequest) {
         vendorName: body.vendorName,
         hardwareDescription: body.hardwareDescription,
         billingDate: new Date(body.billingDate),
-        issuedDate: body.issuedDate ? new Date(body.issuedDate) : null,
         dueDate: new Date(body.dueDate),
         quantity: body.quantity,
         unitPrice: new Decimal(body.unitPrice),
