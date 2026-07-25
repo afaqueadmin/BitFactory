@@ -7,6 +7,7 @@ export interface VendorInvoice {
   paidDate: Date | null;
   dueDate: Date;
   totalMiners: number;
+  isDeleted: boolean;
   unitPrice: number;
   miscellaneousCharges: number;
   totalAmount: number;

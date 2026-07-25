@@ -27,21 +27,26 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const costPayments = await prisma.costPayment.aggregate({
+    // Hosting revenue is invoice-based: sum totalAmount of all ELECTRICITY_CHARGES
+    // invoices that aren't CANCELLED/REFUNDED (DRAFT/ISSUED/OVERDUE/PAID all count).
+    const invoices = await prisma.invoice.aggregate({
       where: {
-        type: {
-          in: ["ELECTRICITY_CHARGES", "ADJUSTMENT"],
+        invoiceType: "ELECTRICITY_CHARGES",
+        status: {
+          in: ["DRAFT", "ISSUED", "OVERDUE", "PAID"],
         },
       },
       _sum: {
-        amount: true,
+        totalAmount: true,
       },
     });
 
     return NextResponse.json(
       {
         success: true,
-        hostingRevenue: -1 * (costPayments._sum.amount || 0), // Negate the sum to reflect revenue (since costs are negative)
+        hostingRevenue: invoices._sum.totalAmount
+          ? Number(invoices._sum.totalAmount)
+          : 0,
       },
       { status: 200 },
     );

@@ -189,10 +189,11 @@ export default function AdminDashboard() {
     });
 
   const { vendorInvoices } = useVendorInvoices(1, 100000, undefined);
-  const vendorInvoicesTotalAmount = vendorInvoices.reduce(
-    (sum, invoice) => sum + Number(invoice.totalAmount),
-    0,
-  );
+  const vendorInvoicesTotalAmount = vendorInvoices
+    .filter(
+      (invoice) => invoice.paymentStatus !== "Cancelled" && !invoice.isDeleted,
+    )
+    .reduce((sum, invoice) => sum + Number(invoice.totalAmount), 0);
 
   const hostingProfit = hostingRevenueData?.hostingRevenue
     ? hostingRevenueData.hostingRevenue - vendorInvoicesTotalAmount
@@ -287,7 +288,7 @@ export default function AdminDashboard() {
       "Monthly Revenue (30 days)",
       "Total Customer Balance",
       "Total Customers",
-      "Hosting Revenue (Electricity)",
+      "Hosting and Colocation",
       "Hosting Cost",
       "Hosting Profit",
       "Hardware Revenue",
@@ -714,9 +715,9 @@ export default function AdminDashboard() {
 
           {/* === RESERVED FOR FUTURE LUXOR ENDPOINTS === */}
 
-          {/* Hosting Revenue - From Cost Payments */}
+          {/* Hosting and Colocation - From ELECTRICITY_CHARGES invoices (DRAFT/ISSUED/OVERDUE/PAID) */}
           <AdminValueCard
-            title="Hosting Revenue (Electricity)"
+            title="Hosting and Colocation"
             borderColor="#757575"
             value={hostingRevenueData?.hostingRevenue ?? 0}
             type="currency"
