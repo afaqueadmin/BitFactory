@@ -8,6 +8,7 @@ import AdminValueCard from "@/components/admin/AdminValueCard";
 import { Box, CircularProgress, Alert, useTheme } from "@mui/material";
 import { useVendorInvoices } from "@/lib/hooks/useVendorInvoices";
 import { useHardwarePurchases } from "@/lib/hooks/useHardwarePurchases";
+import { useInvoices, InvoiceWithDetails } from "@/lib/hooks/useInvoices";
 
 interface PoolData {
   workers: {
@@ -231,6 +232,23 @@ export default function AdminDashboard() {
     ? hardwareRevenueData.hardwareRevenue - hardwarePurchasesTotalAmount
     : 0;
 
+  const { invoices: hardwareSalesInvoices } = useInvoices(
+    1,
+    100000,
+    undefined,
+    undefined,
+    "HARDWARE_SALES",
+  );
+  const hardwareRevenuePending = hardwareSalesInvoices
+    .filter((invoice: InvoiceWithDetails) =>
+      ["DRAFT", "ISSUED", "OVERDUE"].includes(invoice.status),
+    )
+    .reduce(
+      (sum: number, invoice: InvoiceWithDetails) =>
+        sum + Number(invoice.totalAmount),
+      0,
+    );
+
   // Get pool stats based on poolMode
   const getPoolStats = (mode: "total" | "luxor" | "braiins") => {
     if (mode === "braiins" && stats?.braiins) {
@@ -292,6 +310,7 @@ export default function AdminDashboard() {
       "Hosting Cost",
       "Hosting Profit",
       "Hardware Revenue",
+      "Hardware Revenue Pending",
       "Hardware Cost",
       "Hardware Profit",
       "Positive Customer Balance",
@@ -744,6 +763,14 @@ export default function AdminDashboard() {
             title="Hardware Revenue"
             borderColor="#757575"
             value={hardwareRevenueData?.hardwareRevenue ?? 0}
+            type="currency"
+          />
+
+          {/* Hardware Revenue Pending - HARDWARE_SALES invoices not yet paid (DRAFT/ISSUED/OVERDUE) */}
+          <AdminValueCard
+            title="Hardware Revenue Pending"
+            borderColor="#757575"
+            value={hardwareRevenuePending}
             type="currency"
           />
 

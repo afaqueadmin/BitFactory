@@ -76,7 +76,9 @@ export default function HardwareSalesDashboard() {
   const totalOutstanding = invoices
     .filter(
       (inv: InvoiceWithDetails) =>
-        inv.status !== "PAID" && inv.status !== "CANCELLED",
+        inv.status !== "PAID" &&
+        inv.status !== "CANCELLED" &&
+        inv.status !== "REFUNDED",
     )
     .reduce(
       (sum: number, inv: InvoiceWithDetails) => sum + Number(inv.totalAmount),
