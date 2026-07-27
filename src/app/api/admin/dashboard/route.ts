@@ -88,6 +88,11 @@ interface DashboardStats {
     totalMinedRevenue: number; // BTC from Luxor
     braiinsMinedRevenue?: number; // BTC from Braiins
     combinedMinedRevenue?: number; // Combined BTC from all pools
+    // Self-mining (segment = SELF_MINING) stats
+    selfMiningRevenueBtc: number; // BTC mined, all-time, Luxor
+    selfMiningRevenueUsd: number; // selfMiningRevenueBtc * current BTC price
+    selfMiningHostingCost: number; // USD, sum of issued electricity invoices
+    selfMiningProfitUsd: number; // selfMiningRevenueUsd - selfMiningHostingCost
   };
   // Status
   warnings: string[];
@@ -376,6 +381,95 @@ async function fetchTotalRevenue(
     console.error("[Admin Dashboard] Error fetching workers:", error);
   }
   return null;
+}
+
+/**
+ * Helper: Fetch all-time BTC revenue for a specific set of Luxor
+ * subaccounts (as opposed to fetchTotalRevenue, which is site-wide).
+ * Used for the self-mining revenue card.
+ */
+async function fetchRevenueForSubaccountNames(
+  request: NextRequest,
+  subaccountNames: string[],
+): Promise<{ revenue: number } | null> {
+  if (subaccountNames.length === 0) {
+    return { revenue: 0 };
+  }
+
+  try {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const endDate = new Intl.DateTimeFormat("en-CA").format(yesterday);
+
+    const url = new URL("/api/luxor", request.url);
+    url.searchParams.set("endpoint", "revenue");
+    url.searchParams.set("currency", "BTC");
+    url.searchParams.set("start_date", "2025-01-01");
+    url.searchParams.set("end_date", endDate);
+    url.searchParams.set("subaccount_name", subaccountNames.join(","));
+
+    const luxorRequest = new NextRequest(url, {
+      method: "GET",
+      headers: request.headers,
+    });
+
+    const response = await fetch(luxorRequest);
+
+    if (!response.ok) {
+      console.error(
+        "[Admin Dashboard] Self-mining revenue fetch failed:",
+        response.status,
+      );
+      return null;
+    }
+
+    const result = await response.json();
+    if (result.success && result.data) {
+      const data = result.data;
+      const revenueArray = data.revenue as Array<{
+        date_time: string;
+        revenue: { revenue: number };
+      }>;
+      return {
+        revenue: revenueArray.reduce(
+          (sum, dailyRevenueItem) => sum + dailyRevenueItem.revenue.revenue,
+          0,
+        ),
+      };
+    }
+  } catch (error) {
+    console.error(
+      "[Admin Dashboard] Error fetching self-mining revenue:",
+      error,
+    );
+  }
+  return null;
+}
+
+/**
+ * Helper: Fetch the current BTC/USD price (same Binance ticker used by
+ * useBitcoinLivePrice on the client) for converting self-mining BTC
+ * revenue to USD.
+ */
+async function fetchCurrentBtcPriceUsd(): Promise<number | null> {
+  try {
+    const response = await fetch(
+      "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT",
+    );
+    if (!response.ok) {
+      console.error(
+        "[Admin Dashboard] BTC price fetch failed:",
+        response.status,
+      );
+      return null;
+    }
+    const data = await response.json();
+    const price = parseFloat(data.price);
+    return Number.isFinite(price) ? price : null;
+  } catch (error) {
+    console.error("[Admin Dashboard] Error fetching BTC price:", error);
+    return null;
+  }
 }
 
 /**
@@ -930,6 +1024,56 @@ export async function GET(request: NextRequest) {
       luxorStats.minedRevenue = 0;
     }
 
+    // ========== SELF MINING STATS (segment = SELF_MINING) ==========
+    let selfMiningRevenueBtc = 0;
+    let selfMiningRevenueUsd = 0;
+    let selfMiningHostingCost = 0;
+    let selfMiningProfitUsd = 0;
+    try {
+      const selfMiningUsers = await prisma.user.findMany({
+        where: {
+          segment: "SELF_MINING",
+          isDeleted: false,
+          luxorSubaccountName: { not: null },
+        },
+        select: { luxorSubaccountName: true },
+      });
+      const selfMiningSubaccountNames = selfMiningUsers
+        .map((u) => u.luxorSubaccountName)
+        .filter((name): name is string => !!name);
+
+      const [selfMiningRevenueStats, btcPriceUsd, hostingCostSum] =
+        await Promise.all([
+          fetchRevenueForSubaccountNames(request, selfMiningSubaccountNames),
+          fetchCurrentBtcPriceUsd(),
+          prisma.invoice.aggregate({
+            where: {
+              invoiceType: "ELECTRICITY_CHARGES",
+              status: { not: "DRAFT" },
+              user: { segment: "SELF_MINING", isDeleted: false },
+            },
+            _sum: { totalAmount: true },
+          }),
+        ]);
+
+      selfMiningRevenueBtc = selfMiningRevenueStats?.revenue || 0;
+      selfMiningHostingCost = Number(hostingCostSum._sum.totalAmount || 0);
+      if (btcPriceUsd) {
+        selfMiningRevenueUsd = selfMiningRevenueBtc * btcPriceUsd;
+      } else {
+        warnings.push(
+          "Failed to fetch live BTC price - Self Mining Revenue (USD) and Profit may be inaccurate",
+        );
+      }
+      selfMiningProfitUsd = selfMiningRevenueUsd - selfMiningHostingCost;
+    } catch (error) {
+      console.error(
+        "[Admin Dashboard] Error computing self-mining stats:",
+        error,
+      );
+      warnings.push("Failed to compute self-mining statistics");
+    }
+
     // ========== BRAIINS STATS (Mining Pool - Aggregated across all customers) ==========
     let braiinsStats:
       | (PoolData & {
@@ -1113,6 +1257,10 @@ export async function GET(request: NextRequest) {
         combinedMinedRevenue: combinedStats
           ? combinedStats.minedRevenue
           : revenueStats?.revenue || 0,
+        selfMiningRevenueBtc,
+        selfMiningRevenueUsd,
+        selfMiningHostingCost,
+        selfMiningProfitUsd,
       },
       warnings,
     };

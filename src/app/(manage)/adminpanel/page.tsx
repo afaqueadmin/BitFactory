@@ -88,6 +88,10 @@ interface DashboardStats {
     totalMinedRevenue: number;
     braiinsMinedRevenue?: number;
     combinedMinedRevenue?: number;
+    selfMiningRevenueBtc: number;
+    selfMiningRevenueUsd: number;
+    selfMiningHostingCost: number;
+    selfMiningProfitUsd: number;
   };
   warnings: string[];
 }
@@ -836,6 +840,42 @@ export default function AdminDashboard() {
             borderColor="#757575"
             value={customerBalanceData?.negativeCustomerCount ?? 0}
             onClick={() => router.push("/customers/overview?balanceFilter=< 0")}
+          />
+
+          {/* Self Mining Revenue (BTC) - Luxor revenue for SELF_MINING segment users, all-time */}
+          <AdminValueCard
+            title="Self Mining Revenue (BTC)"
+            borderColor="#757575"
+            value={stats?.financial.selfMiningRevenueBtc ?? 0}
+            type="BTC"
+            infoText="All-time BTC mined (since 2025-01-01) on Luxor for customers with segment = SELF_MINING (e.g. Higgs Self Mining)."
+          />
+
+          {/* Self Mining Revenue (USD) - BTC revenue converted at current market price */}
+          <AdminValueCard
+            title="Self Mining Revenue (USD)"
+            borderColor="#757575"
+            value={stats?.financial.selfMiningRevenueUsd ?? 0}
+            type="currency"
+            infoText="Self Mining Revenue (BTC) multiplied by the current BTC/USD market price (live from Binance)."
+          />
+
+          {/* Self Mining Hosting Cost - electricity invoices issued to SELF_MINING users */}
+          <AdminValueCard
+            title="Self Mining Hosting Cost"
+            borderColor="#757575"
+            value={stats?.financial.selfMiningHostingCost ?? 0}
+            type="currency"
+            infoText="Sum of all issued Electricity Charges invoices (status not Draft) for customers with segment = SELF_MINING. Excludes Hardware Sales invoices."
+          />
+
+          {/* Self Mining Profit - USD revenue minus hosting cost */}
+          <AdminValueCard
+            title="Self Mining Profit"
+            borderColor="#757575"
+            value={stats?.financial.selfMiningProfitUsd ?? 0}
+            type="currency"
+            infoText="Self Mining Revenue (USD) minus Self Mining Hosting Cost."
           />
         </Box>
 
