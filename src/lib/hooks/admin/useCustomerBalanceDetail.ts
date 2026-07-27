@@ -32,16 +32,54 @@ interface CustomerBalanceDetailResponse {
   };
 }
 
+export interface CustomerBalanceDetailFilters {
+  type?: "PAYMENT" | "ELECTRICITY_CHARGES" | "ADJUSTMENT";
+  customerId?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
+export interface CustomerBalanceDetailSort {
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
+}
+
 export const useCustomerBalanceDetail = (
   page: number = 0,
   pageSize: number = 25,
+  filters: CustomerBalanceDetailFilters = {},
+  sort: CustomerBalanceDetailSort = {},
 ) => {
+  const { type, customerId, startDate, endDate } = filters;
+  const { sortBy, sortOrder } = sort;
+
   const { data, isLoading, error, refetch } =
     useQuery<CustomerBalanceDetailResponse>({
-      queryKey: ["adminCustomerBalanceDetail", page, pageSize],
+      queryKey: [
+        "adminCustomerBalanceDetail",
+        page,
+        pageSize,
+        type,
+        customerId,
+        startDate,
+        endDate,
+        sortBy,
+        sortOrder,
+      ],
       queryFn: async () => {
+        const params = new URLSearchParams({
+          page: page.toString(),
+          pageSize: pageSize.toString(),
+        });
+        if (type) params.set("type", type);
+        if (customerId) params.set("customerId", customerId);
+        if (startDate) params.set("startDate", startDate);
+        if (endDate) params.set("endDate", endDate);
+        if (sortBy) params.set("sortBy", sortBy);
+        if (sortOrder) params.set("sortOrder", sortOrder);
+
         const response = await fetch(
-          `/api/admin/customer-balance?page=${page}&pageSize=${pageSize}`,
+          `/api/admin/customer-balance?${params.toString()}`,
         );
 
         if (!response.ok) {
