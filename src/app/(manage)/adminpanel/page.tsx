@@ -602,6 +602,7 @@ export default function AdminDashboard() {
             borderColor="#757575"
             value={stats?.financial.monthlyRevenue ?? 0}
             type="currency"
+            onClick={() => router.push("/admin/monthly-revenue")}
           />
 
           {/* Total Customer Balance, from our database */}
@@ -610,6 +611,7 @@ export default function AdminDashboard() {
             borderColor="#757575"
             value={stats?.financial.totalCustomerBalance ?? 0}
             type="currency"
+            onClick={() => router.push("/admin/customer-balance")}
           />
 
           {/* Total Mined Revenue - Available from both Luxor and Braiins */}
