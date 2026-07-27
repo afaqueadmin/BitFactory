@@ -11,8 +11,10 @@ import {
   CardContent,
   Divider,
   Alert,
+  CircularProgress,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import DownloadIcon from "@mui/icons-material/Download";
 import { useCustomerBalanceDetail } from "@/lib/hooks/admin/useCustomerBalanceDetail";
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
 import CostPaymentTransactionsTable from "@/components/admin/CostPaymentTransactionsTable";
@@ -21,9 +23,42 @@ export default function CustomerBalanceDetailPage() {
   const router = useRouter();
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(25);
+  const [downloadLoading, setDownloadLoading] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
 
   const { summary, transactions, pagination, loading, error } =
     useCustomerBalanceDetail(page, pageSize);
+
+  const handleDownloadPdf = async () => {
+    try {
+      setDownloadLoading(true);
+      setDownloadError(null);
+
+      const response = await fetch("/api/admin/customer-balance/pdf", {
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to generate PDF");
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `customer-balance-${new Date().toISOString().slice(0, 10)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (err) {
+      setDownloadError(
+        err instanceof Error ? err.message : "Failed to download PDF",
+      );
+    } finally {
+      setDownloadLoading(false);
+    }
+  };
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
@@ -48,6 +83,11 @@ export default function CustomerBalanceDetailPage() {
       {error && (
         <Alert severity="error" sx={{ mb: 3 }}>
           {error}
+        </Alert>
+      )}
+      {downloadError && (
+        <Alert severity="error" sx={{ mb: 3 }}>
+          {downloadError}
         </Alert>
       )}
 
@@ -111,9 +151,28 @@ export default function CustomerBalanceDetailPage() {
         </CardContent>
       </Card>
 
-      <Typography variant="h6" sx={{ mb: 2 }}>
-        Transactions ({pagination?.totalCount ?? 0})
-      </Typography>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          mb: 2,
+        }}
+      >
+        <Typography variant="h6">
+          Transactions ({pagination?.totalCount ?? 0})
+        </Typography>
+        <Button
+          startIcon={
+            downloadLoading ? <CircularProgress size={16} /> : <DownloadIcon />
+          }
+          variant="outlined"
+          onClick={handleDownloadPdf}
+          disabled={downloadLoading}
+        >
+          {downloadLoading ? "Generating PDF..." : "Download PDF"}
+        </Button>
+      </Box>
       <CostPaymentTransactionsTable
         transactions={transactions}
         loading={loading}
