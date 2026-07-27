@@ -24,7 +24,7 @@ import {
   Customer,
 } from "@/lib/hooks/useInvoices";
 
-export default function CreateHardwarePurchaseInvoicePage() {
+export default function CreateHardwareSalesInvoicePage() {
   const router = useRouter();
   const { create: createInvoice, error: createError } = useCreateInvoice();
   const { customers, loading: customersLoading } = useCustomers();
@@ -34,11 +34,12 @@ export default function CreateHardwarePurchaseInvoicePage() {
     totalMiners: 0,
     unitPrice: 0,
     totalAmount: 0,
+    issueDate: new Date().toISOString().split("T")[0],
     dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
       .toISOString()
       .split("T")[0],
     status: InvoiceStatus.DRAFT,
-    invoiceType: "HARDWARE_PURCHASE",
+    invoiceType: "HARDWARE_SALES",
     hardwareId: "",
   });
 
@@ -144,14 +145,6 @@ export default function CreateHardwarePurchaseInvoicePage() {
         throw new Error("Quantity and unit price must be greater than 0");
       }
 
-      // Validate due date is not in the past
-      const selectedDate = new Date(formData.dueDate);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0); // Reset time to start of day for fair comparison
-      if (selectedDate < today) {
-        throw new Error("Due date must be in the future (not a past date)");
-      }
-
       // Call API to create invoice
       await createInvoice({
         customerId: formData.customerId,
@@ -161,10 +154,11 @@ export default function CreateHardwarePurchaseInvoicePage() {
         status: formData.status,
         invoiceType: formData.invoiceType,
         hardwareId: formData.hardwareId || undefined,
+        invoiceGeneratedDate: formData.issueDate || undefined,
       });
 
-      // Redirect to hardware-purchase dashboard
-      router.push("/hardware-purchase");
+      // Redirect to hardware-sales dashboard
+      router.push("/hardware-sales");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create invoice");
     } finally {
@@ -175,15 +169,15 @@ export default function CreateHardwarePurchaseInvoicePage() {
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
       <Stack direction="row" spacing={2} sx={{ mb: 4 }}>
-        <Link href="/hardware-purchase">
+        <Link href="/hardware-sales">
           <Button startIcon={<ArrowBackIcon />}>
-            Back to Hardware Purchase Dashboard
+            Back to Hardware Sales Dashboard
           </Button>
         </Link>
         <Box flex={1}>
-          <h1 style={{ margin: 0 }}>Create New Hardware Purchase Invoice</h1>
+          <h1 style={{ margin: 0 }}>Create New Hardware Sales Invoice</h1>
           <p style={{ margin: "8px 0 0 0", color: "#666" }}>
-            Create a new hardware purchase invoice and send it to a customer
+            Create a new hardware sales invoice and send it to a customer
           </p>
         </Box>
       </Stack>
@@ -322,6 +316,17 @@ export default function CreateHardwarePurchaseInvoicePage() {
                 Additional Information
               </h3>
               <Stack spacing={2}>
+                <TextField
+                  label="Issue Date"
+                  name="issueDate"
+                  type="date"
+                  value={formData.issueDate}
+                  onChange={handleInputChange}
+                  fullWidth
+                  InputLabelProps={{ shrink: true }}
+                  helperText="When the invoice was issued (defaults to today)"
+                  required
+                />
                 <TextField
                   label="Due Date"
                   name="dueDate"

@@ -29,6 +29,7 @@ async function createUser() {
         email: userEmail,
         name: userName,
         password: hashedPassword,
+        invoicedAmount: 4250,
       },
     });
 

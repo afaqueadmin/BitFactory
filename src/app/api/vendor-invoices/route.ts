@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
       !body.invoiceNumber ||
       !body.billingDate ||
       !body.dueDate ||
-      body.totalMiners <= 0 ||
+      body.totalMiners < 0 ||
       body.unitPrice < 0
     ) {
       return NextResponse.json(
@@ -126,6 +126,8 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "10");
     const paymentStatus = searchParams.get("paymentStatus");
+    const sortByParam = searchParams.get("sortBy");
+    const sortOrderParam = searchParams.get("sortOrder");
 
     const skip = (page - 1) * limit;
 
@@ -133,6 +135,20 @@ export async function GET(request: NextRequest) {
     if (paymentStatus) {
       where.paymentStatus = paymentStatus;
     }
+
+    const sortableFields = [
+      "invoiceNumber",
+      "totalAmount",
+      "paymentStatus",
+      "billingDate",
+      "paidDate",
+      "dueDate",
+      "createdAt",
+    ];
+    const sortBy = sortableFields.includes(sortByParam || "")
+      ? (sortByParam as string)
+      : "createdAt";
+    const sortOrder = sortOrderParam === "asc" ? "asc" : "desc";
 
     const [vendorInvoices, total] = await Promise.all([
       prisma.vendorInvoice.findMany({
@@ -145,7 +161,7 @@ export async function GET(request: NextRequest) {
             select: { id: true, email: true, name: true },
           },
         },
-        orderBy: { createdAt: "desc" },
+        orderBy: { [sortBy]: sortOrder },
         skip,
         take: limit,
       }),

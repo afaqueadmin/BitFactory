@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
 import { WorkersResponse, SummaryResponse } from "@/lib/luxor";
 import { BraiinsClient } from "@/lib/braiins";
+import { franchiseeUserFilter } from "@/lib/franchiseeScope";
 
 interface PoolData {
   workers: {
@@ -104,7 +105,10 @@ interface DashboardStats {
  * context properly. Server-side internal fetches with manually set cookies don't work
  * reliably on production.
  */
-async function getAllSubaccountNames(request: NextRequest): Promise<string[]> {
+async function getAllSubaccountNames(
+  request: NextRequest,
+  currentUser: { id: string; role: string },
+): Promise<string[]> {
   try {
     console.log(
       "[Admin Dashboard] Fetching accessible subaccounts from Luxor API...",
@@ -157,6 +161,7 @@ async function getAllSubaccountNames(request: NextRequest): Promise<string[]> {
           luxorSubaccountName: {
             not: null,
           },
+          ...franchiseeUserFilter(currentUser),
         },
         select: {
           luxorSubaccountName: true,
@@ -712,10 +717,14 @@ export async function GET(request: NextRequest) {
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { role: true },
+      select: { id: true, role: true },
     });
 
-    if (user?.role !== "ADMIN" && user?.role !== "SUPER_ADMIN") {
+    if (
+      user?.role !== "ADMIN" &&
+      user?.role !== "SUPER_ADMIN" &&
+      user?.role !== "FRANCHISEE"
+    ) {
       return NextResponse.json(
         { error: "Only administrators can access dashboard stats" },
         { status: 403 },
@@ -727,7 +736,7 @@ export async function GET(request: NextRequest) {
     // Fetch subaccount names once to reuse for all Luxor queries
     let subaccountNames: string[] = [];
     try {
-      subaccountNames = await getAllSubaccountNames(request);
+      subaccountNames = await getAllSubaccountNames(request, user);
     } catch (error) {
       console.error(
         "[Admin Dashboard] Error fetching subaccount names:",
@@ -825,6 +834,7 @@ export async function GET(request: NextRequest) {
             contains: "_test",
           },
         },
+        ...franchiseeUserFilter(user),
       },
       include: {
         miners: true,
@@ -833,6 +843,7 @@ export async function GET(request: NextRequest) {
 
     // Fetch customer balance information
     const totalCustomerBalance = await prisma.costPayment.aggregate({
+      where: { type: { not: "HARDWARE_SALES" } },
       _sum: {
         amount: true,
       },

@@ -67,6 +67,7 @@ export async function GET(request: NextRequest) {
       console.log(`[Hashprice History API] User ${userId} has no miners`);
       return NextResponse.json(
         {
+          success: true,
           data: [],
           message: "No miners assigned",
         },
@@ -75,13 +76,14 @@ export async function GET(request: NextRequest) {
     }
 
     // Step 2: Check if user has miners on Luxor pool
-    const hasLuxorMiners = miners.some(m => m.pool?.name === "Luxor");
+    const hasLuxorMiners = miners.some((m) => m.pool?.name === "Luxor");
     if (!hasLuxorMiners) {
       console.log(
         `[Hashprice History API] User ${userId} has no miners on Luxor pool`,
       );
       return NextResponse.json(
         {
+          success: true,
           data: [],
           message: "No miners on Luxor pool",
         },
@@ -117,6 +119,7 @@ export async function GET(request: NextRequest) {
       );
       return NextResponse.json(
         {
+          success: true,
           data: [],
           message: "No Luxor pool credentials configured",
         },
@@ -184,7 +187,7 @@ export async function GET(request: NextRequest) {
     };
 
     // Helper to fetch data in chunks due to Luxor API 60-day range limit
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     const fetchDataInChunks = async (
       luxorEndDate: Date,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -201,7 +204,7 @@ export async function GET(request: NextRequest) {
       while (currentEnd >= hardStart) {
         const chunkStart = new Date(currentEnd);
         chunkStart.setDate(chunkStart.getDate() - MAX_DAYS_PER_REQUEST + 1);
-        
+
         // Don't go earlier than Jan 1
         if (chunkStart < hardStart) {
           chunkStart.setTime(hardStart.getTime());
@@ -209,7 +212,7 @@ export async function GET(request: NextRequest) {
 
         const chunkStartStr = formatDate(chunkStart);
         const chunkEndStr = formatDate(currentEnd);
-        
+
         console.log(
           `[Hashprice History API] Fetching chunk: ${chunkStartStr} to ${chunkEndStr}`,
         );
@@ -283,7 +286,7 @@ export async function GET(request: NextRequest) {
     ): Promise<HashpricePoint[]> => {
       // Get end date for chunk fetching
       const { endDate } = getAPIRequestBounds();
-      
+
       // But report the window we're filtering to
       const { startKey: windowStartKey, endKey: windowEndKey } =
         getWindowBounds(rangeDays);

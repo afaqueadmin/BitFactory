@@ -20,6 +20,7 @@ async function main() {
       role: "CLIENT",
       city: "Dubai",
       country: "UAE",
+      invoicedAmount: 4250,
     },
   });
 
@@ -32,6 +33,7 @@ async function main() {
       role: "ADMIN",
       city: "Dubai",
       country: "UAE",
+      invoicedAmount: 4250,
     },
   });
 

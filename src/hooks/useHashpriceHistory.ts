@@ -12,6 +12,7 @@ export interface HashpriceHistoryResponse {
   success: boolean;
   data: HashpricePoint[];
   error?: string;
+  message?: string;
   statistics: {
     current: number;
     high: number;

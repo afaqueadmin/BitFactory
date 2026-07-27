@@ -14,6 +14,8 @@ import {
   CardHeader,
   Divider,
   Typography,
+  Checkbox,
+  FormControlLabel,
 } from "@mui/material";
 import { useState } from "react";
 import { useRouter, useParams } from "next/navigation";
@@ -24,10 +26,17 @@ import { useInvoice, useRecordPayment } from "@/lib/hooks/useInvoices";
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
 import { CostPayment } from "@prisma/client";
 
-export default function RecordPaymentPage() {
+interface RecordPaymentPageProps {
+  basePath: string;
+}
+
+export default function RecordPaymentPage({
+  basePath,
+}: RecordPaymentPageProps) {
   const params = useParams();
   const router = useRouter();
   const invoiceId = params.id as string;
+  const invoiceHref = `${basePath}/${invoiceId}`;
 
   const { invoice, loading: invoiceLoading } = useInvoice(invoiceId);
   const {
@@ -40,6 +49,7 @@ export default function RecordPaymentPage() {
     amountPaid: 0,
     paymentDate: new Date().toISOString().split("T")[0],
     notes: "",
+    markAsPaid: false,
   });
 
   const [loading, setLoading] = useState(false);
@@ -59,12 +69,23 @@ export default function RecordPaymentPage() {
     : 0;
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    const numValue = name === "amountPaid" ? parseFloat(value) || 0 : value;
+    const { name, value, checked, type } = e.target;
+    const fieldValue =
+      type === "checkbox"
+        ? checked
+        : name === "amountPaid"
+          ? parseFloat(value) || 0
+          : value;
 
+    if (name === "markAsPaid" && checked) {
+      setFormData((prev) => ({
+        ...prev,
+        amountPaid: 0,
+      }));
+    }
     setFormData((prev) => ({
       ...prev,
-      [name]: numValue,
+      [name]: fieldValue,
     }));
   };
 
@@ -76,7 +97,7 @@ export default function RecordPaymentPage() {
       setError(null);
 
       // Validate
-      if (formData.amountPaid <= 0) {
+      if (!formData.markAsPaid && formData.amountPaid <= 0) {
         throw new Error("Payment amount must be greater than 0");
       }
 
@@ -91,10 +112,11 @@ export default function RecordPaymentPage() {
         amountPaid: formData.amountPaid,
         paymentDate: formData.paymentDate,
         notes: formData.notes,
+        markAsPaid: formData.markAsPaid,
       });
 
       // Redirect back to invoice detail
-      router.push(`/hardware-purchase/${invoiceId}`);
+      router.push(invoiceHref);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to record payment");
     } finally {
@@ -131,7 +153,7 @@ export default function RecordPaymentPage() {
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
       <Stack direction="row" spacing={2} sx={{ mb: 4 }}>
-        <Link href={`/hardware-purchase/${invoiceId}`}>
+        <Link href={invoiceHref}>
           <Button startIcon={<ArrowBackIcon />}>Back to Invoice</Button>
         </Link>
         <Box flex={1}>
@@ -169,17 +191,43 @@ export default function RecordPaymentPage() {
                   Payment Details
                 </h3>
                 <Stack spacing={2}>
-                  <TextField
-                    label="Amount Paid (USD)"
-                    name="amountPaid"
-                    type="number"
-                    value={formData.amountPaid}
-                    onChange={handleInputChange}
-                    fullWidth
-                    inputProps={{ min: 0, step: 0.01 }}
-                    helperText="Enter the payment amount"
-                    required
-                  />
+                  <Box
+                    sx={{ display: "flex", gap: 2, alignItems: "flex-start" }}
+                  >
+                    <Box sx={{ flex: 1 }}>
+                      <TextField
+                        label="Amount Paid (USD)"
+                        name="amountPaid"
+                        type="number"
+                        value={formData.amountPaid}
+                        onChange={handleInputChange}
+                        fullWidth
+                        inputProps={{ min: 0, step: 0.01 }}
+                        helperText="Enter the payment amount"
+                        required={!formData.markAsPaid}
+                        disabled={formData.markAsPaid}
+                      />
+                    </Box>
+                    <Box
+                      sx={{
+                        flex: 1,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <FormControlLabel
+                        control={
+                          <Checkbox
+                            name="markAsPaid"
+                            checked={formData.markAsPaid}
+                            onChange={handleInputChange}
+                          />
+                        }
+                        label="Mark as Paid"
+                      />
+                    </Box>
+                  </Box>
                   <TextField
                     label="Payment Date"
                     name="paymentDate"
@@ -215,7 +263,9 @@ export default function RecordPaymentPage() {
                     loading ? <CircularProgress size={20} /> : <SaveIcon />
                   }
                   disabled={
-                    loading || paymentLoading || formData.amountPaid <= 0
+                    loading ||
+                    paymentLoading ||
+                    (!formData.markAsPaid && formData.amountPaid <= 0)
                   }
                 >
                   {loading ? "Recording..." : "Record Payment"}

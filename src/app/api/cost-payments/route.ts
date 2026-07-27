@@ -28,7 +28,15 @@ export async function GET(request: NextRequest) {
     const pageSize = parseInt(url.searchParams.get("pageSize") || "10", 10);
     const customerId = url.searchParams.get("customerId");
     if (customerId) {
-      if (userRole !== "ADMIN" && userRole !== "SUPER_ADMIN") {
+      if (userRole === "FRANCHISEE") {
+        const owned = await prisma.user.findFirst({
+          where: { id: customerId, franchisee: { franchiseeId: userId } },
+          select: { id: true },
+        });
+        if (!owned) {
+          return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        }
+      } else if (userRole !== "ADMIN" && userRole !== "SUPER_ADMIN") {
         return NextResponse.json(
           { error: "Only administrators can search by customerId" },
           { status: 403 },
@@ -89,14 +97,12 @@ export async function GET(request: NextRequest) {
     let runningBalance = 0;
 
     for (const payment of allPaymentsForBalance) {
-      if (payment.type === "PAYMENT") {
-        // Payments increase balance
-        runningBalance += payment.amount;
-      } else if (payment.type === "ELECTRICITY_CHARGES") {
-        // Electricity charges decrease balance (amount is already negative)
-        runningBalance += payment.amount;
-      } else if (payment.type === "ADJUSTMENT") {
-        // Adjustments add to balance (can be positive or negative)
+      if (
+        payment.type === "PAYMENT" ||
+        payment.type === "ELECTRICITY_CHARGES" ||
+        payment.type === "ADJUSTMENT" ||
+        payment.type === "HARDWARE_SALES"
+      ) {
         runningBalance += payment.amount;
       }
       balanceMap.set(payment.id, runningBalance);
@@ -115,13 +121,17 @@ export async function GET(request: NextRequest) {
               ? "Hosting & electricity charges"
               : payment.type === "ADJUSTMENT"
                 ? "Adjustment"
-                : payment.type,
+                : payment.type === "HARDWARE_SALES"
+                  ? "Hardware sales payment"
+                  : payment.type,
         consumption:
           payment.consumption > 0
             ? `${payment.consumption.toFixed(2)} kWh`
             : "N/A",
         amount:
-          (payment.type === "PAYMENT" || payment.type === "ADJUSTMENT"
+          (payment.type === "PAYMENT" ||
+          payment.type === "ADJUSTMENT" ||
+          payment.type === "HARDWARE_SALES"
             ? payment.amount >= 0
               ? "+ "
               : "- "
@@ -211,7 +221,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate type is one of the valid PaymentType values
-    const validPaymentTypes = ["PAYMENT", "ELECTRICITY_CHARGES", "ADJUSTMENT"];
+    const validPaymentTypes = [
+      "PAYMENT",
+      "ELECTRICITY_CHARGES",
+      "ADJUSTMENT",
+      "HARDWARE_SALES",
+    ];
     if (!validPaymentTypes.includes(type)) {
       return NextResponse.json(
         {

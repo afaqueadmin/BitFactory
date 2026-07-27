@@ -12,6 +12,7 @@ export type MinerSortField =
   | "name"
   | "user"
   | "subaccount"
+  | "segment"
   | "model"
   | "powerUsage"
   | "hashRate"
@@ -40,6 +41,7 @@ interface User {
   name: string | null;
   email: string;
   luxorSubaccountName?: string | null;
+  segment?: string | null;
 }
 
 /**
@@ -126,6 +128,9 @@ function getSortValue(miner: Miner, field: MinerSortField): string | number {
     case "subaccount":
       return (miner.user?.luxorSubaccountName || "").toLowerCase();
 
+    case "segment":
+      return (miner.user?.segment || "").toLowerCase();
+
     case "model":
       return (miner.hardware?.model || "").toLowerCase();
 
@@ -209,6 +214,7 @@ export function getSortFieldLabel(field: MinerSortField): string {
     name: "Miner Name",
     user: "Username",
     subaccount: "Subaccount",
+    segment: "Type",
     model: "Model",
     powerUsage: "Power Usage",
     hashRate: "Hash Rate",
@@ -230,6 +236,7 @@ export function getAllSortFields(): MinerSortField[] {
     "name",
     "user",
     "subaccount",
+    "segment",
     "model",
     "powerUsage",
     "hashRate",

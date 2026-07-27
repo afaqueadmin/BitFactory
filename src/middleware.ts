@@ -17,23 +17,29 @@ const publicPaths = new Set([
   "/favicon.svg",
 ]);
 
+// CLIENT paths, extracted so FRANCHISEE (who can also act as a client for
+// their own personal mining operation, in addition to managing their
+// onboarded customers) can reuse the exact same set below.
+const clientPaths = [
+  "/account-settings",
+  "/btc-price-history",
+  "/btc-price-predictor",
+  "/clientworkers",
+  "/dashboard",
+  "/hashprice-history",
+  "/invoices",
+  "/luxor",
+  "/miners",
+  "/payback-analysis",
+  "/security-setting",
+  "/transaction",
+  "/wallet",
+  // Add client-specific public paths if any
+];
+const clientDynamicPatterns = [new URLPattern({ pathname: "/invoices/:id*" })];
+
 const securePaths = {
-  CLIENT: new Set<string>([
-    "/account-settings",
-    "/btc-price-history",
-    "/btc-price-predictor",
-    "/clientworkers",
-    "/dashboard",
-    "/hashprice-history",
-    "/invoices",
-    "/luxor",
-    "/miners",
-    "/payback-analysis",
-    "/security-setting",
-    "/transaction",
-    "/wallet",
-    // Add client-specific public paths if any
-  ]),
+  CLIENT: new Set<string>(clientPaths),
   ADMIN: new Set<string>([
     "/admin-profile",
     "/adminpanel",
@@ -44,8 +50,9 @@ const securePaths = {
     "/accounting",
 
     "/external-resource",
-    "/hardware-purchase",
+    "/hardware-sales",
     "/customers/overview",
+    "/franchisees",
     "/groups",
     "/hardware",
     "/machine",
@@ -58,15 +65,29 @@ const securePaths = {
     "/activity-log",
     // Add admin-specific public paths if any
   ]),
+  // Franchisee: their own dashboard plus the customers/machine pages (not
+  // the admin panel itself), scoped server-side to the franchisee's own
+  // customers/miners — PLUS the full CLIENT page set, since a franchisee
+  // can also act as a client for their own personal mining operation.
+  FRANCHISEE: new Set<string>([
+    "/franchisee-dashboard",
+    "/customers/overview",
+    "/machine",
+    ...clientPaths,
+  ]),
 }; // Add admin-specific public paths if any
 
 const dynamicPatternsPaths = {
-  CLIENT: [new URLPattern({ pathname: "/invoices/:id*" })],
+  CLIENT: clientDynamicPatterns,
   ADMIN: [
     new URLPattern({ pathname: "/accounting/:path*" }),
-    new URLPattern({ pathname: "/hardware-purchase/:path*" }),
+    new URLPattern({ pathname: "/hardware-sales/:path*" }),
     new URLPattern({ pathname: "/customers/:id*" }),
     new URLPattern({ pathname: "/groups/:id*" }),
+  ],
+  FRANCHISEE: [
+    new URLPattern({ pathname: "/customers/:id*" }),
+    ...clientDynamicPatterns,
   ],
 };
 
@@ -78,13 +99,18 @@ const getDefaultPathForRole = (role: string) => {
       return "/adminpanel";
     case "CLIENT":
       return "/dashboard";
+    case "FRANCHISEE":
+      return "/franchisee-dashboard";
     default:
       return "/login";
   }
 };
 
 // Check if a path is inside a route group folder like (auth) or (manage)
-const isInRouteGroup = (pathname: string, role: "CLIENT" | "ADMIN") => {
+const isInRouteGroup = (
+  pathname: string,
+  role: "CLIENT" | "ADMIN" | "FRANCHISEE",
+) => {
   return (
     securePaths[role].has(pathname) ||
     dynamicPatternsPaths[role].some((p) => p.test({ pathname }))
@@ -162,6 +188,16 @@ export async function middleware(request: NextRequest) {
       // Prevent client from accessing admin routes
       if (!isInRouteGroup(pathname, userRole)) {
         return NextResponse.redirect(new URL("/dashboard", request.url));
+      }
+    }
+
+    if (userRole === "FRANCHISEE") {
+      // Prevent franchisee from accessing routes outside their scoped set
+      // (including /adminpanel itself, which franchisees should never see)
+      if (!isInRouteGroup(pathname, userRole)) {
+        return NextResponse.redirect(
+          new URL("/franchisee-dashboard", request.url),
+        );
       }
     }
 

@@ -4,6 +4,7 @@ import { verifyJwtToken } from "@/lib/jwt";
 import { prisma } from "@/lib/prisma";
 import { createLuxorClient, Transaction } from "@/lib/luxor";
 import { createBraiinsClient } from "@/lib/braiins";
+import { franchiseeUserFilter } from "@/lib/franchiseeScope";
 
 /**
  * Transaction object with customer information
@@ -88,9 +89,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Only ADMIN and SUPER_ADMIN can access this endpoint
+    // Only ADMIN, SUPER_ADMIN, and FRANCHISEE (scoped to their own customers) can access this endpoint
     const userRole = decoded.role;
-    if (userRole !== "ADMIN" && userRole !== "SUPER_ADMIN") {
+    if (
+      userRole !== "ADMIN" &&
+      userRole !== "SUPER_ADMIN" &&
+      userRole !== "FRANCHISEE"
+    ) {
       console.log(
         `[Client Transaction History API] Forbidden - user role: ${userRole}`,
       );
@@ -134,6 +139,7 @@ export async function GET(request: NextRequest) {
     // Fetch all customers (or filter to specific IDs)
     const customerWhere: Prisma.UserWhereInput = {
       role: "CLIENT",
+      ...franchiseeUserFilter({ id: decoded.userId, role: userRole }),
     };
     if (customerIdsParam) {
       const customerIds = customerIdsParam.split(",").filter((id) => id.trim());

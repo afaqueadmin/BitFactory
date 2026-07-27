@@ -7,6 +7,8 @@ import AdminStatCard from "@/components/admin/AdminStatCard";
 import AdminValueCard from "@/components/admin/AdminValueCard";
 import { Box, CircularProgress, Alert, useTheme } from "@mui/material";
 import { useVendorInvoices } from "@/lib/hooks/useVendorInvoices";
+import { useHardwarePurchases } from "@/lib/hooks/useHardwarePurchases";
+import { useInvoices, InvoiceWithDetails } from "@/lib/hooks/useInvoices";
 
 interface PoolData {
   workers: {
@@ -107,6 +109,10 @@ interface HostingRevenueData {
   hostingRevenue: number;
 }
 
+interface HardwareRevenueData {
+  hardwareRevenue: number;
+}
+
 export default function AdminDashboard() {
   const router = useRouter();
   const theme = useTheme();
@@ -184,13 +190,64 @@ export default function AdminDashboard() {
     });
 
   const { vendorInvoices } = useVendorInvoices(1, 100000, undefined);
-  const vendorInvoicesTotalAmount = Number(
-    vendorInvoices.reduce((sum, invoice) => sum + invoice.totalAmount, 0),
-  );
+  const vendorInvoicesTotalAmount = vendorInvoices
+    .filter(
+      (invoice) => invoice.paymentStatus !== "Cancelled" && !invoice.isDeleted,
+    )
+    .reduce((sum, invoice) => sum + Number(invoice.totalAmount), 0);
 
   const hostingProfit = hostingRevenueData?.hostingRevenue
     ? hostingRevenueData.hostingRevenue - vendorInvoicesTotalAmount
     : 0;
+
+  const { data: hardwareRevenueData, isLoading: hardwareRevenueLoading } =
+    useQuery<HardwareRevenueData>({
+      queryKey: ["hardwareRevenue"],
+      queryFn: async () => {
+        const response = await fetch("/api/cost-payments/hardwareRevenue");
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch hardware revenue");
+        }
+
+        const data = await response.json();
+
+        if (!data.success) {
+          throw new Error(data.error || "Failed to fetch hardware revenue");
+        }
+
+        return data;
+      },
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      retry: 2,
+    });
+
+  const { hardwarePurchases } = useHardwarePurchases(1, 100000, undefined);
+  const hardwarePurchasesTotalAmount = hardwarePurchases.reduce(
+    (sum, invoice) => sum + Number(invoice.totalAmount),
+    0,
+  );
+
+  const hardwareProfit = hardwareRevenueData?.hardwareRevenue
+    ? hardwareRevenueData.hardwareRevenue - hardwarePurchasesTotalAmount
+    : 0;
+
+  const { invoices: hardwareSalesInvoices } = useInvoices(
+    1,
+    100000,
+    undefined,
+    undefined,
+    "HARDWARE_SALES",
+  );
+  const hardwareRevenuePending = hardwareSalesInvoices
+    .filter((invoice: InvoiceWithDetails) =>
+      ["DRAFT", "ISSUED", "OVERDUE"].includes(invoice.status),
+    )
+    .reduce(
+      (sum: number, invoice: InvoiceWithDetails) =>
+        sum + Number(invoice.totalAmount),
+      0,
+    );
 
   // Get pool stats based on poolMode
   const getPoolStats = (mode: "total" | "luxor" | "braiins") => {
@@ -249,9 +306,13 @@ export default function AdminDashboard() {
       "Monthly Revenue (30 days)",
       "Total Customer Balance",
       "Total Customers",
-      "Hosting Revenue (Electricity)",
+      "Hosting and Colocation",
       "Hosting Cost",
       "Hosting Profit",
+      "Hardware Revenue",
+      "Hardware Revenue Pending",
+      "Hardware Cost",
+      "Hardware Profit",
       "Positive Customer Balance",
       "Negative Customer Balance",
       "Positive Balance Customers",
@@ -277,12 +338,20 @@ export default function AdminDashboard() {
     [poolMode, stats?.miners],
   );
 
-  if (loading || customerBalanceLoading || hostingRevenueLoading) {
+  if (
+    loading ||
+    customerBalanceLoading ||
+    hostingRevenueLoading ||
+    hardwareRevenueLoading
+  ) {
     return (
       <Box
         sx={{
           p: 4,
-          backgroundColor: "#f5f5f7",
+          backgroundColor:
+            theme.palette.mode === "dark"
+              ? theme.palette.background.default
+              : "#f5f5f7",
           minHeight: "calc(100vh - 64px)",
           display: "flex",
           justifyContent: "center",
@@ -299,7 +368,10 @@ export default function AdminDashboard() {
       <Box
         sx={{
           p: 4,
-          backgroundColor: "#f5f5f7",
+          backgroundColor:
+            theme.palette.mode === "dark"
+              ? theme.palette.background.default
+              : "#f5f5f7",
           minHeight: "calc(100vh - 64px)",
         }}
       >
@@ -378,7 +450,9 @@ export default function AdminDashboard() {
                     ? "rgba(255,255,255,0.1)"
                     : "rgba(0,0,0,0.05)",
               color:
-                poolMode === "braiins" ? "#FFFFFF" : theme.palette.text.primary,
+                poolMode === "braiins"
+                  ? "rgba(0,0,0,0.87)"
+                  : theme.palette.text.primary,
               transition: "all 0.2s",
             }}
           >
@@ -660,9 +734,9 @@ export default function AdminDashboard() {
 
           {/* === RESERVED FOR FUTURE LUXOR ENDPOINTS === */}
 
-          {/* Hosting Revenue - From Cost Payments */}
+          {/* Hosting and Colocation - From ELECTRICITY_CHARGES invoices (DRAFT/ISSUED/OVERDUE/PAID) */}
           <AdminValueCard
-            title="Hosting Revenue (Electricity)"
+            title="Hosting and Colocation"
             borderColor="#757575"
             value={hostingRevenueData?.hostingRevenue ?? 0}
             type="currency"
@@ -681,6 +755,38 @@ export default function AdminDashboard() {
             title="Hosting Profit"
             borderColor="#757575"
             value={hostingProfit}
+            type="currency"
+          />
+
+          {/* Hardware Revenue - From Cost Payments (HARDWARE_SALES payments) */}
+          <AdminValueCard
+            title="Hardware Revenue"
+            borderColor="#757575"
+            value={hardwareRevenueData?.hardwareRevenue ?? 0}
+            type="currency"
+          />
+
+          {/* Hardware Revenue Pending - HARDWARE_SALES invoices not yet paid (DRAFT/ISSUED/OVERDUE) */}
+          <AdminValueCard
+            title="Hardware Revenue Pending"
+            borderColor="#757575"
+            value={hardwareRevenuePending}
+            type="currency"
+          />
+
+          {/* Hardware Cost - From Hardware Purchase Invoices */}
+          <AdminValueCard
+            title="Hardware Cost"
+            borderColor="#757575"
+            value={hardwarePurchasesTotalAmount}
+            type="currency"
+          />
+
+          {/* Hardware Profit - Hardware Revenue minus Hardware Cost */}
+          <AdminValueCard
+            title="Hardware Profit"
+            borderColor="#757575"
+            value={hardwareProfit}
             type="currency"
           />
 

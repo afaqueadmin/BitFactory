@@ -27,6 +27,12 @@ interface Group {
   isActive: boolean;
 }
 
+interface Franchise {
+  id: string;
+  businessName: string;
+  isActive: boolean;
+}
+
 interface EditCustomerModalProps {
   open: boolean;
   onClose: () => void;
@@ -44,6 +50,8 @@ interface EditCustomerModalProps {
     companyUrl?: string;
     luxorSubaccountName?: string;
     groupId?: string;
+    franchiseeId?: string | null;
+    segment?: string | null;
   };
 }
 
@@ -62,6 +70,8 @@ export default function EditCustomerModal({
     Array<{ name: string; id: number }>
   >([]);
   const [groups, setGroups] = useState<Group[]>([]);
+  const [franchises, setFranchises] = useState<Franchise[]>([]);
+  const [fetchingFranchises, setFetchingFranchises] = useState(false);
   const [formData, setFormData] = useState(
     initialData || {
       id: "",
@@ -75,6 +85,8 @@ export default function EditCustomerModal({
       companyUrl: "",
       luxorSubaccountName: "",
       groupId: "",
+      franchiseeId: "",
+      segment: "",
     },
   );
   const [error, setError] = useState("");
@@ -82,14 +94,40 @@ export default function EditCustomerModal({
 
   useEffect(() => {
     if (initialData && open) {
-      setFormData(initialData);
+      setFormData({
+        ...initialData,
+        franchiseeId: initialData.franchiseeId || "",
+        segment: initialData.segment || "",
+      });
       setError("");
       setSuccess("");
       fetchSubaccounts();
       // Pass the subaccount name directly to avoid stale state issues
       fetchGroups(initialData.luxorSubaccountName || "");
+      fetchFranchises();
     }
   }, [initialData, open]);
+
+  const fetchFranchises = async () => {
+    try {
+      setFetchingFranchises(true);
+      const response = await fetch("/api/franchisees");
+      if (!response.ok) {
+        setFranchises([]);
+        return;
+      }
+      const data = await response.json();
+      const franchisesList: Franchise[] = Array.isArray(data.data)
+        ? data.data
+        : [];
+      setFranchises(franchisesList.filter((f) => f.isActive));
+    } catch (err) {
+      console.error("[EditCustomerModal] Error fetching franchises:", err);
+      setFranchises([]);
+    } finally {
+      setFetchingFranchises(false);
+    }
+  };
 
   const fetchSubaccounts = async () => {
     try {
@@ -307,6 +345,18 @@ export default function EditCustomerModal({
     setError("");
     setSuccess("");
 
+    // Segment is required unless a franchise is assigned (which implies Retail)
+    if (
+      !formData.franchiseeId &&
+      formData.segment !== "CORPORATE" &&
+      formData.segment !== "SME" &&
+      formData.segment !== "SELF_MINING"
+    ) {
+      setError("Please select a Type (Corporate, SME, or Self Mining)");
+      setLoading(false);
+      return;
+    }
+
     try {
       const response = await fetch(`/api/user/${customerId}`, {
         method: "PUT",
@@ -324,6 +374,8 @@ export default function EditCustomerModal({
           companyUrl: formData.companyUrl,
           luxorSubaccountName: formData.luxorSubaccountName || null,
           groupId: formData.groupId || null,
+          franchiseeId: formData.franchiseeId || null,
+          segment: formData.franchiseeId ? undefined : formData.segment,
         }),
       });
 
@@ -514,6 +566,57 @@ export default function EditCustomerModal({
                     {group.name}
                   </MenuItem>
                 ))}
+              </Select>
+            </FormControl>
+            <FormControl fullWidth disabled={fetchingFranchises}>
+              <InputLabel>Franchisee (Optional)</InputLabel>
+              <Select
+                value={formData.franchiseeId || ""}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    franchiseeId: e.target.value,
+                  }))
+                }
+                label="Franchisee (Optional)"
+              >
+                <MenuItem value="">Direct BitFactory Customer</MenuItem>
+                {franchises.map((franchise) => (
+                  <MenuItem key={franchise.id} value={franchise.id}>
+                    {franchise.businessName}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <FormControl fullWidth disabled={!!formData.franchiseeId} required>
+              <InputLabel>Type</InputLabel>
+              <Select
+                value={
+                  formData.franchiseeId ? "RETAIL" : formData.segment || ""
+                }
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    segment: e.target.value,
+                  }))
+                }
+                label="Type"
+              >
+                {formData.franchiseeId ? (
+                  <MenuItem value="RETAIL">Retail (via franchise)</MenuItem>
+                ) : (
+                  [
+                    <MenuItem key="CORPORATE" value="CORPORATE">
+                      Corporate
+                    </MenuItem>,
+                    <MenuItem key="SME" value="SME">
+                      SME
+                    </MenuItem>,
+                    <MenuItem key="SELF_MINING" value="SELF_MINING">
+                      Self Mining
+                    </MenuItem>,
+                  ]
+                )}
               </Select>
             </FormControl>
           </Box>

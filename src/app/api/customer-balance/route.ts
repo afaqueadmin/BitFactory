@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
+import { franchiseeUserFilter } from "@/lib/franchiseeScope";
 
 export async function GET(request: NextRequest) {
   try {
@@ -11,25 +12,30 @@ export async function GET(request: NextRequest) {
     }
 
     // Verify token and extract user ID and role
-    // let userId: string;
+    let userId: string;
     let userRole: string;
     try {
       const decoded = await verifyJwtToken(token);
-      // userId = decoded.userId;
+      userId = decoded.userId;
       userRole = decoded.role;
     } catch (error) {
       console.error("[Customer Balance GET] Token verification failed:", error);
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Check if user is admin or super admin
-    if (userRole !== "ADMIN" && userRole !== "SUPER_ADMIN") {
+    // Check if user is admin, super admin, or franchisee
+    if (
+      userRole !== "ADMIN" &&
+      userRole !== "SUPER_ADMIN" &&
+      userRole !== "FRANCHISEE"
+    ) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // Query cost_payments table and aggregate by userId
     const costPayments = await prisma.costPayment.groupBy({
       by: ["userId"],
+      where: { type: { not: "HARDWARE_SALES" } },
       _sum: {
         amount: true,
       },
@@ -41,6 +47,7 @@ export async function GET(request: NextRequest) {
       where: {
         id: { in: userIds },
         luxorSubaccountName: { not: { contains: "higgs_test" } },
+        ...franchiseeUserFilter({ id: userId, role: userRole }),
       },
       select: {
         id: true,

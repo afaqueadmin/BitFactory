@@ -15,6 +15,7 @@ const DEFAULT_VALUES = {
   s21xpHashrateStockOs: "236.00",
   s21xpHashrateLuxos: "252.00",
   breakevenBtcPrice: "63500.00",
+  defaultInvoicedAmount: "4250.00",
 } as const;
 
 const DECIMAL_FIELDS = Object.keys(DEFAULT_VALUES) as Array<
@@ -71,6 +72,9 @@ const buildDefaultData = (
   breakevenBtcPrice:
     overrides.breakevenBtcPrice ??
     new Decimal(DEFAULT_VALUES.breakevenBtcPrice),
+  defaultInvoicedAmount:
+    overrides.defaultInvoicedAmount ??
+    new Decimal(DEFAULT_VALUES.defaultInvoicedAmount),
 });
 
 export async function getOrCreatePaybackConfig(
@@ -128,5 +132,6 @@ export function serializePaybackConfig(config: PaybackConfig) {
     s21xpHashrateStockOs: Number(config.s21xpHashrateStockOs),
     s21xpHashrateLuxos: Number(config.s21xpHashrateLuxos),
     breakevenBtcPrice: Number(config.breakevenBtcPrice),
+    defaultInvoicedAmount: Number(config.defaultInvoicedAmount),
   };
 }

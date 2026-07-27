@@ -14,6 +14,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
+import { franchiseeMinerFilter } from "@/lib/franchiseeScope";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -40,7 +41,10 @@ interface ApiResponse<T = unknown> {
  * @returns Object with userId and role if authorized
  * @throws Error if not authorized
  */
-async function verifyAdminAuth(request: NextRequest) {
+async function verifyAdminAuth(
+  request: NextRequest,
+  { allowFranchisee = false }: { allowFranchisee?: boolean } = {},
+) {
   const token = request.cookies.get("token")?.value;
 
   if (!token) {
@@ -50,8 +54,11 @@ async function verifyAdminAuth(request: NextRequest) {
   try {
     const decoded = await verifyJwtToken(token);
 
-    // Verify user is admin
-    if (decoded.role !== "ADMIN" && decoded.role !== "SUPER_ADMIN") {
+    // Verify user is admin (optionally, a franchisee scoped to their own data)
+    const isAdmin = decoded.role === "ADMIN" || decoded.role === "SUPER_ADMIN";
+    const isAllowedFranchisee =
+      allowFranchisee && decoded.role === "FRANCHISEE";
+    if (!isAdmin && !isAllowedFranchisee) {
       throw new Error("Forbidden: Admin access required");
     }
 
@@ -93,9 +100,10 @@ export async function GET(
   try {
     console.log("[Miners API] GET: Starting");
 
-    // Verify admin authorization
+    // Verify admin authorization (franchisees may also view, scoped to their own miners)
+    let authedUser: { userId: string; role: string };
     try {
-      await verifyAdminAuth(request);
+      authedUser = await verifyAdminAuth(request, { allowFranchisee: true });
     } catch (authError) {
       const errorMsg =
         authError instanceof Error ? authError.message : "Authorization failed";
@@ -129,6 +137,10 @@ export async function GET(
     if (userId) {
       where.userId = userId;
     }
+    Object.assign(
+      where,
+      franchiseeMinerFilter({ id: authedUser.userId, role: authedUser.role }),
+    );
 
     // Build order by clause
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -157,6 +169,7 @@ export async function GET(
             name: true,
             email: true,
             luxorSubaccountName: true,
+            segment: true,
           },
         },
         space: {
@@ -526,6 +539,7 @@ export async function POST(
               name: true,
               email: true,
               luxorSubaccountName: true,
+              segment: true,
             },
           },
           space: {

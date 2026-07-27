@@ -30,15 +30,21 @@ import {
   ChevronLeft,
   ChevronRight,
   Lock as LockIcon,
+  People as FranchiseesIcon,
 } from "@mui/icons-material";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useUser } from "@/lib/hooks";
 
 interface SidebarItem {
   title: string;
   icon: React.ReactNode;
   path?: string;
   items?: SidebarItem[];
+  // Roles allowed to see this item. Defaults to ADMIN/SUPER_ADMIN (today's
+  // behavior) when omitted, so existing items don't need to be touched.
+  roles?: Array<"ADMIN" | "SUPER_ADMIN" | "FRANCHISEE">;
+  openInNewTab?: boolean;
 }
 
 const sidebarItems: SidebarItem[] = [
@@ -51,14 +57,33 @@ const sidebarItems: SidebarItem[] = [
     // ],
   },
   {
+    title: "Dashboard",
+    icon: <DashboardIcon />,
+    path: "/franchisee-dashboard",
+    roles: ["FRANCHISEE"],
+  },
+  {
+    title: "My Account",
+    icon: <DashboardIcon />,
+    path: "/dashboard",
+    roles: ["FRANCHISEE"],
+    openInNewTab: true,
+  },
+  {
     title: "Activity Log",
     icon: <ActivityLogIcon />,
     path: "/activity-log",
   },
   {
+    title: "Franchisees",
+    icon: <FranchiseesIcon />,
+    path: "/franchisees",
+  },
+  {
     title: "Customers",
     icon: <CustomersIcon />,
     path: "/customers/overview",
+    roles: ["ADMIN", "SUPER_ADMIN", "FRANCHISEE"],
     // items: [
     //   {
     //     title: "Overview",
@@ -93,6 +118,7 @@ const sidebarItems: SidebarItem[] = [
     title: "All Miners",
     icon: <MinersIcon />,
     path: "/machine",
+    roles: ["ADMIN", "SUPER_ADMIN", "FRANCHISEE"],
   },
 
   {
@@ -129,9 +155,19 @@ const sidebarItems: SidebarItem[] = [
         path: "/accounting",
       },
       {
-        title: "Hardware Dashboard",
+        title: "Farm Tariffs",
+        icon: <DocumentIcon />,
+        path: "/accounting/farm-tariffs",
+      },
+      {
+        title: "Hardware Sales Dashboard",
         icon: <DashboardIcon />,
-        path: "/hardware-purchase",
+        path: "/hardware-sales",
+      },
+      {
+        title: "Hardware Purchase Invoices",
+        icon: <DocumentIcon />,
+        path: "/accounting/hardware-purchases",
       },
       // {
       //   title: "Invoices",
@@ -164,11 +200,6 @@ const sidebarItems: SidebarItem[] = [
         path: "/accounting/pdf-invoice-settings",
       },
       {
-        title: "Farm Tariffs",
-        icon: <DocumentIcon />,
-        path: "/accounting/farm-tariffs",
-      },
-      {
         title: "Email Reports",
         icon: <DocumentIcon />,
         path: "/accounting/email-report",
@@ -195,24 +226,6 @@ const sidebarItems: SidebarItem[] = [
     icon: <SettingsIcon />,
     path: "/admin/payback-analysis-company-settings",
   },
-
-  {
-    title: "Hardware Purchases",
-    icon: <HardwareIcon />,
-    items: [
-      {
-        title: "Self Mining",
-        icon: <SelfMiningIcon />,
-        path: "/hardware/self-mining",
-      },
-      { title: "Own Miners", icon: <MinersIcon />, path: "/hardware/miners" },
-    ],
-  },
-  {
-    title: "Pools",
-    icon: <PoolsIcon />,
-    path: "/pools",
-  },
 ];
 
 export default function AdminSidebar() {
@@ -220,6 +233,12 @@ export default function AdminSidebar() {
   const [isHovered, setIsHovered] = React.useState(false);
   const pathname = usePathname();
   const [expandedItems, setExpandedItems] = React.useState<string[]>([]);
+  const { user } = useUser();
+
+  const visibleSidebarItems = sidebarItems.filter((item) => {
+    const allowedRoles = item.roles ?? ["ADMIN", "SUPER_ADMIN"];
+    return user ? (allowedRoles as string[]).includes(user.role) : false;
+  });
 
   const handleExpandClick = (title: string) => {
     if (!sideBarOpen && !isHovered) return;
@@ -260,6 +279,8 @@ export default function AdminSidebar() {
             <ListItemButton
               component={item.path ? Link : "div"}
               href={item.path || "#"}
+              target={item.openInNewTab ? "_blank" : undefined}
+              rel={item.openInNewTab ? "noopener noreferrer" : undefined}
               onClick={() => item.items && handleExpandClick(item.title)}
               selected={item.path === pathname}
               sx={{
@@ -458,7 +479,7 @@ export default function AdminSidebar() {
         </IconButton>
       </Box>
       <List sx={{ px: sideBarOpen || isHovered ? 2 : 1 }}>
-        {renderSidebarItems(sidebarItems)}
+        {renderSidebarItems(visibleSidebarItems)}
       </List>
     </Box>
   );

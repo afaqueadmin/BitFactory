@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyJwtToken } from "@/lib/jwt";
 import { sendWelcomeEmail } from "@/lib/email";
 import normalizeEmailUsername from "@/lib/helpers/normailizeEmailUsername";
+import { getOrCreatePaybackConfig } from "@/lib/paybackConfigHelpers";
 
 /**
  * Response structure from /api/luxor proxy route
@@ -72,6 +73,8 @@ export async function POST(request: NextRequest) {
       initialDeposit,
       luxorSubaccountName,
       groupId,
+      franchiseeId,
+      segment,
     } = await request.json();
 
     // Validate input
@@ -91,6 +94,47 @@ export async function POST(request: NextRequest) {
       if (!luxorSubaccountName || luxorSubaccountName.trim().length === 0) {
         return NextResponse.json(
           { error: "A Luxor subaccount must be selected for CLIENT users" },
+          { status: 400 },
+        );
+      }
+    }
+
+    // franchiseeId is only applicable to CLIENT users (null = direct BitFactory
+    // customer). Ignore it for any other role rather than silently accepting it.
+    if (franchiseeId && role === "CLIENT") {
+      const franchise = await prisma.franchise.findUnique({
+        where: { id: franchiseeId },
+        select: { id: true, isActive: true, deletedAt: true },
+      });
+      if (!franchise || !franchise.isActive || franchise.deletedAt) {
+        return NextResponse.json(
+          { error: "Invalid or inactive franchise selected" },
+          { status: 400 },
+        );
+      }
+    }
+
+    // segment is only applicable to CLIENT users. A franchise assignment
+    // forces RETAIL server-side regardless of what was submitted (mutually
+    // exclusive with the direct-segment picker); otherwise a direct segment
+    // selection is required.
+    let resolvedSegment: "CORPORATE" | "SME" | "SELF_MINING" | "RETAIL" | null =
+      null;
+    if (role === "CLIENT") {
+      if (franchiseeId) {
+        resolvedSegment = "RETAIL";
+      } else if (
+        segment === "CORPORATE" ||
+        segment === "SME" ||
+        segment === "SELF_MINING"
+      ) {
+        resolvedSegment = segment;
+      } else {
+        return NextResponse.json(
+          {
+            error:
+              "Segment (Corporate, SME, or Self Mining) is required for CLIENT users without a franchise",
+          },
           { status: 400 },
         );
       }
@@ -126,6 +170,8 @@ export async function POST(request: NextRequest) {
     const hashedPassword = await hash(tempPassword, 12);
 
     // Create the user in database
+    const { defaultInvoicedAmount } = await getOrCreatePaybackConfig("CLIENT");
+
     let newUser;
     try {
       newUser = await prisma.user.create({
@@ -134,6 +180,9 @@ export async function POST(request: NextRequest) {
           email,
           password: hashedPassword,
           role,
+          invoicedAmount: defaultInvoicedAmount,
+          franchiseeId: role === "CLIENT" ? franchiseeId || null : null,
+          segment: resolvedSegment,
         },
       });
       console.log(`[User Create API] User created in DB: ${newUser.id}`);

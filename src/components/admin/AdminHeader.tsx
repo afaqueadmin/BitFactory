@@ -19,6 +19,7 @@ import { useAuth } from "@/lib/contexts/auth-context";
 import LightModeIcon from "@mui/icons-material/LightMode";
 import DarkModeIcon from "@mui/icons-material/DarkMode";
 import { useTheme } from "@/app/theme-provider";
+import { useUser } from "@/lib/hooks";
 
 const StyledAppBar = styled(AppBar)(({ theme }) => ({
   backgroundColor: theme.palette.background.paper,
@@ -43,6 +44,7 @@ export default function AdminHeader() {
   );
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const { darkMode, toggleDarkMode } = useTheme();
+  const { user } = useUser();
 
   // const handleSettingsClick = (event: React.MouseEvent<HTMLElement>) => {
   //   setSettingsAnchorEl(event.currentTarget);
@@ -58,7 +60,9 @@ export default function AdminHeader() {
   };
 
   const handleLogoClick = () => {
-    router.push("/adminpanel");
+    router.push(
+      user?.role === "FRANCHISEE" ? "/franchisee-dashboard" : "/adminpanel",
+    );
   };
 
   const handleLogout = async () => {

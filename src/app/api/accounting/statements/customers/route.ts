@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
+import { franchiseeUserFilter } from "@/lib/franchiseeScope";
 
 export async function GET(request: NextRequest) {
   try {
@@ -15,10 +16,14 @@ export async function GET(request: NextRequest) {
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { role: true },
+      select: { id: true, role: true },
     });
 
-    if (user?.role !== "ADMIN" && user?.role !== "SUPER_ADMIN") {
+    if (
+      user?.role !== "ADMIN" &&
+      user?.role !== "SUPER_ADMIN" &&
+      user?.role !== "FRANCHISEE"
+    ) {
       return NextResponse.json(
         { error: "Only administrators can access statements" },
         { status: 403 },
@@ -30,11 +35,14 @@ export async function GET(request: NextRequest) {
     const pageSize = parseInt(searchParams.get("pageSize") || "10");
     const skip = (page - 1) * pageSize;
 
+    const customerWhere = {
+      role: "CLIENT" as const,
+      ...franchiseeUserFilter(user),
+    };
+
     // Get all customers with their invoice data
     const customers = await prisma.user.findMany({
-      where: {
-        role: "CLIENT",
-      },
+      where: customerWhere,
       select: {
         id: true,
         name: true,
@@ -61,9 +69,7 @@ export async function GET(request: NextRequest) {
 
     // Get total count
     const totalCount = await prisma.user.count({
-      where: {
-        role: "CLIENT",
-      },
+      where: customerWhere,
     });
 
     // Calculate summaries for each customer

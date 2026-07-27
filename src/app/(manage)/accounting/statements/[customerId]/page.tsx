@@ -508,7 +508,7 @@ export default function CustomerStatementPage() {
                     <DateDisplay date={invoice.dueDate} format="date" />
                   </TableCell>
                   <TableCell>
-                    {invoice.invoiceType === "HARDWARE_PURCHASE"
+                    {invoice.invoiceType === "HARDWARE_SALES"
                       ? "Hardware"
                       : "Hosting & Electricity"}
                   </TableCell>

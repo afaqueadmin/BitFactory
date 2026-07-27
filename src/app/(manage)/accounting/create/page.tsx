@@ -489,12 +489,12 @@ export default function CreateInvoicePage() {
                 />
                 <TextField
                   select
-                  label="Hardware Model (for Hardware Purchase invoices)"
+                  label="Hardware Model (for Hardware Sales invoices)"
                   name="hardwareId"
                   value={formData.hardwareId}
                   onChange={handleInputChange}
                   fullWidth
-                  helperText="Select hardware model for Hardware Purchase invoice type"
+                  helperText="Select hardware model for Hardware Sales invoice type"
                   disabled={
                     hardwareLoading ||
                     formData.invoiceType === "ELECTRICITY_CHARGES"

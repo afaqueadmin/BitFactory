@@ -31,6 +31,7 @@ interface User {
   email: string;
   role?: string;
   luxorSubaccountName?: string | null;
+  segment?: string | null;
 }
 
 /**
@@ -140,6 +141,8 @@ export default function MachinePage() {
   const [selectedModelFilter, setSelectedModelFilter] = useState<string>("");
   const [selectedRateFilter, setSelectedRateFilter] = useState<string>("");
   const [selectedPoolFilter, setSelectedPoolFilter] = useState<string>("");
+  const [selectedSegmentFilter, setSelectedSegmentFilter] =
+    useState<string>("");
   const [showBulkEditModal, setShowBulkEditModal] = useState(false);
   const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
   const [showDeleted, setShowDeleted] = useState(false);
@@ -434,6 +437,13 @@ export default function MachinePage() {
   };
 
   /**
+   * Handle segment (Type) filter change
+   */
+  const handleSegmentFilterChange = (event: SelectChangeEvent) => {
+    setSelectedSegmentFilter(event.target.value);
+  };
+
+  /**
    * Get unique models from miners
    */
   const getUniqueModels = () => {
@@ -467,13 +477,13 @@ export default function MachinePage() {
   const getUniquePools = () => {
     // Check if there are any unassigned miners
     const hasUnassigned = miners.some((m) => !m.poolId);
-    
+
     const poolOptions: Array<{ id: string; name: string }> = [];
-    
+
     if (hasUnassigned) {
       poolOptions.push({ id: "UNASSIGNED", name: "Unassigned" });
     }
-    
+
     // Add all available pools
     poolOptions.push(
       ...pools.map((pool) => ({
@@ -481,7 +491,7 @@ export default function MachinePage() {
         name: pool.name,
       })),
     );
-    
+
     return poolOptions;
   };
 
@@ -527,6 +537,13 @@ export default function MachinePage() {
         // Show only miners with the selected pool
         filtered = filtered.filter((m) => m.poolId === selectedPoolFilter);
       }
+    }
+
+    // Filter by selected Type (user's segment)
+    if (selectedSegmentFilter) {
+      filtered = filtered.filter(
+        (m) => m.user?.segment === selectedSegmentFilter,
+      );
     }
 
     // Sort by user (grouped by userId, then by miner name within each user)
@@ -751,6 +768,24 @@ export default function MachinePage() {
                         {pool.name}
                       </MenuItem>
                     ))}
+                  </Select>
+                </FormControl>
+
+                <FormControl sx={{ minWidth: 250 }}>
+                  <InputLabel>Filter by Type</InputLabel>
+                  <Select
+                    value={selectedSegmentFilter}
+                    onChange={handleSegmentFilterChange}
+                    label="Filter by Type"
+                  >
+                    <MenuItem value="">
+                      <em>All Types</em>
+                    </MenuItem>
+                    <MenuItem value="CORPORATE">Corporate</MenuItem>
+                    <MenuItem value="SME">SME</MenuItem>
+                    <MenuItem value="SELF_MINING">Self Mining</MenuItem>
+                    <MenuItem value="FRANCHISEE">Franchisee</MenuItem>
+                    <MenuItem value="RETAIL">Retail</MenuItem>
                   </Select>
                 </FormControl>
               </Stack>

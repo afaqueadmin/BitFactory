@@ -162,6 +162,7 @@ export function useCreateInvoice() {
       invoiceType?: string;
       hardwareId?: string;
       billingMonth?: string;
+      invoiceGeneratedDate?: string;
     }) => {
       const res = await fetch("/api/accounting/invoices", {
         method: "POST",
@@ -216,6 +217,56 @@ export function useCustomers() {
 
   return {
     customers: data?.customers || [],
+    loading: isLoading,
+    error: error instanceof Error ? error.message : null,
+  };
+}
+
+export function useCustomerBalances() {
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["customerBalances"],
+    queryFn: async () => {
+      const res = await fetch("/api/accounting/customers/balances", {
+        method: "GET",
+        credentials: "include",
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to fetch customer balances");
+      }
+
+      return res.json();
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
+  return {
+    balances: (data?.balances || {}) as Record<string, number>,
+    loading: isLoading,
+    error: error instanceof Error ? error.message : null,
+  };
+}
+
+export function useCustomerMonthlyBills() {
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["customerMonthlyBills"],
+    queryFn: async () => {
+      const res = await fetch("/api/accounting/customers/monthly-bill", {
+        method: "GET",
+        credentials: "include",
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to fetch customer monthly bills");
+      }
+
+      return res.json();
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
+  return {
+    monthlyBills: (data?.monthlyBills || {}) as Record<string, number>,
     loading: isLoading,
     error: error instanceof Error ? error.message : null,
   };
@@ -528,6 +579,37 @@ export function useDeleteInvoice() {
 
   return {
     deleteInvoice: mutation.mutateAsync,
+    loading: mutation.isPending,
+    error: mutation.error instanceof Error ? mutation.error.message : null,
+  };
+}
+
+export interface AlreadyPaidCheck {
+  customerId: string;
+  billingMonth: string;
+}
+
+export function useCheckAlreadyPaidCustomers() {
+  const mutation = useMutation({
+    mutationFn: async (checks: AlreadyPaidCheck[]) => {
+      const res = await fetch("/api/accounting/invoices/paid-check", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ checks }),
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to check paid status");
+      }
+
+      const data = await res.json();
+      return data.alreadyPaid as AlreadyPaidCheck[];
+    },
+  });
+
+  return {
+    checkAlreadyPaid: mutation.mutateAsync,
     loading: mutation.isPending,
     error: mutation.error instanceof Error ? mutation.error.message : null,
   };

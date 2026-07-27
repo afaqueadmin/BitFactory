@@ -32,6 +32,7 @@ interface PaybackConfig {
   s21xpHashrateStockOs: string;
   s21xpHashrateLuxos: string;
   breakevenBtcPrice: string;
+  defaultInvoicedAmount: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -55,6 +56,7 @@ export default function PaybackAnalysisSettingsPage() {
     s21xpHashrateStockOs: "",
     s21xpHashrateLuxos: "",
     breakevenBtcPrice: "",
+    defaultInvoicedAmount: "",
   });
 
   // Fetch current configuration
@@ -84,6 +86,7 @@ export default function PaybackAnalysisSettingsPage() {
           s21xpHashrateStockOs: data.data.s21xpHashrateStockOs,
           s21xpHashrateLuxos: data.data.s21xpHashrateLuxos,
           breakevenBtcPrice: data.data.breakevenBtcPrice,
+          defaultInvoicedAmount: data.data.defaultInvoicedAmount,
         });
       }
     } catch (err) {
@@ -344,6 +347,19 @@ export default function PaybackAnalysisSettingsPage() {
               value={formData.breakevenBtcPrice}
               onChange={handleChange("breakevenBtcPrice")}
               helperText="BTC price for breakeven scenario"
+              inputProps={{ step: "0.01", min: "0" }}
+            />
+          </Grid>
+
+          {/* Default Invoiced Amount */}
+          <Grid item xs={12} md={6}>
+            <TextField
+              fullWidth
+              label="Default Invoiced Amount for New Customers ($)"
+              type="number"
+              value={formData.defaultInvoicedAmount}
+              onChange={handleChange("defaultInvoicedAmount")}
+              helperText="Starting invoiced amount assigned to newly created customers"
               inputProps={{ step: "0.01", min: "0" }}
             />
           </Grid>
