@@ -226,24 +226,6 @@ const sidebarItems: SidebarItem[] = [
     icon: <SettingsIcon />,
     path: "/admin/payback-analysis-company-settings",
   },
-
-  {
-    title: "Hardware Purchases",
-    icon: <HardwareIcon />,
-    items: [
-      {
-        title: "Self Mining",
-        icon: <SelfMiningIcon />,
-        path: "/hardware/self-mining",
-      },
-      { title: "Own Miners", icon: <MinersIcon />, path: "/hardware/miners" },
-    ],
-  },
-  {
-    title: "Pools",
-    icon: <PoolsIcon />,
-    path: "/pools",
-  },
 ];
 
 export default function AdminSidebar() {
