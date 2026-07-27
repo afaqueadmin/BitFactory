@@ -1,7 +1,15 @@
 "use client";
 
 import React from "react";
-import { Card, CardContent, Typography, Box } from "@mui/material";
+import {
+  Card,
+  CardContent,
+  Typography,
+  Box,
+  Tooltip,
+  IconButton,
+} from "@mui/material";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import { formatValue } from "@/lib/helpers/formatValue";
 
 interface AdminValueCardProps {
@@ -11,6 +19,7 @@ interface AdminValueCardProps {
   type?: "currency" | "BTC" | "number";
   onClick?: () => void;
   borderColor?: string; // Color for left border (e.g., "#757575" for DB, "#1565C0" for Luxor, etc.)
+  infoText?: React.ReactNode; // Shown in a tooltip explaining how the value is calculated
 }
 
 export default function AdminValueCard({
@@ -20,6 +29,7 @@ export default function AdminValueCard({
   type = "number",
   onClick,
   borderColor,
+  infoText,
 }: AdminValueCardProps) {
   const formattedValue = formatValue(value, type);
 
@@ -46,16 +56,34 @@ export default function AdminValueCard({
       }}
     >
       <CardContent>
-        <Typography
-          variant="h6"
-          color="textSecondary"
-          sx={{
-            mb: 1,
-            fontWeight: 500,
-          }}
-        >
-          {title}
-        </Typography>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mb: 1 }}>
+          <Typography
+            variant="h6"
+            color="textSecondary"
+            sx={{
+              fontWeight: 500,
+            }}
+          >
+            {title}
+          </Typography>
+          {infoText && (
+            <Tooltip
+              title={infoText}
+              arrow
+              enterTouchDelay={0}
+              leaveTouchDelay={5000}
+            >
+              <IconButton
+                size="small"
+                onClick={(e) => e.stopPropagation()}
+                sx={{ p: 0.25, color: "text.secondary" }}
+                aria-label={`How ${title} is calculated`}
+              >
+                <InfoOutlinedIcon sx={{ fontSize: 16 }} />
+              </IconButton>
+            </Tooltip>
+          )}
+        </Box>
         <Box sx={{ display: "flex", alignItems: "baseline", gap: 1 }}>
           {subtitle && (
             <Typography variant="h4" color="primary" sx={{ fontWeight: 600 }}>

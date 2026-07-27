@@ -6,10 +6,10 @@ import { Prisma } from "@prisma/client";
 /**
  * Drill-down for the adminpanel "Total Customer Balance" card. Mirrors the
  * exact where-clause used by /api/admin/dashboard for that card's
- * aggregate: type != HARDWARE_SALES, all-time (no createdAt filter). No
- * sign flip is applied — this is a net ledger balance, not a revenue figure,
- * so PAYMENT (positive) and ELECTRICITY_CHARGES (negative) rows are shown
- * as stored.
+ * aggregate: type != HARDWARE_SALES, user not soft-deleted, all-time (no
+ * createdAt filter). No sign flip is applied — this is a net ledger
+ * balance, not a revenue figure, so PAYMENT (positive) and
+ * ELECTRICITY_CHARGES (negative) rows are shown as stored.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -51,6 +51,7 @@ export async function GET(request: NextRequest) {
 
     const where: Prisma.CostPaymentWhereInput = {
       type: { not: "HARDWARE_SALES" },
+      user: { isDeleted: false },
     };
 
     const [
@@ -61,15 +62,15 @@ export async function GET(request: NextRequest) {
       transactions,
     ] = await Promise.all([
       prisma.costPayment.aggregate({
-        where: { type: "PAYMENT" },
+        where: { type: "PAYMENT", user: { isDeleted: false } },
         _sum: { amount: true },
       }),
       prisma.costPayment.aggregate({
-        where: { type: "ELECTRICITY_CHARGES" },
+        where: { type: "ELECTRICITY_CHARGES", user: { isDeleted: false } },
         _sum: { amount: true },
       }),
       prisma.costPayment.aggregate({
-        where: { type: "ADJUSTMENT" },
+        where: { type: "ADJUSTMENT", user: { isDeleted: false } },
         _sum: { amount: true },
       }),
       prisma.costPayment.count({ where }),

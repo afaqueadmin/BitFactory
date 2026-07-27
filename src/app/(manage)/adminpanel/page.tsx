@@ -602,6 +602,7 @@ export default function AdminDashboard() {
             borderColor="#757575"
             value={stats?.financial.monthlyRevenue ?? 0}
             type="currency"
+            infoText="Sum of Electricity Charges and Adjustments (cost payments) from the last 30 days, flipped to a positive value. Excludes Payments and Hardware Sales."
             onClick={() => router.push("/admin/monthly-revenue")}
           />
 
@@ -611,6 +612,7 @@ export default function AdminDashboard() {
             borderColor="#757575"
             value={stats?.financial.totalCustomerBalance ?? 0}
             type="currency"
+            infoText="Sum of all Payments, Electricity Charges, and Adjustments (cost payments) across active customers, all-time. Excludes Hardware Sales and deleted customers."
             onClick={() => router.push("/admin/customer-balance")}
           />
 
