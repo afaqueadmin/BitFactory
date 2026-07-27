@@ -843,7 +843,7 @@ export async function GET(request: NextRequest) {
 
     // Fetch customer balance information
     const totalCustomerBalance = await prisma.costPayment.aggregate({
-      where: { type: { not: "HARDWARE_SALES" } },
+      where: { type: { not: "HARDWARE_SALES" }, user: { isDeleted: false } },
       _sum: {
         amount: true,
       },

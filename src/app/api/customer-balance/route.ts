@@ -46,6 +46,7 @@ export async function GET(request: NextRequest) {
     const users = await prisma.user.findMany({
       where: {
         id: { in: userIds },
+        isDeleted: false,
         luxorSubaccountName: { not: { contains: "higgs_test" } },
         ...franchiseeUserFilter({ id: userId, role: userRole }),
       },
