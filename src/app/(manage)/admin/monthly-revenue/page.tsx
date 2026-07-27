@@ -21,6 +21,7 @@ import {
   useMonthlyRevenueDetail,
   MonthlyRevenueDetailFilters,
 } from "@/lib/hooks/admin/useMonthlyRevenueDetail";
+import { useCustomers, Customer } from "@/lib/hooks/useInvoices";
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
 import CostPaymentTransactionsTable from "@/components/admin/CostPaymentTransactionsTable";
 
@@ -36,17 +37,19 @@ export default function MonthlyRevenueDetailPage() {
   const [typeFilter, setTypeFilter] = useState<
     "" | "ELECTRICITY_CHARGES" | "ADJUSTMENT"
   >("");
-  const [customerFilter, setCustomerFilter] = useState("");
+  const [customerId, setCustomerId] = useState("");
   const [startDateFilter, setStartDateFilter] = useState("");
   const [endDateFilter, setEndDateFilter] = useState("");
 
+  const { customers, loading: customersLoading } = useCustomers();
+
   const isFiltered = Boolean(
-    typeFilter || customerFilter || startDateFilter || endDateFilter,
+    typeFilter || customerId || startDateFilter || endDateFilter,
   );
 
   const filters: MonthlyRevenueDetailFilters = {
     type: typeFilter || undefined,
-    customer: customerFilter || undefined,
+    customerId: customerId || undefined,
     startDate: startDateFilter || undefined,
     endDate: endDateFilter || undefined,
   };
@@ -73,7 +76,7 @@ export default function MonthlyRevenueDetailPage() {
 
       const params = new URLSearchParams({ sortBy, sortOrder });
       if (typeFilter) params.set("type", typeFilter);
-      if (customerFilter) params.set("customer", customerFilter);
+      if (customerId) params.set("customerId", customerId);
       if (startDateFilter) params.set("startDate", startDateFilter);
       if (endDateFilter) params.set("endDate", endDateFilter);
 
@@ -247,14 +250,23 @@ export default function MonthlyRevenueDetailPage() {
               InputLabelProps={{ shrink: true }}
             />
             <TextField
-              label="Customer (name or email)"
+              select
+              label="Customer"
               size="small"
-              value={customerFilter}
+              value={customerId}
               onChange={(e) => {
-                setCustomerFilter(e.target.value);
+                setCustomerId(e.target.value);
                 resetToFirstPage();
               }}
-            />
+              disabled={customersLoading}
+            >
+              <MenuItem value="">All customers</MenuItem>
+              {customers.map((c: Customer) => (
+                <MenuItem key={c.id} value={c.id}>
+                  {c.displayName}
+                </MenuItem>
+              ))}
+            </TextField>
             <TextField
               select
               label="Type"

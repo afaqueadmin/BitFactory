@@ -50,7 +50,7 @@ export function parseMonthlyRevenueQuery(url: URL): ParsedMonthlyRevenueQuery {
   const sortOrder: "asc" | "desc" = sortOrderParam === "asc" ? "asc" : "desc";
   const sortBy = SORT_FIELDS.has(sortByParam) ? sortByParam : "createdAt";
   const typeParam = url.searchParams.get("type");
-  const customerParam = url.searchParams.get("customer")?.trim();
+  const customerIdParam = url.searchParams.get("customerId")?.trim();
   const startDateParam = url.searchParams.get("startDate");
   const endDateParam = url.searchParams.get("endDate");
 
@@ -90,16 +90,7 @@ export function parseMonthlyRevenueQuery(url: URL): ParsedMonthlyRevenueQuery {
   const where: Prisma.CostPaymentWhereInput = {
     type: baseTypeFilter,
     createdAt: { gte: effectiveStart, lte: effectiveEnd },
-    ...(customerParam
-      ? {
-          user: {
-            OR: [
-              { name: { contains: customerParam, mode: "insensitive" } },
-              { email: { contains: customerParam, mode: "insensitive" } },
-            ],
-          },
-        }
-      : {}),
+    ...(customerIdParam ? { userId: customerIdParam } : {}),
   };
 
   return { sortBy, sortOrder, where, effectiveStart, effectiveEnd };

@@ -36,7 +36,7 @@ interface MonthlyRevenueDetailResponse {
 
 export interface MonthlyRevenueDetailFilters {
   type?: "ELECTRICITY_CHARGES" | "ADJUSTMENT";
-  customer?: string;
+  customerId?: string;
   startDate?: string;
   endDate?: string;
 }
@@ -52,7 +52,7 @@ export const useMonthlyRevenueDetail = (
   filters: MonthlyRevenueDetailFilters = {},
   sort: MonthlyRevenueDetailSort = {},
 ) => {
-  const { type, customer, startDate, endDate } = filters;
+  const { type, customerId, startDate, endDate } = filters;
   const { sortBy, sortOrder } = sort;
 
   const { data, isLoading, error, refetch } =
@@ -62,7 +62,7 @@ export const useMonthlyRevenueDetail = (
         page,
         pageSize,
         type,
-        customer,
+        customerId,
         startDate,
         endDate,
         sortBy,
@@ -74,7 +74,7 @@ export const useMonthlyRevenueDetail = (
           pageSize: pageSize.toString(),
         });
         if (type) params.set("type", type);
-        if (customer) params.set("customer", customer);
+        if (customerId) params.set("customerId", customerId);
         if (startDate) params.set("startDate", startDate);
         if (endDate) params.set("endDate", endDate);
         if (sortBy) params.set("sortBy", sortBy);
