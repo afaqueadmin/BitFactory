@@ -13,8 +13,10 @@ import {
   Alert,
   TextField,
   MenuItem,
+  CircularProgress,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import DownloadIcon from "@mui/icons-material/Download";
 import {
   useMonthlyRevenueDetail,
   MonthlyRevenueDetailFilters,
@@ -28,6 +30,8 @@ export default function MonthlyRevenueDetailPage() {
   const [pageSize, setPageSize] = useState(25);
   const [sortBy, setSortBy] = useState("createdAt");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [downloadLoading, setDownloadLoading] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
 
   const [typeFilter, setTypeFilter] = useState<
     "" | "ELECTRICITY_CHARGES" | "ADJUSTMENT"
@@ -35,6 +39,10 @@ export default function MonthlyRevenueDetailPage() {
   const [customerFilter, setCustomerFilter] = useState("");
   const [startDateFilter, setStartDateFilter] = useState("");
   const [endDateFilter, setEndDateFilter] = useState("");
+
+  const isFiltered = Boolean(
+    typeFilter || customerFilter || startDateFilter || endDateFilter,
+  );
 
   const filters: MonthlyRevenueDetailFilters = {
     type: typeFilter || undefined,
@@ -57,6 +65,44 @@ export default function MonthlyRevenueDetailPage() {
   };
 
   const resetToFirstPage = () => setPage(0);
+
+  const handleDownloadPdf = async () => {
+    try {
+      setDownloadLoading(true);
+      setDownloadError(null);
+
+      const params = new URLSearchParams({ sortBy, sortOrder });
+      if (typeFilter) params.set("type", typeFilter);
+      if (customerFilter) params.set("customer", customerFilter);
+      if (startDateFilter) params.set("startDate", startDateFilter);
+      if (endDateFilter) params.set("endDate", endDateFilter);
+
+      const response = await fetch(
+        `/api/admin/monthly-revenue/pdf?${params.toString()}`,
+        { credentials: "include" },
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to generate PDF");
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `monthly-revenue-${new Date().toISOString().slice(0, 10)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (err) {
+      setDownloadError(
+        err instanceof Error ? err.message : "Failed to download PDF",
+      );
+    } finally {
+      setDownloadLoading(false);
+    }
+  };
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
@@ -82,6 +128,11 @@ export default function MonthlyRevenueDetailPage() {
           {error}
         </Alert>
       )}
+      {downloadError && (
+        <Alert severity="error" sx={{ mb: 3 }}>
+          {downloadError}
+        </Alert>
+      )}
 
       <Card sx={{ mb: 4 }}>
         <CardContent>
@@ -97,7 +148,7 @@ export default function MonthlyRevenueDetailPage() {
           >
             <Box>
               <Typography color="textSecondary" variant="body2">
-                Electricity Charges (sum, last 30 days)
+                Electricity Charges (sum)
               </Typography>
               <Typography sx={{ fontWeight: 600 }}>
                 <CurrencyDisplay value={summary?.sumElectricityCharges ?? 0} />
@@ -105,7 +156,7 @@ export default function MonthlyRevenueDetailPage() {
             </Box>
             <Box>
               <Typography color="textSecondary" variant="body2">
-                Adjustments (sum, last 30 days)
+                Adjustments (sum)
               </Typography>
               <Typography sx={{ fontWeight: 600 }}>
                 <CurrencyDisplay value={summary?.sumAdjustment ?? 0} />
@@ -132,7 +183,7 @@ export default function MonthlyRevenueDetailPage() {
             </Box>
             <Box>
               <Typography color="textSecondary" variant="body2">
-                Displayed on dashboard card (raw total &times; -1)
+                Total (raw total &times; -1)
               </Typography>
               <Typography variant="h5" sx={{ fontWeight: 700 }}>
                 <CurrencyDisplay value={summary?.displayTotal ?? 0} />
@@ -147,10 +198,10 @@ export default function MonthlyRevenueDetailPage() {
               sx={{ mt: 2, display: "block" }}
             >
               Period: {new Date(summary.periodStart).toLocaleString()} to{" "}
-              {new Date(summary.periodEnd).toLocaleString()} (rolling 30-day
-              window, recalculated each time this page loads). The numbers above
-              never change based on the filters below — filters only narrow
-              which transactions are listed.
+              {new Date(summary.periodEnd).toLocaleString()}.{" "}
+              {isFiltered
+                ? "These 4 numbers are recalculated from the filtered transactions below — they no longer match the dashboard card while a filter is active."
+                : "No filters applied — these 4 numbers match the dashboard card exactly."}
             </Typography>
           )}
         </CardContent>
@@ -226,9 +277,28 @@ export default function MonthlyRevenueDetailPage() {
         </CardContent>
       </Card>
 
-      <Typography variant="h6" sx={{ mb: 2 }}>
-        Transactions ({pagination?.totalCount ?? 0})
-      </Typography>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          mb: 2,
+        }}
+      >
+        <Typography variant="h6">
+          Transactions ({pagination?.totalCount ?? 0})
+        </Typography>
+        <Button
+          startIcon={
+            downloadLoading ? <CircularProgress size={16} /> : <DownloadIcon />
+          }
+          variant="outlined"
+          onClick={handleDownloadPdf}
+          disabled={downloadLoading}
+        >
+          {downloadLoading ? "Generating PDF..." : "Download PDF"}
+        </Button>
+      </Box>
       <CostPaymentTransactionsTable
         transactions={transactions}
         loading={loading}
