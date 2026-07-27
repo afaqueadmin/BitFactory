@@ -9,6 +9,7 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  TableSortLabel,
   TablePagination,
   Typography,
   CircularProgress,
@@ -35,6 +36,21 @@ const TYPE_LABELS: Record<string, string> = {
   HARDWARE_SALES: "Hardware sales payment",
 };
 
+type RowsPerPageOption = number | { value: number; label: string };
+
+const HEAD_CELLS: Array<{
+  id: string;
+  label: string;
+  align: "left" | "right";
+}> = [
+  { id: "createdAt", label: "Date", align: "left" },
+  { id: "customer", label: "Customer", align: "left" },
+  { id: "type", label: "Type", align: "left" },
+  { id: "amount", label: "Amount", align: "right" },
+  { id: "invoiceNumber", label: "Invoice #", align: "left" },
+  { id: "narration", label: "Narration", align: "left" },
+];
+
 interface CostPaymentTransactionsTableProps {
   transactions: TransactionRow[];
   loading: boolean;
@@ -43,6 +59,10 @@ interface CostPaymentTransactionsTableProps {
   totalCount: number;
   onPageChange: (page: number) => void;
   onPageSizeChange: (pageSize: number) => void;
+  rowsPerPageOptions?: RowsPerPageOption[];
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
+  onSortChange?: (field: string) => void;
 }
 
 export default function CostPaymentTransactionsTable({
@@ -53,6 +73,10 @@ export default function CostPaymentTransactionsTable({
   totalCount,
   onPageChange,
   onPageSizeChange,
+  rowsPerPageOptions = [10, 25, 50, 100],
+  sortBy,
+  sortOrder,
+  onSortChange,
 }: CostPaymentTransactionsTableProps) {
   const theme = useTheme();
 
@@ -79,14 +103,26 @@ export default function CostPaymentTransactionsTable({
             <Table sx={{ minWidth: 750 }} size="small">
               <TableHead>
                 <TableRow>
-                  <TableCell sx={{ fontWeight: "bold" }}>Date</TableCell>
-                  <TableCell sx={{ fontWeight: "bold" }}>Customer</TableCell>
-                  <TableCell sx={{ fontWeight: "bold" }}>Type</TableCell>
-                  <TableCell sx={{ fontWeight: "bold" }} align="right">
-                    Amount
-                  </TableCell>
-                  <TableCell sx={{ fontWeight: "bold" }}>Invoice #</TableCell>
-                  <TableCell sx={{ fontWeight: "bold" }}>Narration</TableCell>
+                  {HEAD_CELLS.map((cell) => (
+                    <TableCell
+                      key={cell.id}
+                      align={cell.align}
+                      sx={{ fontWeight: "bold" }}
+                      sortDirection={sortBy === cell.id ? sortOrder : false}
+                    >
+                      {onSortChange ? (
+                        <TableSortLabel
+                          active={sortBy === cell.id}
+                          direction={sortBy === cell.id ? sortOrder : "asc"}
+                          onClick={() => onSortChange(cell.id)}
+                        >
+                          {cell.label}
+                        </TableSortLabel>
+                      ) : (
+                        cell.label
+                      )}
+                    </TableCell>
+                  ))}
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -152,7 +188,7 @@ export default function CostPaymentTransactionsTable({
             </Table>
           </TableContainer>
           <TablePagination
-            rowsPerPageOptions={[10, 25, 50, 100]}
+            rowsPerPageOptions={rowsPerPageOptions}
             component="div"
             count={totalCount}
             rowsPerPage={pageSize}

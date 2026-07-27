@@ -11,9 +11,14 @@ import {
   CardContent,
   Divider,
   Alert,
+  TextField,
+  MenuItem,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
-import { useMonthlyRevenueDetail } from "@/lib/hooks/admin/useMonthlyRevenueDetail";
+import {
+  useMonthlyRevenueDetail,
+  MonthlyRevenueDetailFilters,
+} from "@/lib/hooks/admin/useMonthlyRevenueDetail";
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
 import CostPaymentTransactionsTable from "@/components/admin/CostPaymentTransactionsTable";
 
@@ -21,9 +26,37 @@ export default function MonthlyRevenueDetailPage() {
   const router = useRouter();
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(25);
+  const [sortBy, setSortBy] = useState("createdAt");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+
+  const [typeFilter, setTypeFilter] = useState<
+    "" | "ELECTRICITY_CHARGES" | "ADJUSTMENT"
+  >("");
+  const [customerFilter, setCustomerFilter] = useState("");
+  const [startDateFilter, setStartDateFilter] = useState("");
+  const [endDateFilter, setEndDateFilter] = useState("");
+
+  const filters: MonthlyRevenueDetailFilters = {
+    type: typeFilter || undefined,
+    customer: customerFilter || undefined,
+    startDate: startDateFilter || undefined,
+    endDate: endDateFilter || undefined,
+  };
 
   const { summary, transactions, pagination, loading, error } =
-    useMonthlyRevenueDetail(page, pageSize);
+    useMonthlyRevenueDetail(page, pageSize, filters, { sortBy, sortOrder });
+
+  const handleSortChange = (field: string) => {
+    if (sortBy === field) {
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+    } else {
+      setSortBy(field);
+      setSortOrder("asc");
+    }
+    setPage(0);
+  };
+
+  const resetToFirstPage = () => setPage(0);
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
@@ -115,9 +148,81 @@ export default function MonthlyRevenueDetailPage() {
             >
               Period: {new Date(summary.periodStart).toLocaleString()} to{" "}
               {new Date(summary.periodEnd).toLocaleString()} (rolling 30-day
-              window, recalculated each time this page loads)
+              window, recalculated each time this page loads). The numbers above
+              never change based on the filters below — filters only narrow
+              which transactions are listed.
             </Typography>
           )}
+        </CardContent>
+      </Card>
+
+      <Card sx={{ mb: 3 }}>
+        <CardContent>
+          <Typography variant="h6" sx={{ mb: 2 }}>
+            Filters
+          </Typography>
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: {
+                xs: "1fr",
+                sm: "1fr 1fr",
+                md: "1fr 1fr 1fr 1fr",
+              },
+              gap: 2,
+            }}
+          >
+            <TextField
+              label="From date"
+              type="date"
+              size="small"
+              value={startDateFilter}
+              onChange={(e) => {
+                setStartDateFilter(e.target.value);
+                resetToFirstPage();
+              }}
+              InputLabelProps={{ shrink: true }}
+              helperText="Narrows within the 30-day window"
+            />
+            <TextField
+              label="To date"
+              type="date"
+              size="small"
+              value={endDateFilter}
+              onChange={(e) => {
+                setEndDateFilter(e.target.value);
+                resetToFirstPage();
+              }}
+              InputLabelProps={{ shrink: true }}
+            />
+            <TextField
+              label="Customer (name or email)"
+              size="small"
+              value={customerFilter}
+              onChange={(e) => {
+                setCustomerFilter(e.target.value);
+                resetToFirstPage();
+              }}
+            />
+            <TextField
+              select
+              label="Type"
+              size="small"
+              value={typeFilter}
+              onChange={(e) => {
+                setTypeFilter(
+                  e.target.value as "" | "ELECTRICITY_CHARGES" | "ADJUSTMENT",
+                );
+                resetToFirstPage();
+              }}
+            >
+              <MenuItem value="">All</MenuItem>
+              <MenuItem value="ELECTRICITY_CHARGES">
+                Hosting & electricity charges
+              </MenuItem>
+              <MenuItem value="ADJUSTMENT">Adjustment</MenuItem>
+            </TextField>
+          </Box>
         </CardContent>
       </Card>
 
@@ -135,6 +240,10 @@ export default function MonthlyRevenueDetailPage() {
           setPageSize(newSize);
           setPage(0);
         }}
+        rowsPerPageOptions={[10, 25, 50, 100, { value: 9999, label: "Max" }]}
+        sortBy={sortBy}
+        sortOrder={sortOrder}
+        onSortChange={handleSortChange}
       />
     </Container>
   );

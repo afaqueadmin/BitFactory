@@ -34,16 +34,54 @@ interface MonthlyRevenueDetailResponse {
   };
 }
 
+export interface MonthlyRevenueDetailFilters {
+  type?: "ELECTRICITY_CHARGES" | "ADJUSTMENT";
+  customer?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
+export interface MonthlyRevenueDetailSort {
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
+}
+
 export const useMonthlyRevenueDetail = (
   page: number = 0,
   pageSize: number = 25,
+  filters: MonthlyRevenueDetailFilters = {},
+  sort: MonthlyRevenueDetailSort = {},
 ) => {
+  const { type, customer, startDate, endDate } = filters;
+  const { sortBy, sortOrder } = sort;
+
   const { data, isLoading, error, refetch } =
     useQuery<MonthlyRevenueDetailResponse>({
-      queryKey: ["adminMonthlyRevenueDetail", page, pageSize],
+      queryKey: [
+        "adminMonthlyRevenueDetail",
+        page,
+        pageSize,
+        type,
+        customer,
+        startDate,
+        endDate,
+        sortBy,
+        sortOrder,
+      ],
       queryFn: async () => {
+        const params = new URLSearchParams({
+          page: page.toString(),
+          pageSize: pageSize.toString(),
+        });
+        if (type) params.set("type", type);
+        if (customer) params.set("customer", customer);
+        if (startDate) params.set("startDate", startDate);
+        if (endDate) params.set("endDate", endDate);
+        if (sortBy) params.set("sortBy", sortBy);
+        if (sortOrder) params.set("sortOrder", sortOrder);
+
         const response = await fetch(
-          `/api/admin/monthly-revenue?page=${page}&pageSize=${pageSize}`,
+          `/api/admin/monthly-revenue?${params.toString()}`,
         );
 
         if (!response.ok) {

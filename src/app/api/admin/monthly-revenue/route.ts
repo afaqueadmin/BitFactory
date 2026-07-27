@@ -5,12 +5,44 @@ import { Prisma } from "@prisma/client";
 
 /**
  * Drill-down for the adminpanel "Monthly Revenue (30 days)" card.
- * Mirrors the exact where-clause used by /api/admin/dashboard for that
- * card's aggregate: type in [ELECTRICITY_CHARGES, ADJUSTMENT], createdAt
- * within the last 30 days. The card negates the raw sum (charges are
- * stored negative); this route returns both the raw and negated totals so
- * the itemized rows below can be reconciled against the displayed value.
+ * The summary block always reflects the exact same aggregate as the card
+ * itself: type in [ELECTRICITY_CHARGES, ADJUSTMENT], createdAt within the
+ * last 30 days, summed then sign-flipped for display. Filters (date range,
+ * customer, type) and sorting only affect the itemized `transactions` list
+ * below it — they never change the summary numbers, so the headline total
+ * always matches the card regardless of how the list is filtered/sorted.
  */
+
+const SORT_FIELDS = new Set([
+  "createdAt",
+  "type",
+  "amount",
+  "narration",
+  "customer",
+  "invoiceNumber",
+]);
+
+function buildOrderBy(
+  sortBy: string,
+  sortOrder: "asc" | "desc",
+): Prisma.CostPaymentOrderByWithRelationInput {
+  switch (sortBy) {
+    case "type":
+      return { type: sortOrder };
+    case "amount":
+      return { amount: sortOrder };
+    case "narration":
+      return { narration: sortOrder };
+    case "customer":
+      return { user: { name: sortOrder } };
+    case "invoiceNumber":
+      return { invoice: { invoiceNumber: sortOrder } };
+    case "createdAt":
+    default:
+      return { createdAt: sortOrder };
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
     const token = request.cookies.get("token")?.value;
@@ -41,19 +73,68 @@ export async function GET(request: NextRequest) {
     const url = new URL(request.url);
     const page = parseInt(url.searchParams.get("page") || "0", 10);
     const pageSize = parseInt(url.searchParams.get("pageSize") || "25", 10);
+    const sortByParam = url.searchParams.get("sortBy") || "createdAt";
+    const sortOrderParam = url.searchParams.get("sortOrder");
+    const sortOrder: "asc" | "desc" = sortOrderParam === "asc" ? "asc" : "desc";
+    const sortBy = SORT_FIELDS.has(sortByParam) ? sortByParam : "createdAt";
+    const typeParam = url.searchParams.get("type");
+    const customerParam = url.searchParams.get("customer")?.trim();
+    const startDateParam = url.searchParams.get("startDate");
+    const endDateParam = url.searchParams.get("endDate");
 
-    if (page < 0 || pageSize < 1 || pageSize > 200) {
+    if (page < 0 || pageSize < 1 || pageSize > 9999) {
       return NextResponse.json(
         { error: "Invalid pagination parameters" },
         { status: 400 },
       );
     }
 
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    // Date filter narrows within the mandatory 30-day window — it can never
+    // widen it, so the itemized list can never drift outside the period the
+    // summary/card actually cover.
+    let effectiveStart = thirtyDaysAgo;
+    if (startDateParam) {
+      const parsed = new Date(startDateParam);
+      if (
+        !isNaN(parsed.getTime()) &&
+        parsed.getTime() > thirtyDaysAgo.getTime()
+      ) {
+        effectiveStart = parsed;
+      }
+    }
+
+    let effectiveEnd = now;
+    if (endDateParam) {
+      const parsed = new Date(endDateParam);
+      if (!isNaN(parsed.getTime())) {
+        parsed.setHours(23, 59, 59, 999);
+        if (parsed.getTime() < now.getTime()) {
+          effectiveEnd = parsed;
+        }
+      }
+    }
+
+    const baseTypeFilter: Prisma.CostPaymentWhereInput["type"] =
+      typeParam === "ELECTRICITY_CHARGES" || typeParam === "ADJUSTMENT"
+        ? typeParam
+        : { in: ["ELECTRICITY_CHARGES", "ADJUSTMENT"] };
 
     const where: Prisma.CostPaymentWhereInput = {
-      type: { in: ["ELECTRICITY_CHARGES", "ADJUSTMENT"] },
-      createdAt: { gte: thirtyDaysAgo },
+      type: baseTypeFilter,
+      createdAt: { gte: effectiveStart, lte: effectiveEnd },
+      ...(customerParam
+        ? {
+            user: {
+              OR: [
+                { name: { contains: customerParam, mode: "insensitive" } },
+                { email: { contains: customerParam, mode: "insensitive" } },
+              ],
+            },
+          }
+        : {}),
     };
 
     const [electricitySum, adjustmentSum, totalCount, transactions] =
@@ -72,7 +153,7 @@ export async function GET(request: NextRequest) {
         prisma.costPayment.count({ where }),
         prisma.costPayment.findMany({
           where,
-          orderBy: { createdAt: "desc" },
+          orderBy: buildOrderBy(sortBy, sortOrder),
           skip: page * pageSize,
           take: pageSize,
           include: {
@@ -94,7 +175,7 @@ export async function GET(request: NextRequest) {
       data: {
         summary: {
           periodStart: thirtyDaysAgo.toISOString(),
-          periodEnd: new Date().toISOString(),
+          periodEnd: now.toISOString(),
           sumElectricityCharges,
           sumAdjustment,
           rawTotal,
