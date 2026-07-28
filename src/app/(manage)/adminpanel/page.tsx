@@ -310,9 +310,9 @@ export default function AdminDashboard() {
       "Monthly Revenue (30 days)",
       "Total Customer Balance",
       "Total Customers",
-      "Hosting and Colocation",
-      "Hosting Cost",
-      "Hosting Profit",
+      "Hosting and Colocation (Invoice)",
+      "Hosting Cost (Invoice)",
+      "Hosting Profit (Invoice)",
       "Hardware Revenue",
       "Hardware Revenue Pending",
       "Hardware Cost",
@@ -763,26 +763,29 @@ export default function AdminDashboard() {
 
           {/* Hosting and Colocation - From ELECTRICITY_CHARGES invoices (DRAFT/ISSUED/OVERDUE/PAID) */}
           <AdminValueCard
-            title="Hosting and Colocation"
+            title="Hosting and Colocation (Invoice)"
             borderColor="#757575"
             value={hostingRevenueData?.hostingRevenue ?? 0}
             type="currency"
+            infoText="Sum of the total amount on all Electricity Charges invoices with status Draft, Issued, Overdue, or Paid. Cancelled and Refunded invoices are excluded. Includes unpaid and overdue invoices, not just ones customers have actually paid."
           />
 
           {/* Hosting Cost - implemented */}
           <AdminValueCard
-            title="Hosting Cost"
+            title="Hosting Cost (Invoice)"
             borderColor="#757575"
             value={vendorInvoicesTotalAmount}
             type="currency"
+            infoText="Sum of the total amount on all Vendor Invoices (what Bitfactory owes the hosting vendor), excluding Cancelled and deleted ones. Includes both Pending and Paid vendor invoices, not just paid ones."
           />
 
           {/* Hosting Profit - implemented */}
           <AdminValueCard
-            title="Hosting Profit"
+            title="Hosting Profit (Invoice)"
             borderColor="#757575"
             value={hostingProfit}
             type="currency"
+            infoText="Hosting and Colocation (Invoice) minus Hosting Cost (Invoice) — what customers were invoiced for hosting minus what the vendor invoiced Bitfactory for the same, regardless of whether either invoice has actually been paid yet."
           />
 
           {/* Hardware Revenue - From Cost Payments (HARDWARE_SALES payments) */}

@@ -1,15 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
-import { Prisma } from "@prisma/client";
+import { buildOrderBy, parseCustomerBalanceQuery } from "./query";
 
 /**
- * Drill-down for the adminpanel "Total Customer Balance" card. Mirrors the
- * exact where-clause used by /api/admin/dashboard for that card's
- * aggregate: type != HARDWARE_SALES, user not soft-deleted, all-time (no
- * createdAt filter). No sign flip is applied — this is a net ledger
- * balance, not a revenue figure, so PAYMENT (positive) and
- * ELECTRICITY_CHARGES (negative) rows are shown as stored.
+ * Drill-down for the adminpanel "Total Customer Balance" card. With no
+ * filters applied, the summary matches the card exactly: type !=
+ * HARDWARE_SALES, user not soft-deleted, all-time (no createdAt filter). No
+ * sign flip is applied — this is a net ledger balance, not a revenue
+ * figure. When date/customer/type filters are applied, the summary is
+ * recomputed over that same filtered subset (via the same `where` used for
+ * the transaction list), so it no longer matches the card — it reflects
+ * exactly what's listed below.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -42,18 +44,19 @@ export async function GET(request: NextRequest) {
     const page = parseInt(url.searchParams.get("page") || "0", 10);
     const pageSize = parseInt(url.searchParams.get("pageSize") || "25", 10);
 
-    if (page < 0 || pageSize < 1 || pageSize > 200) {
+    if (page < 0 || pageSize < 1 || pageSize > 9999) {
       return NextResponse.json(
         { error: "Invalid pagination parameters" },
         { status: 400 },
       );
     }
 
-    const where: Prisma.CostPaymentWhereInput = {
-      type: { not: "HARDWARE_SALES" },
-      user: { isDeleted: false },
-    };
+    const { sortBy, sortOrder, where } = parseCustomerBalanceQuery(url);
 
+    // Summary buckets use the exact same where-clause as the transaction
+    // list (date range + customer filter), each intersected with a single
+    // type — so the summary always reflects the filtered subset currently
+    // being listed below, not the fixed unfiltered all-time card total.
     const [
       paymentSum,
       electricitySum,
@@ -62,21 +65,21 @@ export async function GET(request: NextRequest) {
       transactions,
     ] = await Promise.all([
       prisma.costPayment.aggregate({
-        where: { type: "PAYMENT", user: { isDeleted: false } },
+        where: { AND: [where, { type: "PAYMENT" }] },
         _sum: { amount: true },
       }),
       prisma.costPayment.aggregate({
-        where: { type: "ELECTRICITY_CHARGES", user: { isDeleted: false } },
+        where: { AND: [where, { type: "ELECTRICITY_CHARGES" }] },
         _sum: { amount: true },
       }),
       prisma.costPayment.aggregate({
-        where: { type: "ADJUSTMENT", user: { isDeleted: false } },
+        where: { AND: [where, { type: "ADJUSTMENT" }] },
         _sum: { amount: true },
       }),
       prisma.costPayment.count({ where }),
       prisma.costPayment.findMany({
         where,
-        orderBy: { createdAt: "desc" },
+        orderBy: buildOrderBy(sortBy, sortOrder),
         skip: page * pageSize,
         take: pageSize,
         include: {

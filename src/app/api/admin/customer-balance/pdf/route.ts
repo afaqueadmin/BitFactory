@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
-import { Prisma } from "@prisma/client";
 import { generatePDFFromHTML } from "@/lib/email";
 import { buildCostPaymentTransactionsPdfHtml } from "@/lib/helpers/admin/costPaymentTransactionsPdf";
+import { buildOrderBy, parseCustomerBalanceQuery } from "../query";
 
-// Hard cap on rows rendered into the PDF — this is an all-time, unpaginated
-// export, so a cap keeps Puppeteer rendering fast even on a large ledger.
+// Hard cap on rows rendered into the PDF — this endpoint is unpaginated by
+// design (it exports the full filtered/sorted result set), so a cap keeps
+// Puppeteer rendering fast even on a large, unfiltered all-time ledger.
 const ROW_LIMIT = 2000;
 
 export async function GET(request: NextRequest) {
@@ -36,10 +37,9 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const where: Prisma.CostPaymentWhereInput = {
-      type: { not: "HARDWARE_SALES" },
-      user: { isDeleted: false },
-    };
+    const url = new URL(request.url);
+    const { sortBy, sortOrder, where, startDate, endDate } =
+      parseCustomerBalanceQuery(url);
 
     const [
       paymentSum,
@@ -49,21 +49,21 @@ export async function GET(request: NextRequest) {
       transactions,
     ] = await Promise.all([
       prisma.costPayment.aggregate({
-        where: { type: "PAYMENT", user: { isDeleted: false } },
+        where: { AND: [where, { type: "PAYMENT" }] },
         _sum: { amount: true },
       }),
       prisma.costPayment.aggregate({
-        where: { type: "ELECTRICITY_CHARGES", user: { isDeleted: false } },
+        where: { AND: [where, { type: "ELECTRICITY_CHARGES" }] },
         _sum: { amount: true },
       }),
       prisma.costPayment.aggregate({
-        where: { type: "ADJUSTMENT", user: { isDeleted: false } },
+        where: { AND: [where, { type: "ADJUSTMENT" }] },
         _sum: { amount: true },
       }),
       prisma.costPayment.count({ where }),
       prisma.costPayment.findMany({
         where,
-        orderBy: { createdAt: "desc" },
+        orderBy: buildOrderBy(sortBy, sortOrder),
         take: ROW_LIMIT,
         include: {
           user: { select: { name: true, email: true } },
@@ -87,9 +87,14 @@ export async function GET(request: NextRequest) {
         currency: "USD",
       }).format(value);
 
+    const subtitle =
+      startDate || endDate
+        ? `Period: ${startDate ? startDate.toLocaleString() : "the beginning"} to ${endDate ? endDate.toLocaleString() : "now"}`
+        : "All-time, every CostPayment row except HARDWARE_SALES";
+
     const html = buildCostPaymentTransactionsPdfHtml({
       title: "Total Customer Balance — Transaction Detail",
-      subtitle: "All-time, every CostPayment row except HARDWARE_SALES",
+      subtitle,
       summaryRows: [
         { label: "Payments (sum)", value: formatCurrency(sumPayment) },
         {
