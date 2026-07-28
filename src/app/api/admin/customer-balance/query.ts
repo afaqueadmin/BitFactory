@@ -87,6 +87,7 @@ export function parseCustomerBalanceQuery(
 
   const where: Prisma.CostPaymentWhereInput = {
     type: baseTypeFilter,
+    isDeleted: false,
     // Excludes self-mining users - this drill-down mirrors the "Total
     // Customer Balance" dashboard card, which is hosted customers only.
     user: { isDeleted: false, segment: { not: "SELF_MINING" } },

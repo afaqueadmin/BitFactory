@@ -996,6 +996,7 @@ export async function GET(request: NextRequest) {
     const totalCustomerBalance = await prisma.costPayment.aggregate({
       where: {
         type: { not: "HARDWARE_SALES" },
+        isDeleted: false,
         user: { isDeleted: false, segment: { not: "SELF_MINING" } },
       },
       _sum: {
@@ -1010,6 +1011,7 @@ export async function GET(request: NextRequest) {
       where: {
         type: { in: ["ELECTRICITY_CHARGES", "ADJUSTMENT"] },
         createdAt: { gte: thirtyDaysAgo },
+        isDeleted: false,
         user: { segment: { not: "SELF_MINING" } },
       },
       _sum: { amount: true },

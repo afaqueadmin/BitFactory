@@ -314,12 +314,14 @@ model CostPayment {
   type        PaymentType
   createdAt   DateTime    @default(now())
   narration   String?
+  isDeleted   Boolean     @default(false)
   user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   invoice     Invoice?    @relation("invoiceCostPayments", fields: [invoiceId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([invoiceId])
   @@index([createdAt])
+  @@index([isDeleted])
   @@map("cost_payments")
 }
 

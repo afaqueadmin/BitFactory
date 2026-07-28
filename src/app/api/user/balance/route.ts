@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
 
     // Get sum of all amounts for this user from cost_payments table
     const result = await prisma.costPayment.aggregate({
-      where: { userId, type: { not: "HARDWARE_SALES" } },
+      where: { userId, type: { not: "HARDWARE_SALES" }, isDeleted: false },
       _sum: {
         amount: true,
       },

@@ -30,6 +30,7 @@ export async function GET(request: NextRequest) {
     const costPayments = await prisma.costPayment.aggregate({
       where: {
         type: "HARDWARE_SALES",
+        isDeleted: false,
       },
       _sum: {
         amount: true,

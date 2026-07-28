@@ -93,6 +93,7 @@ export async function GET(request: NextRequest) {
             type: {
               not: PaymentType.HARDWARE_SALES, // Exclude hardware sales from the running balance amount
             },
+            isDeleted: false,
           },
           select: {
             amount: true,
@@ -135,6 +136,7 @@ export async function GET(request: NextRequest) {
     const totalRevenue = await prisma.costPayment.aggregate({
       where: {
         type: "PAYMENT",
+        isDeleted: false,
       },
       _sum: {
         amount: true,

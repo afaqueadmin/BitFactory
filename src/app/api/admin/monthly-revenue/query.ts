@@ -89,6 +89,7 @@ export function parseMonthlyRevenueQuery(url: URL): ParsedMonthlyRevenueQuery {
 
   const where: Prisma.CostPaymentWhereInput = {
     type: baseTypeFilter,
+    isDeleted: false,
     createdAt: { gte: effectiveStart, lte: effectiveEnd },
     ...(customerIdParam ? { userId: customerIdParam } : {}),
   };

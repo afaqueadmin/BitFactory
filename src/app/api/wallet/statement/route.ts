@@ -93,6 +93,7 @@ export async function GET(request: NextRequest) {
     const allPayments = await prisma.costPayment.findMany({
       where: {
         userId: userId,
+        isDeleted: false,
       },
       orderBy: {
         createdAt: "asc",
@@ -119,6 +120,7 @@ export async function GET(request: NextRequest) {
     const costPayments = await prisma.costPayment.findMany({
       where: {
         userId: userId,
+        isDeleted: false,
         createdAt: {
           gte: start,
           lte: end,

@@ -91,6 +91,7 @@ export async function GET(request: NextRequest) {
 
     const where: Prisma.CostPaymentWhereInput = {
       type: "ADJUSTMENT",
+      isDeleted: false,
       user: { isDeleted: false },
       ...(customerIdParam ? { userId: customerIdParam } : {}),
       ...(startDate || endDate

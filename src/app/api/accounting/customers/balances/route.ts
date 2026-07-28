@@ -31,6 +31,7 @@ export async function GET(request: NextRequest) {
 
     const balancesByCustomer = await prisma.costPayment.groupBy({
       by: ["userId"],
+      where: { isDeleted: false },
       _sum: { amount: true },
     });
 

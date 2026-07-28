@@ -340,7 +340,7 @@ export async function GET(request: NextRequest) {
 
     // ========== FINANCIAL (scoped) ==========
     const totalCustomerBalanceAgg = await prisma.costPayment.aggregate({
-      where: { userId: { in: customerIds } },
+      where: { userId: { in: customerIds }, isDeleted: false },
       _sum: { amount: true },
     });
 
@@ -350,6 +350,7 @@ export async function GET(request: NextRequest) {
         userId: { in: customerIds },
         type: { in: ["ELECTRICITY_CHARGES", "ADJUSTMENT"] },
         createdAt: { gte: thirtyDaysAgo },
+        isDeleted: false,
       },
       _sum: { amount: true },
     });

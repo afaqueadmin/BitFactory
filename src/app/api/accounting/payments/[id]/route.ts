@@ -33,7 +33,7 @@ export async function GET(
       },
     });
 
-    if (!payment) {
+    if (!payment || payment.isDeleted) {
       return NextResponse.json({ error: "Payment not found" }, { status: 404 });
     }
 
@@ -79,12 +79,13 @@ export async function DELETE(
       include: { invoice: true },
     });
 
-    if (!payment) {
+    if (!payment || payment.isDeleted) {
       return NextResponse.json({ error: "Payment not found" }, { status: 404 });
     }
 
-    await prisma.costPayment.delete({
+    await prisma.costPayment.update({
       where: { id },
+      data: { isDeleted: true },
     });
 
     // Log audit

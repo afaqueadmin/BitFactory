@@ -88,7 +88,7 @@ export async function PATCH(
 
     const existing = await prisma.costPayment.findUnique({ where: { id } });
 
-    if (!existing) {
+    if (!existing || existing.isDeleted) {
       return NextResponse.json(
         { error: "Adjustment not found" },
         { status: 404 },
@@ -143,7 +143,7 @@ export async function DELETE(
 
     const existing = await prisma.costPayment.findUnique({ where: { id } });
 
-    if (!existing) {
+    if (!existing || existing.isDeleted) {
       return NextResponse.json(
         { error: "Adjustment not found" },
         { status: 404 },
@@ -157,7 +157,10 @@ export async function DELETE(
       );
     }
 
-    await prisma.costPayment.delete({ where: { id } });
+    await prisma.costPayment.update({
+      where: { id },
+      data: { isDeleted: true },
+    });
 
     await prisma.auditLog.create({
       data: {

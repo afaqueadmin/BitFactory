@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get("page") || "1", 10);
     const limit = parseInt(searchParams.get("limit") || "10", 10);
 
-    const where: Record<string, unknown> = {};
+    const where: Record<string, unknown> = { isDeleted: false };
     if (invoiceId) where.invoiceId = invoiceId;
 
     const skip = (page - 1) * limit;
@@ -123,7 +123,7 @@ export async function POST(request: NextRequest) {
       where: { id: costPaymentId },
     });
 
-    if (!costPayment) {
+    if (!costPayment || costPayment.isDeleted) {
       return NextResponse.json(
         { error: "Cost payment not found" },
         { status: 404 },
@@ -155,7 +155,7 @@ export async function POST(request: NextRequest) {
 
     // Check if invoice is now fully paid
     const totalPaid = await prisma.costPayment.aggregate({
-      where: { invoiceId },
+      where: { invoiceId, isDeleted: false },
       _sum: { amount: true },
     });
 

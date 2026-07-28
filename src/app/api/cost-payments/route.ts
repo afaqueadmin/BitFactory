@@ -58,12 +58,12 @@ export async function GET(request: NextRequest) {
 
     // Fetch total count for pagination
     const totalCount = await prisma.costPayment.count({
-      where: { userId },
+      where: { userId, isDeleted: false },
     });
 
     // Fetch cost payments for the user, ordered by most recent first
     const costPayments = await prisma.costPayment.findMany({
-      where: { userId },
+      where: { userId, isDeleted: false },
       orderBy: { createdAt: "desc" },
       skip: page * pageSize,
       take: pageSize,
@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
 
     // Fetch all payments for this user to calculate running balance
     const allPaymentsForBalance = await prisma.costPayment.findMany({
-      where: { userId },
+      where: { userId, isDeleted: false },
       orderBy: { createdAt: "asc" },
       select: {
         id: true,
