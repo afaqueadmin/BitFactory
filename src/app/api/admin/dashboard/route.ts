@@ -447,27 +447,55 @@ async function fetchRevenueForSubaccountNames(
 }
 
 /**
- * Helper: Fetch the current BTC/USD price (same Binance ticker used by
- * useBitcoinLivePrice on the client) for converting self-mining BTC
- * revenue to USD.
+ * Helper: Fetch the current BTC/USD price for converting self-mining BTC
+ * revenue to USD. Tries Binance first (same ticker used by
+ * useBitcoinLivePrice on the client), then falls back to CoinGecko since
+ * Binance blocks requests from many server/datacenter IPs even though it
+ * works fine from a browser.
  */
 async function fetchCurrentBtcPriceUsd(): Promise<number | null> {
   try {
     const response = await fetch(
       "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT",
     );
+    if (response.ok) {
+      const data = await response.json();
+      const price = parseFloat(data.price);
+      if (Number.isFinite(price)) {
+        return price;
+      }
+    } else {
+      console.error(
+        "[Admin Dashboard] BTC price fetch failed (Binance):",
+        response.status,
+      );
+    }
+  } catch (error) {
+    console.error(
+      "[Admin Dashboard] Error fetching BTC price (Binance):",
+      error,
+    );
+  }
+
+  try {
+    const response = await fetch(
+      "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd",
+    );
     if (!response.ok) {
       console.error(
-        "[Admin Dashboard] BTC price fetch failed:",
+        "[Admin Dashboard] BTC price fetch failed (CoinGecko):",
         response.status,
       );
       return null;
     }
     const data = await response.json();
-    const price = parseFloat(data.price);
+    const price = data?.bitcoin?.usd;
     return Number.isFinite(price) ? price : null;
   } catch (error) {
-    console.error("[Admin Dashboard] Error fetching BTC price:", error);
+    console.error(
+      "[Admin Dashboard] Error fetching BTC price (CoinGecko):",
+      error,
+    );
     return null;
   }
 }

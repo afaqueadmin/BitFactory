@@ -337,6 +337,18 @@ export default function AdminDashboard() {
   };
 
   const poolStats = useMemo(() => getPoolStats(poolMode), [poolMode, stats]);
+
+  // Self-mining revenue is only tracked on Luxor (segment = SELF_MINING users
+  // are identified by their Luxor subaccount), so it's already excluded when
+  // viewing Braiins alone.
+  const totalMinedRevenue = useMemo(() => {
+    const baseRevenue = poolStats?.minedRevenue ?? 0;
+    if (poolMode === "braiins") {
+      return baseRevenue;
+    }
+    const selfMiningRevenueBtc = stats?.financial.selfMiningRevenueBtc ?? 0;
+    return Math.max(0, baseRevenue - selfMiningRevenueBtc);
+  }, [poolStats, poolMode, stats?.financial.selfMiningRevenueBtc]);
   const minersStats = useMemo(
     () => getMinersStats(poolMode),
     [poolMode, stats?.miners],
@@ -624,8 +636,15 @@ export default function AdminDashboard() {
           <AdminValueCard
             title="Total Mined Revenue"
             borderColor={getCardBorderColor("Total Mined Revenue")}
-            value={poolStats?.minedRevenue ?? 0}
+            value={totalMinedRevenue}
             type="BTC"
+            infoText={
+              poolMode === "braiins"
+                ? "Total BTC mined on Braiins across all customers, all-time. Self-mining users aren't tracked separately for Braiins."
+                : "Total BTC mined since 2025-01-01 across all subaccounts at the site (Luxor" +
+                  (poolMode === "total" ? " + Braiins" : "") +
+                  "), excluding BTC mined by customers with segment = SELF_MINING (shown separately in the Self Mining Revenue (BTC) card)."
+            }
           />
 
           {/* Uptime 24h - From Luxor, shows N/A for Braiins */}
