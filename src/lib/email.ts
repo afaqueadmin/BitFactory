@@ -400,6 +400,55 @@ export const generatePDFFromHTML = async (
   }
 };
 
+const PRODUCT_NAME_LABEL = "Hosting & Colocation Charges";
+
+const escapeHtml = (value: string): string =>
+  value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+export interface InvoicePdfLineItem {
+  model: string;
+  quantity: number;
+  unitPrice: number | string;
+  totalPrice: number | string;
+}
+
+const buildProductRowsHtml = (
+  totalMiners: number,
+  unitPrice: number | string,
+  totalAmount: number | string,
+  hardwareModel?: string | null,
+  lineItems?: InvoicePdfLineItem[] | null,
+): string => {
+  const rows =
+    lineItems && lineItems.length > 0
+      ? lineItems.map((item) => ({
+          machineName: item.model,
+          quantity: item.quantity,
+          unitPrice: Number(item.unitPrice),
+          totalPrice: Number(item.totalPrice),
+        }))
+      : [
+          {
+            machineName: hardwareModel || "",
+            quantity: totalMiners,
+            unitPrice: Number(unitPrice),
+            totalPrice: Number(totalAmount),
+          },
+        ];
+
+  return rows
+    .map(
+      (row) => `        <tr>
+          <td>${PRODUCT_NAME_LABEL}</td>
+          <td>${escapeHtml(row.machineName)}</td>
+          <td class="text-right">${row.quantity}</td>
+          <td class="text-right">$${row.unitPrice.toFixed(2)}</td>
+          <td class="text-right">$${row.totalPrice.toFixed(2)}</td>
+        </tr>`,
+    )
+    .join("\n");
+};
+
 /**
  * Generate invoice PDF from template
  */
@@ -419,6 +468,7 @@ export const generateInvoicePDF = async (
   billingMonth?: Date | null,
   invoiceStatus?: string | null,
   paidDate?: Date | null,
+  lineItems?: InvoicePdfLineItem[] | null,
 ): Promise<Buffer> => {
   try {
     // Load PDF template
@@ -480,6 +530,13 @@ export const generateInvoicePDF = async (
       totalMiners,
       unitPrice: `$${Number(unitPrice).toFixed(2)}`,
       totalAmount: `$${Number(totalAmount).toFixed(2)}`,
+      productRows: buildProductRowsHtml(
+        totalMiners,
+        unitPrice,
+        totalAmount,
+        hardwareModel,
+        lineItems,
+      ),
       invoiceId,
       generatedDate: formatDate(generatedDate),
       cryptoPaymentUrl: cryptoPaymentUrl || "",

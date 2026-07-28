@@ -24,6 +24,11 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
 } from "@mui/material";
 import {
   useInvoice,
@@ -514,6 +519,48 @@ export default function InvoiceDetailPage() {
               </Box>
             </CardContent>
           </Card>
+
+          {/* Line Items */}
+          {invoice.lineItems && invoice.lineItems.length > 0 && (
+            <Card sx={{ mt: 3 }}>
+              <CardHeader title="Line Items" />
+              <Divider />
+              <CardContent>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Model</TableCell>
+                      <TableCell align="right">Number of Miners</TableCell>
+                      <TableCell align="right">Unit Price (USD)</TableCell>
+                      <TableCell align="right">Total Price (USD)</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {invoice.lineItems.map(
+                      (item: {
+                        id: string;
+                        model: string;
+                        quantity: number;
+                        unitPrice: number | string;
+                        totalPrice: number | string;
+                      }) => (
+                        <TableRow key={item.id}>
+                          <TableCell>{item.model}</TableCell>
+                          <TableCell align="right">{item.quantity}</TableCell>
+                          <TableCell align="right">
+                            ${Number(item.unitPrice).toFixed(2)}
+                          </TableCell>
+                          <TableCell align="right">
+                            ${Number(item.totalPrice).toFixed(2)}
+                          </TableCell>
+                        </TableRow>
+                      ),
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          )}
         </Box>
 
         {/* Summary Sidebar */}

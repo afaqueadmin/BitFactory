@@ -76,6 +76,7 @@ export async function POST(
                 model: true,
               },
             },
+            lineItems: true,
           },
         },
       },
@@ -107,6 +108,12 @@ export async function POST(
         billingMonth: result.invoice!.billingMonth || undefined,
         invoiceStatus: result.invoice!.status,
         paidDate: result.invoice!.paidDate || undefined,
+        lineItems: result.invoice!.lineItems.map((li) => ({
+          model: li.model,
+          quantity: li.quantity,
+          unitPrice: Number(li.unitPrice),
+          totalPrice: Number(li.totalPrice),
+        })),
       }));
 
     // Send all with service

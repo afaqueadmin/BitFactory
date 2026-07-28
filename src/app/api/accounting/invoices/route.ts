@@ -237,39 +237,114 @@ export async function POST(request: NextRequest) {
       hardwareId,
       billingMonth,
       invoiceGeneratedDate,
+      lineItems,
     } = body;
 
     // Status is always DRAFT when creating new invoices
     // Admins can change to ISSUED after creation via the status change endpoint
     const status = InvoiceStatus.DRAFT;
 
-    if (
-      !customerId ||
-      totalMiners === undefined ||
-      unitPrice === undefined ||
-      !dueDate
-    ) {
+    const hasLineItems = Array.isArray(lineItems) && lineItems.length > 0;
+
+    if (!customerId || !dueDate) {
       return NextResponse.json(
-        {
-          error:
-            "Missing required fields: customerId, totalMiners, unitPrice, dueDate",
-        },
+        { error: "Missing required fields: customerId, dueDate" },
         { status: 400 },
       );
     }
 
-    if (typeof totalMiners !== "number" || totalMiners < 0) {
-      return NextResponse.json(
-        { error: "totalMiners must be a non-negative number" },
-        { status: 400 },
-      );
+    if (!hasLineItems) {
+      if (totalMiners === undefined || unitPrice === undefined) {
+        return NextResponse.json(
+          {
+            error:
+              "Missing required fields: customerId, totalMiners, unitPrice, dueDate",
+          },
+          { status: 400 },
+        );
+      }
+
+      if (typeof totalMiners !== "number" || totalMiners < 0) {
+        return NextResponse.json(
+          { error: "totalMiners must be a non-negative number" },
+          { status: 400 },
+        );
+      }
+
+      if (typeof unitPrice !== "number" || unitPrice <= 0) {
+        return NextResponse.json(
+          { error: "unitPrice must be a number greater than 0" },
+          { status: 400 },
+        );
+      }
     }
 
-    if (typeof unitPrice !== "number" || unitPrice <= 0) {
-      return NextResponse.json(
-        { error: "unitPrice must be a number greater than 0" },
-        { status: 400 },
+    // Validate line items and compute aggregates server-side (never trust
+    // client-computed sums)
+    let computedTotalMiners = totalMiners;
+    let computedUnitPrice = unitPrice;
+    let computedTotalAmount: number | undefined;
+    let validatedLineItems: Array<{
+      hardwareId: string;
+      model: string;
+      quantity: number;
+      unitPrice: number;
+      totalPrice: number;
+    }> = [];
+
+    if (hasLineItems) {
+      for (const item of lineItems) {
+        if (
+          !item ||
+          typeof item.hardwareId !== "string" ||
+          !item.hardwareId ||
+          typeof item.model !== "string" ||
+          !item.model ||
+          typeof item.quantity !== "number" ||
+          item.quantity <= 0 ||
+          typeof item.unitPrice !== "number" ||
+          item.unitPrice <= 0
+        ) {
+          return NextResponse.json(
+            {
+              error:
+                "Each line item requires hardwareId, model, quantity > 0, and unitPrice > 0",
+            },
+            { status: 400 },
+          );
+        }
+      }
+
+      validatedLineItems = lineItems.map(
+        (item: {
+          hardwareId: string;
+          model: string;
+          quantity: number;
+          unitPrice: number;
+        }) => ({
+          hardwareId: item.hardwareId,
+          model: item.model,
+          quantity: item.quantity,
+          unitPrice: Number(item.unitPrice),
+          totalPrice: parseFloat(
+            (item.quantity * Number(item.unitPrice)).toFixed(2),
+          ),
+        }),
       );
+
+      computedTotalMiners = validatedLineItems.reduce(
+        (sum, item) => sum + item.quantity,
+        0,
+      );
+      computedTotalAmount = parseFloat(
+        validatedLineItems
+          .reduce((sum, item) => sum + item.totalPrice, 0)
+          .toFixed(2),
+      );
+      computedUnitPrice =
+        computedTotalMiners > 0
+          ? parseFloat((computedTotalAmount / computedTotalMiners).toFixed(2))
+          : 0;
     }
 
     // Fetch customer to get luxorSubaccountName
@@ -316,16 +391,20 @@ export async function POST(request: NextRequest) {
     const sequenceNumber = String(lastSeq + 1).padStart(3, "0");
     const invoiceNumber = `${customer.luxorSubaccountName}-${dateStr}-${sequenceNumber}`;
 
-    const numericUnitPrice = Number(unitPrice);
+    const numericUnitPrice = hasLineItems
+      ? (computedUnitPrice as number)
+      : Number(unitPrice);
 
-    const totalAmount = parseFloat((totalMiners * numericUnitPrice).toFixed(2));
+    const totalAmount = hasLineItems
+      ? (computedTotalAmount as number)
+      : parseFloat((totalMiners * numericUnitPrice).toFixed(2));
 
     const invoice = await prisma.invoice.create({
       data: {
         invoiceNumber,
         userId: customerId,
-        hardwareId: hardwareId || undefined,
-        totalMiners,
+        hardwareId: hasLineItems ? undefined : hardwareId || undefined,
+        totalMiners: hasLineItems ? computedTotalMiners : totalMiners,
         unitPrice: numericUnitPrice,
         totalAmount,
         status: status || InvoiceStatus.DRAFT,
@@ -338,10 +417,12 @@ export async function POST(request: NextRequest) {
           ? normalizeBillingMonth(billingMonth)
           : undefined,
         createdBy: userId,
+        lineItems: hasLineItems ? { create: validatedLineItems } : undefined,
       },
       include: {
         user: { select: { id: true, email: true, name: true } },
         createdByUser: { select: { id: true, email: true, name: true } },
+        lineItems: true,
       },
     });
 

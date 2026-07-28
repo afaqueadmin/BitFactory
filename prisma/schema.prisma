@@ -214,6 +214,7 @@ model Hardware {
   procurementHistory HardwareProcurementHistory[]
   miners             Miner[]
   invoices           Invoice[]
+  invoiceLineItems   InvoiceLineItem[]
 
   @@index([isDeleted])
   @@map("hardware")
@@ -408,6 +409,7 @@ model Invoice {
   costPayments         CostPayment[]         @relation("invoiceCostPayments")
   confirmoPayment      ConfirmoPayment?
   emailSendResults     EmailSendResult[]     @relation("emailSendResults")
+  lineItems            InvoiceLineItem[]
   createdByUser        User                  @relation("invoicesCreated", fields: [createdBy], references: [id])
   updatedByUser        User?                 @relation("invoicesUpdated", fields: [updatedBy], references: [id])
   user                 User                  @relation("invoices", fields: [userId], references: [id])
@@ -419,6 +421,25 @@ model Invoice {
   @@index([createdAt])
   @@index([invoiceNumber])
   @@map("invoices")
+}
+
+model InvoiceLineItem {
+  id         String   @id @default(cuid())
+  invoiceId  String
+  hardwareId String?
+  model      String
+  quantity   Int
+  unitPrice  Decimal  @db.Decimal(10, 2)
+  totalPrice Decimal  @db.Decimal(12, 2)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  invoice  Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  hardware Hardware? @relation(fields: [hardwareId], references: [id])
+
+  @@index([invoiceId])
+  @@index([hardwareId])
+  @@map("invoice_line_items")
 }
 
 model VendorInvoice {

@@ -64,9 +64,9 @@ export interface Invoice {
   id: string;
   invoiceNumber: string; // Format: YYYYMMDDSR (e.g., 20260111001)
   userId: string; // Customer ID (FK to User)
-  totalMiners: number; // Number of mining units
-  unitPrice: number; // Price per mining unit (USD)
-  totalAmount: number; // totalMiners × unitPrice (USD)
+  totalMiners: number; // Number of mining units (sum of lineItems quantities, when present)
+  unitPrice: number; // Price per mining unit (USD) - blended average when lineItems are present
+  totalAmount: number; // totalMiners × unitPrice (USD), or sum of lineItems totals
   status: InvoiceStatus; // Current status
   invoiceGeneratedDate: Date; // Date invoice was generated
   issuedDate: Date | null; // Date sent to customer
@@ -75,6 +75,26 @@ export interface Invoice {
   createdBy: string; // Admin user ID who created
   createdAt: Date;
   updatedBy: string | null; // Admin user ID who last updated
+  updatedAt: Date;
+  lineItems?: InvoiceLineItem[]; // Per-model breakdown (ELECTRICITY_CHARGES invoices)
+}
+
+/**
+ * Invoice Line Item
+ *
+ * One priced row on an invoice (e.g. 8x S21 @ $199, 2x S21 Pro @ $219).
+ * Electricity invoices created via the multi-model flow have one or more
+ * of these; legacy/Hardware Sales invoices have none.
+ */
+export interface InvoiceLineItem {
+  id: string;
+  invoiceId: string;
+  hardwareId: string | null;
+  model: string; // Snapshot of Hardware.model at creation time
+  quantity: number;
+  unitPrice: number;
+  totalPrice: number;
+  createdAt: Date;
   updatedAt: Date;
 }
 
@@ -166,6 +186,12 @@ export interface CreateInvoiceRequest {
   totalMiners: number;
   unitPrice: number;
   dueDate: string; // ISO date string
+  lineItems?: Array<{
+    hardwareId: string;
+    model: string;
+    quantity: number;
+    unitPrice: number;
+  }>;
 }
 
 /**
@@ -175,6 +201,12 @@ export interface UpdateInvoiceRequest {
   totalMiners?: number;
   unitPrice?: number;
   dueDate?: string; // ISO date string
+  lineItems?: Array<{
+    hardwareId: string;
+    model: string;
+    quantity: number;
+    unitPrice: number;
+  }>;
 }
 
 /**

@@ -19,6 +19,12 @@ export interface InvoiceEmailPayload {
   billingMonth?: Date | null;
   invoiceStatus?: string | null;
   paidDate?: Date | null;
+  lineItems?: Array<{
+    model: string;
+    quantity: number;
+    unitPrice: number;
+    totalPrice: number;
+  }>;
 }
 
 export interface EmailSendResult {
@@ -149,6 +155,7 @@ export class InvoiceEmailService {
         payload.billingMonth,
         payload.invoiceStatus,
         payload.paidDate,
+        payload.lineItems,
       );
 
       console.log(

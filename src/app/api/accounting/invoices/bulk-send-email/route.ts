@@ -59,6 +59,7 @@ export async function POST(request: NextRequest) {
             model: true,
           },
         },
+        lineItems: true,
       },
     });
 
@@ -97,6 +98,12 @@ export async function POST(request: NextRequest) {
       billingMonth: invoice.billingMonth || undefined,
       invoiceStatus: invoice.status,
       paidDate: invoice.paidDate || undefined,
+      lineItems: invoice.lineItems.map((li) => ({
+        model: li.model,
+        quantity: li.quantity,
+        unitPrice: Number(li.unitPrice),
+        totalPrice: Number(li.totalPrice),
+      })),
     }));
 
     // Send all invoices
