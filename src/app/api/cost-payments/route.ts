@@ -97,11 +97,12 @@ export async function GET(request: NextRequest) {
     let runningBalance = 0;
 
     for (const payment of allPaymentsForBalance) {
+      // HARDWARE_SALES is shown in the statement for reference only and is
+      // excluded from the running balance.
       if (
         payment.type === "PAYMENT" ||
         payment.type === "ELECTRICITY_CHARGES" ||
-        payment.type === "ADJUSTMENT" ||
-        payment.type === "HARDWARE_SALES"
+        payment.type === "ADJUSTMENT"
       ) {
         runningBalance += payment.amount;
       }

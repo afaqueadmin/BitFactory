@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -12,45 +12,42 @@ import {
   IconButton,
   CircularProgress,
   Alert,
-  MenuItem,
 } from "@mui/material";
 import { Close as CloseIcon } from "@mui/icons-material";
-import { useCustomers, Customer } from "@/lib/hooks/useInvoices";
+import { AdjustmentTransaction } from "@/lib/hooks/admin/useAdjustments";
 
-interface AddAdjustmentModalProps {
+interface EditAdjustmentModalProps {
   open: boolean;
   onClose: () => void;
   onSuccess: (text: string) => void;
-  customerId: string | null;
-  customerName?: string;
+  adjustment: AdjustmentTransaction | null;
 }
 
-export default function AddAdjustmentModal({
+export default function EditAdjustmentModal({
   open,
   onClose,
   onSuccess,
-  customerId,
-  customerName,
-}: AddAdjustmentModalProps) {
+  adjustment,
+}: EditAdjustmentModalProps) {
   const [loading, setLoading] = useState(false);
   const [amount, setAmount] = useState("");
   const [narration, setNarration] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  const [selectedCustomerId, setSelectedCustomerId] = useState("");
 
-  // When no customerId is preset (e.g. opened from the Credit Adjustments
-  // page rather than a customer's row menu), let the admin pick one.
-  const needsCustomerPicker = !customerId;
-  const { customers, loading: customersLoading } = useCustomers();
+  useEffect(() => {
+    if (adjustment) {
+      setAmount(String(adjustment.amount));
+      setNarration(adjustment.narration || "");
+      setError("");
+      setSuccess("");
+    }
+  }, [adjustment]);
 
   const handleClose = () => {
     onClose();
-    setAmount("");
-    setNarration("");
     setError("");
     setSuccess("");
-    setSelectedCustomerId("");
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -58,13 +55,8 @@ export default function AddAdjustmentModal({
     setError("");
     setSuccess("");
 
-    const targetCustomerId = customerId || selectedCustomerId;
-    if (!targetCustomerId) {
-      setError("Please select a customer");
-      return;
-    }
+    if (!adjustment) return;
 
-    // Validation
     const adjustmentAmount = parseFloat(amount);
     if (!amount || isNaN(adjustmentAmount) || adjustmentAmount === 0) {
       setError(
@@ -86,15 +78,13 @@ export default function AddAdjustmentModal({
     setLoading(true);
 
     try {
-      const response = await fetch("/api/cost-payments", {
-        method: "POST",
+      const response = await fetch(`/api/admin/adjustments/${adjustment.id}`, {
+        method: "PATCH",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          userId: targetCustomerId,
           amount: adjustmentAmount,
-          type: "ADJUSTMENT",
           narration: narration.trim(),
         }),
       });
@@ -102,17 +92,17 @@ export default function AddAdjustmentModal({
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Failed to credit aaccount");
+        throw new Error(data.error || "Failed to update adjustment");
       }
 
-      setSuccess("Account credited successfully");
+      setSuccess("Adjustment updated successfully");
       setTimeout(() => {
-        onSuccess("Account credited successfully");
+        onSuccess("Adjustment updated successfully");
         handleClose();
-      }, 1500);
+      }, 1000);
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to credit aaccount",
+        err instanceof Error ? err.message : "Failed to update adjustment",
       );
     } finally {
       setLoading(false);
@@ -148,7 +138,7 @@ export default function AddAdjustmentModal({
           alignItems: "center",
         }}
       >
-        Credit Account
+        Edit Adjustment
         <IconButton
           onClick={handleClose}
           sx={{
@@ -168,30 +158,15 @@ export default function AddAdjustmentModal({
             {error && <Alert severity="error">{error}</Alert>}
             {success && <Alert severity="success">{success}</Alert>}
 
-            {customerName && (
+            {adjustment?.customer && (
               <Box sx={{ mb: 1 }}>
                 <p style={{ margin: 0, fontSize: "0.9rem", color: "#666" }}>
-                  Credit Account for: <strong>{customerName}</strong>
+                  Adjustment for:{" "}
+                  <strong>
+                    {adjustment.customer.name || adjustment.customer.email}
+                  </strong>
                 </p>
               </Box>
-            )}
-
-            {needsCustomerPicker && (
-              <TextField
-                fullWidth
-                select
-                label="Customer"
-                value={selectedCustomerId}
-                onChange={(e) => setSelectedCustomerId(e.target.value)}
-                required
-                disabled={customersLoading}
-              >
-                {customers.map((c: Customer) => (
-                  <MenuItem key={c.id} value={c.id}>
-                    {c.displayName}
-                  </MenuItem>
-                ))}
-              </TextField>
             )}
 
             <TextField
@@ -248,7 +223,7 @@ export default function AddAdjustmentModal({
             {loading ? (
               <CircularProgress size={24} color="inherit" />
             ) : (
-              "Credit Account"
+              "Save Changes"
             )}
           </Button>
         </DialogActions>

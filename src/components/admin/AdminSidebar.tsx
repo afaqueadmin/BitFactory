@@ -25,6 +25,7 @@ import {
   PriceCheck as HostingPricesIcon,
   Assignment as AccountingIcon,
   Description as DocumentIcon,
+  RequestQuote as AdjustmentsIcon,
   Settings as SettingsIcon,
   History as ActivityLogIcon,
   ChevronLeft,
@@ -188,6 +189,11 @@ const sidebarItems: SidebarItem[] = [
         title: "Client Transaction History",
         icon: <DocumentIcon />,
         path: "/accounting/client-transaction-history",
+      },
+      {
+        title: "Credit Adjustments",
+        icon: <AdjustmentsIcon />,
+        path: "/admin/credit-adjustments",
       },
       {
         title: "Pricing",

@@ -307,7 +307,7 @@ export default function AdminDashboard() {
 
     // DB-only cards (no pool dependency)
     const dbOnlyCards = [
-      "Monthly Revenue (30 days)",
+      "Monthly Customer Revenue (30 days)",
       "Total Customer Balance",
       "Total Customers",
       "Hosting and Colocation (Invoice)",
@@ -612,13 +612,13 @@ export default function AdminDashboard() {
 
           {/* === LUXOR POOL STATS === */}
 
-          {/* Monthly Revenue - From Cost Payments */}
+          {/* Monthly Revenue - From Cost Payments, excludes self-mining users */}
           <AdminValueCard
-            title="Monthly Revenue (30 days)"
+            title="Monthly Customer Revenue (30 days)"
             borderColor="#757575"
             value={stats?.financial.monthlyRevenue ?? 0}
             type="currency"
-            infoText="Sum of Electricity Charges and Adjustments (cost payments) from the last 30 days, flipped to a positive value. Excludes Payments and Hardware Sales."
+            infoText="Sum of Electricity Charges and Adjustments (cost payments) from the last 30 days, flipped to a positive value, for hosted customers only. Excludes Payments, Hardware Sales, and customers with segment = SELF_MINING."
             onClick={() => router.push("/admin/monthly-revenue")}
           />
 
@@ -628,22 +628,22 @@ export default function AdminDashboard() {
             borderColor="#757575"
             value={stats?.financial.totalCustomerBalance ?? 0}
             type="currency"
-            infoText="Sum of all Payments, Electricity Charges, and Adjustments (cost payments) across active customers, all-time. Excludes Hardware Sales and deleted customers."
+            infoText="Sum of all Payments, Electricity Charges, and Adjustments (cost payments) across hosted customers, all-time. Excludes Hardware Sales, deleted customers, and customers with segment = SELF_MINING."
             onClick={() => router.push("/admin/customer-balance")}
           />
 
-          {/* Total Mined Revenue - Available from both Luxor and Braiins */}
+          {/* Total Customer Mined Revenue - Available from both Luxor and Braiins, excludes self-mining users */}
           <AdminValueCard
-            title="Total Mined Revenue"
-            borderColor={getCardBorderColor("Total Mined Revenue")}
+            title="Total Customer Mined Revenue"
+            borderColor={getCardBorderColor("Total Customer Mined Revenue")}
             value={totalMinedRevenue}
             type="BTC"
             infoText={
               poolMode === "braiins"
-                ? "Total BTC mined on Braiins across all customers, all-time. Self-mining users aren't tracked separately for Braiins."
+                ? "Total BTC mined on Braiins for hosted customers, all-time. Self-mining users aren't tracked separately for Braiins."
                 : "Total BTC mined since 2025-01-01 across all subaccounts at the site (Luxor" +
                   (poolMode === "total" ? " + Braiins" : "") +
-                  "), excluding BTC mined by customers with segment = SELF_MINING (shown separately in the Self Mining Revenue (BTC) card)."
+                  "), for hosted customers only. Excludes BTC mined by customers with segment = SELF_MINING (shown separately in the Self Mining Revenue (BTC) card)."
             }
           />
 
@@ -864,19 +864,19 @@ export default function AdminDashboard() {
             onClick={() => router.push("/customers/overview?balanceFilter=< 0")}
           />
 
-          {/* Self Mining Revenue (BTC) - Luxor revenue for SELF_MINING segment users, all-time */}
+          {/* Self Mining Revenue (BTC) - Luxor + Braiins revenue for SELF_MINING segment users */}
           <AdminValueCard
             title="Self Mining Revenue (BTC)"
-            borderColor="#757575"
+            borderColor="#9C27B0"
             value={stats?.financial.selfMiningRevenueBtc ?? 0}
             type="BTC"
-            infoText="All-time BTC mined (since 2025-01-01) on Luxor for customers with segment = SELF_MINING (e.g. Higgs Self Mining)."
+            infoText="Combined all-time BTC mined for customers with segment = SELF_MINING (e.g. Higgs Self Mining), across both pools: Luxor (since 2025-01-01) plus Braiins (all-time reward)."
           />
 
           {/* Self Mining Revenue (USD) - BTC revenue converted at current market price */}
           <AdminValueCard
             title="Self Mining Revenue (USD)"
-            borderColor="#757575"
+            borderColor="#9C27B0"
             value={stats?.financial.selfMiningRevenueUsd ?? 0}
             type="currency"
             infoText="Self Mining Revenue (BTC) multiplied by the current BTC/USD market price (live from Binance)."
@@ -885,7 +885,7 @@ export default function AdminDashboard() {
           {/* Self Mining Hosting Cost - electricity invoices issued to SELF_MINING users */}
           <AdminValueCard
             title="Self Mining Hosting Cost"
-            borderColor="#757575"
+            borderColor="#9C27B0"
             value={stats?.financial.selfMiningHostingCost ?? 0}
             type="currency"
             infoText="Sum of all issued Electricity Charges invoices (status not Draft) for customers with segment = SELF_MINING. Excludes Hardware Sales invoices."
@@ -894,7 +894,7 @@ export default function AdminDashboard() {
           {/* Self Mining Profit - USD revenue minus hosting cost */}
           <AdminValueCard
             title="Self Mining Profit"
-            borderColor="#757575"
+            borderColor="#9C27B0"
             value={stats?.financial.selfMiningProfitUsd ?? 0}
             type="currency"
             infoText="Self Mining Revenue (USD) minus Self Mining Hosting Cost."

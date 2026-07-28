@@ -13,8 +13,11 @@ import {
   TablePagination,
   Typography,
   CircularProgress,
+  IconButton,
+  Tooltip,
   useTheme,
 } from "@mui/material";
+import { Edit as EditIcon, Delete as DeleteIcon } from "@mui/icons-material";
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
 import { DateDisplay } from "@/components/accounting/common/DateDisplay";
 
@@ -63,6 +66,10 @@ interface CostPaymentTransactionsTableProps {
   sortBy?: string;
   sortOrder?: "asc" | "desc";
   onSortChange?: (field: string) => void;
+  // When provided, an "Actions" column with edit/delete icon buttons is
+  // rendered for each row (used by the Credit Adjustments page).
+  onEdit?: (row: TransactionRow) => void;
+  onDelete?: (row: TransactionRow) => void;
 }
 
 export default function CostPaymentTransactionsTable({
@@ -77,8 +84,11 @@ export default function CostPaymentTransactionsTable({
   sortBy,
   sortOrder,
   onSortChange,
+  onEdit,
+  onDelete,
 }: CostPaymentTransactionsTableProps) {
   const theme = useTheme();
+  const showActions = Boolean(onEdit || onDelete);
 
   return (
     <Paper
@@ -123,6 +133,11 @@ export default function CostPaymentTransactionsTable({
                       )}
                     </TableCell>
                   ))}
+                  {showActions && (
+                    <TableCell align="right" sx={{ fontWeight: "bold" }}>
+                      Actions
+                    </TableCell>
+                  )}
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -182,6 +197,31 @@ export default function CostPaymentTransactionsTable({
                         {row.narration || "—"}
                       </Typography>
                     </TableCell>
+                    {showActions && (
+                      <TableCell align="right">
+                        {onEdit && (
+                          <Tooltip title="Edit">
+                            <IconButton
+                              size="small"
+                              onClick={() => onEdit(row)}
+                            >
+                              <EditIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                        {onDelete && (
+                          <Tooltip title="Delete">
+                            <IconButton
+                              size="small"
+                              onClick={() => onDelete(row)}
+                              sx={{ color: "error.main" }}
+                            >
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))}
               </TableBody>

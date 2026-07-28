@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   Box,
@@ -56,7 +56,6 @@ import CreateUserModal from "@/components/CreateUserModal";
 import EditCustomerModal from "@/components/EditCustomerModal";
 import ChangePasswordModal from "@/components/ChangePasswordModal";
 import AddPaymentModal from "@/components/AddPaymentModal";
-import AddAdjustmentModal from "@/components/AddAdjustmentModal";
 
 interface FetchedUser {
   id: string;
@@ -96,11 +95,11 @@ interface FilterColumns {
 const Grid = MuiGrid as React.ComponentType<any>;
 
 export default function CustomerOverviewContent() {
+  const router = useRouter();
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [changePasswordModalOpen, setChangePasswordModalOpen] = useState(false);
   const [addPaymentModalOpen, setAddPaymentModalOpen] = useState(false);
-  const [addAdjustmentModalOpen, setAddAdjustmentModalOpen] = useState(false);
   const [showDeleted, setShowDeleted] = useState(false);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<FetchedUser | null>(
@@ -368,7 +367,9 @@ export default function CustomerOverviewContent() {
 
   const handleCreateAdjustment = () => {
     if (selectedCustomer) {
-      setAddAdjustmentModalOpen(true);
+      router.push(
+        `/admin/credit-adjustments?customerId=${selectedCustomer.id}`,
+      );
     }
     handleMenuClose();
   };
@@ -413,7 +414,6 @@ export default function CustomerOverviewContent() {
     setEditModalOpen(false);
     setChangePasswordModalOpen(false);
     setAddPaymentModalOpen(false);
-    setAddAdjustmentModalOpen(false);
     setSelectedCustomer(null);
   };
 
@@ -493,17 +493,6 @@ export default function CustomerOverviewContent() {
       {selectedCustomer && (
         <AddPaymentModal
           open={addPaymentModalOpen}
-          onClose={handleModalClose}
-          onSuccess={handleUserCreated}
-          customerId={selectedCustomer.id}
-          customerName={selectedCustomer.name}
-        />
-      )}
-
-      {/* Add Adjustment Modal */}
-      {selectedCustomer && (
-        <AddAdjustmentModal
-          open={addAdjustmentModalOpen}
           onClose={handleModalClose}
           onSuccess={handleUserCreated}
           customerId={selectedCustomer.id}
@@ -954,7 +943,7 @@ export default function CustomerOverviewContent() {
         <MenuItem onClick={handleEditCustomer}>Edit Customer</MenuItem>
         <MenuItem onClick={handleChangePassword}>Change Password</MenuItem>
         <MenuItem onClick={handleAddPayment}>Add Startup Payment</MenuItem>
-        <MenuItem onClick={handleCreateAdjustment}>Credit Account</MenuItem>
+        <MenuItem onClick={handleCreateAdjustment}>Credit Adjustments</MenuItem>
         <MenuItem
           onClick={handleDeleteCustomer}
           sx={{ color: "error.main" }}

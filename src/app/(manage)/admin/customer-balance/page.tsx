@@ -123,8 +123,8 @@ export default function CustomerBalanceDetailPage() {
       </Typography>
       <Typography color="textSecondary" sx={{ mb: 3 }}>
         All-time net sum of CostPayment rows (every type except HARDWARE_SALES)
-        — a net ledger balance, not a revenue figure, so no sign flip is
-        applied.
+        for hosted customers — a net ledger balance, not a revenue figure, so no
+        sign flip is applied. Excludes customers with segment = SELF_MINING.
       </Typography>
 
       {error && (

@@ -663,6 +663,38 @@ async function fetchBraiinsRevenue(
 }
 
 /**
+ * Helper: Fetch Braiins all-time revenue from the user profile endpoint
+ * (btc.all_time_reward), used for the self-mining revenue card. Unlike
+ * fetchBraiinsRevenue (which sums daily rewards over a 30-day window because
+ * that's what the general Braiins mined-revenue card needs), this returns
+ * the pool's own all-time total directly - no date range required.
+ */
+async function fetchBraiinsAllTimeRevenue(
+  braiinsApiToken: string,
+): Promise<{ revenue: number } | null> {
+  try {
+    if (!braiinsApiToken) {
+      console.warn("[Admin Dashboard] No Braiins API token provided");
+      return null;
+    }
+
+    const client = new BraiinsClient(braiinsApiToken, "admin-dashboard");
+    const profile = await client.getUserProfile();
+
+    if (profile?.btc) {
+      const revenue = parseFloat(profile.btc.all_time_reward || "0");
+      return { revenue: Number.isFinite(revenue) ? revenue : 0 };
+    }
+  } catch (error) {
+    console.error(
+      "[Admin Dashboard] Error fetching Braiins all-time revenue:",
+      error,
+    );
+  }
+  return null;
+}
+
+/**
  * Helper: Fetch Luxor miners stats (pool-specific)
  * Compares DB miners assigned to Luxor with actual Luxor API workers
  */
@@ -959,20 +991,26 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    // Fetch customer balance information
+    // Fetch customer balance information (excludes self-mining users - this
+    // card is meant to reflect hosted customer balances only)
     const totalCustomerBalance = await prisma.costPayment.aggregate({
-      where: { type: { not: "HARDWARE_SALES" }, user: { isDeleted: false } },
+      where: {
+        type: { not: "HARDWARE_SALES" },
+        user: { isDeleted: false, segment: { not: "SELF_MINING" } },
+      },
       _sum: {
         amount: true,
       },
     });
 
-    // Calculate monthly revenue from cost payments
+    // Calculate monthly revenue from cost payments (excludes self-mining
+    // users - this card is meant to reflect hosted customer revenue only)
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const monthlyRevenue = await prisma.costPayment.aggregate({
       where: {
         type: { in: ["ELECTRICITY_CHARGES", "ADJUSTMENT"] },
         createdAt: { gte: thirtyDaysAgo },
+        user: { segment: { not: "SELF_MINING" } },
       },
       _sum: { amount: true },
     });
@@ -1052,39 +1090,68 @@ export async function GET(request: NextRequest) {
       luxorStats.minedRevenue = 0;
     }
 
-    // ========== SELF MINING STATS (segment = SELF_MINING) ==========
+    // ========== SELF MINING STATS (segment = SELF_MINING, all pools) ==========
     let selfMiningRevenueBtc = 0;
     let selfMiningRevenueUsd = 0;
     let selfMiningHostingCost = 0;
     let selfMiningProfitUsd = 0;
     try {
-      const selfMiningUsers = await prisma.user.findMany({
-        where: {
-          segment: "SELF_MINING",
-          isDeleted: false,
-          luxorSubaccountName: { not: null },
-        },
-        select: { luxorSubaccountName: true },
-      });
-      const selfMiningSubaccountNames = selfMiningUsers
+      const [selfMiningLuxorUsers, selfMiningBraiinsAuths] = await Promise.all([
+        prisma.user.findMany({
+          where: {
+            segment: "SELF_MINING",
+            isDeleted: false,
+            luxorSubaccountName: { not: null },
+          },
+          select: { luxorSubaccountName: true },
+        }),
+        prisma.poolAuth.findMany({
+          where: {
+            pool: { name: "Braiins" },
+            user: { segment: "SELF_MINING", isDeleted: false },
+          },
+          select: { authKey: true },
+        }),
+      ]);
+
+      const selfMiningSubaccountNames = selfMiningLuxorUsers
         .map((u) => u.luxorSubaccountName)
         .filter((name): name is string => !!name);
 
-      const [selfMiningRevenueStats, btcPriceUsd, hostingCostSum] =
-        await Promise.all([
-          fetchRevenueForSubaccountNames(request, selfMiningSubaccountNames),
-          fetchCurrentBtcPriceUsd(),
-          prisma.invoice.aggregate({
-            where: {
-              invoiceType: "ELECTRICITY_CHARGES",
-              status: { not: "DRAFT" },
-              user: { segment: "SELF_MINING", isDeleted: false },
-            },
-            _sum: { totalAmount: true },
-          }),
-        ]);
+      const [
+        selfMiningLuxorRevenueStats,
+        selfMiningBraiinsRevenueResults,
+        btcPriceUsd,
+        hostingCostSum,
+      ] = await Promise.all([
+        fetchRevenueForSubaccountNames(request, selfMiningSubaccountNames),
+        Promise.all(
+          selfMiningBraiinsAuths.map(({ authKey }) =>
+            fetchBraiinsAllTimeRevenue(authKey),
+          ),
+        ),
+        fetchCurrentBtcPriceUsd(),
+        prisma.invoice.aggregate({
+          where: {
+            invoiceType: "ELECTRICITY_CHARGES",
+            status: { not: "DRAFT" },
+            user: { segment: "SELF_MINING", isDeleted: false },
+          },
+          _sum: { totalAmount: true },
+        }),
+      ]);
 
-      selfMiningRevenueBtc = selfMiningRevenueStats?.revenue || 0;
+      // Luxor: all-time revenue since 2025-01-01 (via the revenue endpoint).
+      // Braiins: all-time revenue via the user profile's all_time_reward.
+      const selfMiningLuxorRevenueBtc =
+        selfMiningLuxorRevenueStats?.revenue || 0;
+      const selfMiningBraiinsRevenueBtc =
+        selfMiningBraiinsRevenueResults.reduce(
+          (sum, result) => sum + (result?.revenue || 0),
+          0,
+        );
+      selfMiningRevenueBtc =
+        selfMiningLuxorRevenueBtc + selfMiningBraiinsRevenueBtc;
       selfMiningHostingCost = Number(hostingCostSum._sum.totalAmount || 0);
       if (btcPriceUsd) {
         selfMiningRevenueUsd = selfMiningRevenueBtc * btcPriceUsd;
