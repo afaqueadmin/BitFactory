@@ -508,7 +508,7 @@ export function useChangeInvoiceStatus() {
       status,
     }: {
       invoiceId: string;
-      status: "ISSUED" | "PAID" | "CANCELLED" | "OVERDUE";
+      status: "ISSUED" | "PAID" | "CANCELLED" | "OVERDUE" | "REFUNDED";
     }) => {
       const res = await fetch(`/api/accounting/invoices/${invoiceId}`, {
         method: "PUT",
@@ -533,7 +533,7 @@ export function useChangeInvoiceStatus() {
   return {
     changeStatus: (
       invoiceId: string,
-      status: "ISSUED" | "PAID" | "CANCELLED" | "OVERDUE",
+      status: "ISSUED" | "PAID" | "CANCELLED" | "OVERDUE" | "REFUNDED",
     ) => mutation.mutateAsync({ invoiceId, status }),
     loading: mutation.isPending,
     error: mutation.error instanceof Error ? mutation.error.message : null,

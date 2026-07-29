@@ -42,7 +42,7 @@ interface EmailSendRun {
   updatedAt: string;
 }
 
-export default function EmailReportPage() {
+export default function HardwareSalesEmailReportPage() {
   const [runs, setRuns] = useState<EmailSendRun[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -57,7 +57,7 @@ export default function EmailReportPage() {
       setRefreshing(true);
       setError(null);
       const response = await fetch(
-        "/api/accounting/email-runs?type=ELECTRICITY_CHARGES",
+        "/api/accounting/email-runs?type=HARDWARE_SALES",
       );
 
       if (!response.ok) {
@@ -107,10 +107,10 @@ export default function EmailReportPage() {
         >
           <Box>
             <Typography variant="h4" component="h1" gutterBottom>
-              Email Send Reports
+              Hardware Sales Email Send Reports
             </Typography>
             <Typography variant="body2" color="textSecondary">
-              View and manage all bulk email operations
+              View and manage bulk email operations for hardware sales invoices
             </Typography>
           </Box>
           <Button
@@ -215,7 +215,7 @@ export default function EmailReportPage() {
                     <TableCell align="right">
                       <Button
                         component={Link}
-                        href={`/accounting/email-report/${run.id}`}
+                        href={`/hardware-sales/email-report/${run.id}`}
                         variant="outlined"
                         size="small"
                       >

@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
     const run = await prisma.emailSendRun.create({
       data: {
         id: runId,
-        type: "INVOICE",
+        type: invoices[0].invoiceType,
         status: "IN_PROGRESS",
         totalInvoices: invoices.length,
         successCount: 0,
