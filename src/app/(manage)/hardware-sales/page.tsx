@@ -22,25 +22,73 @@ import {
   TableHead,
   TableRow,
   TablePagination,
+  TableSortLabel,
+  TextField,
+  MenuItem,
 } from "@mui/material";
 import Link from "next/link";
 import { useState } from "react";
-import { InvoiceWithDetails, useInvoices } from "@/lib/hooks/useInvoices";
+import {
+  Customer,
+  InvoiceWithDetails,
+  useCustomers,
+  useInvoices,
+} from "@/lib/hooks/useInvoices";
 import { StatsCard } from "@/components/accounting/dashboard/StatsCard";
 import { StatusBadge } from "@/components/accounting/common/StatusBadge";
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
 import { DateDisplay } from "@/components/accounting/common/DateDisplay";
 import AddIcon from "@mui/icons-material/Add";
+import { InvoiceStatus } from "@prisma/client";
+
+type SortKey =
+  | "invoiceNumber"
+  | "customer"
+  | "amount"
+  | "status"
+  | "issuedDate"
+  | "paidDate"
+  | "dueDate"
+  | "daysUntilDue";
 
 export default function HardwareSalesDashboard() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [customerFilter, setCustomerFilter] = useState<string>("");
+  const [statusFilter, setStatusFilter] = useState<string>("");
+  const [sortBy, setSortBy] = useState<SortKey>("dueDate");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+
+  const { customers, loading: customersLoading } = useCustomers();
+
   const {
     invoices,
     total,
     loading: invoicesLoading,
     error: invoicesError,
-  } = useInvoices(page, pageSize, undefined, undefined, "HARDWARE_SALES");
+  } = useInvoices(
+    page,
+    pageSize,
+    customerFilter || undefined,
+    statusFilter ? (statusFilter as InvoiceStatus) : undefined,
+    "HARDWARE_SALES",
+    sortBy,
+    sortDirection,
+  );
+
+  // Fetch the full filtered set (independent of table pagination) so the
+  // summary cards reflect the selected filters across all matching invoices.
+  const {
+    invoices: statsInvoices,
+    total: statsTotal,
+    loading: statsLoading,
+  } = useInvoices(
+    1,
+    9999,
+    customerFilter || undefined,
+    statusFilter ? (statusFilter as InvoiceStatus) : undefined,
+    "HARDWARE_SALES",
+  );
 
   const handleChangePage = (event: unknown, newPage: number) => {
     setPage(newPage + 1);
@@ -50,6 +98,30 @@ export default function HardwareSalesDashboard() {
     event: React.ChangeEvent<HTMLInputElement>,
   ) => {
     setPageSize(parseInt(event.target.value, 10));
+    setPage(1);
+  };
+
+  const handleCustomerFilterChange = (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    setCustomerFilter(event.target.value);
+    setPage(1);
+  };
+
+  const handleStatusFilterChange = (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    setStatusFilter(event.target.value);
+    setPage(1);
+  };
+
+  const handleRequestSort = (property: SortKey) => {
+    if (sortBy === property) {
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortBy(property);
+      setSortDirection(property === "daysUntilDue" ? "desc" : "asc");
+    }
     setPage(1);
   };
 
@@ -63,17 +135,17 @@ export default function HardwareSalesDashboard() {
     return diffDays;
   };
 
-  // Calculate stats from invoices
-  const totalInvoices = total;
-  const unpaidInvoices = invoices.filter(
+  // Calculate stats from the full filtered set of invoices
+  const totalInvoices = statsTotal;
+  const unpaidInvoices = statsInvoices.filter(
     (inv: InvoiceWithDetails) => inv.status !== "PAID",
   ).length;
   const now = new Date();
-  const overdueInvoices = invoices.filter(
+  const overdueInvoices = statsInvoices.filter(
     (inv: InvoiceWithDetails) =>
       inv.status !== "PAID" && new Date(inv.dueDate) < now,
   ).length;
-  const totalOutstanding = invoices
+  const totalOutstanding = statsInvoices
     .filter(
       (inv: InvoiceWithDetails) =>
         inv.status !== "PAID" &&
@@ -85,7 +157,7 @@ export default function HardwareSalesDashboard() {
       0,
     );
 
-  const loading = invoicesLoading;
+  const loading = invoicesLoading || statsLoading;
   const error = invoicesError;
 
   if (loading) {
@@ -194,19 +266,129 @@ export default function HardwareSalesDashboard() {
               </Button>
             </Link>
           </Box>
+          <Box
+            sx={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 2,
+              px: 2,
+              pb: 2,
+            }}
+          >
+            <TextField
+              select
+              size="small"
+              label="Filter by Customer"
+              value={customerFilter}
+              onChange={handleCustomerFilterChange}
+              sx={{ minWidth: 220 }}
+              disabled={customersLoading}
+            >
+              <MenuItem value="">All customers</MenuItem>
+              {customers.map((customer: Customer) => (
+                <MenuItem key={customer.id} value={customer.id}>
+                  {customer.displayName}
+                </MenuItem>
+              ))}
+            </TextField>
+            <TextField
+              select
+              size="small"
+              label="Filter by Status"
+              value={statusFilter}
+              onChange={handleStatusFilterChange}
+              sx={{ minWidth: 180 }}
+            >
+              <MenuItem value="">All statuses</MenuItem>
+              <MenuItem value="DRAFT">Draft</MenuItem>
+              <MenuItem value="ISSUED">Issued</MenuItem>
+              <MenuItem value="OVERDUE">Overdue</MenuItem>
+              <MenuItem value="PAID">Paid</MenuItem>
+              <MenuItem value="CANCELLED">Cancelled</MenuItem>
+              <MenuItem value="REFUNDED">Refunded</MenuItem>
+            </TextField>
+          </Box>
           <TableContainer>
             <Table>
               <TableHead sx={{ backgroundColor: "#f5f5f5" }}>
                 <TableRow>
-                  <TableCell sx={{ fontWeight: "bold" }}>Invoice</TableCell>
-                  <TableCell sx={{ fontWeight: "bold" }}>Customer</TableCell>
-                  <TableCell sx={{ fontWeight: "bold" }}>Amount</TableCell>
-                  <TableCell sx={{ fontWeight: "bold" }}>Status</TableCell>
-                  <TableCell sx={{ fontWeight: "bold" }}>Issued Date</TableCell>
-                  <TableCell sx={{ fontWeight: "bold" }}>Paid Date</TableCell>
-                  <TableCell sx={{ fontWeight: "bold" }}>Due Date</TableCell>
                   <TableCell sx={{ fontWeight: "bold" }}>
-                    Days Until Due
+                    <TableSortLabel
+                      active={sortBy === "invoiceNumber"}
+                      direction={
+                        sortBy === "invoiceNumber" ? sortDirection : "asc"
+                      }
+                      onClick={() => handleRequestSort("invoiceNumber")}
+                    >
+                      Invoice
+                    </TableSortLabel>
+                  </TableCell>
+                  <TableCell sx={{ fontWeight: "bold" }}>
+                    <TableSortLabel
+                      active={sortBy === "customer"}
+                      direction={sortBy === "customer" ? sortDirection : "asc"}
+                      onClick={() => handleRequestSort("customer")}
+                    >
+                      Customer
+                    </TableSortLabel>
+                  </TableCell>
+                  <TableCell sx={{ fontWeight: "bold" }}>
+                    <TableSortLabel
+                      active={sortBy === "amount"}
+                      direction={sortBy === "amount" ? sortDirection : "asc"}
+                      onClick={() => handleRequestSort("amount")}
+                    >
+                      Amount
+                    </TableSortLabel>
+                  </TableCell>
+                  <TableCell sx={{ fontWeight: "bold" }}>
+                    <TableSortLabel
+                      active={sortBy === "status"}
+                      direction={sortBy === "status" ? sortDirection : "asc"}
+                      onClick={() => handleRequestSort("status")}
+                    >
+                      Status
+                    </TableSortLabel>
+                  </TableCell>
+                  <TableCell sx={{ fontWeight: "bold" }}>
+                    <TableSortLabel
+                      active={sortBy === "issuedDate"}
+                      direction={
+                        sortBy === "issuedDate" ? sortDirection : "asc"
+                      }
+                      onClick={() => handleRequestSort("issuedDate")}
+                    >
+                      Issued Date
+                    </TableSortLabel>
+                  </TableCell>
+                  <TableCell sx={{ fontWeight: "bold" }}>
+                    <TableSortLabel
+                      active={sortBy === "paidDate"}
+                      direction={sortBy === "paidDate" ? sortDirection : "asc"}
+                      onClick={() => handleRequestSort("paidDate")}
+                    >
+                      Paid Date
+                    </TableSortLabel>
+                  </TableCell>
+                  <TableCell sx={{ fontWeight: "bold" }}>
+                    <TableSortLabel
+                      active={sortBy === "dueDate"}
+                      direction={sortBy === "dueDate" ? sortDirection : "asc"}
+                      onClick={() => handleRequestSort("dueDate")}
+                    >
+                      Due Date
+                    </TableSortLabel>
+                  </TableCell>
+                  <TableCell sx={{ fontWeight: "bold" }}>
+                    <TableSortLabel
+                      active={sortBy === "daysUntilDue"}
+                      direction={
+                        sortBy === "daysUntilDue" ? sortDirection : "asc"
+                      }
+                      onClick={() => handleRequestSort("daysUntilDue")}
+                    >
+                      Days Until Due
+                    </TableSortLabel>
                   </TableCell>
                 </TableRow>
               </TableHead>

@@ -126,7 +126,7 @@ export default function BulkInvoicesPage() {
         const response = await fetch("/api/hardware");
         if (response.ok) {
           const data = await response.json();
-          setHardwareList(data.hardware || []);
+          setHardwareList(data.data || []);
         }
       } catch (err) {
         console.error("Error fetching hardware:", err);
