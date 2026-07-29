@@ -63,6 +63,7 @@ export async function POST(
             model: true,
           },
         },
+        lineItems: true,
       },
     });
 
@@ -85,6 +86,54 @@ export async function POST(
         { error: "Customer email not found" },
         { status: 400 },
       );
+    }
+
+    const body = await request.json().catch(() => ({}));
+    const { issuedDate, skipEmail } = body as {
+      issuedDate?: string;
+      skipEmail?: boolean;
+    };
+    const finalIssuedDate = issuedDate ? new Date(issuedDate) : new Date();
+
+    // Skip email entirely: just flip status to ISSUED with the chosen date
+    if (skipEmail) {
+      await prisma.invoice.update({
+        where: { id },
+        data: {
+          status: InvoiceStatus.ISSUED,
+          issuedDate: finalIssuedDate,
+          updatedBy: userId,
+        },
+      });
+
+      await prisma.auditLog.create({
+        data: {
+          action: AuditAction.INVOICE_ISSUED,
+          entityType: "Invoice",
+          entityId: id,
+          userId,
+          description: `Invoice ${invoice.invoiceNumber} issued (email not sent)`,
+          changes: JSON.stringify({
+            status: { from: InvoiceStatus.DRAFT, to: InvoiceStatus.ISSUED },
+            issuedDate: finalIssuedDate.toISOString(),
+            emailSent: false,
+          }),
+        },
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: `Invoice ${invoice.invoiceNumber} issued successfully. Email was not sent.`,
+        invoiceId: id,
+        invoiceNumber: invoice.invoiceNumber,
+        emailSent: false,
+        status: "ISSUED",
+        issuedDate: finalIssuedDate.toISOString(),
+        details: {
+          invoiceNumber: invoice.invoiceNumber,
+          status: "ISSUED_NOT_SENT",
+        },
+      });
     }
 
     // Get relationship manager info for response
@@ -118,7 +167,7 @@ export async function POST(
       customerEmail: invoice.user.email,
       customerName: invoice.user.name || "Valued Customer",
       totalAmount: Number(invoice.totalAmount),
-      issuedDate: new Date(), // Use today as issued date
+      issuedDate: finalIssuedDate,
       dueDate: invoice.dueDate,
       totalMiners: invoice.totalMiners,
       unitPrice: Number(invoice.unitPrice),
@@ -127,6 +176,13 @@ export async function POST(
       billingMonth: invoice.billingMonth || undefined,
       invoiceStatus: invoice.status,
       paidDate: invoice.paidDate || undefined,
+      invoiceType: invoice.invoiceType,
+      lineItems: invoice.lineItems.map((li) => ({
+        model: li.model,
+        quantity: li.quantity,
+        unitPrice: Number(li.unitPrice),
+        totalPrice: Number(li.totalPrice),
+      })),
     };
 
     // Send invoice with PDF (mandatory - fails entire operation if PDF fails)
@@ -158,7 +214,7 @@ export async function POST(
       where: { id },
       data: {
         status: InvoiceStatus.ISSUED,
-        issuedDate: new Date(),
+        issuedDate: finalIssuedDate,
         updatedBy: userId,
       },
     });
@@ -173,7 +229,7 @@ export async function POST(
         description: `Invoice ${invoice.invoiceNumber} issued and sent to ${invoice.user.email}`,
         changes: JSON.stringify({
           status: { from: InvoiceStatus.DRAFT, to: InvoiceStatus.ISSUED },
-          issuedDate: new Date().toISOString(),
+          issuedDate: finalIssuedDate.toISOString(),
           sentTo: invoice.user.email,
           ccEmails: ccEmails.join(","),
           pdfAttached: true,
@@ -194,8 +250,9 @@ export async function POST(
           ? `CC'd to: ${rmInfo.name} (${rmInfo.email}), invoices@bitfactory.ae`
           : "CC'd to: invoices@bitfactory.ae",
       pdfAttached: true,
+      emailSent: true,
       status: "ISSUED",
-      issuedDate: new Date().toISOString(),
+      issuedDate: finalIssuedDate.toISOString(),
       details: {
         invoiceNumber: invoice.invoiceNumber,
         recipientCount: 1 + ccEmails.length,

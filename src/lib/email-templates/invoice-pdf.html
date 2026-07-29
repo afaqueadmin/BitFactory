@@ -301,24 +301,36 @@
     <!-- Products Table -->
     <table class="products-table">
       <thead>
+{{#if isHardwareSales}}
         <tr>
           <th>PRODUCT NAME</th>
           <th class="text-right">QUANTITY</th>
           <th class="text-right">UNIT PRICE (USD)</th>
           <th class="text-right">TOTAL PRICE (USD)</th>
         </tr>
+{{else}}
+        <tr>
+          <th>PRODUCT NAME</th>
+          <th>MACHINE NAME</th>
+          <th class="text-right">QUANTITY</th>
+          <th class="text-right">UNIT PRICE (USD)</th>
+          <th class="text-right">TOTAL PRICE (USD)</th>
+        </tr>
+{{/if}}
       </thead>
       <tbody>
-        <tr>
-          <td>{{#if hardwareModel}}{{hardwareModel}}{{else}}Hosting & Electricity Charges{{/if}}</td>
-          <td>{{totalMiners}}</td>
-          <td>{{unitPrice}}</td>
-          <td>{{totalAmount}}</td>
-        </tr>
+        {{productRows}}
+{{#if isHardwareSales}}
         <tr class="total-row">
           <td colspan="3">Total Amount</td>
           <td>{{totalAmount}}</td>
         </tr>
+{{else}}
+        <tr class="total-row">
+          <td colspan="4">Total Amount</td>
+          <td>{{totalAmount}}</td>
+        </tr>
+{{/if}}
       </tbody>
     </table>
 

@@ -29,6 +29,7 @@ export async function GET(
             email: true,
           },
         },
+        lineItems: true,
       },
     });
 
@@ -82,6 +83,13 @@ export async function GET(
       invoice.billingMonth,
       invoice.status,
       invoice.paidDate,
+      invoice.lineItems.map((li) => ({
+        model: li.model,
+        quantity: li.quantity,
+        unitPrice: Number(li.unitPrice),
+        totalPrice: Number(li.totalPrice),
+      })),
+      invoice.invoiceType,
     );
 
     // Return PDF as file download

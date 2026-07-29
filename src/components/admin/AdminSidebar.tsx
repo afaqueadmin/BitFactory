@@ -151,7 +151,7 @@ const sidebarItems: SidebarItem[] = [
     icon: <AccountingIcon />,
     items: [
       {
-        title: "Hosting Dashboard",
+        title: "Hosting and Colocation",
         icon: <DashboardIcon />,
         path: "/accounting/Hosting-and-Colocation",
       },

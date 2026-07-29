@@ -10,6 +10,11 @@ import {
   CircularProgress,
   Alert,
   MenuItem,
+  Typography,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from "@mui/material";
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
@@ -17,6 +22,10 @@ import SaveIcon from "@mui/icons-material/Save";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import Link from "next/link";
 import { useInvoice, useUpdateInvoice } from "@/lib/hooks/useInvoices";
+import {
+  LineItemsEditor,
+  LineItem,
+} from "@/components/accounting/invoices/LineItemsEditor";
 
 export default function EditInvoicePage() {
   const params = useParams();
@@ -38,8 +47,31 @@ export default function EditInvoicePage() {
     billingYear: new Date().getFullYear(),
   });
 
+  const [lineItems, setLineItems] = useState<LineItem[]>([]);
+  const [hardwareList, setHardwareList] = useState<
+    Array<{ id: string; model: string }>
+  >([]);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pastDueDateWarningOpen, setPastDueDateWarningOpen] = useState(false);
+
+  // Fetch hardware list on mount (for the "Add Line Item" picker)
+  useEffect(() => {
+    const fetchHardware = async () => {
+      try {
+        const response = await fetch("/api/hardware");
+        if (response.ok) {
+          const data = await response.json();
+          setHardwareList(data.data || []);
+        }
+      } catch (err) {
+        console.error("Error fetching hardware:", err);
+      }
+    };
+
+    fetchHardware();
+  }, []);
 
   // Populate form when invoice loads
   useEffect(() => {
@@ -54,8 +86,25 @@ export default function EditInvoicePage() {
         billingMonth: billingDate.getMonth(),
         billingYear: billingDate.getFullYear(),
       });
+      setLineItems(
+        (invoice.lineItems || []).map(
+          (li: {
+            hardwareId: string | null;
+            model: string;
+            quantity: number;
+            unitPrice: number | string;
+          }) => ({
+            hardwareId: li.hardwareId || "",
+            model: li.model,
+            quantity: li.quantity,
+            unitPrice: Number(li.unitPrice),
+          }),
+        ),
+      );
     }
   }, [invoice]);
+
+  const hasLineItems = (invoice?.lineItems?.length ?? 0) > 0;
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -78,6 +127,27 @@ export default function EditInvoicePage() {
     }));
   };
 
+  const isPastDate = (dateStr: string) => {
+    if (!dateStr) return false;
+    const selectedDate = new Date(dateStr);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return selectedDate < today;
+  };
+
+  const handleDueDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { value } = e.target;
+    setFormData((prev) => ({ ...prev, dueDate: value }));
+    if (isPastDate(value)) {
+      setPastDueDateWarningOpen(true);
+    }
+  };
+
+  const handleReselectDueDate = () => {
+    setFormData((prev) => ({ ...prev, dueDate: "" }));
+    setPastDueDateWarningOpen(false);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -86,15 +156,19 @@ export default function EditInvoicePage() {
       setError(null);
 
       // Validate
-      if (formData.totalMiners <= 0 || formData.unitPrice <= 0) {
+      if (hasLineItems) {
+        if (lineItems.length === 0) {
+          throw new Error("Add at least one line item");
+        }
+        if (
+          lineItems.some((item) => item.quantity <= 0 || item.unitPrice <= 0)
+        ) {
+          throw new Error(
+            "Every line item must have a miner count and unit price greater than 0",
+          );
+        }
+      } else if (formData.totalMiners <= 0 || formData.unitPrice <= 0) {
         throw new Error("Miners count and unit price must be greater than 0");
-      }
-
-      const selectedDate = new Date(formData.dueDate);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      if (selectedDate < today) {
-        throw new Error("Due date must be in the future");
       }
 
       // Build billingMonth as UTC midnight on the first day of the selected month
@@ -108,6 +182,7 @@ export default function EditInvoicePage() {
         unitPrice: formData.unitPrice,
         dueDate: formData.dueDate,
         billingMonth: billingMonthDate.toISOString(),
+        lineItems: hasLineItems ? lineItems : undefined,
       });
 
       // Redirect back to invoice detail
@@ -176,34 +251,44 @@ export default function EditInvoicePage() {
                 Invoice Details
               </h3>
               <Stack spacing={2}>
-                <TextField
-                  label="Number of Miners"
-                  name="totalMiners"
-                  type="number"
-                  value={formData.totalMiners}
-                  onChange={handleInputChange}
-                  fullWidth
-                  inputProps={{ min: 0, step: 1 }}
-                  helperText="Total active mining units allocated to this customer"
-                  required
-                />
-                <TextField
-                  label="Unit Price (USD)"
-                  name="unitPrice"
-                  type="number"
-                  value={formData.unitPrice}
-                  onChange={handleInputChange}
-                  fullWidth
-                  inputProps={{ min: 0, step: 0.01 }}
-                  helperText="Price per miner unit"
-                  required
-                />
+                {hasLineItems ? (
+                  <LineItemsEditor
+                    lineItems={lineItems}
+                    onChange={setLineItems}
+                    hardwareList={hardwareList}
+                  />
+                ) : (
+                  <>
+                    <TextField
+                      label="Number of Miners"
+                      name="totalMiners"
+                      type="number"
+                      value={formData.totalMiners}
+                      onChange={handleInputChange}
+                      fullWidth
+                      inputProps={{ min: 0, step: 1 }}
+                      helperText="Total active mining units allocated to this customer"
+                      required
+                    />
+                    <TextField
+                      label="Unit Price (USD)"
+                      name="unitPrice"
+                      type="number"
+                      value={formData.unitPrice}
+                      onChange={handleInputChange}
+                      fullWidth
+                      inputProps={{ min: 0, step: 0.01 }}
+                      helperText="Price per miner unit"
+                      required
+                    />
+                  </>
+                )}
                 <TextField
                   label="Due Date"
                   name="dueDate"
                   type="date"
                   value={formData.dueDate}
-                  onChange={handleInputChange}
+                  onChange={handleDueDateChange}
                   fullWidth
                   InputLabelProps={{ shrink: true }}
                   helperText="When payment is due"
@@ -261,6 +346,28 @@ export default function EditInvoicePage() {
           </Stack>
         </form>
       </Paper>
+
+      <Dialog
+        open={pastDueDateWarningOpen}
+        onClose={() => setPastDueDateWarningOpen(false)}
+      >
+        <DialogTitle>Due Date is in the Past</DialogTitle>
+        <DialogContent>
+          <Typography>
+            The due date you selected is in the past. Do you want to reselect a
+            due date, or continue anyway?
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleReselectDueDate}>Reselect Due Date</Button>
+          <Button
+            variant="contained"
+            onClick={() => setPastDueDateWarningOpen(false)}
+          >
+            Continue
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 }

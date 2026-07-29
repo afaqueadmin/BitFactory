@@ -59,6 +59,7 @@ export async function POST(request: NextRequest) {
             model: true,
           },
         },
+        lineItems: true,
       },
     });
 
@@ -71,7 +72,7 @@ export async function POST(request: NextRequest) {
     const run = await prisma.emailSendRun.create({
       data: {
         id: runId,
-        type: "INVOICE",
+        type: invoices[0].invoiceType,
         status: "IN_PROGRESS",
         totalInvoices: invoices.length,
         successCount: 0,
@@ -97,6 +98,13 @@ export async function POST(request: NextRequest) {
       billingMonth: invoice.billingMonth || undefined,
       invoiceStatus: invoice.status,
       paidDate: invoice.paidDate || undefined,
+      invoiceType: invoice.invoiceType,
+      lineItems: invoice.lineItems.map((li) => ({
+        model: li.model,
+        quantity: li.quantity,
+        unitPrice: Number(li.unitPrice),
+        totalPrice: Number(li.totalPrice),
+      })),
     }));
 
     // Send all invoices

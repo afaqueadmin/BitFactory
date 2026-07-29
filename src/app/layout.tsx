@@ -23,6 +23,7 @@ export const metadata: Metadata = {
   },
 };
 
+import { AppRouterCacheProvider } from "@mui/material-nextjs/v15-appRouter";
 import { AuthProvider } from "@/lib/contexts/auth-context";
 import { ThemeProvider } from "./theme-provider";
 import { Providers } from "@/providers/QueryProvider";
@@ -38,11 +39,13 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         suppressHydrationWarning={true}
       >
-        <AuthProvider>
-          <ThemeProvider>
-            <Providers>{children}</Providers>
-          </ThemeProvider>
-        </AuthProvider>
+        <AppRouterCacheProvider options={{ key: "mui" }}>
+          <AuthProvider>
+            <ThemeProvider>
+              <Providers>{children}</Providers>
+            </ThemeProvider>
+          </AuthProvider>
+        </AppRouterCacheProvider>
       </body>
     </html>
   );

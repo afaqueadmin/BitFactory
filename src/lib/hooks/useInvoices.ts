@@ -1,5 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Invoice, InvoiceStatus, CostPayment, AuditLog } from "@prisma/client";
+import {
+  Invoice,
+  InvoiceStatus,
+  CostPayment,
+  AuditLog,
+  InvoiceLineItem,
+} from "@prisma/client";
 
 export interface AuditLogWithUser extends AuditLog {
   user?: {
@@ -7,6 +13,14 @@ export interface AuditLogWithUser extends AuditLog {
     name: string | null;
     email: string;
   };
+}
+
+// Line item shape used for create/update requests and in the LineItemsEditor
+export interface InvoiceLineItemInput {
+  hardwareId: string;
+  model: string;
+  quantity: number;
+  unitPrice: number;
 }
 
 export interface InvoiceWithDetails extends Invoice {
@@ -21,6 +35,7 @@ export interface InvoiceWithDetails extends Invoice {
     name: string | null;
   };
   costPayments?: CostPayment[];
+  lineItems?: InvoiceLineItem[];
   group?: {
     id: string;
     name: string;
@@ -163,6 +178,7 @@ export function useCreateInvoice() {
       hardwareId?: string;
       billingMonth?: string;
       invoiceGeneratedDate?: string;
+      lineItems?: InvoiceLineItemInput[];
     }) => {
       const res = await fetch("/api/accounting/invoices", {
         method: "POST",
@@ -284,6 +300,17 @@ export interface Miner {
   isDeleted: boolean;
 }
 
+// Suggested invoice line item for a customer, grouped by (hardwareId, rate)
+// and priced via rate_per_kwh * powerUsage * 24 * (365/12)
+export interface SuggestedLineItem {
+  hardwareId: string;
+  model: string;
+  rate: number;
+  quantity: number;
+  suggestedUnitPrice: number;
+  suggestedTotalPrice: number;
+}
+
 export function useCustomerMiners(customerId?: string) {
   const { data, isLoading, error } = useQuery({
     queryKey: ["customerMiners", customerId],
@@ -308,6 +335,7 @@ export function useCustomerMiners(customerId?: string) {
 
   return {
     miners: data?.miners || [],
+    lineItems: (data?.lineItems || []) as SuggestedLineItem[],
     loading: isLoading,
     error: error instanceof Error ? error.message : null,
   };
@@ -327,6 +355,7 @@ export function useUpdateInvoice() {
         unitPrice: number;
         dueDate: string;
         billingMonth?: string;
+        lineItems?: InvoiceLineItemInput[];
       };
     }) => {
       const res = await fetch(`/api/accounting/invoices/${invoiceId}`, {
@@ -356,6 +385,7 @@ export function useUpdateInvoice() {
         unitPrice: number;
         dueDate: string;
         billingMonth?: string;
+        lineItems?: InvoiceLineItemInput[];
       },
     ) => mutation.mutateAsync({ invoiceId, data }),
     loading: mutation.isPending,
@@ -478,7 +508,7 @@ export function useChangeInvoiceStatus() {
       status,
     }: {
       invoiceId: string;
-      status: "ISSUED" | "PAID" | "CANCELLED" | "OVERDUE";
+      status: "ISSUED" | "PAID" | "CANCELLED" | "OVERDUE" | "REFUNDED";
     }) => {
       const res = await fetch(`/api/accounting/invoices/${invoiceId}`, {
         method: "PUT",
@@ -503,7 +533,7 @@ export function useChangeInvoiceStatus() {
   return {
     changeStatus: (
       invoiceId: string,
-      status: "ISSUED" | "PAID" | "CANCELLED" | "OVERDUE",
+      status: "ISSUED" | "PAID" | "CANCELLED" | "OVERDUE" | "REFUNDED",
     ) => mutation.mutateAsync({ invoiceId, status }),
     loading: mutation.isPending,
     error: mutation.error instanceof Error ? mutation.error.message : null,
@@ -520,10 +550,20 @@ export function useIssueInvoice() {
   const queryClient = useQueryClient();
 
   const mutation = useMutation({
-    mutationFn: async (invoiceId: string) => {
+    mutationFn: async ({
+      invoiceId,
+      issuedDate,
+      skipEmail,
+    }: {
+      invoiceId: string;
+      issuedDate?: string;
+      skipEmail?: boolean;
+    }) => {
       const res = await fetch(`/api/accounting/invoices/${invoiceId}/issue`, {
         method: "POST",
         credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ issuedDate, skipEmail }),
       });
 
       if (!res.ok) {
@@ -535,13 +575,13 @@ export function useIssueInvoice() {
 
       return await res.json();
     },
-    onSuccess: (data, invoiceId) => {
+    onSuccess: (data, variables) => {
       queryClient.setQueryData(
-        ["invoice", invoiceId],
+        ["invoice", variables.invoiceId],
         (oldData: Record<string, unknown> | undefined) => ({
           ...oldData,
           status: "ISSUED",
-          issuedDate: new Date(),
+          issuedDate: data?.issuedDate ? new Date(data.issuedDate) : new Date(),
         }),
       );
       queryClient.invalidateQueries({ queryKey: ["invoices"] });

@@ -25,8 +25,11 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    const type = request.nextUrl.searchParams.get("type");
+
     // Get all email send runs with summary
     const runs = await prisma.emailSendRun.findMany({
+      where: type ? { type } : undefined,
       include: {
         creator: {
           select: {

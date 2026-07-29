@@ -33,9 +33,13 @@ import {
   useCustomers,
 } from "@/lib/hooks/useInvoices";
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
+import {
+  LineItemsEditor,
+  LineItem,
+} from "@/components/accounting/invoices/LineItemsEditor";
 
-interface CustomerMinersState {
-  count: number;
+interface CustomerLineItemsState {
+  lineItems: LineItem[];
   loading: boolean;
   error?: string | null;
 }
@@ -82,7 +86,6 @@ export default function BulkInvoicesPage() {
   const defaultBilling = { month: now.getMonth(), year: now.getFullYear() };
 
   const [selectedCustomerIds, setSelectedCustomerIds] = useState<string[]>([]);
-  const [unitPrice, setUnitPrice] = useState<number>(0);
   const [dueDate, setDueDate] = useState("");
   const [billingMonth, setBillingMonth] = useState<number>(
     defaultBilling.month,
@@ -90,9 +93,12 @@ export default function BulkInvoicesPage() {
   const [billingYear, setBillingYear] = useState<number>(defaultBilling.year);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
-  const [customerMiners, setCustomerMiners] = useState<
-    Record<string, CustomerMinersState>
+  const [customerLineItems, setCustomerLineItems] = useState<
+    Record<string, CustomerLineItemsState>
   >({});
+  const [hardwareList, setHardwareList] = useState<
+    Array<{ id: string; model: string }>
+  >([]);
   const [confirmZeroMinersOpen, setConfirmZeroMinersOpen] = useState(false);
   const [customersWithNoMinersNames, setCustomersWithNoMinersNames] = useState<
     string[]
@@ -102,6 +108,7 @@ export default function BulkInvoicesPage() {
     { id: string; name: string }[]
   >([]);
   const [excludedCustomerIds, setExcludedCustomerIds] = useState<string[]>([]);
+  const [pastDueDateWarningOpen, setPastDueDateWarningOpen] = useState(false);
 
   const allCustomerIds = useMemo(
     () => customers.map((c: Customer) => c.id),
@@ -112,14 +119,32 @@ export default function BulkInvoicesPage() {
     allCustomerIds.length > 0 &&
     selectedCustomerIds.length === allCustomerIds.length;
 
-  // Fetch miners (status=AUTO) for each selected customer, once
+  // Fetch hardware list once (for the "Add Line Item" picker on each customer)
   useEffect(() => {
-    const fetchMinersForCustomer = async (customerId: string) => {
+    const fetchHardware = async () => {
       try {
-        setCustomerMiners((prev) => ({
+        const response = await fetch("/api/hardware");
+        if (response.ok) {
+          const data = await response.json();
+          setHardwareList(data.data || []);
+        }
+      } catch (err) {
+        console.error("Error fetching hardware:", err);
+      }
+    };
+
+    fetchHardware();
+  }, []);
+
+  // Fetch suggested line items (miners grouped by model + rate, status=AUTO)
+  // for each selected customer, once
+  useEffect(() => {
+    const fetchLineItemsForCustomer = async (customerId: string) => {
+      try {
+        setCustomerLineItems((prev) => ({
           ...prev,
           [customerId]: {
-            count: prev[customerId]?.count ?? 0,
+            lineItems: prev[customerId]?.lineItems ?? [],
             loading: true,
             error: null,
           },
@@ -138,21 +163,33 @@ export default function BulkInvoicesPage() {
         }
 
         const data = await res.json();
-        const count = data?.totalActiveMiners ?? 0;
+        const lineItems: LineItem[] = (data?.lineItems || []).map(
+          (li: {
+            hardwareId: string;
+            model: string;
+            quantity: number;
+            suggestedUnitPrice: number;
+          }) => ({
+            hardwareId: li.hardwareId,
+            model: li.model,
+            quantity: li.quantity,
+            unitPrice: li.suggestedUnitPrice,
+          }),
+        );
 
-        setCustomerMiners((prev) => ({
+        setCustomerLineItems((prev) => ({
           ...prev,
           [customerId]: {
-            count,
+            lineItems,
             loading: false,
             error: null,
           },
         }));
       } catch (error) {
-        setCustomerMiners((prev) => ({
+        setCustomerLineItems((prev) => ({
           ...prev,
           [customerId]: {
-            count: prev[customerId]?.count ?? 0,
+            lineItems: prev[customerId]?.lineItems ?? [],
             loading: false,
             error:
               error instanceof Error ? error.message : "Failed to fetch miners",
@@ -162,13 +199,16 @@ export default function BulkInvoicesPage() {
     };
 
     selectedCustomerIds.forEach((customerId) => {
-      const state = customerMiners[customerId];
-      if (!state || (!state.loading && state.count === 0 && !state.error)) {
+      const state = customerLineItems[customerId];
+      if (
+        !state ||
+        (!state.loading && state.lineItems.length === 0 && !state.error)
+      ) {
         // No data yet for this customer; fetch miners
-        void fetchMinersForCustomer(customerId);
+        void fetchLineItemsForCustomer(customerId);
       }
     });
-  }, [selectedCustomerIds, customerMiners]);
+  }, [selectedCustomerIds, customerLineItems]);
 
   const handleToggleAll = () => {
     if (allSelected) {
@@ -187,14 +227,44 @@ export default function BulkInvoicesPage() {
     });
   };
 
+  const isPastDate = (dateStr: string) => {
+    if (!dateStr) return false;
+    const selectedDate = new Date(dateStr);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return selectedDate < today;
+  };
+
+  const handleDueDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { value } = e.target;
+    setDueDate(value);
+    if (isPastDate(value)) {
+      setPastDueDateWarningOpen(true);
+    }
+  };
+
+  const handleReselectDueDate = () => {
+    setDueDate("");
+    setPastDueDateWarningOpen(false);
+  };
+
   const totalInvoices = selectedCustomerIds.length;
 
   const totalMinersAllSelected = selectedCustomerIds.reduce((sum, id) => {
-    const count = customerMiners[id]?.count ?? 0;
-    return sum + count;
+    const items = customerLineItems[id]?.lineItems ?? [];
+    return sum + items.reduce((s, item) => s + (item.quantity || 0), 0);
   }, 0);
 
-  const estimatedTotalAmount = totalMinersAllSelected * (unitPrice || 0);
+  const estimatedTotalAmount = selectedCustomerIds.reduce((sum, id) => {
+    const items = customerLineItems[id]?.lineItems ?? [];
+    return (
+      sum +
+      items.reduce(
+        (s, item) => s + (item.quantity || 0) * (item.unitPrice || 0),
+        0,
+      )
+    );
+  }, 0);
 
   const submitBulkInvoices = async (
     options: {
@@ -217,21 +287,8 @@ export default function BulkInvoicesPage() {
       return;
     }
 
-    if (!unitPrice || unitPrice <= 0) {
-      setSubmitError("Unit price must be greater than 0.");
-      return;
-    }
-
     if (!dueDate) {
       setSubmitError("Due date is required.");
-      return;
-    }
-
-    const selectedDate = new Date(dueDate);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    if (selectedDate < today) {
-      setSubmitError("Due date must be in the future (not a past date).");
       return;
     }
 
@@ -285,11 +342,11 @@ export default function BulkInvoicesPage() {
       }
     }
 
-    // Check for customers with zero miners
+    // Check for customers with zero line items
     const customersWithNoMiners: string[] = [];
     targetCustomerIds.forEach((id) => {
-      const minersCount = customerMiners[id]?.count ?? 0;
-      if (minersCount <= 0) {
+      const lineItemsCount = customerLineItems[id]?.lineItems.length ?? 0;
+      if (lineItemsCount <= 0) {
         const customer = customers.find((c: Customer) => c.id === id);
         customersWithNoMiners.push(customer?.displayName || id);
       }
@@ -301,17 +358,41 @@ export default function BulkInvoicesPage() {
       return;
     }
 
+    const invalidLineItemCustomer = targetCustomerIds.find((id) =>
+      (customerLineItems[id]?.lineItems ?? []).some(
+        (item) => item.quantity <= 0 || item.unitPrice <= 0,
+      ),
+    );
+    if (invalidLineItemCustomer) {
+      const customer = customers.find(
+        (c: Customer) => c.id === invalidLineItemCustomer,
+      );
+      setSubmitError(
+        `${customer?.displayName || invalidLineItemCustomer}: every line item must have a miner count and unit price greater than 0.`,
+      );
+      return;
+    }
+
     try {
       for (const customerId of targetCustomerIds) {
-        const minersCount = customerMiners[customerId]?.count ?? 0;
+        const lineItems = customerLineItems[customerId]?.lineItems ?? [];
+        const totalMiners = lineItems.reduce(
+          (sum, item) => sum + item.quantity,
+          0,
+        );
+        const totalAmount = lineItems.reduce(
+          (sum, item) => sum + item.quantity * item.unitPrice,
+          0,
+        );
 
         await createInvoice({
           customerId,
-          totalMiners: minersCount,
-          unitPrice,
+          totalMiners,
+          unitPrice: totalMiners > 0 ? totalAmount / totalMiners : 0,
           dueDate,
           invoiceType: "ELECTRICITY_CHARGES",
           billingMonth: billingMonthDate.toISOString(),
+          lineItems,
         });
       }
 
@@ -432,27 +513,21 @@ export default function BulkInvoicesPage() {
                     label="Select all customers"
                   />
                   {customers.map((customer: Customer) => {
-                    const minersState = customerMiners[customer.id];
+                    const lineItemsState = customerLineItems[customer.id];
                     const isSelected = selectedCustomerIds.includes(
                       customer.id,
                     );
 
                     return (
-                      <FormControlLabel
-                        key={customer.id}
-                        control={
-                          <Checkbox
-                            checked={isSelected}
-                            onChange={() => handleToggleCustomer(customer.id)}
-                          />
-                        }
-                        label={
-                          <Box
-                            sx={{
-                              display: "flex",
-                              flexDirection: "column",
-                            }}
-                          >
+                      <Box key={customer.id} sx={{ mb: isSelected ? 2 : 0 }}>
+                        <FormControlLabel
+                          control={
+                            <Checkbox
+                              checked={isSelected}
+                              onChange={() => handleToggleCustomer(customer.id)}
+                            />
+                          }
+                          label={
                             <Stack
                               direction="row"
                               spacing={1}
@@ -478,21 +553,40 @@ export default function BulkInvoicesPage() {
                                 />
                               </Typography>
                             </Stack>
-                            {isSelected && (
+                          }
+                        />
+                        {isSelected && (
+                          <Box sx={{ ml: 4, mt: 0.5 }}>
+                            {lineItemsState?.loading ? (
                               <Typography
                                 variant="caption"
                                 color="textSecondary"
                               >
-                                {minersState?.loading
-                                  ? "Loading miners (status=AUTO)..."
-                                  : minersState?.error
-                                    ? `Error: ${minersState.error}`
-                                    : `AUTO miners: ${minersState?.count ?? 0}`}
+                                Loading miners (status=AUTO)...
                               </Typography>
+                            ) : lineItemsState?.error ? (
+                              <Typography variant="caption" color="error">
+                                Error: {lineItemsState.error}
+                              </Typography>
+                            ) : (
+                              <LineItemsEditor
+                                lineItems={lineItemsState?.lineItems ?? []}
+                                onChange={(items) =>
+                                  setCustomerLineItems((prev) => ({
+                                    ...prev,
+                                    [customer.id]: {
+                                      lineItems: items,
+                                      loading: false,
+                                      error: null,
+                                    },
+                                  }))
+                                }
+                                hardwareList={hardwareList}
+                              />
                             )}
                           </Box>
-                        }
-                      />
+                        )}
+                      </Box>
                     );
                   })}
                 </FormGroup>
@@ -505,18 +599,6 @@ export default function BulkInvoicesPage() {
                 Invoice Configuration
               </Typography>
               <Stack spacing={2}>
-                <TextField
-                  label="Unit Price (USD)"
-                  type="number"
-                  value={unitPrice}
-                  onChange={(e) =>
-                    setUnitPrice(parseFloat(e.target.value) || 0)
-                  }
-                  fullWidth
-                  inputProps={{ min: 0, step: 0.01 }}
-                  helperText="Price per miner unit (applied to all selected customers)"
-                  required
-                />
                 <TextField
                   select
                   label="Billing Month"
@@ -539,7 +621,7 @@ export default function BulkInvoicesPage() {
                   label="Due Date"
                   type="date"
                   value={dueDate}
-                  onChange={(e) => setDueDate(e.target.value)}
+                  onChange={handleDueDateChange}
                   fullWidth
                   InputLabelProps={{ shrink: true }}
                   helperText="Select the due date for these invoices"
@@ -591,7 +673,6 @@ export default function BulkInvoicesPage() {
                   creating ||
                   customersLoading ||
                   selectedCustomerIds.length === 0 ||
-                  !unitPrice ||
                   !dueDate
                 }
               >
@@ -701,6 +782,28 @@ export default function BulkInvoicesPage() {
             disabled={creating}
           >
             {creating ? "Creating Invoices..." : "Yes, send anyway"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={pastDueDateWarningOpen}
+        onClose={() => setPastDueDateWarningOpen(false)}
+      >
+        <DialogTitle>Due Date is in the Past</DialogTitle>
+        <DialogContent>
+          <Typography>
+            The due date you selected is in the past. Do you want to reselect a
+            due date, or continue anyway?
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleReselectDueDate}>Reselect Due Date</Button>
+          <Button
+            variant="contained"
+            onClick={() => setPastDueDateWarningOpen(false)}
+          >
+            Continue
           </Button>
         </DialogActions>
       </Dialog>

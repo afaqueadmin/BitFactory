@@ -45,6 +45,7 @@ export async function GET(
         updatedByUser: { select: { id: true, email: true, name: true } },
         costPayments: true,
         notifications: true,
+        lineItems: true,
       },
     });
 
@@ -115,10 +116,11 @@ export async function PATCH(
     }
 
     const body = await request.json();
-    const { totalMiners, unitPrice, dueDate, billingMonth } = body;
+    const { totalMiners, unitPrice, dueDate, billingMonth, lineItems } = body;
 
     const currentInvoice = await prisma.invoice.findUnique({
       where: { id },
+      include: { lineItems: true },
     });
 
     if (!currentInvoice) {
@@ -133,20 +135,127 @@ export async function PATCH(
       );
     }
 
+    const hasLineItems = Array.isArray(lineItems) && lineItems.length > 0;
+
+    let validatedLineItems: Array<{
+      hardwareId: string;
+      model: string;
+      quantity: number;
+      unitPrice: number;
+      totalPrice: number;
+    }> = [];
+
+    if (hasLineItems) {
+      for (const item of lineItems) {
+        if (
+          !item ||
+          typeof item.hardwareId !== "string" ||
+          !item.hardwareId ||
+          typeof item.model !== "string" ||
+          !item.model ||
+          typeof item.quantity !== "number" ||
+          item.quantity <= 0 ||
+          typeof item.unitPrice !== "number" ||
+          item.unitPrice <= 0
+        ) {
+          return NextResponse.json(
+            {
+              error:
+                "Each line item requires hardwareId, model, quantity > 0, and unitPrice > 0",
+            },
+            { status: 400 },
+          );
+        }
+      }
+
+      validatedLineItems = lineItems.map(
+        (item: {
+          hardwareId: string;
+          model: string;
+          quantity: number;
+          unitPrice: number;
+        }) => ({
+          hardwareId: item.hardwareId,
+          model: item.model,
+          quantity: item.quantity,
+          unitPrice: Number(item.unitPrice),
+          totalPrice: parseFloat(
+            (item.quantity * Number(item.unitPrice)).toFixed(2),
+          ),
+        }),
+      );
+    }
+
     const updateData: Record<string, unknown> = { updatedBy: userId };
     const changes: Record<string, unknown> = {};
 
-    if (totalMiners !== undefined) {
-      updateData.totalMiners = totalMiners;
-      changes.totalMiners = {
-        from: currentInvoice.totalMiners,
-        to: totalMiners,
+    let newTotalMiners = totalMiners;
+    let newUnitPrice = unitPrice;
+    let newTotalAmount: number;
+
+    if (hasLineItems) {
+      newTotalMiners = validatedLineItems.reduce(
+        (sum, item) => sum + item.quantity,
+        0,
+      );
+      newTotalAmount = parseFloat(
+        validatedLineItems
+          .reduce((sum, item) => sum + item.totalPrice, 0)
+          .toFixed(2),
+      );
+      newUnitPrice =
+        newTotalMiners > 0
+          ? parseFloat((newTotalAmount / newTotalMiners).toFixed(2))
+          : 0;
+
+      updateData.totalMiners = newTotalMiners;
+      updateData.unitPrice = newUnitPrice;
+      updateData.totalAmount = newTotalAmount;
+      updateData.lineItems = {
+        deleteMany: {},
+        create: validatedLineItems,
       };
+      changes.lineItems = {
+        from: currentInvoice.lineItems.map((li) => ({
+          model: li.model,
+          quantity: li.quantity,
+          unitPrice: li.unitPrice,
+        })),
+        to: validatedLineItems.map((li) => ({
+          model: li.model,
+          quantity: li.quantity,
+          unitPrice: li.unitPrice,
+        })),
+      };
+    } else {
+      if (totalMiners !== undefined) {
+        updateData.totalMiners = totalMiners;
+        changes.totalMiners = {
+          from: currentInvoice.totalMiners,
+          to: totalMiners,
+        };
+      }
+      if (unitPrice !== undefined) {
+        updateData.unitPrice = unitPrice;
+        changes.unitPrice = { from: currentInvoice.unitPrice, to: unitPrice };
+      }
+
+      // Recalculate totalAmount if totalMiners or unitPrice changed
+      newTotalMiners =
+        totalMiners !== undefined ? totalMiners : currentInvoice.totalMiners;
+      newUnitPrice =
+        unitPrice !== undefined ? unitPrice : Number(currentInvoice.unitPrice);
+      newTotalAmount = parseFloat((newTotalMiners * newUnitPrice).toFixed(2));
+
+      if (newTotalAmount !== Number(currentInvoice.totalAmount)) {
+        updateData.totalAmount = newTotalAmount;
+        changes.totalAmount = {
+          from: currentInvoice.totalAmount,
+          to: newTotalAmount,
+        };
+      }
     }
-    if (unitPrice !== undefined) {
-      updateData.unitPrice = unitPrice;
-      changes.unitPrice = { from: currentInvoice.unitPrice, to: unitPrice };
-    }
+
     if (dueDate) {
       updateData.dueDate = new Date(dueDate);
       changes.dueDate = dueDate;
@@ -159,23 +268,6 @@ export async function PATCH(
       };
     }
 
-    // Recalculate totalAmount if totalMiners or unitPrice changed
-    const newTotalMiners =
-      totalMiners !== undefined ? totalMiners : currentInvoice.totalMiners;
-    const newUnitPrice =
-      unitPrice !== undefined ? unitPrice : Number(currentInvoice.unitPrice);
-    const newTotalAmount = parseFloat(
-      (newTotalMiners * newUnitPrice).toFixed(2),
-    );
-
-    if (newTotalAmount !== Number(currentInvoice.totalAmount)) {
-      updateData.totalAmount = newTotalAmount;
-      changes.totalAmount = {
-        from: currentInvoice.totalAmount,
-        to: newTotalAmount,
-      };
-    }
-
     const invoice = await prisma.invoice.update({
       where: { id },
       data: updateData,
@@ -184,6 +276,7 @@ export async function PATCH(
         createdByUser: { select: { id: true, email: true, name: true } },
         updatedByUser: { select: { id: true, email: true, name: true } },
         costPayments: true,
+        lineItems: true,
       },
     });
 

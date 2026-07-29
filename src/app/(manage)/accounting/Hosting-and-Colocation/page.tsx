@@ -35,6 +35,7 @@ import {
 import Link from "next/link";
 import { useState } from "react";
 import { useDashboardStats } from "@/lib/hooks/useDashboard";
+import { useUser } from "@/lib/hooks/useUser";
 import {
   Customer,
   InvoiceWithDetails,
@@ -83,6 +84,8 @@ export default function AccountingDashboard() {
     error: statsError,
   } = useDashboardStats();
   const { customers, loading: customersLoading } = useCustomers();
+  const { user } = useUser();
+  const isAdmin = user?.role === "ADMIN" || user?.role === "SUPER_ADMIN";
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [customerFilter, setCustomerFilter] = useState<string>("");
@@ -650,84 +653,95 @@ export default function AccountingDashboard() {
               <MenuItem value="CANCELLED">Cancelled</MenuItem>
             </TextField>
             <Box sx={{ flexGrow: 1 }} />
-            <TextField
-              select
-              size="small"
-              label="Bulk status"
-              value={bulkStatus}
-              onChange={(e) =>
-                setBulkStatus(
-                  e.target.value as
-                    | ""
-                    | "ISSUED"
-                    | "PAID"
-                    | "OVERDUE"
-                    | "CANCELLED",
-                )
-              }
-              sx={{ minWidth: 180 }}
-              disabled={selectedInvoiceIds.length === 0}
-            >
-              <MenuItem value="">Select status</MenuItem>
-              <MenuItem value="ISSUED">Mark as Issued</MenuItem>
-              <MenuItem value="PAID">Mark as Paid</MenuItem>
-              <MenuItem value="OVERDUE">Mark as Overdue</MenuItem>
-              <MenuItem value="CANCELLED">Cancel</MenuItem>
-            </TextField>
-            <Button
-              variant="outlined"
-              size="small"
-              onClick={handleApplyBulkStatus}
-              disabled={
-                !bulkStatus ||
-                selectedInvoiceIds.length === 0 ||
-                bulkStatusLoading
-              }
-            >
-              Apply Status
-            </Button>
-            <Button
-              variant="contained"
-              size="small"
-              onClick={() => void handleIssueAndSendSelected()}
-              disabled={selectedInvoiceIds.length === 0 || bulkEmailProcessing}
-            >
-              Issue &amp; Send Emails
-            </Button>
-            <Button
-              variant="outlined"
-              color="error"
-              size="small"
-              onClick={handleBulkDelete}
-              disabled={selectedInvoiceIds.length === 0 || bulkDeleteLoading}
-            >
-              Delete Selected
-            </Button>
+            {isAdmin && (
+              <>
+                <TextField
+                  select
+                  size="small"
+                  label="Bulk status"
+                  value={bulkStatus}
+                  onChange={(e) =>
+                    setBulkStatus(
+                      e.target.value as
+                        | ""
+                        | "ISSUED"
+                        | "PAID"
+                        | "OVERDUE"
+                        | "CANCELLED",
+                    )
+                  }
+                  sx={{ minWidth: 180 }}
+                  disabled={selectedInvoiceIds.length === 0}
+                >
+                  <MenuItem value="">Select status</MenuItem>
+                  <MenuItem value="ISSUED">Mark as Issued</MenuItem>
+                  <MenuItem value="PAID">Mark as Paid</MenuItem>
+                  <MenuItem value="OVERDUE">Mark as Overdue</MenuItem>
+                  <MenuItem value="CANCELLED">Cancel</MenuItem>
+                </TextField>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={handleApplyBulkStatus}
+                  disabled={
+                    !bulkStatus ||
+                    selectedInvoiceIds.length === 0 ||
+                    bulkStatusLoading
+                  }
+                >
+                  Apply Status
+                </Button>
+                <Button
+                  variant="contained"
+                  size="small"
+                  onClick={() => void handleIssueAndSendSelected()}
+                  disabled={
+                    selectedInvoiceIds.length === 0 || bulkEmailProcessing
+                  }
+                >
+                  Issue &amp; Send Emails
+                </Button>
+                <Button
+                  variant="outlined"
+                  color="error"
+                  size="small"
+                  onClick={handleBulkDelete}
+                  disabled={
+                    selectedInvoiceIds.length === 0 || bulkDeleteLoading
+                  }
+                >
+                  Delete Selected
+                </Button>
+              </>
+            )}
           </Box>
-          {(bulkError || bulkStatusHookError || bulkDeleteHookError) && (
-            <Box sx={{ px: 2 }}>
-              <Alert severity="error" sx={{ mb: 1 }}>
-                {bulkError || bulkStatusHookError || bulkDeleteHookError}
-              </Alert>
-            </Box>
-          )}
+          {isAdmin &&
+            (bulkError || bulkStatusHookError || bulkDeleteHookError) && (
+              <Box sx={{ px: 2 }}>
+                <Alert severity="error" sx={{ mb: 1 }}>
+                  {bulkError || bulkStatusHookError || bulkDeleteHookError}
+                </Alert>
+              </Box>
+            )}
           <TableContainer>
             <Table>
               <TableHead sx={{ backgroundColor: "#f5f5f5" }}>
                 <TableRow>
-                  <TableCell padding="checkbox">
-                    <Checkbox
-                      indeterminate={
-                        selectedInvoiceIds.length > 0 &&
-                        selectedInvoiceIds.length < invoices.length
-                      }
-                      checked={
-                        invoices.length > 0 &&
-                        selectedInvoiceIds.length === invoices.length
-                      }
-                      onChange={(e) => handleToggleAllInvoices(e, invoices)}
-                    />
-                  </TableCell>
+                  {isAdmin && (
+                    <TableCell padding="checkbox">
+                      <Checkbox
+                        indeterminate={
+                          selectedInvoiceIds.length > 0 &&
+                          selectedInvoiceIds.length < invoices.length
+                        }
+                        checked={
+                          invoices.length > 0 &&
+                          selectedInvoiceIds.length === invoices.length
+                        }
+                        onChange={(e) => handleToggleAllInvoices(e, invoices)}
+                      />
+                    </TableCell>
+                  )}
                   <TableCell
                     sx={{ fontWeight: "bold" }}
                     sortDirection={
@@ -878,14 +892,16 @@ export default function AccountingDashboard() {
                     : null;
                   return (
                     <TableRow key={invoice.id} hover>
-                      <TableCell padding="checkbox">
-                        <Checkbox
-                          checked={selectedInvoiceIds.includes(invoice.id)}
-                          onChange={() =>
-                            handleToggleInvoiceSelection(invoice.id)
-                          }
-                        />
-                      </TableCell>
+                      {isAdmin && (
+                        <TableCell padding="checkbox">
+                          <Checkbox
+                            checked={selectedInvoiceIds.includes(invoice.id)}
+                            onChange={() =>
+                              handleToggleInvoiceSelection(invoice.id)
+                            }
+                          />
+                        </TableCell>
+                      )}
                       <TableCell>
                         <Link
                           href={`/accounting/${invoice.id}`}

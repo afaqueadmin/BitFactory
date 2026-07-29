@@ -30,6 +30,7 @@
     "@faker-js/faker": "^10.2.0",
     "@mui/icons-material": "^7.3.2",
     "@mui/material": "^7.3.4",
+    "@mui/material-nextjs": "^9.1.1",
     "@mui/x-date-pickers": "^8.18.0",
     "@prisma/client": "^6.16.2",
     "@simplewebauthn/browser": "^11.0.0",

@@ -12,6 +12,10 @@ import {
   MenuItem,
   Typography,
   Switch,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from "@mui/material";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -25,6 +29,10 @@ import {
   useCustomerMiners,
   Customer,
 } from "@/lib/hooks/useInvoices";
+import {
+  LineItemsEditor,
+  LineItem,
+} from "@/components/accounting/invoices/LineItemsEditor";
 
 export default function CreateInvoicePage() {
   const router = useRouter();
@@ -35,9 +43,6 @@ export default function CreateInvoicePage() {
 
   const [formData, setFormData] = useState({
     customerId: "",
-    totalMiners: 0,
-    unitPrice: 0,
-    totalAmount: 0,
     dueDate: "",
     status: InvoiceStatus.DRAFT,
     invoiceType: "ELECTRICITY_CHARGES",
@@ -46,10 +51,12 @@ export default function CreateInvoicePage() {
     billingYear: now.getFullYear(),
   });
 
-  // Fetch miners only when customerId changes
-  const { miners, loading: minersLoading } = useCustomerMiners(
-    formData.customerId || undefined,
-  );
+  const [lineItems, setLineItems] = useState<LineItem[]>([]);
+  const [pastDueDateWarningOpen, setPastDueDateWarningOpen] = useState(false);
+
+  // Fetch miners (grouped into suggested line items) only when customerId changes
+  const { lineItems: suggestedLineItems, loading: minersLoading } =
+    useCustomerMiners(formData.customerId || undefined);
 
   // Fetch group/RM info when customerId changes
   const [groupInfo, setGroupInfo] = useState<{
@@ -79,7 +86,7 @@ export default function CreateInvoicePage() {
         const response = await fetch("/api/hardware");
         if (response.ok) {
           const data = await response.json();
-          setHardwareList(data.hardware || []);
+          setHardwareList(data.data || []);
         }
       } catch (err) {
         console.error("Error fetching hardware:", err);
@@ -116,29 +123,25 @@ export default function CreateInvoicePage() {
     };
   }, []);
 
-  // When customer changes, auto-populate total miners from all their active miners
+  // When customer changes, auto-populate line items from their AUTO miners,
+  // grouped by model + rate, priced via the hosting-formula
   useEffect(() => {
-    const minerCount = miners.length;
-
-    if (formData.customerId && minerCount > 0) {
-      // Only update if the count actually changed to avoid re-render loops
-      setFormData((prev) => {
-        if (prev.totalMiners === minerCount) return prev;
-        return {
-          ...prev,
-          totalMiners: minerCount,
-        };
-      });
-    } else if (!formData.customerId) {
-      setFormData((prev) => {
-        if (prev.totalMiners === 0) return prev;
-        return {
-          ...prev,
-          totalMiners: 0,
-        };
-      });
+    if (!formData.customerId) {
+      setLineItems([]);
+      return;
     }
-  }, [formData.customerId, miners.length]);
+    if (!minersLoading) {
+      setLineItems(
+        suggestedLineItems.map((li) => ({
+          hardwareId: li.hardwareId,
+          model: li.model,
+          quantity: li.quantity,
+          unitPrice: li.suggestedUnitPrice,
+        })),
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.customerId, minersLoading]);
 
   // Fetch group/RM info when customerId changes
   useEffect(() => {
@@ -166,29 +169,36 @@ export default function CreateInvoicePage() {
     setFormData((prev) => ({
       ...prev,
       customerId: value,
-      totalMiners: 0,
     }));
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    const numValue =
-      name === "totalMiners" || name === "unitPrice"
-        ? parseFloat(value) || 0
-        : value;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
 
-    const newFormData = {
-      ...formData,
-      [name]: numValue,
-    };
+  const isPastDate = (dateStr: string) => {
+    if (!dateStr) return false;
+    const selectedDate = new Date(dateStr);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return selectedDate < today;
+  };
 
-    // Calculate total amount
-    if (name === "totalMiners" || name === "unitPrice") {
-      newFormData.totalAmount =
-        (newFormData.totalMiners || 0) * (newFormData.unitPrice || 0);
+  const handleDueDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { value } = e.target;
+    setFormData((prev) => ({ ...prev, dueDate: value }));
+    if (isPastDate(value)) {
+      setPastDueDateWarningOpen(true);
     }
+  };
 
-    setFormData(newFormData);
+  const handleReselectDueDate = () => {
+    setFormData((prev) => ({ ...prev, dueDate: "" }));
+    setPastDueDateWarningOpen(false);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -202,19 +212,18 @@ export default function CreateInvoicePage() {
       if (!formData.customerId) {
         throw new Error("Customer is required");
       }
-      if (formData.totalMiners <= 0 || formData.unitPrice <= 0) {
-        throw new Error("Miners count and unit price must be greater than 0");
+      if (lineItems.length === 0) {
+        throw new Error(
+          "Add at least one line item (auto-loaded from the customer's miners, or added manually)",
+        );
+      }
+      if (lineItems.some((item) => item.quantity <= 0 || item.unitPrice <= 0)) {
+        throw new Error(
+          "Every line item must have a miner count and unit price greater than 0",
+        );
       }
       if (!formData.dueDate) {
         throw new Error("Due date is required");
-      }
-
-      // Validate due date is not in the past
-      const selectedDate = new Date(formData.dueDate);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0); // Reset time to start of day for fair comparison
-      if (selectedDate < today) {
-        throw new Error("Due date must be in the future (not a past date)");
       }
 
       // Build billingMonth as UTC midnight on the first day of the selected month
@@ -222,16 +231,26 @@ export default function CreateInvoicePage() {
         Date.UTC(formData.billingYear, formData.billingMonth, 1),
       );
 
+      const totalMiners = lineItems.reduce(
+        (sum, item) => sum + item.quantity,
+        0,
+      );
+      const totalAmount = lineItems.reduce(
+        (sum, item) => sum + item.quantity * item.unitPrice,
+        0,
+      );
+
       // Call API to create invoice
       await createInvoice({
         customerId: formData.customerId,
-        totalMiners: formData.totalMiners,
-        unitPrice: formData.unitPrice,
+        totalMiners,
+        unitPrice: totalMiners > 0 ? totalAmount / totalMiners : 0,
         dueDate: formData.dueDate,
         status: formData.status,
         invoiceType: formData.invoiceType,
         hardwareId: formData.hardwareId || undefined,
         billingMonth: billingMonthDate.toISOString(),
+        lineItems,
       });
 
       // Redirect to accounting dashboard
@@ -357,42 +376,19 @@ export default function CreateInvoicePage() {
                 Invoice Details
               </h3>
               <Stack spacing={2}>
-                <TextField
-                  label="Number of Miners"
-                  name="totalMiners"
-                  type="number"
-                  value={formData.totalMiners}
-                  onChange={handleInputChange}
-                  fullWidth
-                  inputProps={{ min: 0, step: 1 }}
-                  helperText={
-                    !formData.customerId
-                      ? "Select a customer first to auto-load their miners"
-                      : minersLoading
-                        ? "Loading miners (status=AUTO) for selected customer..."
-                        : miners.length > 0
-                          ? `Auto-loaded: ${miners.length} miner(s) with status=AUTO`
-                          : "No miners with status=AUTO found for this customer"
-                  }
-                  disabled={minersLoading || !formData.customerId}
-                  required
+                <Typography variant="body2" color="textSecondary">
+                  {!formData.customerId
+                    ? "Select a customer first to auto-load their miners, grouped by model and priced from the hosting rate formula."
+                    : minersLoading
+                      ? "Loading miners (status=AUTO) for selected customer..."
+                      : "Auto-loaded from this customer's AUTO miners. Adjust quantities/prices or add/remove lines as needed."}
+                </Typography>
+                <LineItemsEditor
+                  lineItems={lineItems}
+                  onChange={setLineItems}
+                  hardwareList={hardwareList}
+                  disabled={minersLoading}
                 />
-                <TextField
-                  label="Unit Price (USD)"
-                  name="unitPrice"
-                  type="number"
-                  value={formData.unitPrice}
-                  onChange={handleInputChange}
-                  fullWidth
-                  inputProps={{ min: 0, step: 0.01 }}
-                  helperText="Price per miner unit (total = miners × unit price)"
-                  required
-                />
-                <Box sx={{ p: 2, backgroundColor: "#f5f5f5", borderRadius: 1 }}>
-                  <strong>
-                    Total Amount: ${(formData.totalAmount || 0).toFixed(2)}
-                  </strong>
-                </Box>
 
                 <Box
                   sx={{ mt: 1, display: "flex", alignItems: "center", gap: 1 }}
@@ -481,7 +477,7 @@ export default function CreateInvoicePage() {
                   name="dueDate"
                   type="date"
                   value={formData.dueDate}
-                  onChange={handleInputChange}
+                  onChange={handleDueDateChange}
                   fullWidth
                   InputLabelProps={{ shrink: true }}
                   helperText="Select the due date for this invoice"
@@ -525,8 +521,7 @@ export default function CreateInvoicePage() {
                 disabled={
                   loading ||
                   !formData.customerId ||
-                  !formData.totalMiners ||
-                  !formData.unitPrice ||
+                  lineItems.length === 0 ||
                   !formData.dueDate
                 }
               >
@@ -536,6 +531,28 @@ export default function CreateInvoicePage() {
           </Stack>
         </form>
       </Paper>
+
+      <Dialog
+        open={pastDueDateWarningOpen}
+        onClose={() => setPastDueDateWarningOpen(false)}
+      >
+        <DialogTitle>Due Date is in the Past</DialogTitle>
+        <DialogContent>
+          <Typography>
+            The due date you selected is in the past. Do you want to reselect a
+            due date, or continue anyway?
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleReselectDueDate}>Reselect Due Date</Button>
+          <Button
+            variant="contained"
+            onClick={() => setPastDueDateWarningOpen(false)}
+          >
+            Continue
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 }
