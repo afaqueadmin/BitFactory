@@ -12,6 +12,10 @@ import {
   MenuItem,
   Typography,
   Switch,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from "@mui/material";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -48,6 +52,7 @@ export default function CreateInvoicePage() {
   });
 
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
+  const [pastDueDateWarningOpen, setPastDueDateWarningOpen] = useState(false);
 
   // Fetch miners (grouped into suggested line items) only when customerId changes
   const { lineItems: suggestedLineItems, loading: minersLoading } =
@@ -175,6 +180,27 @@ export default function CreateInvoicePage() {
     }));
   };
 
+  const isPastDate = (dateStr: string) => {
+    if (!dateStr) return false;
+    const selectedDate = new Date(dateStr);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return selectedDate < today;
+  };
+
+  const handleDueDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { value } = e.target;
+    setFormData((prev) => ({ ...prev, dueDate: value }));
+    if (isPastDate(value)) {
+      setPastDueDateWarningOpen(true);
+    }
+  };
+
+  const handleReselectDueDate = () => {
+    setFormData((prev) => ({ ...prev, dueDate: "" }));
+    setPastDueDateWarningOpen(false);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -198,14 +224,6 @@ export default function CreateInvoicePage() {
       }
       if (!formData.dueDate) {
         throw new Error("Due date is required");
-      }
-
-      // Validate due date is not in the past
-      const selectedDate = new Date(formData.dueDate);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0); // Reset time to start of day for fair comparison
-      if (selectedDate < today) {
-        throw new Error("Due date must be in the future (not a past date)");
       }
 
       // Build billingMonth as UTC midnight on the first day of the selected month
@@ -459,7 +477,7 @@ export default function CreateInvoicePage() {
                   name="dueDate"
                   type="date"
                   value={formData.dueDate}
-                  onChange={handleInputChange}
+                  onChange={handleDueDateChange}
                   fullWidth
                   InputLabelProps={{ shrink: true }}
                   helperText="Select the due date for this invoice"
@@ -513,6 +531,28 @@ export default function CreateInvoicePage() {
           </Stack>
         </form>
       </Paper>
+
+      <Dialog
+        open={pastDueDateWarningOpen}
+        onClose={() => setPastDueDateWarningOpen(false)}
+      >
+        <DialogTitle>Due Date is in the Past</DialogTitle>
+        <DialogContent>
+          <Typography>
+            The due date you selected is in the past. Do you want to reselect a
+            due date, or continue anyway?
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleReselectDueDate}>Reselect Due Date</Button>
+          <Button
+            variant="contained"
+            onClick={() => setPastDueDateWarningOpen(false)}
+          >
+            Continue
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 }

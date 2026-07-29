@@ -108,6 +108,7 @@ export default function BulkInvoicesPage() {
     { id: string; name: string }[]
   >([]);
   const [excludedCustomerIds, setExcludedCustomerIds] = useState<string[]>([]);
+  const [pastDueDateWarningOpen, setPastDueDateWarningOpen] = useState(false);
 
   const allCustomerIds = useMemo(
     () => customers.map((c: Customer) => c.id),
@@ -226,6 +227,27 @@ export default function BulkInvoicesPage() {
     });
   };
 
+  const isPastDate = (dateStr: string) => {
+    if (!dateStr) return false;
+    const selectedDate = new Date(dateStr);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return selectedDate < today;
+  };
+
+  const handleDueDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { value } = e.target;
+    setDueDate(value);
+    if (isPastDate(value)) {
+      setPastDueDateWarningOpen(true);
+    }
+  };
+
+  const handleReselectDueDate = () => {
+    setDueDate("");
+    setPastDueDateWarningOpen(false);
+  };
+
   const totalInvoices = selectedCustomerIds.length;
 
   const totalMinersAllSelected = selectedCustomerIds.reduce((sum, id) => {
@@ -267,14 +289,6 @@ export default function BulkInvoicesPage() {
 
     if (!dueDate) {
       setSubmitError("Due date is required.");
-      return;
-    }
-
-    const selectedDate = new Date(dueDate);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    if (selectedDate < today) {
-      setSubmitError("Due date must be in the future (not a past date).");
       return;
     }
 
@@ -607,7 +621,7 @@ export default function BulkInvoicesPage() {
                   label="Due Date"
                   type="date"
                   value={dueDate}
-                  onChange={(e) => setDueDate(e.target.value)}
+                  onChange={handleDueDateChange}
                   fullWidth
                   InputLabelProps={{ shrink: true }}
                   helperText="Select the due date for these invoices"
@@ -768,6 +782,28 @@ export default function BulkInvoicesPage() {
             disabled={creating}
           >
             {creating ? "Creating Invoices..." : "Yes, send anyway"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={pastDueDateWarningOpen}
+        onClose={() => setPastDueDateWarningOpen(false)}
+      >
+        <DialogTitle>Due Date is in the Past</DialogTitle>
+        <DialogContent>
+          <Typography>
+            The due date you selected is in the past. Do you want to reselect a
+            due date, or continue anyway?
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleReselectDueDate}>Reselect Due Date</Button>
+          <Button
+            variant="contained"
+            onClick={() => setPastDueDateWarningOpen(false)}
+          >
+            Continue
           </Button>
         </DialogActions>
       </Dialog>
