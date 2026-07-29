@@ -301,6 +301,14 @@
     <!-- Products Table -->
     <table class="products-table">
       <thead>
+{{#if isHardwareSales}}
+        <tr>
+          <th>PRODUCT NAME</th>
+          <th class="text-right">QUANTITY</th>
+          <th class="text-right">UNIT PRICE (USD)</th>
+          <th class="text-right">TOTAL PRICE (USD)</th>
+        </tr>
+{{else}}
         <tr>
           <th>PRODUCT NAME</th>
           <th>MACHINE NAME</th>
@@ -308,13 +316,21 @@
           <th class="text-right">UNIT PRICE (USD)</th>
           <th class="text-right">TOTAL PRICE (USD)</th>
         </tr>
+{{/if}}
       </thead>
       <tbody>
         {{productRows}}
+{{#if isHardwareSales}}
+        <tr class="total-row">
+          <td colspan="3">Total Amount</td>
+          <td>{{totalAmount}}</td>
+        </tr>
+{{else}}
         <tr class="total-row">
           <td colspan="4">Total Amount</td>
           <td>{{totalAmount}}</td>
         </tr>
+{{/if}}
       </tbody>
     </table>
 

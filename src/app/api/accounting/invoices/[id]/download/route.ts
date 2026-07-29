@@ -89,6 +89,7 @@ export async function GET(
         unitPrice: Number(li.unitPrice),
         totalPrice: Number(li.totalPrice),
       })),
+      invoice.invoiceType,
     );
 
     // Return PDF as file download

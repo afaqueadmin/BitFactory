@@ -25,6 +25,7 @@ export interface InvoiceEmailPayload {
     unitPrice: number;
     totalPrice: number;
   }>;
+  invoiceType?: string | null;
 }
 
 export interface EmailSendResult {
@@ -156,6 +157,7 @@ export class InvoiceEmailService {
         payload.invoiceStatus,
         payload.paidDate,
         payload.lineItems,
+        payload.invoiceType,
       );
 
       console.log(

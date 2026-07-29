@@ -24,13 +24,21 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  TextField,
+  Checkbox,
+  FormControlLabel,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
 } from "@mui/material";
 import {
   useInvoice,
-  useChangeInvoiceStatus,
   useDeleteInvoice,
   useInvoiceAuditLog,
   useSendInvoiceEmail,
+  useIssueInvoice,
   AuditLogWithUser,
 } from "@/lib/hooks/useInvoices";
 import { useUser } from "@/lib/hooks/useUser";
@@ -66,7 +74,7 @@ export default function InvoiceDetailPage() {
   const router = useRouter();
   const { invoice, loading, error } = useInvoice(params.id as string);
   const { user } = useUser();
-  const { changeStatus, loading: statusLoading } = useChangeInvoiceStatus();
+  const { issueInvoice, loading: issueLoading } = useIssueInvoice();
   const { deleteInvoice, loading: deleteLoading } = useDeleteInvoice();
   const { auditLogs, loading: auditLoading } = useInvoiceAuditLog(
     params.id as string,
@@ -100,7 +108,14 @@ export default function InvoiceDetailPage() {
     message: string;
     sentTo: string;
     ccDescription: string;
+    emailSent: boolean;
   } | null>(null);
+
+  const todayIso = () => new Date().toISOString().split("T")[0];
+  const [issuedDateInput, setIssuedDateInput] = useState(todayIso());
+  const [skipEmailChecked, setSkipEmailChecked] = useState(false);
+  const [pastIssueDateWarningOpen, setPastIssueDateWarningOpen] =
+    useState(false);
 
   // Fetch group info when invoice loads
   useEffect(() => {
@@ -122,33 +137,61 @@ export default function InvoiceDetailPage() {
 
   const isAdmin = user?.role === "ADMIN" || user?.role === "SUPER_ADMIN";
 
+  const isPastDate = (dateStr: string) => {
+    if (!dateStr) return false;
+    const selectedDate = new Date(dateStr);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return selectedDate < today;
+  };
+
+  const handleOpenIssueDialog = () => {
+    setIssuedDateInput(todayIso());
+    setSkipEmailChecked(false);
+    setPastIssueDateWarningOpen(false);
+    setStatusDialogOpen(true);
+  };
+
+  const handleIssuedDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { value } = e.target;
+    setIssuedDateInput(value);
+    if (isPastDate(value)) {
+      setPastIssueDateWarningOpen(true);
+    }
+  };
+
+  const handleReselectIssuedDate = () => {
+    setIssuedDateInput("");
+    setPastIssueDateWarningOpen(false);
+  };
+
   const handleIssueInvoice = async () => {
     try {
       setStatusDialogError(null);
       setIssueSuccess(null);
 
-      // First, change status to ISSUED
-      await changeStatus(invoice!.id, "ISSUED");
+      // Call atomic issue endpoint: sends email first (unless skipped), then
+      // changes status to ISSUED. If email fails, status stays DRAFT and an
+      // error is returned.
+      const result = await issueInvoice({
+        invoiceId: invoice!.id,
+        issuedDate: issuedDateInput
+          ? new Date(issuedDateInput).toISOString()
+          : undefined,
+        skipEmail: skipEmailChecked,
+      });
 
-      // Then, automatically send the email
-      try {
-        const emailResult = await sendEmail(invoice!.id);
-        setIssueSuccess({
-          message: emailResult.message,
-          sentTo: emailResult.sentTo,
-          ccDescription: emailResult.ccDescription,
-        });
-        // Keep dialog open to show success
-        // Auto-reload after 3 seconds
-        setTimeout(() => {
-          window.location.reload();
-        }, 3000);
-      } catch (emailErr) {
-        // Status was changed but email failed - show error but don't fail completely
-        setStatusDialogError(
-          `Invoice issued successfully, but failed to send email: ${emailErr instanceof Error ? emailErr.message : "Unknown error"}`,
-        );
-      }
+      setIssueSuccess({
+        message: result.message,
+        sentTo: result.sentTo || "",
+        ccDescription: result.ccDescription || "",
+        emailSent: !skipEmailChecked,
+      });
+
+      // Auto-reload after 3 seconds to show updated status and audit logs
+      setTimeout(() => {
+        window.location.reload();
+      }, 3000);
     } catch (err) {
       setStatusDialogError(
         err instanceof Error ? err.message : "Failed to issue invoice",
@@ -310,7 +353,7 @@ export default function InvoiceDetailPage() {
               startIcon={<CheckCircleIcon />}
               variant="contained"
               color="success"
-              onClick={() => setStatusDialogOpen(true)}
+              onClick={handleOpenIssueDialog}
             >
               Issue Invoice
             </Button>
@@ -470,6 +513,48 @@ export default function InvoiceDetailPage() {
               </Box>
             </CardContent>
           </Card>
+
+          {/* Line Items */}
+          {invoice.lineItems && invoice.lineItems.length > 0 && (
+            <Card sx={{ mt: 3 }}>
+              <CardHeader title="Line Items" />
+              <Divider />
+              <CardContent>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Model</TableCell>
+                      <TableCell align="right">Quantity</TableCell>
+                      <TableCell align="right">Unit Price (USD)</TableCell>
+                      <TableCell align="right">Total Price (USD)</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {invoice.lineItems.map(
+                      (item: {
+                        id: string;
+                        model: string;
+                        quantity: number;
+                        unitPrice: number | string;
+                        totalPrice: number | string;
+                      }) => (
+                        <TableRow key={item.id}>
+                          <TableCell>{item.model}</TableCell>
+                          <TableCell align="right">{item.quantity}</TableCell>
+                          <TableCell align="right">
+                            ${Number(item.unitPrice).toFixed(2)}
+                          </TableCell>
+                          <TableCell align="right">
+                            ${Number(item.totalPrice).toFixed(2)}
+                          </TableCell>
+                        </TableRow>
+                      ),
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          )}
         </Box>
 
         {/* Summary Sidebar */}
@@ -747,7 +832,7 @@ export default function InvoiceDetailPage() {
       <Dialog
         open={statusDialogOpen}
         onClose={() => {
-          if (!statusLoading) setStatusDialogOpen(false);
+          if (!issueLoading) setStatusDialogOpen(false);
         }}
       >
         <DialogTitle>Issue Invoice</DialogTitle>
@@ -761,17 +846,25 @@ export default function InvoiceDetailPage() {
                 <Typography variant="body2" sx={{ mb: 1 }}>
                   {issueSuccess.message}
                 </Typography>
-                <Typography variant="body2" sx={{ fontWeight: 500, mt: 1 }}>
-                  Email Details:
-                </Typography>
-                <Typography variant="body2" sx={{ ml: 1, mt: 0.5 }}>
-                  To: {issueSuccess.sentTo}
-                </Typography>
-                <Typography variant="body2" sx={{ ml: 1 }}>
-                  {issueSuccess.ccDescription}
-                </Typography>
+                {issueSuccess.emailSent ? (
+                  <>
+                    <Typography variant="body2" sx={{ fontWeight: 500, mt: 1 }}>
+                      Email Details:
+                    </Typography>
+                    <Typography variant="body2" sx={{ ml: 1, mt: 0.5 }}>
+                      To: {issueSuccess.sentTo}
+                    </Typography>
+                    <Typography variant="body2" sx={{ ml: 1 }}>
+                      {issueSuccess.ccDescription}
+                    </Typography>
+                  </>
+                ) : (
+                  <Typography variant="body2" sx={{ fontWeight: 500, mt: 1 }}>
+                    Email was not sent (Do not send email was checked).
+                  </Typography>
+                )}
               </Alert>
-            ) : statusDialogError && !statusLoading ? (
+            ) : statusDialogError && !issueLoading ? (
               <Alert severity="error" sx={{ mb: 2 }}>
                 {statusDialogError}
               </Alert>
@@ -783,62 +876,93 @@ export default function InvoiceDetailPage() {
                 <ul style={{ marginTop: 0, marginBottom: 16 }}>
                   <li>Change the status from DRAFT to ISSUED</li>
                   <li>
-                    Set the issued date to today (
-                    {new Date().toLocaleDateString()})
+                    Set the issued date to{" "}
+                    {issuedDateInput
+                      ? new Date(issuedDateInput).toLocaleDateString()
+                      : "(select a date below)"}
                   </li>
                   <li>Make the invoice available for payment</li>
-                  <li>Automatically send an email to the customer</li>
+                  <li>
+                    {skipEmailChecked
+                      ? "Not send an email to the customer"
+                      : "Automatically send an email to the customer"}
+                  </li>
                 </ul>
 
+                <TextField
+                  label="Issue Date"
+                  type="date"
+                  value={issuedDateInput}
+                  onChange={handleIssuedDateChange}
+                  fullWidth
+                  InputLabelProps={{ shrink: true }}
+                  helperText="Defaults to today; can be backdated"
+                  required
+                  sx={{ mb: 2 }}
+                />
+
+                <FormControlLabel
+                  sx={{ mb: 2 }}
+                  control={
+                    <Checkbox
+                      checked={skipEmailChecked}
+                      onChange={(e) => setSkipEmailChecked(e.target.checked)}
+                    />
+                  }
+                  label="Do not send email"
+                />
+
                 {/* Email Details Section */}
-                <Box
-                  sx={{
-                    mb: 2,
-                    p: 2,
-                    backgroundColor: "#f5f5f5",
-                    borderRadius: 1,
-                  }}
-                >
-                  <Typography sx={{ fontWeight: 600, mb: 1.5 }}>
-                    📧 Email will be sent to:
-                  </Typography>
-                  <Box sx={{ ml: 1 }}>
-                    <Typography variant="body2" sx={{ mb: 1 }}>
-                      <strong>To:</strong> {invoice?.user?.email}
+                {!skipEmailChecked && (
+                  <Box
+                    sx={{
+                      mb: 2,
+                      p: 2,
+                      backgroundColor: "#f5f5f5",
+                      borderRadius: 1,
+                    }}
+                  >
+                    <Typography sx={{ fontWeight: 600, mb: 1.5 }}>
+                      📧 Email will be sent to:
                     </Typography>
-                    {groupLoading ? (
-                      <Box
-                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
-                      >
-                        <CircularProgress size={16} />
-                        <Typography variant="body2">
-                          Loading CC details...
-                        </Typography>
-                      </Box>
-                    ) : groupInfo ? (
-                      <Box>
-                        <Typography variant="body2" sx={{ mb: 0.5 }}>
-                          <strong>CC:</strong> {groupInfo.relationshipManager} (
-                          {groupInfo.email})
-                        </Typography>
-                        <Typography variant="body2">
-                          <strong>CC:</strong> invoices@bitfactory.ae
-                        </Typography>
-                      </Box>
-                    ) : (
-                      <Typography variant="body2" sx={{ color: "#d32f2f" }}>
-                        <strong>CC:</strong> invoices@bitfactory.ae{" "}
-                        <em>(No RM assigned to this customer)</em>
+                    <Box sx={{ ml: 1 }}>
+                      <Typography variant="body2" sx={{ mb: 1 }}>
+                        <strong>To:</strong> {invoice?.user?.email}
                       </Typography>
-                    )}
+                      {groupLoading ? (
+                        <Box
+                          sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                        >
+                          <CircularProgress size={16} />
+                          <Typography variant="body2">
+                            Loading CC details...
+                          </Typography>
+                        </Box>
+                      ) : groupInfo ? (
+                        <Box>
+                          <Typography variant="body2" sx={{ mb: 0.5 }}>
+                            <strong>CC:</strong> {groupInfo.relationshipManager}{" "}
+                            ({groupInfo.email})
+                          </Typography>
+                          <Typography variant="body2">
+                            <strong>CC:</strong> invoices@bitfactory.ae
+                          </Typography>
+                        </Box>
+                      ) : (
+                        <Typography variant="body2" sx={{ color: "#d32f2f" }}>
+                          <strong>CC:</strong> invoices@bitfactory.ae{" "}
+                          <em>(No RM assigned to this customer)</em>
+                        </Typography>
+                      )}
+                    </Box>
                   </Box>
-                </Box>
+                )}
               </>
             )}
           </Box>
         </DialogContent>
         <DialogActions>
-          {!issueSuccess && statusDialogError && !statusLoading && (
+          {!issueSuccess && statusDialogError && !issueLoading && (
             <Button
               onClick={() => {
                 setStatusDialogOpen(false);
@@ -853,7 +977,7 @@ export default function InvoiceDetailPage() {
             <>
               <Button
                 onClick={() => setStatusDialogOpen(false)}
-                disabled={statusLoading}
+                disabled={issueLoading}
               >
                 Cancel
               </Button>
@@ -861,9 +985,13 @@ export default function InvoiceDetailPage() {
                 onClick={handleIssueInvoice}
                 variant="contained"
                 color="success"
-                disabled={statusLoading}
+                disabled={issueLoading || !issuedDateInput}
               >
-                {statusLoading ? "Issuing & Sending..." : "Issue Invoice"}
+                {issueLoading
+                  ? skipEmailChecked
+                    ? "Issuing..."
+                    : "Issuing & Sending..."
+                  : "Issue Invoice"}
               </Button>
             </>
           )}
@@ -878,6 +1006,28 @@ export default function InvoiceDetailPage() {
               Close
             </Button>
           )}
+        </DialogActions>
+      </Dialog>
+      {/* Issue Date in the Past Warning Dialog */}
+      <Dialog
+        open={pastIssueDateWarningOpen}
+        onClose={() => setPastIssueDateWarningOpen(false)}
+      >
+        <DialogTitle>Issue Date is in the Past</DialogTitle>
+        <DialogContent>
+          <Typography>
+            The issue date you selected is in the past. Do you want to reselect
+            a date, or continue anyway?
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleReselectIssuedDate}>Reselect Date</Button>
+          <Button
+            variant="contained"
+            onClick={() => setPastIssueDateWarningOpen(false)}
+          >
+            Continue
+          </Button>
         </DialogActions>
       </Dialog>
       {/* Delete Invoice Dialog */}

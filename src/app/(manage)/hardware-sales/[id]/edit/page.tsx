@@ -16,6 +16,10 @@ import SaveIcon from "@mui/icons-material/Save";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import Link from "next/link";
 import { useInvoice, useUpdateInvoice } from "@/lib/hooks/useInvoices";
+import {
+  LineItemsEditor,
+  LineItem,
+} from "@/components/accounting/invoices/LineItemsEditor";
 
 export default function EditInvoicePage() {
   const params = useParams();
@@ -35,8 +39,30 @@ export default function EditInvoicePage() {
     dueDate: "",
   });
 
+  const [lineItems, setLineItems] = useState<LineItem[]>([]);
+  const [hardwareList, setHardwareList] = useState<
+    Array<{ id: string; model: string }>
+  >([]);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Fetch hardware list on mount (for the "Add Line Item" picker)
+  useEffect(() => {
+    const fetchHardware = async () => {
+      try {
+        const response = await fetch("/api/hardware");
+        if (response.ok) {
+          const data = await response.json();
+          setHardwareList(data.data || []);
+        }
+      } catch (err) {
+        console.error("Error fetching hardware:", err);
+      }
+    };
+
+    fetchHardware();
+  }, []);
 
   // Populate form when invoice loads
   useEffect(() => {
@@ -46,8 +72,25 @@ export default function EditInvoicePage() {
         unitPrice: Number(invoice.unitPrice),
         dueDate: new Date(invoice.dueDate).toISOString().split("T")[0],
       });
+      setLineItems(
+        (invoice.lineItems || []).map(
+          (li: {
+            hardwareId: string | null;
+            model: string;
+            quantity: number;
+            unitPrice: number | string;
+          }) => ({
+            hardwareId: li.hardwareId || "",
+            model: li.model,
+            quantity: li.quantity,
+            unitPrice: Number(li.unitPrice),
+          }),
+        ),
+      );
     }
   }, [invoice]);
+
+  const hasLineItems = (invoice?.lineItems?.length ?? 0) > 0;
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -70,7 +113,18 @@ export default function EditInvoicePage() {
       setError(null);
 
       // Validate
-      if (formData.totalMiners <= 0 || formData.unitPrice <= 0) {
+      if (hasLineItems) {
+        if (lineItems.length === 0) {
+          throw new Error("Add at least one line item");
+        }
+        if (
+          lineItems.some((item) => item.quantity <= 0 || item.unitPrice <= 0)
+        ) {
+          throw new Error(
+            "Every line item must have a quantity and unit price greater than 0",
+          );
+        }
+      } else if (formData.totalMiners <= 0 || formData.unitPrice <= 0) {
         throw new Error("Miners count and unit price must be greater than 0");
       }
 
@@ -79,6 +133,7 @@ export default function EditInvoicePage() {
         totalMiners: formData.totalMiners,
         unitPrice: formData.unitPrice,
         dueDate: formData.dueDate,
+        lineItems: hasLineItems ? lineItems : undefined,
       });
 
       // Redirect back to invoice detail
@@ -147,28 +202,39 @@ export default function EditInvoicePage() {
                 Invoice Details
               </h3>
               <Stack spacing={2}>
-                <TextField
-                  label="Number of Miners"
-                  name="totalMiners"
-                  type="number"
-                  value={formData.totalMiners}
-                  onChange={handleInputChange}
-                  fullWidth
-                  inputProps={{ min: 0, step: 1 }}
-                  helperText="Total active mining units allocated to this customer"
-                  required
-                />
-                <TextField
-                  label="Unit Price (USD)"
-                  name="unitPrice"
-                  type="number"
-                  value={formData.unitPrice}
-                  onChange={handleInputChange}
-                  fullWidth
-                  inputProps={{ min: 0, step: 0.01 }}
-                  helperText="Price per miner unit"
-                  required
-                />
+                {hasLineItems ? (
+                  <LineItemsEditor
+                    lineItems={lineItems}
+                    onChange={setLineItems}
+                    hardwareList={hardwareList}
+                    excludeUsedModels
+                  />
+                ) : (
+                  <>
+                    <TextField
+                      label="Number of Miners"
+                      name="totalMiners"
+                      type="number"
+                      value={formData.totalMiners}
+                      onChange={handleInputChange}
+                      fullWidth
+                      inputProps={{ min: 0, step: 1 }}
+                      helperText="Total active mining units allocated to this customer"
+                      required
+                    />
+                    <TextField
+                      label="Unit Price (USD)"
+                      name="unitPrice"
+                      type="number"
+                      value={formData.unitPrice}
+                      onChange={handleInputChange}
+                      fullWidth
+                      inputProps={{ min: 0, step: 0.01 }}
+                      helperText="Price per miner unit"
+                      required
+                    />
+                  </>
+                )}
                 <TextField
                   label="Due Date"
                   name="dueDate"

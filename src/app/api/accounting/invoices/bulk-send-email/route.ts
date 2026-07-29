@@ -98,6 +98,7 @@ export async function POST(request: NextRequest) {
       billingMonth: invoice.billingMonth || undefined,
       invoiceStatus: invoice.status,
       paidDate: invoice.paidDate || undefined,
+      invoiceType: invoice.invoiceType,
       lineItems: invoice.lineItems.map((li) => ({
         model: li.model,
         quantity: li.quantity,

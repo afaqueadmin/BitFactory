@@ -23,6 +23,10 @@ import {
   useCustomers,
   Customer,
 } from "@/lib/hooks/useInvoices";
+import {
+  LineItemsEditor,
+  LineItem,
+} from "@/components/accounting/invoices/LineItemsEditor";
 
 export default function CreateHardwareSalesInvoicePage() {
   const router = useRouter();
@@ -31,17 +35,15 @@ export default function CreateHardwareSalesInvoicePage() {
 
   const [formData, setFormData] = useState({
     customerId: "",
-    totalMiners: 0,
-    unitPrice: 0,
-    totalAmount: 0,
     issueDate: new Date().toISOString().split("T")[0],
     dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
       .toISOString()
       .split("T")[0],
     status: InvoiceStatus.DRAFT,
     invoiceType: "HARDWARE_SALES",
-    hardwareId: "",
   });
+
+  const [lineItems, setLineItems] = useState<LineItem[]>([]);
 
   // Fetch group/RM info when customerId changes
   const [groupInfo, setGroupInfo] = useState<{
@@ -105,29 +107,15 @@ export default function CreateHardwareSalesInvoicePage() {
     setFormData((prev) => ({
       ...prev,
       customerId: value,
-      totalMiners: 0,
     }));
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    const numValue =
-      name === "totalMiners" || name === "unitPrice"
-        ? parseFloat(value) || 0
-        : value;
-
-    const newFormData = {
-      ...formData,
-      [name]: numValue,
-    };
-
-    // Calculate total amount
-    if (name === "totalMiners" || name === "unitPrice") {
-      newFormData.totalAmount =
-        (newFormData.totalMiners || 0) * (newFormData.unitPrice || 0);
-    }
-
-    setFormData(newFormData);
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -141,20 +129,35 @@ export default function CreateHardwareSalesInvoicePage() {
       if (!formData.customerId) {
         throw new Error("Customer is required");
       }
-      if (formData.totalMiners <= 0 || formData.unitPrice <= 0) {
-        throw new Error("Quantity and unit price must be greater than 0");
+      if (lineItems.length === 0) {
+        throw new Error("Add at least one line item");
       }
+      if (lineItems.some((item) => item.quantity <= 0 || item.unitPrice <= 0)) {
+        throw new Error(
+          "Every line item must have a quantity and unit price greater than 0",
+        );
+      }
+
+      const totalMiners = lineItems.reduce(
+        (sum, item) => sum + item.quantity,
+        0,
+      );
+      const totalAmount = lineItems.reduce(
+        (sum, item) => sum + item.quantity * item.unitPrice,
+        0,
+      );
 
       // Call API to create invoice
       await createInvoice({
         customerId: formData.customerId,
-        totalMiners: formData.totalMiners,
-        unitPrice: formData.unitPrice,
+        totalMiners,
+        unitPrice: totalMiners > 0 ? totalAmount / totalMiners : 0,
         dueDate: formData.dueDate,
         status: formData.status,
         invoiceType: formData.invoiceType,
-        hardwareId: formData.hardwareId || undefined,
+        hardwareId: undefined,
         invoiceGeneratedDate: formData.issueDate || undefined,
+        lineItems,
       });
 
       // Redirect to hardware-sales dashboard
@@ -280,33 +283,17 @@ export default function CreateHardwareSalesInvoicePage() {
                 Invoice Details
               </h3>
               <Stack spacing={2}>
-                <TextField
-                  label="Quantity"
-                  name="totalMiners"
-                  type="number"
-                  value={formData.totalMiners}
-                  onChange={handleInputChange}
-                  fullWidth
-                  inputProps={{ min: 0, step: 1 }}
-                  helperText="Number of hardware units"
-                  required
+                <Typography variant="body2" color="textSecondary">
+                  Add each hardware model being sold, with its quantity and unit
+                  price.
+                </Typography>
+                <LineItemsEditor
+                  lineItems={lineItems}
+                  onChange={setLineItems}
+                  hardwareList={hardwareList}
+                  disabled={hardwareLoading}
+                  excludeUsedModels
                 />
-                <TextField
-                  label="Unit Price (USD)"
-                  name="unitPrice"
-                  type="number"
-                  value={formData.unitPrice}
-                  onChange={handleInputChange}
-                  fullWidth
-                  inputProps={{ min: 0, step: 0.01 }}
-                  helperText="Price per hardware unit (total = quantity × unit price)"
-                  required
-                />
-                <Box sx={{ p: 2, backgroundColor: "#f5f5f5", borderRadius: 1 }}>
-                  <strong>
-                    Total Amount: ${(formData.totalAmount || 0).toFixed(2)}
-                  </strong>
-                </Box>
               </Stack>
             </Box>
 
@@ -338,24 +325,6 @@ export default function CreateHardwareSalesInvoicePage() {
                   helperText="When payment is due (defaults to 30 days from today)"
                   required
                 />
-                <TextField
-                  select
-                  label="Hardware Model"
-                  name="hardwareId"
-                  value={formData.hardwareId}
-                  onChange={handleInputChange}
-                  fullWidth
-                  helperText="Select the hardware model purchased"
-                  disabled={hardwareLoading}
-                  required
-                >
-                  <MenuItem value="">-- Select Hardware --</MenuItem>
-                  {hardwareList.map((hw) => (
-                    <MenuItem key={hw.id} value={hw.id}>
-                      {hw.model}
-                    </MenuItem>
-                  ))}
-                </TextField>
                 {/* Status is automatically set to DRAFT when creating invoices */}
               </Stack>
             </Box>
@@ -372,10 +341,7 @@ export default function CreateHardwareSalesInvoicePage() {
                   loading ? <CircularProgress size={20} /> : <SaveIcon />
                 }
                 disabled={
-                  loading ||
-                  !formData.customerId ||
-                  !formData.totalMiners ||
-                  !formData.unitPrice
+                  loading || !formData.customerId || lineItems.length === 0
                 }
               >
                 {loading ? "Creating..." : "Create Invoice"}

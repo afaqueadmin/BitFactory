@@ -34,6 +34,7 @@ interface LineItemsEditorProps {
   onChange: (lineItems: LineItem[]) => void;
   hardwareList: HardwareOption[];
   disabled?: boolean;
+  excludeUsedModels?: boolean;
 }
 
 const round2 = (value: number) => Math.round(value * 100) / 100;
@@ -43,8 +44,14 @@ export function LineItemsEditor({
   onChange,
   hardwareList,
   disabled = false,
+  excludeUsedModels = false,
 }: LineItemsEditorProps) {
   const [newHardwareId, setNewHardwareId] = useState("");
+
+  const usedHardwareIds = new Set(lineItems.map((item) => item.hardwareId));
+  const addableHardwareList = excludeUsedModels
+    ? hardwareList.filter((hw) => !usedHardwareIds.has(hw.id))
+    : hardwareList;
 
   const totalMiners = lineItems.reduce(
     (sum, item) => sum + (item.quantity || 0),
@@ -187,10 +194,10 @@ export function LineItemsEditor({
           value={newHardwareId}
           onChange={(e) => setNewHardwareId(e.target.value)}
           sx={{ minWidth: 220 }}
-          disabled={disabled || hardwareList.length === 0}
+          disabled={disabled || addableHardwareList.length === 0}
         >
           <MenuItem value="">-- Select model --</MenuItem>
-          {hardwareList.map((hw) => (
+          {addableHardwareList.map((hw) => (
             <MenuItem key={hw.id} value={hw.id}>
               {hw.model}
             </MenuItem>
