@@ -29,6 +29,9 @@ import {
   TableCell,
   TableHead,
   TableRow,
+  TextField,
+  Checkbox,
+  FormControlLabel,
 } from "@mui/material";
 import {
   useInvoice,
@@ -105,7 +108,14 @@ export default function InvoiceDetailPage() {
     message: string;
     sentTo: string;
     ccDescription: string;
+    emailSent: boolean;
   } | null>(null);
+
+  const todayIso = () => new Date().toISOString().split("T")[0];
+  const [issuedDateInput, setIssuedDateInput] = useState(todayIso());
+  const [skipEmailChecked, setSkipEmailChecked] = useState(false);
+  const [pastIssueDateWarningOpen, setPastIssueDateWarningOpen] =
+    useState(false);
 
   // Fetch group info when invoice loads
   useEffect(() => {
@@ -127,19 +137,55 @@ export default function InvoiceDetailPage() {
 
   const isAdmin = user?.role === "ADMIN" || user?.role === "SUPER_ADMIN";
 
+  const isPastDate = (dateStr: string) => {
+    if (!dateStr) return false;
+    const selectedDate = new Date(dateStr);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return selectedDate < today;
+  };
+
+  const handleOpenIssueDialog = () => {
+    setIssuedDateInput(todayIso());
+    setSkipEmailChecked(false);
+    setPastIssueDateWarningOpen(false);
+    setStatusDialogOpen(true);
+  };
+
+  const handleIssuedDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { value } = e.target;
+    setIssuedDateInput(value);
+    if (isPastDate(value)) {
+      setPastIssueDateWarningOpen(true);
+    }
+  };
+
+  const handleReselectIssuedDate = () => {
+    setIssuedDateInput("");
+    setPastIssueDateWarningOpen(false);
+  };
+
   const handleIssueInvoice = async () => {
     try {
       setStatusDialogError(null);
       setIssueSuccess(null);
 
-      // Call atomic issue endpoint: sends email first, then changes status to ISSUED
-      // If email fails, status stays DRAFT and error is returned
-      const result = await issueInvoice(invoice!.id);
+      // Call atomic issue endpoint: sends email first (unless skipped), then
+      // changes status to ISSUED. If email fails, status stays DRAFT and an
+      // error is returned.
+      const result = await issueInvoice({
+        invoiceId: invoice!.id,
+        issuedDate: issuedDateInput
+          ? new Date(issuedDateInput).toISOString()
+          : undefined,
+        skipEmail: skipEmailChecked,
+      });
 
       setIssueSuccess({
         message: result.message,
-        sentTo: result.sentTo,
-        ccDescription: result.ccDescription,
+        sentTo: result.sentTo || "",
+        ccDescription: result.ccDescription || "",
+        emailSent: !skipEmailChecked,
       });
 
       // Auto-reload after 3 seconds to show updated status and audit logs
@@ -307,7 +353,7 @@ export default function InvoiceDetailPage() {
               startIcon={<CheckCircleIcon />}
               variant="contained"
               color="success"
-              onClick={() => setStatusDialogOpen(true)}
+              onClick={handleOpenIssueDialog}
             >
               Issue Invoice
             </Button>
@@ -920,15 +966,23 @@ export default function InvoiceDetailPage() {
                 <Typography variant="body2" sx={{ mb: 1 }}>
                   {issueSuccess.message}
                 </Typography>
-                <Typography variant="body2" sx={{ fontWeight: 500, mt: 1 }}>
-                  Email Details:
-                </Typography>
-                <Typography variant="body2" sx={{ ml: 1, mt: 0.5 }}>
-                  To: {issueSuccess.sentTo}
-                </Typography>
-                <Typography variant="body2" sx={{ ml: 1 }}>
-                  {issueSuccess.ccDescription}
-                </Typography>
+                {issueSuccess.emailSent ? (
+                  <>
+                    <Typography variant="body2" sx={{ fontWeight: 500, mt: 1 }}>
+                      Email Details:
+                    </Typography>
+                    <Typography variant="body2" sx={{ ml: 1, mt: 0.5 }}>
+                      To: {issueSuccess.sentTo}
+                    </Typography>
+                    <Typography variant="body2" sx={{ ml: 1 }}>
+                      {issueSuccess.ccDescription}
+                    </Typography>
+                  </>
+                ) : (
+                  <Typography variant="body2" sx={{ fontWeight: 500, mt: 1 }}>
+                    Email was not sent (Do not send email was checked).
+                  </Typography>
+                )}
               </Alert>
             ) : statusDialogError && !issueLoading ? (
               <Alert severity="error" sx={{ mb: 2 }}>
@@ -942,56 +996,87 @@ export default function InvoiceDetailPage() {
                 <ul style={{ marginTop: 0, marginBottom: 16 }}>
                   <li>Change the status from DRAFT to ISSUED</li>
                   <li>
-                    Set the issued date to today (
-                    {new Date().toLocaleDateString()})
+                    Set the issued date to{" "}
+                    {issuedDateInput
+                      ? new Date(issuedDateInput).toLocaleDateString()
+                      : "(select a date below)"}
                   </li>
                   <li>Make the invoice available for payment</li>
-                  <li>Automatically send an email to the customer</li>
+                  <li>
+                    {skipEmailChecked
+                      ? "Not send an email to the customer"
+                      : "Automatically send an email to the customer"}
+                  </li>
                 </ul>
 
+                <TextField
+                  label="Issue Date"
+                  type="date"
+                  value={issuedDateInput}
+                  onChange={handleIssuedDateChange}
+                  fullWidth
+                  InputLabelProps={{ shrink: true }}
+                  helperText="Defaults to today; can be backdated"
+                  required
+                  sx={{ mb: 2 }}
+                />
+
+                <FormControlLabel
+                  sx={{ mb: 2 }}
+                  control={
+                    <Checkbox
+                      checked={skipEmailChecked}
+                      onChange={(e) => setSkipEmailChecked(e.target.checked)}
+                    />
+                  }
+                  label="Do not send email"
+                />
+
                 {/* Email Details Section */}
-                <Box
-                  sx={{
-                    mb: 2,
-                    p: 2,
-                    backgroundColor: "#f5f5f5",
-                    borderRadius: 1,
-                  }}
-                >
-                  <Typography sx={{ fontWeight: 600, mb: 1.5 }}>
-                    📧 Email will be sent to:
-                  </Typography>
-                  <Box sx={{ ml: 1 }}>
-                    <Typography variant="body2" sx={{ mb: 1 }}>
-                      <strong>To:</strong> {invoice?.user?.email}
+                {!skipEmailChecked && (
+                  <Box
+                    sx={{
+                      mb: 2,
+                      p: 2,
+                      backgroundColor: "#f5f5f5",
+                      borderRadius: 1,
+                    }}
+                  >
+                    <Typography sx={{ fontWeight: 600, mb: 1.5 }}>
+                      📧 Email will be sent to:
                     </Typography>
-                    {groupLoading ? (
-                      <Box
-                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
-                      >
-                        <CircularProgress size={16} />
-                        <Typography variant="body2">
-                          Loading CC details...
-                        </Typography>
-                      </Box>
-                    ) : groupInfo ? (
-                      <Box>
-                        <Typography variant="body2" sx={{ mb: 0.5 }}>
-                          <strong>CC:</strong> {groupInfo.relationshipManager} (
-                          {groupInfo.email})
-                        </Typography>
-                        <Typography variant="body2">
-                          <strong>CC:</strong> invoices@bitfactory.ae
-                        </Typography>
-                      </Box>
-                    ) : (
-                      <Typography variant="body2" sx={{ color: "#d32f2f" }}>
-                        <strong>CC:</strong> invoices@bitfactory.ae{" "}
-                        <em>(No RM assigned to this customer)</em>
+                    <Box sx={{ ml: 1 }}>
+                      <Typography variant="body2" sx={{ mb: 1 }}>
+                        <strong>To:</strong> {invoice?.user?.email}
                       </Typography>
-                    )}
+                      {groupLoading ? (
+                        <Box
+                          sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                        >
+                          <CircularProgress size={16} />
+                          <Typography variant="body2">
+                            Loading CC details...
+                          </Typography>
+                        </Box>
+                      ) : groupInfo ? (
+                        <Box>
+                          <Typography variant="body2" sx={{ mb: 0.5 }}>
+                            <strong>CC:</strong> {groupInfo.relationshipManager}{" "}
+                            ({groupInfo.email})
+                          </Typography>
+                          <Typography variant="body2">
+                            <strong>CC:</strong> invoices@bitfactory.ae
+                          </Typography>
+                        </Box>
+                      ) : (
+                        <Typography variant="body2" sx={{ color: "#d32f2f" }}>
+                          <strong>CC:</strong> invoices@bitfactory.ae{" "}
+                          <em>(No RM assigned to this customer)</em>
+                        </Typography>
+                      )}
+                    </Box>
                   </Box>
-                </Box>
+                )}
               </>
             )}
           </Box>
@@ -1020,9 +1105,13 @@ export default function InvoiceDetailPage() {
                 onClick={handleIssueInvoice}
                 variant="contained"
                 color="success"
-                disabled={issueLoading}
+                disabled={issueLoading || !issuedDateInput}
               >
-                {issueLoading ? "Issuing & Sending..." : "Issue Invoice"}
+                {issueLoading
+                  ? skipEmailChecked
+                    ? "Issuing..."
+                    : "Issuing & Sending..."
+                  : "Issue Invoice"}
               </Button>
             </>
           )}
@@ -1037,6 +1126,28 @@ export default function InvoiceDetailPage() {
               Close
             </Button>
           )}
+        </DialogActions>
+      </Dialog>
+      {/* Issue Date in the Past Warning Dialog */}
+      <Dialog
+        open={pastIssueDateWarningOpen}
+        onClose={() => setPastIssueDateWarningOpen(false)}
+      >
+        <DialogTitle>Issue Date is in the Past</DialogTitle>
+        <DialogContent>
+          <Typography>
+            The issue date you selected is in the past. Do you want to reselect
+            a date, or continue anyway?
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleReselectIssuedDate}>Reselect Date</Button>
+          <Button
+            variant="contained"
+            onClick={() => setPastIssueDateWarningOpen(false)}
+          >
+            Continue
+          </Button>
         </DialogActions>
       </Dialog>
       {/* Delete Invoice Dialog */}

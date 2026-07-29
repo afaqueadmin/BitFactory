@@ -550,10 +550,20 @@ export function useIssueInvoice() {
   const queryClient = useQueryClient();
 
   const mutation = useMutation({
-    mutationFn: async (invoiceId: string) => {
+    mutationFn: async ({
+      invoiceId,
+      issuedDate,
+      skipEmail,
+    }: {
+      invoiceId: string;
+      issuedDate?: string;
+      skipEmail?: boolean;
+    }) => {
       const res = await fetch(`/api/accounting/invoices/${invoiceId}/issue`, {
         method: "POST",
         credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ issuedDate, skipEmail }),
       });
 
       if (!res.ok) {
@@ -565,13 +575,13 @@ export function useIssueInvoice() {
 
       return await res.json();
     },
-    onSuccess: (data, invoiceId) => {
+    onSuccess: (data, variables) => {
       queryClient.setQueryData(
-        ["invoice", invoiceId],
+        ["invoice", variables.invoiceId],
         (oldData: Record<string, unknown> | undefined) => ({
           ...oldData,
           status: "ISSUED",
-          issuedDate: new Date(),
+          issuedDate: data?.issuedDate ? new Date(data.issuedDate) : new Date(),
         }),
       );
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
