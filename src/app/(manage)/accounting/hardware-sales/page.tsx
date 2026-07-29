@@ -123,7 +123,7 @@ export default function HardwareSalesDashboard() {
             Overview of hardware sales invoices and payments
           </Typography>
         </div>
-        <Link href="/hardware-sales/create">
+        <Link href="/accounting/hardware-sales/create">
           <Button variant="contained" startIcon={<AddIcon />}>
             Create Invoice
           </Button>
@@ -188,7 +188,7 @@ export default function HardwareSalesDashboard() {
             <Typography variant="h6" sx={{ fontWeight: "bold" }}>
               All Hardware Sales Invoices
             </Typography>
-            <Link href="/hardware-sales/create">
+            <Link href="/accounting/hardware-sales/create">
               <Button variant="contained" startIcon={<AddIcon />}>
                 Create Invoice
               </Button>
@@ -217,7 +217,7 @@ export default function HardwareSalesDashboard() {
                     <TableRow key={invoice.id} hover>
                       <TableCell>
                         <Link
-                          href={`/hardware-sales/${invoice.id}`}
+                          href={`/accounting/hardware-sales/${invoice.id}`}
                           style={{ color: "#1976d2", textDecoration: "none" }}
                         >
                           {invoice.invoiceNumber}

@@ -368,7 +368,7 @@ export default function CustomerOverviewContent() {
   const handleCreateAdjustment = () => {
     if (selectedCustomer) {
       router.push(
-        `/admin/credit-adjustments?customerId=${selectedCustomer.id}`,
+        `/accounting/credit-adjustments?customerId=${selectedCustomer.id}`,
       );
     }
     handleMenuClose();

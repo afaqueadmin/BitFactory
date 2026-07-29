@@ -324,7 +324,7 @@ export default function BulkInvoicesPage() {
       setAlreadyPaidCustomers([]);
       setExcludedCustomerIds([]);
       // After success, navigate back to accounting dashboard
-      router.push("/accounting");
+      router.push("/accounting/Hosting-and-Colocation");
     } catch (error) {
       setSubmitError(
         error instanceof Error ? error.message : "Failed to create invoices.",
@@ -340,7 +340,7 @@ export default function BulkInvoicesPage() {
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
       <Stack direction="row" spacing={2} sx={{ mb: 4 }}>
-        <Link href="/accounting">
+        <Link href="/accounting/Hosting-and-Colocation">
           <Button startIcon={<ArrowBackIcon />}>
             Back to Accounting Dashboard
           </Button>

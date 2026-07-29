@@ -235,7 +235,7 @@ export default function CreateInvoicePage() {
       });
 
       // Redirect to accounting dashboard
-      router.push("/accounting");
+      router.push("/accounting/Hosting-and-Colocation");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create invoice");
     } finally {
@@ -246,7 +246,7 @@ export default function CreateInvoicePage() {
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
       <Stack direction="row" spacing={2} sx={{ mb: 4 }}>
-        <Link href="/accounting">
+        <Link href="/accounting/Hosting-and-Colocation">
           <Button startIcon={<ArrowBackIcon />}>
             Back to Accounting Dashboard
           </Button>

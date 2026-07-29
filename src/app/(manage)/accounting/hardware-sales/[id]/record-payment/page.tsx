@@ -3,5 +3,5 @@
 import RecordPaymentPage from "@/components/accounting/common/RecordPaymentPage";
 
 export default function Page() {
-  return <RecordPaymentPage basePath="/hardware-sales" />;
+  return <RecordPaymentPage basePath="/accounting/hardware-sales" />;
 }

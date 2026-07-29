@@ -153,7 +153,7 @@ const sidebarItems: SidebarItem[] = [
       {
         title: "Hosting Dashboard",
         icon: <DashboardIcon />,
-        path: "/accounting",
+        path: "/accounting/Hosting-and-Colocation",
       },
       {
         title: "Farm Tariffs",
@@ -163,7 +163,7 @@ const sidebarItems: SidebarItem[] = [
       {
         title: "Hardware Sales Dashboard",
         icon: <DashboardIcon />,
-        path: "/hardware-sales",
+        path: "/accounting/hardware-sales",
       },
       {
         title: "Hardware Purchase Invoices",
@@ -193,7 +193,7 @@ const sidebarItems: SidebarItem[] = [
       {
         title: "Credit Adjustments",
         icon: <AdjustmentsIcon />,
-        path: "/admin/credit-adjustments",
+        path: "/accounting/credit-adjustments",
       },
       {
         title: "Pricing",

@@ -82,7 +82,7 @@ export default function EditInvoicePage() {
       });
 
       // Redirect back to invoice detail
-      router.push(`/hardware-sales/${invoiceId}`);
+      router.push(`/accounting/hardware-sales/${invoiceId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update invoice");
     } finally {
@@ -117,7 +117,7 @@ export default function EditInvoicePage() {
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
       <Stack direction="row" spacing={2} sx={{ mb: 4 }}>
-        <Link href={`/hardware-sales/${invoiceId}`}>
+        <Link href={`/accounting/hardware-sales/${invoiceId}`}>
           <Button startIcon={<ArrowBackIcon />}>Back to Invoice</Button>
         </Link>
         <Box flex={1}>

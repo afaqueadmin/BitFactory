@@ -158,7 +158,7 @@ export default function CreateHardwareSalesInvoicePage() {
       });
 
       // Redirect to hardware-sales dashboard
-      router.push("/hardware-sales");
+      router.push("/accounting/hardware-sales");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create invoice");
     } finally {
@@ -169,7 +169,7 @@ export default function CreateHardwareSalesInvoicePage() {
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
       <Stack direction="row" spacing={2} sx={{ mb: 4 }}>
-        <Link href="/hardware-sales">
+        <Link href="/accounting/hardware-sales">
           <Button startIcon={<ArrowBackIcon />}>
             Back to Hardware Sales Dashboard
           </Button>
