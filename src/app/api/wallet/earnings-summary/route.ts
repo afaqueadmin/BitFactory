@@ -76,8 +76,20 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    if (!miners || miners.length === 0) {
-      console.log(`[Earnings Summary API] User ${userId} has no miners`);
+    // Get PoolAuth entries for this user (contains API keys) - this includes
+    // auth for pools the user is no longer actively mining on (e.g. a
+    // customer who moved from Braiins back to Luxor but still has a balance
+    // sitting on Braiins), so balances must be fetched for ALL of these, not
+    // just pools with currently assigned miners.
+    const poolAuths = await prisma.poolAuth.findMany({
+      where: { userId },
+      include: { pool: { select: { id: true, name: true } } },
+    });
+
+    if ((!miners || miners.length === 0) && poolAuths.length === 0) {
+      console.log(
+        `[Earnings Summary API] User ${userId} has no miners and no pool history`,
+      );
       return NextResponse.json(
         {
           totalEarnings: { btc: 0, usd: 0 },
@@ -95,19 +107,14 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get PoolAuth entries for this user (contains API keys)
-    const poolAuths = await prisma.poolAuth.findMany({
-      where: { userId },
-      include: { pool: { select: { id: true, name: true } } },
-    });
+    const luxorAuths = poolAuths.filter((auth) => auth.pool.name === "Luxor");
+    const braiinsAuths = poolAuths.filter(
+      (auth) => auth.pool.name === "Braiins",
+    );
 
-    // Create a map of poolId -> authKey for quick lookup
-    const authKeyByPoolId = new Map<string, string>();
-    poolAuths.forEach((auth) => {
-      authKeyByPoolId.set(auth.poolId, auth.authKey);
-    });
-
-    // Group miners by pool
+    // Group current miners by pool - used only to report which pool(s) the
+    // customer is actively mining on right now (activePoolNames below),
+    // separate from which pools contribute to the balance totals.
     const aggregation = groupMinersByPool(miners);
     const luxorGroups = getLuxorGroups(aggregation);
     const braiinsGroups = getBraiinsGroups(aggregation);
@@ -121,27 +128,10 @@ export async function GET(request: NextRequest) {
     const startDate = new Date("2020-01-01");
     const formatDate = (date: Date) => date.toISOString().split("T")[0];
 
-    // Fetch from Luxor groups
-    for (const group of luxorGroups) {
+    // Fetch from every Luxor pool the user has ever had credentials for
+    for (const auth of luxorAuths) {
       try {
-        // Get the poolId from the first miner in the group to look up auth
-        const minerWithPool = group.miners[0];
-        const poolId = minerWithPool?.poolId;
-
-        if (!poolId) {
-          console.warn(
-            `[Earnings Summary API] Luxor group has no poolId, skipping`,
-          );
-          continue;
-        }
-
-        const authKey = authKeyByPoolId.get(poolId);
-        if (!authKey) {
-          console.warn(
-            `[Earnings Summary API] No auth key found for Luxor pool ${poolId}`,
-          );
-          continue;
-        }
+        const authKey = auth.authKey;
 
         console.log(
           `[Earnings Summary API] Fetching Luxor data for auth key: ${authKey}`,
@@ -189,27 +179,10 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Fetch from Braiins groups
-    for (const group of braiinsGroups) {
+    // Fetch from every Braiins pool the user has ever had credentials for
+    for (const auth of braiinsAuths) {
       try {
-        // Get the poolId from the first miner in the group to look up auth
-        const minerWithPool = group.miners[0];
-        const poolId = minerWithPool?.poolId;
-
-        if (!poolId) {
-          console.warn(
-            `[Earnings Summary API] Braiins group has no poolId, skipping`,
-          );
-          continue;
-        }
-
-        const authKey = authKeyByPoolId.get(poolId);
-        if (!authKey) {
-          console.warn(
-            `[Earnings Summary API] No auth key found for Braiins pool ${poolId}`,
-          );
-          continue;
-        }
+        const authKey = auth.authKey;
 
         console.log(
           `[Earnings Summary API] Fetching Braiins data for auth key: ${authKey}`,
@@ -271,11 +244,13 @@ export async function GET(request: NextRequest) {
       },
       currency: "BTC",
       dataSource:
-        luxorGroups.length > 0 && braiinsGroups.length > 0
+        luxorAuths.length > 0 && braiinsAuths.length > 0
           ? "both"
-          : luxorGroups.length > 0
+          : luxorAuths.length > 0
             ? "luxor"
-            : "braiins",
+            : braiinsAuths.length > 0
+              ? "braiins"
+              : "none",
       timestamp: new Date().toISOString(),
       activePoolNames,
       poolBreakdown: {
