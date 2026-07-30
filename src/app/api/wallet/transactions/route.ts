@@ -2,11 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyJwtToken } from "@/lib/jwt";
 import { createLuxorClient } from "@/lib/luxor";
 import { createBraiinsClient } from "@/lib/braiins";
-import {
-  groupMinersByPool,
-  getLuxorGroups,
-  getBraiinsGroups,
-} from "@/lib/poolAggregation";
 import { prisma } from "@/lib/prisma";
 
 /**
@@ -120,17 +115,17 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get all miners with pool and user info
-    const miners = await prisma.miner.findMany({
+    // Get PoolAuth entries for this user (contains API keys). Which pools
+    // are active is determined directly from PoolAuth, not from
+    // Miner.poolId - a Braiins/Luxor account is authenticated independently
+    // of whether any Miner row happens to be tagged with that pool.
+    const poolAuths = await prisma.poolAuth.findMany({
       where: { userId },
-      include: {
-        pool: { select: { id: true, name: true } },
-        user: { select: { luxorSubaccountName: true } },
-      },
+      include: { pool: { select: { id: true, name: true } } },
     });
 
-    if (!miners || miners.length === 0) {
-      console.log(`[Transactions API] User ${userId} has no miners`);
+    if (!poolAuths || poolAuths.length === 0) {
+      console.log(`[Transactions API] User ${userId} has no pool accounts`);
       return NextResponse.json(
         {
           transactions: [],
@@ -170,28 +165,18 @@ export async function GET(request: NextRequest) {
               netAmountUsd: 0,
             },
           },
-          message: "No miners assigned",
+          message: "No pool accounts configured",
         },
         { status: 200 },
       );
     }
 
-    // Get PoolAuth entries for this user (contains API keys)
-    const poolAuths = await prisma.poolAuth.findMany({
-      where: { userId },
-      include: { pool: { select: { id: true, name: true } } },
-    });
-
-    // Create a map of poolId -> authKey for quick lookup
-    const authKeyByPoolId = new Map<string, string>();
-    poolAuths.forEach((auth) => {
-      authKeyByPoolId.set(auth.poolId, auth.authKey);
-    });
-
-    // Group miners by pool
-    const aggregation = groupMinersByPool(miners);
-    const luxorGroups = getLuxorGroups(aggregation);
-    const braiinsGroups = getBraiinsGroups(aggregation);
+    const luxorAuth = poolAuths.find((auth) =>
+      auth.pool.name.toLowerCase().includes("luxor"),
+    );
+    const braiinsAuth = poolAuths.find((auth) =>
+      auth.pool.name.toLowerCase().includes("braiins"),
+    );
 
     // Calculate date range (Option 3: Hybrid Smart Default)
     // If no dates provided, default to all-time history
@@ -241,28 +226,10 @@ export async function GET(request: NextRequest) {
       totalDebitsUsd: 0,
     };
 
-    // Fetch from Luxor groups
-    for (const group of luxorGroups) {
+    // Fetch from Luxor
+    if (luxorAuth) {
       try {
-        // Get the poolId from the first miner in the group to look up auth
-        const minerWithPool = group.miners[0];
-        const poolId = minerWithPool?.poolId;
-
-        if (!poolId) {
-          console.warn(
-            `[Transactions API] Luxor group has no poolId, skipping`,
-          );
-          continue;
-        }
-
-        const authKey = authKeyByPoolId.get(poolId);
-        if (!authKey) {
-          console.warn(
-            `[Transactions API] No auth key found for Luxor pool ${poolId}`,
-          );
-          continue;
-        }
-
+        const authKey = luxorAuth.authKey;
         console.log(
           `[Transactions API] Fetching Luxor transactions for auth key: ${authKey}`,
         );
@@ -322,28 +289,10 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Fetch from Braiins groups (use payouts as equivalent to transactions)
-    for (const group of braiinsGroups) {
+    // Fetch from Braiins (use payouts as equivalent to transactions)
+    if (braiinsAuth) {
       try {
-        // Get the poolId from the first miner in the group to look up auth
-        const minerWithPool = group.miners[0];
-        const poolId = minerWithPool?.poolId;
-
-        if (!poolId) {
-          console.warn(
-            `[Transactions API] Braiins group has no poolId, skipping`,
-          );
-          continue;
-        }
-
-        const authKey = authKeyByPoolId.get(poolId);
-        if (!authKey) {
-          console.warn(
-            `[Transactions API] No auth key found for Braiins pool ${poolId}`,
-          );
-          continue;
-        }
-
+        const authKey = braiinsAuth.authKey;
         console.log(
           `[Transactions API] Fetching Braiins payouts for auth key: ${authKey}`,
         );

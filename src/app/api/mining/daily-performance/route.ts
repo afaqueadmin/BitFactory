@@ -8,11 +8,6 @@ import {
   LuxorError,
 } from "@/lib/luxor";
 import { createBraiinsClient } from "@/lib/braiins";
-import {
-  groupMinersByPool,
-  getLuxorGroups,
-  getBraiinsGroups,
-} from "@/lib/poolAggregation";
 
 interface DailyPerformanceData {
   date: string;
@@ -66,17 +61,18 @@ export async function GET(request: NextRequest) {
       `[Mining Performance API] Fetching ${days} days of mining revenue data for user ${userId}`,
     );
 
-    // Get all miners with pool info
-    const miners = await prisma.miner.findMany({
+    // Get PoolAuth entries for this user (contains API keys). Which pools
+    // are active is determined directly from PoolAuth, not from
+    // Miner.poolId - a Braiins/Luxor account is authenticated independently
+    // of whether any Miner row happens to be tagged with that pool.
+    const poolAuths = await prisma.poolAuth.findMany({
       where: { userId },
-      include: {
-        pool: { select: { id: true, name: true } },
-      },
+      include: { pool: { select: { id: true, name: true } } },
     });
 
-    if (!miners || miners.length === 0) {
+    if (!poolAuths || poolAuths.length === 0) {
       console.warn(
-        `[Mining Performance API] User ${userId} has no miners configured`,
+        `[Mining Performance API] User ${userId} has no pool accounts configured`,
       );
       // Return empty successful response so frontend components can render
       // a friendly 'no data' message instead of an error.
@@ -98,22 +94,12 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get PoolAuth entries for this user (contains API keys)
-    const poolAuths = await prisma.poolAuth.findMany({
-      where: { userId },
-      include: { pool: { select: { id: true, name: true } } },
-    });
-
-    // Create a map of poolId -> authKey for quick lookup
-    const authKeyByPoolId = new Map<string, string>();
-    poolAuths.forEach((auth) => {
-      authKeyByPoolId.set(auth.poolId, auth.authKey);
-    });
-
-    // Group miners by pool
-    const aggregation = groupMinersByPool(miners);
-    const luxorGroups = getLuxorGroups(aggregation);
-    const braiinsGroups = getBraiinsGroups(aggregation);
+    const luxorAuth = poolAuths.find((auth) =>
+      auth.pool.name.toLowerCase().includes("luxor"),
+    );
+    const braiinsAuth = poolAuths.find((auth) =>
+      auth.pool.name.toLowerCase().includes("braiins"),
+    );
 
     // Calculate start_date and end_date
     const yesterday = new Date();
@@ -139,28 +125,10 @@ export async function GET(request: NextRequest) {
     const performanceByDate: Map<string, { luxor: number; braiins: number }> =
       new Map();
 
-    // Fetch from Luxor groups
-    for (const group of luxorGroups) {
+    // Fetch from Luxor
+    if (luxorAuth) {
       try {
-        // Get the poolId from the first miner in the group to look up auth
-        const minerWithPool = group.miners[0];
-        const poolId = minerWithPool?.poolId;
-
-        if (!poolId) {
-          console.warn(
-            `[Mining Performance API] Luxor group has no poolId, skipping`,
-          );
-          continue;
-        }
-
-        const authKey = authKeyByPoolId.get(poolId);
-        if (!authKey) {
-          console.warn(
-            `[Mining Performance API] No auth key found for Luxor pool ${poolId}`,
-          );
-          continue;
-        }
-
+        const authKey = luxorAuth.authKey;
         console.log(
           `[Mining Performance API] Fetching Luxor revenue for auth key: ${authKey}`,
         );
@@ -203,28 +171,10 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Fetch from Braiins groups
-    for (const group of braiinsGroups) {
+    // Fetch from Braiins
+    if (braiinsAuth) {
       try {
-        // Get the poolId from the first miner in the group to look up auth
-        const minerWithPool = group.miners[0];
-        const poolId = minerWithPool?.poolId;
-
-        if (!poolId) {
-          console.warn(
-            `[Mining Performance API] Braiins group has no poolId, skipping`,
-          );
-          continue;
-        }
-
-        const authKey = authKeyByPoolId.get(poolId);
-        if (!authKey) {
-          console.warn(
-            `[Mining Performance API] No auth key found for Braiins pool ${poolId}`,
-          );
-          continue;
-        }
-
+        const authKey = braiinsAuth.authKey;
         console.log(
           `[Mining Performance API] Fetching Braiins daily hashrate/rewards for auth key: ${authKey}`,
         );

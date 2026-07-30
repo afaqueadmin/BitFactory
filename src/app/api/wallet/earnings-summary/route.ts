@@ -2,11 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyJwtToken } from "@/lib/jwt";
 import { createLuxorClient } from "@/lib/luxor";
 import { createBraiinsClient } from "@/lib/braiins";
-import {
-  groupMinersByPool,
-  getLuxorGroups,
-  getBraiinsGroups,
-} from "@/lib/poolAggregation";
 import { prisma } from "@/lib/prisma";
 
 /**
@@ -68,28 +63,17 @@ export async function GET(request: NextRequest) {
 
     console.log(`[Earnings Summary API] Fetching data for user: ${userId}`);
 
-    // Get all miners with pool info
-    const miners = await prisma.miner.findMany({
-      where: { userId },
-      include: {
-        pool: { select: { id: true, name: true } },
-      },
-    });
-
-    // Get PoolAuth entries for this user (contains API keys) - this includes
-    // auth for pools the user is no longer actively mining on (e.g. a
-    // customer who moved from Braiins back to Luxor but still has a balance
-    // sitting on Braiins), so balances must be fetched for ALL of these, not
-    // just pools with currently assigned miners.
+    // Get PoolAuth entries for this user (contains API keys). Which pools are
+    // active is determined directly from PoolAuth, not from Miner.poolId -
+    // a user's Braiins/Luxor account is authenticated independently of
+    // whether any Miner row happens to be tagged with that pool.
     const poolAuths = await prisma.poolAuth.findMany({
       where: { userId },
       include: { pool: { select: { id: true, name: true } } },
     });
 
-    if ((!miners || miners.length === 0) && poolAuths.length === 0) {
-      console.log(
-        `[Earnings Summary API] User ${userId} has no miners and no pool history`,
-      );
+    if (!poolAuths || poolAuths.length === 0) {
+      console.log(`[Earnings Summary API] User ${userId} has no pool accounts`);
       return NextResponse.json(
         {
           totalEarnings: { btc: 0, usd: 0 },
@@ -101,23 +85,18 @@ export async function GET(request: NextRequest) {
             luxor: { totalEarnings: 0, pendingPayouts: 0 },
             braiins: { totalEarnings: 0, pendingPayouts: 0 },
           },
-          message: "No miners assigned",
+          message: "No pool accounts configured",
         },
         { status: 200 },
       );
     }
 
-    const luxorAuths = poolAuths.filter((auth) => auth.pool.name === "Luxor");
-    const braiinsAuths = poolAuths.filter(
-      (auth) => auth.pool.name === "Braiins",
+    const luxorAuth = poolAuths.find((auth) =>
+      auth.pool.name.toLowerCase().includes("luxor"),
     );
-
-    // Group current miners by pool - used only to report which pool(s) the
-    // customer is actively mining on right now (activePoolNames below),
-    // separate from which pools contribute to the balance totals.
-    const aggregation = groupMinersByPool(miners);
-    const luxorGroups = getLuxorGroups(aggregation);
-    const braiinsGroups = getBraiinsGroups(aggregation);
+    const braiinsAuth = poolAuths.find((auth) =>
+      auth.pool.name.toLowerCase().includes("braiins"),
+    );
 
     let totalLuxorEarnings = 0;
     let totalLuxorPending = 0;
@@ -128,11 +107,10 @@ export async function GET(request: NextRequest) {
     const startDate = new Date("2020-01-01");
     const formatDate = (date: Date) => date.toISOString().split("T")[0];
 
-    // Fetch from every Luxor pool the user has ever had credentials for
-    for (const auth of luxorAuths) {
+    // Fetch from Luxor
+    if (luxorAuth) {
       try {
-        const authKey = auth.authKey;
-
+        const authKey = luxorAuth.authKey;
         console.log(
           `[Earnings Summary API] Fetching Luxor data for auth key: ${authKey}`,
         );
@@ -179,41 +157,24 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Fetch from every Braiins pool the user has ever had credentials for
-    for (const auth of braiinsAuths) {
+    // Fetch from Braiins
+    if (braiinsAuth) {
       try {
-        const authKey = auth.authKey;
-
+        const authKey = braiinsAuth.authKey;
         console.log(
           `[Earnings Summary API] Fetching Braiins data for auth key: ${authKey}`,
         );
         const braiinsClient = createBraiinsClient(authKey);
 
-        // Get user profile to fetch current pending balance
+        // Get user profile for current pending balance and all-time reward.
+        // all_time_reward mirrors Luxor's "sum of all credit transactions"
+        // semantics (gross earned, all-time), rather than summing realized
+        // payouts (which nets out withdrawal fees and excludes any balance
+        // that hasn't reached the payout threshold yet).
         const profile = await braiinsClient.getUserProfile();
-        totalBraiinsPending += parseFloat(profile.btc.current_balance) || 0;
-
-        // Get all payouts to calculate total earnings
-        const payouts = await braiinsClient.getPayouts({
-          from: formatDate(startDate),
-          to: formatDate(endDate),
-        });
-
-        // Process on-chain payouts (Braiins returns amount_sats, convert to BTC)
-        if (payouts?.onchain) {
-          for (const payout of payouts.onchain) {
-            // Convert satoshis to BTC: 1 BTC = 100,000,000 satoshis
-            const btcAmount = payout.amount_sats / 100_000_000;
-            totalBraiinsEarnings += btcAmount;
-          }
-        }
-
-        // Process Lightning payouts if present
-        if (payouts?.lightning) {
-          for (const payout of payouts.lightning) {
-            const btcAmount = payout.amount_sats / 100_000_000;
-            totalBraiinsEarnings += btcAmount;
-          }
+        if (profile?.btc) {
+          totalBraiinsPending += parseFloat(profile.btc.current_balance) || 0;
+          totalBraiinsEarnings += parseFloat(profile.btc.all_time_reward) || 0;
         }
 
         console.log(
@@ -230,10 +191,10 @@ export async function GET(request: NextRequest) {
     const totalEarnings = totalLuxorEarnings + totalBraiinsEarnings;
     const totalPending = totalLuxorPending + totalBraiinsPending;
 
-    // Determine which pools have miners
+    // Determine which pools have a configured account
     const activePoolNames = [];
-    if (luxorGroups.length > 0) activePoolNames.push("Luxor");
-    if (braiinsGroups.length > 0) activePoolNames.push("Braiins");
+    if (luxorAuth) activePoolNames.push("Luxor");
+    if (braiinsAuth) activePoolNames.push("Braiins");
 
     const response = {
       totalEarnings: {
@@ -244,13 +205,7 @@ export async function GET(request: NextRequest) {
       },
       currency: "BTC",
       dataSource:
-        luxorAuths.length > 0 && braiinsAuths.length > 0
-          ? "both"
-          : luxorAuths.length > 0
-            ? "luxor"
-            : braiinsAuths.length > 0
-              ? "braiins"
-              : "none",
+        luxorAuth && braiinsAuth ? "both" : luxorAuth ? "luxor" : "braiins",
       timestamp: new Date().toISOString(),
       activePoolNames,
       poolBreakdown: {
