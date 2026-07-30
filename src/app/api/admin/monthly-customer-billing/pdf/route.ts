@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
 import { generatePDFFromHTML } from "@/lib/email";
 import { buildCostPaymentTransactionsPdfHtml } from "@/lib/helpers/admin/costPaymentTransactionsPdf";
-import { buildOrderBy, parseMonthlyRevenueQuery } from "../query";
+import { buildOrderBy, parseMonthlyBillingQuery } from "../query";
 
 // Hard cap on rows rendered into the PDF — this endpoint is unpaginated by
 // design (it exports the full filtered/sorted result set), so a cap keeps
@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
       userRole = decoded.role;
     } catch (error) {
       console.error(
-        "[Admin Monthly Revenue PDF] Token verification failed:",
+        "[Admin Monthly Customer Billing PDF] Token verification failed:",
         error,
       );
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
 
     const url = new URL(request.url);
     const { sortBy, sortOrder, where, effectiveStart, effectiveEnd } =
-      parseMonthlyRevenueQuery(url);
+      parseMonthlyBillingQuery(url);
 
     const [electricitySum, adjustmentSum, totalCount, transactions] =
       await Promise.all([
@@ -77,7 +77,7 @@ export async function GET(request: NextRequest) {
       }).format(value);
 
     const html = buildCostPaymentTransactionsPdfHtml({
-      title: "Monthly Revenue (30 days) — Transaction Detail",
+      title: "Monthly Billing (30 days) — Transaction Detail",
       subtitle: `Period: ${effectiveStart.toLocaleString()} to ${effectiveEnd.toLocaleString()}`,
       summaryRows: [
         {
@@ -109,11 +109,11 @@ export async function GET(request: NextRequest) {
       status: 200,
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="monthly-revenue-${new Date().toISOString().slice(0, 10)}.pdf"`,
+        "Content-Disposition": `attachment; filename="monthly-customer-billing-${new Date().toISOString().slice(0, 10)}.pdf"`,
       },
     });
   } catch (error) {
-    console.error("[Admin Monthly Revenue PDF] Error:", error);
+    console.error("[Admin Monthly Customer Billing PDF] Error:", error);
     return NextResponse.json(
       { error: "Failed to generate PDF" },
       { status: 500 },

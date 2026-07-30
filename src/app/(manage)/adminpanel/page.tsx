@@ -307,7 +307,7 @@ export default function AdminDashboard() {
 
     // DB-only cards (no pool dependency)
     const dbOnlyCards = [
-      "Monthly Customer Revenue (30 days)",
+      "Monthly Customer Billing (30 days)",
       "Total Customer Balance",
       "Total Customers",
       "Hosting and Colocation (Invoice)",
@@ -614,12 +614,12 @@ export default function AdminDashboard() {
 
           {/* Monthly Revenue - From Cost Payments, excludes self-mining users */}
           <AdminValueCard
-            title="Monthly Customer Revenue (30 days)"
+            title="Monthly Customer Billing (30 days)"
             borderColor="#757575"
             value={stats?.financial.monthlyRevenue ?? 0}
             type="currency"
             infoText="Sum of Electricity Charges and Adjustments (cost payments) from the last 30 days, flipped to a positive value, for hosted customers only. Excludes Payments, Hardware Sales, and customers with segment = SELF_MINING."
-            onClick={() => router.push("/admin/monthly-revenue")}
+            onClick={() => router.push("/admin/monthly-customer-billing")}
           />
 
           {/* Total Customer Balance, from our database */}
@@ -761,13 +761,13 @@ export default function AdminDashboard() {
 
           {/* === RESERVED FOR FUTURE LUXOR ENDPOINTS === */}
 
-          {/* Hosting and Colocation - From ELECTRICITY_CHARGES invoices (DRAFT/ISSUED/OVERDUE/PAID) */}
+          {/* Hosting and Colocation - From ELECTRICITY_CHARGES invoices (ISSUED/OVERDUE/PAID) */}
           <AdminValueCard
             title="Hosting and Colocation (Invoice)"
             borderColor="#757575"
             value={hostingRevenueData?.hostingRevenue ?? 0}
             type="currency"
-            infoText="Sum of the total amount on all Electricity Charges invoices with status Draft, Issued, Overdue, or Paid. Cancelled and Refunded invoices are excluded. Includes unpaid and overdue invoices, not just ones customers have actually paid."
+            infoText="Sum of the total amount on all Electricity Charges invoices with status Issued, Overdue, or Paid. Draft, Cancelled, and Refunded invoices are excluded. Includes unpaid and overdue invoices, not just ones customers have actually paid."
           />
 
           {/* Hosting Cost - implemented */}

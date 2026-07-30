@@ -18,14 +18,14 @@ import {
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import DownloadIcon from "@mui/icons-material/Download";
 import {
-  useMonthlyRevenueDetail,
-  MonthlyRevenueDetailFilters,
-} from "@/lib/hooks/admin/useMonthlyRevenueDetail";
+  useMonthlyCustomerBillingDetail,
+  MonthlyCustomerBillingDetailFilters,
+} from "@/lib/hooks/admin/useMonthlyCustomerBillingDetail";
 import { useCustomers, Customer } from "@/lib/hooks/useInvoices";
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
 import CostPaymentTransactionsTable from "@/components/admin/CostPaymentTransactionsTable";
 
-export default function MonthlyRevenueDetailPage() {
+export default function MonthlyCustomerBillingDetailPage() {
   const router = useRouter();
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(25);
@@ -47,7 +47,7 @@ export default function MonthlyRevenueDetailPage() {
     typeFilter || customerId || startDateFilter || endDateFilter,
   );
 
-  const filters: MonthlyRevenueDetailFilters = {
+  const filters: MonthlyCustomerBillingDetailFilters = {
     type: typeFilter || undefined,
     customerId: customerId || undefined,
     startDate: startDateFilter || undefined,
@@ -55,7 +55,10 @@ export default function MonthlyRevenueDetailPage() {
   };
 
   const { summary, transactions, pagination, loading, error } =
-    useMonthlyRevenueDetail(page, pageSize, filters, { sortBy, sortOrder });
+    useMonthlyCustomerBillingDetail(page, pageSize, filters, {
+      sortBy,
+      sortOrder,
+    });
 
   const handleSortChange = (field: string) => {
     if (sortBy === field) {
@@ -81,7 +84,7 @@ export default function MonthlyRevenueDetailPage() {
       if (endDateFilter) params.set("endDate", endDateFilter);
 
       const response = await fetch(
-        `/api/admin/monthly-revenue/pdf?${params.toString()}`,
+        `/api/admin/monthly-customer-billing/pdf?${params.toString()}`,
         { credentials: "include" },
       );
 
@@ -93,7 +96,7 @@ export default function MonthlyRevenueDetailPage() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `monthly-revenue-${new Date().toISOString().slice(0, 10)}.pdf`;
+      a.download = `monthly-customer-billing-${new Date().toISOString().slice(0, 10)}.pdf`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -119,7 +122,7 @@ export default function MonthlyRevenueDetailPage() {
       </Button>
 
       <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>
-        Monthly Revenue (30 days)
+        Monthly Billing (30 days)
       </Typography>
       <Typography color="textSecondary" sx={{ mb: 3 }}>
         Sum of CostPayment rows (type: ELECTRICITY_CHARGES or ADJUSTMENT)

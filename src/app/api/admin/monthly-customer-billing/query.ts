@@ -1,9 +1,10 @@
 import { Prisma } from "@prisma/client";
 
 /**
- * Shared query-parsing for the Monthly Revenue drill-down, used by both the
- * JSON route (paginated) and the PDF export route (capped, unpaginated) so
- * the filters/sort/where-clause logic can never drift between the two.
+ * Shared query-parsing for the Monthly Customer Billing drill-down, used by
+ * both the JSON route (paginated) and the PDF export route (capped,
+ * unpaginated) so the filters/sort/where-clause logic can never drift
+ * between the two.
  */
 
 export const SORT_FIELDS = new Set([
@@ -36,7 +37,7 @@ export function buildOrderBy(
   }
 }
 
-export interface ParsedMonthlyRevenueQuery {
+export interface ParsedMonthlyBillingQuery {
   sortBy: string;
   sortOrder: "asc" | "desc";
   where: Prisma.CostPaymentWhereInput;
@@ -44,7 +45,7 @@ export interface ParsedMonthlyRevenueQuery {
   effectiveEnd: Date;
 }
 
-export function parseMonthlyRevenueQuery(url: URL): ParsedMonthlyRevenueQuery {
+export function parseMonthlyBillingQuery(url: URL): ParsedMonthlyBillingQuery {
   const sortByParam = url.searchParams.get("sortBy") || "createdAt";
   const sortOrderParam = url.searchParams.get("sortOrder");
   const sortOrder: "asc" | "desc" = sortOrderParam === "asc" ? "asc" : "desc";

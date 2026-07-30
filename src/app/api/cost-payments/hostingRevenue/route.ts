@@ -28,12 +28,13 @@ export async function GET(request: NextRequest) {
     }
 
     // Hosting revenue is invoice-based: sum totalAmount of all ELECTRICITY_CHARGES
-    // invoices that aren't CANCELLED/REFUNDED (DRAFT/ISSUED/OVERDUE/PAID all count).
+    // invoices that have been issued to the customer (ISSUED/OVERDUE/PAID).
+    // DRAFT invoices are excluded since they haven't been sent yet.
     const invoices = await prisma.invoice.aggregate({
       where: {
         invoiceType: "ELECTRICITY_CHARGES",
         status: {
-          in: ["DRAFT", "ISSUED", "OVERDUE", "PAID"],
+          in: ["ISSUED", "OVERDUE", "PAID"],
         },
       },
       _sum: {

@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
-import { buildOrderBy, parseMonthlyRevenueQuery } from "./query";
+import { buildOrderBy, parseMonthlyBillingQuery } from "./query";
 
 /**
- * Drill-down for the adminpanel "Monthly Revenue (30 days)" card.
+ * Drill-down for the adminpanel "Monthly Customer Billing (30 days)" card.
  * With no filters applied, the summary matches the card exactly: type in
  * [ELECTRICITY_CHARGES, ADJUSTMENT], createdAt within the last 30 days,
  * summed then sign-flipped for display. When date/customer/type filters are
@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
       userRole = decoded.role;
     } catch (error) {
       console.error(
-        "[Admin Monthly Revenue] Token verification failed:",
+        "[Admin Monthly Customer Billing] Token verification failed:",
         error,
       );
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
     }
 
     const { sortBy, sortOrder, where, effectiveStart, effectiveEnd } =
-      parseMonthlyRevenueQuery(url);
+      parseMonthlyBillingQuery(url);
 
     // Summary buckets use the exact same where-clause as the transaction
     // list (date range + customer filter), each intersected with a single
@@ -119,9 +119,9 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("[Admin Monthly Revenue] Error:", error);
+    console.error("[Admin Monthly Customer Billing] Error:", error);
     return NextResponse.json(
-      { error: "Failed to fetch monthly revenue detail" },
+      { error: "Failed to fetch monthly billing detail" },
       { status: 500 },
     );
   }

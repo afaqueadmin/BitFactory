@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 
-export interface MonthlyRevenueTransaction {
+export interface MonthlyCustomerBillingTransaction {
   id: string;
   createdAt: string;
   type: "ELECTRICITY_CHARGES" | "ADJUSTMENT";
@@ -11,7 +11,7 @@ export interface MonthlyRevenueTransaction {
   invoiceNumber: string | null;
 }
 
-export interface MonthlyRevenueSummary {
+export interface MonthlyCustomerBillingSummary {
   periodStart: string;
   periodEnd: string;
   sumElectricityCharges: number;
@@ -20,11 +20,11 @@ export interface MonthlyRevenueSummary {
   displayTotal: number;
 }
 
-interface MonthlyRevenueDetailResponse {
+interface MonthlyCustomerBillingDetailResponse {
   success: boolean;
   data: {
-    summary: MonthlyRevenueSummary;
-    transactions: MonthlyRevenueTransaction[];
+    summary: MonthlyCustomerBillingSummary;
+    transactions: MonthlyCustomerBillingTransaction[];
   };
   pagination: {
     page: number;
@@ -34,31 +34,31 @@ interface MonthlyRevenueDetailResponse {
   };
 }
 
-export interface MonthlyRevenueDetailFilters {
+export interface MonthlyCustomerBillingDetailFilters {
   type?: "ELECTRICITY_CHARGES" | "ADJUSTMENT";
   customerId?: string;
   startDate?: string;
   endDate?: string;
 }
 
-export interface MonthlyRevenueDetailSort {
+export interface MonthlyCustomerBillingDetailSort {
   sortBy?: string;
   sortOrder?: "asc" | "desc";
 }
 
-export const useMonthlyRevenueDetail = (
+export const useMonthlyCustomerBillingDetail = (
   page: number = 0,
   pageSize: number = 25,
-  filters: MonthlyRevenueDetailFilters = {},
-  sort: MonthlyRevenueDetailSort = {},
+  filters: MonthlyCustomerBillingDetailFilters = {},
+  sort: MonthlyCustomerBillingDetailSort = {},
 ) => {
   const { type, customerId, startDate, endDate } = filters;
   const { sortBy, sortOrder } = sort;
 
   const { data, isLoading, error, refetch } =
-    useQuery<MonthlyRevenueDetailResponse>({
+    useQuery<MonthlyCustomerBillingDetailResponse>({
       queryKey: [
-        "adminMonthlyRevenueDetail",
+        "adminMonthlyCustomerBillingDetail",
         page,
         pageSize,
         type,
@@ -81,18 +81,18 @@ export const useMonthlyRevenueDetail = (
         if (sortOrder) params.set("sortOrder", sortOrder);
 
         const response = await fetch(
-          `/api/admin/monthly-revenue?${params.toString()}`,
+          `/api/admin/monthly-customer-billing?${params.toString()}`,
         );
 
         if (!response.ok) {
-          throw new Error("Failed to fetch monthly revenue detail");
+          throw new Error("Failed to fetch monthly billing detail");
         }
 
         const result = await response.json();
 
         if (!result.success) {
           throw new Error(
-            result.error || "Failed to fetch monthly revenue detail",
+            result.error || "Failed to fetch monthly billing detail",
           );
         }
 
