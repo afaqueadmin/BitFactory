@@ -89,6 +89,8 @@ interface DashboardStats {
     braiinsMinedRevenue?: number;
     combinedMinedRevenue?: number;
     selfMiningRevenueBtc: number;
+    selfMiningLuxorRevenueBtc: number;
+    selfMiningBraiinsRevenueBtc: number;
     selfMiningRevenueUsd: number;
     selfMiningHostingCost: number;
     selfMiningProfitUsd: number;
@@ -338,17 +340,27 @@ export default function AdminDashboard() {
 
   const poolStats = useMemo(() => getPoolStats(poolMode), [poolMode, stats]);
 
-  // Self-mining revenue is only tracked on Luxor (segment = SELF_MINING users
-  // are identified by their Luxor subaccount), so it's already excluded when
-  // viewing Braiins alone.
+  // Self-mining (segment = SELF_MINING) revenue must be excluded per pool:
+  // Luxor mode excludes only Luxor self-mining revenue, Braiins mode excludes
+  // only Braiins self-mining revenue, and combined/"total" mode excludes both.
   const totalMinedRevenue = useMemo(() => {
     const baseRevenue = poolStats?.minedRevenue ?? 0;
+    let selfMiningRevenueBtc = 0;
     if (poolMode === "braiins") {
-      return baseRevenue;
+      selfMiningRevenueBtc = stats?.financial.selfMiningBraiinsRevenueBtc ?? 0;
+    } else if (poolMode === "luxor") {
+      selfMiningRevenueBtc = stats?.financial.selfMiningLuxorRevenueBtc ?? 0;
+    } else {
+      selfMiningRevenueBtc = stats?.financial.selfMiningRevenueBtc ?? 0;
     }
-    const selfMiningRevenueBtc = stats?.financial.selfMiningRevenueBtc ?? 0;
     return Math.max(0, baseRevenue - selfMiningRevenueBtc);
-  }, [poolStats, poolMode, stats?.financial.selfMiningRevenueBtc]);
+  }, [
+    poolStats,
+    poolMode,
+    stats?.financial.selfMiningRevenueBtc,
+    stats?.financial.selfMiningLuxorRevenueBtc,
+    stats?.financial.selfMiningBraiinsRevenueBtc,
+  ]);
   const minersStats = useMemo(
     () => getMinersStats(poolMode),
     [poolMode, stats?.miners],
@@ -640,7 +652,7 @@ export default function AdminDashboard() {
             type="BTC"
             infoText={
               poolMode === "braiins"
-                ? "Total BTC mined on Braiins for hosted customers, all-time. Self-mining users aren't tracked separately for Braiins."
+                ? "Total BTC mined on Braiins for hosted customers, all-time. Excludes BTC mined by customers with segment = SELF_MINING (shown separately in the Self Mining Revenue (BTC) card)."
                 : "Total BTC mined since 2025-01-01 across all subaccounts at the site (Luxor" +
                   (poolMode === "total" ? " + Braiins" : "") +
                   "), for hosted customers only. Excludes BTC mined by customers with segment = SELF_MINING (shown separately in the Self Mining Revenue (BTC) card)."

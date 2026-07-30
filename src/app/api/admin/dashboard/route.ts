@@ -89,7 +89,9 @@ interface DashboardStats {
     braiinsMinedRevenue?: number; // BTC from Braiins
     combinedMinedRevenue?: number; // Combined BTC from all pools
     // Self-mining (segment = SELF_MINING) stats
-    selfMiningRevenueBtc: number; // BTC mined, all-time, Luxor
+    selfMiningRevenueBtc: number; // BTC mined, all-time, Luxor + Braiins combined
+    selfMiningLuxorRevenueBtc: number; // BTC mined, all-time, Luxor only
+    selfMiningBraiinsRevenueBtc: number; // BTC mined, all-time, Braiins only
     selfMiningRevenueUsd: number; // selfMiningRevenueBtc * current BTC price
     selfMiningHostingCost: number; // USD, sum of issued electricity invoices
     selfMiningProfitUsd: number; // selfMiningRevenueUsd - selfMiningHostingCost
@@ -623,51 +625,9 @@ async function fetchBraiinsProfile(braiinsApiToken: string): Promise<{
 }
 
 /**
- * Helper: Fetch Braiins total revenue from daily rewards
- */
-async function fetchBraiinsRevenue(
-  braiinsApiToken: string,
-): Promise<{ revenue: number } | null> {
-  try {
-    if (!braiinsApiToken) {
-      console.warn("[Admin Dashboard] No Braiins API token provided");
-      return null;
-    }
-
-    const client = new BraiinsClient(braiinsApiToken, "admin-dashboard");
-
-    // Fetch last 30 days of rewards
-    const today = new Date();
-    const thirtyDaysAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
-
-    const fromDate = thirtyDaysAgo.toISOString().split("T")[0]; // YYYY-MM-DD
-    const toDate = today.toISOString().split("T")[0]; // YYYY-MM-DD
-
-    const rewards = await client.getDailyRewards({
-      from: fromDate,
-      to: toDate,
-    });
-
-    if (rewards?.btc?.daily_rewards) {
-      const totalRevenue = rewards.btc.daily_rewards.reduce((sum, day) => {
-        const reward = parseFloat(day.total_reward || "0");
-        return sum + reward;
-      }, 0);
-
-      return { revenue: totalRevenue };
-    }
-  } catch (error) {
-    console.error("[Admin Dashboard] Error fetching Braiins revenue:", error);
-  }
-  return null;
-}
-
-/**
  * Helper: Fetch Braiins all-time revenue from the user profile endpoint
- * (btc.all_time_reward), used for the self-mining revenue card. Unlike
- * fetchBraiinsRevenue (which sums daily rewards over a 30-day window because
- * that's what the general Braiins mined-revenue card needs), this returns
- * the pool's own all-time total directly - no date range required.
+ * (btc.all_time_reward). Used for both the Braiins mined-revenue card and
+ * the self-mining revenue card, so both read the same all-time metric.
  */
 async function fetchBraiinsAllTimeRevenue(
   braiinsApiToken: string,
@@ -1094,6 +1054,8 @@ export async function GET(request: NextRequest) {
 
     // ========== SELF MINING STATS (segment = SELF_MINING, all pools) ==========
     let selfMiningRevenueBtc = 0;
+    let selfMiningLuxorRevenueBtc = 0;
+    let selfMiningBraiinsRevenueBtc = 0;
     let selfMiningRevenueUsd = 0;
     let selfMiningHostingCost = 0;
     let selfMiningProfitUsd = 0;
@@ -1145,13 +1107,11 @@ export async function GET(request: NextRequest) {
 
       // Luxor: all-time revenue since 2025-01-01 (via the revenue endpoint).
       // Braiins: all-time revenue via the user profile's all_time_reward.
-      const selfMiningLuxorRevenueBtc =
-        selfMiningLuxorRevenueStats?.revenue || 0;
-      const selfMiningBraiinsRevenueBtc =
-        selfMiningBraiinsRevenueResults.reduce(
-          (sum, result) => sum + (result?.revenue || 0),
-          0,
-        );
+      selfMiningLuxorRevenueBtc = selfMiningLuxorRevenueStats?.revenue || 0;
+      selfMiningBraiinsRevenueBtc = selfMiningBraiinsRevenueResults.reduce(
+        (sum, result) => sum + (result?.revenue || 0),
+        0,
+      );
       selfMiningRevenueBtc =
         selfMiningLuxorRevenueBtc + selfMiningBraiinsRevenueBtc;
       selfMiningHostingCost = Number(hostingCostSum._sum.totalAmount || 0);
@@ -1223,8 +1183,8 @@ export async function GET(request: NextRequest) {
               );
             }
 
-            // Fetch revenue for this Braiins customer
-            const braiinsRevenue = await fetchBraiinsRevenue(authKey);
+            // Fetch all-time revenue for this Braiins customer
+            const braiinsRevenue = await fetchBraiinsAllTimeRevenue(authKey);
             if (braiinsRevenue) {
               totalRevenue += braiinsRevenue.revenue;
             }
@@ -1355,6 +1315,8 @@ export async function GET(request: NextRequest) {
           ? combinedStats.minedRevenue
           : revenueStats?.revenue || 0,
         selfMiningRevenueBtc,
+        selfMiningLuxorRevenueBtc,
+        selfMiningBraiinsRevenueBtc,
         selfMiningRevenueUsd,
         selfMiningHostingCost,
         selfMiningProfitUsd,

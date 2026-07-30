@@ -176,25 +176,21 @@ async function fetchBraiinsProfile(braiinsApiToken: string): Promise<{
   return null;
 }
 
-async function fetchBraiinsRevenue(
+/**
+ * Fetch Braiins all-time revenue from the user profile endpoint
+ * (btc.all_time_reward), matching the admin dashboard's calculation.
+ */
+async function fetchBraiinsAllTimeRevenue(
   braiinsApiToken: string,
 ): Promise<{ revenue: number } | null> {
   try {
     if (!braiinsApiToken) return null;
     const client = new BraiinsClient(braiinsApiToken, "franchisee-dashboard");
+    const profile = await client.getUserProfile();
 
-    const today = new Date();
-    const thirtyDaysAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
-    const rewards = await client.getDailyRewards({
-      from: thirtyDaysAgo.toISOString().split("T")[0],
-      to: today.toISOString().split("T")[0],
-    });
-
-    if (rewards?.btc?.daily_rewards) {
-      const totalRevenue = rewards.btc.daily_rewards.reduce((sum, day) => {
-        return sum + (parseFloat(day.total_reward || "0") || 0);
-      }, 0);
-      return { revenue: totalRevenue };
+    if (profile?.btc) {
+      const revenue = parseFloat(profile.btc.all_time_reward || "0");
+      return { revenue: Number.isFinite(revenue) ? revenue : 0 };
     }
   } catch (error) {
     console.error(
@@ -440,7 +436,7 @@ export async function GET(request: NextRequest) {
               braiinsInactive += profile.inactiveWorkers;
             }
 
-            const revenue = await fetchBraiinsRevenue(authKey);
+            const revenue = await fetchBraiinsAllTimeRevenue(authKey);
             if (revenue) {
               braiinsRevenue += revenue.revenue;
             }
