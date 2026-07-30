@@ -3,7 +3,6 @@ import { verifyJwtToken } from "@/lib/jwt";
 import { prisma } from "@/lib/prisma";
 import { createLuxorClient, LuxorError } from "@/lib/luxor";
 import { createBraiinsClient } from "@/lib/braiins";
-import { groupMinersByPool, getLuxorGroups, getBraiinsGroups } from "@/lib/poolAggregation";
 
 /**
  * GET /api/miners/summary
@@ -34,21 +33,28 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
 
-    // Fetch the user's miners
-    const miners = await prisma.miner.findMany({
+    // Get PoolAuth entries for this user (contains API keys). Which pools
+    // are active is determined directly from PoolAuth, not from
+    // Miner.poolId - a Braiins/Luxor account is authenticated independently
+    // of whether any Miner row happens to be tagged with that pool.
+    const poolAuths = await prisma.poolAuth.findMany({
       where: { userId },
-      include: {
-        pool: { select: { id: true, name: true } },
-      },
+      include: { pool: { select: { id: true, name: true } } },
     });
 
-    // Determine which pools are active (have at least one miner)
-    const activePoolNames: string[] = [];
-    if (miners.some(m => m.pool?.name === "Luxor")) activePoolNames.push("Luxor");
-    if (miners.some(m => m.pool?.name === "Braiins")) activePoolNames.push("Braiins");
+    const luxorAuth = poolAuths.find((auth) =>
+      auth.pool.name.toLowerCase().includes("luxor"),
+    );
+    const braiinsAuth = poolAuths.find((auth) =>
+      auth.pool.name.toLowerCase().includes("braiins"),
+    );
 
-    if (!miners || miners.length === 0) {
-      console.log(`[Miners Summary API] User ${userId} has no miners`);
+    const activePoolNames: string[] = [];
+    if (luxorAuth) activePoolNames.push("Luxor");
+    if (braiinsAuth) activePoolNames.push("Braiins");
+
+    if (poolAuths.length === 0) {
+      console.log(`[Miners Summary API] User ${userId} has no pool accounts`);
       return NextResponse.json(
         {
           success: true,
@@ -71,28 +77,23 @@ export async function GET(request: NextRequest) {
               },
             },
           },
-          message: "No miners assigned",
+          message: "No pool accounts configured",
         },
         { status: 200 },
       );
     }
 
-    // Get PoolAuth entries for this user (contains API keys)
-    const poolAuths = await prisma.poolAuth.findMany({
-      where: { userId },
-      include: { pool: { select: { id: true, name: true } } },
-    });
-
-    // Create a map of poolId -> authKey for quick lookup
-    const authKeyByPoolId = new Map<string, string>();
-    poolAuths.forEach((auth) => {
-      authKeyByPoolId.set(auth.poolId, auth.authKey);
-    });
-
-    // Group miners by pool
-    const aggregation = groupMinersByPool(miners);
-    const luxorGroups = getLuxorGroups(aggregation);
-    const braiinsGroups = getBraiinsGroups(aggregation);
+    // Miner counts per pool (display-only, independent of which pools get
+    // queried above - a user's PoolAuth account can be active even with
+    // zero Miner rows tagged to that pool).
+    const [luxorMinerCount, braiinsMinerCount] = await Promise.all([
+      prisma.miner.count({
+        where: { userId, isDeleted: false, pool: { name: "Luxor" } },
+      }),
+      prisma.miner.count({
+        where: { userId, isDeleted: false, pool: { name: "Braiins" } },
+      }),
+    ]);
 
     // Aggregate data from both pools
     let totalHashrate = 0;
@@ -100,36 +101,32 @@ export async function GET(request: NextRequest) {
     let totalRevenue = 0;
     let avgHashprice = 0;
     let hashpriceCount = 0;
-    let efficiencyValues: number[] = [];
-    let uptimeValues: number[] = [];
+    const efficiencyValues: number[] = [];
+    const uptimeValues: number[] = [];
 
     const poolStats = {
-      luxor: { miners: 0, hashrate: 0, activeWorkers: 0, hashprice: 0, efficiency_5m: 0, uptime_24h: 0 },
-      braiins: { miners: 0, hashrate: 0, activeWorkers: 0, hashprice: 0, efficiency_5m: 0, uptime_24h: 0 },
+      luxor: {
+        miners: luxorMinerCount,
+        hashrate: 0,
+        activeWorkers: 0,
+        hashprice: 0,
+        efficiency_5m: 0,
+        uptime_24h: 0,
+      },
+      braiins: {
+        miners: braiinsMinerCount,
+        hashrate: 0,
+        activeWorkers: 0,
+        hashprice: 0,
+        efficiency_5m: 0,
+        uptime_24h: 0,
+      },
     };
 
-    // Fetch from Luxor groups
-    for (const group of luxorGroups) {
+    // Fetch from Luxor
+    if (luxorAuth) {
       try {
-        // Get the poolId from the first miner in the group to look up auth
-        const minerWithPool = group.miners[0];
-        const poolId = minerWithPool?.poolId;
-
-        if (!poolId) {
-          console.warn(
-            `[Miners Summary API] Luxor group has no poolId, skipping`,
-          );
-          continue;
-        }
-
-        const authKey = authKeyByPoolId.get(poolId);
-        if (!authKey) {
-          console.warn(
-            `[Miners Summary API] No auth key found for Luxor pool ${poolId}`,
-          );
-          continue;
-        }
-
+        const authKey = luxorAuth.authKey;
         console.log(
           `[Miners Summary API] Fetching Luxor summary for auth key: ${authKey}`,
         );
@@ -155,22 +152,19 @@ export async function GET(request: NextRequest) {
         // IMPORTANT: Luxor hashrate_24h appears to be in H/s (raw value), keep as-is for now
         // This will be used by card which divides by 10^15 to convert H/s to PH/s
         const luxorHashrate24h = parseFloat(summaryData.hashrate_24h || "0");
-        
+
         // Log raw value to understand the unit
-        console.log(
-          `[Miners Summary API] LUXOR HASHRATE DEBUG`,
-          {
-            raw_string: summaryData.hashrate_24h,
-            parsed_float: luxorHashrate24h,
-            divided_by_1e12: luxorHashrate24h / 1000000000000,
-            divided_by_1e15: luxorHashrate24h / 1000000000000000,
-          }
-        );
-        
+        console.log(`[Miners Summary API] LUXOR HASHRATE DEBUG`, {
+          raw_string: summaryData.hashrate_24h,
+          parsed_float: luxorHashrate24h,
+          divided_by_1e12: luxorHashrate24h / 1000000000000,
+          divided_by_1e15: luxorHashrate24h / 1000000000000000,
+        });
+
         const hashrate = luxorHashrate24h;
         const efficiency = summaryData.efficiency_5m || 0; // Use directly, no calculation
         const uptime = summaryData.uptime_24h || 0; // Use directly, no calculation
-        
+
         // revenue_24h is an array of RevenueSummary objects, sum them up
         let revenue = 0;
         if (Array.isArray(summaryData.revenue_24h)) {
@@ -179,7 +173,7 @@ export async function GET(request: NextRequest) {
             return sum + (item.amount || item.revenue || 0);
           }, 0);
         }
-        
+
         const hashprice = summaryData.hashprice?.[0]?.value
           ? Number(summaryData.hashprice[0].value)
           : 0;
@@ -208,7 +202,6 @@ export async function GET(request: NextRequest) {
           uptimeValues.push(uptime);
         }
 
-        poolStats.luxor.miners += group.miners.length;
         poolStats.luxor.hashrate = hashrate;
         poolStats.luxor.activeWorkers = activeMiners;
         poolStats.luxor.hashprice = hashprice;
@@ -226,28 +219,10 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Fetch from Braiins groups
-    for (const group of braiinsGroups) {
+    // Fetch from Braiins
+    if (braiinsAuth) {
       try {
-        // Get the poolId from the first miner in the group to look up auth
-        const minerWithPool = group.miners[0];
-        const poolId = minerWithPool?.poolId;
-
-        if (!poolId) {
-          console.warn(
-            `[Miners Summary API] Braiins group has no poolId, skipping`,
-          );
-          continue;
-        }
-
-        const authKey = authKeyByPoolId.get(poolId);
-        if (!authKey) {
-          console.warn(
-            `[Miners Summary API] No auth key found for Braiins pool ${poolId}`,
-          );
-          continue;
-        }
-
+        const authKey = braiinsAuth.authKey;
         console.log(
           `[Miners Summary API] Fetching Braiins profile for auth key: ${authKey}`,
         );
@@ -272,9 +247,11 @@ export async function GET(request: NextRequest) {
         // Use only values directly from API - NO CALCULATIONS
         // IMPORTANT: Braiins API hashrate is in Gh/s (gigahash per second)
         // Convert Gh/s to H/s for consistency with Luxor
-        const hashrateInGH = parseFloat(profileData.btc?.hash_rate_24h?.toString() || "0");
+        const hashrateInGH = parseFloat(
+          profileData.btc?.hash_rate_24h?.toString() || "0",
+        );
         const hashrate = hashrateInGH * 1000000000; // Convert Gh/s to H/s (Ghash * 10^9)
-        
+
         const okWorkers = profileData.btc?.ok_workers || 0;
         const todayReward = parseFloat(profileData.btc?.today_reward || "0");
 
@@ -296,7 +273,6 @@ export async function GET(request: NextRequest) {
         totalActiveMiners += okWorkers;
         totalRevenue += todayReward;
 
-        poolStats.braiins.miners += group.miners.length;
         poolStats.braiins.hashrate = hashrate;
         poolStats.braiins.activeWorkers = okWorkers;
         poolStats.braiins.efficiency_5m = 0; // Not available from Braiins API
@@ -315,17 +291,24 @@ export async function GET(request: NextRequest) {
     }
 
     const aggHashprice =
-      hashpriceCount > 0 ? parseFloat((avgHashprice / hashpriceCount).toFixed(8)) : 0;
+      hashpriceCount > 0
+        ? parseFloat((avgHashprice / hashpriceCount).toFixed(8))
+        : 0;
     const avgEfficiency =
       efficiencyValues.length > 0
         ? parseFloat(
-            (efficiencyValues.reduce((a, b) => a + b, 0) / efficiencyValues.length).toFixed(4),
+            (
+              efficiencyValues.reduce((a, b) => a + b, 0) /
+              efficiencyValues.length
+            ).toFixed(4),
           )
         : 0;
     const avgUptime =
       uptimeValues.length > 0
         ? parseFloat(
-            (uptimeValues.reduce((a, b) => a + b, 0) / uptimeValues.length).toFixed(4),
+            (
+              uptimeValues.reduce((a, b) => a + b, 0) / uptimeValues.length
+            ).toFixed(4),
           )
         : 0;
 

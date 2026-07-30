@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyJwtToken } from "@/lib/jwt";
 import { createLuxorClient } from "@/lib/luxor";
 import { createBraiinsClient } from "@/lib/braiins";
-import { groupMinersByPool, getLuxorGroups, getBraiinsGroups } from "@/lib/poolAggregation";
 import { prisma } from "@/lib/prisma";
 
 /**
@@ -39,16 +38,17 @@ export async function GET(request: NextRequest) {
     const userId = decoded.userId;
     console.log(`[24h Revenue API] Fetching data for user: ${userId}`);
 
-    // Get all miners with pool info
-    const miners = await prisma.miner.findMany({
+    // Get PoolAuth entries for this user (contains API keys). Which pools
+    // are active is determined directly from PoolAuth, not from
+    // Miner.poolId - a Braiins/Luxor account is authenticated independently
+    // of whether any Miner row happens to be tagged with that pool.
+    const poolAuths = await prisma.poolAuth.findMany({
       where: { userId },
-      include: {
-        pool: { select: { id: true, name: true } },
-      },
+      include: { pool: { select: { id: true, name: true } } },
     });
 
-    if (!miners || miners.length === 0) {
-      console.log(`[24h Revenue API] User ${userId} has no miners`);
+    if (!poolAuths || poolAuths.length === 0) {
+      console.log(`[24h Revenue API] User ${userId} has no pool accounts`);
       return NextResponse.json(
         {
           revenue24h: { btc: 0, usd: 0 },
@@ -59,28 +59,18 @@ export async function GET(request: NextRequest) {
             luxor: { btc: 0, usd: 0 },
             braiins: { btc: 0, usd: 0 },
           },
-          message: "No miners assigned",
+          message: "No pool accounts configured",
         },
         { status: 200 },
       );
     }
 
-    // Get PoolAuth entries for this user (contains API keys)
-    const poolAuths = await prisma.poolAuth.findMany({
-      where: { userId },
-      include: { pool: { select: { id: true, name: true } } },
-    });
-
-    // Create a map of poolId -> authKey for quick lookup
-    const authKeyByPoolId = new Map<string, string>();
-    poolAuths.forEach((auth) => {
-      authKeyByPoolId.set(auth.poolId, auth.authKey);
-    });
-
-    // Group miners by pool
-    const aggregation = groupMinersByPool(miners);
-    const luxorGroups = getLuxorGroups(aggregation);
-    const braiinsGroups = getBraiinsGroups(aggregation);
+    const luxorAuth = poolAuths.find((auth) =>
+      auth.pool.name.toLowerCase().includes("luxor"),
+    );
+    const braiinsAuth = poolAuths.find((auth) =>
+      auth.pool.name.toLowerCase().includes("braiins"),
+    );
 
     // Calculate date range - last 24 hours
     const endDate = new Date();
@@ -93,28 +83,10 @@ export async function GET(request: NextRequest) {
     let luxorRevenueUsd = 0;
     let braiinsRevenueBtc = 0;
 
-    // Fetch from Luxor groups
-    for (const group of luxorGroups) {
+    // Fetch from Luxor
+    if (luxorAuth) {
       try {
-        // Get the poolId from the first miner in the group to look up auth
-        const minerWithPool = group.miners[0];
-        const poolId = minerWithPool?.poolId;
-
-        if (!poolId) {
-          console.warn(
-            `[24h Revenue API] Luxor group has no poolId, skipping`,
-          );
-          continue;
-        }
-
-        const authKey = authKeyByPoolId.get(poolId);
-        if (!authKey) {
-          console.warn(
-            `[24h Revenue API] No auth key found for Luxor pool ${poolId}`,
-          );
-          continue;
-        }
-
+        const authKey = luxorAuth.authKey;
         console.log(
           `[24h Revenue API] Fetching Luxor transactions for auth key: ${authKey}`,
         );
@@ -134,32 +106,17 @@ export async function GET(request: NextRequest) {
           }
         }
       } catch (error) {
-        console.error(`[24h Revenue API] Error fetching Luxor transactions:`, error);
+        console.error(
+          `[24h Revenue API] Error fetching Luxor transactions:`,
+          error,
+        );
       }
     }
 
-    // Fetch from Braiins groups (use daily rewards for 24h earnings)
-    for (const group of braiinsGroups) {
+    // Fetch from Braiins (use daily rewards for 24h earnings)
+    if (braiinsAuth) {
       try {
-        // Get the poolId from the first miner in the group to look up auth
-        const minerWithPool = group.miners[0];
-        const poolId = minerWithPool?.poolId;
-
-        if (!poolId) {
-          console.warn(
-            `[24h Revenue API] Braiins group has no poolId, skipping`,
-          );
-          continue;
-        }
-
-        const authKey = authKeyByPoolId.get(poolId);
-        if (!authKey) {
-          console.warn(
-            `[24h Revenue API] No auth key found for Braiins pool ${poolId}`,
-          );
-          continue;
-        }
-
+        const authKey = braiinsAuth.authKey;
         console.log(
           `[24h Revenue API] Fetching Braiins daily rewards for auth key: ${authKey}`,
         );
@@ -185,10 +142,10 @@ export async function GET(request: NextRequest) {
     totalRevenueBtc = luxorRevenueBtc + braiinsRevenueBtc;
     totalRevenueUsd = luxorRevenueUsd;
 
-    // Determine which pools have miners
+    // Determine which pools have a configured account
     const activePoolNames = [];
-    if (luxorGroups.length > 0) activePoolNames.push("Luxor");
-    if (braiinsGroups.length > 0) activePoolNames.push("Braiins");
+    if (luxorAuth) activePoolNames.push("Luxor");
+    if (braiinsAuth) activePoolNames.push("Braiins");
 
     return NextResponse.json({
       revenue24h: {
@@ -197,7 +154,8 @@ export async function GET(request: NextRequest) {
       },
       currency: "BTC",
       timestamp: new Date().toISOString(),
-      dataSource: luxorGroups.length > 0 && braiinsGroups.length > 0 ? "both" : luxorGroups.length > 0 ? "luxor" : "braiins",
+      dataSource:
+        luxorAuth && braiinsAuth ? "both" : luxorAuth ? "luxor" : "braiins",
       activePoolNames,
       poolBreakdown: {
         luxor: {
