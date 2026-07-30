@@ -244,7 +244,7 @@ export async function DELETE(
     // Check if hardware exists
     const existingHardware = await prisma.hardware.findUnique({
       where: { id },
-      include: { miners: true },
+      include: { miners: { where: { isDeleted: false } } },
     });
 
     if (!existingHardware) {
