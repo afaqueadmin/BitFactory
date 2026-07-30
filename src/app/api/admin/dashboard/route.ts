@@ -93,7 +93,7 @@ interface DashboardStats {
     selfMiningLuxorRevenueBtc: number; // BTC mined, all-time, Luxor only
     selfMiningBraiinsRevenueBtc: number; // BTC mined, all-time, Braiins only
     selfMiningRevenueUsd: number; // selfMiningRevenueBtc * current BTC price
-    selfMiningHostingCost: number; // USD, sum of issued electricity invoices
+    selfMiningHostingCost: number; // USD, sum of issued electricity invoices (not split by pool)
     selfMiningProfitUsd: number; // selfMiningRevenueUsd - selfMiningHostingCost
   };
   // Status

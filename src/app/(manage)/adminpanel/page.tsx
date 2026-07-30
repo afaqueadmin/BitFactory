@@ -361,6 +361,7 @@ export default function AdminDashboard() {
     stats?.financial.selfMiningLuxorRevenueBtc,
     stats?.financial.selfMiningBraiinsRevenueBtc,
   ]);
+
   const minersStats = useMemo(
     () => getMinersStats(poolMode),
     [poolMode, stats?.miners],
@@ -876,41 +877,47 @@ export default function AdminDashboard() {
             onClick={() => router.push("/customers/overview?balanceFilter=< 0")}
           />
 
-          {/* Self Mining Revenue (BTC) - Luxor + Braiins revenue for SELF_MINING segment users */}
-          <AdminValueCard
-            title="Self Mining Revenue (BTC)"
-            borderColor="#9C27B0"
-            value={stats?.financial.selfMiningRevenueBtc ?? 0}
-            type="BTC"
-            infoText="Combined all-time BTC mined for customers with segment = SELF_MINING (e.g. Higgs Self Mining), across both pools: Luxor (since 2025-01-01) plus Braiins (all-time reward)."
-          />
+          {/* Self Mining Revenue (BTC) - always Luxor + Braiins combined; only shown on "All Pools" filter */}
+          {poolMode === "total" && (
+            <AdminValueCard
+              title="Self Mining Revenue (BTC)"
+              borderColor="#9C27B0"
+              value={stats?.financial.selfMiningRevenueBtc ?? 0}
+              type="BTC"
+              infoText="Combined all-time BTC mined for customers with segment = SELF_MINING (e.g. Higgs Self Mining), across both pools: Luxor (since 2025-01-01) plus Braiins (all-time reward)."
+            />
+          )}
 
-          {/* Self Mining Revenue (USD) - BTC revenue converted at current market price */}
-          <AdminValueCard
-            title="Self Mining Revenue (USD)"
-            borderColor="#9C27B0"
-            value={stats?.financial.selfMiningRevenueUsd ?? 0}
-            type="currency"
-            infoText="Self Mining Revenue (BTC) multiplied by the current BTC/USD market price (live from Binance)."
-          />
+          {/* Self Mining Revenue (USD) - always Luxor + Braiins combined; only shown on "All Pools" filter */}
+          {poolMode === "total" && (
+            <AdminValueCard
+              title="Self Mining Revenue (USD)"
+              borderColor="#9C27B0"
+              value={stats?.financial.selfMiningRevenueUsd ?? 0}
+              type="currency"
+              infoText="Self Mining Revenue (BTC) multiplied by the current BTC/USD market price (live from Binance)."
+            />
+          )}
 
-          {/* Self Mining Hosting Cost - electricity invoices issued to SELF_MINING users */}
+          {/* Self Mining Hosting Cost - electricity invoices issued to SELF_MINING users; a DB value, not pool-specific, always visible */}
           <AdminValueCard
             title="Self Mining Hosting Cost"
-            borderColor="#9C27B0"
+            borderColor="#757575"
             value={stats?.financial.selfMiningHostingCost ?? 0}
             type="currency"
-            infoText="Sum of all issued Electricity Charges invoices (status not Draft) for customers with segment = SELF_MINING. Excludes Hardware Sales invoices."
+            infoText="Sum of all issued Electricity Charges invoices (status not Draft) for customers with segment = SELF_MINING. Excludes Hardware Sales invoices. This is a single DB total and does not change with the pool filter."
           />
 
-          {/* Self Mining Profit - USD revenue minus hosting cost */}
-          <AdminValueCard
-            title="Self Mining Profit"
-            borderColor="#9C27B0"
-            value={stats?.financial.selfMiningProfitUsd ?? 0}
-            type="currency"
-            infoText="Self Mining Revenue (USD) minus Self Mining Hosting Cost."
-          />
+          {/* Self Mining Profit - always combined USD revenue minus hosting cost; only shown on "All Pools" filter */}
+          {poolMode === "total" && (
+            <AdminValueCard
+              title="Self Mining Profit"
+              borderColor="#9C27B0"
+              value={stats?.financial.selfMiningProfitUsd ?? 0}
+              type="currency"
+              infoText="Self Mining Revenue (USD) minus Self Mining Hosting Cost."
+            />
+          )}
         </Box>
 
         {/* === WARNINGS AND NOTES === */}
