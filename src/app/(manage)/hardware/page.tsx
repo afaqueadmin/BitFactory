@@ -56,6 +56,9 @@ interface Hardware {
   updatedAt: string;
   procurementHistory?: ProcurementHistoryEntry[];
   isDeleted: boolean;
+  _count?: {
+    miners: number;
+  };
 }
 
 interface FormData {
@@ -415,17 +418,40 @@ export default function HardwarePage() {
   const [averagePowerUsage, averageHashRate] = useMemo(() => {
     const baseValues = ["0.00 kW", "0.00 TH/s"];
     if (hardware.length === 0) return baseValues;
-    const denominator = hardware.reduce((sum, hw) => sum + hw.quantity, 0);
-    if (denominator === 0) return baseValues;
+
+    // Prefer weighting by currently deployed miners per model, since that
+    // reflects the fleet actually drawing power / hashing right now.
+    const deployedCount = hardware.reduce(
+      (sum, hw) => sum + (hw._count?.miners ?? 0),
+      0,
+    );
+
+    if (deployedCount > 0) {
+      const avgPowerUsage = (
+        hardware.reduce(
+          (sum, hw) => sum + hw.powerUsage * (hw._count?.miners ?? 0),
+          0,
+        ) / deployedCount
+      ).toFixed(2);
+      const avgHashRate = (
+        hardware.reduce(
+          (sum, hw) =>
+            sum + parseFloat(String(hw.hashRate)) * (hw._count?.miners ?? 0),
+          0,
+        ) / deployedCount
+      ).toFixed(2);
+
+      return [`${avgPowerUsage} kW`, `${avgHashRate} TH/s`];
+    }
+
+    // No miners deployed yet - fall back to a plain average across models
+    // so the cards still reflect the catalog instead of showing 0.
     const avgPowerUsage = (
-      hardware.reduce((sum, hw) => sum + hw.powerUsage * hw.quantity, 0) /
-      denominator
+      hardware.reduce((sum, hw) => sum + hw.powerUsage, 0) / hardware.length
     ).toFixed(2);
     const avgHashRate = (
-      hardware.reduce(
-        (sum, hw) => sum + parseFloat(String(hw.hashRate)) * hw.quantity,
-        0,
-      ) / denominator
+      hardware.reduce((sum, hw) => sum + parseFloat(String(hw.hashRate)), 0) /
+      hardware.length
     ).toFixed(2);
 
     return [`${avgPowerUsage} kW`, `${avgHashRate} TH/s`];

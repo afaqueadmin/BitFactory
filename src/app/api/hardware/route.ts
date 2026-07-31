@@ -32,6 +32,11 @@ export async function GET(req: NextRequest) {
             createdAt: "desc",
           },
         },
+        _count: {
+          select: {
+            miners: { where: { isDeleted: false } },
+          },
+        },
       },
       orderBy: {
         createdAt: "desc",
