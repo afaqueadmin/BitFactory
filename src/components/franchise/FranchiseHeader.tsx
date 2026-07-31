@@ -11,7 +11,6 @@ import {
   MenuItem,
   CircularProgress,
 } from "@mui/material";
-// import SettingsIcon from "@mui/icons-material/Settings";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -32,34 +31,22 @@ const StyledIconButton = styled(IconButton)(({ theme }) => ({
   },
 }));
 
-export default function AdminHeader() {
+export default function FranchiseHeader() {
   const router = useRouter();
   const { logout } = useAuth();
-  // const [settingsAnchorEl, setSettingsAnchorEl] = useState<null | HTMLElement>(
-  //   null,
-  // );
   const [accountAnchorEl, setAccountAnchorEl] = useState<null | HTMLElement>(
     null,
   );
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const { darkMode, toggleDarkMode } = useTheme();
 
-  // const handleSettingsClick = (event: React.MouseEvent<HTMLElement>) => {
-  //   setSettingsAnchorEl(event.currentTarget);
-  // };
-
   const handleAccountClick = (event: React.MouseEvent<HTMLElement>) => {
     setAccountAnchorEl(event.currentTarget);
   };
 
-  const handleClose = () => {
-    // setSettingsAnchorEl(null);
-    setAccountAnchorEl(null);
-  };
+  const handleClose = () => setAccountAnchorEl(null);
 
-  const handleLogoClick = () => {
-    router.push("/adminpanel");
-  };
+  const handleLogoClick = () => router.push("/franchise/dashboard");
 
   const handleLogout = async () => {
     try {
@@ -76,7 +63,6 @@ export default function AdminHeader() {
   return (
     <StyledAppBar position="sticky" elevation={2}>
       <Toolbar>
-        {/* Left Side - BitFactory Logo */}
         <Box sx={{ display: "flex", alignItems: "center", flexGrow: 1 }}>
           <Image
             src="/BitfactoryLogo.webp"
@@ -89,9 +75,7 @@ export default function AdminHeader() {
           />
         </Box>
 
-        {/* Right Side - Settings and Account Icons */}
         <Box sx={{ display: "flex", gap: 1 }}>
-          {/* Dark Mode Toggle */}
           <StyledIconButton
             size="large"
             aria-label="darkmode"
@@ -100,37 +84,6 @@ export default function AdminHeader() {
           >
             {darkMode ? <LightModeIcon /> : <DarkModeIcon />}
           </StyledIconButton>
-
-          {/*<StyledIconButton*/}
-          {/*  size="large"*/}
-          {/*  aria-label="settings"*/}
-          {/*  color="inherit"*/}
-          {/*  onClick={handleSettingsClick}*/}
-          {/*>*/}
-          {/*  <SettingsIcon />*/}
-          {/*</StyledIconButton>*/}
-          {/*<Menu*/}
-          {/*  anchorEl={settingsAnchorEl}*/}
-          {/*  open={Boolean(settingsAnchorEl)}*/}
-          {/*  onClose={handleClose}*/}
-          {/*>*/}
-          {/*  <MenuItem*/}
-          {/*    onClick={() => {*/}
-          {/*      router.push("/adminpanel/settings");*/}
-          {/*      handleClose();*/}
-          {/*    }}*/}
-          {/*  >*/}
-          {/*    General Settings*/}
-          {/*  </MenuItem>*/}
-          {/*  <MenuItem*/}
-          {/*    onClick={() => {*/}
-          {/*      router.push("/adminpanel/security");*/}
-          {/*      handleClose();*/}
-          {/*    }}*/}
-          {/*  >*/}
-          {/*    Security Settings*/}
-          {/*  </MenuItem>*/}
-          {/*</Menu>*/}
 
           <StyledIconButton
             size="large"
@@ -147,7 +100,7 @@ export default function AdminHeader() {
           >
             <MenuItem
               onClick={() => {
-                router.push("/admin-profile");
+                router.push("/account-settings");
                 handleClose();
               }}
             >
@@ -155,38 +108,16 @@ export default function AdminHeader() {
             </MenuItem>
             <MenuItem
               onClick={() => {
-                router.push("/security-settings");
+                router.push("/security-setting");
                 handleClose();
               }}
             >
               Security Settings
             </MenuItem>
-
-            <MenuItem
-              onClick={() => {
-                router.push("/settings/payment");
-                handleClose();
-              }}
-            >
-              Payment Settings
-            </MenuItem>
-
-            <MenuItem
-              onClick={() => {
-                router.push("/external-resource");
-                handleClose();
-              }}
-            >
-              External Resource
-            </MenuItem>
             <MenuItem
               onClick={handleLogout}
               disabled={isLoggingOut}
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                gap: 1,
-              }}
+              sx={{ display: "flex", alignItems: "center", gap: 1 }}
             >
               {isLoggingOut ? (
                 <>

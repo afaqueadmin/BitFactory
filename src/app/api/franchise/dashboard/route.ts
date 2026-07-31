@@ -1,5 +1,5 @@
 /**
- * GET /api/franchisee/dashboard
+ * GET /api/franchise/dashboard
  *
  * Franchisee-facing dashboard stats — scoped to the calling franchisee's
  * own customers. FRANCHISEE role only.
@@ -96,7 +96,7 @@ async function getAllSubaccountNames(request: NextRequest): Promise<string[]> {
       .map((u) => u.luxorSubaccountName)
       .filter((name): name is string => name !== null);
   } catch (error) {
-    console.error("[Franchisee Dashboard] Error fetching subaccounts:", error);
+    console.error("[Franchise Dashboard] Error fetching subaccounts:", error);
     return [];
   }
 }
@@ -139,7 +139,7 @@ async function fetchSummary(
       };
     }
   } catch (error) {
-    console.error("[Franchisee Dashboard] Error fetching summary:", error);
+    console.error("[Franchise Dashboard] Error fetching summary:", error);
   }
   return null;
 }
@@ -152,7 +152,7 @@ async function fetchBraiinsProfile(braiinsApiToken: string): Promise<{
 } | null> {
   try {
     if (!braiinsApiToken) return null;
-    const client = new BraiinsClient(braiinsApiToken, "franchisee-dashboard");
+    const client = new BraiinsClient(braiinsApiToken, "franchise-dashboard");
     const profile = await client.getUserProfile();
 
     if (profile?.btc) {
@@ -169,7 +169,7 @@ async function fetchBraiinsProfile(braiinsApiToken: string): Promise<{
     }
   } catch (error) {
     console.error(
-      "[Franchisee Dashboard] Error fetching Braiins profile:",
+      "[Franchise Dashboard] Error fetching Braiins profile:",
       error,
     );
   }
@@ -185,7 +185,7 @@ async function fetchBraiinsAllTimeRevenue(
 ): Promise<{ revenue: number } | null> {
   try {
     if (!braiinsApiToken) return null;
-    const client = new BraiinsClient(braiinsApiToken, "franchisee-dashboard");
+    const client = new BraiinsClient(braiinsApiToken, "franchise-dashboard");
     const profile = await client.getUserProfile();
 
     if (profile?.btc) {
@@ -194,7 +194,7 @@ async function fetchBraiinsAllTimeRevenue(
     }
   } catch (error) {
     console.error(
-      "[Franchisee Dashboard] Error fetching Braiins revenue:",
+      "[Franchise Dashboard] Error fetching Braiins revenue:",
       error,
     );
   }
@@ -233,7 +233,7 @@ async function fetchScopedWorkers(request: NextRequest): Promise<{
       };
     }
   } catch (error) {
-    console.error("[Franchisee Dashboard] Error fetching workers:", error);
+    console.error("[Franchise Dashboard] Error fetching workers:", error);
   }
   return null;
 }
@@ -286,7 +286,7 @@ async function fetchScopedRevenue(
       };
     }
   } catch (error) {
-    console.error("[Franchisee Dashboard] Error fetching revenue:", error);
+    console.error("[Franchise Dashboard] Error fetching revenue:", error);
   }
   return null;
 }
@@ -302,7 +302,7 @@ export async function GET(request: NextRequest) {
     try {
       decoded = await verifyJwtToken(token);
     } catch (error) {
-      console.error("[Franchisee Dashboard] Token verification failed:", error);
+      console.error("[Franchise Dashboard] Token verification failed:", error);
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
 
@@ -396,7 +396,7 @@ export async function GET(request: NextRequest) {
       luxorActionRequired = Math.max(0, luxorDbCount - luxorActive);
     } catch (error) {
       console.error(
-        "[Franchisee Dashboard] Error fetching Luxor miners/revenue:",
+        "[Franchise Dashboard] Error fetching Luxor miners/revenue:",
         error,
       );
       warnings.push("Failed to fetch Luxor miners/revenue data");
@@ -442,7 +442,7 @@ export async function GET(request: NextRequest) {
             }
           } catch (error) {
             console.error(
-              "[Franchisee Dashboard] Error fetching Braiins data for authKey:",
+              "[Franchise Dashboard] Error fetching Braiins data for authKey:",
               error,
             );
             continue;
@@ -453,7 +453,7 @@ export async function GET(request: NextRequest) {
       }
     } catch (error) {
       console.error(
-        "[Franchisee Dashboard] Error fetching Braiins miners/revenue:",
+        "[Franchise Dashboard] Error fetching Braiins miners/revenue:",
         error,
       );
       warnings.push("Failed to fetch Braiins miners/revenue data");
@@ -479,10 +479,7 @@ export async function GET(request: NextRequest) {
         warnings.push("No Luxor subaccounts configured for any users");
       }
     } catch (error) {
-      console.error(
-        "[Franchisee Dashboard] Error fetching Luxor stats:",
-        error,
-      );
+      console.error("[Franchise Dashboard] Error fetching Luxor stats:", error);
       warnings.push("Failed to fetch Luxor statistics");
     }
 
@@ -504,7 +501,7 @@ export async function GET(request: NextRequest) {
           }
         } catch (error) {
           console.error(
-            "[Franchisee Dashboard] Error fetching Braiins data for authKey:",
+            "[Franchise Dashboard] Error fetching Braiins data for authKey:",
             error,
           );
           continue;
@@ -512,7 +509,7 @@ export async function GET(request: NextRequest) {
       }
     } catch (error) {
       console.error(
-        "[Franchisee Dashboard] Error fetching Braiins stats:",
+        "[Franchise Dashboard] Error fetching Braiins stats:",
         error,
       );
       warnings.push("Failed to fetch Braiins statistics");
@@ -568,7 +565,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ success: true, data: stats });
   } catch (error) {
-    console.error("[Franchisee Dashboard] Error:", error);
+    console.error("[Franchise Dashboard] Error:", error);
     return NextResponse.json(
       { success: false, error: "Failed to fetch dashboard statistics" },
       { status: 500 },

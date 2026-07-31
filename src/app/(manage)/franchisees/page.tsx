@@ -34,6 +34,8 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  Tabs,
+  Tab,
 } from "@mui/material";
 import {
   Add as AddIcon,
@@ -46,6 +48,7 @@ import StorefrontIcon from "@mui/icons-material/Storefront";
 import AdminValueCard from "@/components/admin/AdminValueCard";
 import CreateFranchiseeModal from "@/components/CreateFranchiseeModal";
 import EditFranchiseeModal from "@/components/EditFranchiseeModal";
+import CustomerRequestsPanel from "@/components/admin/CustomerRequestsPanel";
 import { useUser } from "@/lib/hooks";
 
 interface Franchise {
@@ -99,6 +102,26 @@ export default function FranchiseesPage() {
   const [notification, setNotification] = useState("");
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
   const [menuFranchise, setMenuFranchise] = useState<Franchise | null>(null);
+  const [tab, setTab] = useState<"franchisees" | "requests">("franchisees");
+  const [pendingRequestCount, setPendingRequestCount] = useState(0);
+
+  const fetchPendingRequestCount = useCallback(async () => {
+    try {
+      const response = await fetch(
+        "/api/admin/customer-requests?status=PENDING",
+      );
+      const data = await response.json();
+      if (data.success) {
+        setPendingRequestCount(Array.isArray(data.data) ? data.data.length : 0);
+      }
+    } catch {
+      // non-critical, badge just won't show
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchPendingRequestCount();
+  }, [fetchPendingRequestCount]);
 
   const handleMenuOpen = (
     event: React.MouseEvent<HTMLElement>,
@@ -248,246 +271,274 @@ export default function FranchiseesPage() {
           </Stack>
         </Box>
 
-        {error && (
-          <Alert severity="error" sx={{ mb: 3 }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: "bold" }}>
-              Error Loading Franchisees
-            </Typography>
-            <Typography variant="body2">{error}</Typography>
-          </Alert>
-        )}
+        <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 3 }}>
+          <Tab label="Franchisees" value="franchisees" />
+          <Tab
+            label={
+              pendingRequestCount > 0
+                ? `Customer Requests (${pendingRequestCount})`
+                : "Customer Requests"
+            }
+            value="requests"
+          />
+        </Tabs>
 
-        <Box
-          sx={{
-            display: "grid",
-            gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
-            gap: 3,
-            mb: 4,
-          }}
-        >
-          <Box>
-            <AdminValueCard
-              title="Total Franchisees"
-              value={franchises.length}
-            />
-          </Box>
-          <Box>
-            <AdminValueCard title="Active Franchises" value={activeCount} />
-          </Box>
-        </Box>
-
-        {franchises.length > 0 ? (
-          <TableContainer component={Paper} sx={{ mb: 4 }}>
-            <Table>
-              <TableHead>
-                <TableRow sx={{ backgroundColor: "background.default" }}>
-                  <TableCell sx={{ fontWeight: "bold" }}>
-                    Business Name
-                  </TableCell>
-                  <TableCell sx={{ fontWeight: "bold" }}>Franchisee</TableCell>
-                  <TableCell sx={{ fontWeight: "bold" }}>Contact</TableCell>
-                  <TableCell sx={{ fontWeight: "bold" }}>Location</TableCell>
-                  <TableCell sx={{ fontWeight: "bold" }}>Code</TableCell>
-                  <TableCell sx={{ fontWeight: "bold" }} align="center">
-                    Status
-                  </TableCell>
-                  {isAdmin && (
-                    <TableCell sx={{ fontWeight: "bold" }} align="right">
-                      Actions
-                    </TableCell>
-                  )}
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {franchises.map((franchise) => (
-                  <TableRow
-                    key={franchise.id}
-                    sx={{
-                      "&:hover": { backgroundColor: "background.default" },
-                    }}
-                  >
-                    <TableCell>
-                      <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                        {franchise.businessName}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {franchise.authorizedPersonName}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2">
-                        {franchise.franchisee?.name || "-"}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {franchise.franchisee?.email}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2">{franchise.email}</Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {franchise.phoneNumber}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2">
-                        {franchise.city}, {franchise.state}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography
-                        variant="body2"
-                        sx={{ fontFamily: "monospace" }}
-                      >
-                        {franchise.franchiseCode}
-                      </Typography>
-                    </TableCell>
-                    <TableCell align="center">
-                      <Chip
-                        label={franchise.isActive ? "Active" : "Inactive"}
-                        color={franchise.isActive ? "success" : "default"}
-                        variant="outlined"
-                        size="small"
-                      />
-                    </TableCell>
-                    {isAdmin && (
-                      <TableCell align="right">
-                        <IconButton
-                          size="small"
-                          onClick={(e) => handleMenuOpen(e, franchise)}
-                          aria-label="Franchisee actions"
-                        >
-                          <MoreVertIcon fontSize="small" />
-                        </IconButton>
-                      </TableCell>
-                    )}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
+        {tab === "requests" ? (
+          <CustomerRequestsPanel />
         ) : (
-          <Paper sx={{ p: 4, textAlign: "center", mb: 4 }}>
-            <StorefrontIcon
-              sx={{
-                fontSize: 64,
-                color: "text.secondary",
-                mb: 2,
-                opacity: 0.5,
-              }}
-            />
-            <Typography variant="h6" color="text.secondary">
-              No franchisees created yet
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-              Click &quot;Create New Franchisee&quot; to add one
-            </Typography>
-          </Paper>
-        )}
-
-        <Menu
-          anchorEl={menuAnchor}
-          open={Boolean(menuAnchor)}
-          onClose={handleMenuClose}
-          anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-          transformOrigin={{ vertical: "top", horizontal: "right" }}
-        >
-          <MenuItem
-            onClick={() => {
-              setEditingFranchise(menuFranchise);
-              handleMenuClose();
-            }}
-          >
-            <ListItemIcon>
-              <EditIcon fontSize="small" />
-            </ListItemIcon>
-            <ListItemText>Edit</ListItemText>
-          </MenuItem>
-          {isSuperAdmin && (
-            <MenuItem
-              onClick={() => {
-                setDeleteError("");
-                setDeletingFranchise(menuFranchise);
-                handleMenuClose();
-              }}
-              sx={{ color: "error.main" }}
-            >
-              <ListItemIcon>
-                <DeleteIcon fontSize="small" color="error" />
-              </ListItemIcon>
-              <ListItemText>Delete</ListItemText>
-            </MenuItem>
-          )}
-        </Menu>
-
-        <CreateFranchiseeModal
-          open={createModalOpen}
-          onClose={() => setCreateModalOpen(false)}
-          onSuccess={handleFranchiseeCreated}
-        />
-
-        <EditFranchiseeModal
-          open={Boolean(editingFranchise)}
-          onClose={() => setEditingFranchise(null)}
-          onSuccess={handleFranchiseeEdited}
-          franchise={editingFranchise}
-        />
-
-        <Dialog
-          open={Boolean(deletingFranchise)}
-          onClose={() => (deleting ? null : setDeletingFranchise(null))}
-          maxWidth="xs"
-          fullWidth
-        >
-          <DialogTitle>Delete Franchisee</DialogTitle>
-          <DialogContent>
-            <Typography variant="body2">
-              Are you sure you want to delete{" "}
-              <strong>{deletingFranchise?.businessName}</strong>? This action
-              cannot be undone.
-            </Typography>
-            {deleteError && (
-              <Alert severity="error" sx={{ mt: 2 }}>
-                {deleteError}
+          <>
+            {error && (
+              <Alert severity="error" sx={{ mb: 3 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: "bold" }}>
+                  Error Loading Franchisees
+                </Typography>
+                <Typography variant="body2">{error}</Typography>
               </Alert>
             )}
-          </DialogContent>
-          <DialogActions sx={{ px: 3, py: 2 }}>
-            <Button
-              onClick={() => setDeletingFranchise(null)}
-              disabled={deleting}
-              color="inherit"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleConfirmDelete}
-              disabled={deleting}
-              variant="contained"
-              color="error"
-            >
-              {deleting ? (
-                <CircularProgress size={20} color="inherit" />
-              ) : (
-                "Delete"
-              )}
-            </Button>
-          </DialogActions>
-        </Dialog>
 
-        <Snackbar
-          open={Boolean(notification)}
-          autoHideDuration={5000}
-          onClose={() => setNotification("")}
-          anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-        >
-          <Alert
-            onClose={() => setNotification("")}
-            severity="success"
-            sx={{ width: "100%" }}
-          >
-            {notification}
-          </Alert>
-        </Snackbar>
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
+                gap: 3,
+                mb: 4,
+              }}
+            >
+              <Box>
+                <AdminValueCard
+                  title="Total Franchisees"
+                  value={franchises.length}
+                />
+              </Box>
+              <Box>
+                <AdminValueCard title="Active Franchises" value={activeCount} />
+              </Box>
+            </Box>
+
+            {franchises.length > 0 ? (
+              <TableContainer component={Paper} sx={{ mb: 4 }}>
+                <Table>
+                  <TableHead>
+                    <TableRow sx={{ backgroundColor: "background.default" }}>
+                      <TableCell sx={{ fontWeight: "bold" }}>
+                        Business Name
+                      </TableCell>
+                      <TableCell sx={{ fontWeight: "bold" }}>
+                        Franchisee
+                      </TableCell>
+                      <TableCell sx={{ fontWeight: "bold" }}>Contact</TableCell>
+                      <TableCell sx={{ fontWeight: "bold" }}>
+                        Location
+                      </TableCell>
+                      <TableCell sx={{ fontWeight: "bold" }}>Code</TableCell>
+                      <TableCell sx={{ fontWeight: "bold" }} align="center">
+                        Status
+                      </TableCell>
+                      {isAdmin && (
+                        <TableCell sx={{ fontWeight: "bold" }} align="right">
+                          Actions
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {franchises.map((franchise) => (
+                      <TableRow
+                        key={franchise.id}
+                        sx={{
+                          "&:hover": { backgroundColor: "background.default" },
+                        }}
+                      >
+                        <TableCell>
+                          <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                            {franchise.businessName}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {franchise.authorizedPersonName}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2">
+                            {franchise.franchisee?.name || "-"}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {franchise.franchisee?.email}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2">
+                            {franchise.email}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {franchise.phoneNumber}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2">
+                            {franchise.city}, {franchise.state}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography
+                            variant="body2"
+                            sx={{ fontFamily: "monospace" }}
+                          >
+                            {franchise.franchiseCode}
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="center">
+                          <Chip
+                            label={franchise.isActive ? "Active" : "Inactive"}
+                            color={franchise.isActive ? "success" : "default"}
+                            variant="outlined"
+                            size="small"
+                          />
+                        </TableCell>
+                        {isAdmin && (
+                          <TableCell align="right">
+                            <IconButton
+                              size="small"
+                              onClick={(e) => handleMenuOpen(e, franchise)}
+                              aria-label="Franchisee actions"
+                            >
+                              <MoreVertIcon fontSize="small" />
+                            </IconButton>
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            ) : (
+              <Paper sx={{ p: 4, textAlign: "center", mb: 4 }}>
+                <StorefrontIcon
+                  sx={{
+                    fontSize: 64,
+                    color: "text.secondary",
+                    mb: 2,
+                    opacity: 0.5,
+                  }}
+                />
+                <Typography variant="h6" color="text.secondary">
+                  No franchisees created yet
+                </Typography>
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ mt: 1 }}
+                >
+                  Click &quot;Create New Franchisee&quot; to add one
+                </Typography>
+              </Paper>
+            )}
+
+            <Menu
+              anchorEl={menuAnchor}
+              open={Boolean(menuAnchor)}
+              onClose={handleMenuClose}
+              anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+              transformOrigin={{ vertical: "top", horizontal: "right" }}
+            >
+              <MenuItem
+                onClick={() => {
+                  setEditingFranchise(menuFranchise);
+                  handleMenuClose();
+                }}
+              >
+                <ListItemIcon>
+                  <EditIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText>Edit</ListItemText>
+              </MenuItem>
+              {isSuperAdmin && (
+                <MenuItem
+                  onClick={() => {
+                    setDeleteError("");
+                    setDeletingFranchise(menuFranchise);
+                    handleMenuClose();
+                  }}
+                  sx={{ color: "error.main" }}
+                >
+                  <ListItemIcon>
+                    <DeleteIcon fontSize="small" color="error" />
+                  </ListItemIcon>
+                  <ListItemText>Delete</ListItemText>
+                </MenuItem>
+              )}
+            </Menu>
+
+            <CreateFranchiseeModal
+              open={createModalOpen}
+              onClose={() => setCreateModalOpen(false)}
+              onSuccess={handleFranchiseeCreated}
+            />
+
+            <EditFranchiseeModal
+              open={Boolean(editingFranchise)}
+              onClose={() => setEditingFranchise(null)}
+              onSuccess={handleFranchiseeEdited}
+              franchise={editingFranchise}
+            />
+
+            <Dialog
+              open={Boolean(deletingFranchise)}
+              onClose={() => (deleting ? null : setDeletingFranchise(null))}
+              maxWidth="xs"
+              fullWidth
+            >
+              <DialogTitle>Delete Franchisee</DialogTitle>
+              <DialogContent>
+                <Typography variant="body2">
+                  Are you sure you want to delete{" "}
+                  <strong>{deletingFranchise?.businessName}</strong>? This
+                  action cannot be undone.
+                </Typography>
+                {deleteError && (
+                  <Alert severity="error" sx={{ mt: 2 }}>
+                    {deleteError}
+                  </Alert>
+                )}
+              </DialogContent>
+              <DialogActions sx={{ px: 3, py: 2 }}>
+                <Button
+                  onClick={() => setDeletingFranchise(null)}
+                  disabled={deleting}
+                  color="inherit"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleConfirmDelete}
+                  disabled={deleting}
+                  variant="contained"
+                  color="error"
+                >
+                  {deleting ? (
+                    <CircularProgress size={20} color="inherit" />
+                  ) : (
+                    "Delete"
+                  )}
+                </Button>
+              </DialogActions>
+            </Dialog>
+
+            <Snackbar
+              open={Boolean(notification)}
+              autoHideDuration={5000}
+              onClose={() => setNotification("")}
+              anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+            >
+              <Alert
+                onClose={() => setNotification("")}
+                severity="success"
+                sx={{ width: "100%" }}
+              >
+                {notification}
+              </Alert>
+            </Snackbar>
+          </>
+        )}
       </Container>
     </Box>
   );

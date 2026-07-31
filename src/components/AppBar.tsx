@@ -349,10 +349,10 @@ export default function AppBarComponent() {
           {user?.role === "FRANCHISEE" && (
             <MenuItem
               component={Link}
-              href="/franchisee-dashboard"
+              href="/franchise/dashboard"
               onClick={handleClose}
             >
-              Franchisee Dashboard
+              Franchise Dashboard
             </MenuItem>
           )}
           <MenuItem

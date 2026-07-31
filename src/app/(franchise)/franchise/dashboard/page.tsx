@@ -49,7 +49,7 @@ interface CustomerBalanceData {
   negativeCustomerCount: number;
 }
 
-export default function FranchiseeDashboard() {
+export default function FranchiseDashboardPage() {
   const router = useRouter();
   const theme = useTheme();
   const [poolMode, setPoolMode] = React.useState<"total" | "luxor" | "braiins">(
@@ -61,9 +61,9 @@ export default function FranchiseeDashboard() {
     isLoading: loading,
     error,
   } = useQuery<FranchiseeDashboardStats>({
-    queryKey: ["franchiseeDashboard"],
+    queryKey: ["franchiseDashboard"],
     queryFn: async () => {
-      const response = await fetch("/api/franchisee/dashboard");
+      const response = await fetch("/api/franchise/dashboard");
 
       if (!response.ok) {
         throw new Error("Failed to fetch dashboard statistics");
@@ -445,7 +445,7 @@ export default function FranchiseeDashboard() {
           title="Positive Balance Customers"
           borderColor="#757575"
           value={customerBalanceData?.positiveCustomerCount ?? 0}
-          onClick={() => router.push("/customers/overview?balanceFilter=> 0")}
+          onClick={() => router.push("/franchise/customers?balanceFilter=> 0")}
         />
 
         {/* Negative Balance Customers Count */}
@@ -453,7 +453,7 @@ export default function FranchiseeDashboard() {
           title="Negative Balance Customers"
           borderColor="#757575"
           value={customerBalanceData?.negativeCustomerCount ?? 0}
-          onClick={() => router.push("/customers/overview?balanceFilter=< 0")}
+          onClick={() => router.push("/franchise/customers?balanceFilter=< 0")}
         />
       </Box>
 

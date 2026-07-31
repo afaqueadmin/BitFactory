@@ -44,7 +44,9 @@ interface SidebarItem {
   items?: SidebarItem[];
   // Roles allowed to see this item. Defaults to ADMIN/SUPER_ADMIN (today's
   // behavior) when omitted, so existing items don't need to be touched.
-  roles?: Array<"ADMIN" | "SUPER_ADMIN" | "FRANCHISEE">;
+  // FRANCHISEE no longer renders this sidebar at all — they get their own
+  // dedicated FranchiseSidebar under the (franchise) route group.
+  roles?: Array<"ADMIN" | "SUPER_ADMIN">;
   openInNewTab?: boolean;
 }
 
@@ -56,19 +58,6 @@ const sidebarItems: SidebarItem[] = [
     // items: [
     //   { title: "Dashboard", icon: <DashboardIcon />, path: "/dashboard" },
     // ],
-  },
-  {
-    title: "Dashboard",
-    icon: <DashboardIcon />,
-    path: "/franchisee-dashboard",
-    roles: ["FRANCHISEE"],
-  },
-  {
-    title: "My Account",
-    icon: <DashboardIcon />,
-    path: "/dashboard",
-    roles: ["FRANCHISEE"],
-    openInNewTab: true,
   },
   {
     title: "Activity Log",
@@ -84,7 +73,6 @@ const sidebarItems: SidebarItem[] = [
     title: "Customers",
     icon: <CustomersIcon />,
     path: "/customers/overview",
-    roles: ["ADMIN", "SUPER_ADMIN", "FRANCHISEE"],
     // items: [
     //   {
     //     title: "Overview",
@@ -125,7 +113,6 @@ const sidebarItems: SidebarItem[] = [
     title: "All Miners",
     icon: <MinersIcon />,
     path: "/machine",
-    roles: ["ADMIN", "SUPER_ADMIN", "FRANCHISEE"],
   },
 
   {

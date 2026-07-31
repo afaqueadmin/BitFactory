@@ -67,14 +67,17 @@ const securePaths = {
     "/activity-log",
     // Add admin-specific public paths if any
   ]),
-  // Franchisee: their own dashboard plus the customers/machine pages (not
-  // the admin panel itself), scoped server-side to the franchisee's own
-  // customers/miners — PLUS the full CLIENT page set, since a franchisee
-  // can also act as a client for their own personal mining operation.
+  // Franchisee: their own dashboard/account/customers/miners pages under
+  // /franchise/* (a separate, independent portal — not the admin panel and
+  // not the shared /customers/overview or /machine admin pages), scoped
+  // server-side to the franchisee's own customers/miners — PLUS the full
+  // CLIENT page set, since a franchisee can also act as a client for their
+  // own personal mining operation.
   FRANCHISEE: new Set<string>([
-    "/franchisee-dashboard",
-    "/customers/overview",
-    "/machine",
+    "/franchise/dashboard",
+    "/franchise/account",
+    "/franchise/customers",
+    "/franchise/miners",
     ...clientPaths,
   ]),
 }; // Add admin-specific public paths if any
@@ -86,10 +89,7 @@ const dynamicPatternsPaths = {
     new URLPattern({ pathname: "/customers/:id*" }),
     new URLPattern({ pathname: "/groups/:id*" }),
   ],
-  FRANCHISEE: [
-    new URLPattern({ pathname: "/customers/:id*" }),
-    ...clientDynamicPatterns,
-  ],
+  FRANCHISEE: [...clientDynamicPatterns],
 };
 
 // Role-based default redirects
@@ -101,7 +101,7 @@ const getDefaultPathForRole = (role: string) => {
     case "CLIENT":
       return "/dashboard";
     case "FRANCHISEE":
-      return "/franchisee-dashboard";
+      return "/franchise/dashboard";
     default:
       return "/login";
   }
@@ -197,7 +197,7 @@ export async function middleware(request: NextRequest) {
       // (including /adminpanel itself, which franchisees should never see)
       if (!isInRouteGroup(pathname, userRole)) {
         return NextResponse.redirect(
-          new URL("/franchisee-dashboard", request.url),
+          new URL("/franchise/dashboard", request.url),
         );
       }
     }

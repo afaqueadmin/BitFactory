@@ -145,7 +145,7 @@ export async function POST(request: NextRequest) {
         redirectUrl = "/adminpanel";
         break;
       case "FRANCHISEE":
-        redirectUrl = "/franchisee-dashboard";
+        redirectUrl = "/franchise/dashboard";
         break;
       default:
         redirectUrl = "/dashboard";
