@@ -264,9 +264,7 @@ export async function POST(
     const config = toneConfig[emailTone as keyof typeof toneConfig];
 
     // Build CC list (includes RM and invoices@bitfactory.ae)
-    const ccEmails = await InvoiceEmailService.buildCCList(
-      customer.luxorSubaccountName,
-    );
+    const ccEmails = await InvoiceEmailService.buildCCList(customerId);
 
     // Create nodemailer transporter
     const transporter = nodemailer.createTransport({

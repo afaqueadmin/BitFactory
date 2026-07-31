@@ -104,6 +104,7 @@ export async function POST(
         unitPrice: Number(result.invoice!.unitPrice),
         luxorSubaccountName:
           result.invoice!.user?.luxorSubaccountName || undefined,
+        customerId: result.invoice!.user?.id || undefined,
         hardwareModel: result.invoice!.hardware?.model || undefined,
         billingMonth: result.invoice!.billingMonth || undefined,
         invoiceStatus: result.invoice!.status,

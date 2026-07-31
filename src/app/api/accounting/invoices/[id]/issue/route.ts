@@ -5,7 +5,7 @@ import {
   InvoiceEmailService,
   InvoiceEmailPayload,
 } from "@/services/invoiceEmailService";
-import { getGroupBySubaccountName } from "@/lib/groupUtils";
+import { getGroupByUserId } from "@/lib/groupUtils";
 import { InvoiceStatus, AuditAction } from "@prisma/client";
 
 /**
@@ -138,25 +138,21 @@ export async function POST(
 
     // Get relationship manager info for response
     let rmInfo = { name: "", email: "" };
-    if (invoice.user.luxorSubaccountName) {
-      try {
-        const group = await getGroupBySubaccountName(
-          invoice.user.luxorSubaccountName,
-        );
-        if (group && group.relationshipManager && group.email) {
-          rmInfo = {
-            name: group.relationshipManager,
-            email: group.email,
-          };
-        }
-      } catch (error) {
-        console.error("Error fetching group info:", error);
+    try {
+      const group = await getGroupByUserId(invoice.user.id);
+      if (group && group.relationshipManager && group.email) {
+        rmInfo = {
+          name: group.relationshipManager,
+          email: group.email,
+        };
       }
+    } catch (error) {
+      console.error("Error fetching group info:", error);
     }
 
     // Build CC list and get crypto payment
     const [ccEmails, cryptoPaymentUrl] = await Promise.all([
-      InvoiceEmailService.buildCCList(invoice.user.luxorSubaccountName),
+      InvoiceEmailService.buildCCList(invoice.user.id),
       InvoiceEmailService.getCryptoPaymentUrl(id, userId),
     ]);
 

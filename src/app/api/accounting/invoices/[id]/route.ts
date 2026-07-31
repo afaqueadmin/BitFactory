@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
 import { AuditAction, InvoiceStatus } from "@prisma/client";
 import { sendInvoiceCancellationEmail } from "@/lib/email";
+import { getGroupByUserId } from "@/lib/groupUtils";
 
 function normalizeBillingMonth(billingMonth: string | Date): Date {
   const parsedBillingMonth = new Date(billingMonth);
@@ -53,25 +54,8 @@ export async function GET(
       return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
     }
 
-    // Fetch group information if customer has a Luxor subaccount
-    let group = null;
-    if (invoice.user.luxorSubaccountName) {
-      group = await prisma.group.findFirst({
-        where: {
-          subaccounts: {
-            some: {
-              subaccountName: invoice.user.luxorSubaccountName,
-            },
-          },
-        },
-        select: {
-          id: true,
-          name: true,
-          relationshipManager: true,
-          email: true,
-        },
-      });
-    }
+    // Fetch group information for this customer
+    const group = await getGroupByUserId(invoice.user.id);
 
     const response = NextResponse.json({ ...invoice, group });
     response.headers.set(

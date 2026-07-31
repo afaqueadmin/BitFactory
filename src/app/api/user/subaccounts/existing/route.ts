@@ -26,19 +26,28 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
 
-    // Fetch all non-null luxorSubaccountName values from database
-    const usersWithSubaccounts = await prisma.user.findMany({
-      where: {
-        luxorSubaccountName: { not: null },
-      },
-      select: {
-        luxorSubaccountName: true,
-      },
-    });
+    // Fetch all non-null luxorSubaccountName values from database, plus all
+    // Luxor PoolAuth.authKey values. Unioned because some users (notably
+    // Franchisees) are only ever written to luxorSubaccountName, not PoolAuth.
+    const [usersWithSubaccounts, luxorPoolAuths] = await Promise.all([
+      prisma.user.findMany({
+        where: { luxorSubaccountName: { not: null } },
+        select: { luxorSubaccountName: true },
+      }),
+      prisma.poolAuth.findMany({
+        where: { pool: { name: "Luxor" } },
+        select: { authKey: true },
+      }),
+    ]);
 
-    const existingSubaccounts = usersWithSubaccounts
-      .map((user) => user.luxorSubaccountName)
-      .filter(Boolean) as string[];
+    const existingSubaccounts = Array.from(
+      new Set([
+        ...(usersWithSubaccounts
+          .map((user) => user.luxorSubaccountName)
+          .filter(Boolean) as string[]),
+        ...luxorPoolAuths.map((pa) => pa.authKey),
+      ]),
+    );
 
     console.log(
       `[API] Found ${existingSubaccounts.length} assigned subaccounts in database:`,

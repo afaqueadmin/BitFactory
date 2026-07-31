@@ -13,7 +13,7 @@ export type CustomerSortField =
   | "email"
   | "role"
   | "segment"
-  | "luxorSubaccount"
+  | "pools"
   | "miners"
   | "status"
   | "joinDate"
@@ -45,6 +45,7 @@ interface Customer {
   phoneNumber: string;
   companyName: string;
   luxorSubaccountName: string;
+  pools: string;
   streetAddress: string;
   twoFactorEnabled: boolean;
   isDeleted: boolean;
@@ -76,8 +77,8 @@ function getSortValue(
     case "segment":
       return (customer.segment || "").toLowerCase();
 
-    case "luxorSubaccount":
-      return (customer.luxorSubaccountName || "").toLowerCase();
+    case "pools":
+      return (customer.pools || "").toLowerCase();
 
     case "miners":
       return Number(customer.miners || 0);
@@ -152,7 +153,7 @@ export function toggleSortDirection(current: SortDirection): SortDirection {
  * @returns User-friendly display label
  *
  * @example
- * const label = getSortFieldLabel("luxorSubaccount"); // Returns "Luxor Subaccount"
+ * const label = getSortFieldLabel("pools"); // Returns "Pools"
  */
 export function getSortFieldLabel(field: CustomerSortField): string {
   const labels: Record<CustomerSortField, string> = {
@@ -160,7 +161,7 @@ export function getSortFieldLabel(field: CustomerSortField): string {
     email: "Email",
     role: "Role",
     segment: "Type",
-    luxorSubaccount: "Luxor Subaccount",
+    pools: "Pools",
     miners: "Miners",
     status: "Status",
     joinDate: "Join Date",
@@ -181,7 +182,7 @@ export function getAllSortFields(): CustomerSortField[] {
     "email",
     "role",
     "segment",
-    "luxorSubaccount",
+    "pools",
     "miners",
     "status",
     "joinDate",

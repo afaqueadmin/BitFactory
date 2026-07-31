@@ -12,7 +12,7 @@ export async function POST(
 ) {
   try {
     const { id: groupId } = await params;
-    const { subaccountNames } = await request.json();
+    const { poolAuthIds } = await request.json();
 
     // Verify authentication
     const token = request.cookies.get("token")?.value;
@@ -31,19 +31,29 @@ export async function POST(
       );
     }
 
+    if (user.role !== "ADMIN" && user.role !== "SUPER_ADMIN") {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Forbidden: Only Admin/Super Admin can manage groups",
+        },
+        { status: 403 },
+      );
+    }
+
     const userId = user.userId;
 
-    if (!Array.isArray(subaccountNames) || subaccountNames.length === 0) {
+    if (!Array.isArray(poolAuthIds) || poolAuthIds.length === 0) {
       return NextResponse.json(
-        { success: false, error: "Subaccount names array is required" },
+        { success: false, error: "poolAuthIds array is required" },
         { status: 400 },
       );
     }
 
     console.log(
       "[Groups API] Bulk adding",
-      subaccountNames.length,
-      "subaccounts to group",
+      poolAuthIds.length,
+      "credentials to group",
       groupId,
     );
 
@@ -56,33 +66,38 @@ export async function POST(
       );
     }
 
-    // Check which subaccounts are already in groups
-    const existingSubaccounts = await prisma.groupSubaccount.findMany({
-      where: { subaccountName: { in: subaccountNames } },
-      select: { subaccountName: true },
+    const poolAuths = await prisma.poolAuth.findMany({
+      where: { id: { in: poolAuthIds } },
+      select: { id: true, authKey: true },
     });
 
-    const existingNames = existingSubaccounts.map((s) => s.subaccountName);
-    const alreadyAssigned = subaccountNames.filter((name) =>
-      existingNames.includes(name),
-    );
+    // Check which credentials are already in groups
+    const existingSubaccounts = await prisma.groupSubaccount.findMany({
+      where: { poolAuthId: { in: poolAuthIds } },
+      select: { poolAuthId: true },
+    });
+
+    const existingIds = new Set(existingSubaccounts.map((s) => s.poolAuthId));
+    const alreadyAssigned = poolAuthIds.filter((id) => existingIds.has(id));
 
     if (alreadyAssigned.length > 0) {
       return NextResponse.json(
         {
           success: false,
-          error: `The following subaccounts are already in groups: ${alreadyAssigned.join(", ")}`,
+          error: `${alreadyAssigned.length} of the selected credential(s) are already in groups`,
           alreadyAssigned,
         },
         { status: 400 },
       );
     }
 
-    // Add all subaccounts to the group
-    const toAdd = subaccountNames.map((subaccountName) => ({
+    // Add all credentials to the group
+    const toAdd = poolAuths.map((pa) => ({
       groupId,
-      subaccountName: subaccountName.trim(),
+      subaccountName: pa.authKey,
+      poolAuthId: pa.id,
       addedBy: userId,
+      addedByUserId: userId,
     }));
 
     const createdSubaccounts = await prisma.groupSubaccount.createMany({

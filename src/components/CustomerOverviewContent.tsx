@@ -67,6 +67,7 @@ interface FetchedUser {
   phoneNumber: string;
   companyName: string;
   luxorSubaccountName: string;
+  pools: string;
   streetAddress: string;
   twoFactorEnabled: boolean;
   isDeleted: boolean;
@@ -83,7 +84,7 @@ interface FilterColumns {
   email: string;
   role: string;
   segment: string;
-  luxorSubaccountName: string;
+  pools: string;
   miners: string;
   status: string;
   joinDate: string;
@@ -274,7 +275,7 @@ export default function CustomerOverviewContent() {
     email: "",
     role: "",
     segment: "",
-    luxorSubaccountName: "",
+    pools: "",
     miners: "",
     status: "",
     joinDate: "",
@@ -712,10 +713,10 @@ export default function CustomerOverviewContent() {
                       "&:hover": { backgroundColor: "action.selected" },
                       whiteSpace: "nowrap",
                     }}
-                    onClick={() => handleHeaderClick("luxorSubaccount")}
+                    onClick={() => handleHeaderClick("pools")}
                   >
-                    Luxor Subaccount{" "}
-                    {sortConfig.field === "luxorSubaccount" &&
+                    Pools{" "}
+                    {sortConfig.field === "pools" &&
                       (sortConfig.direction === "asc" ? (
                         <ArrowUpwardIcon
                           fontSize="small"
@@ -901,9 +902,7 @@ export default function CustomerOverviewContent() {
                     <TableCell>{customer.email}</TableCell>
                     <TableCell>{customer.role}</TableCell>
                     <TableCell>{customer.segment ?? "—"}</TableCell>
-                    <TableCell>
-                      {customer.luxorSubaccountName ?? "Not Set"}
-                    </TableCell>
+                    <TableCell>{customer.pools || "Not Set"}</TableCell>
                     <TableCell align="center">{customer.miners}</TableCell>
                     <TableCell align="center">
                       <Chip

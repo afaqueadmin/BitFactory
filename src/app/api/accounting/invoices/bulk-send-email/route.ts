@@ -94,6 +94,7 @@ export async function POST(request: NextRequest) {
       totalMiners: invoice.totalMiners,
       unitPrice: Number(invoice.unitPrice),
       luxorSubaccountName: invoice.user?.luxorSubaccountName || undefined,
+      customerId: invoice.user?.id || undefined,
       hardwareModel: invoice.hardware?.model || undefined,
       billingMonth: invoice.billingMonth || undefined,
       invoiceStatus: invoice.status,

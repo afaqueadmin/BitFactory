@@ -66,6 +66,7 @@ model User {
   invoicedAmount             Decimal                      @db.Decimal(12, 2)
   createdRepairNotes         MinerRepairNote[]            @relation("CreatedRepairNotes")
   createdMinerPoolHistory    MinerPoolHistory[]           @relation("MinerPoolHistoryCreatedBy")
+  addedGroupSubaccounts      GroupSubaccount[]            @relation("GroupSubaccountAddedBy")
 
   @@index([isDeleted])
   @@index([franchiseeId])
@@ -300,8 +301,9 @@ model PoolAuth {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  pool Pool @relation(fields: [poolId], references: [id], onDelete: Cascade)
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pool             Pool              @relation(fields: [poolId], references: [id], onDelete: Cascade)
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  groupSubaccounts GroupSubaccount[]
 
   @@unique([poolId, userId])
   @@index([userId])
@@ -394,15 +396,20 @@ model Group {
 }
 
 model GroupSubaccount {
-  id             String   @id @default(cuid())
+  id             String    @id @default(cuid())
   groupId        String
-  subaccountName String   @unique
-  addedAt        DateTime @default(now())
+  subaccountName String    @unique
+  poolAuthId     String?
+  addedAt        DateTime  @default(now())
   addedBy        String
-  group          Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  addedByUserId  String?
+  group          Group     @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  poolAuth       PoolAuth? @relation(fields: [poolAuthId], references: [id])
+  addedByUser    User?     @relation("GroupSubaccountAddedBy", fields: [addedByUserId], references: [id])
 
   @@index([groupId])
   @@index([subaccountName])
+  @@index([poolAuthId])
   @@map("group_subaccounts")
 }
 

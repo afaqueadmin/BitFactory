@@ -88,6 +88,11 @@ export async function GET(request: NextRequest) {
             id: true,
           },
         },
+        poolAuths: {
+          select: {
+            pool: { select: { name: true } },
+          },
+        },
         costPayments: {
           where: {
             type: {
@@ -122,6 +127,10 @@ export async function GET(request: NextRequest) {
         phoneNumber: user.phoneNumber || "N/A",
         companyName: user.companyName || "N/A",
         luxorSubaccountName: user.luxorSubaccountName || "N/A",
+        pools: user.poolAuths
+          .map((pa) => pa.pool.name)
+          .sort()
+          .join(", "),
         twoFactorEnabled: user.twoFactorEnabled,
         joinDate: user.createdAt.toISOString().split("T")[0],
         miners: user.miners.length,

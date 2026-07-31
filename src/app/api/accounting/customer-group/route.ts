@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
+import { getGroupByUserId } from "@/lib/groupUtils";
 
 export async function GET(request: NextRequest) {
   try {
@@ -37,9 +38,7 @@ export async function GET(request: NextRequest) {
     // Fetch customer
     const customer = await prisma.user.findUnique({
       where: { id: customerId },
-      select: {
-        luxorSubaccountName: true,
-      },
+      select: { id: true },
     });
 
     if (!customer) {
@@ -49,26 +48,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    if (!customer.luxorSubaccountName) {
-      return NextResponse.json({ group: null });
-    }
-
-    // Fetch group by subaccount name
-    const group = await prisma.group.findFirst({
-      where: {
-        subaccounts: {
-          some: {
-            subaccountName: customer.luxorSubaccountName,
-          },
-        },
-      },
-      select: {
-        id: true,
-        name: true,
-        relationshipManager: true,
-        email: true,
-      },
-    });
+    const group = await getGroupByUserId(customer.id);
 
     return NextResponse.json({ group: group || null });
   } catch (error) {

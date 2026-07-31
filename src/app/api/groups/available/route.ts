@@ -44,42 +44,51 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    // Get all users with a luxor subaccount name
-    const allUsers = await prisma.user.findMany({
+    // Get all PoolAuth rows for in-scope users (any pool)
+    const allPoolAuths = await prisma.poolAuth.findMany({
       where: {
-        isDeleted: false,
-        luxorSubaccountName: { not: null },
-        ...franchiseeUserFilter({ id: user.userId, role: user.role }),
+        user: {
+          isDeleted: false,
+          ...franchiseeUserFilter({ id: user.userId, role: user.role }),
+        },
       },
       select: {
         id: true,
-        name: true,
-        email: true,
-        role: true,
-        luxorSubaccountName: true,
-        miners: { where: { isDeleted: false }, select: { id: true } },
+        authKey: true,
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+            luxorSubaccountName: true,
+            miners: { where: { isDeleted: false }, select: { id: true } },
+          },
+        },
       },
     });
 
-    // Get all subaccount names that are already assigned to any group
+    // Get all PoolAuth ids that are already assigned to any group
     const allGrouped = await prisma.groupSubaccount.findMany({
-      select: { subaccountName: true },
+      where: { poolAuthId: { not: null } },
+      select: { poolAuthId: true },
     });
-    const allGroupedNames = allGrouped.map((s) => s.subaccountName);
+    const groupedPoolAuthIds = new Set(allGrouped.map((s) => s.poolAuthId));
 
-    const available = allUsers
-      .filter((u) => !allGroupedNames.includes(u.luxorSubaccountName || ""))
-      .map((user) => ({
-        id: user.id,
-        subaccountName: user.luxorSubaccountName || "",
+    const available = allPoolAuths
+      .filter((pa) => !groupedPoolAuthIds.has(pa.id))
+      .map((pa) => ({
+        id: pa.id,
+        poolAuthId: pa.id,
+        subaccountName: pa.authKey,
         user: {
-          id: user.id,
-          name: user.name || "Unknown",
-          email: user.email || "unknown@example.com",
-          role: user.role,
-          luxorSubaccountName: user.luxorSubaccountName || "",
+          id: pa.user.id,
+          name: pa.user.name || "Unknown",
+          email: pa.user.email || "unknown@example.com",
+          role: pa.user.role,
+          luxorSubaccountName: pa.user.luxorSubaccountName || "",
         },
-        minerCount: user.miners.length,
+        minerCount: pa.user.miners.length,
       }));
 
     return NextResponse.json(

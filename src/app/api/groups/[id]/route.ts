@@ -83,11 +83,31 @@ export async function GET(
       );
     }
 
-    // Fetch group with subaccounts and creator
+    // Fetch group with subaccounts (via poolAuth -> user relation) and creator
     const group = await prisma.group.findUnique({
       where: { id },
       include: {
-        subaccounts: true,
+        subaccounts: {
+          include: {
+            poolAuth: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                    role: true,
+                    luxorSubaccountName: true,
+                    miners: {
+                      where: { isDeleted: false },
+                      select: { id: true },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
         creator: {
           select: {
             id: true,
@@ -114,68 +134,77 @@ export async function GET(
       );
     }
 
-    // Get all users with their luxor subaccount names
-    const allUsers = await prisma.user.findMany({
-      where: {
-        isDeleted: false,
-        luxorSubaccountName: { not: null },
-        ...franchiseeUserFilter({ id: user.userId, role: user.role }),
-      },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        luxorSubaccountName: true,
-        miners: {
-          where: { isDeleted: false },
-          select: { id: true },
-        },
-      },
-    });
-
-    // Map subaccounts in group with user details
+    // Map subaccounts in group with user details (via the poolAuth relation)
     const subaccounts = group.subaccounts.map((groupSub) => {
-      const user = allUsers.find(
-        (u) => u.luxorSubaccountName === groupSub.subaccountName,
-      );
+      const poolAuthUser = groupSub.poolAuth?.user;
       return {
         id: groupSub.id,
         subaccountName: groupSub.subaccountName,
+        poolAuthId: groupSub.poolAuthId || undefined,
         addedAt: groupSub.addedAt.toISOString(),
         user: {
-          id: user?.id || "",
-          name: user?.name || "Unknown",
-          email: user?.email || "unknown@example.com",
-          role: user?.role || "CLIENT",
+          id: poolAuthUser?.id || "",
+          name: poolAuthUser?.name || "Unknown",
+          email: poolAuthUser?.email || "unknown@example.com",
+          role: poolAuthUser?.role || "CLIENT",
           luxorSubaccountName:
-            user?.luxorSubaccountName || groupSub.subaccountName,
+            poolAuthUser?.luxorSubaccountName || groupSub.subaccountName,
         },
-        minerCount: user?.miners.length || 0,
+        minerCount: poolAuthUser?.miners.length || 0,
       };
     });
 
-    // Get all subaccounts assigned to ANY group (globally)
-    const allGroupedSubaccounts = await prisma.groupSubaccount.findMany({
-      select: { subaccountName: true },
+    // Get all PoolAuth ids already assigned to ANY group (globally)
+    const allGroupedPoolAuths = await prisma.groupSubaccount.findMany({
+      where: { poolAuthId: { not: null } },
+      select: { poolAuthId: true },
     });
-    const allGroupedNames = allGroupedSubaccounts.map((s) => s.subaccountName);
+    const groupedPoolAuthIds = new Set(
+      allGroupedPoolAuths.map((s) => s.poolAuthId),
+    );
 
-    // Get available subaccounts (users not assigned to any group yet)
-    const availableSubaccounts = allUsers
-      .filter((u) => !allGroupedNames.includes(u.luxorSubaccountName || ""))
-      .map((user) => ({
-        id: user.id,
-        subaccountName: user.luxorSubaccountName || "",
+    // Get available subaccounts (PoolAuth rows not assigned to any group yet)
+    const allPoolAuths = await prisma.poolAuth.findMany({
+      where: {
+        user: {
+          isDeleted: false,
+          ...franchiseeUserFilter({ id: user.userId, role: user.role }),
+        },
+      },
+      select: {
+        id: true,
+        authKey: true,
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+            luxorSubaccountName: true,
+            miners: {
+              where: { isDeleted: false },
+              select: { id: true },
+            },
+          },
+        },
+      },
+    });
+
+    const availableSubaccounts = allPoolAuths
+      .filter((pa) => !groupedPoolAuthIds.has(pa.id))
+      .map((pa) => ({
+        id: pa.id,
+        poolAuthId: pa.id,
+        subaccountName: pa.authKey,
         addedAt: new Date().toISOString(),
         user: {
-          id: user.id,
-          name: user.name || "Unknown",
-          email: user.email || "unknown@example.com",
-          role: user.role,
-          luxorSubaccountName: user.luxorSubaccountName || "",
+          id: pa.user.id,
+          name: pa.user.name || "Unknown",
+          email: pa.user.email || "unknown@example.com",
+          role: pa.user.role,
+          luxorSubaccountName: pa.user.luxorSubaccountName || "",
         },
-        minerCount: user.miners.length,
+        minerCount: pa.user.miners.length,
       }));
 
     console.log("[Groups API] GET[id] - Retrieved group:", id);

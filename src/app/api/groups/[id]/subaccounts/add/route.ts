@@ -1,28 +1,60 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { verifyJwtToken } from "@/lib/jwt";
 
 /**
  * POST /api/groups/[id]/subaccounts/add
- * Add a subaccount to a group
+ * Add a client's pool credential (PoolAuth) to a group. Admin/Super Admin only.
  */
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const { id: groupId } = await params;
-    const { subaccountName } = await request.json();
-
-    if (!subaccountName?.trim()) {
+    const token = request.cookies.get("token")?.value;
+    if (!token) {
       return NextResponse.json(
-        { success: false, error: "Subaccount name is required" },
+        { success: false, error: "Unauthorized" },
+        { status: 401 },
+      );
+    }
+
+    let authenticatedUserId: string;
+    let role: string;
+    try {
+      const decoded = await verifyJwtToken(token);
+      authenticatedUserId = decoded.userId;
+      role = decoded.role;
+    } catch {
+      return NextResponse.json(
+        { success: false, error: "Invalid token" },
+        { status: 401 },
+      );
+    }
+
+    if (role !== "ADMIN" && role !== "SUPER_ADMIN") {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Forbidden: Only Admin/Super Admin can manage groups",
+        },
+        { status: 403 },
+      );
+    }
+
+    const { id: groupId } = await params;
+    const { poolAuthId } = await request.json();
+
+    if (!poolAuthId?.trim()) {
+      return NextResponse.json(
+        { success: false, error: "poolAuthId is required" },
         { status: 400 },
       );
     }
 
     console.log(
-      "[Groups API] Adding subaccount",
-      subaccountName,
+      "[Groups API] Adding poolAuthId",
+      poolAuthId,
       "to group",
       groupId,
     );
@@ -36,9 +68,21 @@ export async function POST(
       );
     }
 
-    // Check if subaccount already exists in any group
-    const existingSubaccount = await prisma.groupSubaccount.findUnique({
-      where: { subaccountName },
+    const poolAuth = await prisma.poolAuth.findUnique({
+      where: { id: poolAuthId },
+      select: { id: true, authKey: true },
+    });
+
+    if (!poolAuth) {
+      return NextResponse.json(
+        { success: false, error: "Pool credential not found" },
+        { status: 404 },
+      );
+    }
+
+    // Check if this credential already belongs to any group
+    const existingSubaccount = await prisma.groupSubaccount.findFirst({
+      where: { poolAuthId },
     });
 
     if (existingSubaccount) {
@@ -46,7 +90,7 @@ export async function POST(
         {
           success: false,
           error:
-            "Subaccount already belongs to another group. Remove it from the other group first.",
+            "This credential already belongs to another group. Remove it from the other group first.",
         },
         { status: 409 },
       );
@@ -56,8 +100,10 @@ export async function POST(
     const groupSubaccount = await prisma.groupSubaccount.create({
       data: {
         groupId,
-        subaccountName,
-        addedBy: "system", // TODO: Get from auth context
+        subaccountName: poolAuth.authKey,
+        poolAuthId: poolAuth.id,
+        addedBy: authenticatedUserId,
+        addedByUserId: authenticatedUserId,
       },
     });
 

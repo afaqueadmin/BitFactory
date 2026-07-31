@@ -215,7 +215,10 @@ export async function POST(request: NextRequest) {
     }
 
     // For CLIENT role, assign the selected Luxor subaccount
-    // (subaccount already exists in Luxor, we're just assigning it to this user)
+    // (subaccount already exists in Luxor, we're just assigning it to this user).
+    // Dual-write: User.luxorSubaccountName (legacy, still read by ~20 other
+    // files) and PoolAuth (new source of truth) are kept in sync.
+    let luxorPoolAuthId: string | null = null;
     if (role === "CLIENT" && luxorSubaccountName) {
       try {
         await prisma.user.update({
@@ -225,6 +228,26 @@ export async function POST(request: NextRequest) {
         console.log(
           `[User Create API] Assigned luxorSubaccountName "${luxorSubaccountName}" to user ${newUser.id}`,
         );
+
+        const luxorPool = await prisma.pool.findUnique({
+          where: { name: "Luxor" },
+          select: { id: true },
+        });
+        if (luxorPool) {
+          const poolAuth = await prisma.poolAuth.upsert({
+            where: {
+              poolId_userId: { poolId: luxorPool.id, userId: newUser.id },
+            },
+            create: {
+              poolId: luxorPool.id,
+              userId: newUser.id,
+              authKey: luxorSubaccountName.trim(),
+            },
+            update: { authKey: luxorSubaccountName.trim() },
+            select: { id: true },
+          });
+          luxorPoolAuthId = poolAuth.id;
+        }
       } catch (updateError) {
         console.error(
           "[User Create API] Failed to update user with subaccount name:",
@@ -234,14 +257,17 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // If groupId provided, create GroupSubaccount entry to link subaccount to group
-    if (role === "CLIENT" && groupId && luxorSubaccountName) {
+    // If groupId provided, create GroupSubaccount entry to link the Luxor
+    // credential to the group
+    if (role === "CLIENT" && groupId && luxorPoolAuthId) {
       try {
         await prisma.groupSubaccount.create({
           data: {
             groupId: groupId,
             subaccountName: luxorSubaccountName.trim(),
+            poolAuthId: luxorPoolAuthId,
             addedBy: userId, // Admin who added the user
+            addedByUserId: userId,
           },
         });
         console.log(

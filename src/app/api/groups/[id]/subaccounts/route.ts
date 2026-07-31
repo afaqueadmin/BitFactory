@@ -18,45 +18,47 @@ export async function GET(
       where: { groupId },
       include: {
         group: true,
+        poolAuth: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                role: true,
+                luxorSubaccountName: true,
+                miners: {
+                  where: { isDeleted: false },
+                  select: { id: true },
+                },
+              },
+            },
+          },
+        },
       },
     });
 
-    // Get user details for each subaccount
-    const subaccountsWithDetails = await Promise.all(
-      groupSubaccounts.map(async (sa) => {
-        const user = await prisma.user.findFirst({
-          where: { luxorSubaccountName: sa.subaccountName },
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            role: true,
-            luxorSubaccountName: true,
-            miners: {
-              where: { isDeleted: false },
-              select: { id: true },
-            },
-          },
-        });
+    const subaccountsWithDetails = groupSubaccounts.map((sa) => {
+      const user = sa.poolAuth?.user;
 
-        return {
-          id: sa.id,
-          subaccountName: sa.subaccountName,
-          addedAt: sa.addedAt,
-          addedBy: sa.addedBy,
-          user: user
-            ? {
-                id: user.id,
-                name: user.name,
-                email: user.email,
-                role: user.role,
-                luxorSubaccountName: user.luxorSubaccountName,
-                minerCount: user.miners.length,
-              }
-            : null,
-        };
-      }),
-    );
+      return {
+        id: sa.id,
+        subaccountName: sa.subaccountName,
+        poolAuthId: sa.poolAuthId || undefined,
+        addedAt: sa.addedAt,
+        addedBy: sa.addedBy,
+        user: user
+          ? {
+              id: user.id,
+              name: user.name,
+              email: user.email,
+              role: user.role,
+              luxorSubaccountName: user.luxorSubaccountName,
+              minerCount: user.miners.length,
+            }
+          : null,
+      };
+    });
 
     return NextResponse.json({
       success: true,

@@ -109,6 +109,7 @@ interface GroupFormData {
 interface Subaccount {
   id: string;
   subaccountName: string;
+  poolAuthId?: string;
   user: {
     id: string;
     name: string;
@@ -594,16 +595,18 @@ export default function GroupsPage() {
       const selectedSubaccounts = dialog.availableSubaccounts.filter((s) =>
         dialog.selectedSubaccountIds.has(s.id),
       );
-      const subaccountNames = selectedSubaccounts.map((s) => s.subaccountName);
+      const poolAuthIds = selectedSubaccounts
+        .map((s) => s.poolAuthId)
+        .filter((id): id is string => !!id);
 
-      console.log("[Groups] Adding subaccounts:", subaccountNames);
+      console.log("[Groups] Adding subaccounts (poolAuthIds):", poolAuthIds);
 
       const response = await fetch(
         `/api/groups/${dialog.selectedGroup.id}/subaccounts/bulk-add`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ subaccountNames }),
+          body: JSON.stringify({ poolAuthIds }),
         },
       );
 

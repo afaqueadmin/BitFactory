@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { generateInvoicePDF, sendInvoiceEmailWithPDF } from "@/lib/email";
-import { getGroupBySubaccountName } from "@/lib/groupUtils";
+import { getGroupByUserId } from "@/lib/groupUtils";
 import { ConfirmoPaymentService } from "./confirmoPaymentService";
 import { AuditAction } from "@prisma/client";
 
@@ -15,6 +15,7 @@ export interface InvoiceEmailPayload {
   totalMiners: number;
   unitPrice: number;
   luxorSubaccountName?: string | null;
+  customerId?: string | null;
   hardwareModel?: string | null;
   billingMonth?: Date | null;
   invoiceStatus?: string | null;
@@ -45,15 +46,13 @@ export class InvoiceEmailService {
    * Build CC list for invoice email
    * Includes: Relationship Manager (if any) + invoices@bitfactory.ae
    */
-  static async buildCCList(
-    luxorSubaccountName?: string | null,
-  ): Promise<string[]> {
+  static async buildCCList(userId?: string | null): Promise<string[]> {
     const ccEmails: string[] = [];
 
     // Fetch group/RM if available
-    if (luxorSubaccountName) {
+    if (userId) {
       try {
-        const group = await getGroupBySubaccountName(luxorSubaccountName);
+        const group = await getGroupByUserId(userId);
         if (group?.email && !ccEmails.includes(group.email)) {
           ccEmails.push(group.email);
         }
@@ -296,7 +295,7 @@ export class InvoiceEmailService {
       try {
         // Build CC list & get crypto payment simultaneously
         const [ccEmails, cryptoPaymentUrl] = await Promise.all([
-          this.buildCCList(invoice.luxorSubaccountName),
+          this.buildCCList(invoice.customerId),
           this.getCryptoPaymentUrl(invoice.invoiceId, userId),
         ]);
 
