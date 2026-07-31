@@ -455,6 +455,27 @@ export async function PUT(
         });
       }
 
+      // Handle pool reassignment (poolId change)
+      if (
+        Object.prototype.hasOwnProperty.call(updateData, "poolId") &&
+        updateData.poolId &&
+        updateData.poolId !== existingMiner.poolId
+      ) {
+        // Get authenticated user ID from token
+        const token = request.cookies.get("token")?.value;
+        const decoded = await verifyJwtToken(token!);
+        const authenticatedUserId = decoded.userId;
+
+        // Create pool history entry for the new assignment
+        await tx.minerPoolHistory.create({
+          data: {
+            minerId: id,
+            poolId: updateData.poolId,
+            createdById: authenticatedUserId,
+          },
+        });
+      }
+
       // Update the miner
       return await tx.miner.update({
         where: { id },

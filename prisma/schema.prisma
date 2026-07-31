@@ -65,6 +65,7 @@ model User {
   webauthnCredentials        WebAuthnCredential[]
   invoicedAmount             Decimal                      @db.Decimal(12, 2)
   createdRepairNotes         MinerRepairNote[]            @relation("CreatedRepairNotes")
+  createdMinerPoolHistory    MinerPoolHistory[]           @relation("MinerPoolHistoryCreatedBy")
 
   @@index([isDeleted])
   @@index([franchiseeId])
@@ -236,6 +237,7 @@ model Miner {
   macAddress       String?
   ownershipHistory MinerOwnershipHistory[]
   rateHistory      MinerRateHistory[]
+  poolHistory      MinerPoolHistory[]
   hardware         Hardware                @relation(fields: [hardwareId], references: [id])
   space            Space                   @relation(fields: [spaceId], references: [id])
   user             User                    @relation(fields: [userId], references: [id])
@@ -283,8 +285,9 @@ model Pool {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  miners    Miner[]
-  poolAuths PoolAuth[]
+  miners      Miner[]
+  poolAuths   PoolAuth[]
+  poolHistory MinerPoolHistory[]
 
   @@map("pools")
 }
@@ -340,6 +343,23 @@ model MinerOwnershipHistory {
   @@index([ownerId])
   @@index([createdById])
   @@map("miner_ownership_history")
+}
+
+model MinerPoolHistory {
+  id          String   @id @default(cuid())
+  minerId     String
+  poolId      String
+  createdById String
+  createdAt   DateTime @default(now())
+
+  miner     Miner @relation(fields: [minerId], references: [id], onDelete: Cascade)
+  pool      Pool  @relation(fields: [poolId], references: [id], onDelete: Cascade)
+  createdBy User  @relation("MinerPoolHistoryCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@index([minerId])
+  @@index([poolId])
+  @@index([createdById])
+  @@map("miner_pool_history")
 }
 
 model HardwareProcurementHistory {

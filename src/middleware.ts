@@ -57,6 +57,7 @@ const securePaths = {
     "/groups",
     "/hardware",
     "/machine",
+    "/pools",
     "/security-settings",
     "/settings/payment",
     "/space",

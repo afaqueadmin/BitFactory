@@ -20,6 +20,7 @@ import {
   formatHashrate,
 } from "@/lib/workerNormalization";
 import RepairNotesModal from "./admin/RepairNotesModal";
+import MinerPoolHistoryModal from "./admin/MinerPoolHistoryModal";
 
 // Types
 interface Hardware {
@@ -75,8 +76,12 @@ export default function HostedMinersList({
   repairButtonLabel = "🛠️ Previous Repair Notes",
 }: HostedMinersListProps) {
   const theme = useTheme();
+  // Pool history is an admin-only view; this component is also rendered on
+  // the client's own /miners page without a customerId, so gate on that.
+  const isAdminView = !!customerId;
   const [activeFilter, setActiveFilter] = useState<FilterType>("ALL MINERS");
   const [repairNotesOpen, setRepairNotesOpen] = useState(false);
+  const [poolHistoryOpen, setPoolHistoryOpen] = useState(false);
   const [selectedMinerId, setSelectedMinerId] = useState<string | null>(null);
   const [selectedMinerName, setSelectedMinerName] = useState("");
 
@@ -84,6 +89,12 @@ export default function HostedMinersList({
     setSelectedMinerId(id);
     setSelectedMinerName(name);
     setRepairNotesOpen(true);
+  };
+
+  const handleOpenPoolHistory = (id: string, name: string) => {
+    setSelectedMinerId(id);
+    setSelectedMinerName(name);
+    setPoolHistoryOpen(true);
   };
 
   // TanStack Query hook to fetch and transform miners
@@ -811,20 +822,44 @@ export default function HostedMinersList({
                       >
                         Action
                       </Typography>
-                      <Button
-                        variant="outlined"
-                        size="small"
-                        onClick={() =>
-                          handleOpenNotes(miner.id, miner.workerName)
-                        }
+                      <Box
                         sx={{
-                          textTransform: "none",
-                          borderRadius: 2,
-                          fontSize: { xs: "0.7rem", sm: "0.8rem" },
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 1,
                         }}
                       >
-                        {repairButtonLabel}
-                      </Button>
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          onClick={() =>
+                            handleOpenNotes(miner.id, miner.workerName)
+                          }
+                          sx={{
+                            textTransform: "none",
+                            borderRadius: 2,
+                            fontSize: { xs: "0.7rem", sm: "0.8rem" },
+                          }}
+                        >
+                          {repairButtonLabel}
+                        </Button>
+                        {isAdminView && (
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            onClick={() =>
+                              handleOpenPoolHistory(miner.id, miner.workerName)
+                            }
+                            sx={{
+                              textTransform: "none",
+                              borderRadius: 2,
+                              fontSize: { xs: "0.7rem", sm: "0.8rem" },
+                            }}
+                          >
+                            Pool History
+                          </Button>
+                        )}
+                      </Box>
                     </Box>
                   </Box>
                 </Box>
@@ -840,6 +875,13 @@ export default function HostedMinersList({
         minerId={selectedMinerId}
         minerName={selectedMinerName}
         readonly={true}
+      />
+
+      <MinerPoolHistoryModal
+        open={poolHistoryOpen}
+        onClose={() => setPoolHistoryOpen(false)}
+        minerId={selectedMinerId}
+        minerName={selectedMinerName}
       />
     </Box>
   );

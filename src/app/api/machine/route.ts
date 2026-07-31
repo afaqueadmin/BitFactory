@@ -569,6 +569,17 @@ export async function POST(
         },
       });
 
+      // Create miner pool history entry
+      if (poolId) {
+        await tx.minerPoolHistory.create({
+          data: {
+            minerId: newMiner.id,
+            poolId,
+            createdById: authenticatedUserId,
+          },
+        });
+      }
+
       // Reduce hardware quantity
       await tx.hardware.update({
         where: { id: hardwareId },

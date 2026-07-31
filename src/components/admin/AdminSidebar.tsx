@@ -116,6 +116,12 @@ const sidebarItems: SidebarItem[] = [
   },
 
   {
+    title: "Pools",
+    icon: <PoolsIcon />,
+    path: "/pools",
+  },
+
+  {
     title: "All Miners",
     icon: <MinersIcon />,
     path: "/machine",
