@@ -84,6 +84,9 @@ export async function GET(request: NextRequest) {
         franchiseeId: true,
         segment: true,
         miners: {
+          where: {
+            isDeleted: false,
+          },
           select: {
             id: true,
           },
