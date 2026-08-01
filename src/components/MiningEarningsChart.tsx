@@ -30,6 +30,7 @@ interface DailyPerformanceData {
   breakdown?: {
     luxor: number;
     braiins: number;
+    luxorRebate: number;
   };
 }
 
@@ -58,16 +59,20 @@ export default function MiningEarningsChart({
     let values: number[] = [];
 
     if (viewMode === "sideBySide") {
-      // In side-by-side mode, use both luxor and braiins values
+      // In side-by-side mode, use both luxor (incl. rebate stack) and braiins values
       values = miningData
         .flatMap((item) => [
-          item.breakdown?.luxor || 0,
+          (item.breakdown?.luxor || 0) + (item.breakdown?.luxorRebate || 0),
           item.breakdown?.braiins || 0,
         ])
         .filter((value) => Number.isFinite(value));
     } else if (viewMode === "luxor") {
+      // Luxor bar is stacked with its rebate segment on top
       values = miningData
-        .map((item) => item.breakdown?.luxor || 0)
+        .map(
+          (item) =>
+            (item.breakdown?.luxor || 0) + (item.breakdown?.luxorRebate || 0),
+        )
         .filter((value) => Number.isFinite(value));
     } else if (viewMode === "braiins") {
       values = miningData
@@ -300,67 +305,118 @@ export default function MiningEarningsChart({
               />
 
               <Tooltip
-                formatter={(
-                  value: any, // eslint-disable-line @typescript-eslint/no-explicit-any
-                  name?: any, // eslint-disable-line @typescript-eslint/no-explicit-any
-                ) => {
-                  if (value == null || !name) {
-                    return ["", ""];
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                content={({ active, payload, label }: any) => {
+                  if (!active || !payload || !payload.length) {
+                    return null;
                   }
-                  const num = Number(value);
-                  if (name === "earnings" || name === "Daily Revenue (Luxor)") {
-                    const btcValue = num.toFixed(8);
-                    return [`₿${btcValue}`, "Daily Revenue"];
+
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  const entries = payload.filter((entry: any) => {
+                    if (entry.name === "LuxOS Rebate") {
+                      return Number(entry.value) > 0;
+                    }
+                    return entry.value != null;
+                  });
+
+                  if (!entries.length) {
+                    return null;
                   }
-                  return [
-                    `${num.toFixed(8)}`,
-                    name === "costs" ? "Costs" : name,
-                  ];
-                }}
-                labelFormatter={(value) => {
+
+                  let dateLabel = String(label);
                   try {
-                    const date = new Date(value);
-                    return date.toLocaleDateString("en-US", {
+                    dateLabel = new Date(label).toLocaleDateString("en-US", {
                       weekday: "short",
                       year: "numeric",
                       month: "short",
                       day: "numeric",
                     });
                   } catch {
-                    return String(value);
+                    // keep raw label
                   }
-                }}
-                contentStyle={{
-                  backgroundColor: theme.palette.background.paper,
-                  border: `1px solid ${theme.palette.divider}`,
-                  borderRadius: "8px",
-                  boxShadow: theme.shadows[4],
+
+                  return (
+                    <Box
+                      sx={{
+                        backgroundColor: theme.palette.background.paper,
+                        border: `1px solid ${theme.palette.divider}`,
+                        borderRadius: "8px",
+                        boxShadow: theme.shadows[4],
+                        px: 1.5,
+                        py: 1,
+                      }}
+                    >
+                      <Typography
+                        variant="body2"
+                        sx={{ fontWeight: 600, mb: 0.5 }}
+                      >
+                        {dateLabel}
+                      </Typography>
+                      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                      {entries.map((entry: any) => (
+                        <Typography
+                          key={entry.name}
+                          variant="body2"
+                          sx={{ color: entry.color }}
+                        >
+                          {entry.name}: ₿{Number(entry.value).toFixed(8)}
+                        </Typography>
+                      ))}
+                    </Box>
+                  );
                 }}
                 cursor={{ fill: "rgba(0,198,255,0.1)" }}
               />
 
               <Legend />
 
-              {/* Total earnings view - default */}
+              {/* Total earnings view - default. Revenue and LuxOS Rebate
+                  are stacked into a single bar per day. */}
               {viewMode === "total" && (
-                <Bar
-                  dataKey="earnings"
-                  name="Daily Revenue"
-                  barSize={18}
-                  radius={[6, 6, 0, 0]}
-                  fill="url(#earningsGradient)"
-                />
+                <>
+                  <Bar
+                    dataKey={(entry: DailyPerformanceData) =>
+                      entry.breakdown
+                        ? entry.breakdown.luxor + entry.breakdown.braiins
+                        : entry.earnings
+                    }
+                    name="Daily Revenue"
+                    stackId="revenue"
+                    barSize={18}
+                    radius={[0, 0, 6, 6]}
+                    fill="url(#earningsGradient)"
+                  />
+                  <Bar
+                    dataKey="breakdown.luxorRebate"
+                    name="LuxOS Rebate"
+                    stackId="revenue"
+                    barSize={18}
+                    radius={[6, 6, 0, 0]}
+                    fill={theme.palette.error.main}
+                  />
+                </>
               )}
 
-              {/* Luxor only view */}
+              {/* Luxor only view - revenue with rebate stacked on top */}
               {viewMode === "luxor" && (
-                <Bar
-                  dataKey="breakdown.luxor"
-                  name="Luxor Revenue"
-                  barSize={18}
-                  radius={[6, 6, 0, 0]}
-                  fill="#1565C0"
-                />
+                <>
+                  <Bar
+                    dataKey="breakdown.luxor"
+                    name="Luxor Revenue"
+                    stackId="luxor"
+                    barSize={18}
+                    radius={[0, 0, 6, 6]}
+                    fill="#1565C0"
+                  />
+                  <Bar
+                    dataKey="breakdown.luxorRebate"
+                    name="LuxOS Rebate"
+                    stackId="luxor"
+                    barSize={18}
+                    radius={[6, 6, 0, 0]}
+                    fill={theme.palette.error.main}
+                  />
+                </>
               )}
 
               {/* Braiins only view */}
@@ -374,14 +430,22 @@ export default function MiningEarningsChart({
                 />
               )}
 
-              {/* Side-by-side view - both pools */}
+              {/* Side-by-side view - Luxor (with rebate stacked on top) next to Braiins */}
               {viewMode === "sideBySide" && (
                 <>
                   <Bar
                     dataKey="breakdown.luxor"
                     name="Luxor"
-                    radius={[6, 6, 0, 0]}
+                    stackId="luxor"
+                    radius={[0, 0, 6, 6]}
                     fill="#1565C0"
+                  />
+                  <Bar
+                    dataKey="breakdown.luxorRebate"
+                    name="LuxOS Rebate"
+                    stackId="luxor"
+                    radius={[6, 6, 0, 0]}
+                    fill={theme.palette.error.main}
                   />
                   <Bar
                     dataKey="breakdown.braiins"

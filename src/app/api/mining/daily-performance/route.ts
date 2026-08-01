@@ -17,6 +17,7 @@ interface DailyPerformanceData {
   breakdown?: {
     luxor: number;
     braiins: number;
+    luxorRebate: number;
   };
 }
 
@@ -86,7 +87,7 @@ export async function GET(request: NextRequest) {
             averageDailyEarnings: 0,
             currency: "BTC",
             dataSource: "none",
-            poolBreakdown: { luxor: 0, braiins: 0 },
+            poolBreakdown: { luxor: 0, braiins: 0, luxorRebate: 0 },
           },
           timestamp: new Date().toISOString(),
         },
@@ -122,8 +123,10 @@ export async function GET(request: NextRequest) {
     );
 
     // Map to store daily performance data by date
-    const performanceByDate: Map<string, { luxor: number; braiins: number }> =
-      new Map();
+    const performanceByDate: Map<
+      string,
+      { luxor: number; braiins: number; luxorRebate: number }
+    > = new Map();
 
     // Fetch from Luxor
     if (luxorAuth) {
@@ -150,16 +153,27 @@ export async function GET(request: NextRequest) {
               if (!dateStr) continue;
 
               let btcRevenue = 0;
+              let revenueType = "";
               if (item.revenue && typeof item.revenue === "object") {
                 const revenueObj = item.revenue as Record<string, unknown>;
                 btcRevenue = Number(revenueObj.revenue || 0) || 0;
+                revenueType = String(revenueObj.revenue_type || "");
               }
 
               if (!performanceByDate.has(dateStr)) {
-                performanceByDate.set(dateStr, { luxor: 0, braiins: 0 });
+                performanceByDate.set(dateStr, {
+                  luxor: 0,
+                  braiins: 0,
+                  luxorRebate: 0,
+                });
               }
               const dayData = performanceByDate.get(dateStr)!;
-              dayData.luxor += btcRevenue;
+              if (revenueType === "LUXOS_REBATE") {
+                dayData.luxorRebate += btcRevenue;
+              } else {
+                // MINING and REFERRAL are combined into base revenue
+                dayData.luxor += btcRevenue;
+              }
             }
           }
         }
@@ -195,7 +209,11 @@ export async function GET(request: NextRequest) {
             const amount = parseFloat(reward.total_reward) || 0;
 
             if (!performanceByDate.has(dateStr)) {
-              performanceByDate.set(dateStr, { luxor: 0, braiins: 0 });
+              performanceByDate.set(dateStr, {
+                luxor: 0,
+                braiins: 0,
+                luxorRebate: 0,
+              });
             }
             const dayData = performanceByDate.get(dateStr)!;
             dayData.braiins += amount;
@@ -215,12 +233,13 @@ export async function GET(request: NextRequest) {
     )
       .map(([date, data]) => ({
         date,
-        earnings: data.luxor + data.braiins,
+        earnings: data.luxor + data.braiins + data.luxorRebate,
         costs: 0,
         hashRate: 0,
         breakdown: {
           luxor: parseFloat(data.luxor.toFixed(8)),
           braiins: parseFloat(data.braiins.toFixed(8)),
+          luxorRebate: parseFloat(data.luxorRebate.toFixed(8)),
         },
       }))
       .sort((a, b) => a.date.localeCompare(b.date));
@@ -236,6 +255,10 @@ export async function GET(request: NextRequest) {
     );
     const totalBraiinsEarnings = performanceData.reduce(
       (sum, d) => sum + (d.breakdown?.braiins || 0),
+      0,
+    );
+    const totalLuxorRebate = performanceData.reduce(
+      (sum, d) => sum + (d.breakdown?.luxorRebate || 0),
       0,
     );
     const avgEarnings =
@@ -258,6 +281,7 @@ export async function GET(request: NextRequest) {
           poolBreakdown: {
             luxor: parseFloat(totalLuxorEarnings.toFixed(8)),
             braiins: parseFloat(totalBraiinsEarnings.toFixed(8)),
+            luxorRebate: parseFloat(totalLuxorRebate.toFixed(8)),
           },
         },
         timestamp: new Date().toISOString(),
