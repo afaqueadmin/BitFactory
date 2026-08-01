@@ -659,7 +659,7 @@ export default function PoolsPage() {
                     >
                       {clientsWithoutCredential.map((c) => (
                         <MenuItem key={c.id} value={c.id}>
-                          {c.name || "Unnamed"} ({c.email})
+                          {c.name || "Unnamed"} ({c.email}), {c.role}
                         </MenuItem>
                       ))}
                     </Select>

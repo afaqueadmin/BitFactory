@@ -54,6 +54,7 @@ import {
 import AdminValueCard from "@/components/admin/AdminValueCard";
 import CreateUserModal from "@/components/CreateUserModal";
 import EditCustomerModal from "@/components/EditCustomerModal";
+import EditFranchiseeModal from "@/components/EditFranchiseeModal";
 import ChangePasswordModal from "@/components/ChangePasswordModal";
 import AddPaymentModal from "@/components/AddPaymentModal";
 
@@ -91,6 +92,28 @@ interface FilterColumns {
   balance: string;
 }
 
+// Shape expected by EditFranchiseeModal — keyed on the Franchise record
+// itself, not the User row, so a FRANCHISEE row's own Franchise must be
+// looked up before this modal can be opened.
+interface FranchiseData {
+  id: string;
+  businessName: string;
+  authorizedPersonName: string;
+  email: string;
+  phoneNumber: string;
+  address: string;
+  city: string;
+  state: string;
+  postalCode: string;
+  isActive: boolean;
+  franchisee: {
+    id: string;
+    name: string;
+    email: string;
+    luxorSubaccountName: string | null;
+  };
+}
+
 // Create a Grid component that includes the 'item' prop
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const Grid = MuiGrid as React.ComponentType<any>;
@@ -99,6 +122,10 @@ export default function CustomerOverviewContent() {
   const router = useRouter();
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editFranchiseeModalOpen, setEditFranchiseeModalOpen] = useState(false);
+  const [editFranchiseeData, setEditFranchiseeData] =
+    useState<FranchiseData | null>(null);
+  const [franchiseeLookupError, setFranchiseeLookupError] = useState("");
   const [changePasswordModalOpen, setChangePasswordModalOpen] = useState(false);
   const [addPaymentModalOpen, setAddPaymentModalOpen] = useState(false);
   const [showDeleted, setShowDeleted] = useState(false);
@@ -183,16 +210,20 @@ export default function CustomerOverviewContent() {
 
     let filteredUsers = usersData.users;
 
-    // ADMIN can only see CLIENT users
+    // ADMIN can see CLIENT and FRANCHISEE users
     if (currentUserRole === "ADMIN") {
       filteredUsers = usersData.users.filter(
-        (user: FetchedUser) => user.role === "CLIENT",
+        (user: FetchedUser) =>
+          user.role === "CLIENT" || user.role === "FRANCHISEE",
       );
     }
-    // SUPER_ADMIN can see both CLIENT and ADMIN users
+    // SUPER_ADMIN can see CLIENT, ADMIN, and FRANCHISEE users
     else if (currentUserRole === "SUPER_ADMIN") {
       filteredUsers = usersData.users.filter(
-        (user: FetchedUser) => user.role === "CLIENT" || user.role === "ADMIN",
+        (user: FetchedUser) =>
+          user.role === "CLIENT" ||
+          user.role === "ADMIN" ||
+          user.role === "FRANCHISEE",
       );
     }
 
@@ -345,10 +376,49 @@ export default function CustomerOverviewContent() {
     // setSelectedCustomer(null);
   };
 
-  const handleEditCustomer = () => {
-    if (selectedCustomer) {
-      setEditModalOpen(true);
+  const handleEditCustomer = async () => {
+    if (!selectedCustomer) {
+      handleMenuClose();
+      return;
     }
+
+    if (selectedCustomer.role === "FRANCHISEE") {
+      handleMenuClose();
+      setFranchiseeLookupError("");
+      try {
+        const response = await fetch("/api/franchisees");
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+          throw new Error(data.error || "Failed to load franchise details");
+        }
+
+        const franchises: FranchiseData[] = Array.isArray(data.data)
+          ? data.data
+          : [];
+        const match = franchises.find(
+          (f) => f.franchisee.id === selectedCustomer.id,
+        );
+
+        if (!match) {
+          throw new Error(
+            "Could not find a franchise record for this franchisee",
+          );
+        }
+
+        setEditFranchiseeData(match);
+        setEditFranchiseeModalOpen(true);
+      } catch (err) {
+        setFranchiseeLookupError(
+          err instanceof Error
+            ? err.message
+            : "Failed to load franchise details",
+        );
+      }
+      return;
+    }
+
+    setEditModalOpen(true);
     handleMenuClose();
   };
 
@@ -418,6 +488,12 @@ export default function CustomerOverviewContent() {
     setSelectedCustomer(null);
   };
 
+  const handleFranchiseeModalClose = () => {
+    setEditFranchiseeModalOpen(false);
+    setEditFranchiseeData(null);
+    setSelectedCustomer(null);
+  };
+
   return (
     <Box sx={{ p: 3 }}>
       {/* Page Title with Create Button */}
@@ -479,6 +555,27 @@ export default function CustomerOverviewContent() {
           initialData={selectedCustomer}
         />
       )}
+
+      {/* Edit Franchisee Modal - used instead of EditCustomerModal when the
+          selected row is a FRANCHISEE, since the underlying data shape
+          (Franchise record, not just a User row) differs. */}
+      <EditFranchiseeModal
+        open={editFranchiseeModalOpen}
+        onClose={handleFranchiseeModalClose}
+        onSuccess={handleUserCreated}
+        franchise={editFranchiseeData}
+      />
+
+      <Snackbar
+        open={Boolean(franchiseeLookupError)}
+        autoHideDuration={5000}
+        onClose={() => setFranchiseeLookupError("")}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert onClose={() => setFranchiseeLookupError("")} severity="error">
+          {franchiseeLookupError}
+        </Alert>
+      </Snackbar>
 
       {/* Change Password Modal */}
       {selectedCustomer && (
