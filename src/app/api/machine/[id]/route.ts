@@ -488,6 +488,10 @@ export async function PUT(
               email: true,
               luxorSubaccountName: true,
               segment: true,
+              poolAuths: {
+                where: { pool: { name: "Luxor" } },
+                select: { authKey: true },
+              },
             },
           },
           space: {
@@ -511,10 +515,22 @@ export async function PUT(
 
     console.log(`[Miners API] PUT: Successfully updated miner ${id}`);
 
+    // Resolve the customer's Luxor subaccount from PoolAuth (falling back to
+    // the legacy field) so the response shape stays unchanged for consumers.
+    const { poolAuths, ...updatedMinerUser } = updatedMiner.user;
+    const transformedMiner = {
+      ...updatedMiner,
+      user: {
+        ...updatedMinerUser,
+        luxorSubaccountName:
+          poolAuths[0]?.authKey || updatedMiner.user.luxorSubaccountName,
+      },
+    };
+
     return NextResponse.json<ApiResponse>(
       {
         success: true,
-        data: updatedMiner,
+        data: transformedMiner,
         timestamp: new Date().toISOString(),
       },
       { status: 200 },

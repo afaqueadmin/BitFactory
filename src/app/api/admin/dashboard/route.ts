@@ -175,9 +175,22 @@ async function getAllSubaccountNames(
         },
       });
 
-      const dbSubaccountNames = usersWithSubaccounts
-        .map((u) => u.luxorSubaccountName)
-        .filter((name): name is string => name !== null);
+      const usersWithLuxorPoolAuth = await prisma.poolAuth.findMany({
+        where: {
+          pool: { name: "Luxor" },
+          user: { ...franchiseeUserFilter(currentUser) },
+        },
+        select: { authKey: true },
+      });
+
+      const dbSubaccountNames = Array.from(
+        new Set([
+          ...usersWithSubaccounts
+            .map((u) => u.luxorSubaccountName)
+            .filter((name): name is string => name !== null),
+          ...usersWithLuxorPoolAuth.map((pa) => pa.authKey),
+        ]),
+      );
 
       console.log(
         `[Admin Dashboard] Fallback: Found ${dbSubaccountNames.length} subaccounts in database:`,
@@ -944,6 +957,7 @@ export async function GET(request: NextRequest) {
             contains: "_test",
           },
         },
+        poolAuths: { none: { authKey: { contains: "_test" } } },
         ...franchiseeUserFilter(user),
       },
       include: {
@@ -1060,7 +1074,11 @@ export async function GET(request: NextRequest) {
     let selfMiningHostingCost = 0;
     let selfMiningProfitUsd = 0;
     try {
-      const [selfMiningLuxorUsers, selfMiningBraiinsAuths] = await Promise.all([
+      const [
+        selfMiningLuxorUsers,
+        selfMiningLuxorAuths,
+        selfMiningBraiinsAuths,
+      ] = await Promise.all([
         prisma.user.findMany({
           where: {
             segment: "SELF_MINING",
@@ -1071,6 +1089,13 @@ export async function GET(request: NextRequest) {
         }),
         prisma.poolAuth.findMany({
           where: {
+            pool: { name: "Luxor" },
+            user: { segment: "SELF_MINING", isDeleted: false },
+          },
+          select: { authKey: true },
+        }),
+        prisma.poolAuth.findMany({
+          where: {
             pool: { name: "Braiins" },
             user: { segment: "SELF_MINING", isDeleted: false },
           },
@@ -1078,9 +1103,14 @@ export async function GET(request: NextRequest) {
         }),
       ]);
 
-      const selfMiningSubaccountNames = selfMiningLuxorUsers
-        .map((u) => u.luxorSubaccountName)
-        .filter((name): name is string => !!name);
+      const selfMiningSubaccountNames = Array.from(
+        new Set([
+          ...selfMiningLuxorUsers
+            .map((u) => u.luxorSubaccountName)
+            .filter((name): name is string => !!name),
+          ...selfMiningLuxorAuths.map((pa) => pa.authKey),
+        ]),
+      );
 
       const [
         selfMiningLuxorRevenueStats,

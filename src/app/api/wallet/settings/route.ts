@@ -150,8 +150,15 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         id: true,
         email: true,
         luxorSubaccountName: true,
+        poolAuths: {
+          where: { pool: { name: "Luxor" } },
+          select: { authKey: true },
+        },
       },
     });
+
+    const luxorIdentifier =
+      user?.poolAuths[0]?.authKey || user?.luxorSubaccountName;
 
     if (!user) {
       console.error("[Wallet API] User not found:", userId);
@@ -172,7 +179,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     }
 
     // 4. Check if user has Luxor subaccount configured
-    if (!user.luxorSubaccountName) {
+    if (!luxorIdentifier) {
       console.warn(
         "[Wallet API] User has no luxorSubaccountName configured:",
         userId,
@@ -218,13 +225,13 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     // 6. Fetch from Luxor API
     console.log(`[Wallet API] Cache miss, fetching from Luxor for ${cacheKey}`);
-    const luxorClient = createLuxorClient(user.luxorSubaccountName);
+    const luxorClient = createLuxorClient(luxorIdentifier);
 
     let paymentSettings;
     try {
       paymentSettings = await luxorClient.getSubaccountPaymentSettings(
         currency,
-        user.luxorSubaccountName,
+        luxorIdentifier,
       );
       console.log(
         `[Wallet API] Successfully fetched from Luxor (${Date.now() - startTime}ms)`,

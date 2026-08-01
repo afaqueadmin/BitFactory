@@ -34,7 +34,6 @@ interface CustomerDetails {
   country: string;
   phoneNumber: string;
   companyName: string;
-  luxorSubaccountName: string;
   streetAddress: string;
   twoFactorEnabled: boolean;
   joinDate: string;
@@ -141,7 +140,6 @@ export default function CustomerDetailPage() {
           country: user.country || "",
           phoneNumber: user.phoneNumber || "",
           companyName: user.companyName || "",
-          luxorSubaccountName: user.luxorSubaccountName || "",
           streetAddress: user.streetAddress || "",
           twoFactorEnabled: user.twoFactorEnabled || false,
           joinDate: user.joinDate || "",

@@ -72,6 +72,7 @@ export async function POST(request: NextRequest) {
       sendEmail,
       initialDeposit,
       luxorSubaccountName,
+      braiinsAuthKey,
       groupId,
       franchiseeId,
       segment,
@@ -279,6 +280,38 @@ export async function POST(request: NextRequest) {
           groupError,
         );
         // Don't fail user creation if group assignment fails
+      }
+    }
+
+    // For CLIENT role, optionally assign a Braiins credential too
+    if (role === "CLIENT" && braiinsAuthKey && braiinsAuthKey.trim()) {
+      try {
+        const braiinsPool = await prisma.pool.findUnique({
+          where: { name: "Braiins" },
+          select: { id: true },
+        });
+        if (braiinsPool) {
+          await prisma.poolAuth.upsert({
+            where: {
+              poolId_userId: { poolId: braiinsPool.id, userId: newUser.id },
+            },
+            create: {
+              poolId: braiinsPool.id,
+              userId: newUser.id,
+              authKey: braiinsAuthKey.trim(),
+            },
+            update: { authKey: braiinsAuthKey.trim() },
+          });
+          console.log(
+            `[User Create API] Assigned Braiins credential to user ${newUser.id}`,
+          );
+        }
+      } catch (braiinsError) {
+        console.error(
+          "[User Create API] Failed to assign Braiins credential:",
+          braiinsError,
+        );
+        // Don't fail user creation if this fails
       }
     }
 

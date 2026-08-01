@@ -347,10 +347,18 @@ export async function POST(request: NextRequest) {
           : 0;
     }
 
-    // Fetch customer to get luxorSubaccountName
+    // Fetch customer to get their Luxor identifier for the invoice number
+    // prefix. PoolAuth is the source of truth; luxorSubaccountName is a
+    // fallback for any row the dual-write hasn't caught up on.
     const customer = await prisma.user.findUnique({
       where: { id: customerId },
-      select: { luxorSubaccountName: true },
+      select: {
+        luxorSubaccountName: true,
+        poolAuths: {
+          where: { pool: { name: "Luxor" } },
+          select: { authKey: true },
+        },
+      },
     });
 
     if (!customer) {
@@ -360,14 +368,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!customer.luxorSubaccountName) {
+    const luxorIdentifier =
+      customer.poolAuths[0]?.authKey || customer.luxorSubaccountName;
+
+    if (!luxorIdentifier) {
       return NextResponse.json(
         { error: "Customer does not have a Luxor subaccount name" },
         { status: 400 },
       );
     }
 
-    // Generate invoice number: luxorSubaccountName-YYYYMMDD-sequence
+    // Generate invoice number: luxorIdentifier-YYYYMMDD-sequence
     const timestamp = new Date();
     const dateStr = `${timestamp.getFullYear()}${String(timestamp.getMonth() + 1).padStart(2, "0")}${String(timestamp.getDate()).padStart(2, "0")}`;
 
@@ -389,7 +400,7 @@ export async function POST(request: NextRequest) {
         ) || 0
       : 0;
     const sequenceNumber = String(lastSeq + 1).padStart(3, "0");
-    const invoiceNumber = `${customer.luxorSubaccountName}-${dateStr}-${sequenceNumber}`;
+    const invoiceNumber = `${luxorIdentifier}-${dateStr}-${sequenceNumber}`;
 
     const numericUnitPrice = hasLineItems
       ? (computedUnitPrice as number)

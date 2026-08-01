@@ -178,6 +178,10 @@ async function extractUserFromToken(request: NextRequest) {
         id: true,
         luxorSubaccountName: true,
         role: true,
+        poolAuths: {
+          where: { pool: { name: "Luxor" } },
+          select: { authKey: true },
+        },
       },
     });
 
@@ -189,6 +193,7 @@ async function extractUserFromToken(request: NextRequest) {
       userId: decoded.userId,
       role: decoded.role,
       luxorSubaccountName: user.luxorSubaccountName,
+      luxorPoolAuthKey: user.poolAuths[0]?.authKey || null,
     };
   } catch (error) {
     if (error instanceof Error) {
@@ -355,6 +360,7 @@ export async function GET(
       userId: string;
       role: string;
       luxorSubaccountName: string | null;
+      luxorPoolAuthKey: string | null;
     };
     try {
       user = await extractUserFromToken(request);
@@ -408,7 +414,9 @@ export async function GET(
     // ✅ STEP 4: Initialize Luxor client
     let luxorClient;
     try {
-      luxorClient = createLuxorClient(user.luxorSubaccountName || user.userId);
+      luxorClient = createLuxorClient(
+        user.luxorPoolAuthKey || user.luxorSubaccountName || user.userId,
+      );
     } catch (clientError) {
       const errorMsg =
         clientError instanceof Error
@@ -630,10 +638,12 @@ export async function GET(
             );
           }
           console.log(`[Luxor Proxy V2] GET: Getting workers for ${currency}`);
+          const clientLuxorIdentifier =
+            user.luxorPoolAuthKey || user.luxorSubaccountName || undefined;
           data = await luxorClient.getWorkers(currency, {
             subaccount_names:
-              user.role === "CLIENT" && user.luxorSubaccountName
-                ? user.luxorSubaccountName
+              user.role === "CLIENT" && clientLuxorIdentifier
+                ? clientLuxorIdentifier
                 : user.role === "FRANCHISEE"
                   ? (await getFranchiseeSubaccountNames(user.userId)) ||
                     undefined
@@ -837,10 +847,12 @@ export async function GET(
           // NOTE: Luxor API requires exactly ONE of subaccount_names or site_id, not both
           // Prefer subaccount_names if provided, otherwise use site_id
 
+          const summaryLuxorIdentifier =
+            user.luxorPoolAuthKey || user.luxorSubaccountName || undefined;
           data = await luxorClient.getSummary(currency, {
             subaccount_names:
-              user.role === "CLIENT" && user.luxorSubaccountName
-                ? user.luxorSubaccountName
+              user.role === "CLIENT" && summaryLuxorIdentifier
+                ? summaryLuxorIdentifier
                 : undefined,
             // FRANCHISEE intentionally gets the same site-wide summary as
             // ADMIN/SUPER_ADMIN (uptime/hashrate are not per-customer scoped).

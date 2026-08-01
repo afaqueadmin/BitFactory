@@ -233,6 +233,48 @@ export async function PUT(
       }
     }
 
+    // Sync the Braiins credential when the field is explicitly provided:
+    // a non-empty value upserts it, an empty/null value removes it.
+    if (body.braiinsAuthKey !== undefined && currentUser?.role === "CLIENT") {
+      try {
+        const braiinsPool = await prisma.pool.findUnique({
+          where: { name: "Braiins" },
+          select: { id: true },
+        });
+        if (braiinsPool) {
+          if (body.braiinsAuthKey && body.braiinsAuthKey.trim()) {
+            await prisma.poolAuth.upsert({
+              where: {
+                poolId_userId: { poolId: braiinsPool.id, userId: id },
+              },
+              create: {
+                poolId: braiinsPool.id,
+                userId: id,
+                authKey: body.braiinsAuthKey.trim(),
+              },
+              update: { authKey: body.braiinsAuthKey.trim() },
+            });
+            console.log(
+              `[User Update API] Synced Braiins credential for user ${id}`,
+            );
+          } else {
+            await prisma.poolAuth.deleteMany({
+              where: { poolId: braiinsPool.id, userId: id },
+            });
+            console.log(
+              `[User Update API] Removed Braiins credential for user ${id}`,
+            );
+          }
+        }
+      } catch (braiinsError) {
+        console.error(
+          "[User Update API] Failed to sync Braiins credential:",
+          braiinsError,
+        );
+        // Don't fail the user update if this fails
+      }
+    }
+
     return NextResponse.json({
       message: "User updated successfully",
       user: updatedUser,

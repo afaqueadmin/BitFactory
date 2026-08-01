@@ -60,14 +60,24 @@ export async function GET(request: NextRequest) {
     // Note: We need a valid subaccount to authenticate, but we'll query pool-wide data
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { luxorSubaccountName: true, role: true },
+      select: {
+        luxorSubaccountName: true,
+        role: true,
+        poolAuths: {
+          where: { pool: { name: "Luxor" } },
+          select: { authKey: true },
+        },
+      },
     });
+
+    const luxorIdentifier =
+      user?.poolAuths[0]?.authKey || user?.luxorSubaccountName;
 
     let subaccountForAuth: string;
     if (user?.role === "ADMIN") {
       subaccountForAuth = "higgs"; // Use main/admin subaccount for auth
-    } else if (user?.luxorSubaccountName) {
-      subaccountForAuth = user.luxorSubaccountName;
+    } else if (luxorIdentifier) {
+      subaccountForAuth = luxorIdentifier;
     } else {
       // Fallback to 'higgs' if user has no subaccount configured
       subaccountForAuth = "higgs";

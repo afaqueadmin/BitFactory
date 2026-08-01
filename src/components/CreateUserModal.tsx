@@ -75,6 +75,7 @@ export default function CreateUserModal({
     role: "CLIENT",
     sendEmail: true,
     luxorSubaccountName: "",
+    braiinsAuthKey: "",
     groupId: "",
     initialDeposit: 0,
     franchiseeId: "",
@@ -366,6 +367,7 @@ export default function CreateUserModal({
         role: "CLIENT",
         sendEmail: true,
         luxorSubaccountName: "",
+        braiinsAuthKey: "",
         groupId: "",
         initialDeposit: 0,
         franchiseeId: "",
@@ -607,6 +609,20 @@ export default function CreateUserModal({
                 {subaccountsError && (
                   <Alert severity="warning">{subaccountsError}</Alert>
                 )}
+
+                {/* Braiins Auth Key - Optional, no live subaccount list exists for Braiins */}
+                <TextField
+                  fullWidth
+                  label="Braiins Auth Key (Optional)"
+                  value={formData.braiinsAuthKey}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      braiinsAuthKey: e.target.value,
+                    }))
+                  }
+                  helperText="Braiins API token for this client, if applicable"
+                />
 
                 {/* Group Selection - Only for CLIENT role */}
                 <FormControl fullWidth disabled={fetchingGroups}>

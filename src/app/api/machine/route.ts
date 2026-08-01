@@ -170,6 +170,10 @@ export async function GET(
             email: true,
             luxorSubaccountName: true,
             segment: true,
+            poolAuths: {
+              where: { pool: { name: "Luxor" } },
+              select: { authKey: true },
+            },
           },
         },
         space: {
@@ -249,14 +253,24 @@ export async function GET(
       orderBy,
     });
 
-    // Transform miners to include latest rate_per_kwh
-    const transformedMiners = miners.map((miner) => ({
-      ...miner,
-      rate_per_kwh:
-        miner.rateHistory && miner.rateHistory.length > 0
-          ? miner.rateHistory[0].rate_per_kwh
-          : undefined,
-    }));
+    // Transform miners to include latest rate_per_kwh, and resolve the
+    // customer's Luxor subaccount from PoolAuth (falling back to the legacy
+    // field) so the response shape stays unchanged for existing consumers.
+    const transformedMiners = miners.map((miner) => {
+      const { poolAuths, ...user } = miner.user;
+      return {
+        ...miner,
+        user: {
+          ...user,
+          luxorSubaccountName:
+            poolAuths[0]?.authKey || miner.user.luxorSubaccountName,
+        },
+        rate_per_kwh:
+          miner.rateHistory && miner.rateHistory.length > 0
+            ? miner.rateHistory[0].rate_per_kwh
+            : undefined,
+      };
+    });
 
     console.log(
       `[Miners API] GET: Successfully retrieved ${transformedMiners.length} miners`,
@@ -540,6 +554,10 @@ export async function POST(
               email: true,
               luxorSubaccountName: true,
               segment: true,
+              poolAuths: {
+                where: { pool: { name: "Luxor" } },
+                select: { authKey: true },
+              },
             },
           },
           space: {
@@ -595,10 +613,22 @@ export async function POST(
 
     console.log(`[Miners API] POST: Created miner with id ${miner.id}`);
 
+    // Resolve the customer's Luxor subaccount from PoolAuth (falling back to
+    // the legacy field) so the response shape stays unchanged for consumers.
+    const { poolAuths, ...minerUser } = miner.user;
+    const transformedMiner = {
+      ...miner,
+      user: {
+        ...minerUser,
+        luxorSubaccountName:
+          poolAuths[0]?.authKey || miner.user.luxorSubaccountName,
+      },
+    };
+
     return NextResponse.json<ApiResponse>(
       {
         success: true,
-        data: miner,
+        data: transformedMiner,
         timestamp: new Date().toISOString(),
       },
       { status: 201 },

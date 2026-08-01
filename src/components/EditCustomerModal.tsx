@@ -49,6 +49,7 @@ interface EditCustomerModalProps {
     streetAddress?: string;
     companyUrl?: string;
     luxorSubaccountName?: string;
+    braiinsAuthKey?: string;
     groupId?: string;
     franchiseeId?: string | null;
     segment?: string | null;
@@ -84,6 +85,7 @@ export default function EditCustomerModal({
       streetAddress: "",
       companyUrl: "",
       luxorSubaccountName: "",
+      braiinsAuthKey: "",
       groupId: "",
       franchiseeId: "",
       segment: "",
@@ -96,6 +98,7 @@ export default function EditCustomerModal({
     if (initialData && open) {
       setFormData({
         ...initialData,
+        braiinsAuthKey: "",
         franchiseeId: initialData.franchiseeId || "",
         segment: initialData.segment || "",
       });
@@ -105,6 +108,7 @@ export default function EditCustomerModal({
       fetchGroups();
       if (customerId) {
         loadCurrentGroup(customerId);
+        loadCurrentBraiinsAuth(customerId);
       }
       fetchFranchises();
     }
@@ -285,6 +289,34 @@ export default function EditCustomerModal({
     }
   };
 
+  /**
+   * Load the customer's current Braiins credential, if any
+   */
+  const loadCurrentBraiinsAuth = async (custId: string) => {
+    try {
+      const response = await fetch(`/api/pool-auth?userId=${custId}`);
+
+      if (!response.ok) return;
+
+      const data = await response.json();
+      if (!data.success || !Array.isArray(data.data)) return;
+
+      const braiinsEntry = (
+        data.data as Array<{ authKey: string; pool: { name: string } }>
+      ).find((entry) => entry.pool.name === "Braiins");
+
+      setFormData((prev) => ({
+        ...prev,
+        braiinsAuthKey: braiinsEntry?.authKey || "",
+      }));
+    } catch (err) {
+      console.error(
+        "[EditCustomerModal] Error loading current Braiins credential:",
+        err,
+      );
+    }
+  };
+
   const handleClose = () => {
     onClose();
     setError("");
@@ -325,6 +357,7 @@ export default function EditCustomerModal({
           streetAddress: formData.streetAddress,
           companyUrl: formData.companyUrl,
           luxorSubaccountName: formData.luxorSubaccountName || null,
+          braiinsAuthKey: formData.braiinsAuthKey || null,
           groupId: formData.groupId || null,
           franchiseeId: formData.franchiseeId || null,
           segment: formData.franchiseeId ? undefined : formData.segment,
@@ -500,6 +533,18 @@ export default function EditCustomerModal({
                 ))}
               </Select>
             </FormControl>
+            <TextField
+              fullWidth
+              label="Braiins Auth Key (Optional)"
+              value={formData.braiinsAuthKey || ""}
+              onChange={(e) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  braiinsAuthKey: e.target.value,
+                }))
+              }
+              helperText="Braiins API token for this client, if applicable. Leave blank to remove."
+            />
             <FormControl fullWidth disabled={fetchingGroups}>
               <InputLabel>Group (Optional)</InputLabel>
               <Select
