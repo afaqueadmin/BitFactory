@@ -65,6 +65,7 @@ const securePaths = {
     "/workers",
     "/braiins-workers",
     "/activity-log",
+    "/incentives/payouts",
     // Add admin-specific public paths if any
   ]),
   // Franchisee: their own dashboard/account/customers/miners pages under
@@ -78,6 +79,7 @@ const securePaths = {
     "/franchise/account",
     "/franchise/customers",
     "/franchise/miners",
+    "/franchise/incentives",
     ...clientPaths,
   ]),
 }; // Add admin-specific public paths if any
@@ -88,6 +90,7 @@ const dynamicPatternsPaths = {
     new URLPattern({ pathname: "/accounting/:path*" }),
     new URLPattern({ pathname: "/customers/:id*" }),
     new URLPattern({ pathname: "/groups/:id*" }),
+    new URLPattern({ pathname: "/franchisees/:id/incentives" }),
   ],
   FRANCHISEE: [...clientDynamicPatterns],
 };

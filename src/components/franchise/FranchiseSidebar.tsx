@@ -16,6 +16,7 @@ import {
   AccountCircle as AccountIcon,
   Group as CustomersIcon,
   Storage as MinersIcon,
+  MonetizationOn as IncentivesIcon,
   ChevronLeft,
   ChevronRight,
 } from "@mui/icons-material";
@@ -33,6 +34,11 @@ const sidebarItems: FranchiseSidebarItem[] = [
   { title: "My Account", icon: <AccountIcon />, path: "/franchise/account" },
   { title: "Customers", icon: <CustomersIcon />, path: "/franchise/customers" },
   { title: "All Miners", icon: <MinersIcon />, path: "/franchise/miners" },
+  {
+    title: "Incentives",
+    icon: <IncentivesIcon />,
+    path: "/franchise/incentives",
+  },
 ];
 
 export default function FranchiseSidebar() {

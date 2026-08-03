@@ -70,6 +70,10 @@ model User {
   customerRequestsSubmitted  FranchiseCustomerRequest[]   @relation("CustomerRequestsSubmitted")
   customerRequestsReviewed   FranchiseCustomerRequest[]   @relation("CustomerRequestsReviewed")
   customerRequestCreatedFrom FranchiseCustomerRequest?    @relation("CustomerRequestsCreatedUser")
+  incentiveRatesCreated      FranchiseIncentiveRate[]     @relation("incentiveRatesCreated")
+  incentiveRatesUpdated      FranchiseIncentiveRate[]     @relation("incentiveRatesUpdated")
+  incentiveEntriesAsClient   IncentiveEntry[]             @relation("incentiveEntriesClient")
+  incentivePayoutsCreated    IncentivePayoutBatch[]       @relation("incentivePayoutsCreated")
 
   @@index([isDeleted])
   @@index([franchiseeId])
@@ -97,6 +101,9 @@ model Franchise {
   franchisee           User      @relation("FranchiseFranchisee", fields: [franchiseeId], references: [id])
   users                User[]    @relation("FranchiseUsers")
   customerRequests     FranchiseCustomerRequest[]
+  incentiveRates          FranchiseIncentiveRate[]
+  incentiveEntries        IncentiveEntry[]
+  incentivePayoutBatches  IncentivePayoutBatch[]
 
   @@index([franchiseeId])
   @@index([createdById])
@@ -484,6 +491,7 @@ model Invoice {
   updatedByUser        User?                 @relation("invoicesUpdated", fields: [updatedBy], references: [id])
   user                 User                  @relation("invoices", fields: [userId], references: [id])
   hardware             Hardware?             @relation(fields: [hardwareId], references: [id])
+  incentiveEntries     IncentiveEntry[]      @relation("invoiceIncentiveEntries")
 
   @@index([userId])
   @@index([status])
@@ -615,6 +623,98 @@ model CustomerPricingConfig {
   @@map("customer_pricing_config")
 }
 
+// Per-franchise, effective-dated incentive rate configuration. One row per
+// (franchise, incentiveType, effectiveFrom) — never mutated in place, only
+// superseded by a new row (mirrors CustomerPricingConfig) so that amounts
+// already snapshotted onto IncentiveEntry rows never drift.
+model FranchiseIncentiveRate {
+  id            String              @id @default(cuid())
+  franchiseId   String
+  incentiveType IncentiveType
+  rateBasis     IncentiveRateBasis? // HARDWARE_SALE only: which of flatAmount/percentage applies
+  flatAmount    Decimal?            @db.Decimal(12, 2) // $/unit (HARDWARE_SALE flat) or $/machine/month (OWN_MACHINE_HOSTING_REBATE)
+  percentage    Decimal?            @db.Decimal(5, 2) // HARDWARE_SALE percent, or CLIENT_HOSTING_COMMISSION
+  effectiveFrom DateTime
+  effectiveTo   DateTime?
+  createdBy     String
+  updatedBy     String?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  franchise     Franchise           @relation(fields: [franchiseId], references: [id])
+  createdByUser User                @relation("incentiveRatesCreated", fields: [createdBy], references: [id])
+  updatedByUser User?               @relation("incentiveRatesUpdated", fields: [updatedBy], references: [id])
+  entries       IncentiveEntry[]
+
+  @@unique([franchiseId, incentiveType, effectiveFrom])
+  @@index([franchiseId])
+  @@index([incentiveType])
+  @@index([effectiveTo])
+  @@map("franchise_incentive_rates")
+}
+
+// Individual accrued (or reversed / clawback) incentive amounts. Created by
+// src/lib/incentives/accrue.ts when a source invoice is issued, reversed by
+// src/lib/incentives/reverse.ts if that invoice is later cancelled/refunded.
+model IncentiveEntry {
+  id                  String                  @id @default(cuid())
+  franchiseId         String
+  incentiveType       IncentiveType
+  rateId              String?
+  sourceInvoiceId     String? // null for clawback/adjustment rows
+  sourceInvoiceNumber String // snapshot, survives source invoice deletion
+  clientUserId        String?
+  basisAmount         Decimal                 @db.Decimal(12, 2) // invoice totalAmount or unit count the rate applied to
+  rateApplied         Decimal                 @db.Decimal(12, 4) // snapshot of the % or flat rate actually used
+  amount              Decimal                 @db.Decimal(12, 2) // computed incentive; negative for clawback rows
+  status              IncentiveEntryStatus    @default(ACCRUED)
+  accrualDate         DateTime                @default(now())
+  billingPeriod       DateTime? // = source invoice's billingMonth, for reporting
+  reversedAt          DateTime?
+  reversedReason      String?
+  adjustsEntryId      String? // set on a clawback row, points at the already-paid entry it offsets
+  payoutBatchId       String?
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+  franchise           Franchise               @relation(fields: [franchiseId], references: [id])
+  rate                FranchiseIncentiveRate? @relation(fields: [rateId], references: [id])
+  sourceInvoice       Invoice?                @relation("invoiceIncentiveEntries", fields: [sourceInvoiceId], references: [id], onDelete: SetNull)
+  clientUser          User?                   @relation("incentiveEntriesClient", fields: [clientUserId], references: [id])
+  adjustsEntry        IncentiveEntry?         @relation("entryAdjustments", fields: [adjustsEntryId], references: [id])
+  adjustments         IncentiveEntry[]        @relation("entryAdjustments")
+  payoutBatch         IncentivePayoutBatch?   @relation(fields: [payoutBatchId], references: [id])
+
+  @@unique([sourceInvoiceId, incentiveType])
+  @@index([franchiseId])
+  @@index([status])
+  @@index([payoutBatchId])
+  @@index([incentiveType])
+  @@index([accrualDate])
+  @@map("incentive_entries")
+}
+
+// A batch payout event: admin marking one or more IncentiveEntry rows as
+// paid to a franchisee, either individually (few entryIds) or in bulk
+// (a full period's worth of outstanding entries) via the same endpoint.
+model IncentivePayoutBatch {
+  id            String           @id @default(cuid())
+  franchiseId   String
+  periodFrom    DateTime?
+  periodTo      DateTime?
+  totalAmount   Decimal          @db.Decimal(12, 2)
+  entryCount    Int
+  paidDate      DateTime
+  notes         String?
+  createdBy     String
+  createdAt     DateTime         @default(now())
+  franchise     Franchise        @relation(fields: [franchiseId], references: [id])
+  createdByUser User             @relation("incentivePayoutsCreated", fields: [createdBy], references: [id])
+  entries       IncentiveEntry[]
+
+  @@index([franchiseId])
+  @@index([paidDate])
+  @@map("incentive_payout_batches")
+}
+
 model AuditLog {
   id          String      @id @default(cuid())
   action      AuditAction
@@ -697,6 +797,22 @@ enum InvoiceType {
   HARDWARE_SALES
 }
 
+enum IncentiveType {
+  HARDWARE_SALE
+  OWN_MACHINE_HOSTING_REBATE
+  CLIENT_HOSTING_COMMISSION
+}
+
+enum IncentiveRateBasis {
+  FLAT_PER_UNIT
+  PERCENTAGE
+}
+
+enum IncentiveEntryStatus {
+  ACCRUED
+  REVERSED
+}
+
 enum AuditAction {
   INVOICE_CREATED
   INVOICE_UPDATED
@@ -718,6 +834,12 @@ enum AuditAction {
   EMAIL_SENT
   EMAIL_FAILED
   EMAIL_RETRY
+  INCENTIVE_RATE_CREATED
+  INCENTIVE_RATE_ARCHIVED
+  INCENTIVE_ACCRUED
+  INCENTIVE_REVERSED
+  INCENTIVE_CLAWBACK_CREATED
+  INCENTIVE_PAYOUT_CREATED
 }
 
 enum NotificationType {

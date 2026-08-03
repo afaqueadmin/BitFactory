@@ -7,6 +7,7 @@ import {
 } from "@/services/invoiceEmailService";
 import { getGroupByUserId } from "@/lib/groupUtils";
 import { InvoiceStatus, AuditAction } from "@prisma/client";
+import { accrueIncentivesForInvoice } from "@/lib/incentives/accrue";
 
 /**
  * POST /api/accounting/invoices/[id]/issue
@@ -121,6 +122,8 @@ export async function POST(
         },
       });
 
+      await accrueIncentivesForInvoice(id, userId);
+
       return NextResponse.json({
         success: true,
         message: `Invoice ${invoice.invoiceNumber} issued successfully. Email was not sent.`,
@@ -233,6 +236,8 @@ export async function POST(
         }),
       },
     });
+
+    await accrueIncentivesForInvoice(id, userId);
 
     // Success response
     return NextResponse.json({
