@@ -117,7 +117,8 @@ model FranchiseCustomerRequest {
   requestedBy         User          @relation("CustomerRequestsSubmitted", fields: [requestedById], references: [id])
   name                String
   email               String
-  luxorSubaccountName String
+  phoneNumber         String?
+  luxorSubaccountName String?
   initialDeposit      Decimal?      @db.Decimal(12, 2)
   status              RequestStatus @default(PENDING)
   rejectionReason     String?
@@ -308,6 +309,7 @@ model Space {
   id            String   @id @default(cuid())
   name          String
   location      String
+  address       String?
   capacity      Int
   powerCapacity Float
   status        String   @default("AVAILABLE")
@@ -467,6 +469,7 @@ model Invoice {
   issuedDate           DateTime?
   dueDate              DateTime
   billingMonth         DateTime? // Format: First day of month (e.g., 2026-04-01 for April 2026)
+  machineHostingLocation String?
   paidDate             DateTime?
   createdBy            String
   updatedBy            String?

@@ -238,7 +238,19 @@ export async function POST(request: NextRequest) {
       billingMonth,
       invoiceGeneratedDate,
       lineItems,
+      machineHostingLocation,
     } = body;
+
+    if (
+      machineHostingLocation !== undefined &&
+      machineHostingLocation !== null &&
+      typeof machineHostingLocation !== "string"
+    ) {
+      return NextResponse.json(
+        { error: "machineHostingLocation must be a string" },
+        { status: 400 },
+      );
+    }
 
     // Status is always DRAFT when creating new invoices
     // Admins can change to ISSUED after creation via the status change endpoint
@@ -427,6 +439,11 @@ export async function POST(request: NextRequest) {
         billingMonth: billingMonth
           ? normalizeBillingMonth(billingMonth)
           : undefined,
+        machineHostingLocation:
+          typeof machineHostingLocation === "string" &&
+          machineHostingLocation.trim()
+            ? machineHostingLocation.trim()
+            : undefined,
         createdBy: userId,
         lineItems: hasLineItems ? { create: validatedLineItems } : undefined,
       },

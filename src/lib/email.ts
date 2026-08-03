@@ -485,6 +485,7 @@ export const generateInvoicePDF = async (
   paidDate?: Date | null,
   lineItems?: InvoicePdfLineItem[] | null,
   invoiceType?: string | null,
+  machineHostingLocationOverride?: string | null,
 ): Promise<Buffer> => {
   try {
     // Load PDF template
@@ -590,6 +591,10 @@ export const generateInvoicePDF = async (
             paymentOption3Title: paymentDetails.paymentOption3Title,
             paymentOption3Details: paymentDetails.paymentOption3Details,
           }
+        : {}),
+      // Per-invoice override wins over the global PaymentDetails default
+      ...(machineHostingLocationOverride
+        ? { machineHostingLocation: machineHostingLocationOverride }
         : {}),
     };
 

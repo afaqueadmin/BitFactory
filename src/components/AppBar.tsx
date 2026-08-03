@@ -181,8 +181,8 @@ export default function AppBarComponent() {
             <Image
               src="/BitfactoryLogo.webp"
               alt="BitFactory Logo"
-              width={isMobile ? 150 : 160}
-              height={isMobile ? 44 : 46}
+              width={isMobile ? 172 : 184}
+              height={isMobile ? 50 : 53}
               priority
               style={{ cursor: "pointer", height: "auto" }}
             />
@@ -414,8 +414,8 @@ export default function AppBarComponent() {
                 <Image
                   src="/BitfactoryLogo.webp"
                   alt="BitFactory Logo"
-                  width={120}
-                  height={34}
+                  width={138}
+                  height={39}
                   priority
                   style={{ cursor: "pointer", height: "auto" }}
                 />

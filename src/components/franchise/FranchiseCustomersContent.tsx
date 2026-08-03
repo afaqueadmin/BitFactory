@@ -78,7 +78,8 @@ interface CustomerRequest {
   id: string;
   name: string;
   email: string;
-  luxorSubaccountName: string;
+  phoneNumber: string | null;
+  luxorSubaccountName: string | null;
   initialDeposit: string | null;
   status: "PENDING" | "APPROVED" | "REJECTED";
   rejectionReason: string | null;
@@ -421,7 +422,7 @@ export default function FranchiseCustomersContent() {
               <TableRow>
                 <TableCell sx={{ fontWeight: "bold" }}>Name</TableCell>
                 <TableCell sx={{ fontWeight: "bold" }}>Email</TableCell>
-                <TableCell sx={{ fontWeight: "bold" }}>Subaccount</TableCell>
+                <TableCell sx={{ fontWeight: "bold" }}>Phone</TableCell>
                 <TableCell sx={{ fontWeight: "bold" }}>Submitted</TableCell>
                 <TableCell sx={{ fontWeight: "bold" }} align="center">
                   Status
@@ -449,7 +450,7 @@ export default function FranchiseCustomersContent() {
                   <TableRow key={r.id} hover>
                     <TableCell>{r.name}</TableCell>
                     <TableCell>{r.email}</TableCell>
-                    <TableCell>{r.luxorSubaccountName}</TableCell>
+                    <TableCell>{r.phoneNumber || "-"}</TableCell>
                     <TableCell>
                       {new Date(r.createdAt).toLocaleDateString()}
                     </TableCell>

@@ -179,6 +179,7 @@ export function useCreateInvoice() {
       billingMonth?: string;
       invoiceGeneratedDate?: string;
       lineItems?: InvoiceLineItemInput[];
+      machineHostingLocation?: string;
     }) => {
       const res = await fetch("/api/accounting/invoices", {
         method: "POST",
@@ -298,6 +299,7 @@ export interface Miner {
   createdAt: string;
   updatedAt: string;
   isDeleted: boolean;
+  space?: { id: string; name: string; location: string } | null;
 }
 
 // Suggested invoice line item for a customer, grouped by (hardwareId, rate)

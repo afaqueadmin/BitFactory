@@ -110,6 +110,8 @@ export async function POST(
         invoiceStatus: result.invoice!.status,
         paidDate: result.invoice!.paidDate || undefined,
         invoiceType: result.invoice!.invoiceType,
+        machineHostingLocation:
+          result.invoice!.machineHostingLocation || undefined,
         lineItems: result.invoice!.lineItems.map((li) => ({
           model: li.model,
           quantity: li.quantity,

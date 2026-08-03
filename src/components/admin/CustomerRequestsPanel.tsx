@@ -18,38 +18,38 @@ import {
   TableRow,
   Chip,
   Button,
+  IconButton,
+  Menu,
+  MenuItem,
   CircularProgress,
   Alert,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
-  TextField,
   Snackbar,
 } from "@mui/material";
-
-interface CustomerRequestRow {
-  id: string;
-  name: string;
-  email: string;
-  luxorSubaccountName: string;
-  initialDeposit: string | null;
-  status: "PENDING" | "APPROVED" | "REJECTED";
-  rejectionReason: string | null;
-  createdAt: string;
-  franchise: { id: string; businessName: string; franchiseCode: string };
-  requestedBy: { id: string; name: string | null; email: string };
-}
+import {
+  MoreVert as MoreVertIcon,
+  Delete as DeleteIcon,
+} from "@mui/icons-material";
+import CustomerRequestReviewModal, {
+  type CustomerRequestRow,
+} from "./CustomerRequestReviewModal";
 
 export default function CustomerRequestsPanel() {
   const [requests, setRequests] = useState<CustomerRequestRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [approvingId, setApprovingId] = useState<string | null>(null);
-  const [rejectingRequest, setRejectingRequest] =
+  const [viewingRequest, setViewingRequest] =
     useState<CustomerRequestRow | null>(null);
-  const [rejectionReason, setRejectionReason] = useState("");
-  const [rejecting, setRejecting] = useState(false);
+  const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
+  const [menuRequest, setMenuRequest] = useState<CustomerRequestRow | null>(
+    null,
+  );
+  const [deletingRequest, setDeletingRequest] =
+    useState<CustomerRequestRow | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [notification, setNotification] = useState("");
 
   const fetchRequests = useCallback(async () => {
@@ -73,56 +73,39 @@ export default function CustomerRequestsPanel() {
     fetchRequests();
   }, [fetchRequests]);
 
-  const handleApprove = async (id: string) => {
-    setApprovingId(id);
-    try {
-      const response = await fetch(
-        `/api/admin/customer-requests/${id}/approve`,
-        { method: "POST" },
-      );
-      const data = await response.json();
-      if (!data.success) {
-        throw new Error(data.error || "Failed to approve request");
-      }
-      setNotification(
-        `Customer created. Temporary password: ${data.data?.tempPassword}`,
-      );
-      fetchRequests();
-    } catch (err) {
-      setNotification(
-        err instanceof Error ? err.message : "Failed to approve request",
-      );
-    } finally {
-      setApprovingId(null);
-    }
+  const handleMenuOpen = (
+    e: React.MouseEvent<HTMLElement>,
+    request: CustomerRequestRow,
+  ) => {
+    setMenuAnchorEl(e.currentTarget);
+    setMenuRequest(request);
+  };
+  const handleMenuClose = () => {
+    setMenuAnchorEl(null);
+    setMenuRequest(null);
   };
 
-  const handleReject = async () => {
-    if (!rejectingRequest) return;
-    setRejecting(true);
+  const handleDelete = async () => {
+    if (!deletingRequest) return;
+    setDeleting(true);
     try {
       const response = await fetch(
-        `/api/admin/customer-requests/${rejectingRequest.id}/reject`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ reason: rejectionReason }),
-        },
+        `/api/admin/customer-requests/${deletingRequest.id}`,
+        { method: "DELETE" },
       );
       const data = await response.json();
       if (!data.success) {
-        throw new Error(data.error || "Failed to reject request");
+        throw new Error(data.error || "Failed to delete request");
       }
-      setNotification("Request rejected");
-      setRejectingRequest(null);
-      setRejectionReason("");
+      setNotification("Request deleted");
+      setDeletingRequest(null);
       fetchRequests();
     } catch (err) {
       setNotification(
-        err instanceof Error ? err.message : "Failed to reject request",
+        err instanceof Error ? err.message : "Failed to delete request",
       );
     } finally {
-      setRejecting(false);
+      setDeleting(false);
     }
   };
 
@@ -155,6 +138,7 @@ export default function CustomerRequestsPanel() {
               <TableRow sx={{ backgroundColor: "background.default" }}>
                 <TableCell sx={{ fontWeight: "bold" }}>Customer</TableCell>
                 <TableCell sx={{ fontWeight: "bold" }}>Franchise</TableCell>
+                <TableCell sx={{ fontWeight: "bold" }}>Phone</TableCell>
                 <TableCell sx={{ fontWeight: "bold" }}>Subaccount</TableCell>
                 <TableCell sx={{ fontWeight: "bold" }}>
                   Initial Deposit
@@ -190,7 +174,8 @@ export default function CustomerRequestsPanel() {
                       by {r.requestedBy.name || r.requestedBy.email}
                     </Typography>
                   </TableCell>
-                  <TableCell>{r.luxorSubaccountName}</TableCell>
+                  <TableCell>{r.phoneNumber || "-"}</TableCell>
+                  <TableCell>{r.luxorSubaccountName || "-"}</TableCell>
                   <TableCell>
                     {r.initialDeposit ? `$${r.initialDeposit}` : "-"}
                   </TableCell>
@@ -212,38 +197,28 @@ export default function CustomerRequestsPanel() {
                     />
                   </TableCell>
                   <TableCell align="right">
-                    {r.status === "PENDING" ? (
-                      <Box
-                        sx={{
-                          display: "flex",
-                          gap: 1,
-                          justifyContent: "flex-end",
-                        }}
+                    <Box
+                      sx={{
+                        display: "flex",
+                        gap: 1,
+                        justifyContent: "flex-end",
+                      }}
+                    >
+                      <Button
+                        size="small"
+                        variant="contained"
+                        onClick={() => setViewingRequest(r)}
                       >
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          color="error"
-                          onClick={() => setRejectingRequest(r)}
-                        >
-                          Reject
-                        </Button>
-                        <Button
-                          size="small"
-                          variant="contained"
-                          disabled={approvingId === r.id}
-                          onClick={() => handleApprove(r.id)}
-                        >
-                          {approvingId === r.id ? (
-                            <CircularProgress size={16} color="inherit" />
-                          ) : (
-                            "Approve"
-                          )}
-                        </Button>
-                      </Box>
-                    ) : (
-                      "-"
-                    )}
+                        View
+                      </Button>
+                      <IconButton
+                        size="small"
+                        onClick={(e) => handleMenuOpen(e, r)}
+                        aria-label="More options"
+                      >
+                        <MoreVertIcon fontSize="small" />
+                      </IconButton>
+                    </Box>
                   </TableCell>
                 </TableRow>
               ))}
@@ -252,44 +227,66 @@ export default function CustomerRequestsPanel() {
         </TableContainer>
       )}
 
+      <CustomerRequestReviewModal
+        open={Boolean(viewingRequest)}
+        request={viewingRequest}
+        onClose={() => setViewingRequest(null)}
+        onSuccess={(text) => {
+          setNotification(text);
+          fetchRequests();
+        }}
+      />
+
+      <Menu
+        anchorEl={menuAnchorEl}
+        open={Boolean(menuAnchorEl)}
+        onClose={handleMenuClose}
+      >
+        <MenuItem
+          onClick={() => {
+            setDeletingRequest(menuRequest);
+            handleMenuClose();
+          }}
+          sx={{ color: "error.main" }}
+        >
+          <DeleteIcon fontSize="small" sx={{ mr: 1 }} />
+          Delete Request
+        </MenuItem>
+      </Menu>
+
       <Dialog
-        open={Boolean(rejectingRequest)}
-        onClose={() => (rejecting ? null : setRejectingRequest(null))}
+        open={Boolean(deletingRequest)}
+        onClose={() => (deleting ? null : setDeletingRequest(null))}
         maxWidth="xs"
         fullWidth
       >
-        <DialogTitle>Reject Request</DialogTitle>
+        <DialogTitle>Delete Request</DialogTitle>
         <DialogContent>
-          <Typography variant="body2" sx={{ mb: 2 }}>
-            Reject the request for <strong>{rejectingRequest?.name}</strong>?
+          <Typography variant="body2">
+            Delete the request for <strong>{deletingRequest?.name}</strong>?
+            {deletingRequest?.status === "APPROVED" &&
+              " This will not affect the customer account already created."}{" "}
+            This action cannot be undone.
           </Typography>
-          <TextField
-            fullWidth
-            label="Reason (optional)"
-            multiline
-            minRows={2}
-            value={rejectionReason}
-            onChange={(e) => setRejectionReason(e.target.value)}
-          />
         </DialogContent>
         <DialogActions sx={{ px: 3, py: 2 }}>
           <Button
-            onClick={() => setRejectingRequest(null)}
-            disabled={rejecting}
+            onClick={() => setDeletingRequest(null)}
+            disabled={deleting}
             color="inherit"
           >
             Cancel
           </Button>
           <Button
-            onClick={handleReject}
+            onClick={handleDelete}
             variant="contained"
             color="error"
-            disabled={rejecting}
+            disabled={deleting}
           >
-            {rejecting ? (
+            {deleting ? (
               <CircularProgress size={20} color="inherit" />
             ) : (
-              "Reject"
+              "Delete"
             )}
           </Button>
         </DialogActions>

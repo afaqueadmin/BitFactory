@@ -74,6 +74,7 @@ interface ApiResponse<T = unknown> {
  * {
  *   name?: string
  *   location?: string
+ *   address?: string
  *   capacity?: number
  *   powerCapacity?: number
  *   status?: string
@@ -127,7 +128,7 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { name, location, capacity, powerCapacity, status } = body;
+    const { name, location, address, capacity, powerCapacity, status } = body;
 
     // Build update data with only provided fields
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -151,6 +152,17 @@ export async function PUT(
         );
       }
       updateData.location = location.trim();
+    }
+
+    if (address !== undefined) {
+      if (address !== null && typeof address !== "string") {
+        return NextResponse.json<ApiResponse>(
+          { success: false, error: "address must be a string" },
+          { status: 400 },
+        );
+      }
+      updateData.address =
+        typeof address === "string" && address.trim() ? address.trim() : null;
     }
 
     if (capacity !== undefined) {

@@ -54,6 +54,7 @@ interface Space {
   id: string;
   name: string;
   location: string;
+  address: string | null;
   capacity: number;
   powerCapacity: number;
   status: "AVAILABLE" | "OCCUPIED";
@@ -229,7 +230,8 @@ export default function SpacesPage() {
   const filteredSpaces = spaces.filter((space) => {
     const matchesSearch =
       space.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      space.location.toLowerCase().includes(searchTerm.toLowerCase());
+      space.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (space.address || "").toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = !statusFilter || space.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -351,7 +353,7 @@ export default function SpacesPage() {
           <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
             <TextField
               label="Search spaces"
-              placeholder="Search by name or location..."
+              placeholder="Search by name, location, or address..."
               value={searchTerm}
               onChange={(e) => {
                 setSearchTerm(e.target.value);
@@ -389,8 +391,11 @@ export default function SpacesPage() {
               <Table>
                 <TableHead>
                   <TableRow sx={{ backgroundColor: "background.default" }}>
-                    <TableCell sx={{ fontWeight: "bold" }}>Space Name</TableCell>
+                    <TableCell sx={{ fontWeight: "bold" }}>
+                      Space Name
+                    </TableCell>
                     <TableCell sx={{ fontWeight: "bold" }}>Location</TableCell>
+                    <TableCell sx={{ fontWeight: "bold" }}>Address</TableCell>
                     <TableCell sx={{ fontWeight: "bold" }} align="center">
                       Capacity
                     </TableCell>
@@ -426,6 +431,11 @@ export default function SpacesPage() {
                       <TableCell>
                         <Typography variant="body2">
                           {space.location}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" color="text.secondary">
+                          {space.address || "-"}
                         </Typography>
                       </TableCell>
                       <TableCell align="center">

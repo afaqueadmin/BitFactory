@@ -90,6 +90,7 @@ export async function GET(
         totalPrice: Number(li.totalPrice),
       })),
       invoice.invoiceType,
+      invoice.machineHostingLocation,
     );
 
     // Return PDF as file download

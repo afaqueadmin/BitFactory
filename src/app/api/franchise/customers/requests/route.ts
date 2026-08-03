@@ -48,6 +48,7 @@ export async function GET(request: NextRequest) {
         id: true,
         name: true,
         email: true,
+        phoneNumber: true,
         luxorSubaccountName: true,
         initialDeposit: true,
         status: true,
@@ -78,7 +79,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { name, email, luxorSubaccountName, initialDeposit } = body;
+    const { name, email, phoneNumber, initialDeposit } = body;
 
     if (!name || typeof name !== "string" || !name.trim()) {
       return NextResponse.json(
@@ -100,12 +101,12 @@ export async function POST(request: NextRequest) {
       );
     }
     if (
-      !luxorSubaccountName ||
-      typeof luxorSubaccountName !== "string" ||
-      !luxorSubaccountName.trim()
+      phoneNumber !== undefined &&
+      phoneNumber !== null &&
+      typeof phoneNumber !== "string"
     ) {
       return NextResponse.json(
-        { success: false, error: "A Luxor subaccount must be selected" },
+        { success: false, error: "Invalid phone number" },
         { status: 400 },
       );
     }
@@ -148,24 +149,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const existingSubaccount = await prisma.user.findFirst({
-      where: { luxorSubaccountName: luxorSubaccountName.trim() },
-      select: { id: true },
-    });
-    if (existingSubaccount) {
-      return NextResponse.json(
-        { success: false, error: "This Luxor subaccount is already assigned" },
-        { status: 400 },
-      );
-    }
-
     const created = await prisma.franchiseCustomerRequest.create({
       data: {
         franchiseId: franchise.id,
         requestedById: auth.decoded.userId,
         name: name.trim(),
         email: email.trim(),
-        luxorSubaccountName: luxorSubaccountName.trim(),
+        phoneNumber:
+          typeof phoneNumber === "string" && phoneNumber.trim()
+            ? phoneNumber.trim()
+            : null,
         initialDeposit:
           initialDeposit !== undefined &&
           initialDeposit !== null &&

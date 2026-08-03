@@ -81,8 +81,8 @@ export default function AdminHeader() {
           <Image
             src="/BitfactoryLogo.webp"
             alt="BitFactory Logo"
-            width={140}
-            height={40}
+            width={162}
+            height={46}
             priority
             style={{ cursor: "pointer", height: "auto" }}
             onClick={handleLogoClick}

@@ -21,8 +21,11 @@ import { InvoiceStatus } from "@prisma/client";
 import {
   useCreateInvoice,
   useCustomers,
+  useCustomerMiners,
   Customer,
 } from "@/lib/hooks/useInvoices";
+import { useSpaceLocations } from "@/lib/hooks/useSpaceLocations";
+import { getMostCommonMinerLocation } from "@/lib/utils/minerLocation";
 import {
   LineItemsEditor,
   LineItem,
@@ -41,9 +44,27 @@ export default function CreateHardwareSalesInvoicePage() {
       .split("T")[0],
     status: InvoiceStatus.DRAFT,
     invoiceType: "HARDWARE_SALES",
+    machineHostingLocation: "",
   });
 
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
+
+  const { locations: spaceLocations, loading: spaceLocationsLoading } =
+    useSpaceLocations();
+
+  // Pre-fill "Machine Hosting Location" from the customer's existing miners
+  const { miners: customerMiners, loading: customerMinersLoading } =
+    useCustomerMiners(formData.customerId || undefined);
+
+  useEffect(() => {
+    if (!formData.customerId || customerMinersLoading) return;
+    const derivedLocation = getMostCommonMinerLocation(customerMiners);
+    setFormData((prev) => ({
+      ...prev,
+      machineHostingLocation: derivedLocation || prev.machineHostingLocation,
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.customerId, customerMinersLoading]);
 
   // Fetch group/RM info when customerId changes
   const [groupInfo, setGroupInfo] = useState<{
@@ -158,6 +179,7 @@ export default function CreateHardwareSalesInvoicePage() {
         hardwareId: undefined,
         invoiceGeneratedDate: formData.issueDate || undefined,
         lineItems,
+        machineHostingLocation: formData.machineHostingLocation || undefined,
       });
 
       // Redirect to hardware-sales dashboard
@@ -325,6 +347,23 @@ export default function CreateHardwareSalesInvoicePage() {
                   helperText="When payment is due (defaults to 30 days from today)"
                   required
                 />
+                <TextField
+                  select
+                  label="Machine Hosting Location"
+                  name="machineHostingLocation"
+                  value={formData.machineHostingLocation}
+                  onChange={handleInputChange}
+                  fullWidth
+                  disabled={spaceLocationsLoading}
+                  helperText="Shown on the invoice PDF as the Machine Hosting Location. Leave blank to use the default location."
+                >
+                  <MenuItem value="">-- Use Default Location --</MenuItem>
+                  {spaceLocations.map((location) => (
+                    <MenuItem key={location} value={location}>
+                      {location}
+                    </MenuItem>
+                  ))}
+                </TextField>
                 {/* Status is automatically set to DRAFT when creating invoices */}
               </Stack>
             </Box>

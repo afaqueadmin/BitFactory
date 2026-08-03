@@ -29,6 +29,8 @@ import {
   useCustomerMiners,
   Customer,
 } from "@/lib/hooks/useInvoices";
+import { useSpaceLocations } from "@/lib/hooks/useSpaceLocations";
+import { getMostCommonMinerLocation } from "@/lib/utils/minerLocation";
 import {
   LineItemsEditor,
   LineItem,
@@ -49,14 +51,21 @@ export default function CreateInvoicePage() {
     hardwareId: "",
     billingMonth: now.getMonth(),
     billingYear: now.getFullYear(),
+    machineHostingLocation: "",
   });
 
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
   const [pastDueDateWarningOpen, setPastDueDateWarningOpen] = useState(false);
 
+  const { locations: spaceLocations, loading: spaceLocationsLoading } =
+    useSpaceLocations();
+
   // Fetch miners (grouped into suggested line items) only when customerId changes
-  const { lineItems: suggestedLineItems, loading: minersLoading } =
-    useCustomerMiners(formData.customerId || undefined);
+  const {
+    miners: customerMiners,
+    lineItems: suggestedLineItems,
+    loading: minersLoading,
+  } = useCustomerMiners(formData.customerId || undefined);
 
   // Fetch group/RM info when customerId changes
   const [groupInfo, setGroupInfo] = useState<{
@@ -139,6 +148,11 @@ export default function CreateInvoicePage() {
           unitPrice: li.suggestedUnitPrice,
         })),
       );
+      const derivedLocation = getMostCommonMinerLocation(customerMiners);
+      setFormData((prev) => ({
+        ...prev,
+        machineHostingLocation: derivedLocation || prev.machineHostingLocation,
+      }));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.customerId, minersLoading]);
@@ -251,6 +265,7 @@ export default function CreateInvoicePage() {
         hardwareId: formData.hardwareId || undefined,
         billingMonth: billingMonthDate.toISOString(),
         lineItems,
+        machineHostingLocation: formData.machineHostingLocation || undefined,
       });
 
       // Redirect to accounting dashboard
@@ -500,6 +515,23 @@ export default function CreateInvoicePage() {
                   {hardwareList.map((hw) => (
                     <MenuItem key={hw.id} value={hw.id}>
                       {hw.model}
+                    </MenuItem>
+                  ))}
+                </TextField>
+                <TextField
+                  select
+                  label="Machine Hosting Location"
+                  name="machineHostingLocation"
+                  value={formData.machineHostingLocation}
+                  onChange={handleInputChange}
+                  fullWidth
+                  disabled={spaceLocationsLoading}
+                  helperText="Shown on the invoice PDF as the Machine Hosting Location. Leave blank to use the default location."
+                >
+                  <MenuItem value="">-- Use Default Location --</MenuItem>
+                  {spaceLocations.map((location) => (
+                    <MenuItem key={location} value={location}>
+                      {location}
                     </MenuItem>
                   ))}
                 </TextField>

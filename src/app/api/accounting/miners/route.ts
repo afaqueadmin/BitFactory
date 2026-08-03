@@ -56,6 +56,9 @@ export async function GET(request: NextRequest) {
         hardware: {
           select: { id: true, model: true, powerUsage: true },
         },
+        space: {
+          select: { id: true, name: true, location: true },
+        },
       },
       orderBy: { createdAt: "desc" },
     });

@@ -27,6 +27,7 @@ export interface InvoiceEmailPayload {
     totalPrice: number;
   }>;
   invoiceType?: string | null;
+  machineHostingLocation?: string | null;
 }
 
 export interface EmailSendResult {
@@ -157,6 +158,7 @@ export class InvoiceEmailService {
         payload.paidDate,
         payload.lineItems,
         payload.invoiceType,
+        payload.machineHostingLocation,
       );
 
       console.log(

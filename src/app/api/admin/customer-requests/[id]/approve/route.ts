@@ -82,11 +82,62 @@ export async function POST(
       );
     }
 
+    // Admin may edit details (and must supply a subaccount) from the review
+    // form before creating the user — fall back to the submitted values.
+    const body = await request.json().catch(() => ({}));
+
+    const name =
+      typeof body.name === "string" && body.name.trim()
+        ? body.name.trim()
+        : customerRequest.name;
+
+    const email =
+      typeof body.email === "string" && body.email.trim()
+        ? body.email.trim()
+        : customerRequest.email;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return NextResponse.json(
+        { success: false, error: "Invalid email format" },
+        { status: 400 },
+      );
+    }
+
+    const phoneNumber =
+      body.phoneNumber !== undefined
+        ? typeof body.phoneNumber === "string" && body.phoneNumber.trim()
+          ? body.phoneNumber.trim()
+          : null
+        : customerRequest.phoneNumber;
+
+    const initialDeposit =
+      body.initialDeposit !== undefined
+        ? body.initialDeposit !== null &&
+          body.initialDeposit !== "" &&
+          typeof body.initialDeposit === "number" &&
+          body.initialDeposit >= 0
+          ? body.initialDeposit
+          : null
+        : customerRequest.initialDeposit;
+
+    const luxorSubaccountName =
+      typeof body.luxorSubaccountName === "string" &&
+      body.luxorSubaccountName.trim()
+        ? body.luxorSubaccountName.trim()
+        : customerRequest.luxorSubaccountName;
+
+    if (!luxorSubaccountName) {
+      return NextResponse.json(
+        { success: false, error: "A Luxor subaccount must be selected" },
+        { status: 400 },
+      );
+    }
+
     // Re-validate uniqueness at approval time (time may have passed since submission)
     const allUsers = await prisma.user.findMany({
       select: { id: true, email: true },
     });
-    const normalizedUsername = normalizeEmailUsername(customerRequest.email);
+    const normalizedUsername = normalizeEmailUsername(email);
     if (
       allUsers.some(
         (u) => normalizeEmailUsername(u.email) === normalizedUsername,
@@ -99,12 +150,15 @@ export async function POST(
     }
 
     const existingSubaccount = await prisma.user.findFirst({
-      where: { luxorSubaccountName: customerRequest.luxorSubaccountName },
+      where: { luxorSubaccountName },
       select: { id: true },
     });
     if (existingSubaccount) {
       return NextResponse.json(
-        { success: false, error: "This Luxor subaccount is already assigned" },
+        {
+          success: false,
+          error: "This Luxor subaccount is already assigned",
+        },
         { status: 400 },
       );
     }
@@ -116,25 +170,23 @@ export async function POST(
     const newUser = await prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
         data: {
-          name: customerRequest.name,
-          email: customerRequest.email,
+          name,
+          email,
+          phoneNumber,
           password: hashedPassword,
           role: "CLIENT",
           segment: "RETAIL",
           franchiseeId: customerRequest.franchiseId,
-          luxorSubaccountName: customerRequest.luxorSubaccountName,
+          luxorSubaccountName,
           invoicedAmount: defaultInvoicedAmount,
         },
       });
 
-      if (
-        customerRequest.initialDeposit &&
-        Number(customerRequest.initialDeposit) > 0
-      ) {
+      if (initialDeposit && Number(initialDeposit) > 0) {
         await tx.costPayment.create({
           data: {
             userId: user.id,
-            amount: Number(customerRequest.initialDeposit),
+            amount: Number(initialDeposit),
             consumption: 0,
             type: "PAYMENT",
           },
@@ -144,6 +196,11 @@ export async function POST(
       await tx.franchiseCustomerRequest.update({
         where: { id },
         data: {
+          name,
+          email,
+          phoneNumber,
+          initialDeposit,
+          luxorSubaccountName,
           status: "APPROVED",
           reviewedById: decoded.userId,
           reviewedAt: new Date(),

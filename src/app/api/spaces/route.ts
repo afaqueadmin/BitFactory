@@ -166,6 +166,7 @@ export async function GET(
         id: space.id,
         name: space.name,
         location: space.location,
+        address: space.address,
         capacity: space.capacity,
         powerCapacity: space.powerCapacity,
         status: space.status,
@@ -223,6 +224,7 @@ export async function GET(
  * {
  *   name: string (required)
  *   location: string (required)
+ *   address: string (optional)
  *   capacity: number (required) - Total mining spots
  *   powerCapacity: number (required) - Total power in kilowatts
  *   status: string (optional) - AVAILABLE or OCCUPIED (default: AVAILABLE)
@@ -260,7 +262,7 @@ export async function POST(
     }
 
     const body = await request.json();
-    const { name, location, capacity, powerCapacity, status } = body;
+    const { name, location, address, capacity, powerCapacity, status } = body;
 
     // Validate required fields
     if (
@@ -287,6 +289,21 @@ export async function POST(
         {
           success: false,
           error: "Invalid field types: name and location must be strings",
+        },
+        { status: 400 },
+      );
+    }
+
+    if (
+      address !== undefined &&
+      address !== null &&
+      typeof address !== "string"
+    ) {
+      console.error("[Spaces API] POST: Invalid address field type");
+      return NextResponse.json<ApiResponse>(
+        {
+          success: false,
+          error: "Invalid field type: address must be a string",
         },
         { status: 400 },
       );
@@ -321,6 +338,8 @@ export async function POST(
       data: {
         name: name.trim(),
         location: location.trim(),
+        address:
+          typeof address === "string" && address.trim() ? address.trim() : null,
         capacity,
         powerCapacity,
         status: status || "AVAILABLE",

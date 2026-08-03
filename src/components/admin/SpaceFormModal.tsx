@@ -32,6 +32,7 @@ import { Close as CloseIcon } from "@mui/icons-material";
 interface SpaceFormData {
   name: string;
   location: string;
+  address: string;
   capacity: number | string;
   powerCapacity: number | string;
   status: "AVAILABLE" | "OCCUPIED";
@@ -40,8 +41,9 @@ interface SpaceFormData {
 /**
  * Space object (from API)
  */
-interface Space extends SpaceFormData {
+interface Space extends Omit<SpaceFormData, "address"> {
   id: string;
+  address: string | null;
   createdAt: string;
   updatedAt: string;
   minerCount?: number;
@@ -68,6 +70,7 @@ export default function SpaceFormModal({
   const [formData, setFormData] = useState<SpaceFormData>({
     name: "",
     location: "",
+    address: "",
     capacity: "",
     powerCapacity: "",
     status: "AVAILABLE",
@@ -79,6 +82,7 @@ export default function SpaceFormModal({
       setFormData({
         name: space.name,
         location: space.location,
+        address: space.address || "",
         capacity: space.capacity,
         powerCapacity: space.powerCapacity,
         status: space.status,
@@ -87,6 +91,7 @@ export default function SpaceFormModal({
       setFormData({
         name: "",
         location: "",
+        address: "",
         capacity: "",
         powerCapacity: "",
         status: "AVAILABLE",
@@ -155,6 +160,7 @@ export default function SpaceFormModal({
         body: JSON.stringify({
           name: formData.name.trim(),
           location: formData.location.trim(),
+          address: formData.address.trim() || null,
           capacity: Number(formData.capacity),
           powerCapacity: Number(formData.powerCapacity),
           status: formData.status,
@@ -231,6 +237,19 @@ export default function SpaceFormModal({
             placeholder="e.g., New York, USA"
             margin="normal"
             required
+            disabled={loading || isLoading}
+          />
+
+          <TextField
+            fullWidth
+            label="Address (optional)"
+            name="address"
+            value={formData.address}
+            onChange={handleChange}
+            placeholder="e.g., 123 Main St, Suite 4"
+            margin="normal"
+            multiline
+            minRows={2}
             disabled={loading || isLoading}
           />
 
