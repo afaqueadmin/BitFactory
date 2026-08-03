@@ -99,6 +99,7 @@ export async function PUT(
       postalCode,
       isActive,
       luxorSubaccountName,
+      braiinsAuthKey,
     } = body;
 
     const stringFields: Record<string, unknown> = {
@@ -161,6 +162,89 @@ export async function PUT(
             : null,
         },
       });
+
+      // Dual-write: keep the Luxor PoolAuth row in sync with
+      // User.luxorSubaccountName (legacy, still read by ~20 other files) —
+      // same pattern as /api/user/[id] for CLIENT.
+      try {
+        const luxorPool = await prisma.pool.findUnique({
+          where: { name: "Luxor" },
+          select: { id: true },
+        });
+        if (luxorPool) {
+          if (luxorSubaccountName && String(luxorSubaccountName).trim()) {
+            await prisma.poolAuth.upsert({
+              where: {
+                poolId_userId: {
+                  poolId: luxorPool.id,
+                  userId: existingFranchise.franchiseeId,
+                },
+              },
+              create: {
+                poolId: luxorPool.id,
+                userId: existingFranchise.franchiseeId,
+                authKey: String(luxorSubaccountName).trim(),
+              },
+              update: { authKey: String(luxorSubaccountName).trim() },
+            });
+          } else {
+            await prisma.poolAuth.deleteMany({
+              where: {
+                poolId: luxorPool.id,
+                userId: existingFranchise.franchiseeId,
+              },
+            });
+          }
+        }
+      } catch (poolAuthError) {
+        console.error(
+          "[Franchisees API] Failed to sync Luxor PoolAuth:",
+          poolAuthError,
+        );
+        // Don't fail the franchise update if this fails
+      }
+    }
+
+    // Sync the Braiins credential when the field is explicitly provided:
+    // a non-empty value upserts it, an empty/null value removes it.
+    if (braiinsAuthKey !== undefined) {
+      try {
+        const braiinsPool = await prisma.pool.findUnique({
+          where: { name: "Braiins" },
+          select: { id: true },
+        });
+        if (braiinsPool) {
+          if (braiinsAuthKey && String(braiinsAuthKey).trim()) {
+            await prisma.poolAuth.upsert({
+              where: {
+                poolId_userId: {
+                  poolId: braiinsPool.id,
+                  userId: existingFranchise.franchiseeId,
+                },
+              },
+              create: {
+                poolId: braiinsPool.id,
+                userId: existingFranchise.franchiseeId,
+                authKey: String(braiinsAuthKey).trim(),
+              },
+              update: { authKey: String(braiinsAuthKey).trim() },
+            });
+          } else {
+            await prisma.poolAuth.deleteMany({
+              where: {
+                poolId: braiinsPool.id,
+                userId: existingFranchise.franchiseeId,
+              },
+            });
+          }
+        }
+      } catch (braiinsError) {
+        console.error(
+          "[Franchisees API] Failed to sync Braiins credential:",
+          braiinsError,
+        );
+        // Don't fail the franchise update if this fails
+      }
     }
 
     const updatedFranchise = await prisma.franchise.update({

@@ -71,6 +71,7 @@ const toFormData = (franchise: FranchiseData | null) => ({
   postalCode: franchise?.postalCode || "",
   isActive: franchise?.isActive ?? true,
   luxorSubaccountName: franchise?.franchisee?.luxorSubaccountName || "",
+  braiinsAuthKey: "",
 });
 
 export default function EditFranchiseeModal({
@@ -90,8 +91,40 @@ export default function EditFranchiseeModal({
       setFormData(toFormData(franchise));
       setError("");
       fetchSubaccounts(franchise?.franchisee?.luxorSubaccountName || null);
+      if (franchise?.franchisee?.id) {
+        loadCurrentBraiinsAuth(franchise.franchisee.id);
+      }
     }
   }, [open, franchise]);
+
+  /**
+   * Load the franchisee's current Braiins credential, if any — same
+   * PoolAuth lookup EditCustomerModal uses for CLIENT.
+   */
+  const loadCurrentBraiinsAuth = async (franchiseeId: string) => {
+    try {
+      const response = await fetch(`/api/pool-auth?userId=${franchiseeId}`);
+
+      if (!response.ok) return;
+
+      const data = await response.json();
+      if (!data.success || !Array.isArray(data.data)) return;
+
+      const braiinsEntry = (
+        data.data as Array<{ authKey: string; pool: { name: string } }>
+      ).find((entry) => entry.pool.name === "Braiins");
+
+      setFormData((prev) => ({
+        ...prev,
+        braiinsAuthKey: braiinsEntry?.authKey || "",
+      }));
+    } catch (err) {
+      console.error(
+        "[EditFranchiseeModal] Error loading current Braiins credential:",
+        err,
+      );
+    }
+  };
 
   /**
    * Same exclude-already-assigned pattern as CreateFranchiseeModal, except
@@ -311,6 +344,19 @@ export default function EditFranchiseeModal({
                 )}
               </Select>
             </FormControl>
+
+            <TextField
+              fullWidth
+              label="Braiins Auth Key (Optional)"
+              value={formData.braiinsAuthKey}
+              onChange={(e) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  braiinsAuthKey: e.target.value,
+                }))
+              }
+              helperText="Braiins API token for this franchisee, if applicable. Leave blank to remove."
+            />
 
             <TextField
               fullWidth

@@ -175,6 +175,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       state,
       postalCode,
       luxorSubaccountName,
+      braiinsAuthKey,
     } = body;
 
     const requiredFields: Record<string, unknown> = {
@@ -264,6 +265,72 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
       return { franchisee, franchise };
     });
+
+    // Dual-write: keep the Luxor PoolAuth row in sync with
+    // User.luxorSubaccountName (legacy, still read by ~20 other files) —
+    // same pattern as /api/user/create for CLIENT.
+    if (luxorSubaccountName && luxorSubaccountName.trim()) {
+      try {
+        const luxorPool = await prisma.pool.findUnique({
+          where: { name: "Luxor" },
+          select: { id: true },
+        });
+        if (luxorPool) {
+          await prisma.poolAuth.upsert({
+            where: {
+              poolId_userId: { poolId: luxorPool.id, userId: franchisee.id },
+            },
+            create: {
+              poolId: luxorPool.id,
+              userId: franchisee.id,
+              authKey: luxorSubaccountName.trim(),
+            },
+            update: { authKey: luxorSubaccountName.trim() },
+          });
+          console.log(
+            `[Franchisees API] Synced Luxor PoolAuth for franchisee ${franchisee.id}`,
+          );
+        }
+      } catch (poolAuthError) {
+        console.error(
+          "[Franchisees API] Failed to sync Luxor PoolAuth:",
+          poolAuthError,
+        );
+        // Don't fail franchisee creation if this fails
+      }
+    }
+
+    // Optionally assign a Braiins credential too
+    if (braiinsAuthKey && braiinsAuthKey.trim()) {
+      try {
+        const braiinsPool = await prisma.pool.findUnique({
+          where: { name: "Braiins" },
+          select: { id: true },
+        });
+        if (braiinsPool) {
+          await prisma.poolAuth.upsert({
+            where: {
+              poolId_userId: { poolId: braiinsPool.id, userId: franchisee.id },
+            },
+            create: {
+              poolId: braiinsPool.id,
+              userId: franchisee.id,
+              authKey: braiinsAuthKey.trim(),
+            },
+            update: { authKey: braiinsAuthKey.trim() },
+          });
+          console.log(
+            `[Franchisees API] Assigned Braiins credential to franchisee ${franchisee.id}`,
+          );
+        }
+      } catch (braiinsError) {
+        console.error(
+          "[Franchisees API] Failed to assign Braiins credential:",
+          braiinsError,
+        );
+        // Don't fail franchisee creation if this fails
+      }
+    }
 
     await prisma.userActivity.create({
       data: {

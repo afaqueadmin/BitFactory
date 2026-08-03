@@ -54,6 +54,7 @@ const initialFormData = {
   state: "",
   postalCode: "",
   luxorSubaccountName: "",
+  braiinsAuthKey: "",
 };
 
 export default function CreateFranchiseeModal({
@@ -356,6 +357,20 @@ export default function CreateFranchiseeModal({
                 )}
               </Select>
             </FormControl>
+
+            {/* Braiins Auth Key - Optional, no live subaccount list exists for Braiins */}
+            <TextField
+              fullWidth
+              label="Braiins Auth Key (Optional)"
+              value={formData.braiinsAuthKey}
+              onChange={(e) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  braiinsAuthKey: e.target.value,
+                }))
+              }
+              helperText="Braiins API token for this franchisee, if applicable"
+            />
 
             <Divider sx={{ my: 1 }} />
             <Typography variant="subtitle2" color="text.secondary">
