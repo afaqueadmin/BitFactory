@@ -43,7 +43,9 @@ import {
   Edit as EditIcon,
   Delete as DeleteIcon,
   MoreVert as MoreVertIcon,
+  MonetizationOn as IncentivesIcon,
 } from "@mui/icons-material";
+import { useRouter } from "next/navigation";
 import StorefrontIcon from "@mui/icons-material/Storefront";
 import AdminValueCard from "@/components/admin/AdminValueCard";
 import CreateFranchiseeModal from "@/components/CreateFranchiseeModal";
@@ -82,6 +84,7 @@ interface ApiResponse<T = Record<string, unknown>> {
 }
 
 export default function FranchiseesPage() {
+  const router = useRouter();
   const { user } = useUser();
   const isSuperAdmin = user?.role === "SUPER_ADMIN";
   const isAdmin = user?.role === "ADMIN" || user?.role === "SUPER_ADMIN";
@@ -450,6 +453,19 @@ export default function FranchiseesPage() {
                   <EditIcon fontSize="small" />
                 </ListItemIcon>
                 <ListItemText>Edit</ListItemText>
+              </MenuItem>
+              <MenuItem
+                onClick={() => {
+                  if (menuFranchise) {
+                    router.push(`/franchisees/${menuFranchise.id}/incentives`);
+                  }
+                  handleMenuClose();
+                }}
+              >
+                <ListItemIcon>
+                  <IncentivesIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText>Manage Incentives</ListItemText>
               </MenuItem>
               {isSuperAdmin && (
                 <MenuItem

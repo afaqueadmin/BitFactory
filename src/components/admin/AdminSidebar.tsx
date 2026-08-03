@@ -32,6 +32,7 @@ import {
   ChevronRight,
   Lock as LockIcon,
   People as FranchiseesIcon,
+  MonetizationOn as IncentivesIcon,
 } from "@mui/icons-material";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -68,6 +69,11 @@ const sidebarItems: SidebarItem[] = [
     title: "Franchisees",
     icon: <FranchiseesIcon />,
     path: "/franchisees",
+  },
+  {
+    title: "Incentive Payouts",
+    icon: <IncentivesIcon />,
+    path: "/incentives/payouts",
   },
   {
     title: "Customers",

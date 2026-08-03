@@ -4,6 +4,8 @@ import { verifyJwtToken } from "@/lib/jwt";
 import { AuditAction, InvoiceStatus } from "@prisma/client";
 import { sendInvoiceCancellationEmail } from "@/lib/email";
 import { getGroupByUserId } from "@/lib/groupUtils";
+import { accrueIncentivesForInvoice } from "@/lib/incentives/accrue";
+import { reverseIncentivesForInvoice } from "@/lib/incentives/reverse";
 
 function normalizeBillingMonth(billingMonth: string | Date): Date {
   const parsedBillingMonth = new Date(billingMonth);
@@ -373,6 +375,19 @@ export async function PUT(
       },
     });
 
+    if (status === "ISSUED" && currentInvoice.status !== "ISSUED") {
+      await accrueIncentivesForInvoice(id, userId);
+    } else if (
+      (status === "CANCELLED" || status === "REFUNDED") &&
+      currentInvoice.status === "ISSUED"
+    ) {
+      await reverseIncentivesForInvoice(
+        id,
+        userId,
+        `Invoice status changed to ${status} via PUT`,
+      );
+    }
+
     return NextResponse.json(invoice);
   } catch (error) {
     console.error("Update invoice error:", error);
@@ -461,6 +476,8 @@ export async function POST(
         }),
       },
     });
+
+    await reverseIncentivesForInvoice(id, userId, "Invoice cancelled by admin");
 
     // Send cancellation email to customer (non-blocking)
     if (invoice.user?.email) {

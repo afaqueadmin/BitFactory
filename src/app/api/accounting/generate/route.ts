@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
 import { AuditAction, InvoiceStatus } from "@prisma/client";
+import { accrueIncentivesForInvoice } from "@/lib/incentives/accrue";
 
 // Generate invoices from recurring invoice templates
 export async function POST(request: NextRequest) {
@@ -123,6 +124,8 @@ export async function POST(request: NextRequest) {
       where: { id: recurringInvoice.id },
       data: { lastGeneratedDate: new Date() },
     });
+
+    await accrueIncentivesForInvoice(invoice.id, userId);
 
     // Log audit
     await prisma.auditLog.create({

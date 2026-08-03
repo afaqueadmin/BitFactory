@@ -202,6 +202,12 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   [AuditAction.EMAIL_SENT]: "Email Sent",
   [AuditAction.EMAIL_FAILED]: "Email Failed",
   [AuditAction.EMAIL_RETRY]: "Email Retry",
+  [AuditAction.INCENTIVE_RATE_CREATED]: "Incentive Rate Created",
+  [AuditAction.INCENTIVE_RATE_ARCHIVED]: "Incentive Rate Archived",
+  [AuditAction.INCENTIVE_ACCRUED]: "Incentive Accrued",
+  [AuditAction.INCENTIVE_REVERSED]: "Incentive Reversed",
+  [AuditAction.INCENTIVE_CLAWBACK_CREATED]: "Incentive Clawback Created",
+  [AuditAction.INCENTIVE_PAYOUT_CREATED]: "Incentive Payout Created",
 };
 
 // ============================================================================
