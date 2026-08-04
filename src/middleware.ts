@@ -90,6 +90,7 @@ const dynamicPatternsPaths = {
     new URLPattern({ pathname: "/accounting/:path*" }),
     new URLPattern({ pathname: "/customers/:id*" }),
     new URLPattern({ pathname: "/groups/:id*" }),
+    new URLPattern({ pathname: "/franchisees/:id" }),
     new URLPattern({ pathname: "/franchisees/:id/incentives" }),
   ],
   FRANCHISEE: [...clientDynamicPatterns],

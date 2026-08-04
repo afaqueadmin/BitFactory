@@ -348,7 +348,12 @@ export default function FranchiseesPage() {
                     {franchises.map((franchise) => (
                       <TableRow
                         key={franchise.id}
+                        hover
+                        onClick={() =>
+                          router.push(`/franchisees/${franchise.id}`)
+                        }
                         sx={{
+                          cursor: "pointer",
                           "&:hover": { backgroundColor: "background.default" },
                         }}
                       >
@@ -401,7 +406,10 @@ export default function FranchiseesPage() {
                           <TableCell align="right">
                             <IconButton
                               size="small"
-                              onClick={(e) => handleMenuOpen(e, franchise)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleMenuOpen(e, franchise);
+                              }}
                               aria-label="Franchisee actions"
                             >
                               <MoreVertIcon fontSize="small" />

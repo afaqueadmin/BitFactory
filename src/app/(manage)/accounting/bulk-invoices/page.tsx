@@ -37,11 +37,13 @@ import {
   LineItemsEditor,
   LineItem,
 } from "@/components/accounting/invoices/LineItemsEditor";
+import { getMostCommonMinerLocation } from "@/lib/utils/minerLocation";
 
 interface CustomerLineItemsState {
   lineItems: LineItem[];
   loading: boolean;
   error?: string | null;
+  machineHostingLocation?: string | null;
 }
 
 // Default to current month/year — user must select billing month from dropdown
@@ -177,12 +179,19 @@ export default function BulkInvoicesPage() {
           }),
         );
 
+        // Auto-calculate the machine hosting location from the majority of
+        // this customer's miners' locations, same as the single-invoice form
+        const machineHostingLocation = getMostCommonMinerLocation(
+          data?.miners || [],
+        );
+
         setCustomerLineItems((prev) => ({
           ...prev,
           [customerId]: {
             lineItems,
             loading: false,
             error: null,
+            machineHostingLocation,
           },
         }));
       } catch (error) {
@@ -393,6 +402,8 @@ export default function BulkInvoicesPage() {
           invoiceType: "ELECTRICITY_CHARGES",
           billingMonth: billingMonthDate.toISOString(),
           lineItems,
+          machineHostingLocation:
+            customerLineItems[customerId]?.machineHostingLocation || undefined,
         });
       }
 
@@ -569,20 +580,35 @@ export default function BulkInvoicesPage() {
                                 Error: {lineItemsState.error}
                               </Typography>
                             ) : (
-                              <LineItemsEditor
-                                lineItems={lineItemsState?.lineItems ?? []}
-                                onChange={(items) =>
-                                  setCustomerLineItems((prev) => ({
-                                    ...prev,
-                                    [customer.id]: {
-                                      lineItems: items,
-                                      loading: false,
-                                      error: null,
-                                    },
-                                  }))
-                                }
-                                hardwareList={hardwareList}
-                              />
+                              <>
+                                <LineItemsEditor
+                                  lineItems={lineItemsState?.lineItems ?? []}
+                                  onChange={(items) =>
+                                    setCustomerLineItems((prev) => ({
+                                      ...prev,
+                                      [customer.id]: {
+                                        ...prev[customer.id],
+                                        lineItems: items,
+                                        loading: false,
+                                        error: null,
+                                      },
+                                    }))
+                                  }
+                                  hardwareList={hardwareList}
+                                />
+                                <Typography
+                                  variant="caption"
+                                  color="textSecondary"
+                                  sx={{ display: "block", mt: 0.5 }}
+                                >
+                                  Machine Hosting Location on the invoice will
+                                  be auto-calculated from the majority of this
+                                  customer&apos;s miners&apos; locations
+                                  {lineItemsState?.machineHostingLocation
+                                    ? `: ${lineItemsState.machineHostingLocation}`
+                                    : " (no located miners found)."}
+                                </Typography>
+                              </>
                             )}
                           </Box>
                         )}

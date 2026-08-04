@@ -33,6 +33,76 @@ async function getAuthenticatedUser(request: NextRequest) {
 }
 
 /**
+ * GET /api/franchisees/[id]
+ * Fetch a single franchise's details, including owner and creator info
+ *
+ * Authorization: Admin/Super Admin only
+ */
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+): Promise<NextResponse> {
+  try {
+    const { id } = await params;
+
+    const user = await getAuthenticatedUser(request);
+
+    if (!user) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized" } as ApiResponse,
+        { status: 401 },
+      );
+    }
+
+    if (user.role !== "ADMIN" && user.role !== "SUPER_ADMIN") {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Forbidden: Only Admin/Super Admin can view franchisees",
+        } as ApiResponse,
+        { status: 403 },
+      );
+    }
+
+    const franchise = await prisma.franchise.findUnique({
+      where: { id },
+      include: {
+        franchisee: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            luxorSubaccountName: true,
+          },
+        },
+        createdBy: { select: { id: true, name: true, email: true } },
+        _count: { select: { users: true } },
+      },
+    });
+
+    if (!franchise || franchise.deletedAt) {
+      return NextResponse.json(
+        { success: false, error: "Franchise not found" } as ApiResponse,
+        { status: 404 },
+      );
+    }
+
+    return NextResponse.json(
+      { success: true, data: franchise } as ApiResponse,
+      { status: 200 },
+    );
+  } catch (error) {
+    const errorMsg =
+      error instanceof Error ? error.message : "Unknown error occurred";
+    console.error("[Franchisees API] GET[id] - Error:", errorMsg);
+    return NextResponse.json(
+      { success: false, error: errorMsg } as ApiResponse,
+      { status: 500 },
+    );
+  }
+}
+
+/**
  * PUT /api/franchisees/[id]
  * Update a franchise's business details
  *

@@ -64,27 +64,17 @@ export async function PUT(
       luxorSubaccountName,
     } = body;
 
-    if (luxorSubaccountName !== undefined && luxorSubaccountName !== null) {
-      const trimmed = String(luxorSubaccountName).trim();
-      if (!trimmed) {
-        return NextResponse.json(
-          { success: false, error: "Luxor subaccount cannot be empty" },
-          { status: 400 },
-        );
-      }
-      const existing = await prisma.user.findFirst({
-        where: { luxorSubaccountName: trimmed, id: { not: id } },
-        select: { id: true },
-      });
-      if (existing) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: "This Luxor subaccount is already assigned",
-          },
-          { status: 400 },
-        );
-      }
+    // Franchisees are not permitted to view, assign, or remove a customer's
+    // subaccount — reject the request outright rather than silently
+    // dropping the field, so a direct API call can't slip it through.
+    if (luxorSubaccountName !== undefined) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Franchisees are not permitted to manage customer subaccounts",
+        },
+        { status: 403 },
+      );
     }
 
     const updated = await prisma.user.update({
@@ -97,9 +87,20 @@ export async function PUT(
         ...(city !== undefined && { city }),
         ...(country !== undefined && { country }),
         ...(companyUrl !== undefined && { companyUrl }),
-        ...(luxorSubaccountName !== undefined && {
-          luxorSubaccountName: String(luxorSubaccountName).trim(),
-        }),
+      },
+      // Explicit select: never return password or subaccount info to a
+      // franchisee, even incidentally, on a route they don't own the
+      // full user record semantics of.
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phoneNumber: true,
+        companyName: true,
+        streetAddress: true,
+        city: true,
+        country: true,
+        companyUrl: true,
       },
     });
 

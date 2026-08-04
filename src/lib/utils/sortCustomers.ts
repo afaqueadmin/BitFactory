@@ -44,7 +44,6 @@ interface Customer {
   country: string;
   phoneNumber: string;
   companyName: string;
-  luxorSubaccountName: string;
   pools: string;
   streetAddress: string;
   twoFactorEnabled: boolean;

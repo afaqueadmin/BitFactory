@@ -62,7 +62,6 @@ interface Customer {
   phoneNumber: string;
   companyName: string;
   streetAddress: string;
-  luxorSubaccountName: string;
   pools: string;
   twoFactorEnabled: boolean;
   joinDate: string;

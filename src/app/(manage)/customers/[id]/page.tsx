@@ -9,6 +9,8 @@ import {
   CircularProgress,
   Alert,
   Button,
+  ToggleButton,
+  ToggleButtonGroup,
 } from "@mui/material";
 import { ArrowBack as ArrowBackIcon } from "@mui/icons-material";
 import { useQuery } from "@tanstack/react-query";
@@ -16,6 +18,7 @@ import ElectricityCostTable from "@/components/ElectricityCostTable";
 import HostedMinersList from "@/components/HostedMinersList";
 import PoolAuthSection from "@/components/PoolAuthSection";
 import TransactionHistorySection from "@/components/TransactionHistorySection";
+import CustomerInvoicesTable from "@/components/CustomerInvoicesTable";
 import BalanceCard from "@/components/dashboardCards/BalanceCard";
 import CostsCard from "@/components/dashboardCards/CostsCard";
 import EstimatedMiningDaysLeftCard from "@/components/dashboardCards/EstimatedMiningDaysLeftCard";
@@ -111,6 +114,9 @@ export default function CustomerDetailPage() {
   const params = useParams();
   const router = useRouter();
   const customerId = params.id as string;
+  const [activeView, setActiveView] = React.useState<
+    "statement" | "transactions" | "invoices"
+  >("statement");
 
   // Fetch customer details
   const {
@@ -708,24 +714,7 @@ export default function CustomerDetailPage() {
             <HostedMinersList customerId={customerId} />
           </Paper>
 
-          {/* Account Statement Section */}
-          <Paper
-            elevation={3}
-            sx={{
-              p: 3,
-              borderRadius: 2,
-              background: (theme) =>
-                theme.palette.mode === "dark"
-                  ? "linear-gradient(145deg, rgba(40,40,40,0.9), rgba(30,30,30,0.9))"
-                  : "linear-gradient(145deg, rgba(255,255,255,0.9), rgba(250,250,250,0.9))",
-              backdropFilter: "blur(10px)",
-              border: (theme) => `1px solid ${theme.palette.divider}`,
-            }}
-          >
-            <ElectricityCostTable customerId={customerId} />
-          </Paper>
-
-          {/* Transaction History Section */}
+          {/* Account Statement / Transaction History / Invoices Section */}
           <Paper
             elevation={3}
             sx={{
@@ -740,7 +729,33 @@ export default function CustomerDetailPage() {
               border: (theme) => `1px solid ${theme.palette.divider}`,
             }}
           >
-            <TransactionHistorySection customerId={customerId} />
+            <ToggleButtonGroup
+              value={activeView}
+              exclusive
+              onChange={(event, newView) => {
+                if (newView !== null) {
+                  setActiveView(newView);
+                }
+              }}
+              size="small"
+              sx={{ flexWrap: "wrap", mb: 1 }}
+            >
+              <ToggleButton value="statement">Account Statement</ToggleButton>
+              <ToggleButton value="transactions">
+                Transaction History
+              </ToggleButton>
+              <ToggleButton value="invoices">Invoices</ToggleButton>
+            </ToggleButtonGroup>
+
+            {activeView === "statement" && (
+              <ElectricityCostTable customerId={customerId} />
+            )}
+            {activeView === "transactions" && (
+              <TransactionHistorySection customerId={customerId} />
+            )}
+            {activeView === "invoices" && (
+              <CustomerInvoicesTable customerId={customerId} />
+            )}
           </Paper>
         </>
       )}

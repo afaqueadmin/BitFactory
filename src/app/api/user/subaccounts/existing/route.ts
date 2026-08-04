@@ -18,12 +18,21 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Verify token (just to ensure user is authenticated)
+    let decoded;
     try {
-      await verifyJwtToken(token);
+      decoded = await verifyJwtToken(token);
     } catch (error) {
       console.error("Token verification failed:", error);
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
+    }
+
+    // Subaccount assignment is an admin-only capability — franchisees must
+    // not be able to view which Luxor subaccounts exist/are taken.
+    if (decoded.role !== "ADMIN" && decoded.role !== "SUPER_ADMIN") {
+      return NextResponse.json(
+        { error: "Only administrators can view subaccount assignments" },
+        { status: 403 },
+      );
     }
 
     // Fetch all non-null luxorSubaccountName values from database, plus all

@@ -60,7 +60,6 @@ export async function GET(request: NextRequest) {
         phoneNumber: true,
         companyName: true,
         streetAddress: true,
-        luxorSubaccountName: true,
         twoFactorEnabled: true,
         createdAt: true,
         isDeleted: true,
@@ -100,7 +99,6 @@ export async function GET(request: NextRequest) {
         phoneNumber: c.phoneNumber || "N/A",
         companyName: c.companyName || "N/A",
         streetAddress: c.streetAddress || "N/A",
-        luxorSubaccountName: c.luxorSubaccountName || "N/A",
         pools: c.poolAuths
           .map((pa) => pa.pool.name)
           .sort()
