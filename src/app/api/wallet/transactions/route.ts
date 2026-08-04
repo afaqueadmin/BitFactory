@@ -326,7 +326,7 @@ export async function GET(request: NextRequest) {
             transaction_category: "payout",
             currency_amount: btcAmount,
             usd_equivalent: 0, // Braiins API doesn't provide USD equivalent
-            transaction_id: payout.tx_id || "pending",
+            transaction_id: payout.tx_id || "",
             transaction_type: "credit", // Payouts are always credits
           });
 
