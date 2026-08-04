@@ -79,11 +79,13 @@ export default function EditInvoicePage() {
             model: string;
             quantity: number;
             unitPrice: number | string;
+            lineItemType?: "HARDWARE" | "HOSTING_COLOCATION";
           }) => ({
             hardwareId: li.hardwareId || "",
             model: li.model,
             quantity: li.quantity,
             unitPrice: Number(li.unitPrice),
+            lineItemType: li.lineItemType || "HARDWARE",
           }),
         ),
       );
@@ -208,6 +210,7 @@ export default function EditInvoicePage() {
                     onChange={setLineItems}
                     hardwareList={hardwareList}
                     excludeUsedModels
+                    enableHostingColocation
                   />
                 ) : (
                   <>

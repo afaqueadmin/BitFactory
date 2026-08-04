@@ -108,6 +108,7 @@ export async function POST(
         quantity: li.quantity,
         unitPrice: Number(li.unitPrice),
         totalPrice: Number(li.totalPrice),
+        lineItemType: li.lineItemType,
       })),
     };
 

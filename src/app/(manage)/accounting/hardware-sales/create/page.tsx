@@ -307,7 +307,8 @@ export default function CreateHardwareSalesInvoicePage() {
               <Stack spacing={2}>
                 <Typography variant="body2" color="textSecondary">
                   Add each hardware model being sold, with its quantity and unit
-                  price.
+                  price. Optionally add first-month Hosting & Colocation charges
+                  for the added models.
                 </Typography>
                 <LineItemsEditor
                   lineItems={lineItems}
@@ -315,6 +316,7 @@ export default function CreateHardwareSalesInvoicePage() {
                   hardwareList={hardwareList}
                   disabled={hardwareLoading}
                   excludeUsedModels
+                  enableHostingColocation
                 />
               </Stack>
             </Box>

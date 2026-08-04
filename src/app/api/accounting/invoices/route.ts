@@ -302,6 +302,7 @@ export async function POST(request: NextRequest) {
       quantity: number;
       unitPrice: number;
       totalPrice: number;
+      lineItemType: "HARDWARE" | "HOSTING_COLOCATION";
     }> = [];
 
     if (hasLineItems) {
@@ -315,12 +316,15 @@ export async function POST(request: NextRequest) {
           typeof item.quantity !== "number" ||
           item.quantity <= 0 ||
           typeof item.unitPrice !== "number" ||
-          item.unitPrice <= 0
+          item.unitPrice <= 0 ||
+          (item.lineItemType !== undefined &&
+            item.lineItemType !== "HARDWARE" &&
+            item.lineItemType !== "HOSTING_COLOCATION")
         ) {
           return NextResponse.json(
             {
               error:
-                "Each line item requires hardwareId, model, quantity > 0, and unitPrice > 0",
+                "Each line item requires hardwareId, model, quantity > 0, unitPrice > 0, and a valid lineItemType",
             },
             { status: 400 },
           );
@@ -333,6 +337,7 @@ export async function POST(request: NextRequest) {
           model: string;
           quantity: number;
           unitPrice: number;
+          lineItemType?: "HARDWARE" | "HOSTING_COLOCATION";
         }) => ({
           hardwareId: item.hardwareId,
           model: item.model,
@@ -341,6 +346,7 @@ export async function POST(request: NextRequest) {
           totalPrice: parseFloat(
             (item.quantity * Number(item.unitPrice)).toFixed(2),
           ),
+          lineItemType: item.lineItemType || "HARDWARE",
         }),
       );
 

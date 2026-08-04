@@ -17,11 +17,14 @@ import { useState } from "react";
 import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
 
+export type LineItemType = "HARDWARE" | "HOSTING_COLOCATION";
+
 export interface LineItem {
   hardwareId: string;
   model: string;
   quantity: number;
   unitPrice: number;
+  lineItemType: LineItemType;
 }
 
 export interface HardwareOption {
@@ -35,9 +38,31 @@ interface LineItemsEditorProps {
   hardwareList: HardwareOption[];
   disabled?: boolean;
   excludeUsedModels?: boolean;
+  enableHostingColocation?: boolean;
 }
 
 const round2 = (value: number) => Math.round(value * 100) / 100;
+
+// Hardware rows always render/submit above Hosting & Colocation rows,
+// regardless of the order they were added in.
+const LINE_ITEM_TYPE_RANK: Record<LineItemType, number> = {
+  HARDWARE: 0,
+  HOSTING_COLOCATION: 1,
+};
+
+export function sortLineItems<T extends { lineItemType: LineItemType }>(
+  items: T[],
+): T[] {
+  return items
+    .map((item, index) => ({ item, index }))
+    .sort((a, b) => {
+      const rankDiff =
+        LINE_ITEM_TYPE_RANK[a.item.lineItemType] -
+        LINE_ITEM_TYPE_RANK[b.item.lineItemType];
+      return rankDiff !== 0 ? rankDiff : a.index - b.index;
+    })
+    .map(({ item }) => item);
+}
 
 export function LineItemsEditor({
   lineItems,
@@ -45,13 +70,26 @@ export function LineItemsEditor({
   hardwareList,
   disabled = false,
   excludeUsedModels = false,
+  enableHostingColocation = false,
 }: LineItemsEditorProps) {
   const [newHardwareId, setNewHardwareId] = useState("");
 
-  const usedHardwareIds = new Set(lineItems.map((item) => item.hardwareId));
+  const hardwareRows = lineItems.filter(
+    (item) => item.lineItemType === "HARDWARE",
+  );
+  const usedHardwareIds = new Set(hardwareRows.map((item) => item.hardwareId));
   const addableHardwareList = excludeUsedModels
     ? hardwareList.filter((hw) => !usedHardwareIds.has(hw.id))
     : hardwareList;
+
+  const hostingableHardwareRows = hardwareRows.filter(
+    (hw) =>
+      !lineItems.some(
+        (item) =>
+          item.lineItemType === "HOSTING_COLOCATION" &&
+          item.hardwareId === hw.hardwareId,
+      ),
+  );
 
   const totalMiners = lineItems.reduce(
     (sum, item) => sum + (item.quantity || 0),
@@ -72,7 +110,20 @@ export function LineItemsEditor({
   };
 
   const removeRow = (index: number) => {
-    onChange(lineItems.filter((_, i) => i !== index));
+    const removed = lineItems[index];
+    // Removing a hardware model also removes its paired hosting row, if any.
+    const next = lineItems.filter((item, i) => {
+      if (i === index) return false;
+      if (
+        removed?.lineItemType === "HARDWARE" &&
+        item.lineItemType === "HOSTING_COLOCATION" &&
+        item.hardwareId === removed.hardwareId
+      ) {
+        return false;
+      }
+      return true;
+    });
+    onChange(next);
   };
 
   const addRow = () => {
@@ -85,10 +136,32 @@ export function LineItemsEditor({
         model: hardware.model,
         quantity: 1,
         unitPrice: 0,
+        lineItemType: "HARDWARE",
       },
     ]);
     setNewHardwareId("");
   };
+
+  const addHostingRows = () => {
+    const newRows: LineItem[] = hostingableHardwareRows.map((hw) => ({
+      hardwareId: hw.hardwareId,
+      model: `Hosting & Colocation (${hw.model})`,
+      quantity: hw.quantity,
+      unitPrice: 0,
+      lineItemType: "HOSTING_COLOCATION",
+    }));
+    if (newRows.length === 0) return;
+    onChange([...lineItems, ...newRows]);
+  };
+
+  const displayOrder = lineItems
+    .map((item, index) => ({ item, index }))
+    .sort((a, b) => {
+      const rankDiff =
+        LINE_ITEM_TYPE_RANK[a.item.lineItemType] -
+        LINE_ITEM_TYPE_RANK[b.item.lineItemType];
+      return rankDiff !== 0 ? rankDiff : a.index - b.index;
+    });
 
   return (
     <Box>
@@ -124,7 +197,7 @@ export function LineItemsEditor({
               </TableCell>
             </TableRow>
           )}
-          {lineItems.map((item, index) => {
+          {displayOrder.map(({ item, index }) => {
             const rowTotal = round2(
               (item.quantity || 0) * (item.unitPrice || 0),
             );
@@ -211,6 +284,18 @@ export function LineItemsEditor({
           Add Line Item
         </Button>
       </Box>
+
+      {enableHostingColocation && (
+        <Box sx={{ mt: 1 }}>
+          <Button
+            startIcon={<AddIcon />}
+            onClick={addHostingRows}
+            disabled={disabled || hostingableHardwareRows.length === 0}
+          >
+            Add Hosting & Colocation
+          </Button>
+        </Box>
+      )}
 
       <Box sx={{ p: 2, backgroundColor: "#f5f5f5", borderRadius: 1, mt: 2 }}>
         <strong>Total Amount: ${totalAmount.toFixed(2)}</strong>

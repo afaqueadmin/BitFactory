@@ -410,7 +410,26 @@ export interface InvoicePdfLineItem {
   quantity: number;
   unitPrice: number | string;
   totalPrice: number | string;
+  lineItemType?: "HARDWARE" | "HOSTING_COLOCATION";
 }
+
+// Hardware rows are always listed above Hosting & Colocation rows on the
+// invoice PDF, regardless of the order they were stored/passed in.
+const LINE_ITEM_TYPE_RANK: Record<"HARDWARE" | "HOSTING_COLOCATION", number> = {
+  HARDWARE: 0,
+  HOSTING_COLOCATION: 1,
+};
+
+const sortPdfLineItems = (items: InvoicePdfLineItem[]): InvoicePdfLineItem[] =>
+  items
+    .map((item, index) => ({ item, index }))
+    .sort((a, b) => {
+      const rankDiff =
+        LINE_ITEM_TYPE_RANK[a.item.lineItemType || "HARDWARE"] -
+        LINE_ITEM_TYPE_RANK[b.item.lineItemType || "HARDWARE"];
+      return rankDiff !== 0 ? rankDiff : a.index - b.index;
+    })
+    .map(({ item }) => item);
 
 const buildProductRowsHtml = (
   totalMiners: number,
@@ -422,7 +441,7 @@ const buildProductRowsHtml = (
 ): string => {
   const rows =
     lineItems && lineItems.length > 0
-      ? lineItems.map((item) => ({
+      ? sortPdfLineItems(lineItems).map((item) => ({
           model: item.model,
           quantity: item.quantity,
           unitPrice: Number(item.unitPrice),

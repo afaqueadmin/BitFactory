@@ -176,6 +176,7 @@ export default function BulkInvoicesPage() {
             model: li.model,
             quantity: li.quantity,
             unitPrice: li.suggestedUnitPrice,
+            lineItemType: "HARDWARE" as const,
           }),
         );
 

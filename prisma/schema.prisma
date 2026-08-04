@@ -502,15 +502,16 @@ model Invoice {
 }
 
 model InvoiceLineItem {
-  id         String   @id @default(cuid())
-  invoiceId  String
-  hardwareId String?
-  model      String
-  quantity   Int
-  unitPrice  Decimal  @db.Decimal(10, 2)
-  totalPrice Decimal  @db.Decimal(12, 2)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id           String              @id @default(cuid())
+  invoiceId    String
+  hardwareId   String?
+  model        String
+  quantity     Int
+  unitPrice    Decimal             @db.Decimal(10, 2)
+  totalPrice   Decimal             @db.Decimal(12, 2)
+  lineItemType InvoiceLineItemType @default(HARDWARE)
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
 
   invoice  Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   hardware Hardware? @relation(fields: [hardwareId], references: [id])
@@ -795,6 +796,11 @@ enum InvoiceType {
   ELECTRICITY_CHARGES
   HARDWARE_PURCHASE
   HARDWARE_SALES
+}
+
+enum InvoiceLineItemType {
+  HARDWARE
+  HOSTING_COLOCATION
 }
 
 enum IncentiveType {

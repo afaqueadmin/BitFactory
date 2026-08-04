@@ -21,6 +21,7 @@ export interface InvoiceLineItemInput {
   model: string;
   quantity: number;
   unitPrice: number;
+  lineItemType?: "HARDWARE" | "HOSTING_COLOCATION";
 }
 
 export interface InvoiceWithDetails extends Invoice {
@@ -462,6 +463,9 @@ export function useRecordPayment() {
         amountPaid: number;
         paymentDate: string;
         notes?: string;
+        hostingAmountPaid?: number;
+        hostingNotes?: string;
+        markAsPaid?: boolean;
       };
     }) => {
       const res = await fetch(
@@ -493,6 +497,8 @@ export function useRecordPayment() {
         amountPaid: number;
         paymentDate: string;
         notes?: string;
+        hostingAmountPaid?: number;
+        hostingNotes?: string;
         markAsPaid?: boolean;
       },
     ) => mutation.mutateAsync({ invoiceId, data }),
