@@ -100,7 +100,6 @@ export default function TransactionHistorySection({
   const [data, setData] = useState<TransactionResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   // Calculate date range based on mode
   const getDateRange = () => {
@@ -537,33 +536,24 @@ export default function TransactionHistorySection({
                     <TableCell
                       sx={{ fontSize: "0.75rem", fontFamily: "monospace" }}
                     >
-                      <span
-                        title={
-                          copiedId === tx.transaction_id
-                            ? "Copied!"
-                            : `Click to copy: ${tx.transaction_id}`
-                        }
-                        onClick={() => {
-                          navigator.clipboard.writeText(tx.transaction_id);
-                          setCopiedId(tx.transaction_id);
-                          setTimeout(() => setCopiedId(null), 2000);
-                        }}
-                        style={{
-                          cursor: "pointer",
-                          textDecoration: "underline",
-                          color:
-                            copiedId === tx.transaction_id
-                              ? "green"
-                              : "inherit",
-                          fontWeight:
-                            copiedId === tx.transaction_id ? 600 : 400,
-                          transition: "all 0.2s",
-                        }}
-                      >
-                        {copiedId === tx.transaction_id
-                          ? "Copied!"
-                          : tx.transaction_id.substring(0, 8) + "..."}
-                      </span>
+                      {tx.transaction_id ? (
+                        <a
+                          href={`https://mempool.space/tx/${tx.transaction_id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title={`View on mempool.space: ${tx.transaction_id}`}
+                          style={{
+                            textDecoration: "underline",
+                            color: "inherit",
+                          }}
+                        >
+                          {tx.transaction_id.length > 8
+                            ? tx.transaction_id.substring(0, 8) + "..."
+                            : tx.transaction_id}
+                        </a>
+                      ) : (
+                        <span>N/A</span>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
