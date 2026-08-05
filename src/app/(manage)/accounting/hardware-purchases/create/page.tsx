@@ -7,6 +7,7 @@ import {
   Paper,
   Stack,
   TextField,
+  MenuItem,
   CircularProgress,
   Alert,
   Typography,
@@ -16,11 +17,15 @@ import { useRouter } from "next/navigation";
 import SaveIcon from "@mui/icons-material/Save";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import Link from "next/link";
-import { useCreateHardwarePurchase } from "@/lib/hooks/useHardwarePurchases";
+import {
+  useCreateHardwarePurchase,
+  VENDOR_NAME_OPTIONS,
+  VendorNameValue,
+} from "@/lib/hooks/useHardwarePurchases";
 
 export interface HardwarePurchaseFormData {
   invoiceNumber: string;
-  vendorName: string;
+  vendorName: VendorNameValue | "";
   hardwareDescription: string;
   billingDate: string;
   dueDate: string;
@@ -125,7 +130,7 @@ export default function CreateHardwarePurchasePage() {
 
       await createHardwarePurchase.mutateAsync({
         invoiceNumber: formData.invoiceNumber,
-        vendorName: formData.vendorName,
+        vendorName: formData.vendorName as VendorNameValue,
         hardwareDescription: formData.hardwareDescription,
         billingDate: formData.billingDate,
         dueDate: formData.dueDate,
@@ -198,15 +203,22 @@ export default function CreateHardwarePurchasePage() {
                 disabled={saving}
               />
               <TextField
+                select
                 fullWidth
                 label="Vendor Name"
                 name="vendorName"
                 value={formData.vendorName}
                 onChange={handleInputChange}
-                placeholder="e.g., Bitmain"
                 required
                 disabled={saving}
-              />
+              >
+                <MenuItem value="">-- Select Vendor --</MenuItem>
+                {VENDOR_NAME_OPTIONS.map((option) => (
+                  <MenuItem key={option.value} value={option.value}>
+                    {option.label}
+                  </MenuItem>
+                ))}
+              </TextField>
             </Stack>
 
             {/* Row 2: Hardware Description */}

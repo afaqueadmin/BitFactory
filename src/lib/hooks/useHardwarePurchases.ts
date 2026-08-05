@@ -1,9 +1,24 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
+export type VendorNameValue = "HASHLABS_PTE_LTD" | "QRB_LABS" | "LUXOR_TECH";
+
+export const VENDOR_NAME_OPTIONS: Array<{
+  value: VendorNameValue;
+  label: string;
+}> = [
+  { value: "HASHLABS_PTE_LTD", label: "HashLabs Pte Ltd" },
+  { value: "QRB_LABS", label: "QRB Labs" },
+  { value: "LUXOR_TECH", label: "Luxor Tech" },
+];
+
+export const VENDOR_NAME_LABELS: Record<string, string> = Object.fromEntries(
+  VENDOR_NAME_OPTIONS.map((o) => [o.value, o.label]),
+);
+
 export interface HardwarePurchaseInvoice {
   id: string;
   invoiceNumber: string;
-  vendorName: string;
+  vendorName: VendorNameValue;
   hardwareDescription: string;
   billingDate: Date;
   paidDate: Date | null;
@@ -96,7 +111,7 @@ export const useCreateHardwarePurchase = () => {
   return useMutation({
     mutationFn: async (data: {
       invoiceNumber: string;
-      vendorName: string;
+      vendorName: VendorNameValue;
       hardwareDescription: string;
       billingDate: string;
       dueDate: string;

@@ -552,7 +552,7 @@ model VendorInvoice {
 model HardwarePurchaseInvoice {
   id                   String              @id @default(cuid())
   invoiceNumber        String              @unique
-  vendorName           String
+  vendorName           VendorName
   hardwareDescription  String
   billingDate          DateTime            @db.Date
   paidDate             DateTime?
@@ -869,6 +869,12 @@ enum VendorPaymentStatus {
   Paid
   Pending
   Cancelled
+}
+
+enum VendorName {
+  HASHLABS_PTE_LTD
+  QRB_LABS
+  LUXOR_TECH
 }
 
 // Payment Details for Invoice PDF - Admin configurable settings

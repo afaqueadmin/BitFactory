@@ -2,10 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
 import { Decimal } from "@prisma/client/runtime/library";
+import {
+  VENDOR_NAME_OPTIONS,
+  VendorNameValue,
+} from "@/lib/hooks/useHardwarePurchases";
+
+const VALID_VENDOR_NAMES = VENDOR_NAME_OPTIONS.map((o) => o.value);
 
 interface UpdateHardwarePurchaseRequest {
   invoiceNumber?: string;
-  vendorName?: string;
+  vendorName?: VendorNameValue;
   hardwareDescription?: string;
   billingDate?: string;
   dueDate?: string;
@@ -128,6 +134,18 @@ export async function PUT(
       );
     }
 
+    if (
+      body.vendorName !== undefined &&
+      !VALID_VENDOR_NAMES.includes(body.vendorName)
+    ) {
+      return NextResponse.json(
+        {
+          error: `vendorName must be one of: ${VALID_VENDOR_NAMES.join(", ")}`,
+        },
+        { status: 400 },
+      );
+    }
+
     // If invoice number is being changed, check for duplicates
     if (
       body.invoiceNumber &&
@@ -149,7 +167,7 @@ export async function PUT(
     interface UpdateDataType {
       updatedBy: string;
       invoiceNumber?: string;
-      vendorName?: string;
+      vendorName?: VendorNameValue;
       hardwareDescription?: string;
       billingDate?: Date;
       dueDate?: Date;
