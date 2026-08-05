@@ -33,6 +33,7 @@ import {
   TableHead,
   TableRow,
 } from "@mui/material";
+import { sortLineItems } from "@/components/accounting/invoices/LineItemsEditor";
 import {
   useInvoice,
   useDeleteInvoice,
@@ -532,26 +533,27 @@ export default function InvoiceDetailPage() {
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {invoice.lineItems.map(
-                      (item: {
+                    {sortLineItems(
+                      invoice.lineItems as Array<{
                         id: string;
                         model: string;
                         quantity: number;
                         unitPrice: number | string;
                         totalPrice: number | string;
-                      }) => (
-                        <TableRow key={item.id}>
-                          <TableCell>{item.model}</TableCell>
-                          <TableCell align="right">{item.quantity}</TableCell>
-                          <TableCell align="right">
-                            ${Number(item.unitPrice).toFixed(2)}
-                          </TableCell>
-                          <TableCell align="right">
-                            ${Number(item.totalPrice).toFixed(2)}
-                          </TableCell>
-                        </TableRow>
-                      ),
-                    )}
+                        lineItemType: "HARDWARE" | "HOSTING_COLOCATION";
+                      }>,
+                    ).map((item) => (
+                      <TableRow key={item.id}>
+                        <TableCell>{item.model}</TableCell>
+                        <TableCell align="right">{item.quantity}</TableCell>
+                        <TableCell align="right">
+                          ${Number(item.unitPrice).toFixed(2)}
+                        </TableCell>
+                        <TableCell align="right">
+                          ${Number(item.totalPrice).toFixed(2)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
                   </TableBody>
                 </Table>
               </CardContent>

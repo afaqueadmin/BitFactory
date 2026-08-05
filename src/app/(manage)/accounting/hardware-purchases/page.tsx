@@ -31,6 +31,7 @@ import EditIcon from "@mui/icons-material/Edit";
 import {
   useHardwarePurchases,
   HardwarePurchaseInvoice,
+  VENDOR_NAME_LABELS,
 } from "@/lib/hooks/useHardwarePurchases";
 import EditHardwarePurchaseModal from "@/components/accounting/EditHardwarePurchaseModal";
 
@@ -294,7 +295,10 @@ export default function HardwarePurchases() {
                           {invoice.invoiceNumber}
                         </Link>
                       </TableCell>
-                      <TableCell>{invoice.vendorName}</TableCell>
+                      <TableCell>
+                        {VENDOR_NAME_LABELS[invoice.vendorName] ||
+                          invoice.vendorName}
+                      </TableCell>
                       <TableCell>{invoice.hardwareDescription}</TableCell>
                       <TableCell>
                         <CurrencyDisplay value={invoice.totalAmount} />

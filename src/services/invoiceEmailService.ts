@@ -25,6 +25,7 @@ export interface InvoiceEmailPayload {
     quantity: number;
     unitPrice: number;
     totalPrice: number;
+    lineItemType?: "HARDWARE" | "HOSTING_COLOCATION";
   }>;
   invoiceType?: string | null;
   machineHostingLocation?: string | null;

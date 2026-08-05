@@ -94,6 +94,7 @@ export interface InvoiceLineItem {
   quantity: number;
   unitPrice: number;
   totalPrice: number;
+  lineItemType: "HARDWARE" | "HOSTING_COLOCATION";
   createdAt: Date;
   updatedAt: Date;
 }
@@ -191,6 +192,7 @@ export interface CreateInvoiceRequest {
     model: string;
     quantity: number;
     unitPrice: number;
+    lineItemType?: "HARDWARE" | "HOSTING_COLOCATION";
   }>;
 }
 
@@ -206,6 +208,7 @@ export interface UpdateInvoiceRequest {
     model: string;
     quantity: number;
     unitPrice: number;
+    lineItemType?: "HARDWARE" | "HOSTING_COLOCATION";
   }>;
 }
 

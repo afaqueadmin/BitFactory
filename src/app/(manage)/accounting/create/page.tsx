@@ -146,6 +146,7 @@ export default function CreateInvoicePage() {
           model: li.model,
           quantity: li.quantity,
           unitPrice: li.suggestedUnitPrice,
+          lineItemType: "HARDWARE" as const,
         })),
       );
       const derivedLocation = getMostCommonMinerLocation(customerMiners);

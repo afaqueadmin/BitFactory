@@ -106,6 +106,7 @@ export async function POST(request: NextRequest) {
         quantity: li.quantity,
         unitPrice: Number(li.unitPrice),
         totalPrice: Number(li.totalPrice),
+        lineItemType: li.lineItemType,
       })),
     }));
 

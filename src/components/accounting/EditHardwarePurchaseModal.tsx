@@ -8,6 +8,7 @@ import {
   DialogContentText,
   DialogActions,
   TextField,
+  MenuItem,
   Button,
   Box,
   IconButton,
@@ -22,6 +23,8 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import {
   HardwarePurchaseInvoice,
   useDeleteHardwarePurchase,
+  VENDOR_NAME_OPTIONS,
+  VendorNameValue,
 } from "@/lib/hooks/useHardwarePurchases";
 import { HardwarePurchaseFormData } from "@/app/(manage)/accounting/hardware-purchases/create/page";
 
@@ -206,7 +209,7 @@ export default function EditHardwarePurchaseModal({
         },
         body: JSON.stringify({
           invoiceNumber: formData.invoiceNumber,
-          vendorName: formData.vendorName,
+          vendorName: formData.vendorName as VendorNameValue,
           hardwareDescription: formData.hardwareDescription,
           billingDate: formData.billingDate,
           dueDate: formData.dueDate,
@@ -309,16 +312,23 @@ export default function EditHardwarePurchaseModal({
                     size="small"
                   />
                   <TextField
+                    select
                     fullWidth
                     label="Vendor Name"
                     name="vendorName"
                     value={formData.vendorName || ""}
                     onChange={handleInputChange}
-                    placeholder="e.g., Bitmain"
                     required
                     disabled={saving}
                     size="small"
-                  />
+                  >
+                    <MenuItem value="">-- Select Vendor --</MenuItem>
+                    {VENDOR_NAME_OPTIONS.map((option) => (
+                      <MenuItem key={option.value} value={option.value}>
+                        {option.label}
+                      </MenuItem>
+                    ))}
+                  </TextField>
                 </Stack>
 
                 {/* Row 2: Hardware Description */}

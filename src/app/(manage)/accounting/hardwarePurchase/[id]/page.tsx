@@ -26,6 +26,7 @@ import Link from "next/link";
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
 import { DateDisplay } from "@/components/accounting/common/DateDisplay";
 import { StatusBadge } from "@/components/accounting/common/StatusBadge";
+import { VENDOR_NAME_LABELS } from "@/lib/hooks/useHardwarePurchases";
 
 interface HardwarePurchaseDetail {
   id: string;
@@ -272,7 +273,9 @@ export default function HardwarePurchaseDetailPage() {
               >
                 Vendor Name
               </Typography>
-              <Typography variant="body1">{invoice.vendorName}</Typography>
+              <Typography variant="body1">
+                {VENDOR_NAME_LABELS[invoice.vendorName] || invoice.vendorName}
+              </Typography>
             </Box>
 
             {/* Hardware Description */}

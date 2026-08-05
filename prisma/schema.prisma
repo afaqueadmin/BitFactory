@@ -521,15 +521,16 @@ model Invoice {
 }
 
 model InvoiceLineItem {
-  id         String   @id @default(cuid())
-  invoiceId  String
-  hardwareId String?
-  model      String
-  quantity   Int
-  unitPrice  Decimal  @db.Decimal(10, 2)
-  totalPrice Decimal  @db.Decimal(12, 2)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id           String              @id @default(cuid())
+  invoiceId    String
+  hardwareId   String?
+  model        String
+  quantity     Int
+  unitPrice    Decimal             @db.Decimal(10, 2)
+  totalPrice   Decimal             @db.Decimal(12, 2)
+  lineItemType InvoiceLineItemType @default(HARDWARE)
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
 
   invoice  Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   hardware Hardware? @relation(fields: [hardwareId], references: [id])
@@ -570,7 +571,7 @@ model VendorInvoice {
 model HardwarePurchaseInvoice {
   id                   String              @id @default(cuid())
   invoiceNumber        String              @unique
-  vendorName           String
+  vendorName           VendorName
   hardwareDescription  String
   billingDate          DateTime            @db.Date
   paidDate             DateTime?
@@ -816,6 +817,11 @@ enum InvoiceType {
   HARDWARE_SALES
 }
 
+enum InvoiceLineItemType {
+  HARDWARE
+  HOSTING_COLOCATION
+}
+
 enum IncentiveType {
   HARDWARE_SALE
   OWN_MACHINE_HOSTING_REBATE
@@ -882,6 +888,12 @@ enum VendorPaymentStatus {
   Paid
   Pending
   Cancelled
+}
+
+enum VendorName {
+  HASHLABS_PTE_LTD
+  QRB_LABS
+  LUXOR_TECH
 }
 
 // Payment Details for Invoice PDF - Admin configurable settings

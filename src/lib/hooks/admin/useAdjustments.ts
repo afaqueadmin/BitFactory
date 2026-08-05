@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { AuditLogWithUser } from "@/lib/hooks/useInvoices";
 
 export interface AdjustmentTransaction {
   id: string;
@@ -100,3 +101,28 @@ export const useAdjustments = (
     refetch,
   };
 };
+
+export function useAdjustmentAuditLog(adjustmentId: string | null) {
+  const { data, isLoading, error } = useQuery<AuditLogWithUser[]>({
+    queryKey: ["adjustmentAuditLog", adjustmentId],
+    queryFn: async () => {
+      const res = await fetch(
+        `/api/admin/adjustments/${adjustmentId}/audit-log`,
+      );
+
+      if (!res.ok) {
+        throw new Error("Failed to fetch audit log");
+      }
+
+      return await res.json();
+    },
+    enabled: !!adjustmentId,
+    staleTime: 60 * 1000,
+  });
+
+  return {
+    auditLogs: data || [],
+    loading: isLoading,
+    error: error instanceof Error ? error.message : null,
+  };
+}

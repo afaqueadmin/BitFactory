@@ -2,10 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
 import { Decimal } from "@prisma/client/runtime/library";
+import {
+  VENDOR_NAME_OPTIONS,
+  VendorNameValue,
+} from "@/lib/hooks/useHardwarePurchases";
+
+const VALID_VENDOR_NAMES = VENDOR_NAME_OPTIONS.map((o) => o.value);
 
 interface CreateHardwarePurchaseRequest {
   invoiceNumber: string;
-  vendorName: string;
+  vendorName: VendorNameValue;
   hardwareDescription: string;
   billingDate: string;
   dueDate: string;
@@ -54,6 +60,15 @@ export async function POST(request: NextRequest) {
     ) {
       return NextResponse.json(
         { error: "Missing or invalid required fields" },
+        { status: 400 },
+      );
+    }
+
+    if (!VALID_VENDOR_NAMES.includes(body.vendorName)) {
+      return NextResponse.json(
+        {
+          error: `vendorName must be one of: ${VALID_VENDOR_NAMES.join(", ")}`,
+        },
         { status: 400 },
       );
     }
