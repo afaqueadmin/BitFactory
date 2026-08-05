@@ -115,10 +115,10 @@ function compareValues(a: string | number, b: string | number): -1 | 0 | 1 {
  * @example
  * const sortedCustomers = sortCustomers(customers, { field: "name", direction: "asc" });
  */
-export function sortCustomers(
-  customers: Customer[],
+export function sortCustomers<T extends Customer>(
+  customers: T[],
   config: SortConfig,
-): Customer[] {
+): T[] {
   const sorted = [...customers];
 
   sorted.sort((a, b) => {

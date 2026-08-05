@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import {
   Container,
   Box,
@@ -15,7 +15,6 @@ import {
   Snackbar,
   CircularProgress,
 } from "@mui/material";
-import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import AddIcon from "@mui/icons-material/Add";
 import {
   useAdjustments,
@@ -28,6 +27,7 @@ import CostPaymentTransactionsTable, {
 } from "@/components/admin/CostPaymentTransactionsTable";
 import AddAdjustmentModal from "@/components/AddAdjustmentModal";
 import EditAdjustmentModal from "@/components/EditAdjustmentModal";
+import AdjustmentHistoryDialog from "@/components/AdjustmentHistoryDialog";
 
 function LoadingFallback() {
   return (
@@ -53,7 +53,6 @@ export default function CreditAdjustmentsPage() {
 }
 
 function CreditAdjustmentsContent() {
-  const router = useRouter();
   const searchParams = useSearchParams();
 
   const [page, setPage] = useState(0);
@@ -72,6 +71,9 @@ function CreditAdjustmentsContent() {
     useState<AdjustmentTransaction | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [notification, setNotification] = useState("");
+  const [historyAdjustmentId, setHistoryAdjustmentId] = useState<string | null>(
+    null,
+  );
 
   const { customers, loading: customersLoading } = useCustomers();
 
@@ -112,6 +114,10 @@ function CreditAdjustmentsContent() {
     refetch();
   };
 
+  const handleViewHistory = (row: TransactionRow) => {
+    setHistoryAdjustmentId(row.id);
+  };
+
   const handleDelete = async (row: TransactionRow) => {
     if (
       !window.confirm(
@@ -145,15 +151,6 @@ function CreditAdjustmentsContent() {
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
-      <Button
-        startIcon={<ArrowBackIcon />}
-        variant="text"
-        onClick={() => router.push("/adminpanel")}
-        sx={{ mb: 2 }}
-      >
-        Back to Dashboard
-      </Button>
-
       <Box
         sx={{
           display: "flex",
@@ -280,6 +277,7 @@ function CreditAdjustmentsContent() {
         onSortChange={handleSortChange}
         onEdit={handleEdit}
         onDelete={handleDelete}
+        onViewHistory={handleViewHistory}
       />
 
       <AddAdjustmentModal
@@ -294,6 +292,12 @@ function CreditAdjustmentsContent() {
         onClose={() => setEditingAdjustment(null)}
         onSuccess={handleEditSuccess}
         adjustment={editingAdjustment}
+      />
+
+      <AdjustmentHistoryDialog
+        open={Boolean(historyAdjustmentId)}
+        onClose={() => setHistoryAdjustmentId(null)}
+        adjustmentId={historyAdjustmentId}
       />
 
       <Snackbar

@@ -11,9 +11,11 @@ import { AuditAction } from "@prisma/client";
  * invoice.
  */
 
-type AdminAuthResult = { userId: string } | { error: NextResponse };
+export type AdminAuthResult = { userId: string } | { error: NextResponse };
 
-async function requireAdmin(request: NextRequest): Promise<AdminAuthResult> {
+export async function requireAdmin(
+  request: NextRequest,
+): Promise<AdminAuthResult> {
   const token = request.cookies.get("token")?.value;
   if (!token) {
     return {

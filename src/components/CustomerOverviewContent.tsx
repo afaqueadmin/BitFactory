@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   Box,
@@ -56,7 +56,6 @@ import CreateUserModal from "@/components/CreateUserModal";
 import EditCustomerModal from "@/components/EditCustomerModal";
 import EditFranchiseeModal from "@/components/EditFranchiseeModal";
 import ChangePasswordModal from "@/components/ChangePasswordModal";
-import AddPaymentModal from "@/components/AddPaymentModal";
 
 interface FetchedUser {
   id: string;
@@ -119,7 +118,6 @@ interface FranchiseData {
 const Grid = MuiGrid as React.ComponentType<any>;
 
 export default function CustomerOverviewContent() {
-  const router = useRouter();
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editFranchiseeModalOpen, setEditFranchiseeModalOpen] = useState(false);
@@ -127,7 +125,6 @@ export default function CustomerOverviewContent() {
     useState<FranchiseData | null>(null);
   const [franchiseeLookupError, setFranchiseeLookupError] = useState("");
   const [changePasswordModalOpen, setChangePasswordModalOpen] = useState(false);
-  const [addPaymentModalOpen, setAddPaymentModalOpen] = useState(false);
   const [showDeleted, setShowDeleted] = useState(false);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<FetchedUser | null>(
@@ -327,7 +324,7 @@ export default function CustomerOverviewContent() {
     setFilters((prev) => ({ ...prev, [column]: value }));
   };
 
-  const filteredRows = useMemo(
+  const filteredRows = useMemo<FetchedUser[]>(
     () =>
       users.filter((row: FetchedUser) =>
         (Object.keys(filters) as Array<keyof FilterColumns>).every((column) => {
@@ -429,22 +426,6 @@ export default function CustomerOverviewContent() {
     handleMenuClose();
   };
 
-  const handleAddPayment = () => {
-    if (selectedCustomer) {
-      setAddPaymentModalOpen(true);
-    }
-    handleMenuClose();
-  };
-
-  const handleCreateAdjustment = () => {
-    if (selectedCustomer) {
-      router.push(
-        `/accounting/credit-adjustments?customerId=${selectedCustomer.id}`,
-      );
-    }
-    handleMenuClose();
-  };
-
   const handleDeleteCustomer = async () => {
     if (!selectedCustomer) return;
 
@@ -484,7 +465,6 @@ export default function CustomerOverviewContent() {
   const handleModalClose = () => {
     setEditModalOpen(false);
     setChangePasswordModalOpen(false);
-    setAddPaymentModalOpen(false);
     setSelectedCustomer(null);
   };
 
@@ -584,17 +564,6 @@ export default function CustomerOverviewContent() {
           onClose={handleModalClose}
           onSuccess={handleUserCreated}
           customerId={selectedCustomer.id}
-        />
-      )}
-
-      {/* Add Payment Modal */}
-      {selectedCustomer && (
-        <AddPaymentModal
-          open={addPaymentModalOpen}
-          onClose={handleModalClose}
-          onSuccess={handleUserCreated}
-          customerId={selectedCustomer.id}
-          customerName={selectedCustomer.name}
         />
       )}
 
@@ -1038,8 +1007,6 @@ export default function CustomerOverviewContent() {
       >
         <MenuItem onClick={handleEditCustomer}>Edit Customer</MenuItem>
         <MenuItem onClick={handleChangePassword}>Change Password</MenuItem>
-        <MenuItem onClick={handleAddPayment}>Add Startup Payment</MenuItem>
-        <MenuItem onClick={handleCreateAdjustment}>Credit Adjustments</MenuItem>
         <MenuItem
           onClick={handleDeleteCustomer}
           sx={{ color: "error.main" }}

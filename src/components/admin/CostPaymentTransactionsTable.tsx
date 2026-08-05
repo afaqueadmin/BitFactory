@@ -17,7 +17,11 @@ import {
   Tooltip,
   useTheme,
 } from "@mui/material";
-import { Edit as EditIcon, Delete as DeleteIcon } from "@mui/icons-material";
+import {
+  Edit as EditIcon,
+  Delete as DeleteIcon,
+  History as HistoryIcon,
+} from "@mui/icons-material";
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
 import { DateDisplay } from "@/components/accounting/common/DateDisplay";
 
@@ -66,10 +70,11 @@ interface CostPaymentTransactionsTableProps {
   sortBy?: string;
   sortOrder?: "asc" | "desc";
   onSortChange?: (field: string) => void;
-  // When provided, an "Actions" column with edit/delete icon buttons is
-  // rendered for each row (used by the Credit Adjustments page).
+  // When provided, an "Actions" column with edit/delete/history icon buttons
+  // is rendered for each row (used by the Credit Adjustments page).
   onEdit?: (row: TransactionRow) => void;
   onDelete?: (row: TransactionRow) => void;
+  onViewHistory?: (row: TransactionRow) => void;
 }
 
 export default function CostPaymentTransactionsTable({
@@ -86,9 +91,10 @@ export default function CostPaymentTransactionsTable({
   onSortChange,
   onEdit,
   onDelete,
+  onViewHistory,
 }: CostPaymentTransactionsTableProps) {
   const theme = useTheme();
-  const showActions = Boolean(onEdit || onDelete);
+  const showActions = Boolean(onEdit || onDelete || onViewHistory);
 
   return (
     <Paper
@@ -199,6 +205,16 @@ export default function CostPaymentTransactionsTable({
                     </TableCell>
                     {showActions && (
                       <TableCell align="right">
+                        {onViewHistory && (
+                          <Tooltip title="History">
+                            <IconButton
+                              size="small"
+                              onClick={() => onViewHistory(row)}
+                            >
+                              <HistoryIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        )}
                         {onEdit && (
                           <Tooltip title="Edit">
                             <IconButton

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
+import { AuditAction } from "@prisma/client";
 
 export async function GET(request: NextRequest) {
   try {
@@ -290,6 +291,19 @@ export async function POST(request: NextRequest) {
         narration: type === "ADJUSTMENT" ? narration : null,
       },
     });
+
+    if (type === "ADJUSTMENT") {
+      await prisma.auditLog.create({
+        data: {
+          action: AuditAction.PAYMENT_ADDED,
+          entityType: "CostPayment",
+          entityId: costPayment.id,
+          userId,
+          description: `Adjustment created for user ${customerId}`,
+          changes: JSON.stringify({ amount, narration }),
+        },
+      });
+    }
 
     console.log(
       `[Cost Payment] Created payment entry: ${costPayment.id} for user: ${customerId}`,
