@@ -3,6 +3,10 @@
     {
       "path": "/api/cron_deduct_daily_cost",
       "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron_payback_snapshot",
+      "schedule": "10 0 * * *"
     }
   ],
   "$schema": "https://openapi.vercel.sh/vercel.json",

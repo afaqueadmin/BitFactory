@@ -327,7 +327,7 @@ export default function CustomerOverviewContent() {
     setFilters((prev) => ({ ...prev, [column]: value }));
   };
 
-  const filteredRows = useMemo(
+  const filteredRows = useMemo<FetchedUser[]>(
     () =>
       users.filter((row: FetchedUser) =>
         (Object.keys(filters) as Array<keyof FilterColumns>).every((column) => {

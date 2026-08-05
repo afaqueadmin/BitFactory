@@ -33,34 +33,28 @@ export interface SortConfig {
 }
 
 /**
- * Customer object from API
+ * Minimal shape sortCustomers()/getSortValue() need. Callers pass their own
+ * (differently-shaped) customer row types, which only need to satisfy this
+ * subset — sortCustomers() is generic and returns exactly the input type,
+ * so it doesn't force callers to widen their own types to match this one.
  */
-interface Customer {
-  id: string;
+interface SortableCustomer {
   name: string;
   email: string;
   role: string;
-  city: string;
-  country: string;
-  phoneNumber: string;
-  companyName: string;
+  segment: string | null;
   pools: string;
-  streetAddress: string;
-  twoFactorEnabled: boolean;
-  isDeleted: boolean;
-  joinDate: string;
   miners: number;
   status: "active" | "inactive";
+  joinDate: string;
   balance: string;
-  franchiseeId: string | null;
-  segment: string | null;
 }
 
 /**
  * Extract sortable value from a customer by field name
  */
 function getSortValue(
-  customer: Customer,
+  customer: SortableCustomer,
   field: CustomerSortField,
 ): string | number {
   switch (field) {
@@ -115,10 +109,10 @@ function compareValues(a: string | number, b: string | number): -1 | 0 | 1 {
  * @example
  * const sortedCustomers = sortCustomers(customers, { field: "name", direction: "asc" });
  */
-export function sortCustomers(
-  customers: Customer[],
+export function sortCustomers<T extends SortableCustomer>(
+  customers: T[],
   config: SortConfig,
-): Customer[] {
+): T[] {
   const sorted = [...customers];
 
   sorted.sort((a, b) => {

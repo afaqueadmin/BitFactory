@@ -24,6 +24,7 @@ import {
 } from "@mui/material";
 import { useCallback, useEffect, useState } from "react";
 import { formatValue } from "@/lib/helpers/formatValue";
+import PaybackHistoryChart from "@/components/PaybackHistoryChart";
 import {
   MinerModel,
   MINER_LABELS,
@@ -924,6 +925,10 @@ export default function PaybackAnalysisPage() {
           )}
         </Box>
       </Paper>
+
+      {selectedStrategy === "STRATEGY_1" && (
+        <PaybackHistoryChart profile="CLIENT" miner={selectedMiner} />
+      )}
 
       {/* Data table — horizontally scrollable on mobile */}
       <TableContainer

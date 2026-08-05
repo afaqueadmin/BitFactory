@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
+    "test": "vitest run",
     "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts",
     "migrate:dev": "npx prisma migrate dev",
     "prepare": "husky install"
@@ -84,6 +85,7 @@
     "prettier": "^3.6.2",
     "tailwindcss": "^4",
     "ts-node": "^10.9.2",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.10"
   }
 }

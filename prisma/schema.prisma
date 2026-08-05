@@ -252,6 +252,25 @@ model PaybackConfig {
   @@map("payback_config")
 }
 
+model PaybackDailySnapshot {
+  id                            Int      @id @default(autoincrement())
+  date                          DateTime @unique @db.Date
+  btcCloseUsd                   Decimal  @db.Decimal(12, 2)
+  hashpriceBtcPerPhDay           Decimal @db.Decimal(20, 10)
+  clientS21ProStockBreakeven    Decimal  @db.Decimal(12, 2)
+  clientS21ProCustomBreakeven   Decimal  @db.Decimal(12, 2)
+  clientS21XpStockBreakeven     Decimal  @db.Decimal(12, 2)
+  clientS21XpCustomBreakeven    Decimal  @db.Decimal(12, 2)
+  companyS21ProStockBreakeven   Decimal  @db.Decimal(12, 2)
+  companyS21ProCustomBreakeven  Decimal  @db.Decimal(12, 2)
+  companyS21XpStockBreakeven    Decimal  @db.Decimal(12, 2)
+  companyS21XpCustomBreakeven   Decimal  @db.Decimal(12, 2)
+  createdAt                     DateTime @default(now())
+  updatedAt                     DateTime @updatedAt
+
+  @@map("payback_daily_snapshot")
+}
+
 model Hardware {
   id                 String                       @id @default(cuid())
   model              String                       @unique
