@@ -97,7 +97,7 @@ export default function PaybackHistoryChart({
         }}
       >
         <Box>
-          <Typography variant="h6" sx={{ fontWeight: 600 }}>
+          <Typography variant="h5" sx={{ fontWeight: 700 }}>
             Cost to Mine vs Buy BTC
           </Typography>
           <Typography variant="body2" color="text.secondary">
@@ -173,11 +173,13 @@ export default function PaybackHistoryChart({
               }}
             >
               <CartesianGrid
-                strokeDasharray="3 3"
-                stroke={theme.palette.mode === "dark" ? "#333" : "#f0f0f0"}
+                vertical={false}
+                stroke={theme.palette.mode === "dark" ? "#333" : "#e8e8e8"}
               />
               <XAxis
                 dataKey="dateLabel"
+                axisLine={false}
+                tickLine={false}
                 tick={{
                   fontSize: isMobile ? 9 : 11,
                   fill: theme.palette.text.secondary,
@@ -185,16 +187,17 @@ export default function PaybackHistoryChart({
                 interval={isMobile ? "preserveStartEnd" : "preserveStartEnd"}
               />
               <YAxis
+                axisLine={false}
+                tickLine={false}
                 tick={{
                   fontSize: isMobile ? 9 : 11,
                   fill: theme.palette.text.secondary,
                 }}
-                width={isMobile ? 56 : 76}
+                width={isMobile ? 48 : 60}
+                domain={[35000, 70000]}
+                ticks={[35000, 40000, 45000, 50000, 55000, 60000, 65000, 70000]}
                 tickFormatter={(value: number) =>
-                  formatValue(value, "currency", {
-                    minimumFractionDigits: 0,
-                    maximumFractionDigits: 0,
-                  })
+                  `$${Math.round(value / 1000)}k`
                 }
               />
               <Tooltip
@@ -233,30 +236,41 @@ export default function PaybackHistoryChart({
                   );
                 }}
               />
-              <Legend />
-              <Line
-                type="monotone"
-                dataKey="btcPriceUsd"
-                name="BTC Market Price"
-                stroke={COLOR_BTC_PRICE}
-                strokeWidth={2}
-                dot={false}
+              <Legend
+                verticalAlign="top"
+                align="center"
+                iconType="square"
+                wrapperStyle={{
+                  paddingBottom: 16,
+                  fontSize: isMobile ? 11 : 13,
+                }}
               />
               <Line
                 type="monotone"
                 dataKey="stockOsBreakeven"
                 name="Stock OS Breakeven"
                 stroke={COLOR_STOCK_OS}
-                strokeWidth={2}
-                dot={false}
+                strokeWidth={3}
+                dot={{ r: 5, strokeWidth: 0, fill: COLOR_STOCK_OS }}
+                activeDot={{ r: 6 }}
               />
               <Line
                 type="monotone"
                 dataKey="customOsBreakeven"
                 name="Custom OS Breakeven"
                 stroke={COLOR_CUSTOM_OS}
-                strokeWidth={2}
-                dot={false}
+                strokeWidth={3}
+                dot={{ r: 5, strokeWidth: 0, fill: COLOR_CUSTOM_OS }}
+                activeDot={{ r: 6 }}
+              />
+              <Line
+                type="monotone"
+                dataKey="btcPriceUsd"
+                name="BTC Market Price"
+                stroke={COLOR_BTC_PRICE}
+                strokeWidth={3}
+                dot={{ r: 5, strokeWidth: 0, fill: COLOR_BTC_PRICE }}
+                activeDot={{ r: 6 }}
               />
             </LineChart>
           </ResponsiveContainer>

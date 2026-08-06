@@ -7,7 +7,8 @@ import {
 
 // Luxor's historical hashprice data only goes back ~45 days, so backfilling
 // further would have no hashprice to compute breakeven prices with.
-const BACKFILL_DAYS = 45;
+const MAX_BACKFILL_DAYS = 45;
+const DEFAULT_BACKFILL_DAYS = 45;
 
 interface BackfillDayResult {
   date: string;
@@ -46,10 +47,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
+    const daysParam = request.nextUrl.searchParams.get("days");
+    const parsedDays = daysParam
+      ? parseInt(daysParam, 10)
+      : DEFAULT_BACKFILL_DAYS;
+    const backfillDays =
+      Number.isFinite(parsedDays) && parsedDays > 0
+        ? Math.min(parsedDays, MAX_BACKFILL_DAYS)
+        : DEFAULT_BACKFILL_DAYS;
+
     const today = toUtcDateOnly(new Date());
     const results: BackfillDayResult[] = [];
 
-    for (let daysAgo = 1; daysAgo <= BACKFILL_DAYS; daysAgo++) {
+    for (let daysAgo = 1; daysAgo <= backfillDays; daysAgo++) {
       const targetDate = new Date(today);
       targetDate.setUTCDate(targetDate.getUTCDate() - daysAgo);
 
