@@ -530,6 +530,16 @@ export default function PaybackAnalysisCompanyPage() {
       selectedStrategy === "STRATEGY_3"
     ) {
       allDynamicRows.push({
+        label: "Lifetime Machine Revenue (BTC) (Stock OS)",
+        values: calculatedValues.map((calc) =>
+          calc.lifetimeBtcStock.toFixed(8),
+        ),
+      });
+      allDynamicRows.push({
+        label: "Lifetime Machine Revenue (BTC) (Custom OS)",
+        values: calculatedValues.map((calc) => calc.lifetimeBtcLux.toFixed(8)),
+      });
+      allDynamicRows.push({
         label: "Lifetime Machine Revenue (Stock OS)",
         values: calculatedValues.map(
           (calc) => `$${calc.lifetimeRevenueStock.toFixed(2)}`,
@@ -945,7 +955,11 @@ export default function PaybackAnalysisCompanyPage() {
       </Paper>
 
       {selectedStrategy === "STRATEGY_1" && (
-        <PaybackHistoryChart profile="COMPANY" miner={selectedMiner} />
+        <PaybackHistoryChart
+          profile="COMPANY"
+          miner={selectedMiner}
+          os={selectedOS}
+        />
       )}
 
       {/* Data table — horizontally scrollable on mobile */}

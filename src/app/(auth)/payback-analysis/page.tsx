@@ -19,12 +19,14 @@ import {
   ToggleButton,
   Tabs,
   Tab,
+  Chip,
   useTheme,
   useMediaQuery,
 } from "@mui/material";
 import { useCallback, useEffect, useState } from "react";
 import { formatValue } from "@/lib/helpers/formatValue";
 import PaybackHistoryChart from "@/components/PaybackHistoryChart";
+import { PaybackAccountType } from "@/lib/helpers/paybackAccountType";
 import {
   MinerModel,
   MINER_LABELS,
@@ -94,6 +96,7 @@ export default function PaybackAnalysisPage() {
 
   // User role and invoiced amount state
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [accountType, setAccountType] = useState<PaybackAccountType>("CLIENT");
   const [editableInvoicedAmount, setEditableInvoicedAmount] =
     useState<string>("4250");
   const [isUpdatingInvoiced, setIsUpdatingInvoiced] = useState(false);
@@ -145,6 +148,9 @@ export default function PaybackAnalysisPage() {
       if (data.success && data.data) {
         setConfig(data.data);
         setUserRole(data.userRole || null);
+        setAccountType(
+          data.accountType === "SELF_MINING" ? "SELF_MINING" : "CLIENT",
+        );
 
         // Set editable invoiced amount based on user role
         if (data.userRole === "ADMIN" || data.userRole === "SUPER_ADMIN") {
@@ -283,10 +289,19 @@ export default function PaybackAnalysisPage() {
   const resolvedRewardBtcPerPhDay =
     liveRewardBtcPerPhDay ?? FALLBACK_REWARD_BTC_PER_PH_DAY;
 
+  const isSelfMining = accountType === "SELF_MINING";
+
   // Calculate derived values from config
   const monthlyElectricityHosting = config ? config.monthlyInvoicingAmount : 0;
+  // Self-mining accounts have no client invoice to offset — use the
+  // company's own machine cost for the selected miner instead.
   const machineCost = config
-    ? parseFloat(editableInvoicedAmount || "0") - config.monthlyInvoicingAmount
+    ? isSelfMining
+      ? selectedMiner === "S21XP"
+        ? config.s21xpMachineCost
+        : config.s21proMachineCost
+      : parseFloat(editableInvoicedAmount || "0") -
+        config.monthlyInvoicingAmount
     : 0;
 
   // Resolve hashrate for the currently selected miner model
@@ -516,6 +531,16 @@ export default function PaybackAnalysisPage() {
       selectedStrategy === "STRATEGY_3"
     ) {
       allDynamicRows.push({
+        label: "Lifetime Machine Revenue (BTC) (Stock OS)",
+        values: calculatedValues.map((calc) =>
+          calc.lifetimeBtcStock.toFixed(8),
+        ),
+      });
+      allDynamicRows.push({
+        label: "Lifetime Machine Revenue (BTC) (Custom OS)",
+        values: calculatedValues.map((calc) => calc.lifetimeBtcLux.toFixed(8)),
+      });
+      allDynamicRows.push({
         label: "Lifetime Machine Revenue (Stock OS)",
         values: calculatedValues.map(
           (calc) => `$${calc.lifetimeRevenueStock.toFixed(2)}`,
@@ -703,15 +728,20 @@ export default function PaybackAnalysisPage() {
             mb: { xs: 2, md: 3 },
           }}
         >
-          <Typography
-            variant="h4"
-            sx={{
-              fontWeight: 700,
-              fontSize: { xs: "1.6rem", sm: "2rem", md: "2.125rem" },
-            }}
-          >
-            Payback Analysis
-          </Typography>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+            <Typography
+              variant="h4"
+              sx={{
+                fontWeight: 700,
+                fontSize: { xs: "1.6rem", sm: "2rem", md: "2.125rem" },
+              }}
+            >
+              Payback Analysis
+            </Typography>
+            {isSelfMining && (
+              <Chip label="Self-Mining Account" color="primary" size="small" />
+            )}
+          </Box>
           <ToggleButtonGroup
             value={selectedOS}
             exclusive
@@ -786,31 +816,35 @@ export default function PaybackAnalysisPage() {
             flexWrap: "wrap",
           }}
         >
-          <TextField
-            label="Invoiced Amount"
-            type="number"
-            value={editableInvoicedAmount}
-            onChange={(e) => setEditableInvoicedAmount(e.target.value)}
-            size="small"
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">$</InputAdornment>
-              ),
-            }}
-            inputProps={{ step: "0.01", min: "0" }}
-            sx={{ width: { xs: "100%", sm: "180px" } }}
-          />
+          {!isSelfMining && (
+            <TextField
+              label="Invoiced Amount"
+              type="number"
+              value={editableInvoicedAmount}
+              onChange={(e) => setEditableInvoicedAmount(e.target.value)}
+              size="small"
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">$</InputAdornment>
+                ),
+              }}
+              inputProps={{ step: "0.01", min: "0" }}
+              sx={{ width: { xs: "100%", sm: "180px" } }}
+            />
+          )}
 
           <Box sx={{ display: "flex", gap: 1.5, flex: { xs: "none", sm: 1 } }}>
-            <Button
-              variant="contained"
-              onClick={handleUpdateInvoicedAmount}
-              disabled={isUpdatingInvoiced}
-              size="small"
-              fullWidth={isMobile}
-            >
-              {isUpdatingInvoiced ? "Updating..." : "Update"}
-            </Button>
+            {!isSelfMining && (
+              <Button
+                variant="contained"
+                onClick={handleUpdateInvoicedAmount}
+                disabled={isUpdatingInvoiced}
+                size="small"
+                fullWidth={isMobile}
+              >
+                {isUpdatingInvoiced ? "Updating..." : "Update"}
+              </Button>
+            )}
 
             <Button
               variant="outlined"
@@ -861,7 +895,7 @@ export default function PaybackAnalysisPage() {
           </Box>
           <Box>
             <Typography variant="subtitle2" color="text.secondary">
-              Monthly Invoicing
+              {isSelfMining ? "Monthly Operating Cost" : "Monthly Invoicing"}
             </Typography>
             <Typography variant="body2">
               {formatValue(config.monthlyInvoicingAmount, "currency")}
@@ -873,17 +907,19 @@ export default function PaybackAnalysisPage() {
             </Typography>
             <Typography variant="body2">{`${config.powerConsumption.toFixed(4)} KWH`}</Typography>
           </Box>
-          <Box>
-            <Typography variant="subtitle2" color="text.secondary">
-              Invoiced Amount
-            </Typography>
-            <Typography variant="body2">
-              {formatValue(
-                parseFloat(editableInvoicedAmount || "0"),
-                "currency",
-              )}
-            </Typography>
-          </Box>
+          {!isSelfMining && (
+            <Box>
+              <Typography variant="subtitle2" color="text.secondary">
+                Invoiced Amount
+              </Typography>
+              <Typography variant="body2">
+                {formatValue(
+                  parseFloat(editableInvoicedAmount || "0"),
+                  "currency",
+                )}
+              </Typography>
+            </Box>
+          )}
           <Box>
             <Typography variant="subtitle2" color="text.secondary">
               Machine Cost
@@ -927,7 +963,11 @@ export default function PaybackAnalysisPage() {
       </Paper>
 
       {selectedStrategy === "STRATEGY_1" && (
-        <PaybackHistoryChart profile="CLIENT" miner={selectedMiner} />
+        <PaybackHistoryChart
+          profile="CLIENT"
+          miner={selectedMiner}
+          os={selectedOS}
+        />
       )}
 
       {/* Data table — horizontally scrollable on mobile */}

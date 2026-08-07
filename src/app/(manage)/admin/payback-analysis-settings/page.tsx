@@ -11,8 +11,11 @@ import {
   CircularProgress,
   Paper,
   Divider,
+  Tabs,
+  Tab,
 } from "@mui/material";
 import { Save as SaveIcon, Refresh as RefreshIcon } from "@mui/icons-material";
+import { MinerModel, MINER_LABELS } from "@/lib/helpers/paybackCalculations";
 
 // Type workaround for MUI Grid component
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -43,6 +46,7 @@ export default function PaybackAnalysisSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [selectedMiner, setSelectedMiner] = useState<MinerModel>("S21PRO");
 
   // Form state
   const [formData, setFormData] = useState({
@@ -216,6 +220,95 @@ export default function PaybackAnalysisSettingsPage() {
 
         <Divider sx={{ mb: 3 }} />
 
+        <Typography variant="h6" gutterBottom>
+          Miner Hashrate
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          Select a miner model to edit its hashrate values.
+        </Typography>
+
+        <Tabs
+          value={selectedMiner}
+          onChange={(_event, newValue: MinerModel) =>
+            setSelectedMiner(newValue)
+          }
+          aria-label="Miner model selector"
+          sx={{ mb: 2, minHeight: 36 }}
+        >
+          <Tab
+            value="S21PRO"
+            label={MINER_LABELS.S21PRO}
+            sx={{ minHeight: 36, py: 0.5 }}
+          />
+          <Tab
+            value="S21XP"
+            label={MINER_LABELS.S21XP}
+            sx={{ minHeight: 36, py: 0.5 }}
+          />
+        </Tabs>
+
+        <Grid container spacing={3}>
+          {selectedMiner === "S21PRO" && (
+            <>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  label="S21 Pro Hashrate - Stock OS (TH/s)"
+                  type="number"
+                  value={formData.s21proHashrateStockOs}
+                  onChange={handleChange("s21proHashrateStockOs")}
+                  helperText="Hashrate with stock operating system"
+                  inputProps={{ step: "0.01", min: "0" }}
+                  InputLabelProps={{ sx: { color: "#1565c0" } }}
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  label="S21 Pro Hashrate - LuxOS (TH/s)"
+                  type="number"
+                  value={formData.s21proHashrateLuxos}
+                  onChange={handleChange("s21proHashrateLuxos")}
+                  helperText="Hashrate with LuxOS firmware"
+                  inputProps={{ step: "0.01", min: "0" }}
+                  InputLabelProps={{ sx: { color: "#1565c0" } }}
+                />
+              </Grid>
+            </>
+          )}
+
+          {selectedMiner === "S21XP" && (
+            <>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  label="S21 XP Hashrate - Stock OS (TH/s)"
+                  type="number"
+                  value={formData.s21xpHashrateStockOs}
+                  onChange={handleChange("s21xpHashrateStockOs")}
+                  helperText="Hashrate with stock operating system"
+                  inputProps={{ step: "0.01", min: "0" }}
+                  InputLabelProps={{ sx: { color: "#e65100" } }}
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  label="S21 XP Hashrate - LuxOS (TH/s)"
+                  type="number"
+                  value={formData.s21xpHashrateLuxos}
+                  onChange={handleChange("s21xpHashrateLuxos")}
+                  helperText="Hashrate with LuxOS firmware"
+                  inputProps={{ step: "0.01", min: "0" }}
+                  InputLabelProps={{ sx: { color: "#e65100" } }}
+                />
+              </Grid>
+            </>
+          )}
+        </Grid>
+
+        <Divider sx={{ my: 3 }} />
+
         <Grid container spacing={3}>
           {/* Hosting Charges */}
           <Grid item xs={12} md={6}>
@@ -279,62 +372,6 @@ export default function PaybackAnalysisSettingsPage() {
               onChange={handleChange("poolCommissionLuxos")}
               helperText="Mining pool commission percentage for Custom OS / LuxOS"
               inputProps={{ step: "0.01", min: "0", max: "100" }}
-            />
-          </Grid>
-
-          {/* S21 Pro Hashrate - Stock OS */}
-          <Grid item xs={12} md={6}>
-            <TextField
-              fullWidth
-              label="S21 Pro Hashrate - Stock OS (TH/s)"
-              type="number"
-              value={formData.s21proHashrateStockOs}
-              onChange={handleChange("s21proHashrateStockOs")}
-              helperText="Hashrate with stock operating system"
-              inputProps={{ step: "0.01", min: "0" }}
-              InputLabelProps={{ sx: { color: "#1565c0" } }}
-            />
-          </Grid>
-
-          {/* S21 Pro Hashrate - LuxOS */}
-          <Grid item xs={12} md={6}>
-            <TextField
-              fullWidth
-              label="S21 Pro Hashrate - LuxOS (TH/s)"
-              type="number"
-              value={formData.s21proHashrateLuxos}
-              onChange={handleChange("s21proHashrateLuxos")}
-              helperText="Hashrate with LuxOS firmware"
-              inputProps={{ step: "0.01", min: "0" }}
-              InputLabelProps={{ sx: { color: "#1565c0" } }}
-            />
-          </Grid>
-
-          {/* S21 XP Hashrate - Stock OS */}
-          <Grid item xs={12} md={6}>
-            <TextField
-              fullWidth
-              label="S21 XP Hashrate - Stock OS (TH/s)"
-              type="number"
-              value={formData.s21xpHashrateStockOs}
-              onChange={handleChange("s21xpHashrateStockOs")}
-              helperText="Hashrate with stock operating system"
-              inputProps={{ step: "0.01", min: "0" }}
-              InputLabelProps={{ sx: { color: "#e65100" } }}
-            />
-          </Grid>
-
-          {/* S21 XP Hashrate - LuxOS */}
-          <Grid item xs={12} md={6}>
-            <TextField
-              fullWidth
-              label="S21 XP Hashrate - LuxOS (TH/s)"
-              type="number"
-              value={formData.s21xpHashrateLuxos}
-              onChange={handleChange("s21xpHashrateLuxos")}
-              helperText="Hashrate with LuxOS firmware"
-              inputProps={{ step: "0.01", min: "0" }}
-              InputLabelProps={{ sx: { color: "#e65100" } }}
             />
           </Grid>
 

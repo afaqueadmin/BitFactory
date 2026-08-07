@@ -88,7 +88,54 @@ export const MACHINE_LIFE_YEARS = 5;
 // (calculateStrategy2Values) — this rate is informational/display only.
 export const BORROWING_RATE_APR = 3.5; // % — USDT/(BTC Collateral) borrowing rate
 
+// Next scheduled Bitcoin block-reward halving, which cuts mining output in
+// half. Any lifetime BTC projection spanning this date must apply the
+// reduced rate to the days on/after it.
+export const NEXT_HALVING_DATE = new Date(Date.UTC(2028, 3, 13));
+
+const MS_PER_DAY = 1000 * 60 * 60 * 24;
+
+const toUtcMidnight = (date: Date): number =>
+  Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
+
+const daysBetween = (start: Date, end: Date): number =>
+  Math.max(
+    0,
+    Math.round((toUtcMidnight(end) - toUtcMidnight(start)) / MS_PER_DAY),
+  );
+
+// Projects lifetime BTC production for a machine over its life, halving the
+// daily rate for whichever portion of that life falls on/after the next
+// halving date.
+export const calculateLifetimeBtc = (
+  dailyBtc: number,
+  startDate: Date,
+  machineLifeYears: number = MACHINE_LIFE_YEARS,
+  halvingDate: Date = NEXT_HALVING_DATE,
+): number => {
+  const lifespanEnd = new Date(startDate);
+  lifespanEnd.setFullYear(lifespanEnd.getFullYear() + machineLifeYears);
+
+  const totalDays = daysBetween(startDate, lifespanEnd);
+
+  if (toUtcMidnight(halvingDate) <= toUtcMidnight(startDate)) {
+    // Halving already in effect for the machine's entire life.
+    return dailyBtc * 0.5 * totalDays;
+  }
+  if (toUtcMidnight(halvingDate) >= toUtcMidnight(lifespanEnd)) {
+    // Halving occurs after the machine's life ends — no reduction applies.
+    return dailyBtc * totalDays;
+  }
+
+  const daysBeforeHalving = daysBetween(startDate, halvingDate);
+  const daysAfterHalving = daysBetween(halvingDate, lifespanEnd);
+
+  return dailyBtc * daysBeforeHalving + dailyBtc * 0.5 * daysAfterHalving;
+};
+
 export interface Strategy2Values extends CalculationValues {
+  lifetimeBtcStock: number;
+  lifetimeBtcLux: number;
   lifetimeRevenueStock: number;
   lifetimeRevenueLux: number;
   lifetimeElectricityHostingCharges: number;
@@ -164,6 +211,7 @@ export const calculateStrategy2Values = (
   monthlyElectricityHosting: number,
   machineCost: number,
   machineLifeYears: number = MACHINE_LIFE_YEARS,
+  startDate: Date = new Date(),
 ): Strategy2Values => {
   const base = calculateAllValues(
     btcPrice,
@@ -177,8 +225,18 @@ export const calculateStrategy2Values = (
   );
 
   const lifetimeMonths = machineLifeYears * 12;
-  const lifetimeRevenueStock = base.monthlyRevenueStock * lifetimeMonths;
-  const lifetimeRevenueLux = base.monthlyRevenueLux * lifetimeMonths;
+  const lifetimeBtcStock = calculateLifetimeBtc(
+    base.dailyBtcStock,
+    startDate,
+    machineLifeYears,
+  );
+  const lifetimeBtcLux = calculateLifetimeBtc(
+    base.dailyBtcLux,
+    startDate,
+    machineLifeYears,
+  );
+  const lifetimeRevenueStock = lifetimeBtcStock * btcPrice;
+  const lifetimeRevenueLux = lifetimeBtcLux * btcPrice;
   const lifetimeElectricityHostingCharges =
     monthlyElectricityHosting * lifetimeMonths;
   const machineDepreciation = machineCost;
@@ -212,6 +270,8 @@ export const calculateStrategy2Values = (
 
   return {
     ...base,
+    lifetimeBtcStock,
+    lifetimeBtcLux,
     lifetimeRevenueStock,
     lifetimeRevenueLux,
     lifetimeElectricityHostingCharges,

@@ -47,7 +47,11 @@ export const fetchBtcDailyCloseUsd = async (dateUtc: Date): Promise<number> => {
     dateUtc.getUTCMonth(),
     dateUtc.getUTCDate(),
   );
-  const url = `https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&startTime=${dayStartMs}&limit=1`;
+  // Use Binance's public market-data mirror (not api.binance.com) — Vercel's
+  // serverless functions run from US datacenter IPs, which api.binance.com
+  // geo-blocks with HTTP 451. data-api.binance.vision serves the same public
+  // kline data without that restriction.
+  const url = `https://data-api.binance.vision/api/v3/klines?symbol=BTCUSDT&interval=1d&startTime=${dayStartMs}&limit=1`;
 
   const response = await fetch(url);
   if (!response.ok) {

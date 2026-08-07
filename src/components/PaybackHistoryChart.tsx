@@ -23,7 +23,7 @@ import {
   useMediaQuery,
 } from "@mui/material";
 import { formatValue } from "@/lib/helpers/formatValue";
-import { MinerModel } from "@/lib/helpers/paybackCalculations";
+import { MinerModel, MINER_LABELS } from "@/lib/helpers/paybackCalculations";
 import {
   usePaybackHistory,
   PaybackHistoryProfile,
@@ -33,6 +33,10 @@ import {
   PaybackHistoryRange,
 } from "@/lib/helpers/paybackHistoryRange";
 import { mapSnapshotsToChartSeries } from "@/lib/helpers/paybackChartMapping";
+import {
+  buildPaybackChartHeading,
+  PaybackOsFilter,
+} from "@/lib/helpers/paybackChartHeading";
 
 const RANGE_LABELS: Record<PaybackHistoryRange, string> = {
   "30D": "30D",
@@ -45,9 +49,12 @@ const COLOR_STOCK_OS = "#1565C0"; // blue
 const COLOR_CUSTOM_OS = "#67B12A"; // green
 const COLOR_BTC_PRICE = "#FFA500"; // orange
 
+const BASE_TITLE = "Cost to Mine vs Buy BTC";
+
 interface PaybackHistoryChartProps {
   profile: PaybackHistoryProfile;
   miner: MinerModel;
+  os: PaybackOsFilter;
   height?: number;
 }
 
@@ -60,11 +67,17 @@ interface TooltipEntry {
 export default function PaybackHistoryChart({
   profile,
   miner,
+  os,
   height = 320,
 }: PaybackHistoryChartProps) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const [range, setRange] = useState<PaybackHistoryRange>("30D");
+
+  const heading = useMemo(
+    () => buildPaybackChartHeading(BASE_TITLE, MINER_LABELS[miner], os),
+    [miner, os],
+  );
 
   const { historyData, isLoading, isError, error } = usePaybackHistory(
     profile,
@@ -76,6 +89,26 @@ export default function PaybackHistoryChart({
     () => mapSnapshotsToChartSeries(historyData),
     [historyData],
   );
+
+  const { yMin, yMax } = useMemo(() => {
+    if (chartData.length === 0) return { yMin: 0, yMax: 1 };
+
+    const values = chartData.flatMap((point) => [
+      point.btcPriceUsd,
+      point.stockOsBreakeven,
+      point.customOsBreakeven,
+    ]);
+
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const range = max - min || Math.max(max * 0.1, 1);
+    const padding = range * 0.1;
+
+    return {
+      yMin: Math.max(0, Math.floor((min - padding) / 100) * 100),
+      yMax: Math.ceil((max + padding) / 100) * 100,
+    };
+  }, [chartData]);
 
   return (
     <Paper
@@ -98,7 +131,7 @@ export default function PaybackHistoryChart({
       >
         <Box>
           <Typography variant="h5" sx={{ fontWeight: 700 }}>
-            Cost to Mine vs Buy BTC
+            {heading}
           </Typography>
           <Typography variant="body2" color="text.secondary">
             Market BTC price vs. Stock OS and Custom OS breakeven price over
@@ -194,8 +227,8 @@ export default function PaybackHistoryChart({
                   fill: theme.palette.text.secondary,
                 }}
                 width={isMobile ? 48 : 60}
-                domain={[35000, 70000]}
-                ticks={[35000, 40000, 45000, 50000, 55000, 60000, 65000, 70000]}
+                domain={[yMin, yMax]}
+                tickCount={isMobile ? 5 : 7}
                 tickFormatter={(value: number) =>
                   `$${Math.round(value / 1000)}k`
                 }
