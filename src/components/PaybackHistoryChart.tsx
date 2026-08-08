@@ -49,7 +49,7 @@ const COLOR_STOCK_OS = "#1565C0"; // blue
 const COLOR_CUSTOM_OS = "#67B12A"; // green
 const COLOR_BTC_PRICE = "#FFA500"; // orange
 
-const BASE_TITLE = "Cost to Mine vs Buy BTC";
+const BASE_TITLE = "Buy BTC vs Mine BTC";
 
 interface PaybackHistoryChartProps {
   profile: PaybackHistoryProfile;
@@ -132,10 +132,6 @@ export default function PaybackHistoryChart({
         <Box>
           <Typography variant="h5" sx={{ fontWeight: 700 }}>
             {heading}
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Market BTC price vs. Stock OS and Custom OS breakeven price over
-            time
           </Typography>
         </Box>
 

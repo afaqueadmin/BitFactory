@@ -1,7 +1,8 @@
 import { calculateBreakevenBtcPrice } from "@/lib/helpers/paybackCalculations";
 
 export interface SnapshotProfileConfig {
-  monthlyInvoicingAmount: number;
+  s21proMonthlyInvoicingAmount: number;
+  s21xpMonthlyInvoicingAmount: number;
   poolCommissionStockOs: number;
   poolCommissionLuxos: number;
   s21proHashrateStockOs: number;
@@ -28,28 +29,28 @@ export const computeProfileBreakevens = (
   rewardBtcPerPhDay: number,
 ): ProfileBreakevens => ({
   s21proStock: calculateBreakevenBtcPrice(
-    config.monthlyInvoicingAmount,
+    config.s21proMonthlyInvoicingAmount,
     rewardBtcPerPhDay,
     config.s21proHashrateStockOs,
     config.poolCommissionStockOs,
     config.breakevenBtcPrice,
   ),
   s21proCustom: calculateBreakevenBtcPrice(
-    config.monthlyInvoicingAmount,
+    config.s21proMonthlyInvoicingAmount,
     rewardBtcPerPhDay,
     config.s21proHashrateLuxos,
     config.poolCommissionLuxos,
     config.breakevenBtcPrice,
   ),
   s21xpStock: calculateBreakevenBtcPrice(
-    config.monthlyInvoicingAmount,
+    config.s21xpMonthlyInvoicingAmount,
     rewardBtcPerPhDay,
     config.s21xpHashrateStockOs,
     config.poolCommissionStockOs,
     config.breakevenBtcPrice,
   ),
   s21xpCustom: calculateBreakevenBtcPrice(
-    config.monthlyInvoicingAmount,
+    config.s21xpMonthlyInvoicingAmount,
     rewardBtcPerPhDay,
     config.s21xpHashrateLuxos,
     config.poolCommissionLuxos,

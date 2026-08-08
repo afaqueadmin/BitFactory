@@ -70,9 +70,12 @@ const columns = [
 
 // Interface for config data from API
 interface PaybackConfigData {
-  hostingCharges: number;
-  monthlyInvoicingAmount: number;
-  powerConsumption: number;
+  s21proHostingCharges: number;
+  s21xpHostingCharges: number;
+  s21proMonthlyInvoicingAmount: number;
+  s21xpMonthlyInvoicingAmount: number;
+  s21proPowerConsumption: number;
+  s21xpPowerConsumption: number;
   s21proMachineCost: number;
   s21xpMachineCost: number;
   poolCommissionStockOs: number;
@@ -292,7 +295,11 @@ export default function PaybackAnalysisPage() {
   const isSelfMining = accountType === "SELF_MINING";
 
   // Calculate derived values from config
-  const monthlyElectricityHosting = config ? config.monthlyInvoicingAmount : 0;
+  const monthlyElectricityHosting = config
+    ? selectedMiner === "S21XP"
+      ? config.s21xpMonthlyInvoicingAmount
+      : config.s21proMonthlyInvoicingAmount
+    : 0;
   // Self-mining accounts have no client invoice to offset — use the
   // company's own machine cost for the selected miner instead.
   const machineCost = config
@@ -300,8 +307,7 @@ export default function PaybackAnalysisPage() {
       ? selectedMiner === "S21XP"
         ? config.s21xpMachineCost
         : config.s21proMachineCost
-      : parseFloat(editableInvoicedAmount || "0") -
-        config.monthlyInvoicingAmount
+      : parseFloat(editableInvoicedAmount || "0") - monthlyElectricityHosting
     : 0;
 
   // Resolve hashrate for the currently selected miner model
@@ -314,6 +320,18 @@ export default function PaybackAnalysisPage() {
     ? selectedMiner === "S21XP"
       ? config.s21xpHashrateLuxos
       : config.s21proHashrateLuxos
+    : 0;
+
+  // Resolve hosting charges/power consumption for the selected miner model (display only)
+  const activeHostingCharges = config
+    ? selectedMiner === "S21XP"
+      ? config.s21xpHostingCharges
+      : config.s21proHostingCharges
+    : 0;
+  const activePowerConsumption = config
+    ? selectedMiner === "S21XP"
+      ? config.s21xpPowerConsumption
+      : config.s21proPowerConsumption
     : 0;
 
   // Calculate breakeven BTC prices for both OS types
@@ -447,13 +465,19 @@ export default function PaybackAnalysisPage() {
         {
           label: `${MINER_LABELS[selectedMiner]} Hashrate (TH) (Stock OS)`,
           values: Array.from({ length: 9 }, () =>
-            activeHashrateStockOs.toFixed(2),
+            formatValue(activeHashrateStockOs, "number", {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            }),
           ),
         },
         {
           label: `${MINER_LABELS[selectedMiner]} Hashrate (TH) (Custom OS)`,
           values: Array.from({ length: 9 }, () =>
-            activeHashrateLuxos.toFixed(2),
+            formatValue(activeHashrateLuxos, "number", {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            }),
           ),
         },
       ]
@@ -476,33 +500,32 @@ export default function PaybackAnalysisPage() {
     });
     allDynamicRows.push({
       label: "Monthly Revenue (Stock OS)",
-      values: calculatedValues.map(
-        (calc) => `$${calc.monthlyRevenueStock.toFixed(2)}`,
+      values: calculatedValues.map((calc) =>
+        formatValue(calc.monthlyRevenueStock, "currency"),
       ),
     });
     allDynamicRows.push({
       label: "Monthly Revenue (Custom OS)",
-      values: calculatedValues.map(
-        (calc) => `$${calc.monthlyRevenueLux.toFixed(2)}`,
+      values: calculatedValues.map((calc) =>
+        formatValue(calc.monthlyRevenueLux, "currency"),
       ),
     });
     allDynamicRows.push({
       label: "Electricity & Hosting Charges",
-      values: Array.from(
-        { length: 9 },
-        () => `$${monthlyElectricityHosting.toFixed(2)}`,
+      values: Array.from({ length: 9 }, () =>
+        formatValue(monthlyElectricityHosting, "currency"),
       ),
     });
     allDynamicRows.push({
       label: "Net Revenue (Stock OS)",
-      values: calculatedValues.map(
-        (calc) => `$${calc.netRevenueStock.toFixed(2)}`,
+      values: calculatedValues.map((calc) =>
+        formatValue(calc.netRevenueStock, "currency"),
       ),
     });
     allDynamicRows.push({
       label: "Net Revenue (Custom OS)",
-      values: calculatedValues.map(
-        (calc) => `$${calc.netRevenueLux.toFixed(2)}`,
+      values: calculatedValues.map((calc) =>
+        formatValue(calc.netRevenueLux, "currency"),
       ),
     });
     allDynamicRows.push({
@@ -512,7 +535,7 @@ export default function PaybackAnalysisPage() {
           ? "--"
           : calc.paybackMonthsStock === Infinity
             ? "∞"
-            : Math.round(calc.paybackMonthsStock),
+            : Math.round(calc.paybackMonthsStock).toLocaleString("en-US"),
       ),
     });
     allDynamicRows.push({
@@ -522,7 +545,7 @@ export default function PaybackAnalysisPage() {
           ? "--"
           : calc.paybackMonthsLux === Infinity
             ? "∞"
-            : Math.round(calc.paybackMonthsLux),
+            : Math.round(calc.paybackMonthsLux).toLocaleString("en-US"),
       ),
     });
 
@@ -542,74 +565,96 @@ export default function PaybackAnalysisPage() {
       });
       allDynamicRows.push({
         label: "Lifetime Machine Revenue (Stock OS)",
-        values: calculatedValues.map(
-          (calc) => `$${calc.lifetimeRevenueStock.toFixed(2)}`,
+        values: calculatedValues.map((calc) =>
+          formatValue(calc.lifetimeRevenueStock, "currency"),
         ),
       });
       allDynamicRows.push({
         label: "Lifetime Machine Revenue (Custom OS)",
-        values: calculatedValues.map(
-          (calc) => `$${calc.lifetimeRevenueLux.toFixed(2)}`,
+        values: calculatedValues.map((calc) =>
+          formatValue(calc.lifetimeRevenueLux, "currency"),
         ),
       });
       allDynamicRows.push({
         label: "Machine Depreciation",
-        values: calculatedValues.map(
-          (calc) => `$${calc.machineDepreciation.toFixed(2)}`,
+        values: calculatedValues.map((calc) =>
+          formatValue(calc.machineDepreciation, "currency"),
         ),
       });
       allDynamicRows.push({
         label: "Lifetime Electricity & Hosting Charges",
-        values: calculatedValues.map(
-          (calc) => `$${calc.lifetimeElectricityHostingCharges.toFixed(2)}`,
+        values: calculatedValues.map((calc) =>
+          formatValue(calc.lifetimeElectricityHostingCharges, "currency"),
         ),
       });
       allDynamicRows.push({
         label: "Net Profit over Lifetime (Stock OS)",
         values: calculatedValues.map((calc, index) =>
-          index === 8 ? "--" : `$${calc.netProfitLifetimeStock.toFixed(2)}`,
+          index === 8
+            ? "--"
+            : formatValue(calc.netProfitLifetimeStock, "currency"),
         ),
       });
       allDynamicRows.push({
         label: "Net Profit over Lifetime (Custom OS)",
         values: calculatedValues.map((calc, index) =>
-          index === 8 ? "--" : `$${calc.netProfitLifetimeLux.toFixed(2)}`,
+          index === 8
+            ? "--"
+            : formatValue(calc.netProfitLifetimeLux, "currency"),
         ),
       });
       allDynamicRows.push({
         label: "Return Multiple (X) (Stock OS)",
         values: calculatedValues.map((calc, index) =>
-          index === 8 ? "--" : calc.returnMultipleStock.toFixed(2),
+          index === 8
+            ? "--"
+            : formatValue(calc.returnMultipleStock, "number", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              }),
         ),
       });
       allDynamicRows.push({
         label: "Return Multiple (X) (Custom OS)",
         values: calculatedValues.map((calc, index) =>
-          index === 8 ? "--" : calc.returnMultipleLux.toFixed(2),
+          index === 8
+            ? "--"
+            : formatValue(calc.returnMultipleLux, "number", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              }),
         ),
       });
       allDynamicRows.push({
         label: "ROI over Lifetime (Stock OS)",
         values: calculatedValues.map((calc, index) =>
-          index === 8 ? "--" : `${calc.roiLifetimeStock.toFixed(0)}%`,
+          index === 8
+            ? "--"
+            : `${formatValue(calc.roiLifetimeStock, "number", { maximumFractionDigits: 0 })}%`,
         ),
       });
       allDynamicRows.push({
         label: "ROI over Lifetime (Custom OS)",
         values: calculatedValues.map((calc, index) =>
-          index === 8 ? "--" : `${calc.roiLifetimeLux.toFixed(0)}%`,
+          index === 8
+            ? "--"
+            : `${formatValue(calc.roiLifetimeLux, "number", { maximumFractionDigits: 0 })}%`,
         ),
       });
       allDynamicRows.push({
         label: "ROI/Year (Stock OS)",
         values: calculatedValues.map((calc, index) =>
-          index === 8 ? "--" : `${calc.roiPerYearStock.toFixed(0)}%`,
+          index === 8
+            ? "--"
+            : `${formatValue(calc.roiPerYearStock, "number", { maximumFractionDigits: 0 })}%`,
         ),
       });
       allDynamicRows.push({
         label: "ROI/Year (Custom OS)",
         values: calculatedValues.map((calc, index) =>
-          index === 8 ? "--" : `${calc.roiPerYearLux.toFixed(0)}%`,
+          index === 8
+            ? "--"
+            : `${formatValue(calc.roiPerYearLux, "number", { maximumFractionDigits: 0 })}%`,
         ),
       });
     }
@@ -891,21 +936,31 @@ export default function PaybackAnalysisPage() {
             <Typography variant="subtitle2" color="text.secondary">
               Hosting Charges
             </Typography>
-            <Typography variant="body2">{`$${config.hostingCharges.toFixed(5)}`}</Typography>
+            <Typography variant="body2">
+              {formatValue(activeHostingCharges, "currency", {
+                minimumFractionDigits: 5,
+                maximumFractionDigits: 5,
+              })}
+            </Typography>
           </Box>
           <Box>
             <Typography variant="subtitle2" color="text.secondary">
               {isSelfMining ? "Monthly Operating Cost" : "Monthly Invoicing"}
             </Typography>
             <Typography variant="body2">
-              {formatValue(config.monthlyInvoicingAmount, "currency")}
+              {formatValue(monthlyElectricityHosting, "currency")}
             </Typography>
           </Box>
           <Box>
             <Typography variant="subtitle2" color="text.secondary">
               Power Consumption
             </Typography>
-            <Typography variant="body2">{`${config.powerConsumption.toFixed(4)} KWH`}</Typography>
+            <Typography variant="body2">
+              {`${formatValue(activePowerConsumption, "number", {
+                minimumFractionDigits: 4,
+                maximumFractionDigits: 4,
+              })} KWH`}
+            </Typography>
           </Box>
           {!isSelfMining && (
             <Box>
@@ -1022,15 +1077,7 @@ export default function PaybackAnalysisPage() {
           </TableHead>
           <TableBody>
             {tableRows.map((row) => (
-              <TableRow
-                key={row.label}
-                hover
-                sx={
-                  row.label === "Reward (BTC/PH/Day)"
-                    ? { backgroundColor: "rgba(103, 177, 42, 0.35)" }
-                    : undefined
-                }
-              >
+              <TableRow key={row.label} hover>
                 <TableCell
                   sx={{
                     fontWeight: 600,
@@ -1041,11 +1088,9 @@ export default function PaybackAnalysisPage() {
                     left: 0,
                     zIndex: 1,
                     backgroundColor:
-                      row.label === "Reward (BTC/PH/Day)"
-                        ? "rgba(103, 177, 42, 0.35)"
-                        : theme.palette.mode === "dark"
-                          ? theme.palette.grey[900]
-                          : theme.palette.background.paper,
+                      theme.palette.mode === "dark"
+                        ? theme.palette.grey[900]
+                        : theme.palette.background.paper,
                   }}
                 >
                   {row.label}
@@ -1061,7 +1106,17 @@ export default function PaybackAnalysisPage() {
                       px: { xs: 0.5, sm: 1 },
                       borderLeft: `1px solid ${theme.palette.divider}`,
                       ...(row.label === "BTC Price (USD)" && index === 0
-                        ? { backgroundColor: "rgba(103, 177, 42, 0.35)" }
+                        ? { backgroundColor: "rgba(255, 193, 7, 0.35)" }
+                        : {}),
+                      ...(row.label === "BTC Price (USD)" &&
+                      index === 8 &&
+                      selectedOS === "CUSTOM"
+                        ? { backgroundColor: "rgba(103, 177, 42, 0.35)" } // graph's Custom OS green
+                        : {}),
+                      ...(row.label === "BTC Price (USD)" &&
+                      index === 8 &&
+                      selectedOS === "STOCK"
+                        ? { backgroundColor: "rgba(21, 101, 192, 0.35)" } // graph's Stock OS blue
                         : {}),
                     }}
                   >

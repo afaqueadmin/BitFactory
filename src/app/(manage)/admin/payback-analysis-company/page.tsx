@@ -66,9 +66,12 @@ const columns = [
 
 // Interface for config data from API
 interface PaybackConfigData {
-  hostingCharges: number;
-  monthlyInvoicingAmount: number;
-  powerConsumption: number;
+  s21proHostingCharges: number;
+  s21xpHostingCharges: number;
+  s21proMonthlyInvoicingAmount: number;
+  s21xpMonthlyInvoicingAmount: number;
+  s21proPowerConsumption: number;
+  s21xpPowerConsumption: number;
   s21proMachineCost: number;
   s21xpMachineCost: number;
   poolCommissionStockOs: number;
@@ -94,7 +97,9 @@ export default function PaybackAnalysisCompanyPage() {
     useState<string>("");
   const [editableS21XpMachineCost, setEditableS21XpMachineCost] =
     useState<string>("");
-  const [editableOperatingCost, setEditableOperatingCost] =
+  const [editableS21ProOperatingCost, setEditableS21ProOperatingCost] =
+    useState<string>("");
+  const [editableS21XpOperatingCost, setEditableS21XpOperatingCost] =
     useState<string>("");
   const [isSavingCosts, setIsSavingCosts] = useState(false);
   const [costsUpdateSuccess, setCostsUpdateSuccess] = useState<string | null>(
@@ -144,7 +149,12 @@ export default function PaybackAnalysisCompanyPage() {
         setConfig(data.data);
         setEditableS21ProMachineCost(String(data.data.s21proMachineCost));
         setEditableS21XpMachineCost(String(data.data.s21xpMachineCost));
-        setEditableOperatingCost(String(data.data.monthlyInvoicingAmount));
+        setEditableS21ProOperatingCost(
+          String(data.data.s21proMonthlyInvoicingAmount),
+        );
+        setEditableS21XpOperatingCost(
+          String(data.data.s21xpMonthlyInvoicingAmount),
+        );
       } else {
         throw new Error(data.error || "Invalid configuration data");
       }
@@ -162,7 +172,8 @@ export default function PaybackAnalysisCompanyPage() {
   const handleSaveCosts = useCallback(async () => {
     const s21proMachineCostValue = parseFloat(editableS21ProMachineCost);
     const s21xpMachineCostValue = parseFloat(editableS21XpMachineCost);
-    const operatingCostValue = parseFloat(editableOperatingCost);
+    const s21proOperatingCostValue = parseFloat(editableS21ProOperatingCost);
+    const s21xpOperatingCostValue = parseFloat(editableS21XpOperatingCost);
 
     if (
       !Number.isFinite(s21proMachineCostValue) ||
@@ -175,8 +186,18 @@ export default function PaybackAnalysisCompanyPage() {
       setCostsUpdateError("Please enter a valid S21 XP machine cost");
       return;
     }
-    if (!Number.isFinite(operatingCostValue) || operatingCostValue < 0) {
-      setCostsUpdateError("Please enter a valid operating cost");
+    if (
+      !Number.isFinite(s21proOperatingCostValue) ||
+      s21proOperatingCostValue < 0
+    ) {
+      setCostsUpdateError("Please enter a valid S21 Pro operating cost");
+      return;
+    }
+    if (
+      !Number.isFinite(s21xpOperatingCostValue) ||
+      s21xpOperatingCostValue < 0
+    ) {
+      setCostsUpdateError("Please enter a valid S21 XP operating cost");
       return;
     }
 
@@ -191,7 +212,8 @@ export default function PaybackAnalysisCompanyPage() {
         body: JSON.stringify({
           s21proMachineCost: s21proMachineCostValue,
           s21xpMachineCost: s21xpMachineCostValue,
-          monthlyInvoicingAmount: operatingCostValue,
+          s21proMonthlyInvoicingAmount: s21proOperatingCostValue,
+          s21xpMonthlyInvoicingAmount: s21xpOperatingCostValue,
         }),
       });
 
@@ -207,7 +229,8 @@ export default function PaybackAnalysisCompanyPage() {
               ...prev,
               s21proMachineCost: s21proMachineCostValue,
               s21xpMachineCost: s21xpMachineCostValue,
-              monthlyInvoicingAmount: operatingCostValue,
+              s21proMonthlyInvoicingAmount: s21proOperatingCostValue,
+              s21xpMonthlyInvoicingAmount: s21xpOperatingCostValue,
             }
           : prev,
       );
@@ -223,7 +246,8 @@ export default function PaybackAnalysisCompanyPage() {
   }, [
     editableS21ProMachineCost,
     editableS21XpMachineCost,
-    editableOperatingCost,
+    editableS21ProOperatingCost,
+    editableS21XpOperatingCost,
   ]);
 
   const fetchLivePrice = useCallback(async () => {
@@ -283,12 +307,6 @@ export default function PaybackAnalysisCompanyPage() {
   const resolvedRewardBtcPerPhDay =
     liveRewardBtcPerPhDay ?? FALLBACK_REWARD_BTC_PER_PH_DAY;
 
-  // Calculate derived values from config, using the editable fields so the
-  // table recalculates live as the user types before saving.
-  const monthlyElectricityHosting = config
-    ? parseFloat(editableOperatingCost) || 0
-    : 0;
-
   // The machine cost input tracks whichever miner model tab is active
   const editableActiveMachineCost =
     selectedMiner === "S21XP"
@@ -298,6 +316,22 @@ export default function PaybackAnalysisCompanyPage() {
     selectedMiner === "S21XP"
       ? setEditableS21XpMachineCost
       : setEditableS21ProMachineCost;
+
+  // The operating cost input tracks whichever miner model tab is active
+  const editableActiveOperatingCost =
+    selectedMiner === "S21XP"
+      ? editableS21XpOperatingCost
+      : editableS21ProOperatingCost;
+  const setEditableActiveOperatingCost =
+    selectedMiner === "S21XP"
+      ? setEditableS21XpOperatingCost
+      : setEditableS21ProOperatingCost;
+
+  // Calculate derived values from config, using the editable fields so the
+  // table recalculates live as the user types before saving.
+  const monthlyElectricityHosting = config
+    ? parseFloat(editableActiveOperatingCost) || 0
+    : 0;
 
   // Company self-mining: machine cost is the machine's own capital cost,
   // there is no client invoice to offset against.
@@ -313,6 +347,18 @@ export default function PaybackAnalysisCompanyPage() {
     ? selectedMiner === "S21XP"
       ? config.s21xpHashrateLuxos
       : config.s21proHashrateLuxos
+    : 0;
+
+  // Resolve hosting charges/power consumption for the selected miner model (display only)
+  const activeHostingCharges = config
+    ? selectedMiner === "S21XP"
+      ? config.s21xpHostingCharges
+      : config.s21proHostingCharges
+    : 0;
+  const activePowerConsumption = config
+    ? selectedMiner === "S21XP"
+      ? config.s21xpPowerConsumption
+      : config.s21proPowerConsumption
     : 0;
 
   // Calculate breakeven BTC prices for both OS types
@@ -826,10 +872,10 @@ export default function PaybackAnalysisCompanyPage() {
           />
 
           <TextField
-            label="Operating Cost (Monthly)"
+            label={`${MINER_LABELS[selectedMiner]} Operating Cost (Monthly)`}
             type="number"
-            value={editableOperatingCost}
-            onChange={(e) => setEditableOperatingCost(e.target.value)}
+            value={editableActiveOperatingCost}
+            onChange={(e) => setEditableActiveOperatingCost(e.target.value)}
             size="small"
             InputProps={{
               startAdornment: (
@@ -896,7 +942,7 @@ export default function PaybackAnalysisCompanyPage() {
             <Typography variant="subtitle2" color="text.secondary">
               Hosting Charges
             </Typography>
-            <Typography variant="body2">{`$${config.hostingCharges.toFixed(5)}`}</Typography>
+            <Typography variant="body2">{`$${activeHostingCharges.toFixed(5)}`}</Typography>
           </Box>
           <Box>
             <Typography variant="subtitle2" color="text.secondary">
@@ -910,7 +956,7 @@ export default function PaybackAnalysisCompanyPage() {
             <Typography variant="subtitle2" color="text.secondary">
               Power Consumption
             </Typography>
-            <Typography variant="body2">{`${config.powerConsumption.toFixed(4)} KWH`}</Typography>
+            <Typography variant="body2">{`${activePowerConsumption.toFixed(4)} KWH`}</Typography>
           </Box>
           <Box>
             <Typography variant="subtitle2" color="text.secondary">

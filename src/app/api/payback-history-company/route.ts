@@ -11,7 +11,7 @@ import {
  * GET /api/payback-history-company?range=30D|90D|1Y|ALL&miner=S21PRO|S21XP
  *
  * Historical BTC price vs. COMPANY (self-mining) Stock/Custom OS breakeven
- * price series for the "Cost to Mine vs Buy BTC" chart. Admin-only, matching
+ * price series for the "Buy BTC vs Mine BTC" chart. Admin-only, matching
  * /api/payback-config-company.
  */
 export async function GET(request: NextRequest) {

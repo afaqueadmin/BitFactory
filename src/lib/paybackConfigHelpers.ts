@@ -3,9 +3,12 @@ import { Decimal } from "@prisma/client/runtime/library";
 import type { PaybackConfig, PaybackProfileType } from "@prisma/client";
 
 const DEFAULT_VALUES = {
-  hostingCharges: "0.06300",
-  monthlyInvoicingAmount: "199.05",
-  powerConsumption: "3.5000",
+  s21proHostingCharges: "0.06300",
+  s21xpHostingCharges: "0.06300",
+  s21proMonthlyInvoicingAmount: "199.05",
+  s21xpMonthlyInvoicingAmount: "199.05",
+  s21proPowerConsumption: "3.5000",
+  s21xpPowerConsumption: "3.5000",
   s21proMachineCost: "4050.95",
   s21xpMachineCost: "4050.95",
   poolCommissionStockOs: "2.50",
@@ -39,13 +42,24 @@ const buildDefaultData = (
   overrides: Partial<Record<keyof typeof DEFAULT_VALUES, Decimal>>,
 ) => ({
   profileType,
-  hostingCharges:
-    overrides.hostingCharges ?? new Decimal(DEFAULT_VALUES.hostingCharges),
-  monthlyInvoicingAmount:
-    overrides.monthlyInvoicingAmount ??
-    new Decimal(DEFAULT_VALUES.monthlyInvoicingAmount),
-  powerConsumption:
-    overrides.powerConsumption ?? new Decimal(DEFAULT_VALUES.powerConsumption),
+  s21proHostingCharges:
+    overrides.s21proHostingCharges ??
+    new Decimal(DEFAULT_VALUES.s21proHostingCharges),
+  s21xpHostingCharges:
+    overrides.s21xpHostingCharges ??
+    new Decimal(DEFAULT_VALUES.s21xpHostingCharges),
+  s21proMonthlyInvoicingAmount:
+    overrides.s21proMonthlyInvoicingAmount ??
+    new Decimal(DEFAULT_VALUES.s21proMonthlyInvoicingAmount),
+  s21xpMonthlyInvoicingAmount:
+    overrides.s21xpMonthlyInvoicingAmount ??
+    new Decimal(DEFAULT_VALUES.s21xpMonthlyInvoicingAmount),
+  s21proPowerConsumption:
+    overrides.s21proPowerConsumption ??
+    new Decimal(DEFAULT_VALUES.s21proPowerConsumption),
+  s21xpPowerConsumption:
+    overrides.s21xpPowerConsumption ??
+    new Decimal(DEFAULT_VALUES.s21xpPowerConsumption),
   s21proMachineCost:
     overrides.s21proMachineCost ??
     new Decimal(DEFAULT_VALUES.s21proMachineCost),
@@ -120,9 +134,12 @@ export async function updatePaybackConfig(
 
 export function serializePaybackConfig(config: PaybackConfig) {
   return {
-    hostingCharges: Number(config.hostingCharges),
-    monthlyInvoicingAmount: Number(config.monthlyInvoicingAmount),
-    powerConsumption: Number(config.powerConsumption),
+    s21proHostingCharges: Number(config.s21proHostingCharges),
+    s21xpHostingCharges: Number(config.s21xpHostingCharges),
+    s21proMonthlyInvoicingAmount: Number(config.s21proMonthlyInvoicingAmount),
+    s21xpMonthlyInvoicingAmount: Number(config.s21xpMonthlyInvoicingAmount),
+    s21proPowerConsumption: Number(config.s21proPowerConsumption),
+    s21xpPowerConsumption: Number(config.s21xpPowerConsumption),
     s21proMachineCost: Number(config.s21proMachineCost),
     s21xpMachineCost: Number(config.s21xpMachineCost),
     poolCommissionStockOs: Number(config.poolCommissionStockOs),
