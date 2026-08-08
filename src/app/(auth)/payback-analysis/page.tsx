@@ -1022,15 +1022,7 @@ export default function PaybackAnalysisPage() {
           </TableHead>
           <TableBody>
             {tableRows.map((row) => (
-              <TableRow
-                key={row.label}
-                hover
-                sx={
-                  row.label === "Reward (BTC/PH/Day)"
-                    ? { backgroundColor: "rgba(103, 177, 42, 0.35)" }
-                    : undefined
-                }
-              >
+              <TableRow key={row.label} hover>
                 <TableCell
                   sx={{
                     fontWeight: 600,
@@ -1041,11 +1033,9 @@ export default function PaybackAnalysisPage() {
                     left: 0,
                     zIndex: 1,
                     backgroundColor:
-                      row.label === "Reward (BTC/PH/Day)"
-                        ? "rgba(103, 177, 42, 0.35)"
-                        : theme.palette.mode === "dark"
-                          ? theme.palette.grey[900]
-                          : theme.palette.background.paper,
+                      theme.palette.mode === "dark"
+                        ? theme.palette.grey[900]
+                        : theme.palette.background.paper,
                   }}
                 >
                   {row.label}
@@ -1061,7 +1051,17 @@ export default function PaybackAnalysisPage() {
                       px: { xs: 0.5, sm: 1 },
                       borderLeft: `1px solid ${theme.palette.divider}`,
                       ...(row.label === "BTC Price (USD)" && index === 0
-                        ? { backgroundColor: "rgba(103, 177, 42, 0.35)" }
+                        ? { backgroundColor: "rgba(255, 193, 7, 0.35)" }
+                        : {}),
+                      ...(row.label === "BTC Price (USD)" &&
+                      index === 8 &&
+                      selectedOS === "CUSTOM"
+                        ? { backgroundColor: "rgba(103, 177, 42, 0.35)" } // graph's Custom OS green
+                        : {}),
+                      ...(row.label === "BTC Price (USD)" &&
+                      index === 8 &&
+                      selectedOS === "STOCK"
+                        ? { backgroundColor: "rgba(21, 101, 192, 0.35)" } // graph's Stock OS blue
                         : {}),
                     }}
                   >

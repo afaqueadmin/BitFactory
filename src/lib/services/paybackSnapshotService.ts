@@ -34,13 +34,6 @@ export const getPreviousCompletedUtcDay = (now: Date = new Date()): Date => {
   return today;
 };
 
-const extractDateKey = (value?: string | null): string | null => {
-  if (!value) return null;
-  if (value.includes("T")) return value.split("T")[0] || null;
-  if (value.length >= 10) return value.slice(0, 10);
-  return null;
-};
-
 export const fetchBtcDailyCloseUsd = async (dateUtc: Date): Promise<number> => {
   const dayStartMs = Date.UTC(
     dateUtc.getUTCFullYear(),
@@ -73,45 +66,23 @@ export const fetchBtcDailyCloseUsd = async (dateUtc: Date): Promise<number> => {
   return close;
 };
 
+// Matches the payback-analysis table's live BREAKEVEN column, which reads
+// this same pool-wide summary endpoint via /api/pool-hashprice-live. Note
+// this endpoint has no date range — it only ever returns Luxor's current
+// live hashprice, so any date passed in gets stamped with today's live
+// value rather than a true historical figure for that day.
 export const fetchDailyHashprice = async (dateUtc: Date): Promise<number> => {
   const dateKey = formatUtcDateKey(dateUtc);
   const luxorClient = createLuxorClient(POOL_WIDE_SUBACCOUNT);
 
-  const [revenueResponse, hashrateResponse] = await Promise.all([
-    luxorClient.getRevenue("BTC", {
-      subaccount_names: POOL_WIDE_SUBACCOUNT,
-      start_date: dateKey,
-      end_date: dateKey,
-    }),
-    luxorClient.getHashrateEfficiency("BTC", {
-      subaccount_names: POOL_WIDE_SUBACCOUNT,
-      start_date: dateKey,
-      end_date: dateKey,
-      tick_size: "1d",
-    }),
-  ]);
+  const summaryResponse = await luxorClient.getSummary("BTC", {
+    subaccount_names: POOL_WIDE_SUBACCOUNT,
+  });
 
-  const revenueEntry = revenueResponse.revenue?.find(
-    (entry) => extractDateKey(entry.date_time) === dateKey,
-  );
-  const hashrateEntry = hashrateResponse.hashrate_efficiency?.find(
-    (entry) => extractDateKey(entry.date_time) === dateKey,
-  );
+  const hashprice = summaryResponse.hashprice?.[0]?.value;
 
-  const revenue = revenueEntry?.revenue?.revenue ?? 0;
-  const hashrateRaw = hashrateEntry
-    ? parseFloat(String(hashrateEntry.hashrate))
-    : 0;
-  // Luxor reports hashrate in H/s; hashprice is expressed as BTC/PH/s/day.
-  const hashratePhs = hashrateRaw / 1e15;
-
-  if (!(hashratePhs > 0)) {
-    throw new Error(`No Luxor hashrate data available for ${dateKey}`);
-  }
-
-  const hashprice = revenue / hashratePhs;
-  if (!Number.isFinite(hashprice)) {
-    throw new Error(`Computed a non-finite hashprice for ${dateKey}`);
+  if (!(typeof hashprice === "number" && hashprice > 0)) {
+    throw new Error(`No Luxor hashprice data available for ${dateKey}`);
   }
 
   return hashprice;

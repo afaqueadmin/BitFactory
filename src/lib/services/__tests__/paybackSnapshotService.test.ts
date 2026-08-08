@@ -12,14 +12,11 @@ vi.mock("@/lib/prisma", () => ({
   },
 }));
 
-const getRevenueMock = vi.fn();
-const getHashrateEfficiencyMock = vi.fn();
+const getSummaryMock = vi.fn();
 
 vi.mock("@/lib/luxor", () => ({
   createLuxorClient: () => ({
-    getRevenue: (...args: unknown[]) => getRevenueMock(...args),
-    getHashrateEfficiency: (...args: unknown[]) =>
-      getHashrateEfficiencyMock(...args),
+    getSummary: (...args: unknown[]) => getSummaryMock(...args),
   }),
 }));
 
@@ -71,24 +68,16 @@ const mockBinanceClose = (close: string) => {
   }) as unknown as typeof fetch;
 };
 
-const mockLuxorHashprice = () => {
-  getRevenueMock.mockResolvedValue({
-    revenue: [
-      { date_time: "2026-08-04T00:00:00Z", revenue: { revenue: 0.001 } },
-    ],
-  });
-  getHashrateEfficiencyMock.mockResolvedValue({
-    hashrate_efficiency: [
-      { date_time: "2026-08-04T00:00:00Z", hashrate: "1000000000000000" }, // 1 PH/s
-    ],
+const mockLuxorHashprice = (hashprice = 0.001) => {
+  getSummaryMock.mockResolvedValue({
+    hashprice: [{ value: hashprice }],
   });
 };
 
 beforeEach(() => {
   findUniqueMock.mockReset();
   upsertMock.mockReset();
-  getRevenueMock.mockReset();
-  getHashrateEfficiencyMock.mockReset();
+  getSummaryMock.mockReset();
   getOrCreatePaybackConfigMock.mockReset();
   getOrCreatePaybackConfigMock.mockResolvedValue(SAMPLE_CONFIG);
 });
@@ -116,7 +105,7 @@ describe("upsertSnapshotForDate", () => {
 
     expect(result).toEqual({ status: "skipped", date: "2026-08-04" });
     expect(upsertMock).not.toHaveBeenCalled();
-    expect(getRevenueMock).not.toHaveBeenCalled();
+    expect(getSummaryMock).not.toHaveBeenCalled();
     expect(getOrCreatePaybackConfigMock).not.toHaveBeenCalled();
   });
 
