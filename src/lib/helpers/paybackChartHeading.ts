@@ -7,7 +7,7 @@ const OS_LABELS: Record<Exclude<PaybackOsFilter, "COMPARISON">, string> = {
 
 /**
  * Builds a graph heading that reflects the currently active miner/OS
- * filters, e.g. "Cost to Mine vs Buy BTC — S21 Pro · Custom OS". The miner
+ * filters, e.g. "Buy BTC vs Mine BTC — S21 Pro · Custom OS". The miner
  * filter is always active (there's no "all miners" state), so it's always
  * shown; the OS filter only narrows the view when it's STOCK or CUSTOM —
  * COMPARISON shows both OS lines, so it's the "no filter applied" default

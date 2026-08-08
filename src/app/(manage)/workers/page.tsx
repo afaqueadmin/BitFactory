@@ -70,6 +70,51 @@ interface SubaccountListData {
 }
 
 /**
+ * Mining currency is fixed to BTC for this page
+ */
+const CURRENCY = "BTC";
+
+type StatusFilter = "ALL" | "ACTIVE" | "INACTIVE";
+
+/**
+ * Luxor can return more than one worker "session" sharing the same
+ * subaccount + name (e.g. a stale disconnected session left behind
+ * alongside a live one, often from IP-derived worker names being reused
+ * by different hardware). Collapse those down to a single row per name,
+ * preferring the ACTIVE session, then the one with the most recent share.
+ */
+function dedupeWorkers(
+  workers: WorkersResponse["workers"],
+): WorkersResponse["workers"] {
+  const byKey = new Map<string, WorkersResponse["workers"][number]>();
+
+  for (const worker of workers) {
+    const key = `${worker.subaccount_name}::${worker.name}`;
+    const existing = byKey.get(key);
+
+    if (!existing) {
+      byKey.set(key, worker);
+      continue;
+    }
+
+    const existingIsActive = existing.status === "ACTIVE";
+    const workerIsActive = worker.status === "ACTIVE";
+
+    if (workerIsActive && !existingIsActive) {
+      byKey.set(key, worker);
+    } else if (workerIsActive === existingIsActive) {
+      const existingTime = new Date(existing.last_share_time).getTime();
+      const workerTime = new Date(worker.last_share_time).getTime();
+      if (workerTime > existingTime) {
+        byKey.set(key, worker);
+      }
+    }
+  }
+
+  return Array.from(byKey.values());
+}
+
+/**
  * Component state for managing workers
  */
 interface WorkersState {
@@ -81,7 +126,7 @@ interface WorkersState {
   totalItems: number;
   loading: boolean;
   error: string | null;
-  currency: "BTC" | "LTC" | "DOGE" | "ZEC" | "ZEN" | "LTC_DOGE" | "SC";
+  statusFilter: StatusFilter;
 }
 
 /**
@@ -105,7 +150,7 @@ export default function WorkersPage() {
     totalItems: 0,
     loading: true,
     error: null,
-    currency: "BTC",
+    statusFilter: "ALL",
   });
 
   const [stats, setStats] = useState<WorkerStats>({
@@ -189,7 +234,7 @@ export default function WorkersPage() {
       subaccountNames: string[],
       pageNumber: number,
       pageSize: number,
-      currency: string,
+      statusFilter: StatusFilter,
     ) => {
       // Validate input: filter empty strings and ensure we have valid subaccounts
       const validNames = subaccountNames.filter(
@@ -228,9 +273,17 @@ export default function WorkersPage() {
         // Build query string with validated subaccount names (no spaces, no trailing commas)
         const subaccountNamesParam = validNames.join(",");
 
-        const response = await fetch(
-          `/api/luxor?endpoint=workers&currency=${currency}&page_number=${pageNumber}&page_size=${pageSize}`,
-        );
+        const url = new URL("/api/luxor", window.location.origin);
+        url.searchParams.set("endpoint", "workers");
+        url.searchParams.set("currency", CURRENCY);
+        url.searchParams.set("subaccount_names", subaccountNamesParam);
+        url.searchParams.set("page_number", String(pageNumber));
+        url.searchParams.set("page_size", String(pageSize));
+        if (statusFilter !== "ALL") {
+          url.searchParams.set("status", statusFilter);
+        }
+
+        const response = await fetch(url.toString());
 
         if (!response.ok) {
           throw new Error(`API returned status ${response.status}`);
@@ -243,21 +296,20 @@ export default function WorkersPage() {
         }
 
         const workersData = (data.data as WorkersResponse) || {};
-        const workersList = workersData.workers || [];
-        const totalItems = workersData.pagination?.item_count || 0;
+        const workersList = dedupeWorkers(workersData.workers || []);
+        const totalItems = workersList.length;
 
-        // Calculate statistics
         const activeCount = workersList.filter(
           (w) => w.status === "ACTIVE",
         ).length;
         const inactiveCount = workersList.filter(
           (w) => w.status === "INACTIVE",
         ).length;
-        // @TODO: These should not be calculated client-side in the long term
         const avgHashrate =
           workersList.length > 0
             ? workersList.reduce((sum, w) => sum + (w.hashrate || 0), 0) /
-              workersList.length
+              workersList.length /
+              1000000000000 // Convert from H/s to TH/s
             : 0;
         const avgEfficiency =
           workersList.length > 0
@@ -299,7 +351,7 @@ export default function WorkersPage() {
   );
 
   /**
-   * Fetch subaccounts on component mount
+   * Fetch subaccounts on component mount, then fetch workers for all of them
    */
   useEffect(() => {
     const initializeWorkers = async () => {
@@ -326,82 +378,19 @@ export default function WorkersPage() {
           `[Luxor Workers] Successfully fetched ${subaccountsList.length} subaccounts`,
         );
 
+        const subaccountNames = subaccountsList.map((s) => s.name); // Select all by default
+
         setState((prev) => ({
           ...prev,
           subaccounts: subaccountsList,
-          selectedSubaccountNames: subaccountsList.map((s) => s.name), // Select all by default
+          selectedSubaccountNames: subaccountNames,
         }));
 
-        // Fetch workers for all subaccounts (no spaces in format)
-        if (subaccountsList.length > 0) {
-          const subaccountNames = subaccountsList.map((s) => s.name);
-          const subaccountNamesParam = subaccountNames.join(",");
-
-          const workersResponse = await fetch(
-            `/api/luxor?endpoint=workers&currency=BTC&page_number=1&page_size=200`,
-          );
-
-          if (!workersResponse.ok) {
-            throw new Error(`API returned status ${workersResponse.status}`);
-          }
-
-          const workersData: ProxyResponse<WorkersResponse> =
-            await workersResponse.json();
-
-          if (!workersData.success) {
-            throw new Error(workersData.error || "Failed to fetch workers");
-          }
-
-          const workersDataObj = (workersData.data as WorkersResponse) || {};
-          const workersList = workersDataObj.workers || [];
-          const totalItems = workersDataObj.pagination?.item_count || 0;
-
-          // Calculate statistics
-          const activeCount = workersList.filter(
-            (w) => w.status === "ACTIVE",
-          ).length;
-          const inactiveCount = workersList.filter(
-            (w) => w.status === "INACTIVE",
-          ).length;
-          const avgHashrate =
-            workersList.length > 0
-              ? workersList.reduce((sum, w) => sum + (w.hashrate || 0), 0) /
-                workersList.length
-              : 0;
-          const avgEfficiency =
-            workersList.length > 0
-              ? workersList.reduce((sum, w) => sum + (w.efficiency || 0), 0) /
-                workersList.length
-              : 0;
-
-          setStats({
-            totalWorkers: totalItems,
-            activeWorkers: activeCount,
-            inactiveWorkers: inactiveCount,
-            averageHashrate: avgHashrate / 1000000000000, // Convert from H/s to TH/s,
-            averageEfficiency: avgEfficiency,
-          });
-
-          setState((prev) => ({
-            ...prev,
-            workers: workersList,
-            totalItems,
-            loading: false,
-            error: null,
-          }));
-
-          console.log(
-            `[Luxor Workers] Successfully fetched ${workersList.length} workers`,
-          );
-        } else {
-          setState((prev) => ({
-            ...prev,
-            workers: [],
-            totalItems: 0,
-            loading: false,
-            error: null,
-          }));
+        if (subaccountNames.length > 0) {
+          await fetchWorkers(subaccountNames, 1, state.pageSize, "ALL");
         }
+
+        setState((prev) => ({ ...prev, loading: false }));
       } catch (error) {
         const errorMsg =
           error instanceof Error ? error.message : "Unknown error occurred";
@@ -415,6 +404,7 @@ export default function WorkersPage() {
     };
 
     initializeWorkers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /**
@@ -440,7 +430,7 @@ export default function WorkersPage() {
 
     // Only fetch if we have valid subaccounts selected
     if (selectedNames.length > 0) {
-      fetchWorkers(selectedNames, 1, state.pageSize, state.currency);
+      fetchWorkers(selectedNames, 1, state.pageSize, state.statusFilter);
     } else {
       // Clear workers if no subaccounts selected
       setState((prev) => ({
@@ -460,21 +450,26 @@ export default function WorkersPage() {
   };
 
   /**
-   * Handle currency change
+   * Handle status filter change (All / Active / Inactive)
    */
-  const handleCurrencyChange = (
+  const handleStatusFilterChange = (
     event: React.ChangeEvent<{ value: unknown }>,
   ) => {
-    const currency = event.target.value as WorkersState["currency"];
+    const statusFilter = event.target.value as StatusFilter;
 
     setState((prev) => ({
       ...prev,
-      currency,
+      statusFilter,
       currentPage: 1, // Reset to first page
     }));
 
     if (state.selectedSubaccountNames.length > 0) {
-      fetchWorkers(state.selectedSubaccountNames, 1, state.pageSize, currency);
+      fetchWorkers(
+        state.selectedSubaccountNames,
+        1,
+        state.pageSize,
+        statusFilter,
+      );
     }
   };
 
@@ -489,7 +484,7 @@ export default function WorkersPage() {
       state.selectedSubaccountNames,
       page,
       state.pageSize,
-      state.currency,
+      state.statusFilter,
     );
   };
 
@@ -503,7 +498,7 @@ export default function WorkersPage() {
         state.selectedSubaccountNames,
         state.currentPage,
         state.pageSize,
-        state.currency,
+        state.statusFilter,
       );
     } finally {
       setIsRefreshing(false);
@@ -514,7 +509,13 @@ export default function WorkersPage() {
    * Handle table column sorting
    */
   const handleSort = (
-    field: "name" | "subaccount" | "hashrate" | "efficiency" | "status" | "lastShare",
+    field:
+      | "name"
+      | "subaccount"
+      | "hashrate"
+      | "efficiency"
+      | "status"
+      | "lastShare",
   ) => {
     if (sortField === field) {
       // Toggle sort order if clicking the same column
@@ -760,23 +761,21 @@ export default function WorkersPage() {
             </Select>
           </FormControl>
 
-          {/* Currency Select */}
+          {/* Status Select */}
           <FormControl fullWidth>
-            <InputLabel>Mining Currency</InputLabel>
+            <InputLabel>Worker Status</InputLabel>
             <Select
-              value={state.currency}
-              label="Mining Currency"
+              value={state.statusFilter}
+              label="Worker Status"
               onChange={(e) =>
-                handleCurrencyChange(e as React.ChangeEvent<{ value: unknown }>)
+                handleStatusFilterChange(
+                  e as React.ChangeEvent<{ value: unknown }>,
+                )
               }
             >
-              <MenuItem value="BTC">Bitcoin (BTC)</MenuItem>
-              <MenuItem value="LTC">Litecoin (LTC)</MenuItem>
-              <MenuItem value="DOGE">Dogecoin (DOGE)</MenuItem>
-              <MenuItem value="ZEC">Zcash (ZEC)</MenuItem>
-              <MenuItem value="ZEN">Horizen (ZEN)</MenuItem>
-              <MenuItem value="LTC_DOGE">LTC+DOGE</MenuItem>
-              <MenuItem value="SC">Siacoin (SC)</MenuItem>
+              <MenuItem value="ALL">All Statuses</MenuItem>
+              <MenuItem value="ACTIVE">Active</MenuItem>
+              <MenuItem value="INACTIVE">Inactive</MenuItem>
             </Select>
           </FormControl>
         </Stack>
@@ -890,7 +889,9 @@ export default function WorkersPage() {
                       <TableCell>
                         <TableSortLabel
                           active={sortField === "subaccount"}
-                          direction={sortField === "subaccount" ? sortOrder : "asc"}
+                          direction={
+                            sortField === "subaccount" ? sortOrder : "asc"
+                          }
                           onClick={() => handleSort("subaccount")}
                         >
                           Subaccount
@@ -899,7 +900,9 @@ export default function WorkersPage() {
                       <TableCell align="right">
                         <TableSortLabel
                           active={sortField === "hashrate"}
-                          direction={sortField === "hashrate" ? sortOrder : "asc"}
+                          direction={
+                            sortField === "hashrate" ? sortOrder : "asc"
+                          }
                           onClick={() => handleSort("hashrate")}
                         >
                           Hashrate (TH/s)
@@ -908,7 +911,9 @@ export default function WorkersPage() {
                       <TableCell align="right">
                         <TableSortLabel
                           active={sortField === "efficiency"}
-                          direction={sortField === "efficiency" ? sortOrder : "asc"}
+                          direction={
+                            sortField === "efficiency" ? sortOrder : "asc"
+                          }
                           onClick={() => handleSort("efficiency")}
                         >
                           Efficiency (%)
@@ -926,7 +931,9 @@ export default function WorkersPage() {
                       <TableCell>
                         <TableSortLabel
                           active={sortField === "lastShare"}
-                          direction={sortField === "lastShare" ? sortOrder : "asc"}
+                          direction={
+                            sortField === "lastShare" ? sortOrder : "asc"
+                          }
                           onClick={() => handleSort("lastShare")}
                         >
                           Last Share
@@ -942,7 +949,7 @@ export default function WorkersPage() {
                       )
                       .map((worker, idx) => (
                         <TableRow
-                          key={`${worker.subaccount_name}-${worker.name}`}
+                          key={worker.id}
                           sx={{
                             backgroundColor:
                               idx % 2 === 0

@@ -86,7 +86,7 @@ export const MACHINE_LIFE_YEARS = 5;
 // bills are funded via a loan collateralized by the accumulating BTC rather
 // than an outside funding source. The lifetime figures use the same formula
 // (calculateStrategy2Values) — this rate is informational/display only.
-export const BORROWING_RATE_APR = 3.5; // % — USDT/(BTC Collateral) borrowing rate
+export const BORROWING_RATE_APR = 4; // % — USDT/(BTC Collateral) borrowing rate
 
 // Next scheduled Bitcoin block-reward halving, which cuts mining output in
 // half. Any lifetime BTC projection spanning this date must apply the

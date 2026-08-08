@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import {
   Box,
   Button,
-  Grid as MuiGrid,
+  Grid,
   TextField,
   Typography,
   Alert,
@@ -17,15 +17,14 @@ import {
 import { Save as SaveIcon, Refresh as RefreshIcon } from "@mui/icons-material";
 import { MinerModel, MINER_LABELS } from "@/lib/helpers/paybackCalculations";
 
-// Type workaround for MUI Grid component
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const Grid = MuiGrid as React.ComponentType<any>;
-
 interface PaybackConfig {
   id: number;
-  hostingCharges: string;
-  monthlyInvoicingAmount: string;
-  powerConsumption: string;
+  s21proHostingCharges: string;
+  s21xpHostingCharges: string;
+  s21proMonthlyInvoicingAmount: string;
+  s21xpMonthlyInvoicingAmount: string;
+  s21proPowerConsumption: string;
+  s21xpPowerConsumption: string;
   s21proMachineCost: string;
   s21xpMachineCost: string;
   poolCommissionStockOs: string;
@@ -49,9 +48,12 @@ export default function PaybackAnalysisCompanySettingsPage() {
 
   // Form state
   const [formData, setFormData] = useState({
-    hostingCharges: "",
-    monthlyInvoicingAmount: "",
-    powerConsumption: "",
+    s21proHostingCharges: "",
+    s21xpHostingCharges: "",
+    s21proMonthlyInvoicingAmount: "",
+    s21xpMonthlyInvoicingAmount: "",
+    s21proPowerConsumption: "",
+    s21xpPowerConsumption: "",
     s21proMachineCost: "",
     s21xpMachineCost: "",
     poolCommissionStockOs: "",
@@ -80,9 +82,12 @@ export default function PaybackAnalysisCompanySettingsPage() {
         setConfig(data.data);
         // Set form data with fetched values
         setFormData({
-          hostingCharges: data.data.hostingCharges,
-          monthlyInvoicingAmount: data.data.monthlyInvoicingAmount,
-          powerConsumption: data.data.powerConsumption,
+          s21proHostingCharges: data.data.s21proHostingCharges,
+          s21xpHostingCharges: data.data.s21xpHostingCharges,
+          s21proMonthlyInvoicingAmount: data.data.s21proMonthlyInvoicingAmount,
+          s21xpMonthlyInvoicingAmount: data.data.s21xpMonthlyInvoicingAmount,
+          s21proPowerConsumption: data.data.s21proPowerConsumption,
+          s21xpPowerConsumption: data.data.s21xpPowerConsumption,
           s21proMachineCost: data.data.s21proMachineCost,
           s21xpMachineCost: data.data.s21xpMachineCost,
           poolCommissionStockOs: data.data.poolCommissionStockOs,
@@ -223,10 +228,11 @@ export default function PaybackAnalysisCompanySettingsPage() {
         <Divider sx={{ mb: 3 }} />
 
         <Typography variant="h6" gutterBottom>
-          Miner Cost &amp; Hashrate
+          Miner Cost, Hashrate &amp; Hosting
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Select a miner model to edit its machine cost and hashrate values.
+          Select a miner model to edit its machine cost, hashrate, hosting, and
+          power values.
         </Typography>
 
         <Tabs
@@ -252,7 +258,7 @@ export default function PaybackAnalysisCompanySettingsPage() {
         <Grid container spacing={3}>
           {selectedMiner === "S21PRO" && (
             <>
-              <Grid item xs={12} md={6}>
+              <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                 <TextField
                   fullWidth
                   label="S21 Pro Machine Cost ($)"
@@ -264,8 +270,7 @@ export default function PaybackAnalysisCompanySettingsPage() {
                   InputLabelProps={{ sx: { color: "#1565c0" } }}
                 />
               </Grid>
-              <Grid item xs={12} md={6} />
-              <Grid item xs={12} md={6}>
+              <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                 <TextField
                   fullWidth
                   label="S21 Pro Hashrate - Stock OS (TH/s)"
@@ -277,7 +282,7 @@ export default function PaybackAnalysisCompanySettingsPage() {
                   InputLabelProps={{ sx: { color: "#1565c0" } }}
                 />
               </Grid>
-              <Grid item xs={12} md={6}>
+              <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                 <TextField
                   fullWidth
                   label="S21 Pro Hashrate - LuxOS (TH/s)"
@@ -289,12 +294,48 @@ export default function PaybackAnalysisCompanySettingsPage() {
                   InputLabelProps={{ sx: { color: "#1565c0" } }}
                 />
               </Grid>
+              <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                <TextField
+                  fullWidth
+                  label="S21 Pro Hosting Charges ($/kWh)"
+                  type="number"
+                  value={formData.s21proHostingCharges}
+                  onChange={handleChange("s21proHostingCharges")}
+                  helperText="Cost per kilowatt-hour for hosting"
+                  inputProps={{ step: "0.00001", min: "0" }}
+                  InputLabelProps={{ sx: { color: "#1565c0" } }}
+                />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                <TextField
+                  fullWidth
+                  label="S21 Pro Monthly Hosting/Operating Cost ($)"
+                  type="number"
+                  value={formData.s21proMonthlyInvoicingAmount}
+                  onChange={handleChange("s21proMonthlyInvoicingAmount")}
+                  helperText="Total monthly hosting/electricity cost for company-owned miners"
+                  inputProps={{ step: "0.01", min: "0" }}
+                  InputLabelProps={{ sx: { color: "#1565c0" } }}
+                />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                <TextField
+                  fullWidth
+                  label="S21 Pro Power Consumption (kW)"
+                  type="number"
+                  value={formData.s21proPowerConsumption}
+                  onChange={handleChange("s21proPowerConsumption")}
+                  helperText="Power consumption per miner"
+                  inputProps={{ step: "0.0001", min: "0" }}
+                  InputLabelProps={{ sx: { color: "#1565c0" } }}
+                />
+              </Grid>
             </>
           )}
 
           {selectedMiner === "S21XP" && (
             <>
-              <Grid item xs={12} md={6}>
+              <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                 <TextField
                   fullWidth
                   label="S21 XP Machine Cost ($)"
@@ -306,8 +347,7 @@ export default function PaybackAnalysisCompanySettingsPage() {
                   InputLabelProps={{ sx: { color: "#e65100" } }}
                 />
               </Grid>
-              <Grid item xs={12} md={6} />
-              <Grid item xs={12} md={6}>
+              <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                 <TextField
                   fullWidth
                   label="S21 XP Hashrate - Stock OS (TH/s)"
@@ -319,7 +359,7 @@ export default function PaybackAnalysisCompanySettingsPage() {
                   InputLabelProps={{ sx: { color: "#e65100" } }}
                 />
               </Grid>
-              <Grid item xs={12} md={6}>
+              <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                 <TextField
                   fullWidth
                   label="S21 XP Hashrate - LuxOS (TH/s)"
@@ -331,6 +371,42 @@ export default function PaybackAnalysisCompanySettingsPage() {
                   InputLabelProps={{ sx: { color: "#e65100" } }}
                 />
               </Grid>
+              <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                <TextField
+                  fullWidth
+                  label="S21 XP Hosting Charges ($/kWh)"
+                  type="number"
+                  value={formData.s21xpHostingCharges}
+                  onChange={handleChange("s21xpHostingCharges")}
+                  helperText="Cost per kilowatt-hour for hosting"
+                  inputProps={{ step: "0.00001", min: "0" }}
+                  InputLabelProps={{ sx: { color: "#e65100" } }}
+                />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                <TextField
+                  fullWidth
+                  label="S21 XP Monthly Hosting/Operating Cost ($)"
+                  type="number"
+                  value={formData.s21xpMonthlyInvoicingAmount}
+                  onChange={handleChange("s21xpMonthlyInvoicingAmount")}
+                  helperText="Total monthly hosting/electricity cost for company-owned miners"
+                  inputProps={{ step: "0.01", min: "0" }}
+                  InputLabelProps={{ sx: { color: "#e65100" } }}
+                />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                <TextField
+                  fullWidth
+                  label="S21 XP Power Consumption (kW)"
+                  type="number"
+                  value={formData.s21xpPowerConsumption}
+                  onChange={handleChange("s21xpPowerConsumption")}
+                  helperText="Power consumption per miner"
+                  inputProps={{ step: "0.0001", min: "0" }}
+                  InputLabelProps={{ sx: { color: "#e65100" } }}
+                />
+              </Grid>
             </>
           )}
         </Grid>
@@ -338,47 +414,8 @@ export default function PaybackAnalysisCompanySettingsPage() {
         <Divider sx={{ my: 3 }} />
 
         <Grid container spacing={3}>
-          {/* Hosting Charges */}
-          <Grid item xs={12} md={6}>
-            <TextField
-              fullWidth
-              label="Hosting Charges ($/kWh)"
-              type="number"
-              value={formData.hostingCharges}
-              onChange={handleChange("hostingCharges")}
-              helperText="Cost per kilowatt-hour for hosting"
-              inputProps={{ step: "0.00001", min: "0" }}
-            />
-          </Grid>
-
-          {/* Monthly Invoicing Amount */}
-          <Grid item xs={12} md={6}>
-            <TextField
-              fullWidth
-              label="Monthly Hosting/Operating Cost ($)"
-              type="number"
-              value={formData.monthlyInvoicingAmount}
-              onChange={handleChange("monthlyInvoicingAmount")}
-              helperText="Total monthly hosting/electricity cost for company-owned miners"
-              inputProps={{ step: "0.01", min: "0" }}
-            />
-          </Grid>
-
-          {/* Power Consumption */}
-          <Grid item xs={12} md={6}>
-            <TextField
-              fullWidth
-              label="Power Consumption (kW)"
-              type="number"
-              value={formData.powerConsumption}
-              onChange={handleChange("powerConsumption")}
-              helperText="Power consumption per miner"
-              inputProps={{ step: "0.0001", min: "0" }}
-            />
-          </Grid>
-
           {/* Pool Commission - Stock OS */}
-          <Grid item xs={12} md={6}>
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
             <TextField
               fullWidth
               label="Pool Commission - Stock OS (%)"
@@ -391,7 +428,7 @@ export default function PaybackAnalysisCompanySettingsPage() {
           </Grid>
 
           {/* Pool Commission - LuxOS */}
-          <Grid item xs={12} md={6}>
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
             <TextField
               fullWidth
               label="Pool Commission - LuxOS (%)"
@@ -404,7 +441,7 @@ export default function PaybackAnalysisCompanySettingsPage() {
           </Grid>
 
           {/* Breakeven BTC Price */}
-          <Grid item xs={12} md={6}>
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
             <TextField
               fullWidth
               label="Breakeven BTC Price ($)"

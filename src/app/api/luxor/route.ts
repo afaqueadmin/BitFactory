@@ -408,6 +408,8 @@ export async function GET(
     const siteId =
       searchParams.get("site_id") || process.env.LUXOR_FIXED_SITE_ID;
     const subaccountName = searchParams.get("subaccount_name") || undefined;
+    const subaccountNamesParam =
+      searchParams.get("subaccount_names") || undefined;
 
     console.log("[Luxor Proxy V2] GET: Built query params:", queryParams);
 
@@ -647,10 +649,14 @@ export async function GET(
                 : user.role === "FRANCHISEE"
                   ? (await getFranchiseeSubaccountNames(user.userId)) ||
                     undefined
-                  : undefined,
-            site_id: ["ADMIN", "SUPER_ADMIN"].includes(user.role)
-              ? siteId
-              : undefined,
+                  : ["ADMIN", "SUPER_ADMIN"].includes(user.role)
+                    ? subaccountNamesParam
+                    : undefined,
+            site_id:
+              ["ADMIN", "SUPER_ADMIN"].includes(user.role) &&
+              !subaccountNamesParam
+                ? siteId
+                : undefined,
             status: searchParams.get("status") || undefined,
             page_number: searchParams.get("page_number")
               ? parseInt(searchParams.get("page_number")!)

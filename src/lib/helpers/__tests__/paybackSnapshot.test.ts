@@ -7,7 +7,8 @@ import {
 import { calculateBreakevenBtcPrice } from "@/lib/helpers/paybackCalculations";
 
 const CLIENT_CONFIG: SnapshotProfileConfig = {
-  monthlyInvoicingAmount: 199.05,
+  s21proMonthlyInvoicingAmount: 199.05,
+  s21xpMonthlyInvoicingAmount: 210.5,
   poolCommissionStockOs: 2.5,
   poolCommissionLuxos: 2.5,
   s21proHashrateStockOs: 236,
@@ -18,7 +19,8 @@ const CLIENT_CONFIG: SnapshotProfileConfig = {
 };
 
 const COMPANY_CONFIG: SnapshotProfileConfig = {
-  monthlyInvoicingAmount: 350,
+  s21proMonthlyInvoicingAmount: 350,
+  s21xpMonthlyInvoicingAmount: 370,
   poolCommissionStockOs: 3,
   poolCommissionLuxos: 2,
   s21proHashrateStockOs: 236,
@@ -39,7 +41,7 @@ describe("computeProfileBreakevens", () => {
 
     expect(result.s21proStock).toBeCloseTo(
       calculateBreakevenBtcPrice(
-        CLIENT_CONFIG.monthlyInvoicingAmount,
+        CLIENT_CONFIG.s21proMonthlyInvoicingAmount,
         REWARD_BTC_PER_PH_DAY,
         CLIENT_CONFIG.s21proHashrateStockOs,
         CLIENT_CONFIG.poolCommissionStockOs,
@@ -49,7 +51,7 @@ describe("computeProfileBreakevens", () => {
     );
     expect(result.s21proCustom).toBeCloseTo(
       calculateBreakevenBtcPrice(
-        CLIENT_CONFIG.monthlyInvoicingAmount,
+        CLIENT_CONFIG.s21proMonthlyInvoicingAmount,
         REWARD_BTC_PER_PH_DAY,
         CLIENT_CONFIG.s21proHashrateLuxos,
         CLIENT_CONFIG.poolCommissionLuxos,
@@ -59,7 +61,7 @@ describe("computeProfileBreakevens", () => {
     );
     expect(result.s21xpStock).toBeCloseTo(
       calculateBreakevenBtcPrice(
-        CLIENT_CONFIG.monthlyInvoicingAmount,
+        CLIENT_CONFIG.s21xpMonthlyInvoicingAmount,
         REWARD_BTC_PER_PH_DAY,
         CLIENT_CONFIG.s21xpHashrateStockOs,
         CLIENT_CONFIG.poolCommissionStockOs,
@@ -69,7 +71,7 @@ describe("computeProfileBreakevens", () => {
     );
     expect(result.s21xpCustom).toBeCloseTo(
       calculateBreakevenBtcPrice(
-        CLIENT_CONFIG.monthlyInvoicingAmount,
+        CLIENT_CONFIG.s21xpMonthlyInvoicingAmount,
         REWARD_BTC_PER_PH_DAY,
         CLIENT_CONFIG.s21xpHashrateLuxos,
         CLIENT_CONFIG.poolCommissionLuxos,
@@ -123,7 +125,7 @@ describe("buildSnapshotValues", () => {
       10,
     );
 
-    // CLIENT and COMPANY configs differ (monthlyInvoicingAmount, pool
+    // CLIENT and COMPANY configs differ (monthlyInvoicingAmount fields, pool
     // commissions), so their computed breakevens must not collapse to the
     // same numbers even though the same reward feeds both.
     expect(values.clientS21ProStockBreakeven).not.toBeCloseTo(

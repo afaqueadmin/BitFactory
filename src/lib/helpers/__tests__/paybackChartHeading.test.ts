@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { buildPaybackChartHeading } from "@/lib/helpers/paybackChartHeading";
 
-const BASE = "Cost to Mine vs Buy BTC";
+const BASE = "Buy BTC vs Mine BTC";
 
 describe("buildPaybackChartHeading", () => {
   it("shows only the miner when OS is COMPARISON (both lines shown, no OS filter applied)", () => {

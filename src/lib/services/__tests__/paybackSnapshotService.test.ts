@@ -37,7 +37,8 @@ import { upsertSnapshotForDate } from "@/lib/services/paybackSnapshotService";
 const DATE = new Date("2026-08-04T00:00:00Z");
 
 const SAMPLE_CONFIG = {
-  monthlyInvoicingAmount: 199.05,
+  s21proMonthlyInvoicingAmount: 199.05,
+  s21xpMonthlyInvoicingAmount: 199.05,
   poolCommissionStockOs: 2.5,
   poolCommissionLuxos: 2.5,
   s21proHashrateStockOs: 236,

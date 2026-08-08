@@ -12,7 +12,7 @@ import { resolvePaybackAccountType } from "@/lib/helpers/paybackAccountType";
  * GET /api/payback-history?range=30D|90D|1Y|ALL&miner=S21PRO|S21XP
  *
  * Historical BTC price vs. Stock/Custom OS breakeven price series for the
- * "Cost to Mine vs Buy BTC" chart. Any authenticated user. Reads CLIENT
+ * "Buy BTC vs Mine BTC" chart. Any authenticated user. Reads CLIENT
  * fields by default, or COMPANY fields for self-mining accounts
  * (User.segment === "SELF_MINING") — same rule as /api/payback-config.
  */

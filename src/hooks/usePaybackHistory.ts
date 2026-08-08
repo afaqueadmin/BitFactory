@@ -14,7 +14,7 @@ export interface PaybackHistoryResponse {
 }
 
 /**
- * Fetches the "Cost to Mine vs Buy BTC" history series for either the
+ * Fetches the "Buy BTC vs Mine BTC" history series for either the
  * CLIENT (customer) or COMPANY (self-mining) profile. Same react-query
  * shape/conventions as useHashpriceHistory.
  */
