@@ -651,3 +651,135 @@ export const generateInvoicePDF = async (
     throw error;
   }
 };
+
+export interface MemoPdfData {
+  memoNumber: string;
+  customerName: string;
+  customerEmail: string;
+  category: "HOSTING" | "HARDWARE";
+  amount: number;
+  reason: string;
+  issuedDate: Date;
+  invoiceNumber?: string | null;
+}
+
+/**
+ * Generate a memo PDF from its own dedicated template (not the invoice
+ * template - a memo is a single amount + reason, not a line-itemized bill).
+ * A positive amount increases the customer's balance (debits our revenue,
+ * titled "DEBIT MEMO"); a negative amount decreases it (credits our revenue
+ * back, titled "CREDIT MEMO").
+ */
+export const generateMemoPDF = async (data: MemoPdfData): Promise<Buffer> => {
+  const templatePath = join(
+    process.cwd(),
+    "src/lib/email-templates/memo-pdf.html",
+  );
+  const template = readFileSync(templatePath, "utf-8");
+
+  let paymentDetails = null;
+  try {
+    const { prisma } = await import("./prisma");
+    paymentDetails = await prisma.paymentDetails.findFirst();
+  } catch (dbError) {
+    console.warn("Could not fetch PaymentDetails for memo PDF:", dbError);
+  }
+
+  const categoryLabel =
+    data.category === "HOSTING" ? "Hosting & Colocation" : "Hardware Sales";
+  const absAmount = Math.abs(data.amount);
+  const isDebit = data.amount >= 0;
+  const amountTone = isDebit ? "debit" : "credit";
+  const amountLabel = isDebit ? "Debit Amount" : "Credit Amount";
+  const memoTitleLabel = isDebit ? "DEBIT MEMO" : "CREDIT MEMO";
+
+  const pdfData: Record<string, string | number | null | undefined | boolean> =
+    {
+      memoNumber: data.memoNumber,
+      memoTitleLabel,
+      customerName: data.customerName,
+      customerEmail: data.customerEmail,
+      categoryLabel,
+      issuedDate: formatDate(data.issuedDate),
+      invoiceNumber: data.invoiceNumber || "",
+      hasInvoiceNumber: !!data.invoiceNumber,
+      amountFormatted: `$${absAmount.toFixed(2)}`,
+      amountLabel,
+      amountTone,
+      reason: escapeHtml(data.reason),
+      ...(paymentDetails
+        ? {
+            companyName: paymentDetails.companyName,
+            companyLegalName: paymentDetails.companyLegalName,
+            companyLocation: paymentDetails.companyLocation,
+            billingInquiriesEmail: paymentDetails.billingInquiriesEmail,
+            billingInquiriesWhatsApp: paymentDetails.billingInquiriesWhatsApp,
+            supportEmail: paymentDetails.supportEmail,
+            supportWhatsApp: paymentDetails.supportWhatsApp,
+          }
+        : {
+            companyName: "BitFactory.AE",
+            companyLegalName: "Higgs Computing Limited",
+            companyLocation: "Ras Al Khaimah, UAE",
+            billingInquiriesEmail: "invoices@bitfactory.ae",
+            billingInquiriesWhatsApp: "",
+            supportEmail: "support@bitfactory.ae",
+            supportWhatsApp: "",
+          }),
+    };
+
+  const htmlContent = renderInvoiceTemplate(template, pdfData);
+  return generatePDFFromHTML(htmlContent);
+};
+
+/**
+ * Send a customer-facing memo notice with the PDF attached.
+ */
+export const sendMemoEmail = async (
+  email: string,
+  customerName: string,
+  memoNumber: string,
+  amount: number,
+  reason: string,
+  pdfBuffer: Buffer,
+  invoiceNumber?: string | null,
+) => {
+  try {
+    const { generateMemoEmailHTML } =
+      await import("./email-templates/memo-email");
+
+    const htmlContent = generateMemoEmailHTML(
+      customerName,
+      memoNumber,
+      amount,
+      reason,
+      invoiceNumber,
+    );
+
+    const memoTitleLabel = amount >= 0 ? "Debit Memo" : "Credit Memo";
+
+    const mailOptions = {
+      from:
+        `BitFactory Accounts <${process.env.SMTP_FROM}>` ||
+        "noreply@bitfactory.com",
+      replyTo: REPLY_TO_INVOICE_EMAIL,
+      to: email,
+      cc: CC_INVOICE_EMAIL,
+      subject: `${memoTitleLabel} ${memoNumber} - BitFactory`,
+      html: htmlContent,
+      attachments: [
+        {
+          filename: `${memoTitleLabel.replace(" ", "")}_${memoNumber}.pdf`,
+          content: pdfBuffer,
+          contentType: "application/pdf",
+        },
+      ],
+    };
+
+    await transporter.sendMail(mailOptions);
+    return { success: true };
+  } catch (error) {
+    console.error("Error sending memo email:", error);
+    return { success: false, error };
+  }
+};

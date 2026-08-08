@@ -13,8 +13,17 @@ import {
   Divider,
   Alert,
   CircularProgress,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
+  Chip,
+  IconButton,
+  Tooltip,
 } from "@mui/material";
 import { useInvoice } from "@/lib/hooks/useInvoices";
+import { useMemos, MemoTransaction } from "@/lib/hooks/admin/useMemos";
 import { StatusBadge } from "@/components/accounting/common/StatusBadge";
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
 import { DateDisplay } from "@/components/accounting/common/DateDisplay";
@@ -26,6 +35,42 @@ export default function CustomerInvoiceDetailPage() {
   const router = useRouter();
   const { invoice, loading, error } = useInvoice(params.id as string);
   const [downloadLoading, setDownloadLoading] = useState(false);
+  const [memoDownloadingId, setMemoDownloadingId] = useState<string | null>(
+    null,
+  );
+
+  const { memos, loading: memosLoading } = useMemos(0, 25, {
+    invoiceId: params.id as string,
+  });
+
+  const handleMemoDownload = async (memo: MemoTransaction) => {
+    try {
+      setMemoDownloadingId(memo.id);
+      const response = await fetch(`/api/memos/${memo.id}/download`, {
+        method: "GET",
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to download memo");
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `memo-${memo.memoNumber}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (err) {
+      console.error("Memo download error:", err);
+      alert("Failed to download memo PDF");
+    } finally {
+      setMemoDownloadingId(null);
+    }
+  };
 
   const handleDownload = async () => {
     try {
@@ -324,6 +369,73 @@ export default function CustomerInvoiceDetailPage() {
                 <Typography color="textSecondary">
                   No narration added for this invoice
                 </Typography>
+              )}
+            </CardContent>
+          </Card>
+        </Box>
+      )}
+
+      {/* Memos Section */}
+      {(memosLoading || memos.length > 0) && (
+        <Box sx={{ mb: 3 }}>
+          <Card>
+            <CardHeader title="Memos" />
+            <Divider />
+            <CardContent>
+              {memosLoading ? (
+                <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}>
+                  <CircularProgress size={30} />
+                </Box>
+              ) : (
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Memo #</TableCell>
+                      <TableCell>Date</TableCell>
+                      <TableCell align="right">Amount</TableCell>
+                      <TableCell>Status</TableCell>
+                      <TableCell align="right">PDF</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {memos.map((memo) => (
+                      <TableRow key={memo.id}>
+                        <TableCell>{memo.memoNumber}</TableCell>
+                        <TableCell>
+                          <DateDisplay date={memo.createdAt} />
+                        </TableCell>
+                        <TableCell align="right">
+                          <CurrencyDisplay value={memo.amount} />
+                        </TableCell>
+                        <TableCell>
+                          <Chip
+                            label={memo.status}
+                            size="small"
+                            color={
+                              memo.status === "VOIDED" ? "default" : "success"
+                            }
+                            variant={
+                              memo.status === "VOIDED" ? "outlined" : "filled"
+                            }
+                          />
+                        </TableCell>
+                        <TableCell align="right">
+                          <Tooltip title="Download PDF">
+                            <span>
+                              <IconButton
+                                size="small"
+                                onClick={() => handleMemoDownload(memo)}
+                                disabled={memoDownloadingId === memo.id}
+                              >
+                                <DownloadIcon fontSize="small" />
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               )}
             </CardContent>
           </Card>

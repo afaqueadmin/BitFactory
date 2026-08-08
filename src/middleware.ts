@@ -50,6 +50,7 @@ const securePaths = {
     "/admin/monthly-customer-billing",
     "/admin/customer-balance",
     "/accounting/credit-adjustments",
+    "/accounting/memos",
 
     "/external-resource",
     "/customers/overview",

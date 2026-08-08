@@ -33,6 +33,7 @@ import {
   Lock as LockIcon,
   People as FranchiseesIcon,
   MonetizationOn as IncentivesIcon,
+  ReceiptLong as MemoIcon,
 } from "@mui/icons-material";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -175,9 +176,9 @@ const sidebarItems: SidebarItem[] = [
       //   path: "/accounting/invoices",
       // },
       {
-        title: "Recurring Invoices",
-        icon: <RevenueIcon />,
-        path: "/accounting/recurring",
+        title: "Memos",
+        icon: <MemoIcon />,
+        path: "/accounting/memos",
       },
       {
         title: "Customer Statements",
@@ -185,19 +186,19 @@ const sidebarItems: SidebarItem[] = [
         path: "/accounting/statements",
       },
       {
-        title: "Client Transaction History",
-        icon: <DocumentIcon />,
-        path: "/accounting/client-transaction-history",
-      },
-      {
         title: "Credit Adjustments",
         icon: <AdjustmentsIcon />,
         path: "/accounting/credit-adjustments",
       },
       {
-        title: "Pricing",
-        icon: <HostingPricesIcon />,
-        path: "/accounting/pricing",
+        title: "Client Transaction History",
+        icon: <DocumentIcon />,
+        path: "/accounting/client-transaction-history",
+      },
+      {
+        title: "Email Reports",
+        icon: <DocumentIcon />,
+        path: "/accounting/email-report",
       },
       {
         title: "Invoice PDF Settings",
@@ -205,9 +206,14 @@ const sidebarItems: SidebarItem[] = [
         path: "/accounting/pdf-invoice-settings",
       },
       {
-        title: "Email Reports",
-        icon: <DocumentIcon />,
-        path: "/accounting/email-report",
+        title: "Recurring Invoices",
+        icon: <RevenueIcon />,
+        path: "/accounting/recurring",
+      },
+      {
+        title: "Pricing",
+        icon: <HostingPricesIcon />,
+        path: "/accounting/pricing",
       },
     ],
   },

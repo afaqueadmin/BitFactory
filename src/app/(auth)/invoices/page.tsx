@@ -14,6 +14,8 @@ import {
   TableRow,
   useTheme,
   Button,
+  Chip,
+  Tooltip,
 } from "@mui/material";
 import { useQuery } from "@tanstack/react-query";
 import { useUser } from "@/lib/hooks/useUser";
@@ -23,6 +25,7 @@ import { useRouter } from "next/navigation";
 import { calculateDaysUntilDue } from "@/lib/mocks/invoiceMocks";
 import DownloadIcon from "@mui/icons-material/Download";
 import { useState } from "react";
+import { useMemos } from "@/lib/hooks/admin/useMemos";
 
 interface InvoicesResponse {
   pagination: {
@@ -61,6 +64,14 @@ export default function InvoicesPage() {
     },
     enabled: !!user?.id,
   });
+
+  // Fetch this customer's own issued memos once, to badge invoice rows that
+  // have one - the API force-scopes CLIENT requests to their own
+  // customer-facing memos, so no filters need to be passed here.
+  const { memos: customerMemos } = useMemos(0, 9999, { status: "ISSUED" });
+  const invoiceIdsWithMemo = new Set(
+    customerMemos.filter((m) => m.invoice).map((m) => m.invoice!.id),
+  );
 
   const headerCellSx = {
     fontWeight: "bold",
@@ -260,16 +271,29 @@ export default function InvoicesPage() {
                       <TableCell
                         sx={{ py: { xs: 1, sm: 1.5 }, px: { xs: 1.5, sm: 2 } }}
                       >
-                        <Typography
-                          variant="body2"
-                          fontWeight="medium"
-                          sx={{
-                            color: "primary.main",
-                            "&:hover": { textDecoration: "underline" },
-                          }}
-                        >
-                          {invoice.invoiceNumber}
-                        </Typography>
+                        <Box sx={{ display: "flex", alignItems: "center" }}>
+                          <Typography
+                            variant="body2"
+                            fontWeight="medium"
+                            sx={{
+                              color: "primary.main",
+                              "&:hover": { textDecoration: "underline" },
+                            }}
+                          >
+                            {invoice.invoiceNumber}
+                          </Typography>
+                          {invoiceIdsWithMemo.has(invoice.id) ? (
+                            <Tooltip title="This invoice has a memo">
+                              <Chip
+                                label="Memo"
+                                size="small"
+                                variant="outlined"
+                                color="primary"
+                                sx={{ ml: 1, height: 18, fontSize: "0.65rem" }}
+                              />
+                            </Tooltip>
+                          ) : null}
+                        </Box>
                       </TableCell>
                       <TableCell
                         align="right"
