@@ -354,7 +354,7 @@ export default function HashpriceHistoryPage() {
           value={
             network?.btcPriceUsd != null ? formatUsd(network.btcPriceUsd) : null
           }
-          source="Binance · ticker/price"
+          source={`${network?.priceSource ?? "mempool.space"} · prices`}
         />
 
         <StatCard
@@ -366,7 +366,7 @@ export default function HashpriceHistoryPage() {
               : null
           }
           caption="Price × issued supply"
-          source="Binance · mempool.space"
+          source={`${network?.priceSource ?? "mempool.space"} · mempool.space`}
         />
 
         <StatCard
@@ -719,7 +719,7 @@ export default function HashpriceHistoryPage() {
         </Typography>
         <Typography variant="body2" color="textSecondary" sx={{ mt: 0.5 }}>
           <strong>Network Data:</strong> mempool.space (difficulty, block time,
-          height) • Binance (BTC price) • Updated every 5 minutes
+          height, price) • CoinGecko fallback • Updated every 5 minutes
         </Typography>
       </Paper>
     </Box>

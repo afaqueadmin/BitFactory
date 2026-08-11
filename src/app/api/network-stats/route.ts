@@ -27,9 +27,17 @@ interface DifficultyAdjustmentResponse {
   previousRetarget: number;
 }
 
-interface BinanceTickerResponse {
-  symbol: string;
-  price: string;
+interface MempoolPricesResponse {
+  USD: number;
+}
+
+interface CoinGeckoPriceResponse {
+  bitcoin?: { usd?: number };
+}
+
+interface BtcPrice {
+  price: number;
+  source: string;
 }
 
 async function fetchBlockHeight(): Promise<number> {
@@ -62,13 +70,27 @@ async function fetchAdjustment(): Promise<DifficultyAdjustmentResponse> {
 }
 
 /**
- * Binance is the price source already used elsewhere in the app
- * (useBitcoinLivePrice), so the figure here matches what users see on other
- * pages. Market cap is derived from this same price for internal consistency.
+ * Binance is deliberately not used here, despite being the price source in
+ * useBitcoinLivePrice. That hook runs in the browser, on the user's own IP;
+ * this route runs on the server, which vercel.json pins to iad1 (US), and
+ * api.binance.com answers US requests with HTTP 451 restricted-location. The
+ * sources below are not geo-restricted.
+ *
+ * Market cap is derived from whichever price wins, so the two cards agree.
  */
-async function fetchBtcPrice(): Promise<number> {
+async function fetchPriceFromMempool(): Promise<BtcPrice> {
+  const { data, source } = await fetchFromMempool<MempoolPricesResponse>(
+    "/api/v1/prices",
+    (value) => Number.isFinite(value?.USD) && value.USD > 0,
+    PRICE_CACHE_SECONDS,
+  );
+
+  return { price: data.USD, source };
+}
+
+async function fetchPriceFromCoinGecko(): Promise<BtcPrice> {
   const response = await fetch(
-    "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT",
+    "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd",
     {
       next: { revalidate: PRICE_CACHE_SECONDS },
       signal: AbortSignal.timeout(10_000),
@@ -76,17 +98,34 @@ async function fetchBtcPrice(): Promise<number> {
   );
 
   if (!response.ok) {
-    throw new Error(`Binance responded with status ${response.status}`);
+    throw new Error(`CoinGecko responded with status ${response.status}`);
   }
 
-  const data: BinanceTickerResponse = await response.json();
-  const price = Number(data?.price);
+  const data: CoinGeckoPriceResponse = await response.json();
+  const price = data?.bitcoin?.usd;
 
-  if (!Number.isFinite(price) || price <= 0) {
-    throw new Error("Binance returned an unexpected price payload");
+  if (!Number.isFinite(price) || (price as number) <= 0) {
+    throw new Error("CoinGecko returned an unexpected price payload");
   }
 
-  return price;
+  return { price: price as number, source: "coingecko.com" };
+}
+
+async function fetchBtcPrice(): Promise<BtcPrice> {
+  const providers = [fetchPriceFromMempool, fetchPriceFromCoinGecko];
+
+  for (const provider of providers) {
+    try {
+      return await provider();
+    } catch (error) {
+      console.warn(
+        "[Network Stats API] Price source failed:",
+        error instanceof Error ? error.message : error,
+      );
+    }
+  }
+
+  throw new Error("All BTC price sources failed");
 }
 
 /**
@@ -139,8 +178,9 @@ export async function GET(request: NextRequest) {
     const height = pick("blockHeight", heightResult);
     const difficulty = pick("difficulty", difficultyResult);
     const adjustment = pick("difficultyAdjustment", adjustmentResult);
-    const btcPriceUsd = pick("btcPrice", priceResult);
+    const btcPrice = pick("btcPrice", priceResult);
 
+    const btcPriceUsd = btcPrice?.price ?? null;
     const marketCapUsd =
       height !== null && btcPriceUsd !== null
         ? getCirculatingSupply(height) * btcPriceUsd
@@ -150,6 +190,9 @@ export async function GET(request: NextRequest) {
       success: true,
       data: {
         btcPriceUsd,
+        // Which provider answered, so the card can name its actual source
+        // rather than a hardcoded guess.
+        priceSource: btcPrice?.source ?? null,
         marketCapUsd,
         circulatingSupply:
           height !== null ? getCirculatingSupply(height) : null,
