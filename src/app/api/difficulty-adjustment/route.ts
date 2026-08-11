@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyJwtToken } from "@/lib/jwt";
+import { fetchFromMempool } from "@/lib/bitcoinNetwork";
 
 interface MempoolDifficultyAdjustment {
   progressPercent: number;
@@ -15,11 +16,40 @@ interface MempoolDifficultyAdjustment {
 }
 
 /**
+ * Difficulty only moves on Bitcoin's ~10 minute block cadence, so caching for
+ * five minutes costs nothing in freshness. Without it every page load from
+ * every user hits the upstream API through this server's single IP.
+ */
+const CACHE_SECONDS = 300;
+
+/** Consensus clamps a retarget to a factor of 4 in either direction. */
+const MAX_ABS_CHANGE_PERCENT = 300;
+
+/**
+ * Accepts a timestamp in either unit and returns milliseconds. Guards against a
+ * mirror that reports seconds, which would otherwise render as a 1970 date.
+ */
+function toMilliseconds(value: number): number {
+  return value < 1e12 ? value * 1000 : value;
+}
+
+function isUsable(data: MempoolDifficultyAdjustment): boolean {
+  return (
+    Number.isFinite(data?.difficultyChange) &&
+    Math.abs(data.difficultyChange) <= MAX_ABS_CHANGE_PERCENT &&
+    Number.isFinite(data?.estimatedRetargetDate) &&
+    data.estimatedRetargetDate > 0
+  );
+}
+
+/**
  * GET /api/difficulty-adjustment
  *
- * Fetches the current Bitcoin network difficulty adjustment estimate from
- * mempool.space's public API (no key required). Luxor's pool API does not
- * expose network-wide difficulty data, so this is sourced independently.
+ * Fetches the current Bitcoin network difficulty adjustment estimate from the
+ * mempool.space public API, falling back to a mirror. Luxor's pool API does not
+ * expose network-wide difficulty data — /pool/pool-stats/:currency returns only
+ * hashrate, hashprice, active workers and the payment threshold — so this is
+ * sourced independently.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -39,26 +69,23 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
 
-    const response = await fetch(
-      "https://mempool.space/api/v1/difficulty-adjustment",
-      { next: { revalidate: 0 } },
-    );
-
-    if (!response.ok) {
-      throw new Error(`mempool.space responded with status ${response.status}`);
-    }
-
-    const data: MempoolDifficultyAdjustment = await response.json();
+    const { data, source } =
+      await fetchFromMempool<MempoolDifficultyAdjustment>(
+        "/api/v1/difficulty-adjustment",
+        isUsable,
+        CACHE_SECONDS,
+      );
 
     return NextResponse.json({
       success: true,
       data: {
         estimatedChangePercent: data.difficultyChange,
-        estimatedRetargetDate: data.estimatedRetargetDate,
+        estimatedRetargetDate: toMilliseconds(data.estimatedRetargetDate),
         progressPercent: data.progressPercent,
         remainingBlocks: data.remainingBlocks,
         nextRetargetHeight: data.nextRetargetHeight,
       },
+      source,
       timestamp: new Date().toISOString(),
     });
   } catch (error) {

@@ -38,6 +38,8 @@ import {
   Button,
   useTheme,
   useMediaQuery,
+  SxProps,
+  Theme,
 } from "@mui/material";
 import {
   AreaChart,
@@ -87,6 +89,114 @@ const formatAdjustmentDate = (timestamp: number): string => {
   });
 };
 
+const formatUsd = (value: number): string =>
+  `$${value.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+
+/** Compact notation keeps large figures (market cap, difficulty) card-sized. */
+const formatCompact = (value: number): string =>
+  new Intl.NumberFormat("en-US", {
+    notation: "compact",
+    maximumFractionDigits: 2,
+  }).format(value);
+
+const formatBlockTime = (ms: number): string => {
+  const totalSeconds = Math.round(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}m ${seconds}s`;
+};
+
+/**
+ * Shared card for every statistic on this page. A null value renders
+ * "Unavailable"; `source` names the upstream API the figure came from, so the
+ * provenance of each number is visible without consulting the footer.
+ */
+function StatCard({
+  label,
+  value,
+  isLoading,
+  source,
+  color,
+  caption,
+  sx,
+}: {
+  label: string;
+  value: string | null;
+  isLoading: boolean;
+  source: string;
+  color?: string;
+  caption?: string;
+  sx?: SxProps<Theme>;
+}) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
+
+  return (
+    <Paper
+      sx={{
+        p: { xs: 1.25, sm: 1.5 },
+        backgroundColor: isDark ? theme.palette.grey[800] : "#f5f5f5",
+        borderRadius: 1.5,
+        display: "flex",
+        flexDirection: "column",
+        ...sx,
+      }}
+    >
+      <Typography
+        variant="caption"
+        color="textSecondary"
+        sx={{ fontSize: { xs: "0.68rem", sm: "0.78rem" }, lineHeight: 1.3 }}
+      >
+        {label}
+      </Typography>
+      <Typography
+        sx={{
+          fontWeight: "bold",
+          mt: 0.4,
+          fontSize: { xs: "0.9rem", sm: "1.1rem" },
+          lineHeight: 1.3,
+          // Five columns leaves each card narrow at the md breakpoint; wrapping
+          // keeps longer values (High / Low, Period Change) inside the card.
+          overflowWrap: "break-word",
+          color: value == null ? "inherit" : (color ?? "inherit"),
+        }}
+      >
+        {isLoading ? <CircularProgress size={16} /> : (value ?? "Unavailable")}
+      </Typography>
+      {!isLoading && value != null && caption ? (
+        <Typography
+          variant="caption"
+          color="textSecondary"
+          sx={{
+            display: "block",
+            fontSize: { xs: "0.62rem", sm: "0.68rem" },
+            lineHeight: 1.3,
+          }}
+        >
+          {caption}
+        </Typography>
+      ) : null}
+      <Typography
+        variant="caption"
+        color="textSecondary"
+        sx={{
+          display: "block",
+          mt: "auto",
+          pt: 0.6,
+          fontSize: { xs: "0.58rem", sm: "0.63rem" },
+          lineHeight: 1.3,
+          opacity: 0.75,
+        }}
+      >
+        {source}
+      </Typography>
+    </Paper>
+  );
+}
+
 export default function HashpriceHistoryPage() {
   const theme = useTheme();
   const [selectedTimeframe, setSelectedTimeframe] = useState("30D");
@@ -129,6 +239,21 @@ export default function HashpriceHistoryPage() {
     difficultyData?.data?.estimatedChangePercent;
   const estimatedRetargetDate: number | undefined =
     difficultyData?.data?.estimatedRetargetDate;
+
+  // Fetch Bitcoin network stats (price, market cap, block reward, difficulty,
+  // block time, halving estimate, previous retarget)
+  const { data: networkData, isLoading: isNetworkLoading } = useQuery({
+    queryKey: ["network-stats"],
+    queryFn: async () => {
+      const response = await fetch("/api/network-stats");
+      if (!response.ok) throw new Error("Failed to fetch");
+      return response.json();
+    },
+    staleTime: 5 * 60 * 1000,
+    refetchInterval: 5 * 60 * 1000,
+  });
+
+  const network = networkData?.data;
 
   // Fetch historical pool-wide hashprice data from API (for chart and period statistics)
   const { hashpriceData, statistics, isLoading, isError, error, rawResponse } =
@@ -214,148 +339,160 @@ export default function HashpriceHistoryPage() {
       <Box
         sx={{
           display: "grid",
-          gridTemplateColumns: { xs: "1fr 1fr", sm: "1fr 1fr 1fr" },
-          gap: { xs: 1.5, sm: 2 },
+          gridTemplateColumns: {
+            xs: "1fr 1fr",
+            sm: "repeat(3, 1fr)",
+            md: "repeat(5, 1fr)",
+          },
+          gap: { xs: 1, sm: 1.25 },
           mb: { xs: 2, md: 4 },
         }}
       >
-        <Paper
-          sx={{
-            p: { xs: 1.5, sm: 2 },
-            backgroundColor: isDark ? theme.palette.grey[800] : "#f5f5f5",
-            borderRadius: 2,
-          }}
-        >
-          <Typography variant="caption" color="textSecondary">
-            Current Hashprice
-          </Typography>
-          <Typography
-            variant="h6"
-            sx={{
-              fontWeight: "bold",
-              mt: 0.5,
-              fontSize: { xs: "0.8rem", sm: "1.1rem" },
-            }}
-          >
-            {isLiveLoading ? (
-              <CircularProgress size={20} />
-            ) : (
-              formatHashprice(cardStatistics.current)
-            )}
-          </Typography>
-        </Paper>
+        <StatCard
+          label="BTC Price"
+          isLoading={isNetworkLoading}
+          value={
+            network?.btcPriceUsd != null ? formatUsd(network.btcPriceUsd) : null
+          }
+          source="Binance · ticker/price"
+        />
 
-        <Paper
-          sx={{
-            p: { xs: 1.5, sm: 2 },
-            backgroundColor: isDark ? theme.palette.grey[800] : "#f5f5f5",
-            borderRadius: 2,
-          }}
-        >
-          <Typography variant="caption" color="textSecondary">
-            Period Change
-          </Typography>
-          <Typography
-            variant="h6"
-            sx={{
-              fontWeight: "bold",
-              mt: 0.5,
-              fontSize: { xs: "0.85rem", sm: "1.1rem" },
-              color: cardStatistics.change >= 0 ? "#4caf50" : "#f44336",
-            }}
-          >
-            {cardStatistics.change >= 0 ? "+" : ""}
-            {isMobile
+        <StatCard
+          label="Market Capitalization"
+          isLoading={isNetworkLoading}
+          value={
+            network?.marketCapUsd != null
+              ? `$${formatCompact(network.marketCapUsd)}`
+              : null
+          }
+          caption="Price × issued supply"
+          source="Binance · mempool.space"
+        />
+
+        <StatCard
+          label="Block Reward"
+          isLoading={isNetworkLoading}
+          value={
+            network?.blockReward != null ? `${network.blockReward} BTC` : null
+          }
+          caption={
+            network?.blockHeight != null
+              ? `Block ${network.blockHeight.toLocaleString("en-US")}`
+              : undefined
+          }
+          source="Derived · mempool.space height"
+        />
+
+        <StatCard
+          label="Network Difficulty"
+          isLoading={isNetworkLoading}
+          value={
+            network?.networkDifficulty != null
+              ? formatCompact(network.networkDifficulty)
+              : null
+          }
+          source="mempool.space · mining/hashrate"
+        />
+
+        <StatCard
+          label="Avg Block Time"
+          isLoading={isNetworkLoading}
+          value={
+            network?.avgBlockTimeMs != null
+              ? formatBlockTime(network.avgBlockTimeMs)
+              : null
+          }
+          caption="Current epoch • 10m target"
+          source="mempool.space · difficulty-adjustment"
+        />
+
+        <StatCard
+          label="Halving Estimate"
+          isLoading={isNetworkLoading}
+          value={
+            network?.halving?.estimatedDate != null
+              ? formatAdjustmentDate(network.halving.estimatedDate)
+              : null
+          }
+          caption={
+            network?.halving?.blocksRemaining != null
+              ? `${network.halving.blocksRemaining.toLocaleString("en-US")} blocks to go`
+              : undefined
+          }
+          source="Derived · mempool.space height"
+        />
+
+        <StatCard
+          label="Previous Difficulty Adjustment"
+          isLoading={isNetworkLoading}
+          value={
+            network?.previousRetargetPercent != null
+              ? `${network.previousRetargetPercent >= 0 ? "+" : ""}${network.previousRetargetPercent.toFixed(2)}%`
+              : null
+          }
+          // Rising difficulty cuts miner revenue, so it reads red — matching the
+          // estimated adjustment card above.
+          color={
+            network?.previousRetargetPercent != null &&
+            network.previousRetargetPercent > 0
+              ? "#f44336"
+              : "#4caf50"
+          }
+          source="mempool.space · difficulty-adjustment"
+        />
+
+        <StatCard
+          label="Current Hashprice"
+          isLoading={isLiveLoading}
+          value={formatHashprice(cardStatistics.current)}
+          source="Luxor · pool-hashprice-live"
+        />
+
+        <StatCard
+          label="Period Change"
+          isLoading={false}
+          value={`${cardStatistics.change >= 0 ? "+" : ""}${
+            isMobile
               ? `${cardStatistics.changePercent.toFixed(2)}%`
-              : `${formatHashprice(cardStatistics.change)} (${cardStatistics.changePercent.toFixed(2)}%)`}
-          </Typography>
-        </Paper>
+              : `${formatHashprice(cardStatistics.change)} (${cardStatistics.changePercent.toFixed(2)}%)`
+          }`}
+          color={cardStatistics.change >= 0 ? "#4caf50" : "#f44336"}
+          source="Luxor · hashprice-history"
+        />
 
-        <Paper
-          sx={{
-            p: { xs: 1.5, sm: 2 },
-            gridColumn: { xs: "1 / -1", sm: "auto" },
-            backgroundColor: isDark ? theme.palette.grey[800] : "#f5f5f5",
-            borderRadius: 2,
-          }}
-        >
-          <Typography variant="caption" color="textSecondary">
-            High / Low
-          </Typography>
-          <Typography
-            variant="body2"
-            sx={{
-              fontWeight: "bold",
-              mt: 0.5,
-              fontSize: { xs: "0.75rem", sm: "0.875rem" },
-            }}
-          >
-            {formatHashprice(cardStatistics.high)} /{" "}
-            {formatHashprice(cardStatistics.low)}
-          </Typography>
-        </Paper>
+        <StatCard
+          label="High / Low"
+          isLoading={false}
+          value={`${formatHashprice(cardStatistics.high)} / ${formatHashprice(cardStatistics.low)}`}
+          source="Luxor · hashprice-history"
+        />
 
-        <Paper
-          sx={{
-            p: { xs: 1.5, sm: 2 },
-            backgroundColor: isDark ? theme.palette.grey[800] : "#f5f5f5",
-            borderRadius: 2,
-          }}
-        >
-          <Typography variant="caption" color="textSecondary">
-            Est. Difficulty Adjustment
-          </Typography>
-          <Typography
-            variant="h6"
-            sx={{
-              fontWeight: "bold",
-              mt: 0.5,
-              fontSize: { xs: "0.8rem", sm: "1.1rem" },
-              color:
-                estimatedChangePercent == null
-                  ? "inherit"
-                  : estimatedChangePercent > 0
-                    ? "#f44336"
-                    : "#4caf50",
-            }}
-          >
-            {isDifficultyLoading ? (
-              <CircularProgress size={20} />
-            ) : estimatedChangePercent == null ? (
-              "N/A"
-            ) : (
-              `${estimatedChangePercent >= 0 ? "+" : ""}${estimatedChangePercent.toFixed(2)}%`
-            )}
-          </Typography>
-        </Paper>
+        <StatCard
+          label="Est. Difficulty Adjustment"
+          isLoading={isDifficultyLoading}
+          value={
+            estimatedChangePercent == null
+              ? null
+              : `${estimatedChangePercent >= 0 ? "+" : ""}${estimatedChangePercent.toFixed(2)}%`
+          }
+          color={
+            estimatedChangePercent != null && estimatedChangePercent > 0
+              ? "#f44336"
+              : "#4caf50"
+          }
+          source="mempool.space · difficulty-adjustment"
+        />
 
-        <Paper
-          sx={{
-            p: { xs: 1.5, sm: 2 },
-            backgroundColor: isDark ? theme.palette.grey[800] : "#f5f5f5",
-            borderRadius: 2,
-          }}
-        >
-          <Typography variant="caption" color="textSecondary">
-            Difficulty Adjustment Date Estimate
-          </Typography>
-          <Typography
-            variant="h6"
-            sx={{
-              fontWeight: "bold",
-              mt: 0.5,
-              fontSize: { xs: "0.8rem", sm: "1.1rem" },
-            }}
-          >
-            {isDifficultyLoading ? (
-              <CircularProgress size={20} />
-            ) : estimatedRetargetDate == null ? (
-              "N/A"
-            ) : (
-              formatAdjustmentDate(estimatedRetargetDate)
-            )}
-          </Typography>
-        </Paper>
+        <StatCard
+          label="Difficulty Adjustment Date Estimate"
+          isLoading={isDifficultyLoading}
+          value={
+            estimatedRetargetDate == null
+              ? null
+              : formatAdjustmentDate(estimatedRetargetDate)
+          }
+          source="mempool.space · difficulty-adjustment"
+        />
       </Box>
 
       {/* Chart Section */}
@@ -581,8 +718,8 @@ export default function HashpriceHistoryPage() {
             : "Calculated from: Daily Revenue ÷ Daily Hashrate • Updated every 5 minutes • All values in BTC/PH/s/Day"}
         </Typography>
         <Typography variant="body2" color="textSecondary" sx={{ mt: 0.5 }}>
-          <strong>Difficulty Data:</strong> mempool.space (Bitcoin network) •
-          Updated every 10 minutes
+          <strong>Network Data:</strong> mempool.space (difficulty, block time,
+          height) • Binance (BTC price) • Updated every 5 minutes
         </Typography>
       </Paper>
     </Box>
