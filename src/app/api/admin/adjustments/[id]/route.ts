@@ -104,6 +104,16 @@ export async function PATCH(
       );
     }
 
+    if (existing.memoId) {
+      return NextResponse.json(
+        {
+          error:
+            "This adjustment was created by a memo. Void the memo instead of editing it here.",
+        },
+        { status: 400 },
+      );
+    }
+
     const updated = await prisma.costPayment.update({
       where: { id },
       data: { amount, narration: narration.trim() },
@@ -155,6 +165,16 @@ export async function DELETE(
     if (existing.type !== "ADJUSTMENT") {
       return NextResponse.json(
         { error: "Only ADJUSTMENT transactions can be deleted here" },
+        { status: 400 },
+      );
+    }
+
+    if (existing.memoId) {
+      return NextResponse.json(
+        {
+          error:
+            "This adjustment was created by a memo. Void the memo instead of deleting it here.",
+        },
         { status: 400 },
       );
     }

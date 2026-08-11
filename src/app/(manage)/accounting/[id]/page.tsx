@@ -52,6 +52,9 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EmailIcon from "@mui/icons-material/Email";
 import CancelIcon from "@mui/icons-material/Cancel";
+import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
+import CreateMemoModal from "@/components/CreateMemoModal";
+import { useMemos } from "@/lib/hooks/admin/useMemos";
 
 function formatAuditAction(action: string): string {
   const actionMap: { [key: string]: string } = {
@@ -63,6 +66,9 @@ function formatAuditAction(action: string): string {
     INVOICE_CANCELLED: "Invoice Cancelled",
     INVOICE_SENT_TO_CUSTOMER: "Invoice Sent to Customer",
     PAYMENT_REMINDER_SENT: "Payment Reminder Sent",
+    MEMO_CREATED: "Memo Created",
+    MEMO_SENT: "Memo Emailed to Customer",
+    MEMO_VOIDED: "Memo Voided",
   };
 
   return actionMap[action] || action;
@@ -96,6 +102,14 @@ export default function InvoiceDetailPage() {
     null,
   );
   const [cancelLoading, setCancelLoading] = useState(false);
+  const [memoModalOpen, setMemoModalOpen] = useState(false);
+  const [memoNotification, setMemoNotification] = useState("");
+
+  const {
+    memos: linkedMemos,
+    loading: memosLoading,
+    refetch: refetchMemos,
+  } = useMemos(0, 25, { invoiceId: params.id as string });
 
   const [groupInfo, setGroupInfo] = useState<{
     id: string;
@@ -388,6 +402,18 @@ export default function InvoiceDetailPage() {
               Cancel Invoice
             </Button>
           )}
+          {isAdmin &&
+            (invoice.status === "ISSUED" ||
+              invoice.status === "OVERDUE" ||
+              invoice.status === "PAID") && (
+              <Button
+                startIcon={<ReceiptLongIcon />}
+                variant="outlined"
+                onClick={() => setMemoModalOpen(true)}
+              >
+                Create Memo
+              </Button>
+            )}
           <Button
             startIcon={<DownloadIcon />}
             variant="contained"
@@ -865,6 +891,62 @@ export default function InvoiceDetailPage() {
           </CardContent>
         </Card>
       </Box>
+      {/* Memos Section */}
+      <Box sx={{ mt: 4 }}>
+        <Card>
+          <CardHeader title="Memos" />
+          <Divider />
+          <CardContent>
+            {memoNotification && (
+              <Alert
+                severity="success"
+                sx={{ mb: 2 }}
+                onClose={() => setMemoNotification("")}
+              >
+                {memoNotification}
+              </Alert>
+            )}
+            {memosLoading ? (
+              <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}>
+                <CircularProgress size={30} />
+              </Box>
+            ) : linkedMemos.length === 0 ? (
+              <Typography color="textSecondary">
+                No memos issued against this invoice
+              </Typography>
+            ) : (
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Memo #</TableCell>
+                    <TableCell>Type</TableCell>
+                    <TableCell align="right">Amount</TableCell>
+                    <TableCell>Status</TableCell>
+                    <TableCell>Reason</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {linkedMemos.map((memo) => (
+                    <TableRow key={memo.id}>
+                      <TableCell>{memo.memoNumber}</TableCell>
+                      <TableCell>
+                        {memo.memoType === "CUSTOMER_FACING"
+                          ? "Customer-facing"
+                          : "Internal"}
+                      </TableCell>
+                      <TableCell align="right">
+                        <CurrencyDisplay value={memo.amount} />
+                      </TableCell>
+                      <TableCell>{memo.status}</TableCell>
+                      <TableCell>{memo.reason}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      </Box>
       {/* Audit Trail Section */}
       <Box sx={{ mt: 4 }}>
         <Card>
@@ -1274,6 +1356,21 @@ export default function InvoiceDetailPage() {
           </Button>
         </DialogActions>
       </Dialog>{" "}
+      <CreateMemoModal
+        open={memoModalOpen}
+        onClose={() => setMemoModalOpen(false)}
+        onSuccess={(text) => {
+          setMemoNotification(text);
+          refetchMemos();
+        }}
+        invoiceId={invoice?.id || null}
+        invoiceNumber={invoice?.invoiceNumber || null}
+        customerId={invoice?.user?.id || null}
+        customerName={invoice?.user?.name || invoice?.user?.email || null}
+        category={
+          invoice?.invoiceType === "HARDWARE_SALES" ? "HARDWARE" : "HOSTING"
+        }
+      />
     </Container>
   );
 }

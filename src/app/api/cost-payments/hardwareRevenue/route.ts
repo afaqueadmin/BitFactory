@@ -27,20 +27,29 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const costPayments = await prisma.costPayment.aggregate({
-      where: {
-        type: "HARDWARE_SALES",
-        isDeleted: false,
-      },
-      _sum: {
-        amount: true,
-      },
-    });
+    const [costPayments, credits] = await Promise.all([
+      prisma.costPayment.aggregate({
+        where: {
+          type: "HARDWARE_SALES",
+          isDeleted: false,
+        },
+        _sum: {
+          amount: true,
+        },
+      }),
+      prisma.memo.aggregate({
+        where: { category: "HARDWARE", status: "ISSUED" },
+        _sum: { amount: true },
+      }),
+    ]);
+
+    const paymentsTotal = costPayments._sum.amount || 0;
+    const creditTotal = credits._sum.amount ? Number(credits._sum.amount) : 0;
 
     return NextResponse.json(
       {
         success: true,
-        hardwareRevenue: costPayments._sum.amount || 0,
+        hardwareRevenue: paymentsTotal - creditTotal,
       },
       { status: 200 },
     );
