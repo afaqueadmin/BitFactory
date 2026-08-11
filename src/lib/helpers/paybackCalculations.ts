@@ -84,8 +84,8 @@ export const MACHINE_LIFE_YEARS = 5;
 
 // Strategy 3: same lump-sum-at-end-of-life model as Strategy 2, except the
 // bills are funded via a loan collateralized by the accumulating BTC rather
-// than an outside funding source. The lifetime figures use the same formula
-// (calculateStrategy2Values) — this rate is informational/display only.
+// than an outside funding source. That borrowing is not free, so Strategy 3
+// carries its accrued interest as a real cost (see calculateStrategy3Values).
 export const BORROWING_RATE_APR = 4; // % — USDT/(BTC Collateral) borrowing rate
 
 // Next scheduled Bitcoin block-reward halving, which cuts mining output in
@@ -201,6 +201,45 @@ export const calculateAllValues = (
   };
 };
 
+export interface Strategy3Values extends Strategy2Values {
+  loanPrincipal: number;
+  loanInterest: number;
+  loanBalanceAtEnd: number;
+  borrowingRateApr: number;
+}
+
+/**
+ * Interest accrued on the loan that funds the machine's bills under Strategy 3.
+ *
+ * Each month one bill is drawn on the facility, so the balance builds up over
+ * the machine's life rather than being borrowed as a lump sum on day one.
+ * Nothing is repaid until the BTC is sold at the end, so the interest
+ * capitalises onto the balance and itself accrues — which is why this is
+ * meaningfully larger than a flat `principal x rate x years`.
+ */
+export const calculateLoanInterest = (
+  monthlyBorrowed: number,
+  aprPercent: number = BORROWING_RATE_APR,
+  machineLifeYears: number = MACHINE_LIFE_YEARS,
+): number => {
+  if (monthlyBorrowed <= 0 || aprPercent <= 0) return 0;
+
+  const monthlyRate = aprPercent / 100 / 12;
+  const months = machineLifeYears * 12;
+
+  let balance = 0;
+  let interest = 0;
+
+  for (let month = 0; month < months; month++) {
+    balance += monthlyBorrowed;
+    const accrued = balance * monthlyRate;
+    interest += accrued;
+    balance += accrued;
+  }
+
+  return interest;
+};
+
 export const calculateStrategy2Values = (
   btcPrice: number,
   rewardBtcPerPhDay: number,
@@ -284,5 +323,87 @@ export const calculateStrategy2Values = (
     roiLifetimeLux,
     roiPerYearStock,
     roiPerYearLux,
+  };
+};
+
+/**
+ * Strategy 3 is Strategy 2 with the bills funded by a collateralised loan
+ * instead of an outside source, so it carries one extra cost the other
+ * strategies do not: the interest accrued on that loan over the machine's life.
+ *
+ * The profit, return-multiple and ROI figures returned here are the Strategy 2
+ * figures net of that interest. Every other field is inherited unchanged —
+ * the machine mines exactly the same BTC either way; only the cost of funding
+ * the bills differs.
+ */
+export const calculateStrategy3Values = (
+  btcPrice: number,
+  rewardBtcPerPhDay: number,
+  hashrateStockOs: number,
+  hashrateLuxos: number,
+  poolCommissionStockOs: number,
+  poolCommissionLuxos: number,
+  monthlyElectricityHosting: number,
+  machineCost: number,
+  machineLifeYears: number = MACHINE_LIFE_YEARS,
+  startDate: Date = new Date(),
+  borrowingRateApr: number = BORROWING_RATE_APR,
+): Strategy3Values => {
+  const base = calculateStrategy2Values(
+    btcPrice,
+    rewardBtcPerPhDay,
+    hashrateStockOs,
+    hashrateLuxos,
+    poolCommissionStockOs,
+    poolCommissionLuxos,
+    monthlyElectricityHosting,
+    machineCost,
+    machineLifeYears,
+    startDate,
+  );
+
+  // The bills funded by the loan are exactly the lifetime hosting charges.
+  const loanPrincipal = base.lifetimeElectricityHostingCharges;
+  const loanInterest = calculateLoanInterest(
+    monthlyElectricityHosting,
+    borrowingRateApr,
+    machineLifeYears,
+  );
+  const loanBalanceAtEnd = loanPrincipal + loanInterest;
+
+  const netProfitLifetimeStock = base.netProfitLifetimeStock - loanInterest;
+  const netProfitLifetimeLux = base.netProfitLifetimeLux - loanInterest;
+
+  // Revenue has to clear the machine plus the whole loan balance, interest
+  // included — that balance is what actually gets settled at the end.
+  const totalLifetimeCost = base.machineDepreciation + loanBalanceAtEnd;
+  const returnMultipleStock =
+    totalLifetimeCost > 0 ? base.lifetimeRevenueStock / totalLifetimeCost : 0;
+  const returnMultipleLux =
+    totalLifetimeCost > 0 ? base.lifetimeRevenueLux / totalLifetimeCost : 0;
+
+  // ROI keeps Strategy 2's basis (machine cost plus half the bills, as average
+  // capital employed) so the two strategies stay directly comparable. Interest
+  // is a cost, not capital employed, so it belongs in the numerator only.
+  const roiBasis = base.machineDepreciation + loanPrincipal / 2;
+  const roiLifetimeStock =
+    roiBasis > 0 ? (netProfitLifetimeStock / roiBasis) * 100 : 0;
+  const roiLifetimeLux =
+    roiBasis > 0 ? (netProfitLifetimeLux / roiBasis) * 100 : 0;
+
+  return {
+    ...base,
+    netProfitLifetimeStock,
+    netProfitLifetimeLux,
+    returnMultipleStock,
+    returnMultipleLux,
+    roiLifetimeStock,
+    roiLifetimeLux,
+    roiPerYearStock: roiLifetimeStock / machineLifeYears,
+    roiPerYearLux: roiLifetimeLux / machineLifeYears,
+    loanPrincipal,
+    loanInterest,
+    loanBalanceAtEnd,
+    borrowingRateApr,
   };
 };

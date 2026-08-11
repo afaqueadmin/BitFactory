@@ -19,6 +19,7 @@ import { useAuth } from "@/lib/contexts/auth-context";
 import LightModeIcon from "@mui/icons-material/LightMode";
 import DarkModeIcon from "@mui/icons-material/DarkMode";
 import { useTheme } from "@/app/theme-provider";
+import BtcPriceLabel from "@/components/BtcPriceLabel";
 
 const StyledAppBar = styled(AppBar)(({ theme }) => ({
   backgroundColor: theme.palette.background.paper,
@@ -89,8 +90,13 @@ export default function AdminHeader() {
           />
         </Box>
 
-        {/* Right Side - Settings and Account Icons */}
-        <Box sx={{ display: "flex", gap: 1 }}>
+        {/* Right Side - BTC Ticker, Settings and Account Icons */}
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          {/* Live BTC Price Ticker */}
+          <Box sx={{ display: { xs: "none", sm: "flex" }, mr: 0.5 }}>
+            <BtcPriceLabel />
+          </Box>
+
           {/* Dark Mode Toggle */}
           <StyledIconButton
             size="large"
