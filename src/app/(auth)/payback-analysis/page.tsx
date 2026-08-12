@@ -29,10 +29,15 @@ import {
 } from "@mui/icons-material";
 import { useCallback, useEffect, useState } from "react";
 import { formatValue } from "@/lib/helpers/formatValue";
+import PaybackHistoryChart from "@/components/PaybackHistoryChart";
 import PaybackGraphicalView, {
   PaybackMinerSpec,
 } from "@/components/payback/PaybackGraphicalView";
 import { PaybackAccountType } from "@/lib/helpers/paybackAccountType";
+import {
+  PaybackStrategyKey,
+  STRATEGY_COPY,
+} from "@/lib/helpers/paybackStrategyCopy";
 import {
   MinerModel,
   MINER_LABELS,
@@ -48,15 +53,7 @@ import {
   calculateStrategy3Values,
 } from "@/lib/helpers/paybackCalculations";
 
-type PaybackStrategy = "STRATEGY_1" | "STRATEGY_2" | "STRATEGY_3";
-
-const STRATEGY_DESCRIPTIONS: Record<PaybackStrategy, string> = {
-  STRATEGY_1:
-    "Strategy 1: Where the miner pays for its bills by selling the earned BTC on a monthly basis.",
-  STRATEGY_2:
-    "Strategy 2: Where the miner pays for its bills by NOT selling the earned BTC; instead, by paying the bills through another funding source.",
-  STRATEGY_3: `Strategy 3: Where the miner pays for its bills by NOT selling the earned BTC; instead, by taking a ${BORROWING_RATE_APR}% APR loan against collateralizing the earned BTC.`,
-};
+type PaybackStrategy = PaybackStrategyKey;
 
 const OS_LABELS: Record<"STOCK" | "CUSTOM" | "COMPARISON", string> = {
   STOCK: "Stock OS",
@@ -909,13 +906,23 @@ export default function PaybackAnalysisPage() {
           }}
         >
           <Typography
-            variant="body2"
             sx={{
-              fontWeight: 500,
-              fontSize: { xs: "0.8rem", sm: "0.9rem" },
+              fontWeight: 650,
+              fontSize: { xs: "0.95rem", sm: "1.05rem" },
             }}
           >
-            {STRATEGY_DESCRIPTIONS[selectedStrategy]}
+            {STRATEGY_COPY[selectedStrategy].headline}
+          </Typography>
+          <Typography
+            variant="body2"
+            sx={{
+              color: "text.secondary",
+              maxWidth: "72ch",
+              mt: 0.25,
+              fontSize: { xs: "0.8rem", sm: "0.875rem" },
+            }}
+          >
+            {STRATEGY_COPY[selectedStrategy].detail}
           </Typography>
         </Box>
 
@@ -1141,7 +1148,6 @@ export default function PaybackAnalysisPage() {
 
       {viewMode === "GRAPHS" && (
         <PaybackGraphicalView
-          profile="CLIENT"
           miner={selectedMiner}
           os={selectedOS}
           strategy={selectedStrategy}
@@ -1158,6 +1164,12 @@ export default function PaybackAnalysisPage() {
 
       {viewMode === "TABLE" && (
         <>
+          <PaybackHistoryChart
+            profile="CLIENT"
+            miner={selectedMiner}
+            os={selectedOS}
+          />
+
           {/* Data table — horizontally scrollable on mobile */}
           <TableContainer
             component={Paper}

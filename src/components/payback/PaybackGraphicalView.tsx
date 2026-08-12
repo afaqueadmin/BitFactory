@@ -37,11 +37,9 @@ import {
   Typography,
 } from "@mui/material";
 import { formatValue } from "@/lib/helpers/formatValue";
-import PaybackHistoryChart from "@/components/PaybackHistoryChart";
-import { PaybackHistoryProfile } from "@/hooks/usePaybackHistory";
 import { PaybackOsFilter } from "@/lib/helpers/paybackChartHeading";
+import { PaybackStrategyKey } from "@/lib/helpers/paybackStrategyCopy";
 import {
-  BORROWING_RATE_APR,
   FIXED_SCENARIO_PRICES,
   MACHINE_LIFE_YEARS,
   MINER_LABELS,
@@ -62,29 +60,6 @@ import {
   ScenarioBars,
   WaterfallChart,
 } from "./PaybackCharts";
-
-export type PaybackStrategyKey = "STRATEGY_1" | "STRATEGY_2" | "STRATEGY_3";
-
-/** Buyer-facing wording for each funding strategy — same copy as the pitch. */
-const STRATEGY_COPY: Record<
-  PaybackStrategyKey,
-  { headline: string; detail: string }
-> = {
-  STRATEGY_1: {
-    headline: "The miner pays its own bills",
-    detail:
-      "Each month a portion of the mined Bitcoin is sold to cover hosting and power. Everything left over is yours.",
-  },
-  STRATEGY_2: {
-    headline: "Keep the Bitcoin, fund the bills separately",
-    detail:
-      "Nothing mined is ever sold. The monthly bill is settled from another source and the full Bitcoin stack is held for the machine's life.",
-  },
-  STRATEGY_3: {
-    headline: `Keep the Bitcoin, borrow at ${BORROWING_RATE_APR.toFixed(2)}% APR`,
-    detail: `Nothing mined is sold. The monthly bill is drawn on a loan secured against the accumulating Bitcoin, repaid at the end. Interest is charged at ${BORROWING_RATE_APR.toFixed(2)}% APR and is already deducted from the figures below.`,
-  },
-};
 
 /** The Bitcoin price the charts open on, before anyone touches the slider. */
 export const BASE_CASE_BTC_PRICE = 150_000;
@@ -122,8 +97,6 @@ export interface PaybackMinerSpec {
 }
 
 export interface PaybackGraphicalViewProps {
-  /** Which history series the "Buy BTC vs Mine BTC" chart reads. */
-  profile: PaybackHistoryProfile;
   miner: MinerModel;
   os: PaybackOsFilter;
   strategy: PaybackStrategyKey;
@@ -152,7 +125,6 @@ export interface PaybackGraphicalViewProps {
 }
 
 export default function PaybackGraphicalView({
-  profile,
   miner,
   os,
   strategy,
@@ -437,18 +409,6 @@ export default function PaybackGraphicalView({
       {priceControls}
 
       {/* ============ the answer ============ */}
-      <Box sx={{ mb: 1.25 }}>
-        <Typography sx={{ fontWeight: 650, fontSize: "1.05rem" }}>
-          {STRATEGY_COPY[strategy].headline}
-        </Typography>
-        <Typography
-          variant="body2"
-          sx={{ color: "text.secondary", maxWidth: "72ch", mt: 0.25 }}
-        >
-          {STRATEGY_COPY[strategy].detail}
-        </Typography>
-      </Box>
-
       <Box
         sx={{
           display: "grid",
@@ -525,9 +485,6 @@ export default function PaybackGraphicalView({
           </Typography>
         </Alert>
       )}
-
-      {/* ============ history ============ */}
-      <PaybackHistoryChart profile={profile} miner={miner} os={os} />
 
       {/* ============ charts ============ */}
       <Box sx={{ display: "grid", gridTemplateColumns: "1fr", gap: 2, mb: 2 }}>
