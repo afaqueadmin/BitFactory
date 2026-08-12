@@ -1,27 +1,22 @@
-export type PaybackOsFilter = "STOCK" | "CUSTOM" | "COMPARISON";
+export type PaybackOsFilter = "STOCK" | "CUSTOM";
 
-const OS_LABELS: Record<Exclude<PaybackOsFilter, "COMPARISON">, string> = {
+const OS_LABELS: Record<PaybackOsFilter, string> = {
   STOCK: "Stock OS",
   CUSTOM: "Custom OS",
 };
 
 /**
  * Builds a graph heading that reflects the currently active miner/OS
- * filters, e.g. "Buy BTC vs Mine BTC — S21 Pro · Custom OS". The miner
- * filter is always active (there's no "all miners" state), so it's always
- * shown; the OS filter only narrows the view when it's STOCK or CUSTOM —
- * COMPARISON shows both OS lines, so it's the "no filter applied" default
- * and adds no suffix.
+ * filters, e.g. "Buy BTC vs Mine BTC — S21 Pro · Custom OS". Both filters
+ * are always active (there's no "all miners" or "all OS" state), so both
+ * are always shown.
  */
 export const buildPaybackChartHeading = (
   baseTitle: string,
   minerLabel: string,
   osFilter: PaybackOsFilter,
 ): string => {
-  const parts = [minerLabel];
-  if (osFilter !== "COMPARISON") {
-    parts.push(OS_LABELS[osFilter]);
-  }
+  const parts = [minerLabel, OS_LABELS[osFilter]];
 
-  return parts.length > 0 ? `${baseTitle} — ${parts.join(" · ")}` : baseTitle;
+  return `${baseTitle} — ${parts.join(" · ")}`;
 };

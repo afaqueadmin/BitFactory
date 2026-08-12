@@ -53,10 +53,9 @@ import {
 
 type PaybackStrategy = PaybackStrategyKey;
 
-const OS_LABELS: Record<"STOCK" | "CUSTOM" | "COMPARISON", string> = {
+const OS_LABELS: Record<"STOCK" | "CUSTOM", string> = {
   STOCK: "Stock OS",
   CUSTOM: "Custom OS",
-  COMPARISON: "Comparison (both)",
 };
 
 const columns = [
@@ -134,9 +133,7 @@ export default function PaybackAnalysisCompanyPage() {
     useState<PaybackStrategy>("STRATEGY_1");
 
   // OS selector state
-  const [selectedOS, setSelectedOS] = useState<
-    "STOCK" | "CUSTOM" | "COMPARISON"
-  >("STOCK");
+  const [selectedOS, setSelectedOS] = useState<"STOCK" | "CUSTOM">("STOCK");
 
   // Miner selector state
   const [selectedMiner, setSelectedMiner] = useState<MinerModel>("S21PRO");
@@ -436,17 +433,11 @@ export default function PaybackAnalysisCompanyPage() {
   // hosting charge and the machine's life — not on any BTC price scenario.
   const loanInterest = calculateLoanInterest(monthlyElectricityHosting);
 
-  // Hashrate for whichever miner/OS the selectors are on. Comparison shows
-  // both, since that view charts neither one alone.
+  // Hashrate for whichever miner/OS the selectors are on.
   const formatHashrate = (th: number) => `${th.toFixed(2)} TH/s`;
-  const activeHashrateSummary =
-    selectedOS === "COMPARISON"
-      ? `${formatHashrate(activeHashrateStockOs)} (Stock) · ${formatHashrate(
-          activeHashrateLuxos,
-        )} (Custom)`
-      : formatHashrate(
-          selectedOS === "CUSTOM" ? activeHashrateLuxos : activeHashrateStockOs,
-        );
+  const activeHashrateSummary = formatHashrate(
+    selectedOS === "CUSTOM" ? activeHashrateLuxos : activeHashrateStockOs,
+  );
 
   // Calculate breakeven BTC prices for both OS types
   const breakevenBtcPriceStock = config
@@ -746,14 +737,12 @@ export default function PaybackAnalysisCompanyPage() {
 
   // Filter rows based on selected OS
   const staticRows = allStaticRows.filter((row) => {
-    if (selectedOS === "COMPARISON") return true;
     if (selectedOS === "STOCK" && row.label.includes("Stock OS")) return true;
     if (selectedOS === "CUSTOM" && row.label.includes("Custom OS")) return true;
     return false;
   });
 
   const dynamicRows = allDynamicRows.filter((row) => {
-    if (selectedOS === "COMPARISON") return true;
     if (
       row.label === "Electricity & Hosting Charges" ||
       row.label === "Machine Depreciation" ||
@@ -979,9 +968,6 @@ export default function PaybackAnalysisCompanyPage() {
             <ToggleButton value="CUSTOM" aria-label="Custom OS">
               {isMobile ? "Custom" : "Custom OS"}
             </ToggleButton>
-            <ToggleButton value="COMPARISON" aria-label="COMPARISON">
-              {isMobile ? "Compare" : "Comparison"}
-            </ToggleButton>
           </ToggleButtonGroup>
         </Box>
 
@@ -1158,6 +1144,14 @@ export default function PaybackAnalysisCompanyPage() {
           calculateAtPrice={calculateAtPrice}
           capitalLabel="machine cost"
           purchaseLabel="Machine cost"
+          historyChart={
+            /* Same Buy BTC vs Mine BTC history as the scenario table view. */
+            <PaybackHistoryChart
+              profile="COMPANY"
+              miner={selectedMiner}
+              os={selectedOS}
+            />
+          }
         />
       )}
 

@@ -17,7 +17,7 @@
  * the Bitcoin price is the only control this view adds.
  */
 
-import { useMemo, useState } from "react";
+import { ReactNode, useMemo, useState } from "react";
 import {
   Alert,
   Box,
@@ -122,6 +122,11 @@ export interface PaybackGraphicalViewProps {
   capitalLabel?: string;
   /** Wording for the up-front payment line in the deal breakdown. */
   purchaseLabel?: string;
+  /**
+   * The "Buy BTC vs Mine BTC" history chart, supplied by the owning page so
+   * this view stays free of data fetching. Drawn under the payback curve.
+   */
+  historyChart?: ReactNode;
 }
 
 export default function PaybackGraphicalView({
@@ -136,6 +141,7 @@ export default function PaybackGraphicalView({
   calculateAtPrice,
   capitalLabel = "machine cost",
   purchaseLabel = "Paid once, up front",
+  historyChart,
 }: PaybackGraphicalViewProps) {
   const c = useSeriesColors();
 
@@ -150,8 +156,6 @@ export default function PaybackGraphicalView({
     setPriceText(String(Math.round(price)));
   };
 
-  // Every chart plots a single line, so COMPARISON — which shows both OS rows
-  // in the table — has to settle on one. Stock OS is the page default.
   const usesStock = os !== "CUSTOM";
   const pick = (stock: number, lux: number) => (usesStock ? stock : lux);
 
@@ -476,16 +480,6 @@ export default function PaybackGraphicalView({
         </Typography>
       </Alert>
 
-      {os === "COMPARISON" && (
-        <Alert severity="info" variant="outlined" sx={{ mb: 2, py: 0.5 }}>
-          <Typography variant="body2" sx={{ fontSize: "0.8rem" }}>
-            The charts plot a single line, so they are drawn on{" "}
-            <strong>Stock OS</strong>. Switch the OS selector to Custom OS to
-            chart the optimised firmware instead — the table keeps showing both.
-          </Typography>
-        </Alert>
-      )}
-
       {/* ============ charts ============ */}
       <Box sx={{ display: "grid", gridTemplateColumns: "1fr", gap: 2, mb: 2 }}>
         <ChartCard
@@ -505,6 +499,9 @@ export default function PaybackGraphicalView({
             paybackMonths={paybackMonths}
           />
         </ChartCard>
+
+        {/* The grid's own gap handles the spacing, so drop the chart's margin. */}
+        {historyChart && <Box sx={{ "& > *": { mb: 0 } }}>{historyChart}</Box>}
 
         <Box
           sx={{

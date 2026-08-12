@@ -55,10 +55,9 @@ import {
 
 type PaybackStrategy = PaybackStrategyKey;
 
-const OS_LABELS: Record<"STOCK" | "CUSTOM" | "COMPARISON", string> = {
+const OS_LABELS: Record<"STOCK" | "CUSTOM", string> = {
   STOCK: "Stock OS",
   CUSTOM: "Custom OS",
-  COMPARISON: "Comparison (both)",
 };
 
 const columns = [
@@ -121,6 +120,19 @@ export default function PaybackAnalysisPage() {
     null,
   );
 
+  // Self-mining accounts have no invoice to stand in for capital, so they
+  // enter the machine cost directly — one value per miner model, mirroring
+  // how the company config stores it.
+  const [editableS21ProMachineCost, setEditableS21ProMachineCost] =
+    useState<string>("");
+  const [editableS21XpMachineCost, setEditableS21XpMachineCost] =
+    useState<string>("");
+  const [isSavingMachineCost, setIsSavingMachineCost] = useState(false);
+  const [machineCostSuccess, setMachineCostSuccess] = useState<string | null>(
+    null,
+  );
+  const [machineCostError, setMachineCostError] = useState<string | null>(null);
+
   // Price and reward state
   const [liveBtcPrice, setLiveBtcPrice] = useState<string | null>(null);
   const [liveBtcPriceValue, setLiveBtcPriceValue] = useState<number | null>(
@@ -137,9 +149,7 @@ export default function PaybackAnalysisPage() {
     useState<PaybackStrategy>("STRATEGY_1");
 
   // OS selector state
-  const [selectedOS, setSelectedOS] = useState<
-    "STOCK" | "CUSTOM" | "COMPARISON"
-  >("STOCK");
+  const [selectedOS, setSelectedOS] = useState<"STOCK" | "CUSTOM">("STOCK");
 
   // Miner selector state
   const [selectedMiner, setSelectedMiner] = useState<MinerModel>("S21PRO");
@@ -168,6 +178,9 @@ export default function PaybackAnalysisPage() {
         setAccountType(
           data.accountType === "SELF_MINING" ? "SELF_MINING" : "CLIENT",
         );
+
+        setEditableS21ProMachineCost(String(data.data.s21proMachineCost));
+        setEditableS21XpMachineCost(String(data.data.s21xpMachineCost));
 
         // Set editable invoiced amount based on user role
         if (data.userRole === "ADMIN" || data.userRole === "SUPER_ADMIN") {
@@ -302,11 +315,71 @@ export default function PaybackAnalysisPage() {
     }
   }, [editableInvoicedAmount, userRole, config]);
 
+  // Saves the machine cost of whichever miner model is selected. Self-mining
+  // accounts read the COMPANY config, so this writes that same record — the
+  // admin company page picks the value up too.
+  const handleSaveMachineCost = useCallback(async () => {
+    const numValue = parseFloat(
+      selectedMiner === "S21XP"
+        ? editableS21XpMachineCost
+        : editableS21ProMachineCost,
+    );
+
+    if (!Number.isFinite(numValue) || numValue < 0) {
+      setMachineCostError("Please enter a valid machine cost");
+      return;
+    }
+
+    try {
+      setIsSavingMachineCost(true);
+      setMachineCostError(null);
+      setMachineCostSuccess(null);
+
+      const response = await fetch("/api/payback-config/machine-cost", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ miner: selectedMiner, machineCost: numValue }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || "Failed to save machine cost");
+      }
+
+      // The endpoint returns the company config, which carries no invoiced
+      // amount — keep the page's own.
+      setConfig((prev) =>
+        prev
+          ? { ...prev, ...data.data, invoicedAmount: prev.invoicedAmount }
+          : prev,
+      );
+      setMachineCostSuccess("Machine cost saved successfully!");
+      setTimeout(() => setMachineCostSuccess(null), 3000);
+    } catch (error) {
+      setMachineCostError(
+        error instanceof Error ? error.message : "Failed to save machine cost",
+      );
+    } finally {
+      setIsSavingMachineCost(false);
+    }
+  }, [selectedMiner, editableS21ProMachineCost, editableS21XpMachineCost]);
+
   const resolvedBtcPriceValue = liveBtcPriceValue ?? FALLBACK_BTC_PRICE;
   const resolvedRewardBtcPerPhDay =
     liveRewardBtcPerPhDay ?? FALLBACK_REWARD_BTC_PER_PH_DAY;
 
   const isSelfMining = accountType === "SELF_MINING";
+
+  // The machine cost input tracks whichever miner model tab is active
+  const editableActiveMachineCost =
+    selectedMiner === "S21XP"
+      ? editableS21XpMachineCost
+      : editableS21ProMachineCost;
+  const setEditableActiveMachineCost =
+    selectedMiner === "S21XP"
+      ? setEditableS21XpMachineCost
+      : setEditableS21ProMachineCost;
 
   // Everything the model needs about one miner model. Resolving both models
   // through one function lets the graphical view chart either of them without
@@ -329,11 +402,19 @@ export default function PaybackAnalysisPage() {
         ? config.s21xpMonthlyInvoicingAmount
         : config.s21proMonthlyInvoicingAmount;
       // Self-mining accounts have no client invoice to offset — use the
-      // company's own machine cost for that model instead.
+      // machine cost for that model instead. The typed-in value drives the
+      // analysis straight away; the stored one stands in while the field is
+      // empty or mid-edit.
+      const enteredMachineCost = parseFloat(
+        isXp ? editableS21XpMachineCost : editableS21ProMachineCost,
+      );
+      const storedMachineCost = isXp
+        ? config.s21xpMachineCost
+        : config.s21proMachineCost;
       const purchase = isSelfMining
-        ? isXp
-          ? config.s21xpMachineCost
-          : config.s21proMachineCost
+        ? Number.isFinite(enteredMachineCost) && enteredMachineCost >= 0
+          ? enteredMachineCost
+          : storedMachineCost
         : parseFloat(editableInvoicedAmount || "0");
 
       return {
@@ -354,7 +435,13 @@ export default function PaybackAnalysisPage() {
           : config.s21proHashrateLuxos,
       };
     },
-    [config, isSelfMining, editableInvoicedAmount],
+    [
+      config,
+      isSelfMining,
+      editableInvoicedAmount,
+      editableS21ProMachineCost,
+      editableS21XpMachineCost,
+    ],
   );
 
   // Runs the model for either miner at any BTC price. Both the scenario table
@@ -397,21 +484,15 @@ export default function PaybackAnalysisPage() {
   // hosting charge and the machine's life — not on any BTC price scenario.
   const loanInterest = calculateLoanInterest(monthlyElectricityHosting);
 
-  // Hashrate for whichever miner/OS the selectors are on. Comparison shows
-  // both, since that view charts neither one alone.
+  // Hashrate for whichever miner/OS the selectors are on.
   const formatHashrate = (th: number) =>
     `${formatValue(th, "number", {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     })} TH/s`;
-  const activeHashrateSummary =
-    selectedOS === "COMPARISON"
-      ? `${formatHashrate(activeHashrateStockOs)} (Stock) · ${formatHashrate(
-          activeHashrateLuxos,
-        )} (Custom)`
-      : formatHashrate(
-          selectedOS === "CUSTOM" ? activeHashrateLuxos : activeHashrateStockOs,
-        );
+  const activeHashrateSummary = formatHashrate(
+    selectedOS === "CUSTOM" ? activeHashrateLuxos : activeHashrateStockOs,
+  );
 
   // Calculate breakeven BTC prices for both OS types
   const breakevenBtcPriceStock = config
@@ -736,14 +817,12 @@ export default function PaybackAnalysisPage() {
 
   // Filter rows based on selected OS
   const staticRows = allStaticRows.filter((row) => {
-    if (selectedOS === "COMPARISON") return true;
     if (selectedOS === "STOCK" && row.label.includes("Stock OS")) return true;
     if (selectedOS === "CUSTOM" && row.label.includes("Custom OS")) return true;
     return false;
   });
 
   const dynamicRows = allDynamicRows.filter((row) => {
-    if (selectedOS === "COMPARISON") return true;
     if (
       row.label === "Electricity & Hosting Charges" ||
       row.label === "Machine Depreciation" ||
@@ -809,6 +888,26 @@ export default function PaybackAnalysisPage() {
           onClose={() => setInvoicedUpdateError(null)}
         >
           {invoicedUpdateError}
+        </Alert>
+      )}
+
+      {/* Success/Error messages for the self-mining machine cost */}
+      {machineCostSuccess && (
+        <Alert
+          severity="success"
+          sx={{ mb: 2 }}
+          onClose={() => setMachineCostSuccess(null)}
+        >
+          {machineCostSuccess}
+        </Alert>
+      )}
+      {machineCostError && (
+        <Alert
+          severity="error"
+          sx={{ mb: 2 }}
+          onClose={() => setMachineCostError(null)}
+        >
+          {machineCostError}
         </Alert>
       )}
 
@@ -973,9 +1072,6 @@ export default function PaybackAnalysisPage() {
             <ToggleButton value="CUSTOM" aria-label="Custom OS">
               {isMobile ? "Custom" : "Custom OS"}
             </ToggleButton>
-            <ToggleButton value="COMPARISON" aria-label="COMPARISON">
-              {isMobile ? "Compare" : "Comparison"}
-            </ToggleButton>
           </ToggleButtonGroup>
 
           {!isSelfMining && (
@@ -995,6 +1091,23 @@ export default function PaybackAnalysisPage() {
             />
           )}
 
+          {isSelfMining && (
+            <TextField
+              label={`${MINER_LABELS[selectedMiner]} Machine Cost`}
+              type="number"
+              value={editableActiveMachineCost}
+              onChange={(e) => setEditableActiveMachineCost(e.target.value)}
+              size="small"
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">$</InputAdornment>
+                ),
+              }}
+              inputProps={{ step: "0.01", min: "0" }}
+              sx={{ width: { xs: "100%", sm: "200px" } }}
+            />
+          )}
+
           <Box
             sx={{
               display: "flex",
@@ -1011,6 +1124,18 @@ export default function PaybackAnalysisPage() {
                 fullWidth={isMobile}
               >
                 {isUpdatingInvoiced ? "Updating..." : "Update"}
+              </Button>
+            )}
+
+            {isSelfMining && (
+              <Button
+                variant="contained"
+                onClick={handleSaveMachineCost}
+                disabled={isSavingMachineCost}
+                size="small"
+                fullWidth={isMobile}
+              >
+                {isSavingMachineCost ? "Saving..." : "Save Machine Cost"}
               </Button>
             )}
 
@@ -1159,6 +1284,14 @@ export default function PaybackAnalysisPage() {
           calculateAtPrice={calculateAtPrice}
           capitalLabel="machine cost"
           purchaseLabel={isSelfMining ? "Machine cost" : "You pay once"}
+          historyChart={
+            /* Same Buy BTC vs Mine BTC history as the scenario table view. */
+            <PaybackHistoryChart
+              profile="CLIENT"
+              miner={selectedMiner}
+              os={selectedOS}
+            />
+          }
         />
       )}
 
