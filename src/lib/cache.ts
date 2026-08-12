@@ -161,3 +161,13 @@ function createCacheBackend(): ICacheBackend {
 
 // Export singleton instance
 export const walletCache = createCacheBackend();
+
+/**
+ * Separate instance for pool time-series data (hashrate history).
+ *
+ * Kept apart from walletCache so invalidatePattern() sweeps of wallet keys
+ * never wipe chart data, and so the two can diverge on TTL later. Callers
+ * pass an explicit per-entry TTL because the right freshness depends on the
+ * tick size being cached (5m ticks go stale fast, 1d ticks do not).
+ */
+export const poolDataCache = createCacheBackend();
