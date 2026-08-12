@@ -8,6 +8,7 @@ import ShareEfficiencyCard from "@/components/dashboardCards/ShareEfficiencyCard
 import Uptime24HoursCard from "@/components/dashboardCards/Uptime24HoursCard";
 import HashRate24HoursCard from "@/components/dashboardCards/HashRate24HoursCard";
 import HashpriceCard from "@/components/dashboardCards/HashpriceCard";
+import HashrateHistoryChart from "@/components/HashrateHistoryChart";
 import { formatHashrate } from "@/lib/workerNormalization";
 
 interface MinersSummary {
@@ -331,6 +332,9 @@ export default function Miners() {
           poolMode={poolMode}
         />
       </Box>
+
+      {/* Hashrate & Shares Efficiency history — follows the pool toggle above */}
+      <HashrateHistoryChart poolMode={poolMode} />
 
       {/* Pool Comparison Cards - Only show if multiple pools and in total mode */}
       {poolMode === "total" &&

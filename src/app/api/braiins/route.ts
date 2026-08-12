@@ -573,7 +573,7 @@ export async function GET(
           });
           break;
 
-        case "daily-hashrate":
+        case "daily-hashrate": {
           console.log("[Braiins Proxy] GET: Getting daily hashrate");
           const hashrateFrom = searchParams.get("from")
             ? parseInt(searchParams.get("from")!)
@@ -581,13 +581,22 @@ export async function GET(
           const hashrateTo = searchParams.get("to")
             ? parseInt(searchParams.get("to")!)
             : undefined;
-          const group = searchParams.get("group") === "true";
-          data = await braiinsClient!.getDailyHashrate({
-            from: unixToISODate(hashrateFrom),
-            to: unixToISODate(hashrateTo),
-            group: group || undefined,
+
+          const dailyHashrate = await braiinsClient!.getDailyHashrate();
+
+          // Braiins ignores from/to and always returns its full rolling
+          // window, so the range this proxy advertises has to be applied
+          // here. Timestamps in the response are Unix seconds, matching the
+          // from/to query params.
+          const points = (dailyHashrate?.btc || []).filter((point) => {
+            if (hashrateFrom && point.date < hashrateFrom) return false;
+            if (hashrateTo && point.date > hashrateTo) return false;
+            return true;
           });
+
+          data = { btc: points };
           break;
+        }
 
         case "block-rewards":
           console.log("[Braiins Proxy] GET: Getting block rewards");

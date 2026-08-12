@@ -130,24 +130,23 @@ export interface DailyRewards {
 // INTERFACE: Daily Hashrate
 // ============================================================================
 
-export interface HashrateData {
-  time: string;
-  hashrate: string;
-}
-
-export interface DailyHashrateBTC {
-  hash_rate_unit: string;
-  daily_hashrate: Array<{
-    date: number;
-    hourly_data: Array<{
-      timestamp: number;
-      hash_rate: string;
-    }>;
-  }>;
+/**
+ * One day of account-wide hashrate.
+ *
+ * Verified against the live API 2026-08-11: the response is
+ * `{ btc: [ {date, hash_rate_unit, hash_rate_24h, total_shares}, ... ] }` —
+ * a FLAT ARRAY of daily points. There is no `daily_hashrate` wrapper and no
+ * `hourly_data`; daily is the finest granularity this endpoint offers.
+ */
+export interface DailyHashratePoint {
+  date: number; // Unix timestamp (seconds), start of the UTC day
+  hash_rate_unit: string; // "Gh/s"
+  hash_rate_24h: number; // average over that day, in hash_rate_unit
+  total_shares: number;
 }
 
 export interface DailyHashrate {
-  btc: DailyHashrateBTC;
+  btc: DailyHashratePoint[];
 }
 
 // ============================================================================
@@ -361,20 +360,26 @@ export class BraiinsClient {
   // ========================================================================
 
   /**
-   * Get daily hashrate data, optionally grouped
-   * GET /accounts/hash_rate_daily/json/btc?group=<boolean>
-   * OR
-   * GET /accounts/group/btc (POST for grouped)
+   * Get daily hashrate data
+   * GET /accounts/hash_rate_daily/json/btc
    *
-   * Returns: Hourly hashrate points and summary statistics
-   * Parameters: group=true aggregates all workers for this user
-   * Note: "group" parameter groups THIS user's workers, not multiple users
+   * Returns: one point per day, account-wide, in Gh/s. Daily is the finest
+   * granularity available — there is no hourly or 5m variant.
+   *
+   * ⚠️ VERIFIED 2026-08-11 against the live API: `from` and `to` are SILENTLY
+   * IGNORED. Four different ranges (7 days, 1 month, 3.5 years, and no params
+   * at all) each returned the byte-identical series. The endpoint always
+   * returns a fixed rolling window — ~188 days at time of writing. `group`
+   * likewise changed nothing. Callers that need a specific date range must
+   * filter the returned array themselves; the params are kept only so
+   * existing call sites keep compiling.
+   *
    * Scope: Single user
    */
   async getDailyHashrate(params?: {
-    from?: string; // ISO format date YYYY-MM-DD
-    to?: string; // ISO format date YYYY-MM-DD
-    group?: boolean; // Aggregate all workers for this user
+    from?: string; // ISO format date YYYY-MM-DD — IGNORED by the API
+    to?: string; // ISO format date YYYY-MM-DD — IGNORED by the API
+    group?: boolean; // IGNORED by the API
   }): Promise<DailyHashrate> {
     try {
       const queryParams = new URLSearchParams();
