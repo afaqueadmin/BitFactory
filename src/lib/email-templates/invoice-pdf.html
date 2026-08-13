@@ -242,11 +242,12 @@
       page-break-before: always;
       break-before: page;
       padding-top: 10px;
+      padding-bottom: 16px;
     }
     .terms-section {
-      background-color: #e8e8e8;
+      background-color: #fff3e0;
       padding: 16px 20px;
-      margin: 12px 0;
+      margin: 12px 0 24px 0;
       border-radius: 4px;
     }
     .terms-section-title {
@@ -404,32 +405,8 @@
 {{/if}}
     </div>
 
-    <!-- Footer -->
-    <div class="footer-section">
-      <div class="footer-contact">
-        <div class="footer-contact-title">Direct all Billing Inquiries:</div>
-{{#if billingInquiriesEmail}}
-        <div class="footer-contact-item">Email: <a href="mailto:{{billingInquiriesEmail}}">{{billingInquiriesEmail}}</a></div>
-{{/if}}
-{{#if billingInquiriesWhatsApp}}
-        <div class="footer-contact-item">WhatsApp: {{billingInquiriesWhatsApp}}</div>
-{{/if}}
-      </div>
-      <div class="footer-branding">
-        <div class="footer-branding-text">{{companyName}}</div>
-        <div class="footer-company">{{companyLegalName}}</div>
-        <div class="footer-company-address">{{companyLocation}}</div>
-      </div>
-      <div class="footer-contact2">
-        <div class="footer-contact-title">Direct all Support Inquiries:</div>
-{{#if supportEmail}}
-        <div class="footer-contact-item">Email: <a href="mailto:{{supportEmail}}">{{supportEmail}}</a></div>
-{{/if}}
-{{#if supportWhatsApp}}
-        <div class="footer-contact-item">WhatsApp: {{supportWhatsApp}}</div>
-{{/if}}
-      </div>
-    </div>
+    <!-- Footer (moves to page 2 for Hardware Sales invoices - see footerSectionPage2 below) -->
+    {{footerSectionPage1}}
 
 {{#if isHardwareSales}}
     <!-- Terms and Conditions (Page 2) -->
@@ -446,6 +423,9 @@
           <li>Machine owner: Customer</li>
         </ul>
       </div>
+
+      <!-- Footer moved here for Hardware Sales invoices -->
+      {{footerSectionPage2}}
     </div>
 {{/if}}
   </div>

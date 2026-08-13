@@ -483,6 +483,54 @@ const buildProductRowsHtml = (
     .join("\n");
 };
 
+interface FooterSectionData {
+  companyName?: string | null;
+  companyLegalName?: string | null;
+  companyLocation?: string | null;
+  billingInquiriesEmail?: string | null;
+  billingInquiriesWhatsApp?: string | null;
+  supportEmail?: string | null;
+  supportWhatsApp?: string | null;
+}
+
+// Pre-rendered as a single HTML fragment (rather than left as template
+// {{#if}} tags) so it can be dropped into either page of the PDF via a
+// plain {{footerSectionPageN}} variable - the template's regex-based
+// {{#if}} engine doesn't support nested conditionals, and this block has
+// four of its own.
+const buildFooterSectionHtml = (footer: FooterSectionData): string => {
+  const billingEmailRow = footer.billingInquiriesEmail
+    ? `<div class="footer-contact-item">Email: <a href="mailto:${escapeHtml(footer.billingInquiriesEmail)}">${escapeHtml(footer.billingInquiriesEmail)}</a></div>`
+    : "";
+  const billingWhatsAppRow = footer.billingInquiriesWhatsApp
+    ? `<div class="footer-contact-item">WhatsApp: ${escapeHtml(footer.billingInquiriesWhatsApp)}</div>`
+    : "";
+  const supportEmailRow = footer.supportEmail
+    ? `<div class="footer-contact-item">Email: <a href="mailto:${escapeHtml(footer.supportEmail)}">${escapeHtml(footer.supportEmail)}</a></div>`
+    : "";
+  const supportWhatsAppRow = footer.supportWhatsApp
+    ? `<div class="footer-contact-item">WhatsApp: ${escapeHtml(footer.supportWhatsApp)}</div>`
+    : "";
+
+  return `    <div class="footer-section">
+      <div class="footer-contact">
+        <div class="footer-contact-title">Direct all Billing Inquiries:</div>
+        ${billingEmailRow}
+        ${billingWhatsAppRow}
+      </div>
+      <div class="footer-branding">
+        <div class="footer-branding-text">${escapeHtml(footer.companyName || "")}</div>
+        <div class="footer-company">${escapeHtml(footer.companyLegalName || "")}</div>
+        <div class="footer-company-address">${escapeHtml(footer.companyLocation || "")}</div>
+      </div>
+      <div class="footer-contact2">
+        <div class="footer-contact-title">Direct all Support Inquiries:</div>
+        ${supportEmailRow}
+        ${supportWhatsAppRow}
+      </div>
+    </div>`;
+};
+
 /**
  * Generate invoice PDF from template
  */
@@ -551,6 +599,20 @@ export const generateInvoicePDF = async (
       }
     }
 
+    // Invoice PDFs get a second page (Terms & Conditions) only for
+    // Hardware Sales invoices - the footer moves to the bottom of that
+    // second page for those, and stays on the single page otherwise.
+    const isHardwareSales = invoiceType === "HARDWARE_SALES";
+    const footerSectionHtml = buildFooterSectionHtml({
+      companyName: paymentDetails?.companyName,
+      companyLegalName: paymentDetails?.companyLegalName,
+      companyLocation: paymentDetails?.companyLocation,
+      billingInquiriesEmail: paymentDetails?.billingInquiriesEmail,
+      billingInquiriesWhatsApp: paymentDetails?.billingInquiriesWhatsApp,
+      supportEmail: paymentDetails?.supportEmail,
+      supportWhatsApp: paymentDetails?.supportWhatsApp,
+    });
+
     // Render PDF template with invoice data and payment details
     const pdfData: Record<
       string,
@@ -574,7 +636,9 @@ export const generateInvoicePDF = async (
         lineItems,
         invoiceType,
       ),
-      isHardwareSales: invoiceType === "HARDWARE_SALES",
+      isHardwareSales,
+      footerSectionPage1: isHardwareSales ? "" : footerSectionHtml,
+      footerSectionPage2: isHardwareSales ? footerSectionHtml : "",
       invoiceId,
       generatedDate: formatDate(generatedDate),
       cryptoPaymentUrl: cryptoPaymentUrl || "",
