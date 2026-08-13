@@ -90,8 +90,13 @@ const GRID_DARK = "#383A42"; // Luxor's exact grid colour
 const GRID_LIGHT = "#E0E2E7";
 
 interface HashrateHistoryChartProps {
-  /** Which pool to display. Mirrors the miners page toggle. */
-  poolMode: "total" | "luxor" | "braiins";
+  /**
+   * Which pool to display. Mirrors the client miners page toggle. Defaults to
+   * "total" for the admin and franchise views, which have no pool toggle of
+   * their own — a customer on a single pool still renders correctly, since
+   * the styling keys off how many series actually have data.
+   */
+  poolMode?: "total" | "luxor" | "braiins";
   /** Privileged: admins and the owning franchisee. Omit for own data. */
   userId?: string;
   height?: number;
@@ -109,7 +114,7 @@ const toDateInput = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
 export default function HashrateHistoryChart({
-  poolMode,
+  poolMode = "total",
   userId,
   height = 380,
 }: HashrateHistoryChartProps) {

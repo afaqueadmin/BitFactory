@@ -17,6 +17,7 @@ import { useQuery } from "@tanstack/react-query";
 import ElectricityCostTable from "@/components/ElectricityCostTable";
 import HostedMinersList from "@/components/HostedMinersList";
 import PoolAuthSection from "@/components/PoolAuthSection";
+import HashrateHistoryChart from "@/components/HashrateHistoryChart";
 import TransactionHistorySection from "@/components/TransactionHistorySection";
 import CustomerInvoicesTable from "@/components/CustomerInvoicesTable";
 import BalanceCard from "@/components/dashboardCards/BalanceCard";
@@ -695,6 +696,10 @@ export default function CustomerDetailPage() {
           >
             <PoolAuthSection customerId={customerId} />
           </Paper>
+
+          {/* Hashrate & Shares Efficiency history for this customer. The API
+              authorises the userId param for ADMIN/SUPER_ADMIN. */}
+          <HashrateHistoryChart userId={customerId} />
 
           {/* Miners Section */}
           <Paper

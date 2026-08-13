@@ -18,6 +18,7 @@ import {
 import { Add as AddIcon } from "@mui/icons-material";
 import FranchiseMinerFormModal from "./FranchiseMinerFormModal";
 import MinersTable from "@/components/admin/MinersTable";
+import HashrateHistoryChart from "@/components/HashrateHistoryChart";
 import { BulkEditModal } from "@/components/admin/BulkEditModal";
 import { BulkDeleteModal } from "@/components/admin/BulkDeleteModal";
 
@@ -518,6 +519,31 @@ export default function FranchiseMinersContent() {
                 </FormControl>
               </Stack>
             </Box>
+
+            {/* Hashrate & Shares Efficiency for the customer chosen above.
+                Deliberately scoped to one customer rather than aggregating the
+                whole franchise: the series is fetched per customer, so "All
+                Customers" would mean one pool API call each and Luxor
+                rate-limits under bursts. */}
+            {selectedUserFilter ? (
+              <HashrateHistoryChart userId={selectedUserFilter} />
+            ) : (
+              <Box
+                sx={{
+                  p: 3,
+                  mb: 4,
+                  borderRadius: 2,
+                  border: "1px dashed",
+                  borderColor: "divider",
+                  textAlign: "center",
+                }}
+              >
+                <Typography variant="body2" color="text.secondary">
+                  Select a customer above to see their hashrate &amp; shares
+                  efficiency history.
+                </Typography>
+              </Box>
+            )}
 
             <Stack
               direction={{ xs: "column", sm: "row" }}
