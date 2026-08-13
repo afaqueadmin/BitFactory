@@ -13,6 +13,7 @@ import {
   ToggleButtonGroup,
 } from "@mui/material";
 import ElectricityCostTable from "@/components/ElectricityCostTable";
+import ProfitLossChart from "@/components/ProfitLossChart";
 import { useUser } from "@/lib/hooks/useUser";
 import { LuxorPaymentSettings } from "@/lib/types/wallet";
 import { useBitcoinLivePrice } from "@/components/useBitcoinLivePrice";
@@ -275,6 +276,11 @@ export default function WalletPage() {
 
   const { btcLiveData, BtcLivePriceComponent } = useBitcoinLivePrice();
   const minCardHeight = 140;
+  const btcPriceUsd = btcLiveData?.price
+    ? typeof btcLiveData.price === "string"
+      ? parseFloat(btcLiveData.price)
+      : btcLiveData.price
+    : null;
 
   // Handle statement download
   const handleDownloadStatement = async () => {
@@ -758,6 +764,12 @@ export default function WalletPage() {
           </Paper>
         </Box>
       </Box>
+
+      {/* Profit & Loss Overview */}
+      <ProfitLossChart
+        totalEarningsBtc={getTotalEarnings()}
+        btcPriceUsd={btcPriceUsd}
+      />
 
       {/* Statement Download Section */}
       <Box sx={{ width: "100%", mt: { xs: 2, md: 4 } }}>
