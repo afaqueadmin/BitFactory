@@ -317,14 +317,7 @@ export default function CreateUserModal({
       return;
     }
 
-    // Validate subaccount selection only for CLIENT role
     if (formData.role === "CLIENT") {
-      if (!formData.luxorSubaccountName) {
-        setError("Please select a Luxor subaccount");
-        setLoading(false);
-        return;
-      }
-
       // Segment is required unless a franchise is assigned (which implies Retail)
       if (
         !formData.franchiseeId &&
@@ -578,7 +571,7 @@ export default function CreateUserModal({
               <>
                 {/* Luxor Subaccount Single-Select */}
                 <FormControl fullWidth>
-                  <InputLabel>Luxor Subaccount</InputLabel>
+                  <InputLabel>Luxor Subaccount (Optional)</InputLabel>
                   <Select
                     value={formData.luxorSubaccountName}
                     onChange={(e) =>
@@ -587,8 +580,9 @@ export default function CreateUserModal({
                         luxorSubaccountName: e.target.value,
                       }))
                     }
-                    label="Luxor Subaccount"
+                    label="Luxor Subaccount (Optional)"
                   >
+                    <MenuItem value="">None</MenuItem>
                     {fetchingSubaccounts ? (
                       <MenuItem disabled>
                         <CircularProgress size={20} sx={{ mr: 1 }} />
@@ -685,11 +679,7 @@ export default function CreateUserModal({
             type="submit"
             variant="contained"
             disabled={
-              loading ||
-              (formData.role === "CLIENT" &&
-                (fetchingSubaccounts ||
-                  subaccounts.length === 0 ||
-                  !formData.luxorSubaccountName))
+              loading || (formData.role === "CLIENT" && fetchingSubaccounts)
             }
             sx={{
               px: 4,

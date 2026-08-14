@@ -90,16 +90,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
-    // Validate luxorSubaccountName only for CLIENT role (V2 API: no groups, direct subaccount)
-    if (role === "CLIENT") {
-      if (!luxorSubaccountName || luxorSubaccountName.trim().length === 0) {
-        return NextResponse.json(
-          { error: "A Luxor subaccount must be selected for CLIENT users" },
-          { status: 400 },
-        );
-      }
-    }
-
     // franchiseeId is only applicable to CLIENT users (null = direct BitFactory
     // customer). Ignore it for any other role rather than silently accepting it.
     if (franchiseeId && role === "CLIENT") {
