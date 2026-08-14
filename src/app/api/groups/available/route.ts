@@ -68,12 +68,16 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       },
     });
 
-    // Get all PoolAuth ids that are already assigned to any group
+    // Get all PoolAuth ids and user ids that are already assigned to any group
     const allGrouped = await prisma.groupSubaccount.findMany({
-      where: { poolAuthId: { not: null } },
-      select: { poolAuthId: true },
+      select: { poolAuthId: true, userId: true },
     });
-    const groupedPoolAuthIds = new Set(allGrouped.map((s) => s.poolAuthId));
+    const groupedPoolAuthIds = new Set(
+      allGrouped.map((s) => s.poolAuthId).filter((id): id is string => !!id),
+    );
+    const groupedUserIds = new Set(
+      allGrouped.map((s) => s.userId).filter((id): id is string => !!id),
+    );
 
     const available = allPoolAuths
       .filter((pa) => !groupedPoolAuthIds.has(pa.id))
@@ -91,8 +95,42 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         minerCount: pa.user.miners.length,
       }));
 
+    // CLIENT users with no Luxor subaccount can still be added to a group
+    // directly (userId-based membership) - list those not already grouped.
+    const subaccountlessUsers = await prisma.user.findMany({
+      where: {
+        role: "CLIENT",
+        isDeleted: false,
+        poolAuths: { none: {} },
+        id: { notIn: Array.from(groupedUserIds) },
+        ...franchiseeUserFilter({ id: user.userId, role: user.role }),
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        luxorSubaccountName: true,
+        miners: { where: { isDeleted: false }, select: { id: true } },
+      },
+    });
+
+    const availableUsers = subaccountlessUsers.map((u) => ({
+      id: u.id,
+      userId: u.id,
+      subaccountName: null,
+      user: {
+        id: u.id,
+        name: u.name || "Unknown",
+        email: u.email || "unknown@example.com",
+        role: u.role,
+        luxorSubaccountName: u.luxorSubaccountName || "",
+      },
+      minerCount: u.miners.length,
+    }));
+
     return NextResponse.json(
-      { success: true, data: available } as ApiResponse,
+      { success: true, data: [...available, ...availableUsers] } as ApiResponse,
       { status: 200 },
     );
   } catch (error) {

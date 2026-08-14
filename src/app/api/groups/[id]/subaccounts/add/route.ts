@@ -43,21 +43,14 @@ export async function POST(
     }
 
     const { id: groupId } = await params;
-    const { poolAuthId } = await request.json();
+    const { poolAuthId, userId } = await request.json();
 
-    if (!poolAuthId?.trim()) {
+    if (!poolAuthId?.trim() && !userId?.trim()) {
       return NextResponse.json(
-        { success: false, error: "poolAuthId is required" },
+        { success: false, error: "poolAuthId or userId is required" },
         { status: 400 },
       );
     }
-
-    console.log(
-      "[Groups API] Adding poolAuthId",
-      poolAuthId,
-      "to group",
-      groupId,
-    );
 
     // Check if group exists
     const group = await prisma.group.findUnique({ where: { id: groupId } });
@@ -68,44 +61,93 @@ export async function POST(
       );
     }
 
-    const poolAuth = await prisma.poolAuth.findUnique({
-      where: { id: poolAuthId },
-      select: { id: true, authKey: true },
-    });
+    let groupSubaccount;
 
-    if (!poolAuth) {
-      return NextResponse.json(
-        { success: false, error: "Pool credential not found" },
-        { status: 404 },
-      );
-    }
-
-    // Check if this credential already belongs to any group
-    const existingSubaccount = await prisma.groupSubaccount.findFirst({
-      where: { poolAuthId },
-    });
-
-    if (existingSubaccount) {
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            "This credential already belongs to another group. Remove it from the other group first.",
-        },
-        { status: 409 },
-      );
-    }
-
-    // Add subaccount to group
-    const groupSubaccount = await prisma.groupSubaccount.create({
-      data: {
+    if (poolAuthId?.trim()) {
+      console.log(
+        "[Groups API] Adding poolAuthId",
+        poolAuthId,
+        "to group",
         groupId,
-        subaccountName: poolAuth.authKey,
-        poolAuthId: poolAuth.id,
-        addedBy: authenticatedUserId,
-        addedByUserId: authenticatedUserId,
-      },
-    });
+      );
+
+      const poolAuth = await prisma.poolAuth.findUnique({
+        where: { id: poolAuthId },
+        select: { id: true, authKey: true },
+      });
+
+      if (!poolAuth) {
+        return NextResponse.json(
+          { success: false, error: "Pool credential not found" },
+          { status: 404 },
+        );
+      }
+
+      // Check if this credential already belongs to any group
+      const existingSubaccount = await prisma.groupSubaccount.findFirst({
+        where: { poolAuthId },
+      });
+
+      if (existingSubaccount) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "This credential already belongs to another group. Remove it from the other group first.",
+          },
+          { status: 409 },
+        );
+      }
+
+      groupSubaccount = await prisma.groupSubaccount.create({
+        data: {
+          groupId,
+          subaccountName: poolAuth.authKey,
+          poolAuthId: poolAuth.id,
+          addedBy: authenticatedUserId,
+          addedByUserId: authenticatedUserId,
+        },
+      });
+    } else {
+      // User with no Luxor subaccount - membership keyed directly on userId
+      console.log("[Groups API] Adding userId", userId, "to group", groupId);
+
+      const member = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { id: true, role: true, isDeleted: true },
+      });
+
+      if (!member || member.isDeleted || member.role !== "CLIENT") {
+        return NextResponse.json(
+          { success: false, error: "Customer not found" },
+          { status: 404 },
+        );
+      }
+
+      const existingSubaccount = await prisma.groupSubaccount.findFirst({
+        where: { userId },
+      });
+
+      if (existingSubaccount) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "This customer already belongs to another group. Remove them from the other group first.",
+          },
+          { status: 409 },
+        );
+      }
+
+      groupSubaccount = await prisma.groupSubaccount.create({
+        data: {
+          groupId,
+          userId: member.id,
+          addedBy: authenticatedUserId,
+          addedByUserId: authenticatedUserId,
+        },
+      });
+    }
 
     console.log("[Groups API] Subaccount added successfully:", groupSubaccount);
 

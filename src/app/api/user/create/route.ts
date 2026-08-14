@@ -248,25 +248,39 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // If groupId provided, create GroupSubaccount entry to link the Luxor
-    // credential to the group
-    if (role === "CLIENT" && groupId && luxorPoolAuthId) {
+    // If groupId provided, link the new client to the group - via the Luxor
+    // credential when one was assigned, or directly by userId otherwise.
+    if (role === "CLIENT" && groupId) {
       try {
-        await prisma.groupSubaccount.create({
-          data: {
-            groupId: groupId,
-            subaccountName: luxorSubaccountName.trim(),
-            poolAuthId: luxorPoolAuthId,
-            addedBy: userId, // Admin who added the user
-            addedByUserId: userId,
-          },
-        });
-        console.log(
-          `[User Create API] Added subaccount "${luxorSubaccountName}" to group "${groupId}" for user ${newUser.id}`,
-        );
+        if (luxorPoolAuthId) {
+          await prisma.groupSubaccount.create({
+            data: {
+              groupId: groupId,
+              subaccountName: luxorSubaccountName.trim(),
+              poolAuthId: luxorPoolAuthId,
+              addedBy: userId, // Admin who added the user
+              addedByUserId: userId,
+            },
+          });
+          console.log(
+            `[User Create API] Added subaccount "${luxorSubaccountName}" to group "${groupId}" for user ${newUser.id}`,
+          );
+        } else {
+          await prisma.groupSubaccount.create({
+            data: {
+              groupId: groupId,
+              userId: newUser.id,
+              addedBy: userId,
+              addedByUserId: userId,
+            },
+          });
+          console.log(
+            `[User Create API] Added user ${newUser.id} (no subaccount) to group "${groupId}"`,
+          );
+        }
       } catch (groupError) {
         console.error(
-          "[User Create API] Failed to add subaccount to group:",
+          "[User Create API] Failed to add user to group:",
           groupError,
         );
         // Don't fail user creation if group assignment fails

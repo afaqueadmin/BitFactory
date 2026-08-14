@@ -70,6 +70,7 @@ model User {
   createdRepairNotes         MinerRepairNote[]            @relation("CreatedRepairNotes")
   createdMinerPoolHistory    MinerPoolHistory[]           @relation("MinerPoolHistoryCreatedBy")
   addedGroupSubaccounts      GroupSubaccount[]            @relation("GroupSubaccountAddedBy")
+  groupMemberships           GroupSubaccount[]            @relation("GroupSubaccountUser")
   customerRequestsSubmitted  FranchiseCustomerRequest[]   @relation("CustomerRequestsSubmitted")
   customerRequestsReviewed   FranchiseCustomerRequest[]   @relation("CustomerRequestsReviewed")
   customerRequestCreatedFrom FranchiseCustomerRequest?    @relation("CustomerRequestsCreatedUser")
@@ -475,18 +476,27 @@ model Group {
 model GroupSubaccount {
   id             String    @id @default(cuid())
   groupId        String
-  subaccountName String    @unique
+  // Null for members added without a Luxor subaccount (userId-based
+  // membership) - still @unique since Postgres treats multiple NULLs as
+  // distinct, so this doesn't collide across those rows.
+  subaccountName String?   @unique
   poolAuthId     String?
+  // Direct membership for CLIENT users with no Luxor subaccount/PoolAuth.
+  // Mutually exclusive with poolAuthId in practice: a row is either
+  // credential-based (poolAuthId set) or user-based (userId set).
+  userId         String?
   addedAt        DateTime  @default(now())
   addedBy        String
   addedByUserId  String?
   group          Group     @relation(fields: [groupId], references: [id], onDelete: Cascade)
   poolAuth       PoolAuth? @relation(fields: [poolAuthId], references: [id])
+  user           User?     @relation("GroupSubaccountUser", fields: [userId], references: [id])
   addedByUser    User?     @relation("GroupSubaccountAddedBy", fields: [addedByUserId], references: [id])
 
   @@index([groupId])
   @@index([subaccountName])
   @@index([poolAuthId])
+  @@index([userId])
   @@map("group_subaccounts")
 }
 

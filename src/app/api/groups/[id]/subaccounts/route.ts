@@ -35,16 +35,30 @@ export async function GET(
             },
           },
         },
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+            luxorSubaccountName: true,
+            miners: {
+              where: { isDeleted: false },
+              select: { id: true },
+            },
+          },
+        },
       },
     });
 
     const subaccountsWithDetails = groupSubaccounts.map((sa) => {
-      const user = sa.poolAuth?.user;
+      const user = sa.poolAuth?.user || sa.user;
 
       return {
         id: sa.id,
         subaccountName: sa.subaccountName,
         poolAuthId: sa.poolAuthId || undefined,
+        userId: sa.userId || undefined,
         addedAt: sa.addedAt,
         addedBy: sa.addedBy,
         user: user

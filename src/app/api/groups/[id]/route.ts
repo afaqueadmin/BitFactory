@@ -83,7 +83,8 @@ export async function GET(
       );
     }
 
-    // Fetch group with subaccounts (via poolAuth -> user relation) and creator
+    // Fetch group with subaccounts (via poolAuth -> user relation, or
+    // directly via userId for subaccount-less members) and creator
     const group = await prisma.group.findUnique({
       where: { id },
       include: {
@@ -103,6 +104,19 @@ export async function GET(
                       select: { id: true },
                     },
                   },
+                },
+              },
+            },
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                role: true,
+                luxorSubaccountName: true,
+                miners: {
+                  where: { isDeleted: false },
+                  select: { id: true },
                 },
               },
             },
@@ -134,33 +148,41 @@ export async function GET(
       );
     }
 
-    // Map subaccounts in group with user details (via the poolAuth relation)
+    // Map subaccounts in group with user details (via the poolAuth relation,
+    // or directly via the user relation for subaccount-less members)
     const subaccounts = group.subaccounts.map((groupSub) => {
-      const poolAuthUser = groupSub.poolAuth?.user;
+      const member = groupSub.poolAuth?.user || groupSub.user;
       return {
         id: groupSub.id,
         subaccountName: groupSub.subaccountName,
         poolAuthId: groupSub.poolAuthId || undefined,
+        userId: groupSub.userId || undefined,
         addedAt: groupSub.addedAt.toISOString(),
         user: {
-          id: poolAuthUser?.id || "",
-          name: poolAuthUser?.name || "Unknown",
-          email: poolAuthUser?.email || "unknown@example.com",
-          role: poolAuthUser?.role || "CLIENT",
+          id: member?.id || "",
+          name: member?.name || "Unknown",
+          email: member?.email || "unknown@example.com",
+          role: member?.role || "CLIENT",
           luxorSubaccountName:
-            poolAuthUser?.luxorSubaccountName || groupSub.subaccountName,
+            member?.luxorSubaccountName || groupSub.subaccountName || "",
         },
-        minerCount: poolAuthUser?.miners.length || 0,
+        minerCount: member?.miners.length || 0,
       };
     });
 
-    // Get all PoolAuth ids already assigned to ANY group (globally)
-    const allGroupedPoolAuths = await prisma.groupSubaccount.findMany({
-      where: { poolAuthId: { not: null } },
-      select: { poolAuthId: true },
+    // Get all PoolAuth ids and user ids already assigned to ANY group (globally)
+    const allGroupedSubaccounts = await prisma.groupSubaccount.findMany({
+      select: { poolAuthId: true, userId: true },
     });
     const groupedPoolAuthIds = new Set(
-      allGroupedPoolAuths.map((s) => s.poolAuthId),
+      allGroupedSubaccounts
+        .map((s) => s.poolAuthId)
+        .filter((pid): pid is string => !!pid),
+    );
+    const groupedUserIds = new Set(
+      allGroupedSubaccounts
+        .map((s) => s.userId)
+        .filter((uid): uid is string => !!uid),
     );
 
     // Get available subaccounts (PoolAuth rows not assigned to any group yet)
@@ -207,6 +229,41 @@ export async function GET(
         minerCount: pa.user.miners.length,
       }));
 
+    // CLIENT users with no Luxor subaccount can still be added directly
+    // (userId-based membership) - list those not already in a group.
+    const subaccountlessUsers = await prisma.user.findMany({
+      where: {
+        role: "CLIENT",
+        isDeleted: false,
+        poolAuths: { none: {} },
+        id: { notIn: Array.from(groupedUserIds) },
+        ...franchiseeUserFilter({ id: user.userId, role: user.role }),
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        luxorSubaccountName: true,
+        miners: { where: { isDeleted: false }, select: { id: true } },
+      },
+    });
+
+    const availableUsers = subaccountlessUsers.map((u) => ({
+      id: u.id,
+      userId: u.id,
+      subaccountName: null,
+      addedAt: new Date().toISOString(),
+      user: {
+        id: u.id,
+        name: u.name || "Unknown",
+        email: u.email || "unknown@example.com",
+        role: u.role,
+        luxorSubaccountName: u.luxorSubaccountName || "",
+      },
+      minerCount: u.miners.length,
+    }));
+
     console.log("[Groups API] GET[id] - Retrieved group:", id);
 
     return NextResponse.json(
@@ -223,7 +280,7 @@ export async function GET(
             createdAt: group.createdAt.toISOString(),
           },
           subaccounts,
-          availableSubaccounts,
+          availableSubaccounts: [...availableSubaccounts, ...availableUsers],
         },
       } as ApiResponse,
       { status: 200 },

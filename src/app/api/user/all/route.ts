@@ -129,7 +129,13 @@ export async function GET(request: NextRequest) {
         country: user.country || "N/A",
         phoneNumber: user.phoneNumber || "N/A",
         companyName: user.companyName || "N/A",
-        luxorSubaccountName: user.luxorSubaccountName || "N/A",
+        // Not defaulted to "N/A" like the other display fields below: this
+        // value round-trips into EditCustomerModal's Luxor Subaccount select,
+        // which has a real "N/A (Unassigned)" option — feeding it a fake
+        // "N/A" here made that option look pre-selected, so saving the form
+        // without touching the field silently wrote "N/A" as a real
+        // subaccount and created a bogus Luxor PoolAuth.
+        luxorSubaccountName: user.luxorSubaccountName || "",
         pools: user.poolAuths
           .map((pa) => pa.pool.name)
           .sort()

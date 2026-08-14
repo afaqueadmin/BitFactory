@@ -351,7 +351,7 @@ export default function CustomerInvoiceDetailPage() {
                         }}
                       >
                         <Typography variant="body2" color="textSecondary">
-                          Payment of ${Number(payment.amount).toFixed(2)}
+                          Payment of <CurrencyDisplay value={payment.amount} />
                         </Typography>
                         <Typography variant="body2" color="textSecondary">
                           {new Date(payment.createdAt).toLocaleDateString()}

@@ -371,6 +371,7 @@ export async function POST(request: NextRequest) {
     const customer = await prisma.user.findUnique({
       where: { id: customerId },
       select: {
+        name: true,
         luxorSubaccountName: true,
         poolAuths: {
           where: { pool: { name: "Luxor" } },
@@ -386,15 +387,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Prefer the Luxor subaccount identifier; fall back to the customer's
+    // first name when no subaccount is assigned so invoice numbers stay
+    // human-readable instead of blocking invoice creation.
     const luxorIdentifier =
-      customer.poolAuths[0]?.authKey || customer.luxorSubaccountName;
-
-    if (!luxorIdentifier) {
-      return NextResponse.json(
-        { error: "Customer does not have a Luxor subaccount name" },
-        { status: 400 },
-      );
-    }
+      customer.poolAuths[0]?.authKey ||
+      customer.luxorSubaccountName ||
+      customer.name?.trim().split(/\s+/)[0] ||
+      "Customer";
 
     // Generate invoice number: luxorIdentifier-YYYYMMDD-sequence
     const timestamp = new Date();

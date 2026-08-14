@@ -14,6 +14,14 @@ const formatDate = (date: Date): string => {
   });
 };
 
+// Utility function to format currency amounts with thousands separators
+const formatCurrency = (amount: number): string => {
+  return `$${amount.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+};
+
 /**
  * Render HTML template with invoice data
  * Supports {{variable}} replacement and {{#if variable}}...{{else}}...{{/if}} conditionals
@@ -177,7 +185,7 @@ export const sendInvoiceEmail = async (
         </tr>
         <tr>
           <td style="padding: 10px; border: 1px solid #ddd;"><strong>Amount</strong></td>
-          <td style="padding: 10px; border: 1px solid #ddd;">$${totalAmount.toFixed(2)}</td>
+          <td style="padding: 10px; border: 1px solid #ddd;">${formatCurrency(totalAmount)}</td>
         </tr>
         <tr style="background-color: #f5f5f5;">
           <td style="padding: 10px; border: 1px solid #ddd;"><strong>Issued Date</strong></td>
@@ -306,8 +314,8 @@ export const sendInvoiceEmailWithPDF = async (
       issuedDate: formatDate(issuedDate),
       dueDate: formatDate(dueDate),
       totalMiners,
-      unitPrice: `$${Number(unitPrice).toFixed(2)}`,
-      totalAmount: `$${Number(totalAmount).toFixed(2)}`,
+      unitPrice: formatCurrency(Number(unitPrice)),
+      totalAmount: formatCurrency(Number(totalAmount)),
       cryptoPaymentUrl: cryptoPaymentUrl || "",
       hasCryptoPayment: !!cryptoPaymentUrl,
     };
@@ -463,8 +471,8 @@ const buildProductRowsHtml = (
         (row) => `        <tr>
           <td>${escapeHtml(row.model)}</td>
           <td class="text-right">${row.quantity}</td>
-          <td class="text-right">$${row.unitPrice.toFixed(2)}</td>
-          <td class="text-right">$${row.totalPrice.toFixed(2)}</td>
+          <td class="text-right">${formatCurrency(row.unitPrice)}</td>
+          <td class="text-right">${formatCurrency(row.totalPrice)}</td>
         </tr>`,
       )
       .join("\n");
@@ -476,8 +484,8 @@ const buildProductRowsHtml = (
           <td>${PRODUCT_NAME_LABEL}</td>
           <td>${escapeHtml(row.model)}</td>
           <td class="text-right">${row.quantity}</td>
-          <td class="text-right">$${row.unitPrice.toFixed(2)}</td>
-          <td class="text-right">$${row.totalPrice.toFixed(2)}</td>
+          <td class="text-right">${formatCurrency(row.unitPrice)}</td>
+          <td class="text-right">${formatCurrency(row.totalPrice)}</td>
         </tr>`,
     )
     .join("\n");
@@ -626,8 +634,8 @@ export const generateInvoicePDF = async (
       issuedDate: formatDate(issuedDate),
       dueDate: formatDate(dueDate),
       totalMiners,
-      unitPrice: `$${Number(unitPrice).toFixed(2)}`,
-      totalAmount: `$${Number(totalAmount).toFixed(2)}`,
+      unitPrice: formatCurrency(Number(unitPrice)),
+      totalAmount: formatCurrency(Number(totalAmount)),
       productRows: buildProductRowsHtml(
         totalMiners,
         unitPrice,
@@ -767,7 +775,7 @@ export const generateMemoPDF = async (data: MemoPdfData): Promise<Buffer> => {
       issuedDate: formatDate(data.issuedDate),
       invoiceNumber: data.invoiceNumber || "",
       hasInvoiceNumber: !!data.invoiceNumber,
-      amountFormatted: `$${absAmount.toFixed(2)}`,
+      amountFormatted: formatCurrency(absAmount),
       amountLabel,
       amountTone,
       reason: escapeHtml(data.reason),

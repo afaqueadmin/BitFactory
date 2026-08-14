@@ -620,10 +620,10 @@ export default function InvoiceDetailPage() {
                           <TableCell>{item.model}</TableCell>
                           <TableCell align="right">{item.quantity}</TableCell>
                           <TableCell align="right">
-                            ${Number(item.unitPrice).toFixed(2)}
+                            <CurrencyDisplay value={item.unitPrice} />
                           </TableCell>
                           <TableCell align="right">
-                            ${Number(item.totalPrice).toFixed(2)}
+                            <CurrencyDisplay value={item.totalPrice} />
                           </TableCell>
                         </TableRow>
                       ),
@@ -762,7 +762,8 @@ export default function InvoiceDetailPage() {
                           }}
                         >
                           <Typography variant="body2" color="textSecondary">
-                            Payment of ${Number(payment.amount).toFixed(2)}
+                            Payment of{" "}
+                            <CurrencyDisplay value={payment.amount} />
                           </Typography>
                           <Typography variant="body2" color="textSecondary">
                             {new Date(payment.createdAt).toLocaleDateString()}

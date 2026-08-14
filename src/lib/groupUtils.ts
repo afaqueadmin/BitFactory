@@ -10,9 +10,7 @@ export async function getGroupByUserId(userId: string) {
       where: {
         subaccounts: {
           some: {
-            poolAuth: {
-              userId: userId,
-            },
+            OR: [{ poolAuth: { userId } }, { userId }],
           },
         },
       },

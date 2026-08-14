@@ -356,7 +356,11 @@ export default function EditCustomerModal({
           companyName: formData.companyName,
           streetAddress: formData.streetAddress,
           companyUrl: formData.companyUrl,
-          luxorSubaccountName: formData.luxorSubaccountName || null,
+          luxorSubaccountName:
+            formData.luxorSubaccountName &&
+            formData.luxorSubaccountName !== "N/A"
+              ? formData.luxorSubaccountName
+              : null,
           braiinsAuthKey: formData.braiinsAuthKey || null,
           groupId: formData.groupId || null,
           franchiseeId: formData.franchiseeId || null,

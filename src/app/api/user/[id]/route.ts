@@ -39,6 +39,12 @@ export async function PUT(
 
     const body = await request.json();
 
+    // "N/A" is only a placeholder label for the "unassigned" option in the
+    // subaccount picker, never a real subaccount name - treat it as a clear.
+    if (body.luxorSubaccountName === "N/A") {
+      body.luxorSubaccountName = null;
+    }
+
     // First get the current user to check if they have a luxor subaccount
     const currentUser = await prisma.user.findUnique({
       where: { id },
@@ -195,34 +201,51 @@ export async function PUT(
       }
     }
 
-    // Handle group assignment via GroupSubaccount, keyed by PoolAuth
+    // Handle group assignment via GroupSubaccount, keyed by PoolAuth when
+    // the client has a Luxor credential, or directly by userId otherwise.
     if (body.groupId !== undefined && currentUser?.role === "CLIENT") {
       try {
-        if (luxorPoolAuthId) {
-          // First, remove this credential from any existing group
-          await prisma.groupSubaccount.deleteMany({
-            where: { poolAuthId: luxorPoolAuthId },
-          });
-        }
+        // Remove any existing group membership for this user, whether keyed
+        // by their Luxor credential or directly by userId (subaccount-less).
+        await prisma.groupSubaccount.deleteMany({
+          where: {
+            OR: [
+              { userId: id },
+              ...(luxorPoolAuthId ? [{ poolAuthId: luxorPoolAuthId }] : []),
+            ],
+          },
+        });
 
         // Then add to the new group (only if groupId is not null/empty)
-        if (body.groupId && body.groupId.trim().length > 0 && luxorPoolAuthId) {
-          await prisma.groupSubaccount.create({
-            data: {
-              groupId: body.groupId,
-              subaccountName: subaccountName.trim(),
-              poolAuthId: luxorPoolAuthId,
-              addedBy: userId, // Admin who made the update
-              addedByUserId: userId,
-            },
-          });
-          console.log(
-            `[User Update API] Assigned subaccount "${subaccountName}" to group "${body.groupId}" for user ${id}`,
-          );
+        if (body.groupId && body.groupId.trim().length > 0) {
+          if (luxorPoolAuthId) {
+            await prisma.groupSubaccount.create({
+              data: {
+                groupId: body.groupId,
+                subaccountName: subaccountName.trim(),
+                poolAuthId: luxorPoolAuthId,
+                addedBy: userId, // Admin who made the update
+                addedByUserId: userId,
+              },
+            });
+            console.log(
+              `[User Update API] Assigned subaccount "${subaccountName}" to group "${body.groupId}" for user ${id}`,
+            );
+          } else {
+            await prisma.groupSubaccount.create({
+              data: {
+                groupId: body.groupId,
+                userId: id,
+                addedBy: userId,
+                addedByUserId: userId,
+              },
+            });
+            console.log(
+              `[User Update API] Added user ${id} (no subaccount) to group "${body.groupId}"`,
+            );
+          }
         } else {
-          console.log(
-            `[User Update API] Removed subaccount "${subaccountName}" from all groups for user ${id}`,
-          );
+          console.log(`[User Update API] Removed user ${id} from all groups`);
         }
       } catch (groupError) {
         console.error(

@@ -12,7 +12,7 @@ export async function POST(
 ) {
   try {
     const { id: groupId } = await params;
-    const { poolAuthIds } = await request.json();
+    const { poolAuthIds, userIds } = await request.json();
 
     // Verify authentication
     const token = request.cookies.get("token")?.value;
@@ -43,19 +43,15 @@ export async function POST(
 
     const userId = user.userId;
 
-    if (!Array.isArray(poolAuthIds) || poolAuthIds.length === 0) {
+    const hasPoolAuthIds = Array.isArray(poolAuthIds) && poolAuthIds.length > 0;
+    const hasUserIds = Array.isArray(userIds) && userIds.length > 0;
+
+    if (!hasPoolAuthIds && !hasUserIds) {
       return NextResponse.json(
-        { success: false, error: "poolAuthIds array is required" },
+        { success: false, error: "poolAuthIds or userIds array is required" },
         { status: 400 },
       );
     }
-
-    console.log(
-      "[Groups API] Bulk adding",
-      poolAuthIds.length,
-      "credentials to group",
-      groupId,
-    );
 
     // Check if group exists
     const group = await prisma.group.findUnique({ where: { id: groupId } });
@@ -66,57 +62,117 @@ export async function POST(
       );
     }
 
-    const poolAuths = await prisma.poolAuth.findMany({
-      where: { id: { in: poolAuthIds } },
-      select: { id: true, authKey: true },
-    });
+    let totalCount = 0;
 
-    // Check which credentials are already in groups
-    const existingSubaccounts = await prisma.groupSubaccount.findMany({
-      where: { poolAuthId: { in: poolAuthIds } },
-      select: { poolAuthId: true },
-    });
-
-    const existingIds = new Set(existingSubaccounts.map((s) => s.poolAuthId));
-    const alreadyAssigned = poolAuthIds.filter((id) => existingIds.has(id));
-
-    if (alreadyAssigned.length > 0) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: `${alreadyAssigned.length} of the selected credential(s) are already in groups`,
-          alreadyAssigned,
-        },
-        { status: 400 },
+    if (hasPoolAuthIds) {
+      console.log(
+        "[Groups API] Bulk adding",
+        poolAuthIds.length,
+        "credentials to group",
+        groupId,
       );
+
+      const poolAuths = await prisma.poolAuth.findMany({
+        where: { id: { in: poolAuthIds } },
+        select: { id: true, authKey: true },
+      });
+
+      // Check which credentials are already in groups
+      const existingSubaccounts = await prisma.groupSubaccount.findMany({
+        where: { poolAuthId: { in: poolAuthIds } },
+        select: { poolAuthId: true },
+      });
+
+      const existingIds = new Set(existingSubaccounts.map((s) => s.poolAuthId));
+      const alreadyAssigned = poolAuthIds.filter((id) => existingIds.has(id));
+
+      if (alreadyAssigned.length > 0) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `${alreadyAssigned.length} of the selected credential(s) are already in groups`,
+            alreadyAssigned,
+          },
+          { status: 400 },
+        );
+      }
+
+      const toAdd = poolAuths.map((pa) => ({
+        groupId,
+        subaccountName: pa.authKey,
+        poolAuthId: pa.id,
+        addedBy: userId,
+        addedByUserId: userId,
+      }));
+
+      const createdSubaccounts = await prisma.groupSubaccount.createMany({
+        data: toAdd,
+        skipDuplicates: true,
+      });
+      totalCount += createdSubaccounts.count;
     }
 
-    // Add all credentials to the group
-    const toAdd = poolAuths.map((pa) => ({
-      groupId,
-      subaccountName: pa.authKey,
-      poolAuthId: pa.id,
-      addedBy: userId,
-      addedByUserId: userId,
-    }));
+    if (hasUserIds) {
+      console.log(
+        "[Groups API] Bulk adding",
+        userIds.length,
+        "subaccount-less customers to group",
+        groupId,
+      );
 
-    const createdSubaccounts = await prisma.groupSubaccount.createMany({
-      data: toAdd,
-      skipDuplicates: true,
-    });
+      const members = await prisma.user.findMany({
+        where: { id: { in: userIds }, role: "CLIENT", isDeleted: false },
+        select: { id: true },
+      });
+
+      // Check which customers already belong to a group
+      const existingSubaccounts = await prisma.groupSubaccount.findMany({
+        where: { userId: { in: userIds } },
+        select: { userId: true },
+      });
+
+      const existingIds = new Set(existingSubaccounts.map((s) => s.userId));
+      const alreadyAssigned = userIds.filter((id: string) =>
+        existingIds.has(id),
+      );
+
+      if (alreadyAssigned.length > 0) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `${alreadyAssigned.length} of the selected customer(s) are already in groups`,
+            alreadyAssigned,
+          },
+          { status: 400 },
+        );
+      }
+
+      const toAdd = members.map((m) => ({
+        groupId,
+        userId: m.id,
+        addedBy: userId,
+        addedByUserId: userId,
+      }));
+
+      const createdMembers = await prisma.groupSubaccount.createMany({
+        data: toAdd,
+        skipDuplicates: true,
+      });
+      totalCount += createdMembers.count;
+    }
 
     console.log(
       "[Groups API] Successfully added",
-      createdSubaccounts.count,
-      "subaccounts to group",
+      totalCount,
+      "subaccounts/customers to group",
     );
 
     return NextResponse.json(
       {
         success: true,
         data: {
-          count: createdSubaccounts.count,
-          message: `Added ${createdSubaccounts.count} subaccount(s) to the group`,
+          count: totalCount,
+          message: `Added ${totalCount} subaccount(s) to the group`,
         },
       },
       { status: 201 },

@@ -72,8 +72,9 @@ interface Group {
  */
 interface GroupSubaccount {
   id: string;
-  subaccountName: string;
+  subaccountName: string | null;
   poolAuthId?: string;
+  userId?: string;
   addedAt: string;
   user: {
     id: string;
@@ -216,9 +217,11 @@ export default function GroupDetailPage() {
       const response = await fetch(`/api/groups/${groupId}/subaccounts/add`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          poolAuthId: dialog.selectedSubaccount.poolAuthId,
-        }),
+        body: JSON.stringify(
+          dialog.selectedSubaccount.poolAuthId
+            ? { poolAuthId: dialog.selectedSubaccount.poolAuthId }
+            : { userId: dialog.selectedSubaccount.userId },
+        ),
       });
 
       const data: ApiResponse = await response.json();
@@ -354,10 +357,16 @@ export default function GroupDetailPage() {
       const poolAuthIds = selectedSubaccounts
         .map((s) => s.poolAuthId)
         .filter((id): id is string => !!id);
+      const userIds = selectedSubaccounts
+        .filter((s) => !s.poolAuthId)
+        .map((s) => s.userId)
+        .filter((id): id is string => !!id);
 
       console.log(
         "[GroupDetail] Adding subaccounts (poolAuthIds):",
         poolAuthIds,
+        "(userIds):",
+        userIds,
       );
 
       const response = await fetch(
@@ -365,7 +374,7 @@ export default function GroupDetailPage() {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ poolAuthIds }),
+          body: JSON.stringify({ poolAuthIds, userIds }),
         },
       );
 
@@ -457,7 +466,9 @@ export default function GroupDetailPage() {
     (sub) =>
       sub.user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       sub.user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      sub.subaccountName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (sub.subaccountName || "")
+        .toLowerCase()
+        .includes(searchTerm.toLowerCase()) ||
       sub.user.luxorSubaccountName
         .toLowerCase()
         .includes(searchTerm.toLowerCase()),
@@ -851,7 +862,10 @@ export default function GroupDetailPage() {
                               />
                             </ListItemIcon>
                             <ListItemText
-                              primary={subaccount.subaccountName}
+                              primary={
+                                subaccount.subaccountName ||
+                                `${subaccount.user?.name || "Unknown"} (no subaccount)`
+                              }
                               secondary={`${subaccount.user?.name || "Unknown"} (${subaccount.user?.email}) • ${subaccount.minerCount} miners`}
                               onClick={() =>
                                 handleSubaccountToggle(subaccount.id)
