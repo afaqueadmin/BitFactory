@@ -83,6 +83,7 @@ export default function ProfitLossChart({
   const electricityCost = data?.totals.electricityCostTotal ?? 0;
   const hardwareCost = data?.totals.hardwareCostTotal ?? 0;
   const totalCosts = data?.totals.totalCosts ?? 0;
+  const grossProfit = revenueUsd - electricityCost;
   const netProfitLoss = revenueUsd - totalCosts;
 
   const chartData = [
@@ -103,7 +104,7 @@ export default function ProfitLossChart({
   const axisMax = Math.max(totalCosts, revenueUsd) * 1.1 || 1;
 
   const cards = [
-    { label: "BTC Mined Revenue", value: revenueUsd },
+    { label: "BTC Mined Revenue", value: revenueUsd, color: COLOR_REVENUE },
     {
       label: "Electricity Paid",
       value: electricityCost,
@@ -111,7 +112,12 @@ export default function ProfitLossChart({
     },
     { label: "Hardware Paid", value: hardwareCost, color: COLOR_HARDWARE },
     {
-      label: netProfitLoss >= 0 ? "Net Profit" : "Net Loss",
+      label: "Gross Profit",
+      value: grossProfit,
+      color: grossProfit >= 0 ? COLOR_PROFIT : COLOR_LOSS,
+    },
+    {
+      label: netProfitLoss >= 0 ? "Net Profit" : "Net Cash Flow",
       value: netProfitLoss,
       color: netProfitLoss >= 0 ? COLOR_PROFIT : COLOR_LOSS,
     },
@@ -142,7 +148,7 @@ export default function ProfitLossChart({
           <Box
             sx={{
               display: "grid",
-              gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(4, 1fr)" },
+              gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(5, 1fr)" },
               gap: 1.5,
               mb: 2.5,
             }}

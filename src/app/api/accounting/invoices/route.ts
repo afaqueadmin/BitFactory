@@ -350,8 +350,20 @@ export async function POST(request: NextRequest) {
         }),
       );
 
-      computedTotalMiners = validatedLineItems.reduce(
+      // totalAmount is the full invoice total (hardware + hosting &
+      // colocation, if any). totalMiners/unitPrice are the "miners sold"
+      // summary and must only reflect HARDWARE line items - hosting rows
+      // share the same quantity as their hardware counterpart, so folding
+      // them in double-counts miners and skews the unit price.
+      const hardwareLineItems = validatedLineItems.filter(
+        (item) => item.lineItemType === "HARDWARE",
+      );
+      computedTotalMiners = hardwareLineItems.reduce(
         (sum, item) => sum + item.quantity,
+        0,
+      );
+      const hardwareTotalAmount = hardwareLineItems.reduce(
+        (sum, item) => sum + item.totalPrice,
         0,
       );
       computedTotalAmount = parseFloat(
@@ -361,7 +373,7 @@ export async function POST(request: NextRequest) {
       );
       computedUnitPrice =
         computedTotalMiners > 0
-          ? parseFloat((computedTotalAmount / computedTotalMiners).toFixed(2))
+          ? parseFloat((hardwareTotalAmount / computedTotalMiners).toFixed(2))
           : 0;
     }
 

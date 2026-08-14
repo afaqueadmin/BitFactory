@@ -184,6 +184,9 @@ export class InvoiceEmailService {
         pdfBuffer,
         ccEmails,
         cryptoPaymentUrl,
+        payload.lineItems,
+        payload.invoiceType,
+        payload.hardwareModel,
       );
 
       if (!emailResult.success) {

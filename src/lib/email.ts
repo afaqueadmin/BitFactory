@@ -297,6 +297,9 @@ export const sendInvoiceEmailWithPDF = async (
   pdfBuffer: Buffer,
   ccEmails?: string[],
   cryptoPaymentUrl?: string | null,
+  lineItems?: InvoicePdfLineItem[] | null,
+  invoiceType?: string | null,
+  hardwareModel?: string | null,
 ) => {
   try {
     // Load email template
@@ -305,6 +308,8 @@ export const sendInvoiceEmailWithPDF = async (
       "src/lib/email-templates/invoice-email.html",
     );
     const emailTemplate = readFileSync(emailTemplatePath, "utf-8");
+
+    const hasLineItems = !!(lineItems && lineItems.length > 0);
 
     // Render email template with invoice data
     const emailData = {
@@ -318,6 +323,17 @@ export const sendInvoiceEmailWithPDF = async (
       totalAmount: formatCurrency(Number(totalAmount)),
       cryptoPaymentUrl: cryptoPaymentUrl || "",
       hasCryptoPayment: !!cryptoPaymentUrl,
+      hasLineItems,
+      lineItemsTable: hasLineItems
+        ? buildLineItemsTableHtml(
+            totalMiners,
+            unitPrice,
+            totalAmount,
+            hardwareModel,
+            lineItems,
+            invoiceType,
+          )
+        : "",
     };
 
     console.log("[EMAIL] Crypto payment data:", {
@@ -489,6 +505,51 @@ const buildProductRowsHtml = (
         </tr>`,
     )
     .join("\n");
+};
+
+// Full line-items breakdown table for the invoice notification email body -
+// shows each hardware/hosting row separately instead of collapsing them
+// into a single "Total Miners x average Unit Price" line, which misrepresents
+// the numbers whenever a hosting & colocation charge is mixed in.
+const buildLineItemsTableHtml = (
+  totalMiners: number,
+  unitPrice: number | string,
+  totalAmount: number | string,
+  hardwareModel: string | null | undefined,
+  lineItems: InvoicePdfLineItem[] | null | undefined,
+  invoiceType: string | null | undefined,
+): string => {
+  const rows = buildProductRowsHtml(
+    totalMiners,
+    unitPrice,
+    totalAmount,
+    hardwareModel,
+    lineItems,
+    invoiceType,
+  );
+
+  const header =
+    invoiceType === "HARDWARE_SALES"
+      ? `<tr>
+          <th>Model</th>
+          <th class="text-right">Qty</th>
+          <th class="text-right">Unit Price</th>
+          <th class="text-right">Total</th>
+        </tr>`
+      : `<tr>
+          <th>Product</th>
+          <th>Model</th>
+          <th class="text-right">Qty</th>
+          <th class="text-right">Unit Price</th>
+          <th class="text-right">Total</th>
+        </tr>`;
+
+  return `<table class="line-items-table">
+      <thead>${header}</thead>
+      <tbody>
+${rows}
+      </tbody>
+    </table>`;
 };
 
 interface FooterSectionData {

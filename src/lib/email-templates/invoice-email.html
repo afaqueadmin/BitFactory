@@ -67,6 +67,25 @@
       margin: 20px 0;
       border-radius: 3px;
     }
+    .line-items-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .line-items-table th,
+    .line-items-table td {
+      padding: 8px;
+      border-bottom: 1px solid #eee;
+      text-align: left;
+      font-size: 14px;
+    }
+    .line-items-table th {
+      color: #666;
+      font-weight: 600;
+      border-bottom: 2px solid #ddd;
+    }
+    .line-items-table .text-right {
+      text-align: right;
+    }
     .footer {
       text-align: center;
       color: #999;
@@ -111,6 +130,9 @@
 
     <div class="section">
       <div class="section-title">Amount Details</div>
+      {{#if hasLineItems}}
+      {{lineItemsTable}}
+      {{else}}
       <div class="row">
         <span class="label">Total Miners:</span>
         <span class="value">{{totalMiners}} units</span>
@@ -119,6 +141,7 @@
         <span class="label">Unit Price:</span>
         <span class="value">{{unitPrice}}</span>
       </div>
+      {{/if}}
     </div>
 
     <div class="summary">

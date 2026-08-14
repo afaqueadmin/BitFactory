@@ -186,8 +186,20 @@ export async function PATCH(
     let newTotalAmount: number;
 
     if (hasLineItems) {
-      newTotalMiners = validatedLineItems.reduce(
+      // totalAmount is the full invoice total (hardware + hosting &
+      // colocation, if any). totalMiners/unitPrice are the "miners sold"
+      // summary and must only reflect HARDWARE line items - hosting rows
+      // share the same quantity as their hardware counterpart, so folding
+      // them in double-counts miners and skews the unit price.
+      const hardwareLineItems = validatedLineItems.filter(
+        (item) => item.lineItemType === "HARDWARE",
+      );
+      newTotalMiners = hardwareLineItems.reduce(
         (sum, item) => sum + item.quantity,
+        0,
+      );
+      const hardwareTotalAmount = hardwareLineItems.reduce(
+        (sum, item) => sum + item.totalPrice,
         0,
       );
       newTotalAmount = parseFloat(
@@ -197,7 +209,7 @@ export async function PATCH(
       );
       newUnitPrice =
         newTotalMiners > 0
-          ? parseFloat((newTotalAmount / newTotalMiners).toFixed(2))
+          ? parseFloat((hardwareTotalAmount / newTotalMiners).toFixed(2))
           : 0;
 
       updateData.totalMiners = newTotalMiners;

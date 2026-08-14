@@ -185,8 +185,6 @@ export default function HostedMinersCard({
             {poolBreakdown && activePoolNames.length > 0 && (
               <Box
                 sx={{
-                  display: "flex",
-                  gap: 2,
                   p: 1.5,
                   backgroundColor:
                     theme.palette.mode === "dark"
@@ -195,153 +193,207 @@ export default function HostedMinersCard({
                   borderRadius: 1,
                 }}
               >
-                {typeof totalMinerCount === "number" &&
-                  activePoolNames.includes("Luxor") &&
-                  activePoolNames.includes("Braiins") && (
+                <Box sx={{ display: "flex", gap: 2 }}>
+                  {typeof totalMinerCount === "number" &&
+                    activePoolNames.includes("Luxor") &&
+                    activePoolNames.includes("Braiins") && (
+                      <Box sx={{ flex: 1 }}>
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            fontWeight: 600,
+                            color: "text.secondary",
+                            display: "block",
+                            mb: 0.5,
+                          }}
+                        >
+                          Total Miners
+                        </Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                          {totalMinerCount}
+                        </Typography>
+                      </Box>
+                    )}
+
+                  {/* Luxor Stats - Only show if user has Luxor miners */}
+                  {activePoolNames.includes("Luxor") && (
                     <Box sx={{ flex: 1 }}>
                       <Typography
                         variant="caption"
                         sx={{
                           fontWeight: 600,
-                          color: "text.secondary",
+                          color: "primary.main",
                           display: "block",
                           mb: 0.5,
                         }}
                       >
-                        Total Miners
+                        🔷 Luxor
                       </Typography>
-                      <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                        {totalMinerCount}
-                      </Typography>
+                      <Box
+                        sx={{ display: "flex", gap: 1, alignItems: "baseline" }}
+                      >
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                          {poolBreakdown.luxor.activeWorkers}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          active
+                        </Typography>
+                      </Box>
+                      {poolBreakdown.luxor.inactiveWorkers > 0 && (
+                        <Box
+                          sx={{
+                            display: "flex",
+                            gap: 1,
+                            alignItems: "baseline",
+                          }}
+                        >
+                          <Typography
+                            variant="body2"
+                            sx={{ fontWeight: 600, color: "error.main" }}
+                          >
+                            {poolBreakdown.luxor.inactiveWorkers}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            inactive
+                          </Typography>
+                        </Box>
+                      )}
                     </Box>
                   )}
 
-                {/* Luxor Stats - Only show if user has Luxor miners */}
-                {activePoolNames.includes("Luxor") && (
-                  <Box sx={{ flex: 1 }}>
-                    <Typography
-                      variant="caption"
-                      sx={{
-                        fontWeight: 600,
-                        color: "primary.main",
-                        display: "block",
-                        mb: 0.5,
-                      }}
-                    >
-                      🔷 Luxor
-                    </Typography>
-                    <Box
-                      sx={{ display: "flex", gap: 1, alignItems: "baseline" }}
-                    >
-                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                        {poolBreakdown.luxor.activeWorkers}
+                  {/* Braiins Stats - Only show if user has Braiins miners */}
+                  {activePoolNames.includes("Braiins") && (
+                    <Box sx={{ flex: 1 }}>
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          fontWeight: 600,
+                          color: "warning.main",
+                          display: "block",
+                          mb: 0.5,
+                        }}
+                      >
+                        🔶 Braiins
                       </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        active
-                      </Typography>
-                    </Box>
-                    {poolBreakdown.luxor.inactiveWorkers > 0 && (
                       <Box
                         sx={{ display: "flex", gap: 1, alignItems: "baseline" }}
                       >
-                        <Typography
-                          variant="body2"
-                          sx={{ fontWeight: 600, color: "error.main" }}
-                        >
-                          {poolBreakdown.luxor.inactiveWorkers}
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                          {poolBreakdown.braiins.activeWorkers}
                         </Typography>
                         <Typography variant="caption" color="text.secondary">
-                          inactive
+                          active
                         </Typography>
                       </Box>
-                    )}
-                  </Box>
-                )}
+                      {poolBreakdown.braiins.inactiveWorkers > 0 && (
+                        <Box
+                          sx={{
+                            display: "flex",
+                            gap: 1,
+                            alignItems: "baseline",
+                          }}
+                        >
+                          <Typography
+                            variant="body2"
+                            sx={{ fontWeight: 600, color: "error.main" }}
+                          >
+                            {poolBreakdown.braiins.inactiveWorkers}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            inactive
+                          </Typography>
+                        </Box>
+                      )}
+                    </Box>
+                  )}
+                </Box>
 
-                {/* Braiins Stats - Only show if user has Braiins miners */}
-                {activePoolNames.includes("Braiins") && (
-                  <Box sx={{ flex: 1 }}>
-                    <Typography
-                      variant="caption"
-                      sx={{
-                        fontWeight: 600,
-                        color: "warning.main",
-                        display: "block",
-                        mb: 0.5,
-                      }}
-                    >
-                      🔶 Braiins
-                    </Typography>
+                {/* Split progress bar - green for running, red for errors -
+                    nested inside the pool breakdown box so it reads as part
+                    of the active-miners summary rather than a detached bar */}
+                <Box sx={{ width: "100%", mt: 1.5 }}>
+                  <Box
+                    sx={{
+                      display: "flex",
+                      height: 10,
+                      borderRadius: 5,
+                      overflow: "hidden",
+                      backgroundColor:
+                        theme.palette.mode === "dark"
+                          ? "rgba(255,255,255,0.08)"
+                          : "rgba(0,0,0,0.06)",
+                    }}
+                  >
+                    {/* Green section for running miners */}
                     <Box
-                      sx={{ display: "flex", gap: 1, alignItems: "baseline" }}
-                    >
-                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                        {poolBreakdown.braiins.activeWorkers}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        active
-                      </Typography>
-                    </Box>
-                    {poolBreakdown.braiins.inactiveWorkers > 0 && (
+                      sx={{
+                        flex: runningCount,
+                        backgroundColor: "#00C853",
+                        height: "100%",
+                      }}
+                      role="progressbar"
+                      aria-valuenow={runningCount}
+                      aria-label={`${runningCount} miners running`}
+                    />
+                    {/* Red section for errors */}
+                    {errorCount > 0 && (
                       <Box
-                        sx={{ display: "flex", gap: 1, alignItems: "baseline" }}
-                      >
-                        <Typography
-                          variant="body2"
-                          sx={{ fontWeight: 600, color: "error.main" }}
-                        >
-                          {poolBreakdown.braiins.inactiveWorkers}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          inactive
-                        </Typography>
-                      </Box>
+                        sx={{
+                          flex: errorCount,
+                          backgroundColor: "#FF5252",
+                          height: "100%",
+                        }}
+                        role="progressbar"
+                        aria-valuenow={errorCount}
+                        aria-label={`${errorCount} errors`}
+                      />
                     )}
                   </Box>
-                )}
+                </Box>
               </Box>
             )}
 
-            {/* Split progress bar - green for running, red for errors */}
-            <Box sx={{ width: "100%", mt: 1 }}>
-              <Box
-                sx={{
-                  display: "flex",
-                  height: 10,
-                  borderRadius: 5,
-                  overflow: "hidden",
-                  backgroundColor:
-                    theme.palette.mode === "dark"
-                      ? "rgba(255,255,255,0.08)"
-                      : "rgba(0,0,0,0.06)",
-                }}
-              >
-                {/* Green section for running miners */}
+            {/* Fallback: no pool breakdown to nest into (e.g. no active
+                pools yet) - keep the bar visible on its own */}
+            {!(poolBreakdown && activePoolNames.length > 0) && (
+              <Box sx={{ width: "100%", mt: 1 }}>
                 <Box
                   sx={{
-                    flex: runningCount,
-                    backgroundColor: "#00C853",
-                    height: "100%",
+                    display: "flex",
+                    height: 10,
+                    borderRadius: 5,
+                    overflow: "hidden",
+                    backgroundColor:
+                      theme.palette.mode === "dark"
+                        ? "rgba(255,255,255,0.08)"
+                        : "rgba(0,0,0,0.06)",
                   }}
-                  role="progressbar"
-                  aria-valuenow={runningCount}
-                  aria-label={`${runningCount} miners running`}
-                />
-                {/* Red section for errors */}
-                {errorCount > 0 && (
+                >
                   <Box
                     sx={{
-                      flex: errorCount,
-                      backgroundColor: "#FF5252",
+                      flex: runningCount,
+                      backgroundColor: "#00C853",
                       height: "100%",
                     }}
                     role="progressbar"
-                    aria-valuenow={errorCount}
-                    aria-label={`${errorCount} errors`}
+                    aria-valuenow={runningCount}
+                    aria-label={`${runningCount} miners running`}
                   />
-                )}
+                  {errorCount > 0 && (
+                    <Box
+                      sx={{
+                        flex: errorCount,
+                        backgroundColor: "#FF5252",
+                        height: "100%",
+                      }}
+                      role="progressbar"
+                      aria-valuenow={errorCount}
+                      aria-label={`${errorCount} errors`}
+                    />
+                  )}
+                </Box>
               </Box>
-            </Box>
+            )}
           </>
         )}
 
