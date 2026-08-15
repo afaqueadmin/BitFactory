@@ -10,11 +10,21 @@ export interface HashratePoint {
   efficiency: number | null;
 }
 
+export interface UptimePoint {
+  /** Epoch milliseconds (UTC), always a day boundary. */
+  t: number;
+  /** Uptime as a percentage (0-100). */
+  uptime: number;
+}
+
 export interface PoolSeries {
   available: boolean;
   points: HashratePoint[];
+  /** Daily-only, so its timestamps rarely match the hashrate points. */
+  uptimePoints: UptimePoint[];
   granularity: TickSize;
   hasEfficiency: boolean;
+  hasUptime: boolean;
   note?: string;
   error?: string;
 }

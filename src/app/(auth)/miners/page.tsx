@@ -320,6 +320,7 @@ export default function Miners() {
         <HashRate24HoursCard
           value={getMetric("hashrate") || 0}
           loading={summaryLoading}
+          poolMode={poolMode}
         />
         <Uptime24HoursCard
           value={getMetric("uptime_24h") || 0}

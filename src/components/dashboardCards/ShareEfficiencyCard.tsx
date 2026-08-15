@@ -2,6 +2,12 @@ import GradientStatCard from "@/components/GradientStatCard";
 import React from "react";
 import { formatValue } from "@/lib/helpers/formatValue";
 
+/**
+ * Built from the Shares Efficiency line colour in HashrateHistoryChart
+ * (#f03131) so the card and the chart series read as the same metric.
+ */
+const EFFICIENCY_GRADIENT = "linear-gradient(135deg, #f03131 0%, #b71c1c 100%)";
+
 const ShareEfficiencyCard = ({
   value,
   loading,
@@ -18,7 +24,7 @@ const ShareEfficiencyCard = ({
         title="Share Efficiency (5 min)"
         value="ℹ️ Not available"
         caption="Braiins pool API does not provide efficiency data"
-        gradient="linear-gradient(135deg, #00C6FF 0%, #0072FF 100%)"
+        gradient={EFFICIENCY_GRADIENT}
         isLoading={loading}
       />
     );
@@ -28,7 +34,7 @@ const ShareEfficiencyCard = ({
     <GradientStatCard
       title="Share Efficiency (5 min)"
       value={formatValue(value, "percentage")}
-      gradient="linear-gradient(135deg, #00C6FF 0%, #0072FF 100%)"
+      gradient={EFFICIENCY_GRADIENT}
       isLoading={loading}
     />
   );
