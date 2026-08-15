@@ -86,11 +86,12 @@ const transporter = nodemailer.createTransport({
 
 // CC email for all invoice communications
 const CC_INVOICE_EMAIL =
-  process.env.INVOICE_CC_EMAIL || "invoices@bitfactory.ae";
+  process.env.CC_INVOICES_EMAIL || "invoices@bitfactory.ae";
 
 // Reply-To email for all invoice communications
-const REPLY_TO_INVOICE_EMAIL =
-  process.env.INVOICE_REPLY_TO_EMAIL || "invoices@bitfactory.ae";
+const REPLY_TO_EMAILS =
+  `${process.env.CC_INVOICES_EMAIL}, ${process.env.CC_SUPPORT_EMAIL}` ||
+  "invoices@bitfactory.ae";
 
 export const sendWelcomeEmail = async (email: string, tempPassword: string) => {
   const mailOptions = {
@@ -169,7 +170,7 @@ export const sendInvoiceEmail = async (
   const mailOptions = {
     from:
       `BitFactory Admin <${process.env.SMTP_FROM}>` || "noreply@bitfactory.com",
-    replyTo: REPLY_TO_INVOICE_EMAIL,
+    replyTo: REPLY_TO_EMAILS,
     to: email,
     cc: ccList,
     subject: `Invoice ${invoiceNumber} from BitFactory`,
@@ -260,12 +261,12 @@ export const sendInvoiceCancellationEmail = async (
     dueDate,
   );
 
-  const ccEmail = process.env.INVOICE_CC_EMAIL || "invoices@bitfactory.ae";
+  const ccEmail = process.env.CC_INVOICES_EMAIL || "invoices@bitfactory.ae";
 
   const mailOptions = {
     from:
       `BitFactory Admin <${process.env.SMTP_FROM}>` || "noreply@bitfactory.com",
-    replyTo: REPLY_TO_INVOICE_EMAIL,
+    replyTo: REPLY_TO_EMAILS,
     to: email,
     cc: ccEmail,
     subject: `Invoice ${invoiceNumber} - Cancellation Notice`,
@@ -353,7 +354,7 @@ export const sendInvoiceEmailWithPDF = async (
       from:
         `BitFactory Accounts <${process.env.SMTP_FROM}>` ||
         "noreply@bitfactory.com",
-      replyTo: REPLY_TO_INVOICE_EMAIL,
+      replyTo: REPLY_TO_EMAILS,
       to: email,
       cc: ccList,
       subject: `Invoice ${invoiceNumber} - BitFactory`,
@@ -895,7 +896,7 @@ export const sendMemoEmail = async (
       from:
         `BitFactory Accounts <${process.env.SMTP_FROM}>` ||
         "noreply@bitfactory.com",
-      replyTo: REPLY_TO_INVOICE_EMAIL,
+      replyTo: REPLY_TO_EMAILS,
       to: email,
       cc: CC_INVOICE_EMAIL,
       subject: `${memoTitleLabel} ${memoNumber} - BitFactory`,

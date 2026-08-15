@@ -69,7 +69,7 @@ export class InvoiceEmailService {
 
     // Always add invoices@bitfactory.ae
     const invoiceCCEmail =
-      process.env.INVOICE_CC_EMAIL || "invoices@bitfactory.ae";
+      process.env.CC_INVOICES_EMAIL || "invoices@bitfactory.ae";
     if (!ccEmails.includes(invoiceCCEmail)) {
       ccEmails.push(invoiceCCEmail);
     }
