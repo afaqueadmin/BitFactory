@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyJwtToken } from "@/lib/jwt";
-import { createLuxorClient } from "@/lib/luxor";
 import { prisma } from "@/lib/prisma";
 
 interface HashpricePoint {
@@ -13,12 +12,16 @@ interface HashpricePoint {
 
 /**
  * GET /api/hashprice-history?days=30
- * Fetches pool-wide historical hashprice data by combining:
- * - /pool/revenue/BTC (pool daily earnings from 'higgs' main account)
- * - /pool/hashrate-efficiency/BTC (pool daily hashrate from 'higgs' main account)
- * Calculates: hashprice = daily_revenue / daily_hashrate
+ * Reads the requesting user's Luxor subaccount hashprice history from
+ * PoolSubaccountDailySnapshot.hashprice — daily rows backfilled from Luxor's
+ * own dailystats export (see scripts/backfill-pool-history.js) and gap-filled
+ * from the Luxor API, i.e. the hashprice value Luxor itself reports per
+ * subaccount per day. Not capped at Luxor's ~45-day live API retention since
+ * it's served from our own DB.
  *
- * Returns the same pool-wide hashprice for all users (using 'higgs' subaccount)
+ * The previous strategy (calculating hashprice live as revenue ÷ hashrate via
+ * the Luxor API on every request) is kept below, commented out, in case this
+ * table ever needs to be bypassed again.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -45,10 +48,9 @@ export async function GET(request: NextRequest) {
     const daysParam = request.nextUrl.searchParams.get("days");
     const days = parseInt(daysParam || "30", 10);
 
-    // Luxor API has ~45 days of historical data maximum
-    if (isNaN(days) || days < 1 || days > 45) {
+    if (isNaN(days) || days < 1 || days > 366) {
       return NextResponse.json(
-        { error: "Days must be between 1 and 45 (Luxor API limit)" },
+        { error: "Days must be between 1 and 366" },
         { status: 400 },
       );
     }
@@ -127,258 +129,58 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Step 4: Get subaccount name from PoolAuth.authKey
-    const subaccountName = poolAuth.authKey;
-    console.log(
-      `[Hashprice History API] Using subaccount '${subaccountName}' for user ${userId}`,
-    );
+    // Step 4: Resolve the PoolSubaccount row backing this user's subaccount
+    const poolSubaccount = await prisma.poolSubaccount.findUnique({
+      where: {
+        poolId_subaccountName: {
+          poolId: luxorPool.id,
+          subaccountName: poolAuth.authKey,
+        },
+      },
+    });
 
-    // Create Luxor client for logging purposes
-    const luxorClient = createLuxorClient(subaccountName);
-
-    // Format dates as YYYY-MM-DD for Luxor API
-    const formatDate = (date: Date) => {
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, "0");
-      const day = String(date.getDate()).padStart(2, "0");
-      return `${year}-${month}-${day}`;
-    };
-
-    // Keep date extraction stable across Luxor timestamps without timezone shifts.
-    const extractDateKey = (value?: string | null): string | null => {
-      if (!value) return null;
-      if (value.includes("T")) {
-        return value.split("T")[0] || null;
-      }
-      if (value.length >= 10) {
-        return value.slice(0, 10);
-      }
-      return null;
-    };
-
-    const getWindowBounds = (rangeDays: number) => {
-      const endDate = new Date();
-      endDate.setDate(endDate.getDate() - 1);
-      endDate.setHours(0, 0, 0, 0);
-      const startDate = new Date(endDate);
-      startDate.setDate(startDate.getDate() - (rangeDays - 1));
-      return {
-        startDate,
-        endDate,
-        startKey: formatDate(startDate),
-        endKey: formatDate(endDate),
-      };
-    };
-
-    const getAPIRequestBounds = () => {
-      // Request from a fixed early date to today to capture all available data
-      // (Luxor hashrate data is sparse, so we need to request broadly)
-      const endDate = new Date();
-      endDate.setDate(endDate.getDate() - 1);
-      endDate.setHours(0, 0, 0, 0);
-      // Request from Jan 1, 2026 to get maximum available historical data
-      const startDate = new Date("2026-01-01");
-      return {
-        startDate,
-        endDate,
-        startKey: formatDate(startDate),
-        endKey: formatDate(endDate),
-      };
-    };
-
-    // Helper to fetch data in chunks due to Luxor API 60-day range limit
-
-    const fetchDataInChunks = async (
-      luxorEndDate: Date,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ): Promise<{ revenue: any[]; hashrate: any[] }> => {
-      const MAX_DAYS_PER_REQUEST = 60; // Luxor API limit
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const allRevenue: any[] = [];
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const allHashrate: any[] = [];
-
-      let currentEnd = new Date(luxorEndDate);
-      const hardStart = new Date("2026-01-01");
-
-      while (currentEnd >= hardStart) {
-        const chunkStart = new Date(currentEnd);
-        chunkStart.setDate(chunkStart.getDate() - MAX_DAYS_PER_REQUEST + 1);
-
-        // Don't go earlier than Jan 1
-        if (chunkStart < hardStart) {
-          chunkStart.setTime(hardStart.getTime());
-        }
-
-        const chunkStartStr = formatDate(chunkStart);
-        const chunkEndStr = formatDate(currentEnd);
-
-        console.log(
-          `[Hashprice History API] Fetching chunk: ${chunkStartStr} to ${chunkEndStr}`,
-        );
-
-        // Fetch revenue for this chunk
-        const revenueResponse = await luxorClient.getRevenue("BTC", {
-          subaccount_names: subaccountName,
-          start_date: chunkStartStr,
-          end_date: chunkEndStr,
-        });
-
-        if (revenueResponse.revenue && Array.isArray(revenueResponse.revenue)) {
-          allRevenue.push(...revenueResponse.revenue);
-        }
-
-        // Fetch hashrate for this chunk (all pages)
-        let currentPage = 1;
-        let hasMore = true;
-        const pageSize = 100;
-
-        while (hasMore) {
-          const hashrateResponse = await luxorClient.getHashrateEfficiency(
-            "BTC",
-            {
-              subaccount_names: subaccountName,
-              start_date: chunkStartStr,
-              end_date: chunkEndStr,
-              tick_size: "1d",
-              page_size: pageSize,
-              page_number: currentPage,
-            },
-          );
-
-          console.log(
-            `[Hashprice History API] Hashrate page ${currentPage}: records=${hashrateResponse.hashrate_efficiency?.length || 0}, item_count=${hashrateResponse.pagination?.item_count || 0}, has_next=${hashrateResponse.pagination?.next_page_url !== null}`,
-          );
-
-          if (
-            hashrateResponse.hashrate_efficiency &&
-            Array.isArray(hashrateResponse.hashrate_efficiency)
-          ) {
-            allHashrate.push(...hashrateResponse.hashrate_efficiency);
-          }
-
-          hasMore = hashrateResponse.pagination?.next_page_url !== null;
-          currentPage++;
-        }
-
-        console.log(
-          `[Hashprice History API] Chunk ${chunkStartStr} to ${chunkEndStr}: ${allRevenue.length} revenue, ${allHashrate.length} hashrate total so far`,
-        );
-
-        // Move to previous chunk
-        currentEnd = new Date(chunkStart);
-        currentEnd.setDate(currentEnd.getDate() - 1);
-      }
-
-      return { revenue: allRevenue, hashrate: allHashrate };
-    };
-
-    const filterByWindow = (data: HashpricePoint[], rangeDays: number) => {
-      const { startKey, endKey } = getWindowBounds(rangeDays);
-      return data
-        .filter((point) => point.date >= startKey && point.date <= endKey)
-        .sort((a, b) => a.timestamp - b.timestamp);
-    };
-
-    // Fetch helper with consistent date formatting and merge logic.
-    const fetchHashpriceRange = async (
-      rangeDays: number,
-    ): Promise<HashpricePoint[]> => {
-      // Get end date for chunk fetching
-      const { endDate } = getAPIRequestBounds();
-
-      // But report the window we're filtering to
-      const { startKey: windowStartKey, endKey: windowEndKey } =
-        getWindowBounds(rangeDays);
-
+    if (!poolSubaccount) {
       console.log(
-        `[Hashprice History API] Will filter to window: ${windowStartKey} to ${windowEndKey} (${rangeDays}d)`,
+        `[Hashprice History API] No PoolSubaccount row for '${poolAuth.authKey}' — nothing backfilled yet`,
       );
-
-      // Fetch data in chunks to respect Luxor's ~60-day range limit
-      const { revenue: revenueList, hashrate: hashrateList } =
-        await fetchDataInChunks(endDate);
-
-      console.log(`[Hashprice History API] ===== PERIOD DEBUG =====`);
-      console.log(`[Hashprice History API] Requested days: ${rangeDays}`);
-      console.log(
-        `[Hashprice History API] Filter window: ${windowStartKey} to ${windowEndKey}`,
-      );
-      console.log(
-        `[Hashprice History API] Total revenue records collected: ${revenueList.length}`,
-      );
-      console.log(
-        `[Hashprice History API] Total hashrate records collected: ${hashrateList.length}`,
-      );
-
-      const hashrateByDate: Record<string, number> = {};
-      if (Array.isArray(hashrateList)) {
-        for (const point of hashrateList) {
-          const date = extractDateKey(point.date_time);
-          if (date && point.hashrate) {
-            const hashrate = parseFloat(String(point.hashrate));
-            hashrateByDate[date] = hashrate;
-          }
-        }
-      }
-
-      const hashpriceData: HashpricePoint[] = [];
-      if (revenueList && Array.isArray(revenueList)) {
-        for (const item of revenueList) {
-          if (item && item.date_time) {
-            const dateStr = extractDateKey(item.date_time);
-            if (!dateStr) continue;
-            const revenue = item.revenue?.revenue || 0;
-            const hashrateRaw = hashrateByDate[dateStr] || 0;
-
-            // Hashrate from API is in H/s, but hashprice is BTC/PH/s/day.
-            const hashratePHs = hashrateRaw / 1e15;
-            if (hashratePHs > 0) {
-              const hashprice = revenue / hashratePHs;
-              hashpriceData.push({
-                date: dateStr,
-                timestamp: new Date(item.date_time).getTime(),
-                hashprice: isFinite(hashprice) ? hashprice : 0,
-                revenue,
-                hashrate: hashrateRaw,
-              });
-            }
-          }
-        }
-      }
-
-      hashpriceData.sort((a, b) => a.timestamp - b.timestamp);
-      return hashpriceData;
-    };
-
-    let hashpriceData = await fetchHashpriceRange(days);
-    hashpriceData = filterByWindow(hashpriceData, days);
-
-    // Note: We request from Jan 1 to today to capture all available data,
-    // then filter to the requested window. No fallback needed since
-    // we're already requesting the broadest available range.
-
-    console.log(`[Hashprice History API] ===== FINAL RESULTS =====`);
-    console.log(
-      `[Hashprice History API] Calculated ${hashpriceData.length} hashprice points`,
-    );
-
-    if (hashpriceData.length > 0) {
-      const firstDate = new Date(hashpriceData[0].timestamp)
-        .toISOString()
-        .split("T")[0];
-      const lastDate = new Date(
-        hashpriceData[hashpriceData.length - 1].timestamp,
-      )
-        .toISOString()
-        .split("T")[0];
-      console.log(
-        `[Hashprice History API] Date range in results: ${firstDate} to ${lastDate}`,
-      );
-      console.log(
-        `[Hashprice History API] Actual period covered: ${hashpriceData.length} days`,
+      return NextResponse.json(
+        {
+          success: true,
+          data: [],
+          message: "No pool subaccount snapshot data found",
+        },
+        { status: 200 },
       );
     }
+
+    // Step 5: Pull daily snapshots for the requested window from our own DB
+    const endDate = new Date();
+    endDate.setUTCDate(endDate.getUTCDate() - 1);
+    endDate.setUTCHours(0, 0, 0, 0);
+    const startDate = new Date(endDate);
+    startDate.setUTCDate(startDate.getUTCDate() - (days - 1));
+
+    const snapshots = await prisma.poolSubaccountDailySnapshot.findMany({
+      where: {
+        poolSubaccountId: poolSubaccount.id,
+        date: { gte: startDate, lte: endDate },
+      },
+      orderBy: { date: "asc" },
+    });
+
+    const hashpriceData: HashpricePoint[] = snapshots
+      .filter((snapshot) => snapshot.hashprice != null)
+      .map((snapshot) => ({
+        date: snapshot.date.toISOString().split("T")[0],
+        timestamp: snapshot.date.getTime(),
+        hashprice: Number(snapshot.hashprice),
+        revenue: Number(snapshot.totalRevenue),
+        hashrate: snapshot.hashrate != null ? Number(snapshot.hashrate) : 0,
+      }));
+
+    console.log(
+      `[Hashprice History API] Found ${hashpriceData.length} snapshot day(s) for subaccount '${poolAuth.authKey}'`,
+    );
 
     // Calculate statistics
     const current =
@@ -424,3 +226,243 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
+/* ============================================================================
+ * OLD STRATEGY (superseded — kept for reference only, not compiled)
+ * ============================================================================
+ * Calculated hashprice live on every request as daily_revenue ÷ daily_hashrate
+ * by hitting the Luxor API directly (capped at Luxor's ~45-day retention).
+ * Replaced by reading PoolSubaccountDailySnapshot.hashprice above. To restore
+ * this strategy, re-add `import { createLuxorClient } from "@/lib/luxor";`
+ * and splice this back in after Step 3 (PoolAuth lookup) above.
+ *
+ *   // Step 4: Get subaccount name from PoolAuth.authKey
+ *   const subaccountName = poolAuth.authKey;
+ *   console.log(
+ *     `[Hashprice History API] Using subaccount '${subaccountName}' for user ${userId}`,
+ *   );
+ *
+ *   // Create Luxor client for logging purposes
+ *   const luxorClient = createLuxorClient(subaccountName);
+ *
+ *   // Format dates as YYYY-MM-DD for Luxor API
+ *   const formatDate = (date: Date) => {
+ *     const year = date.getFullYear();
+ *     const month = String(date.getMonth() + 1).padStart(2, "0");
+ *     const day = String(date.getDate()).padStart(2, "0");
+ *     return `${year}-${month}-${day}`;
+ *   };
+ *
+ *   // Keep date extraction stable across Luxor timestamps without timezone shifts.
+ *   const extractDateKey = (value?: string | null): string | null => {
+ *     if (!value) return null;
+ *     if (value.includes("T")) {
+ *       return value.split("T")[0] || null;
+ *     }
+ *     if (value.length >= 10) {
+ *       return value.slice(0, 10);
+ *     }
+ *     return null;
+ *   };
+ *
+ *   const getWindowBounds = (rangeDays: number) => {
+ *     const endDate = new Date();
+ *     endDate.setDate(endDate.getDate() - 1);
+ *     endDate.setHours(0, 0, 0, 0);
+ *     const startDate = new Date(endDate);
+ *     startDate.setDate(startDate.getDate() - (rangeDays - 1));
+ *     return {
+ *       startDate,
+ *       endDate,
+ *       startKey: formatDate(startDate),
+ *       endKey: formatDate(endDate),
+ *     };
+ *   };
+ *
+ *   const getAPIRequestBounds = () => {
+ *     // Request from a fixed early date to today to capture all available data
+ *     // (Luxor hashrate data is sparse, so we need to request broadly)
+ *     const endDate = new Date();
+ *     endDate.setDate(endDate.getDate() - 1);
+ *     endDate.setHours(0, 0, 0, 0);
+ *     // Request from Jan 1, 2026 to get maximum available historical data
+ *     const startDate = new Date("2026-01-01");
+ *     return {
+ *       startDate,
+ *       endDate,
+ *       startKey: formatDate(startDate),
+ *       endKey: formatDate(endDate),
+ *     };
+ *   };
+ *
+ *   // Helper to fetch data in chunks due to Luxor API 60-day range limit
+ *   const fetchDataInChunks = async (
+ *     luxorEndDate: Date,
+ *   ): Promise<{ revenue: any[]; hashrate: any[] }> => {
+ *     const MAX_DAYS_PER_REQUEST = 60; // Luxor API limit
+ *     const allRevenue: any[] = [];
+ *     const allHashrate: any[] = [];
+ *
+ *     let currentEnd = new Date(luxorEndDate);
+ *     const hardStart = new Date("2026-01-01");
+ *
+ *     while (currentEnd >= hardStart) {
+ *       const chunkStart = new Date(currentEnd);
+ *       chunkStart.setDate(chunkStart.getDate() - MAX_DAYS_PER_REQUEST + 1);
+ *
+ *       // Don't go earlier than Jan 1
+ *       if (chunkStart < hardStart) {
+ *         chunkStart.setTime(hardStart.getTime());
+ *       }
+ *
+ *       const chunkStartStr = formatDate(chunkStart);
+ *       const chunkEndStr = formatDate(currentEnd);
+ *
+ *       // Fetch revenue for this chunk
+ *       const revenueResponse = await luxorClient.getRevenue("BTC", {
+ *         subaccount_names: subaccountName,
+ *         start_date: chunkStartStr,
+ *         end_date: chunkEndStr,
+ *       });
+ *
+ *       if (revenueResponse.revenue && Array.isArray(revenueResponse.revenue)) {
+ *         allRevenue.push(...revenueResponse.revenue);
+ *       }
+ *
+ *       // Fetch hashrate for this chunk (all pages)
+ *       let currentPage = 1;
+ *       let hasMore = true;
+ *       const pageSize = 100;
+ *
+ *       while (hasMore) {
+ *         const hashrateResponse = await luxorClient.getHashrateEfficiency(
+ *           "BTC",
+ *           {
+ *             subaccount_names: subaccountName,
+ *             start_date: chunkStartStr,
+ *             end_date: chunkEndStr,
+ *             tick_size: "1d",
+ *             page_size: pageSize,
+ *             page_number: currentPage,
+ *           },
+ *         );
+ *
+ *         if (
+ *           hashrateResponse.hashrate_efficiency &&
+ *           Array.isArray(hashrateResponse.hashrate_efficiency)
+ *         ) {
+ *           allHashrate.push(...hashrateResponse.hashrate_efficiency);
+ *         }
+ *
+ *         hasMore = hashrateResponse.pagination?.next_page_url !== null;
+ *         currentPage++;
+ *       }
+ *
+ *       // Move to previous chunk
+ *       currentEnd = new Date(chunkStart);
+ *       currentEnd.setDate(currentEnd.getDate() - 1);
+ *     }
+ *
+ *     return { revenue: allRevenue, hashrate: allHashrate };
+ *   };
+ *
+ *   const filterByWindow = (data: HashpricePoint[], rangeDays: number) => {
+ *     const { startKey, endKey } = getWindowBounds(rangeDays);
+ *     return data
+ *       .filter((point) => point.date >= startKey && point.date <= endKey)
+ *       .sort((a, b) => a.timestamp - b.timestamp);
+ *   };
+ *
+ *   // Fetch helper with consistent date formatting and merge logic.
+ *   const fetchHashpriceRange = async (
+ *     rangeDays: number,
+ *   ): Promise<HashpricePoint[]> => {
+ *     // Get end date for chunk fetching
+ *     const { endDate } = getAPIRequestBounds();
+ *
+ *     // But report the window we're filtering to
+ *     const { startKey: windowStartKey, endKey: windowEndKey } =
+ *       getWindowBounds(rangeDays);
+ *
+ *     // Fetch data in chunks to respect Luxor's ~60-day range limit
+ *     const { revenue: revenueList, hashrate: hashrateList } =
+ *       await fetchDataInChunks(endDate);
+ *
+ *     const hashrateByDate: Record<string, number> = {};
+ *     if (Array.isArray(hashrateList)) {
+ *       for (const point of hashrateList) {
+ *         const date = extractDateKey(point.date_time);
+ *         if (date && point.hashrate) {
+ *           const hashrate = parseFloat(String(point.hashrate));
+ *           hashrateByDate[date] = hashrate;
+ *         }
+ *       }
+ *     }
+ *
+ *     const hashpriceData: HashpricePoint[] = [];
+ *     if (revenueList && Array.isArray(revenueList)) {
+ *       for (const item of revenueList) {
+ *         if (item && item.date_time) {
+ *           const dateStr = extractDateKey(item.date_time);
+ *           if (!dateStr) continue;
+ *           const revenue = item.revenue?.revenue || 0;
+ *           const hashrateRaw = hashrateByDate[dateStr] || 0;
+ *
+ *           // Hashrate from API is in H/s, but hashprice is BTC/PH/s/day.
+ *           const hashratePHs = hashrateRaw / 1e15;
+ *           if (hashratePHs > 0) {
+ *             const hashprice = revenue / hashratePHs;
+ *             hashpriceData.push({
+ *               date: dateStr,
+ *               timestamp: new Date(item.date_time).getTime(),
+ *               hashprice: isFinite(hashprice) ? hashprice : 0,
+ *               revenue,
+ *               hashrate: hashrateRaw,
+ *             });
+ *           }
+ *         }
+ *       }
+ *     }
+ *
+ *     hashpriceData.sort((a, b) => a.timestamp - b.timestamp);
+ *     return hashpriceData;
+ *   };
+ *
+ *   let hashpriceData = await fetchHashpriceRange(days);
+ *   hashpriceData = filterByWindow(hashpriceData, days);
+ *
+ *   // Note: We request from Jan 1 to today to capture all available data,
+ *   // then filter to the requested window. No fallback needed since
+ *   // we're already requesting the broadest available range.
+ *
+ *   // Calculate statistics
+ *   const current =
+ *     hashpriceData.length > 0
+ *       ? hashpriceData[hashpriceData.length - 1].hashprice
+ *       : 0;
+ *   const high =
+ *     hashpriceData.length > 0
+ *       ? Math.max(...hashpriceData.map((d) => d.hashprice))
+ *       : 0;
+ *   const low =
+ *     hashpriceData.length > 0
+ *       ? Math.min(...hashpriceData.map((d) => d.hashprice))
+ *       : 0;
+ *
+ *   return NextResponse.json(
+ *     {
+ *       success: true,
+ *       data: hashpriceData,
+ *       statistics: {
+ *         current,
+ *         high,
+ *         low,
+ *         daysReturned: hashpriceData.length,
+ *         currency: "BTC",
+ *         unit: "BTC/PH/s/Day",
+ *       },
+ *       timestamp: new Date().toISOString(),
+ *     },
+ *     { status: 200 },
+ *   );
+ * ==========================================================================*/

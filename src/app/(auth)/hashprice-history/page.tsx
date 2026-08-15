@@ -19,13 +19,18 @@
  * - 1D: Last 24 hours
  * - 7D: Last 7 days
  * - 30D: Last 30 days
- * - 45D: Last 45 days (Luxor API historical limit)
+ * - 45D: Last 45 days
+ * - 3M: Last 90 days
+ * - 1Y: Last 365 days
  *
  * Data Sources:
  * - Current Hashprice: LIVE from /api/pool-hashprice-live (real-time Luxor summary API)
- * - Historical Chart: From /api/hashprice-history (pool-wide daily revenue ÷ daily hashrate)
+ * - Historical Chart: From /api/hashprice-history, reading PoolSubaccountDailySnapshot.hashprice
+ *   (daily rows backfilled/gap-filled from Luxor for the user's own subaccount — see
+ *   scripts/backfill-pool-history.js). Not capped at Luxor's live-API retention window
+ *   since it's served from our own DB.
  * - Automatically refetches every 5 minutes
- * - Shows pool-wide hashprice (same value for all users from 'higgs' main account)
+ * - Chart reflects the logged-in user's own Luxor subaccount, not a shared pool-wide figure
  */
 
 import React, { useState, useMemo } from "react";
@@ -67,7 +72,9 @@ const TIMEFRAMES = [
   { label: "1D", days: 1 },
   { label: "7D", days: 7 },
   { label: "30D", days: 30 },
-  { label: "45D", days: 45 }, // Luxor API max historical data is ~45 days
+  { label: "45D", days: 45 },
+  { label: "3M", days: 90 },
+  { label: "1Y", days: 365 },
 ];
 
 const formatHashprice = (value: number): string => {
@@ -330,8 +337,8 @@ export default function HashpriceHistoryPage() {
         </Typography>
         <Typography variant="body2" color="textSecondary">
           {isMobile
-            ? "Pool-wide BTC hashprice from Luxor Mining"
-            : "Pool-wide hashprice data from Luxor Mining (BTC per PH/s per day) • Current: LIVE real-time • Chart: Historical"}
+            ? "Your BTC hashprice from Luxor Mining"
+            : "Your subaccount hashprice from Luxor Mining (BTC per PH/s per day) • Current: LIVE real-time • Chart: Historical"}
         </Typography>
       </Box>
 
@@ -697,29 +704,22 @@ export default function HashpriceHistoryPage() {
       </Paper>
 
       {/* Info Section */}
-      {/*
-        Footer with data source information:
-        - Luxor Mining Pool API for pool-specific hashprice
-        - Calculated from: Daily Revenue ÷ Daily Hashrate
-        - Real historical data (not simulated)
-      */}
+      {/* Footer disclaimer: daily DB snapshots sourced from Luxor, per subaccount, may lag live. */}
       <Paper
         sx={{
-          p: { xs: 1.5, sm: 2 },
+          p: { xs: 1, sm: 1.25 },
           mt: { xs: 2, md: 3 },
           borderRadius: 2,
           backgroundColor: isDark ? theme.palette.grey[800] : "#f5f5f5",
         }}
       >
-        <Typography variant="body2" color="textSecondary">
-          <strong>Data Source:</strong> Luxor Mining Pool •{" "}
-          {isMobile
-            ? "BTC/PH/s/Day • Updates every 5 min"
-            : "Calculated from: Daily Revenue ÷ Daily Hashrate • Updated every 5 minutes • All values in BTC/PH/s/Day"}
-        </Typography>
-        <Typography variant="body2" color="textSecondary" sx={{ mt: 0.5 }}>
-          <strong>Network Data:</strong> mempool.space (difficulty, block time,
-          height, price) • CoinGecko fallback • Updated every 5 minutes
+        <Typography
+          variant="caption"
+          color="textSecondary"
+          sx={{ display: "block", opacity: 0.8 }}
+        >
+          Daily snapshots stored in our database, sourced from Luxor for your
+          subaccount — may lag the live hashprice above.
         </Typography>
       </Paper>
     </Box>
