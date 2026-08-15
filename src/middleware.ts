@@ -89,6 +89,7 @@ const dynamicPatternsPaths = {
   CLIENT: clientDynamicPatterns,
   ADMIN: [
     new URLPattern({ pathname: "/accounting/:path*" }),
+    new URLPattern({ pathname: "/db-data-management/:path*" }),
     new URLPattern({ pathname: "/customers/:id*" }),
     new URLPattern({ pathname: "/groups/:id*" }),
     new URLPattern({ pathname: "/franchisees/:id" }),

@@ -34,6 +34,11 @@ import {
   People as FranchiseesIcon,
   MonetizationOn as IncentivesIcon,
   ReceiptLong as MemoIcon,
+  Dataset as DbDataIcon,
+  ListAlt as SubaccountRecordsIcon,
+  ShowChart as DailySnapshotsIcon,
+  Engineering as WorkerMetricsIcon,
+  SwapHoriz as PoolTransactionsIcon,
 } from "@mui/icons-material";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -214,6 +219,32 @@ const sidebarItems: SidebarItem[] = [
         title: "Pricing",
         icon: <HostingPricesIcon />,
         path: "/accounting/pricing",
+      },
+    ],
+  },
+  {
+    title: "DB Data Management",
+    icon: <DbDataIcon />,
+    items: [
+      {
+        title: "Subaccount Records",
+        icon: <SubaccountRecordsIcon />,
+        path: "/db-data-management/pool-subaccounts",
+      },
+      {
+        title: "Daily Snapshots",
+        icon: <DailySnapshotsIcon />,
+        path: "/db-data-management/pool-daily-snapshots",
+      },
+      {
+        title: "Worker Metrics",
+        icon: <WorkerMetricsIcon />,
+        path: "/db-data-management/pool-worker-metrics",
+      },
+      {
+        title: "Pool Transactions",
+        icon: <PoolTransactionsIcon />,
+        path: "/db-data-management/pool-transactions",
       },
     ],
   },
