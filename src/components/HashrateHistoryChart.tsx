@@ -32,7 +32,6 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ResponsiveContainer,
 } from "recharts";
 import {
@@ -40,6 +39,7 @@ import {
   Paper,
   Typography,
   Button,
+  ButtonBase,
   IconButton,
   TextField,
   CircularProgress,
@@ -53,6 +53,7 @@ import {
   TableRow,
   useTheme,
   useMediaQuery,
+  alpha,
 } from "@mui/material";
 import {
   ChevronLeft as ChevronLeftIcon,
@@ -86,6 +87,7 @@ import {
 const LUXOR_COLOR = "#1565C0";
 const BRAIINS_COLOR = "#FFA500";
 const EFFICIENCY_COLOR = "#f03131"; // Luxor's exact efficiency red
+const UPTIME_COLOR = "#9c27b0"; // matches the wallet Revenue (24 Hours) card
 const GRID_DARK = "#383A42"; // Luxor's exact grid colour
 const GRID_LIGHT = "#E0E2E7";
 
@@ -107,11 +109,34 @@ interface ChartRow {
   luxor: number | null;
   braiins: number | null;
   efficiency: number | null;
+  uptime: number | null;
 }
+
+/** Legend-toggleable series, matching each series' dataKey. */
+type SeriesKey = "luxor" | "braiins" | "efficiency" | "uptime";
 
 /** yyyy-MM-dd in local time, for <input type="date">. */
 const toDateInput = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+/**
+ * Re-anchor a daily bucket to the local start of the day it represents.
+ *
+ * The pools timestamp daily figures at UTC midnight, but the chart's axis and
+ * its calendar buckets are in the viewer's timezone. Plotted raw, a daily
+ * series starts one UTC offset into the window — at GMT+5 the 10 Aug uptime
+ * point landed at 05:00 on 10 Aug, leaving a visible gap before the line
+ * began. A daily value is an aggregate for a date, not an instant, so it
+ * belongs at the start of that date as the viewer reckons it.
+ */
+const toLocalDayStart = (utcMs: number) => {
+  const d = new Date(utcMs);
+  return new Date(
+    d.getUTCFullYear(),
+    d.getUTCMonth(),
+    d.getUTCDate(),
+  ).getTime();
+};
 
 export default function HashrateHistoryChart({
   poolMode = "total",
@@ -210,51 +235,148 @@ export default function HashrateHistoryChart({
     const touch = (t: number): ChartRow => {
       let row = rows.get(t);
       if (!row) {
-        row = { t, luxor: null, braiins: null, efficiency: null };
+        row = { t, luxor: null, braiins: null, efficiency: null, uptime: null };
         rows.set(t, row);
       }
       return row;
     };
 
     if (showLuxor && luxorSeries?.available) {
+      // Hashrate/efficiency are only daily on the coarser periods; 5m and 1h
+      // points are real instants and must not be re-anchored.
+      const luxorIsDaily = luxorSeries.granularity === "1d";
       for (const point of luxorSeries.points) {
-        const row = touch(point.t);
+        const row = touch(luxorIsDaily ? toLocalDayStart(point.t) : point.t);
         row.luxor = point.hashrate;
         row.efficiency = point.efficiency;
+      }
+      // Uptime is always daily, whatever tick the rest of the chart uses, so
+      // it lands on its own rows and connectNulls draws it across the finer
+      // series.
+      for (const point of luxorSeries.uptimePoints) {
+        touch(toLocalDayStart(point.t)).uptime = point.uptime;
       }
     }
 
     if (showBraiins && braiinsSeries?.available) {
+      // Braiins only ever reports daily points.
       for (const point of braiinsSeries.points) {
-        touch(point.t).braiins = point.hashrate;
+        touch(toLocalDayStart(point.t)).braiins = point.hashrate;
       }
     }
 
     return Array.from(rows.values()).sort((a, b) => a.t - b.t);
   }, [showLuxor, showBraiins, luxorSeries, braiinsSeries]);
 
-  const unit = useMemo(() => {
-    const values = chartData.flatMap((row) =>
-      [row.luxor, row.braiins].filter((v): v is number => v != null && v > 0),
-    );
-    return resolveHashrateUnit(values.length ? Math.max(...values) : 0);
-  }, [chartData]);
+  /**
+   * Series switched off by clicking the legend. Keyed by dataKey. "Available"
+   * below still means the data exists; "visible" additionally means the user
+   * hasn't hidden it.
+   */
+  const [hiddenSeries, setHiddenSeries] = useState<Set<SeriesKey>>(new Set());
+
+  const toggleSeries = useCallback((key: SeriesKey) => {
+    setHiddenSeries((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
+
+  const isHidden = (key: SeriesKey) => hiddenSeries.has(key);
 
   // Efficiency only ever comes from Luxor, and only when Luxor is on screen.
-  const showEfficiency =
+  const hasEfficiency =
     showLuxor &&
     !!luxorSeries?.available &&
     chartData.some((row) => row.efficiency != null);
 
+  // Uptime likewise: Luxor-only, and absent on windows shorter than two days
+  // because the pool serves it at a daily tick only.
+  const hasUptime =
+    showLuxor &&
+    !!luxorSeries?.available &&
+    chartData.some((row) => row.uptime != null);
+
+  const hasLuxorHashrate = showLuxor && !!luxorSeries?.available;
+  const hasBraiinsHashrate = showBraiins && !!braiinsSeries?.available;
+
+  // What is actually drawn right now. The percentage series don't need
+  // equivalents: they are rendered whenever available and switched off with
+  // recharts' `hide`, which keeps their legend entry clickable.
+  const showLuxorLine = hasLuxorHashrate && !isHidden("luxor");
+  const showBraiinsLine = hasBraiinsHashrate && !isHidden("braiins");
+
   /**
-   * How many hashrate series are actually drawn. A client on a single pool
-   * sits in "total" mode with the page's pool toggle hidden, so styling keys
-   * off this rather than poolMode.
+   * The percentage axis keys off availability, not visibility: hidden series
+   * stay mounted so their legend entry survives, and a mounted Line whose
+   * yAxisId has no matching axis breaks the chart.
    */
-  const seriesCount =
-    (showLuxor && luxorSeries?.available ? 1 : 0) +
-    (showBraiins && braiinsSeries?.available ? 1 : 0);
-  const isSingleSeries = seriesCount <= 1;
+  const hasPercentAxis = hasEfficiency || hasUptime;
+
+  // Rescale the hashrate axis to whichever hashrate series are still visible,
+  // so hiding one lets the other use the full height.
+  const unit = useMemo(() => {
+    const values = chartData.flatMap((row) =>
+      [
+        showLuxorLine ? row.luxor : null,
+        showBraiinsLine ? row.braiins : null,
+      ].filter((v): v is number => v != null && v > 0),
+    );
+    return resolveHashrateUnit(values.length ? Math.max(...values) : 0);
+  }, [chartData, showLuxorLine, showBraiinsLine]);
+
+  /**
+   * The table lists every column the data supports; the legend toggle is a
+   * chart control, so hiding a line there must not drop it from the table or
+   * the CSV export. Hence its own availability-based single-series check.
+   */
+  const isSingleAvailableSeries =
+    (hasLuxorHashrate ? 1 : 0) + (hasBraiinsHashrate ? 1 : 0) <= 1;
+
+  /**
+   * Legend entries, rendered as toggle buttons under the chart. Labels use
+   * the availability-based check so they don't rename themselves when a
+   * series is switched off.
+   */
+  const legendItems = (
+    [
+      hasLuxorHashrate && {
+        key: "luxor" as SeriesKey,
+        label: isSingleAvailableSeries
+          ? `Hashrate (${unit.label})`
+          : `Luxor (${unit.label})`,
+        color: LUXOR_COLOR,
+        dashed: false,
+      },
+      hasBraiinsHashrate && {
+        key: "braiins" as SeriesKey,
+        label: isSingleAvailableSeries
+          ? `Hashrate (${unit.label})`
+          : `Braiins (${unit.label})`,
+        color: BRAIINS_COLOR,
+        dashed: false,
+      },
+      hasEfficiency && {
+        key: "efficiency" as SeriesKey,
+        label: "Shares Efficiency",
+        color: EFFICIENCY_COLOR,
+        dashed: true,
+      },
+      hasUptime && {
+        key: "uptime" as SeriesKey,
+        label: "Uptime",
+        color: UPTIME_COLOR,
+        dashed: false,
+      },
+    ] as const
+  ).filter(Boolean) as {
+    key: SeriesKey;
+    label: string;
+    color: string;
+    dashed: boolean;
+  }[];
 
   /**
    * A line through fewer than two points draws nothing, so sparse series get
@@ -378,6 +500,7 @@ export default function HashrateHistoryChart({
       "luxor_hashrate_hs",
       "braiins_hashrate_hs",
       "luxor_efficiency_pct",
+      "luxor_uptime_pct",
     ];
     const lines = chartData.map((row) =>
       [
@@ -385,6 +508,7 @@ export default function HashrateHistoryChart({
         row.luxor ?? "",
         row.braiins ?? "",
         row.efficiency != null ? row.efficiency.toFixed(2) : "",
+        row.uptime != null ? row.uptime.toFixed(2) : "",
       ].join(","),
     );
 
@@ -422,6 +546,13 @@ export default function HashrateHistoryChart({
 
   const notes = [
     showBraiins && braiinsSeries?.available ? braiinsSeries.note : null,
+    // Luxor's uptime endpoint accepts a daily tick only, so short windows
+    // (the 1D view, or a one-day custom range) cannot show it at all.
+    // Availability, not visibility — otherwise toggling Uptime off in the
+    // legend would wrongly claim the period cannot show it.
+    showLuxor && luxorSeries?.available && !hasUptime
+      ? "Uptime is not shown for this period — the pool publishes it once per day, so it needs a range of at least two days."
+      : null,
     history?.downgradedFrom
       ? `Showing ${history.tickSize} resolution — the pool only serves ${history.downgradedFrom} data for recent dates.`
       : null,
@@ -458,7 +589,17 @@ export default function HashrateHistoryChart({
           variant="h6"
           sx={{ fontWeight: 600, fontSize: { xs: "1rem", sm: "1.15rem" } }}
         >
-          Hashrate {showEfficiency ? "& Shares Efficiency" : ""}
+          {/* "A", "A & B", "A, B & C" — not "A & B & C". */}
+          {(() => {
+            const parts = [
+              "Hashrate",
+              hasEfficiency && "Shares Efficiency",
+              hasUptime && "Uptime",
+            ].filter(Boolean) as string[];
+            return parts.length > 1
+              ? `${parts.slice(0, -1).join(", ")} & ${parts[parts.length - 1]}`
+              : parts[0];
+          })()}
         </Typography>
 
         <Box
@@ -778,7 +919,7 @@ export default function HashrateHistoryChart({
                 domain={["auto", "auto"]}
               />
 
-              {showEfficiency && (
+              {hasPercentAxis && (
                 <YAxis
                   yAxisId="efficiency"
                   orientation="right"
@@ -808,7 +949,7 @@ export default function HashrateHistoryChart({
                 labelFormatter={(value) => formatTimestamp(Number(value))}
                 formatter={(value, name) => {
                   const numeric = Number(value);
-                  if (name === "Shares Efficiency") {
+                  if (name === "Shares Efficiency" || name === "Uptime") {
                     return [`${numeric.toFixed(2)} %`, name];
                   }
                   // The series name already carries the unit for the legend;
@@ -821,51 +962,56 @@ export default function HashrateHistoryChart({
                 }}
               />
 
-              <Legend wrapperStyle={{ fontSize: "0.8rem" }} iconType="line" />
+              {/* Legend is rendered below the chart as real toggle buttons —
+                  see legendItems. Recharts' own legend had no room for a
+                  readable "off" state. */}
 
-              {showLuxor && luxorSeries?.available && (
+              {hasLuxorHashrate && (
                 <Area
                   yAxisId="hashrate"
                   type="monotone"
                   dataKey="luxor"
+                  hide={isHidden("luxor")}
                   name={
-                    isSingleSeries
+                    isSingleAvailableSeries
                       ? `Hashrate (${unit.label})`
                       : `Luxor (${unit.label})`
                   }
                   stroke={LUXOR_COLOR}
                   strokeWidth={2}
                   fill="url(#hashrateFillLuxor)"
-                  dot={sparseDot(luxorSeries.points.length)}
+                  dot={sparseDot(luxorSeries!.points.length)}
                   connectNulls
                   activeDot={{ r: 4 }}
                 />
               )}
 
-              {showBraiins && braiinsSeries?.available && (
+              {hasBraiinsHashrate && (
                 <Area
                   yAxisId="hashrate"
                   type="monotone"
                   dataKey="braiins"
+                  hide={isHidden("braiins")}
                   name={
-                    isSingleSeries
+                    isSingleAvailableSeries
                       ? `Hashrate (${unit.label})`
                       : `Braiins (${unit.label})`
                   }
                   stroke={BRAIINS_COLOR}
                   strokeWidth={2}
                   fill="url(#hashrateFillBraiins)"
-                  dot={sparseDot(braiinsSeries.points.length)}
+                  dot={sparseDot(braiinsSeries!.points.length)}
                   connectNulls
                   activeDot={{ r: 4 }}
                 />
               )}
 
-              {showEfficiency && (
+              {hasEfficiency && (
                 <Line
                   yAxisId="efficiency"
                   type="monotone"
                   dataKey="efficiency"
+                  hide={isHidden("efficiency")}
                   name="Shares Efficiency"
                   stroke={EFFICIENCY_COLOR}
                   strokeWidth={2}
@@ -879,8 +1025,85 @@ export default function HashrateHistoryChart({
                   activeDot={{ r: 4 }}
                 />
               )}
+
+              {hasUptime && (
+                <Line
+                  yAxisId="efficiency"
+                  type="monotone"
+                  dataKey="uptime"
+                  hide={isHidden("uptime")}
+                  name="Uptime"
+                  stroke={UPTIME_COLOR}
+                  strokeWidth={2}
+                  // Solid, to stay distinguishable from the dashed efficiency
+                  // line it shares the percentage axis with.
+                  isAnimationActive={false}
+                  dot={false}
+                  connectNulls
+                  activeDot={{ r: 4 }}
+                />
+              )}
             </ComposedChart>
           </ResponsiveContainer>
+
+          {/* Series toggles. Deliberately buttons rather than recharts' own
+              legend: an "off" entry has to stay clearly readable, not fade
+              out, so it still looks like something you can switch back on. */}
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "center",
+              flexWrap: "wrap",
+              gap: 1,
+              mt: 1.5,
+            }}
+          >
+            {legendItems.map((item) => {
+              const off = isHidden(item.key);
+              return (
+                <ButtonBase
+                  key={item.key}
+                  onClick={() => toggleSeries(item.key)}
+                  aria-pressed={!off}
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 0.75,
+                    px: 1.25,
+                    py: 0.5,
+                    borderRadius: 999,
+                    fontSize: "0.78rem",
+                    fontWeight: 500,
+                    lineHeight: 1.6,
+                    border: "1px solid",
+                    borderColor: off ? "divider" : item.color,
+                    backgroundColor: off
+                      ? "transparent"
+                      : alpha(item.color, isDark ? 0.22 : 0.1),
+                    color: off ? "text.secondary" : "text.primary",
+                    transition: "background-color .15s, border-color .15s",
+                    "&:hover": {
+                      backgroundColor: alpha(item.color, isDark ? 0.3 : 0.18),
+                      borderColor: item.color,
+                    },
+                  }}
+                >
+                  <Box
+                    component="span"
+                    sx={{
+                      width: 16,
+                      borderTop: "3px",
+                      borderTopStyle: item.dashed ? "dashed" : "solid",
+                      borderTopColor: off
+                        ? theme.palette.action.disabled
+                        : item.color,
+                    }}
+                  />
+                  {item.label}
+                </ButtonBase>
+              );
+            })}
+          </Box>
         </Box>
       )}
 
@@ -892,19 +1115,24 @@ export default function HashrateHistoryChart({
                 <TableCell sx={{ fontWeight: 600 }}>
                   {timestampHeader}
                 </TableCell>
-                {showLuxor && luxorSeries?.available && (
+                {hasLuxorHashrate && (
                   <TableCell align="right" sx={{ fontWeight: 600 }}>
-                    {isSingleSeries ? "Hashrate" : "Luxor"}
+                    {isSingleAvailableSeries ? "Hashrate" : "Luxor"}
                   </TableCell>
                 )}
-                {showBraiins && braiinsSeries?.available && (
+                {hasBraiinsHashrate && (
                   <TableCell align="right" sx={{ fontWeight: 600 }}>
-                    {isSingleSeries ? "Hashrate" : "Braiins"}
+                    {isSingleAvailableSeries ? "Hashrate" : "Braiins"}
                   </TableCell>
                 )}
-                {showEfficiency && (
+                {hasEfficiency && (
                   <TableCell align="right" sx={{ fontWeight: 600 }}>
                     Shares Efficiency
+                  </TableCell>
+                )}
+                {hasUptime && (
+                  <TableCell align="right" sx={{ fontWeight: 600 }}>
+                    Uptime
                   </TableCell>
                 )}
               </TableRow>
@@ -913,25 +1141,30 @@ export default function HashrateHistoryChart({
               {[...chartData].reverse().map((row) => (
                 <TableRow key={row.t} hover>
                   <TableCell>{formatTimestamp(row.t)}</TableCell>
-                  {showLuxor && luxorSeries?.available && (
+                  {hasLuxorHashrate && (
                     <TableCell align="right">
                       {row.luxor != null
                         ? `${(row.luxor / unit.divisor).toFixed(2)} ${unit.label}`
                         : "—"}
                     </TableCell>
                   )}
-                  {showBraiins && braiinsSeries?.available && (
+                  {hasBraiinsHashrate && (
                     <TableCell align="right">
                       {row.braiins != null
                         ? `${(row.braiins / unit.divisor).toFixed(2)} ${unit.label}`
                         : "—"}
                     </TableCell>
                   )}
-                  {showEfficiency && (
+                  {hasEfficiency && (
                     <TableCell align="right">
                       {row.efficiency != null
                         ? `${row.efficiency.toFixed(2)} %`
                         : "—"}
+                    </TableCell>
+                  )}
+                  {hasUptime && (
+                    <TableCell align="right">
+                      {row.uptime != null ? `${row.uptime.toFixed(2)} %` : "—"}
                     </TableCell>
                   )}
                 </TableRow>

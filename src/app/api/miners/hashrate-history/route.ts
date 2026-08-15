@@ -11,6 +11,7 @@ import {
   fetchBraiinsSeries,
   fetchLuxorEarliestData,
   fetchLuxorSeries,
+  fetchLuxorUptime,
 } from "@/lib/hashrateHistory";
 
 /**
@@ -166,49 +167,81 @@ export async function GET(request: NextRequest) {
     const emptySeries = (): PoolSeries => ({
       available: false,
       points: [],
+      uptimePoints: [],
       granularity: tick,
       hasEfficiency: false,
+      hasUptime: false,
     });
 
+    /**
+     * Luxor only serves uptime at a daily tick, so a window shorter than two
+     * days would yield a single point — not a line. Those windows (the 1D
+     * view, and any one-day custom range) skip the call and the UI explains
+     * why instead.
+     */
+    const wantUptime =
+      (end.getTime() - start.getTime()) / 86_400_000 >= 2 && !!luxorAuth;
+
     const luxor: PoolSeries = luxorAuth
-      ? { ...emptySeries(), available: true, hasEfficiency: true }
+      ? {
+          ...emptySeries(),
+          available: true,
+          hasEfficiency: true,
+          hasUptime: wantUptime,
+        }
       : emptySeries();
     const braiins: PoolSeries = braiinsAuth
       ? {
           ...emptySeries(),
           available: true,
           granularity: "1d",
-          note: "Braiins reports one hashrate point per day and does not publish share efficiency.",
+          note: "Braiins reports one hashrate point per day and does not publish share efficiency or uptime.",
         }
       : emptySeries();
 
     // Fetch both pools concurrently; one failing must not blank the other.
-    const [luxorResult, braiinsResult, earliestLuxor] = await Promise.all([
-      luxorAuth
-        ? fetchLuxorSeries(luxorAuth.authKey, window, tick).catch((error) => {
-            console.error("[Hashrate History API] Luxor fetch failed:", error);
-            return error instanceof Error
-              ? error
-              : new Error("Luxor fetch failed");
-          })
-        : Promise.resolve(null),
-      braiinsAuth
-        ? fetchBraiinsSeries(braiinsAuth.authKey, targetUserId, window).catch(
-            (error) => {
+    const [luxorResult, braiinsResult, earliestLuxor, uptimeResult] =
+      await Promise.all([
+        luxorAuth
+          ? fetchLuxorSeries(luxorAuth.authKey, window, tick).catch((error) => {
               console.error(
-                "[Hashrate History API] Braiins fetch failed:",
+                "[Hashrate History API] Luxor fetch failed:",
                 error,
               );
               return error instanceof Error
                 ? error
-                : new Error("Braiins fetch failed");
-            },
-          )
-        : Promise.resolve(null),
-      luxorAuth
-        ? fetchLuxorEarliestData(luxorAuth.authKey)
-        : Promise.resolve(null),
-    ]);
+                : new Error("Luxor fetch failed");
+            })
+          : Promise.resolve(null),
+        braiinsAuth
+          ? fetchBraiinsSeries(braiinsAuth.authKey, targetUserId, window).catch(
+              (error) => {
+                console.error(
+                  "[Hashrate History API] Braiins fetch failed:",
+                  error,
+                );
+                return error instanceof Error
+                  ? error
+                  : new Error("Braiins fetch failed");
+              },
+            )
+          : Promise.resolve(null),
+        luxorAuth
+          ? fetchLuxorEarliestData(luxorAuth.authKey)
+          : Promise.resolve(null),
+        wantUptime && luxorAuth
+          ? fetchLuxorUptime(luxorAuth.authKey, window).catch((error) => {
+              // Uptime is supplementary: log and carry on with the other series.
+              console.error(
+                "[Hashrate History API] Uptime fetch failed:",
+                error,
+              );
+              return [];
+            })
+          : Promise.resolve([]),
+      ]);
+
+    luxor.uptimePoints = uptimeResult;
 
     if (Array.isArray(luxorResult)) {
       luxor.points = luxorResult;

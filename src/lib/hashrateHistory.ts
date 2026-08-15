@@ -44,14 +44,28 @@ export interface HashratePoint {
   efficiency: number | null;
 }
 
+export interface UptimePoint {
+  /** Epoch milliseconds (UTC), always a day boundary. */
+  t: number;
+  /** Uptime as a percentage (0-100). */
+  uptime: number;
+}
+
 export interface PoolSeries {
   /** False when the user has no auth for this pool. */
   available: boolean;
   points: HashratePoint[];
+  /**
+   * Uptime is a separate series because the pool only serves it daily, so its
+   * timestamps rarely line up with the hashrate points (which may be 5m/1h).
+   */
+  uptimePoints: UptimePoint[];
   /** Finest granularity this pool actually returned. */
   granularity: TickSize;
   /** Whether this pool reports share efficiency at all. */
   hasEfficiency: boolean;
+  /** Whether this pool reports uptime at all. */
+  hasUptime: boolean;
   /** Human-readable caveat to surface in the UI, if any. */
   note?: string;
   /** Set when the pool call failed; the other pool can still render. */
@@ -133,6 +147,62 @@ export async function fetchLuxorSeries(
     pageNumber++;
 
     // Defensive: never spin more than 20 pages (20k points) on one window.
+    if (pageNumber > 20) break;
+  }
+
+  return points
+    .filter((p) => p.t >= window.start.getTime() && p.t <= window.end.getTime())
+    .sort((a, b) => a.t - b.t);
+}
+
+/**
+ * Fetch a Luxor subaccount's uptime series.
+ *
+ * ⚠️ VERIFIED 2026-08-14: /pool/uptime/BTC accepts ONLY tick_size 1d|1w|1M.
+ * Both 5m and 1h are rejected outright ("Invalid option: expected one of
+ * 1d|1w|1M"), so uptime has no intraday resolution at all — it is always
+ * fetched daily and overlaid on whatever tick the hashrate chart is using.
+ * `uptime` comes back as a 0..1 fraction, like efficiency, and is scaled to
+ * percent here. Paginates identically to hashrate-efficiency and reaches back
+ * to the subaccount's first hashing day.
+ */
+export async function fetchLuxorUptime(
+  subaccountName: string,
+  window: Window,
+): Promise<UptimePoint[]> {
+  const from = window.start < DATA_FLOOR ? DATA_FLOOR : window.start;
+  const paddedStart = new Date(from.getTime() - 86_400_000);
+  const startDate = toApiDate(
+    paddedStart < DATA_FLOOR ? DATA_FLOOR : paddedStart,
+  );
+
+  const now = new Date();
+  const endDate = toApiDate(window.end > now ? now : window.end);
+
+  const client = createLuxorClient(subaccountName);
+  const points: UptimePoint[] = [];
+
+  let pageNumber = 1;
+  let hasMore = true;
+
+  while (hasMore) {
+    const response = await client.getUptime("BTC", {
+      subaccount_names: subaccountName,
+      start_date: startDate,
+      end_date: endDate,
+      tick_size: "1d",
+      page_size: 1000,
+      page_number: pageNumber,
+    });
+
+    for (const point of response.uptime || []) {
+      const t = new Date(point.date_time).getTime();
+      if (!Number.isFinite(t) || typeof point.uptime !== "number") continue;
+      points.push({ t, uptime: point.uptime * 100 });
+    }
+
+    hasMore = response.pagination?.next_page_url != null;
+    pageNumber++;
     if (pageNumber > 20) break;
   }
 
