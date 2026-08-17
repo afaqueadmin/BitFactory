@@ -1,13 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyJwtToken } from "@/lib/jwt";
 import { prisma } from "@/lib/prisma";
-import {
-  createLuxorClient,
-  RevenueResponse,
-  RevenueData,
-  LuxorError,
-} from "@/lib/luxor";
-import { createBraiinsClient } from "@/lib/braiins";
+import { toUtcDateOnly } from "@/lib/services/paybackSnapshotService";
 
 interface DailyPerformanceData {
   date: string;
@@ -23,8 +17,18 @@ interface DailyPerformanceData {
 
 /**
  * GET /api/mining/daily-performance?days=10
- * Fetches daily mining revenue data from Luxor API /pool/revenue/BTC endpoint
- * Returns 10 days of earnings data for the user's Luxor subaccount
+ * GET /api/mining/daily-performance?granularity=monthly
+ *
+ * Revenue breakdown for the dashboard's "Mining Performance" chart, read
+ * from PoolSubaccountDailySnapshot (populated by /api/cron_pool_daily_snapshot)
+ * instead of calling Luxor/Braiins live.
+ *
+ * Daily mode: window is [yesterday - days, yesterday]. Monthly mode: every
+ * fully-closed calendar month since data began, one bucket per month. Both
+ * modes exclude anything not yet closed — the daily window never reaches
+ * "today", and the monthly bucketing explicitly drops the current
+ * in-progress month — so every bucket returned is already finalized and no
+ * live fallback is needed.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -34,7 +38,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Verify token and extract user ID
     let userId: string;
     try {
       const decoded = await verifyJwtToken(token);
@@ -47,36 +50,53 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
 
-    // Get days parameter from query (default to 10 days)
-    const daysParam = request.nextUrl.searchParams.get("days");
-    const days = parseInt(daysParam || "10", 10);
+    const granularityParam = request.nextUrl.searchParams.get("granularity");
+    const granularity = granularityParam === "monthly" ? "monthly" : "daily";
 
-    if (isNaN(days) || days < 1 || days > 365) {
-      return NextResponse.json(
-        { error: "Days must be between 1 and 365" },
-        { status: 400 },
-      );
+    const today = toUtcDateOnly(new Date());
+    const yesterday = new Date(today);
+    yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+
+    let startDate: Date;
+    let days = 0;
+
+    if (granularity === "daily") {
+      const daysParam = request.nextUrl.searchParams.get("days");
+      days = parseInt(daysParam || "10", 10);
+
+      if (isNaN(days) || days < 1 || days > 365) {
+        return NextResponse.json(
+          { error: "Days must be between 1 and 365" },
+          { status: 400 },
+        );
+      }
+
+      // Same window the live route used: yesterday, then back `days` more
+      // days (so the range is actually `days + 1` days inclusive — matches
+      // the original route's exact math: startDate = yesterday - days).
+      startDate = new Date(yesterday);
+      startDate.setUTCDate(startDate.getUTCDate() - days);
+    } else {
+      // Monthly: every fully-closed month since real data began. No fixed
+      // floor needed here — the query just returns whatever exists.
+      startDate = new Date("2020-01-01T00:00:00.000Z");
     }
 
     console.log(
-      `[Mining Performance API] Fetching ${days} days of mining revenue data for user ${userId}`,
+      granularity === "daily"
+        ? `[Mining Performance API] Reading ${days} days of DB revenue data for user ${userId}`
+        : `[Mining Performance API] Reading monthly DB revenue data for user ${userId}`,
     );
 
-    // Get PoolAuth entries for this user (contains API keys). Which pools
-    // are active is determined directly from PoolAuth, not from
-    // Miner.poolId - a Braiins/Luxor account is authenticated independently
-    // of whether any Miner row happens to be tagged with that pool.
-    const poolAuths = await prisma.poolAuth.findMany({
-      where: { userId },
-      include: { pool: { select: { id: true, name: true } } },
+    const subaccounts = await prisma.poolSubaccount.findMany({
+      where: { userId, pool: { name: { in: ["Luxor", "Braiins"] } } },
+      include: { pool: { select: { name: true } } },
     });
 
-    if (!poolAuths || poolAuths.length === 0) {
+    if (subaccounts.length === 0) {
       console.warn(
-        `[Mining Performance API] User ${userId} has no pool accounts configured`,
+        `[Mining Performance API] User ${userId} has no pool subaccounts`,
       );
-      // Return empty successful response so frontend components can render
-      // a friendly 'no data' message instead of an error.
       return NextResponse.json(
         {
           success: true,
@@ -95,144 +115,62 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const luxorAuth = poolAuths.find((auth) =>
-      auth.pool.name.toLowerCase().includes("luxor"),
-    );
-    const braiinsAuth = poolAuths.find((auth) =>
-      auth.pool.name.toLowerCase().includes("braiins"),
+    const poolNameBySubaccountId = new Map(
+      subaccounts.map((s) => [s.id, s.pool.name]),
     );
 
-    // Calculate start_date and end_date
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const startDate = new Date(yesterday);
-    startDate.setDate(startDate.getDate() - days);
+    const snapshots = await prisma.poolSubaccountDailySnapshot.findMany({
+      where: {
+        poolSubaccountId: { in: subaccounts.map((s) => s.id) },
+        date: { gte: startDate, lte: yesterday },
+      },
+    });
 
-    const formatDate = (date: Date) => {
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, "0");
-      const day = String(date.getDate()).padStart(2, "0");
-      return `${year}-${month}-${day}`;
-    };
+    // Monthly bucket key ("2026-08") vs daily ("2026-08-17") — the current,
+    // still-open month is excluded explicitly below rather than relying on
+    // the `lte: yesterday` query bound, since yesterday can still fall
+    // inside the current month.
+    const currentMonthKey = today.toISOString().slice(0, 7);
+    const bucketKey = (date: Date) =>
+      granularity === "monthly"
+        ? date.toISOString().slice(0, 7)
+        : date.toISOString().split("T")[0];
 
-    const startDateStr = formatDate(startDate);
-    const endDateStr = formatDate(yesterday);
-
-    console.log(
-      `[Mining Performance API] Fetching revenue from ${startDateStr} to ${endDateStr}`,
-    );
-
-    // Map to store daily performance data by date
     const performanceByDate: Map<
       string,
       { luxor: number; braiins: number; luxorRebate: number }
     > = new Map();
 
-    // Fetch from Luxor
-    if (luxorAuth) {
-      try {
-        const authKey = luxorAuth.authKey;
-        console.log(
-          `[Mining Performance API] Fetching Luxor revenue for auth key: ${authKey}`,
-        );
-        const luxorClient = createLuxorClient(authKey);
-        const revenueResponse = await luxorClient.getRevenue("BTC", {
-          subaccount_names: authKey,
-          start_date: startDateStr,
-          end_date: endDateStr,
-        });
+    for (const snap of snapshots) {
+      const key = bucketKey(snap.date);
+      if (granularity === "monthly" && key === currentMonthKey) continue;
 
-        if (revenueResponse && Array.isArray(revenueResponse.revenue)) {
-          for (const item of revenueResponse.revenue) {
-            if (item && typeof item === "object") {
-              const dateStr =
-                item.date_time && typeof item.date_time === "string"
-                  ? item.date_time.split("T")[0]
-                  : null;
+      const poolName = poolNameBySubaccountId.get(snap.poolSubaccountId);
 
-              if (!dateStr) continue;
+      if (!performanceByDate.has(key)) {
+        performanceByDate.set(key, { luxor: 0, braiins: 0, luxorRebate: 0 });
+      }
+      const dayData = performanceByDate.get(key)!;
 
-              let btcRevenue = 0;
-              let revenueType = "";
-              if (item.revenue && typeof item.revenue === "object") {
-                const revenueObj = item.revenue as Record<string, unknown>;
-                btcRevenue = Number(revenueObj.revenue || 0) || 0;
-                revenueType = String(revenueObj.revenue_type || "");
-              }
-
-              if (!performanceByDate.has(dateStr)) {
-                performanceByDate.set(dateStr, {
-                  luxor: 0,
-                  braiins: 0,
-                  luxorRebate: 0,
-                });
-              }
-              const dayData = performanceByDate.get(dateStr)!;
-              if (revenueType === "LUXOS_REBATE") {
-                dayData.luxorRebate += btcRevenue;
-              } else {
-                // MINING and REFERRAL are combined into base revenue
-                dayData.luxor += btcRevenue;
-              }
-            }
-          }
-        }
-      } catch (error) {
-        console.error(
-          `[Mining Performance API] Error fetching Luxor revenue:`,
-          error,
-        );
+      if (poolName === "Luxor") {
+        // Matches the live route's grouping: MINING + REFERRAL combined into
+        // the base "luxor" bar, LUXOS_REBATE (stored in otherRevenue) stacked
+        // separately.
+        dayData.luxor +=
+          Number(snap.miningRevenue) + Number(snap.referralRevenue);
+        dayData.luxorRebate += Number(snap.otherRevenue);
+      } else if (poolName === "Braiins") {
+        dayData.braiins += Number(snap.totalRevenue);
       }
     }
 
-    // Fetch from Braiins
-    if (braiinsAuth) {
-      try {
-        const authKey = braiinsAuth.authKey;
-        console.log(
-          `[Mining Performance API] Fetching Braiins daily hashrate/rewards for auth key: ${authKey}`,
-        );
-        const braiinsClient = createBraiinsClient(authKey);
-        const rewards = await braiinsClient.getDailyRewards({
-          from: startDateStr,
-          to: endDateStr,
-        });
-
-        if (rewards?.btc?.daily_rewards) {
-          for (const reward of rewards.btc.daily_rewards) {
-            // Convert Unix timestamp to ISO date string
-            const date = new Date(reward.date * 1000);
-            const year = date.getFullYear();
-            const month = String(date.getMonth() + 1).padStart(2, "0");
-            const day = String(date.getDate()).padStart(2, "0");
-            const dateStr = `${year}-${month}-${day}`;
-            const amount = parseFloat(reward.total_reward) || 0;
-
-            if (!performanceByDate.has(dateStr)) {
-              performanceByDate.set(dateStr, {
-                luxor: 0,
-                braiins: 0,
-                luxorRebate: 0,
-              });
-            }
-            const dayData = performanceByDate.get(dateStr)!;
-            dayData.braiins += amount;
-          }
-        }
-      } catch (error) {
-        console.error(
-          `[Mining Performance API] Error fetching Braiins rewards:`,
-          error,
-        );
-      }
-    }
-
-    // Convert map to array and sort
     const performanceData: DailyPerformanceData[] = Array.from(
       performanceByDate.entries(),
     )
-      .map(([date, data]) => ({
-        date,
+      .map(([key, data]) => ({
+        // Monthly buckets are keyed "YYYY-MM"; normalize to the month's
+        // first day so the frontend's Date parsing works the same either way.
+        date: granularity === "monthly" ? `${key}-01` : key,
         earnings: data.luxor + data.braiins + data.luxorRebate,
         costs: 0,
         hashRate: 0,
@@ -244,7 +182,6 @@ export async function GET(request: NextRequest) {
       }))
       .sort((a, b) => a.date.localeCompare(b.date));
 
-    // Calculate summary statistics
     const totalEarnings = performanceData.reduce(
       (sum, d) => sum + d.earnings,
       0,
@@ -265,7 +202,7 @@ export async function GET(request: NextRequest) {
       performanceData.length > 0 ? totalEarnings / performanceData.length : 0;
 
     console.log(
-      `[Mining Performance API] Returning ${performanceData.length} days of revenue data`,
+      `[Mining Performance API] Returning ${performanceData.length} days of DB revenue data`,
     );
 
     return NextResponse.json(
@@ -289,21 +226,6 @@ export async function GET(request: NextRequest) {
       { status: 200 },
     );
   } catch (error) {
-    // Handle LuxorError specifically
-    if (error instanceof LuxorError) {
-      console.error(
-        `[Mining Performance API] Luxor API error (${error.statusCode}): ${error.message}`,
-      );
-      return NextResponse.json(
-        {
-          success: false,
-          error: error.message,
-          details: error.errorDetails,
-        },
-        { status: error.statusCode || 500 },
-      );
-    }
-
     console.error("[Mining Performance API] Error:", error);
     return NextResponse.json(
       {
@@ -311,7 +233,7 @@ export async function GET(request: NextRequest) {
         error:
           error instanceof Error
             ? error.message
-            : "Failed to fetch mining performance data from Luxor API",
+            : "Failed to fetch mining performance data",
       },
       { status: 500 },
     );

@@ -243,6 +243,151 @@ export const sendCronRunSuccessfulEmail = async (userCount: number) => {
   }
 };
 
+interface PoolCronDaySummary {
+  date: string;
+  results: Array<{
+    pool: string;
+    subaccountName: string;
+    status: "written" | "skipped" | "error";
+    error?: string;
+  }>;
+}
+
+/**
+ * Sends a per-run summary for the pool-history crons (subaccount daily
+ * snapshot, and later worker/transaction crons) — every run, not just
+ * failures, so a missed/silently-broken run is visible by its absence
+ * rather than needing to be noticed in Vercel's logs.
+ */
+export const sendPoolCronSummaryEmail = async (params: {
+  cronName: string;
+  days: PoolCronDaySummary[];
+}) => {
+  const { cronName, days } = params;
+  const date = new Date();
+
+  const allResults = days.flatMap((d) => d.results);
+  const written = allResults.filter((r) => r.status === "written").length;
+  const skipped = allResults.filter((r) => r.status === "skipped").length;
+  const errors = allResults.filter((r) => r.status === "error");
+
+  const errorRows = errors
+    .map(
+      (e) =>
+        `<li>${e.pool}/${e.subaccountName}: ${e.error || "unknown error"}</li>`,
+    )
+    .join("");
+
+  const dayRows = days
+    .map((d) => {
+      const dayWritten = d.results.filter((r) => r.status === "written").length;
+      const daySkipped = d.results.filter((r) => r.status === "skipped").length;
+      const dayErrors = d.results.filter((r) => r.status === "error").length;
+      return `<li>${d.date}: ${dayWritten} written, ${daySkipped} skipped, ${dayErrors} error(s)</li>`;
+    })
+    .join("");
+
+  const mailOptions = {
+    from:
+      `BitFactory Admin <${process.env.SMTP_FROM}>` || "noreply@bitfactory.com",
+    to: process.env.SMTP_USER,
+    subject: `${errors.length > 0 ? "⚠️ " : ""}Cron run: ${cronName} - BitFactory`,
+    html: `
+      <h1>${cronName}</h1>
+      <p>Ran at ${date.toISOString()}.</p>
+      <p><strong>${written}</strong> written, <strong>${skipped}</strong> already up to date, <strong>${errors.length}</strong> error(s).</p>
+      <h3>Per day</h3>
+      <ul>${dayRows}</ul>
+      ${
+        errors.length > 0
+          ? `<h3 style="color:#c62828;">Errors</h3><ul>${errorRows}</ul>`
+          : ""
+      }
+      <br>
+      <p>Best regards,</p>
+      <p>The BitFactory Team</p>
+    `,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    return { success: true };
+  } catch (error) {
+    console.error(`Error sending ${cronName} summary email:`, error);
+    return { success: false, error };
+  }
+};
+
+interface RangeCronSectionSummary {
+  subaccountName: string;
+  status: "written" | "error";
+  fetched: number;
+  written: number;
+  error?: string;
+}
+
+/**
+ * Summary email for cron_pool_worker_transactions — its two fetches
+ * (worker-level metrics, transaction ledger) each cover a date RANGE per
+ * subaccount in one call, rather than one row per day like the other pool
+ * crons, so the report is shaped around "per subaccount, per section"
+ * rather than "per day".
+ */
+export const sendWorkerTransactionCronSummaryEmail = async (params: {
+  startDate: string;
+  endDate: string;
+  workerResults: RangeCronSectionSummary[];
+  transactionResults: RangeCronSectionSummary[];
+}) => {
+  const { startDate, endDate, workerResults, transactionResults } = params;
+  const date = new Date();
+
+  const section = (label: string, results: RangeCronSectionSummary[]) => {
+    const totalFetched = results.reduce((sum, r) => sum + r.fetched, 0);
+    const totalWritten = results.reduce((sum, r) => sum + r.written, 0);
+    const errors = results.filter((r) => r.status === "error");
+    const errorRows = errors
+      .map((e) => `<li>${e.subaccountName}: ${e.error || "unknown error"}</li>`)
+      .join("");
+    return `
+      <h3>${label}</h3>
+      <p>${results.length} subaccount(s) checked, ${totalFetched} row(s) fetched, ${totalWritten} new row(s) written, ${errors.length} error(s).</p>
+      ${errors.length > 0 ? `<ul style="color:#c62828;">${errorRows}</ul>` : ""}
+    `;
+  };
+
+  const hasErrors =
+    workerResults.some((r) => r.status === "error") ||
+    transactionResults.some((r) => r.status === "error");
+
+  const mailOptions = {
+    from:
+      `BitFactory Admin <${process.env.SMTP_FROM}>` || "noreply@bitfactory.com",
+    to: process.env.SMTP_USER,
+    subject: `${hasErrors ? "⚠️ " : ""}Cron run: cron_pool_worker_transactions - BitFactory`,
+    html: `
+      <h1>cron_pool_worker_transactions</h1>
+      <p>Ran at ${date.toISOString()}, covering ${startDate} to ${endDate}.</p>
+      ${section("Worker-level metrics", workerResults)}
+      ${section("Transactions", transactionResults)}
+      <br>
+      <p>Best regards,</p>
+      <p>The BitFactory Team</p>
+    `,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    return { success: true };
+  } catch (error) {
+    console.error(
+      "Error sending cron_pool_worker_transactions summary email:",
+      error,
+    );
+    return { success: false, error };
+  }
+};
+
 // Send invoice cancellation email
 export const sendInvoiceCancellationEmail = async (
   email: string,

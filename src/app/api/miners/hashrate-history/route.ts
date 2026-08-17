@@ -164,6 +164,20 @@ export async function GET(request: NextRequest) {
     if (luxorAuth) activePoolNames.push("Luxor");
     if (braiinsAuth) activePoolNames.push("Braiins");
 
+    // Resolve each active pool's PoolSubaccount row so the DB-backed portion
+    // of the series can be queried directly by id. A user with no
+    // PoolSubaccount row yet (e.g. added after the last cron sync) simply
+    // falls back to the fully-live path — see the `poolSubaccountId: null`
+    // branches in hashrateHistory.ts.
+    const poolSubaccounts = await prisma.poolSubaccount.findMany({
+      where: { userId: targetUserId },
+      include: { pool: { select: { name: true } } },
+    });
+    const luxorPoolSubaccountId =
+      poolSubaccounts.find((s) => s.pool.name === "Luxor")?.id ?? null;
+    const braiinsPoolSubaccountId =
+      poolSubaccounts.find((s) => s.pool.name === "Braiins")?.id ?? null;
+
     const emptySeries = (): PoolSeries => ({
       available: false,
       points: [],
@@ -174,13 +188,17 @@ export async function GET(request: NextRequest) {
     });
 
     /**
-     * Luxor only serves uptime at a daily tick, so a window shorter than two
-     * days would yield a single point — not a line. Those windows (the 1D
-     * view, and any one-day custom range) skip the call and the UI explains
-     * why instead.
+     * Luxor only serves uptime once a UTC day has fully closed, so a window
+     * that never reaches back past "today" (the live 1D view, or a custom
+     * range starting today) has nothing to show and skips the call — the UI
+     * explains why instead. A window that reaches even one day back (e.g.
+     * the live 1W view a few hours into a new week) is attempted: whatever
+     * closed day(s) it contains render as dots even if there's only one.
      */
-    const wantUptime =
-      (end.getTime() - start.getTime()) / 86_400_000 >= 2 && !!luxorAuth;
+    const todayStart = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+    );
+    const wantUptime = start.getTime() < todayStart.getTime() && !!luxorAuth;
 
     const luxor: PoolSeries = luxorAuth
       ? {
@@ -203,7 +221,12 @@ export async function GET(request: NextRequest) {
     const [luxorResult, braiinsResult, earliestLuxor, uptimeResult] =
       await Promise.all([
         luxorAuth
-          ? fetchLuxorSeries(luxorAuth.authKey, window, tick).catch((error) => {
+          ? fetchLuxorSeries(
+              luxorAuth.authKey,
+              window,
+              tick,
+              luxorPoolSubaccountId,
+            ).catch((error) => {
               console.error(
                 "[Hashrate History API] Luxor fetch failed:",
                 error,
@@ -214,23 +237,30 @@ export async function GET(request: NextRequest) {
             })
           : Promise.resolve(null),
         braiinsAuth
-          ? fetchBraiinsSeries(braiinsAuth.authKey, targetUserId, window).catch(
-              (error) => {
-                console.error(
-                  "[Hashrate History API] Braiins fetch failed:",
-                  error,
-                );
-                return error instanceof Error
-                  ? error
-                  : new Error("Braiins fetch failed");
-              },
-            )
+          ? fetchBraiinsSeries(
+              braiinsAuth.authKey,
+              targetUserId,
+              window,
+              braiinsPoolSubaccountId,
+            ).catch((error) => {
+              console.error(
+                "[Hashrate History API] Braiins fetch failed:",
+                error,
+              );
+              return error instanceof Error
+                ? error
+                : new Error("Braiins fetch failed");
+            })
           : Promise.resolve(null),
         luxorAuth
           ? fetchLuxorEarliestData(luxorAuth.authKey)
           : Promise.resolve(null),
         wantUptime && luxorAuth
-          ? fetchLuxorUptime(luxorAuth.authKey, window).catch((error) => {
+          ? fetchLuxorUptime(
+              luxorAuth.authKey,
+              window,
+              luxorPoolSubaccountId,
+            ).catch((error) => {
               // Uptime is supplementary: log and carry on with the other series.
               console.error(
                 "[Hashrate History API] Uptime fetch failed:",

@@ -63,6 +63,13 @@ interface UseHashrateHistoryArgs {
   isLive: boolean;
   /** Privileged: admins and the owning franchisee. Omit for own data. */
   userId?: string;
+  /**
+   * Scope to a single miner's worker-level series instead of the whole
+   * subaccount. When set, hits /api/miners/[minerId]/hashrate-history and
+   * `userId` is ignored — ownership is resolved server-side from the miner
+   * itself.
+   */
+  minerId?: string;
 }
 
 /**
@@ -77,6 +84,7 @@ export const useHashrateHistory = ({
   period,
   isLive,
   userId,
+  minerId,
 }: UseHashrateHistoryArgs) => {
   const startIso = start.toISOString();
   // A live window's end moves every render; round it to the minute so the
@@ -92,14 +100,18 @@ export const useHashrateHistory = ({
         startIso,
         endIso,
         period,
-        userId ?? "self",
+        minerId ?? userId ?? "self",
       ],
       queryFn: async () => {
         const params = new URLSearchParams({ start: startIso, end: endIso });
         if (period) params.append("period", period);
-        if (userId) params.append("userId", userId);
+        if (!minerId && userId) params.append("userId", userId);
 
-        const response = await fetch(`/api/miners/hashrate-history?${params}`);
+        const endpoint = minerId
+          ? `/api/miners/${minerId}/hashrate-history`
+          : "/api/miners/hashrate-history";
+
+        const response = await fetch(`${endpoint}?${params}`);
         const body: HashrateHistoryResponse = await response.json();
 
         if (!response.ok || !body.success) {

@@ -7,6 +7,18 @@
     {
       "path": "/api/cron_payback_snapshot",
       "schedule": "10 0 * * *"
+    },
+    {
+      "path": "/api/cron_pool_daily_snapshot",
+      "schedule": "20 0 * * *"
+    },
+    {
+      "path": "/api/cron_pool_worker_transactions",
+      "schedule": "30 0 * * *"
+    },
+    {
+      "path": "/api/cron_pool_hashprice_balance",
+      "schedule": "55 23 * * *"
     }
   ],
   "$schema": "https://openapi.vercel.sh/vercel.json",

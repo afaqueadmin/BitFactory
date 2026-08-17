@@ -101,6 +101,13 @@ interface HashrateHistoryChartProps {
   poolMode?: "total" | "luxor" | "braiins";
   /** Privileged: admins and the owning franchisee. Omit for own data. */
   userId?: string;
+  /**
+   * Scope to a single miner's worker-level series instead of the whole
+   * subaccount — same chart, reads from /api/miners/[minerId]/hashrate-history.
+   * Worker-level data has no uptime and, for Braiins miners, no history at
+   * all (neither has any endpoint), so those notes are tailored below.
+   */
+  minerId?: string;
   height?: number;
 }
 
@@ -141,6 +148,7 @@ const toLocalDayStart = (utcMs: number) => {
 export default function HashrateHistoryChart({
   poolMode = "total",
   userId,
+  minerId,
   height = 380,
 }: HashrateHistoryChartProps) {
   const theme = useTheme();
@@ -188,6 +196,7 @@ export default function HashrateHistoryChart({
       period: customRange ? null : period,
       isLive,
       userId,
+      minerId,
     },
   );
 
@@ -546,12 +555,20 @@ export default function HashrateHistoryChart({
 
   const notes = [
     showBraiins && braiinsSeries?.available ? braiinsSeries.note : null,
-    // Luxor's uptime endpoint accepts a daily tick only, so short windows
-    // (the 1D view, or a one-day custom range) cannot show it at all.
-    // Availability, not visibility — otherwise toggling Uptime off in the
-    // legend would wrongly claim the period cannot show it.
-    showLuxor && luxorSeries?.available && !hasUptime
-      ? "Uptime is not shown for this period — the pool publishes it once per day, so it needs a range of at least two days."
+    // Worker-level Braiins data doesn't just lag behind — it never exists
+    // (no historical worker endpoint at any granularity), so this replaces
+    // the generic "no data" empty state with an explanation for that case.
+    minerId && !hasData && history?.activePoolNames?.includes("Braiins")
+      ? "Historical hashrate data isn't available for Braiins miners — Braiins has no worker-level history endpoint. Current status is still shown live elsewhere on this page."
+      : null,
+    // Luxor only publishes uptime once a UTC day has fully closed, so a
+    // window that's entirely "today" (the live 1D view, or a custom range
+    // starting today) has nothing to show yet. Availability, not visibility
+    // — otherwise toggling Uptime off in the legend would wrongly claim the
+    // period cannot show it. Not shown at all for a per-miner chart — Luxor
+    // has no per-worker uptime concept, so it's never a "not yet".
+    !minerId && showLuxor && luxorSeries?.available && !hasUptime
+      ? "Uptime is not shown for this period — the pool only publishes it once a day has fully closed."
       : null,
     history?.downgradedFrom
       ? `Showing ${history.tickSize} resolution — the pool only serves ${history.downgradedFrom} data for recent dates.`
@@ -1038,7 +1055,12 @@ export default function HashrateHistoryChart({
                   // Solid, to stay distinguishable from the dashed efficiency
                   // line it shares the percentage axis with.
                   isAnimationActive={false}
-                  dot={false}
+                  // Uptime is one point per day, unlike the finer hashrate/
+                  // efficiency series it shares the chart with — a dot on
+                  // every point makes each day's value easy to pick out, and
+                  // keeps a single-day window (e.g. a new week a few hours
+                  // in) visible even with nothing to connect a line to yet.
+                  dot={{ r: 3, fill: UPTIME_COLOR, strokeWidth: 0 }}
                   connectNulls
                   activeDot={{ r: 4 }}
                 />

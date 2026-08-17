@@ -150,6 +150,66 @@ export function pickTick(
 }
 
 /**
+ * Per-worker tick preference. Luxor's worker-level endpoint has no 5m tier
+ * at all (verified live 2026-08-17: tick_size=5m is rejected outright with
+ * "expected one of \"1d\"|\"1h\""), so 1h is the finest resolution available
+ * for a single miner, whatever the period.
+ */
+const preferredWorkerTick = (
+  period: Period | null,
+  spanDays: number,
+): TickSize => {
+  if (period) {
+    if (period === "1D" || period === "1W" || period === "1M") return "1h";
+    return "1d";
+  }
+  return spanDays <= 31 ? "1h" : "1d";
+};
+
+/**
+ * Max age (days) of a window START for the worker-level 1h tick. Verified
+ * live 2026-08-17 by binary search: a start_date 92 days back still worked,
+ * 93 days back was rejected with "The time range for 1h tick size must be
+ * within the last 3 months" — one day inside that boundary, matching the
+ * safety margin the subaccount-level table already uses.
+ */
+const WORKER_TICK_MAX_AGE_DAYS: Record<TickSize, number> = {
+  "5m": -1, // never selected for a worker; excluded from the fallback order
+  "1h": 91,
+  "1d": Infinity,
+};
+
+/**
+ * Same coarsen-instead-of-fail strategy as pickTick, but for a single
+ * miner's series: 1h → 1d, no 5m tier to fall back from.
+ */
+export function pickWorkerTick(
+  window: Window,
+  period: Period | null,
+  now: Date = new Date(),
+): { tick: TickSize; downgradedFrom?: TickSize } {
+  const spanDays = (window.end.getTime() - window.start.getTime()) / DAY_MS;
+  const ageDays = (now.getTime() - window.start.getTime()) / DAY_MS;
+
+  const preferred = preferredWorkerTick(period, spanDays);
+  const order: TickSize[] = ["1h", "1d"];
+  const startIndex = order.indexOf(preferred);
+
+  for (let i = startIndex; i < order.length; i++) {
+    if (ageDays <= WORKER_TICK_MAX_AGE_DAYS[order[i]]) {
+      return {
+        tick: order[i],
+        downgradedFrom: i === startIndex ? undefined : preferred,
+      };
+    }
+  }
+  return {
+    tick: "1d",
+    downgradedFrom: preferred === "1d" ? undefined : preferred,
+  };
+}
+
+/**
  * Hashrate display unit.
  *
  * Luxor switches later than a naive 1-PH/s threshold: its table shows

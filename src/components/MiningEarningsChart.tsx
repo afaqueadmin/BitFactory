@@ -38,12 +38,15 @@ interface MiningEarningsChartProps {
   height?: number;
   days?: number;
   viewMode?: "total" | "luxor" | "braiins" | "sideBySide";
+  /** "daily" (default) shows `days` days; "monthly" shows every fully-closed month. */
+  granularity?: "daily" | "monthly";
 }
 
 export default function MiningEarningsChart({
   height = 300,
   days = 10, // Default to 10 days as per Luxor API request
   viewMode = "total",
+  granularity = "daily",
 }: MiningEarningsChartProps) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
@@ -107,19 +110,19 @@ export default function MiningEarningsChart({
         setLoading(true);
         setError(null);
 
+        const query =
+          granularity === "monthly" ? "granularity=monthly" : `days=${days}`;
+
         console.log(
-          `[MiningEarningsChart] Fetching ${days} days of mining performance data`,
+          `[MiningEarningsChart] Fetching mining performance data (${query})`,
         );
 
-        const response = await fetch(
-          `/api/mining/daily-performance?days=${days}`,
-          {
-            method: "GET",
-            headers: {
-              "Content-Type": "application/json",
-            },
+        const response = await fetch(`/api/mining/daily-performance?${query}`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
           },
-        );
+        });
 
         console.log(
           `[MiningEarningsChart] API Response Status: ${response.status} ${response.statusText}`,
@@ -158,7 +161,7 @@ export default function MiningEarningsChart({
     };
 
     fetchMiningData();
-  }, [days]);
+  }, [days, granularity]);
 
   return (
     <Paper
@@ -259,10 +262,15 @@ export default function MiningEarningsChart({
                 tickFormatter={(value: string | number) => {
                   try {
                     const date = new Date(value);
-                    return date.toLocaleDateString("en-US", {
-                      month: "short",
-                      day: "numeric",
-                    });
+                    return granularity === "monthly"
+                      ? date.toLocaleDateString("en-US", {
+                          month: "short",
+                          year: "numeric",
+                        })
+                      : date.toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                        });
                   } catch {
                     return String(value);
                   }
@@ -325,12 +333,18 @@ export default function MiningEarningsChart({
 
                   let dateLabel = String(label);
                   try {
-                    dateLabel = new Date(label).toLocaleDateString("en-US", {
-                      weekday: "short",
-                      year: "numeric",
-                      month: "short",
-                      day: "numeric",
-                    });
+                    dateLabel =
+                      granularity === "monthly"
+                        ? new Date(label).toLocaleDateString("en-US", {
+                            month: "long",
+                            year: "numeric",
+                          })
+                        : new Date(label).toLocaleDateString("en-US", {
+                            weekday: "short",
+                            year: "numeric",
+                            month: "short",
+                            day: "numeric",
+                          });
                   } catch {
                     // keep raw label
                   }
@@ -380,7 +394,11 @@ export default function MiningEarningsChart({
                         ? entry.breakdown.luxor + entry.breakdown.braiins
                         : entry.earnings
                     }
-                    name="Daily Revenue"
+                    name={
+                      granularity === "monthly"
+                        ? "Monthly Revenue"
+                        : "Daily Revenue"
+                    }
                     stackId="revenue"
                     barSize={18}
                     radius={[0, 0, 6, 6]}

@@ -21,6 +21,7 @@ import {
 } from "@/lib/workerNormalization";
 import RepairNotesModal from "./admin/RepairNotesModal";
 import MinerPoolHistoryModal from "./admin/MinerPoolHistoryModal";
+import HashrateHistoryChart from "./HashrateHistoryChart";
 
 // Types
 interface Hardware {
@@ -84,6 +85,19 @@ export default function HostedMinersList({
   const [poolHistoryOpen, setPoolHistoryOpen] = useState(false);
   const [selectedMinerId, setSelectedMinerId] = useState<string | null>(null);
   const [selectedMinerName, setSelectedMinerName] = useState("");
+  // Which accordions are open, so the per-miner hashrate chart only fetches
+  // for a miner actually expanded on screen — not all of them at once.
+  const [expandedMinerIds, setExpandedMinerIds] = useState<Set<string>>(
+    new Set(),
+  );
+  const toggleExpanded = (minerId: string, isExpanded: boolean) => {
+    setExpandedMinerIds((prev) => {
+      const next = new Set(prev);
+      if (isExpanded) next.add(minerId);
+      else next.delete(minerId);
+      return next;
+    });
+  };
 
   const handleOpenNotes = (id: string, name: string) => {
     setSelectedMinerId(id);
@@ -618,6 +632,8 @@ export default function HostedMinersList({
           filteredMiners.map((miner) => (
             <Accordion
               key={miner.id}
+              expanded={expandedMinerIds.has(miner.id)}
+              onChange={(_, isExpanded) => toggleExpanded(miner.id, isExpanded)}
               sx={{
                 mb: 2,
                 border: `1px solid ${alpha(theme.palette.divider, 0.12)}`,
@@ -863,6 +879,13 @@ export default function HostedMinersList({
                     </Box>
                   </Box>
                 </Box>
+
+                {/* Client-only for now, matching the phased rollout of the
+                    subaccount-level chart on the main /miners page. Only
+                    fetches once this miner's accordion is actually open. */}
+                {!isAdminView && expandedMinerIds.has(miner.id) && (
+                  <HashrateHistoryChart minerId={miner.id} height={320} />
+                )}
               </AccordionDetails>
             </Accordion>
           ))

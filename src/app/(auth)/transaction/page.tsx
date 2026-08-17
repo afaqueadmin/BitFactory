@@ -5,6 +5,7 @@ import {
   Box,
   Typography,
   Paper,
+  Button,
   CircularProgress,
   useTheme,
   ToggleButton,
@@ -23,6 +24,7 @@ import {
   Alert,
   Chip,
 } from "@mui/material";
+import DownloadIcon from "@mui/icons-material/Download";
 import { useUser } from "@/lib/hooks/useUser";
 import { formatValue } from "@/lib/helpers/formatValue";
 
@@ -91,40 +93,33 @@ export default function TransactionPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(25);
 
-  // Date filter state (Option 3: Hybrid Smart Default)
+  // Date filter state. 10d/20d/30d are fetched live from Luxor/Braiins (DB
+  // as fallback if a pool call fails); "all" and custom ranges always read
+  // from the DB, never live.
   const [dateMode, setDateMode] = useState<"preset" | "custom">("preset");
-  const [presetRange, setPresetRange] = useState<"30d" | "90d" | "all">("all");
+  const [presetRange, setPresetRange] = useState<"10d" | "20d" | "30d" | "all">(
+    "all",
+  );
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
+  const [isExporting, setIsExporting] = useState(false);
 
   const [data, setData] = useState<TransactionResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Calculate date range based on mode
-  const getDateRange = () => {
+  // Date-related query params based on mode. A 10d/20d/30d preset sends
+  // `range` so the API fetches live (with DB fallback); "All Time" and
+  // custom ranges send only start_date/end_date (or nothing), which the API
+  // always reads from the DB for.
+  const getDateParams = (): Record<string, string> => {
     if (dateMode === "custom" && startDate && endDate) {
       return { start_date: startDate, end_date: endDate };
     }
-
-    // Preset ranges
-    const today = new Date();
-    let start: Date;
-    switch (presetRange) {
-      case "30d":
-        start = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
-        break;
-      case "90d":
-        start = new Date(today.getTime() - 90 * 24 * 60 * 60 * 1000);
-        break;
-      case "all":
-      default:
-        start = new Date("2020-01-01");
+    if (dateMode === "preset" && presetRange !== "all") {
+      return { range: presetRange };
     }
-    return {
-      start_date: start.toISOString().split("T")[0],
-      end_date: today.toISOString().split("T")[0],
-    };
+    return {};
   };
 
   // Fetch transactions
@@ -133,13 +128,13 @@ export default function TransactionPage() {
       setIsLoading(true);
       setError(null);
 
-      const dateRange = getDateRange();
+      const dateParams = getDateParams();
       const params = new URLSearchParams({
         page: page.toString(),
         limit: pageSize.toString(),
         type,
-        start_date: dateRange.start_date,
-        end_date: dateRange.end_date,
+        pool: poolMode,
+        ...dateParams,
       });
 
       const response = await fetch(`/api/wallet/transactions?${params}`, {
@@ -163,22 +158,103 @@ export default function TransactionPage() {
     }
   };
 
+  // Downloads every transaction matching the current pool/type/date filters
+  // as CSV — not just the current page. Hits the same endpoint with
+  // export=true, which returns the full matching set unpaginated.
+  const handleDownloadCsv = async () => {
+    try {
+      setIsExporting(true);
+      setError(null);
+
+      const dateParams = getDateParams();
+      const params = new URLSearchParams({
+        type: typeFilter,
+        pool: poolMode,
+        export: "true",
+        ...dateParams,
+      });
+
+      const response = await fetch(`/api/wallet/transactions?${params}`, {
+        method: "GET",
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        throw new Error(
+          `Failed to export transactions: ${response.statusText}`,
+        );
+      }
+
+      const exportData: TransactionResponse = await response.json();
+
+      const header = [
+        "Date",
+        "Pool",
+        "Category",
+        "Type",
+        "Amount (BTC)",
+        "Amount (USD)",
+        "Transaction ID",
+      ];
+      const rows = exportData.transactions.map((tx) =>
+        [
+          tx.date_time,
+          tx.pool,
+          tx.transaction_category,
+          tx.transaction_type,
+          tx.currency_amount,
+          tx.usd_equivalent,
+          tx.transaction_id || "",
+        ]
+          .map((value) => `"${String(value).replace(/"/g, '""')}"`)
+          .join(","),
+      );
+
+      const blob = new Blob([[header.join(","), ...rows].join("\n")], {
+        type: "text/csv;charset=utf-8;",
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      const rangeLabel =
+        dateMode === "custom" && startDate && endDate
+          ? `${startDate}_to_${endDate}`
+          : dateMode === "preset"
+            ? presetRange
+            : "custom";
+      link.download = `transactions-${poolMode}-${rangeLabel}.csv`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to export transactions";
+      console.error("[Transaction Page] Export failed:", err);
+      setError(errorMessage);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   useEffect(() => {
     setCurrentPage(1);
   }, [poolMode, typeFilter, dateMode, presetRange, startDate, endDate]);
 
   useEffect(() => {
     fetchTransactions(currentPage, typeFilter);
-  }, [currentPage, typeFilter, dateMode, presetRange, startDate, endDate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    currentPage,
+    poolMode,
+    typeFilter,
+    dateMode,
+    presetRange,
+    startDate,
+    endDate,
+  ]);
 
-  // Filter transactions by pool mode
-  const filteredTransactions =
-    data?.transactions.filter((tx) => {
-      if (poolMode === "total") return true;
-      if (poolMode === "luxor") return tx.pool === "Luxor";
-      if (poolMode === "braiins") return tx.pool === "Braiins";
-      return true;
-    }) || [];
+  // The API now filters by pool server-side, before pagination, so what
+  // comes back is already scoped correctly — no client-side re-filtering.
+  const filteredTransactions = data?.transactions || [];
 
   // Get summary for filtered pool mode
   const getDisplaySummary = () => {
@@ -334,6 +410,23 @@ export default function TransactionPage() {
             <ToggleButton value="preset">Preset</ToggleButton>
             <ToggleButton value="custom">Custom</ToggleButton>
           </ToggleButtonGroup>
+
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={
+              isExporting ? (
+                <CircularProgress size={14} />
+              ) : (
+                <DownloadIcon fontSize="small" />
+              )
+            }
+            onClick={handleDownloadCsv}
+            disabled={isExporting || isLoading}
+            sx={{ ml: { sm: "auto" }, textTransform: "none" }}
+          >
+            Download CSV
+          </Button>
         </Box>
 
         {/* Preset Options - Same Row */}
@@ -349,8 +442,9 @@ export default function TransactionPage() {
               }}
               size="small"
             >
+              <ToggleButton value="10d">Last 10 Days</ToggleButton>
+              <ToggleButton value="20d">Last 20 Days</ToggleButton>
               <ToggleButton value="30d">Last 30 Days</ToggleButton>
-              <ToggleButton value="90d">Last 90 Days</ToggleButton>
               <ToggleButton value="all">All Time</ToggleButton>
             </ToggleButtonGroup>
           </Box>

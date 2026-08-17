@@ -85,6 +85,12 @@ export default function DashboardPage() {
     "total" | "luxor" | "braiins" | "sideBySide"
   >("total");
 
+  // Mining Performance chart granularity: daily (last 31 days) or monthly
+  // (every fully-closed calendar month since data began).
+  const [granularity, setGranularity] = React.useState<"daily" | "monthly">(
+    "daily",
+  );
+
   const estimatedMonthlyCost = React.useMemo(() => {
     if (dailyCostLoading) return 0;
     return dailyCost * getDaysInCurrentMonth();
@@ -447,134 +453,181 @@ export default function DashboardPage() {
                 textAlign: "left",
               }}
             >
-              Daily Mining Performance
+              Mining Performance
             </Typography>
 
-            {/* Chart View Mode Toggle Buttons - Only show if multiple pools */}
-            {workersStats.activePoolNames.length > 1 && (
-              <Box
-                sx={{
-                  display: "flex",
-                  gap: 1,
-                  flexWrap: "wrap",
-                  justifyContent: { xs: "flex-start", sm: "flex-end" },
-                }}
-              >
-                <button
-                  onClick={() => setChartMode("total")}
-                  style={{
-                    padding: "6px 12px",
-                    borderRadius: "6px",
-                    border: "none",
-                    cursor: "pointer",
-                    fontSize: "0.8rem",
-                    fontWeight: chartMode === "total" ? 600 : 400,
-                    backgroundColor:
-                      chartMode === "total"
-                        ? theme.palette.primary.main
-                        : theme.palette.mode === "dark"
-                          ? "rgba(255,255,255,0.1)"
-                          : "rgba(0,0,0,0.05)",
-                    color:
-                      chartMode === "total"
-                        ? theme.palette.primary.contrastText
-                        : theme.palette.text.primary,
-                    transition: "all 0.2s",
-                  }}
-                  title="Show total earnings from all pools"
-                >
-                  Total
-                </button>
-
-                {workersStats.activePoolNames.includes("Luxor") && (
+            <Box
+              sx={{
+                display: "flex",
+                gap: 2,
+                flexWrap: "wrap",
+                alignItems: "center",
+                justifyContent: { xs: "flex-start", sm: "flex-end" },
+              }}
+            >
+              {/* Granularity toggle: Daily / Monthly */}
+              <Box sx={{ display: "flex", gap: 0.5 }}>
+                {(["daily", "monthly"] as const).map((g) => (
                   <button
-                    onClick={() => setChartMode("luxor")}
+                    key={g}
+                    onClick={() => setGranularity(g)}
                     style={{
                       padding: "6px 12px",
                       borderRadius: "6px",
                       border: "none",
                       cursor: "pointer",
                       fontSize: "0.8rem",
-                      fontWeight: chartMode === "luxor" ? 600 : 400,
+                      fontWeight: granularity === g ? 600 : 400,
                       backgroundColor:
-                        chartMode === "luxor"
-                          ? "#1565C0"
+                        granularity === g
+                          ? theme.palette.primary.main
                           : theme.palette.mode === "dark"
                             ? "rgba(255,255,255,0.1)"
                             : "rgba(0,0,0,0.05)",
                       color:
-                        chartMode === "luxor"
-                          ? "#FFFFFF"
+                        granularity === g
+                          ? theme.palette.primary.contrastText
                           : theme.palette.text.primary,
                       transition: "all 0.2s",
                     }}
-                    title="Show Luxor pool earnings only"
+                    title={
+                      g === "daily"
+                        ? "Show the last 31 days"
+                        : "Show every fully-closed month"
+                    }
                   >
-                    🔷 Luxor
+                    {g === "daily" ? "Daily" : "Monthly"}
                   </button>
-                )}
-
-                {workersStats.activePoolNames.includes("Braiins") && (
-                  <button
-                    onClick={() => setChartMode("braiins")}
-                    style={{
-                      padding: "6px 12px",
-                      borderRadius: "6px",
-                      border: "none",
-                      cursor: "pointer",
-                      fontSize: "0.8rem",
-                      fontWeight: chartMode === "braiins" ? 600 : 400,
-                      backgroundColor:
-                        chartMode === "braiins"
-                          ? "#FFA500"
-                          : theme.palette.mode === "dark"
-                            ? "rgba(255,255,255,0.1)"
-                            : "rgba(0,0,0,0.05)",
-                      color:
-                        chartMode === "braiins"
-                          ? "#FFFFFF"
-                          : theme.palette.text.primary,
-                      transition: "all 0.2s",
-                    }}
-                    title="Show Braiins pool earnings only"
-                  >
-                    🔶 Braiins
-                  </button>
-                )}
-
-                <button
-                  onClick={() => setChartMode("sideBySide")}
-                  style={{
-                    padding: "6px 12px",
-                    borderRadius: "6px",
-                    border: "none",
-                    cursor: "pointer",
-                    fontSize: "0.8rem",
-                    fontWeight: chartMode === "sideBySide" ? 600 : 400,
-                    backgroundColor:
-                      chartMode === "sideBySide"
-                        ? theme.palette.success.main
-                        : theme.palette.mode === "dark"
-                          ? "rgba(255,255,255,0.1)"
-                          : "rgba(0,0,0,0.05)",
-                    color:
-                      chartMode === "sideBySide"
-                        ? theme.palette.success.contrastText
-                        : theme.palette.text.primary,
-                    transition: "all 0.2s",
-                  }}
-                  title="Show side-by-side comparison of both pools"
-                >
-                  Side by Side
-                </button>
+                ))}
               </Box>
-            )}
+
+              {/* Chart View Mode Toggle Buttons - Only show if multiple pools */}
+              {workersStats.activePoolNames.length > 1 && (
+                <Box
+                  sx={{
+                    display: "flex",
+                    gap: 1,
+                    flexWrap: "wrap",
+                    justifyContent: { xs: "flex-start", sm: "flex-end" },
+                  }}
+                >
+                  <button
+                    onClick={() => setChartMode("total")}
+                    style={{
+                      padding: "6px 12px",
+                      borderRadius: "6px",
+                      border: "none",
+                      cursor: "pointer",
+                      fontSize: "0.8rem",
+                      fontWeight: chartMode === "total" ? 600 : 400,
+                      backgroundColor:
+                        chartMode === "total"
+                          ? theme.palette.primary.main
+                          : theme.palette.mode === "dark"
+                            ? "rgba(255,255,255,0.1)"
+                            : "rgba(0,0,0,0.05)",
+                      color:
+                        chartMode === "total"
+                          ? theme.palette.primary.contrastText
+                          : theme.palette.text.primary,
+                      transition: "all 0.2s",
+                    }}
+                    title="Show total earnings from all pools"
+                  >
+                    Total
+                  </button>
+
+                  {workersStats.activePoolNames.includes("Luxor") && (
+                    <button
+                      onClick={() => setChartMode("luxor")}
+                      style={{
+                        padding: "6px 12px",
+                        borderRadius: "6px",
+                        border: "none",
+                        cursor: "pointer",
+                        fontSize: "0.8rem",
+                        fontWeight: chartMode === "luxor" ? 600 : 400,
+                        backgroundColor:
+                          chartMode === "luxor"
+                            ? "#1565C0"
+                            : theme.palette.mode === "dark"
+                              ? "rgba(255,255,255,0.1)"
+                              : "rgba(0,0,0,0.05)",
+                        color:
+                          chartMode === "luxor"
+                            ? "#FFFFFF"
+                            : theme.palette.text.primary,
+                        transition: "all 0.2s",
+                      }}
+                      title="Show Luxor pool earnings only"
+                    >
+                      🔷 Luxor
+                    </button>
+                  )}
+
+                  {workersStats.activePoolNames.includes("Braiins") && (
+                    <button
+                      onClick={() => setChartMode("braiins")}
+                      style={{
+                        padding: "6px 12px",
+                        borderRadius: "6px",
+                        border: "none",
+                        cursor: "pointer",
+                        fontSize: "0.8rem",
+                        fontWeight: chartMode === "braiins" ? 600 : 400,
+                        backgroundColor:
+                          chartMode === "braiins"
+                            ? "#FFA500"
+                            : theme.palette.mode === "dark"
+                              ? "rgba(255,255,255,0.1)"
+                              : "rgba(0,0,0,0.05)",
+                        color:
+                          chartMode === "braiins"
+                            ? "#FFFFFF"
+                            : theme.palette.text.primary,
+                        transition: "all 0.2s",
+                      }}
+                      title="Show Braiins pool earnings only"
+                    >
+                      🔶 Braiins
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => setChartMode("sideBySide")}
+                    style={{
+                      padding: "6px 12px",
+                      borderRadius: "6px",
+                      border: "none",
+                      cursor: "pointer",
+                      fontSize: "0.8rem",
+                      fontWeight: chartMode === "sideBySide" ? 600 : 400,
+                      backgroundColor:
+                        chartMode === "sideBySide"
+                          ? theme.palette.success.main
+                          : theme.palette.mode === "dark"
+                            ? "rgba(255,255,255,0.1)"
+                            : "rgba(0,0,0,0.05)",
+                      color:
+                        chartMode === "sideBySide"
+                          ? theme.palette.success.contrastText
+                          : theme.palette.text.primary,
+                      transition: "all 0.2s",
+                    }}
+                    title="Show side-by-side comparison of both pools"
+                  >
+                    Side by Side
+                  </button>
+                </Box>
+              )}
+            </Box>
           </Box>
 
           <MiningEarningsChart
             height={isMobile ? 340 : 520}
             days={31}
             viewMode={chartMode}
+            granularity={granularity}
           />
         </Box>
       </Container>

@@ -33,7 +33,32 @@
 import { createLuxorClient } from "./luxor";
 import { createBraiinsClient } from "./braiins";
 import { poolDataCache } from "./cache";
+import { prisma } from "./prisma";
 import { DATA_FLOOR, TickSize, Window } from "./hashrateWindows";
+
+/** UTC midnight of the current day — the cron only ever writes fully-closed
+ * prior days, so anything from this point forward always needs a live call. */
+const todayUtc = (): Date => {
+  const now = new Date();
+  return new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+  );
+};
+
+/**
+ * Lower bound for a DB day-range query, widened by a day for the same reason
+ * fetchLuxorSeriesLive pads its start: `window.start` is an instant in the
+ * VIEWER's local timezone and can land mid-UTC-day, which would otherwise
+ * exclude that day's own row (a `@db.Date` column is always exact UTC
+ * midnight, so a `gte` compare against a non-midnight instant silently drops
+ * it). The final `.filter()` against the real window trims anything the
+ * padding over-fetched, so this is safe to over-ask.
+ */
+const dbRangeStart = (window: Window): Date => {
+  const flooredStart = window.start < DATA_FLOOR ? DATA_FLOOR : window.start;
+  const padded = new Date(flooredStart.getTime() - 86_400_000);
+  return padded < DATA_FLOOR ? new Date(DATA_FLOOR) : padded;
+};
 
 export interface HashratePoint {
   /** Epoch milliseconds (UTC). */
@@ -99,7 +124,65 @@ const toApiDate = (date: Date): string => date.toISOString().slice(0, 10);
  * 400 every live window. end_date is inclusive of that whole day anyway, so
  * no padding is needed there.
  */
+/**
+ * Fetch a Luxor subaccount's hashrate + efficiency series, DB-first.
+ *
+ * Only tick="1d" requests can be served from PoolSubaccountDailySnapshot —
+ * that table only ever holds one point per day, so a 5m/1h request (short
+ * windows: 1D/1W/1M periods) always falls through to the live path
+ * unchanged. For 1d requests, every fully-closed prior day comes from the
+ * DB (written by cron_pool_daily_snapshot) and only "today" (if the window
+ * reaches that far) is fetched live.
+ */
 export async function fetchLuxorSeries(
+  subaccountName: string,
+  window: Window,
+  tick: TickSize,
+  poolSubaccountId: string | null,
+): Promise<HashratePoint[]> {
+  if (tick !== "1d" || !poolSubaccountId) {
+    return fetchLuxorSeriesLive(subaccountName, window, tick);
+  }
+
+  const today = todayUtc();
+
+  const dbRows = await prisma.poolSubaccountDailySnapshot.findMany({
+    where: {
+      poolSubaccountId,
+      date: { gte: dbRangeStart(window), lt: today },
+      hashrate: { not: null },
+    },
+    orderBy: { date: "asc" },
+  });
+
+  const points: HashratePoint[] = dbRows.map((r) => ({
+    t: r.date.getTime(),
+    hashrate: Number(r.hashrate),
+    efficiency: r.efficiency !== null ? Number(r.efficiency) : null,
+  }));
+
+  if (window.end.getTime() >= today.getTime()) {
+    try {
+      const todayPoints = await fetchLuxorSeriesLive(
+        subaccountName,
+        { start: today, end: window.end },
+        "1d",
+      );
+      points.push(...todayPoints);
+    } catch (error) {
+      console.error(
+        `[HashrateHistory] Live "today" fetch failed for ${subaccountName}:`,
+        error,
+      );
+    }
+  }
+
+  return points
+    .filter((p) => p.t >= window.start.getTime() && p.t <= window.end.getTime())
+    .sort((a, b) => a.t - b.t);
+}
+
+async function fetchLuxorSeriesLive(
   subaccountName: string,
   window: Window,
   tick: TickSize,
@@ -166,7 +249,60 @@ export async function fetchLuxorSeries(
  * percent here. Paginates identically to hashrate-efficiency and reaches back
  * to the subaccount's first hashing day.
  */
+/**
+ * Fetch a Luxor subaccount's uptime series, DB-first.
+ *
+ * Unlike hashrate, Luxor uptime is ALWAYS daily (tick_size=1d is the only
+ * option the endpoint accepts), so this can be DB-sourced on every request
+ * regardless of what tick the hashrate series is using — only "today" (if
+ * the window reaches that far) needs a live call.
+ */
 export async function fetchLuxorUptime(
+  subaccountName: string,
+  window: Window,
+  poolSubaccountId: string | null,
+): Promise<UptimePoint[]> {
+  if (!poolSubaccountId) {
+    return fetchLuxorUptimeLive(subaccountName, window);
+  }
+
+  const today = todayUtc();
+
+  const dbRows = await prisma.poolSubaccountDailySnapshot.findMany({
+    where: {
+      poolSubaccountId,
+      date: { gte: dbRangeStart(window), lt: today },
+      uptime: { not: null },
+    },
+    orderBy: { date: "asc" },
+  });
+
+  const points: UptimePoint[] = dbRows.map((r) => ({
+    t: r.date.getTime(),
+    uptime: Number(r.uptime),
+  }));
+
+  if (window.end.getTime() >= today.getTime()) {
+    try {
+      const todayPoints = await fetchLuxorUptimeLive(subaccountName, {
+        start: today,
+        end: window.end,
+      });
+      points.push(...todayPoints);
+    } catch (error) {
+      console.error(
+        `[HashrateHistory] Live "today" uptime fetch failed for ${subaccountName}:`,
+        error,
+      );
+    }
+  }
+
+  return points
+    .filter((p) => p.t >= window.start.getTime() && p.t <= window.end.getTime())
+    .sort((a, b) => a.t - b.t);
+}
+
+async function fetchLuxorUptimeLive(
   subaccountName: string,
   window: Window,
 ): Promise<UptimePoint[]> {
@@ -217,32 +353,76 @@ export async function fetchLuxorUptime(
  * The API ignores date params and always returns its full rolling window, so
  * the whole series is fetched once, cached per user, and sliced locally.
  */
+/**
+ * Fetch a Braiins subaccount's daily hashrate series, DB-first.
+ *
+ * The live endpoint always returns a fixed ~188-day rolling window (see
+ * module note above) regardless of what's asked for, so it's fetched once
+ * and cached as before. Anything OLDER than that rolling window's earliest
+ * point now comes from PoolSubaccountDailySnapshot — that's real history
+ * the live API itself can no longer reach, extending Braiins coverage past
+ * its own retention limit. If the live call fails outright, DB data is used
+ * for the whole window rather than returning nothing.
+ */
 export async function fetchBraiinsSeries(
   apiToken: string,
   userId: string,
   window: Window,
+  poolSubaccountId: string | null,
 ): Promise<HashratePoint[]> {
   const cacheKey = `hashrate_history_braiins_full_${userId}`;
-  let series = poolDataCache.get(cacheKey) as HashratePoint[] | null;
+  let liveSeries = poolDataCache.get(cacheKey) as HashratePoint[] | null;
 
-  if (!series) {
-    const client = createBraiinsClient(apiToken, userId);
-    const response = await client.getDailyHashrate();
+  if (!liveSeries) {
+    try {
+      const client = createBraiinsClient(apiToken, userId);
+      const response = await client.getDailyHashrate();
 
-    series = (response?.btc || [])
-      .map((day) => ({
-        t: day.date * 1000,
-        // Braiins reports Gh/s; convert to H/s to match Luxor.
-        hashrate: (Number(day.hash_rate_24h) || 0) * 1e9,
-        efficiency: null,
-      }))
-      .filter((p) => Number.isFinite(p.t))
-      .sort((a, b) => a.t - b.t);
+      liveSeries = (response?.btc || [])
+        .map((day) => ({
+          t: day.date * 1000,
+          // Braiins reports Gh/s; convert to H/s to match Luxor.
+          hashrate: (Number(day.hash_rate_24h) || 0) * 1e9,
+          efficiency: null,
+        }))
+        .filter((p) => Number.isFinite(p.t))
+        .sort((a, b) => a.t - b.t);
 
-    poolDataCache.set(cacheKey, series, 900);
+      poolDataCache.set(cacheKey, liveSeries, 900);
+    } catch (error) {
+      console.error(
+        `[HashrateHistory] Braiins live fetch failed, falling back to DB only:`,
+        error,
+      );
+      liveSeries = [];
+    }
   }
 
-  return series.filter(
+  let dbPoints: HashratePoint[] = [];
+  if (poolSubaccountId) {
+    const rangeStart = dbRangeStart(window);
+    const dbUpperBound = liveSeries.length
+      ? new Date(liveSeries[0].t)
+      : new Date(window.end.getTime() + 1);
+
+    if (rangeStart.getTime() < dbUpperBound.getTime()) {
+      const dbRows = await prisma.poolSubaccountDailySnapshot.findMany({
+        where: {
+          poolSubaccountId,
+          date: { gte: rangeStart, lt: dbUpperBound },
+          hashrate: { not: null },
+        },
+        orderBy: { date: "asc" },
+      });
+      dbPoints = dbRows.map((r) => ({
+        t: r.date.getTime(),
+        hashrate: Number(r.hashrate),
+        efficiency: null,
+      }));
+    }
+  }
+
+  return [...dbPoints, ...liveSeries].filter(
     (p) => p.t >= window.start.getTime() && p.t <= window.end.getTime(),
   );
 }
@@ -288,4 +468,151 @@ export async function fetchLuxorEarliestData(
     );
     return null;
   }
+}
+
+/**
+ * Fetch a single worker's hashrate + efficiency series, live.
+ *
+ * GET /pool/workers-hashrate-efficiency/BTC/:subaccountName
+ *
+ * VERIFIED live 2026-08-17:
+ *   • tick_size accepts ONLY "1d" or "1h" — "5m" is rejected outright with
+ *     "expected one of \"1d\"|\"1h\"" (no 5m tier at worker level at all).
+ *   • tick_size=1h: start_date must be within the last 3 months (~92 days,
+ *     binary-searched) — a stricter, independent limit from the subaccount
+ *     endpoint's own 30-day 1h limit.
+ *   • Response shape: { hashrate_efficiency_revenue: { [workerName]: [{
+ *     date_time, hashrate, efficiency, est_revenue }] } } — no firmware,
+ *     stale/rejected shares, or status here, same as the daily backfill call.
+ *
+ * Start padding mirrors fetchLuxorSeriesLive for the same reason: the window
+ * is expressed in the viewer's local timezone and can straddle a UTC day.
+ */
+async function fetchWorkerLuxorSeriesLive(
+  subaccountName: string,
+  workerName: string,
+  window: Window,
+  tick: TickSize,
+): Promise<HashratePoint[]> {
+  const from = window.start < DATA_FLOOR ? DATA_FLOOR : window.start;
+  const paddedStart = new Date(from.getTime() - 86_400_000);
+  const startDate = toApiDate(
+    paddedStart < DATA_FLOOR ? DATA_FLOOR : paddedStart,
+  );
+
+  const now = new Date();
+  const endDate = toApiDate(window.end > now ? now : window.end);
+
+  const client = createLuxorClient(subaccountName);
+  const response = (await client.getWorkersHashrateEfficiency(
+    "BTC",
+    subaccountName,
+    {
+      worker_names: workerName,
+      tick_size: tick,
+      start_date: startDate,
+      end_date: endDate,
+      page_size: 5000,
+    },
+  )) as {
+    hashrate_efficiency_revenue?: Record<
+      string,
+      Array<{ date_time: string; hashrate: string; efficiency: number }>
+    >;
+  };
+
+  const rawPoints = response.hashrate_efficiency_revenue?.[workerName] || [];
+
+  return rawPoints
+    .map((p) => ({
+      t: new Date(p.date_time).getTime(),
+      hashrate: parseFloat(p.hashrate || "0") || 0,
+      efficiency: typeof p.efficiency === "number" ? p.efficiency * 100 : null,
+    }))
+    .filter(
+      (p) =>
+        Number.isFinite(p.t) &&
+        p.t >= window.start.getTime() &&
+        p.t <= window.end.getTime(),
+    )
+    .sort((a, b) => a.t - b.t);
+}
+
+/**
+ * Fetch a single worker's hashrate + efficiency series, DB-first.
+ *
+ * Only tick="1d" can be served from PoolWorkerDailyMetric — worker-level
+ * data is daily-only in the DB (no 1h rows exist there; 1h is a live-only
+ * tier, capped at ~91 days back by Luxor itself, see fetchWorkerLuxorSeriesLive).
+ * For 1d requests, every fully-closed prior day comes from the DB and only
+ * "today" (if the window reaches that far) is fetched live.
+ */
+export async function fetchWorkerLuxorSeries(
+  subaccountName: string,
+  workerName: string,
+  window: Window,
+  tick: TickSize,
+  poolSubaccountId: string | null,
+): Promise<HashratePoint[]> {
+  if (tick !== "1d" || !poolSubaccountId) {
+    return fetchWorkerLuxorSeriesLive(subaccountName, workerName, window, tick);
+  }
+
+  const today = todayUtc();
+
+  const dbRows = await prisma.poolWorkerDailyMetric.findMany({
+    where: {
+      poolSubaccountId,
+      workerName,
+      date: { gte: dbRangeStart(window), lt: today },
+      hashrate: { not: null },
+    },
+    orderBy: { date: "asc" },
+  });
+
+  const points: HashratePoint[] = dbRows.map((r) => ({
+    t: r.date.getTime(),
+    hashrate: Number(r.hashrate),
+    efficiency: r.efficiency !== null ? Number(r.efficiency) : null,
+  }));
+
+  if (window.end.getTime() >= today.getTime()) {
+    try {
+      const todayPoints = await fetchWorkerLuxorSeriesLive(
+        subaccountName,
+        workerName,
+        { start: today, end: window.end },
+        "1d",
+      );
+      points.push(...todayPoints);
+    } catch (error) {
+      console.error(
+        `[HashrateHistory] Live "today" fetch failed for worker ${workerName}:`,
+        error,
+      );
+    }
+  }
+
+  return points
+    .filter((p) => p.t >= window.start.getTime() && p.t <= window.end.getTime())
+    .sort((a, b) => a.t - b.t);
+}
+
+/**
+ * Earliest day this worker has a recorded daily metric, from the DB only
+ * (no live equivalent is fetched — unlike fetchLuxorEarliestData, an extra
+ * live call per worker per chart load isn't worth it for a single miner's
+ * paging affordance). Returns null if the worker has no DB rows yet, which
+ * the UI treats as "no known limit" rather than "no history".
+ */
+export async function fetchWorkerEarliestData(
+  poolSubaccountId: string,
+  workerName: string,
+): Promise<number | null> {
+  const earliest = await prisma.poolWorkerDailyMetric.findFirst({
+    where: { poolSubaccountId, workerName },
+    orderBy: { date: "asc" },
+    select: { date: true },
+  });
+  return earliest ? earliest.date.getTime() : null;
 }
