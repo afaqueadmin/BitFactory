@@ -20,6 +20,12 @@ import {
   toUtcDateOnly,
   formatUtcDateKey,
 } from "@/lib/services/paybackSnapshotService";
+import {
+  withRetry,
+  sleep,
+  SUBACCOUNT_SPACING_MS,
+  EXCLUDED_SUBACCOUNTS,
+} from "@/lib/services/cronRetry";
 
 export { toUtcDateOnly, formatUtcDateKey };
 
@@ -44,20 +50,30 @@ export async function upsertTodayHashpriceAndBalance(
   const dateKey = formatUtcDateKey(today);
 
   const subaccounts = await prisma.poolSubaccount.findMany({
-    where: { pool: { name: "Luxor" }, poolAuthId: { not: null } },
+    where: {
+      pool: { name: "Luxor" },
+      poolAuthId: { not: null },
+      subaccountName: { notIn: [...EXCLUDED_SUBACCOUNTS] },
+    },
     include: { poolAuth: true },
   });
 
   const results: HashpriceBalanceResult[] = [];
 
-  for (const sub of subaccounts) {
+  for (const [index, sub] of subaccounts.entries()) {
     if (!sub.poolAuth) continue;
+
+    if (index > 0) await sleep(SUBACCOUNT_SPACING_MS);
 
     try {
       const client = createLuxorClient(sub.poolAuth.authKey);
-      const summary = await client.getSummary("BTC", {
-        subaccount_names: sub.poolAuth.authKey,
-      });
+      const summary = await withRetry(
+        () =>
+          client.getSummary("BTC", {
+            subaccount_names: sub.poolAuth!.authKey,
+          }),
+        `${sub.subaccountName} summary ${dateKey}`,
+      );
 
       const hashprice = summary.hashprice?.[0]?.value ?? null;
       const balance = summary.balance?.[0]?.revenue ?? null;

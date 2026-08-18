@@ -6,6 +6,12 @@ import {
   toUtcDateOnly,
   formatUtcDateKey,
 } from "@/lib/services/paybackSnapshotService";
+import {
+  withRetry,
+  sleep,
+  SUBACCOUNT_SPACING_MS,
+  EXCLUDED_SUBACCOUNTS,
+} from "@/lib/services/cronRetry";
 
 export { getPreviousCompletedUtcDay, toUtcDateOnly, formatUtcDateKey };
 
@@ -106,29 +112,45 @@ async function fetchLuxorDaySnapshot(
   const client = createLuxorClient(authKey);
 
   const [hashrateEff, revenue, uptime, activeWorkers] = await Promise.all([
-    client.getHashrateEfficiency("BTC", {
-      subaccount_names: authKey,
-      start_date: dateKey,
-      end_date: dateKey,
-      tick_size: "1d",
-    }),
-    client.getRevenue("BTC", {
-      subaccount_names: authKey,
-      start_date: dateKey,
-      end_date: dateKey,
-    }),
-    client.getUptime("BTC", {
-      subaccount_names: authKey,
-      start_date: dateKey,
-      end_date: dateKey,
-      tick_size: "1d",
-    }),
-    client.getActiveWorkers("BTC", {
-      subaccount_names: authKey,
-      start_date: dateKey,
-      end_date: dateKey,
-      tick_size: "1d",
-    }),
+    withRetry(
+      () =>
+        client.getHashrateEfficiency("BTC", {
+          subaccount_names: authKey,
+          start_date: dateKey,
+          end_date: dateKey,
+          tick_size: "1d",
+        }),
+      `${authKey} hashrate-efficiency ${dateKey}`,
+    ),
+    withRetry(
+      () =>
+        client.getRevenue("BTC", {
+          subaccount_names: authKey,
+          start_date: dateKey,
+          end_date: dateKey,
+        }),
+      `${authKey} revenue ${dateKey}`,
+    ),
+    withRetry(
+      () =>
+        client.getUptime("BTC", {
+          subaccount_names: authKey,
+          start_date: dateKey,
+          end_date: dateKey,
+          tick_size: "1d",
+        }),
+      `${authKey} uptime ${dateKey}`,
+    ),
+    withRetry(
+      () =>
+        client.getActiveWorkers("BTC", {
+          subaccount_names: authKey,
+          start_date: dateKey,
+          end_date: dateKey,
+          tick_size: "1d",
+        }),
+      `${authKey} active-workers ${dateKey}`,
+    ),
   ]);
 
   const values = emptyValues();
@@ -170,8 +192,14 @@ async function fetchBraiinsDaySnapshot(
   const client = createBraiinsClient(authKey);
 
   const [dailyHashrate, dailyRewards] = await Promise.all([
-    client.getDailyHashrate(),
-    client.getDailyRewards({ from: dateKey, to: dateKey }),
+    withRetry(
+      () => client.getDailyHashrate(),
+      `${authKey} daily-hashrate ${dateKey}`,
+    ),
+    withRetry(
+      () => client.getDailyRewards({ from: dateKey, to: dateKey }),
+      `${authKey} daily-rewards ${dateKey}`,
+    ),
   ]);
 
   const values = emptyValues();
@@ -238,14 +266,17 @@ export async function upsertPoolDailySnapshotsForDate(
     where: {
       pool: { name: { in: poolNames } },
       poolAuthId: { not: null },
+      subaccountName: { notIn: [...EXCLUDED_SUBACCOUNTS] },
     },
     include: { pool: true, poolAuth: true },
   });
 
   const results: PoolSnapshotUpsertResult[] = [];
 
-  for (const sub of subaccounts) {
+  for (const [index, sub] of subaccounts.entries()) {
     if (!sub.poolAuth) continue;
+
+    if (index > 0) await sleep(SUBACCOUNT_SPACING_MS);
 
     const label = {
       poolSubaccountId: sub.id,

@@ -21,6 +21,12 @@ import {
   formatUtcDateKey,
   getPreviousCompletedUtcDay,
 } from "@/lib/services/paybackSnapshotService";
+import {
+  withRetry,
+  sleep,
+  SUBACCOUNT_SPACING_MS,
+  EXCLUDED_SUBACCOUNTS,
+} from "@/lib/services/cronRetry";
 
 export { toUtcDateOnly, formatUtcDateKey, getPreviousCompletedUtcDay };
 
@@ -57,14 +63,20 @@ export async function upsertWorkerDailyMetricsForRange(
   endDate: string,
 ): Promise<RangeResult[]> {
   const subaccounts = await prisma.poolSubaccount.findMany({
-    where: { pool: { name: "Luxor" }, poolAuthId: { not: null } },
+    where: {
+      pool: { name: "Luxor" },
+      poolAuthId: { not: null },
+      subaccountName: { notIn: [...EXCLUDED_SUBACCOUNTS] },
+    },
     include: { poolAuth: true },
   });
 
   const results: RangeResult[] = [];
 
-  for (const sub of subaccounts) {
+  for (const [index, sub] of subaccounts.entries()) {
     if (!sub.poolAuth) continue;
+
+    if (index > 0) await sleep(SUBACCOUNT_SPACING_MS);
 
     try {
       const client = createLuxorClient(sub.poolAuth.authKey);
@@ -80,16 +92,16 @@ export async function upsertWorkerDailyMetricsForRange(
       }> = [];
 
       while (hasMore) {
-        const page = (await client.getWorkersHashrateEfficiency(
-          "BTC",
-          sub.poolAuth.authKey,
-          {
-            tick_size: "1d",
-            start_date: startDate,
-            end_date: endDate,
-            page_number: pageNumber,
-            page_size: 100,
-          },
+        const page = (await withRetry(
+          () =>
+            client.getWorkersHashrateEfficiency("BTC", sub.poolAuth!.authKey, {
+              tick_size: "1d",
+              start_date: startDate,
+              end_date: endDate,
+              page_number: pageNumber,
+              page_size: 100,
+            }),
+          `${sub.subaccountName} workers-hashrate-efficiency p${pageNumber}`,
         )) as WorkerHashrateEfficiencyResponse;
 
         const byWorker = page.hashrate_efficiency_revenue || {};
@@ -172,14 +184,20 @@ export async function upsertTransactionsForRange(
   endDate: string,
 ): Promise<RangeResult[]> {
   const subaccounts = await prisma.poolSubaccount.findMany({
-    where: { pool: { name: "Luxor" }, poolAuthId: { not: null } },
+    where: {
+      pool: { name: "Luxor" },
+      poolAuthId: { not: null },
+      subaccountName: { notIn: [...EXCLUDED_SUBACCOUNTS] },
+    },
     include: { poolAuth: true },
   });
 
   const results: RangeResult[] = [];
 
-  for (const sub of subaccounts) {
+  for (const [index, sub] of subaccounts.entries()) {
     if (!sub.poolAuth) continue;
+
+    if (index > 0) await sleep(SUBACCOUNT_SPACING_MS);
 
     try {
       const client = createLuxorClient(sub.poolAuth.authKey);
@@ -198,13 +216,17 @@ export async function upsertTransactionsForRange(
       }> = [];
 
       while (hasMore) {
-        const page = (await client.getTransactions("BTC", {
-          subaccount_names: sub.poolAuth.authKey,
-          start_date: startDate,
-          end_date: endDate,
-          page_number: pageNumber,
-          page_size: 250,
-        })) as unknown as LuxorTransactionsResponse;
+        const page = (await withRetry(
+          () =>
+            client.getTransactions("BTC", {
+              subaccount_names: sub.poolAuth!.authKey,
+              start_date: startDate,
+              end_date: endDate,
+              page_number: pageNumber,
+              page_size: 250,
+            }),
+          `${sub.subaccountName} transactions p${pageNumber}`,
+        )) as unknown as LuxorTransactionsResponse;
 
         for (const tx of page.transactions || []) {
           records.push({

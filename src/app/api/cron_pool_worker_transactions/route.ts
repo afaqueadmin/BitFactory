@@ -38,10 +38,17 @@ export async function GET(request: NextRequest) {
   const startDate = formatUtcDateKey(earliestDay);
   const endDate = formatUtcDateKey(latestDay);
 
-  const [workerResults, transactionResults] = await Promise.all([
-    upsertWorkerDailyMetricsForRange(startDate, endDate),
-    upsertTransactionsForRange(startDate, endDate),
-  ]);
+  // Sequential, not Promise.all: both loops hit the same shared Luxor
+  // rate-limit budget, so running them concurrently was doubling this
+  // cron's own peak request rate on top of everything else.
+  const workerResults = await upsertWorkerDailyMetricsForRange(
+    startDate,
+    endDate,
+  );
+  const transactionResults = await upsertTransactionsForRange(
+    startDate,
+    endDate,
+  );
 
   console.log(
     `[Worker/Transaction Cron] ${startDate} -> ${endDate}\n` +
