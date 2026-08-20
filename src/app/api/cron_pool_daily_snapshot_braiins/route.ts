@@ -42,9 +42,22 @@ export async function GET(request: NextRequest) {
     const dateKey = targetDate.toISOString().slice(0, 10);
 
     try {
-      const results = await upsertPoolDailySnapshotsForDate(targetDate, [
+      const rawResults = await upsertPoolDailySnapshotsForDate(targetDate, [
         "Braiins",
       ]);
+
+      const attemptsRemaining = RETRY_WINDOW_DAYS - daysAgo - 1;
+      const retryNote =
+        attemptsRemaining > 0
+          ? `Will retry automatically on this cron's next run (once activated in vercel.json) — ${attemptsRemaining} more attempt${attemptsRemaining === 1 ? "" : "s"} left after that before this date drops out of the 3-day retry window.`
+          : `This was the last automatic retry for this date (3-day retry window now exhausted) — if it's still empty after this, it needs a manual backfill, it will not be retried again on its own.`;
+
+      const results: PoolSnapshotUpsertResult[] = rawResults.map((r) =>
+        r.status === "pending"
+          ? { ...r, note: `${r.note ?? ""} ${retryNote}`.trim() }
+          : r,
+      );
+
       dayResults.push({ date: dateKey, results });
       console.log(
         `[Pool Daily Snapshot Cron - Braiins] ${dateKey}: ` +

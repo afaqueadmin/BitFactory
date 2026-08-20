@@ -239,8 +239,16 @@ export interface PoolSnapshotUpsertResult {
   poolSubaccountId: string;
   pool: string;
   subaccountName: string;
-  status: "written" | "skipped" | "error";
+  /**
+   * "pending": the fetch succeeded (no error, no rate limit) but the pool
+   * hadn't finalized this day's data yet, so there's genuinely nothing to
+   * write — distinct from "written", which means real data landed.
+   * Reported separately so the cron email doesn't call an empty result a
+   * success.
+   */
+  status: "written" | "pending" | "skipped" | "error";
   error?: string;
+  note?: string;
 }
 
 /**
@@ -317,7 +325,15 @@ export async function upsertPoolDailySnapshotsForDate(
         update: updateValues,
       });
 
-      results.push({ ...label, status: "written" });
+      if (values.hashrate === null) {
+        results.push({
+          ...label,
+          status: "pending",
+          note: `${sub.pool.name} had not finalized ${dateKey}'s data yet at the time this ran — the fetch succeeded but returned nothing.`,
+        });
+      } else {
+        results.push({ ...label, status: "written" });
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
       console.error(

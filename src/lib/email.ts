@@ -248,8 +248,9 @@ interface PoolCronDaySummary {
   results: Array<{
     pool: string;
     subaccountName: string;
-    status: "written" | "skipped" | "error";
+    status: "written" | "pending" | "skipped" | "error";
     error?: string;
+    note?: string;
   }>;
 }
 
@@ -268,6 +269,7 @@ export const sendPoolCronSummaryEmail = async (params: {
 
   const allResults = days.flatMap((d) => d.results);
   const written = allResults.filter((r) => r.status === "written").length;
+  const pending = allResults.filter((r) => r.status === "pending");
   const skipped = allResults.filter((r) => r.status === "skipped").length;
   const errors = allResults.filter((r) => r.status === "error");
 
@@ -278,12 +280,20 @@ export const sendPoolCronSummaryEmail = async (params: {
     )
     .join("");
 
+  const pendingRows = pending
+    .map(
+      (p) =>
+        `<li>${p.pool}/${p.subaccountName}: ${p.note || "pool hadn't finalized this date yet"}</li>`,
+    )
+    .join("");
+
   const dayRows = days
     .map((d) => {
       const dayWritten = d.results.filter((r) => r.status === "written").length;
+      const dayPending = d.results.filter((r) => r.status === "pending").length;
       const daySkipped = d.results.filter((r) => r.status === "skipped").length;
       const dayErrors = d.results.filter((r) => r.status === "error").length;
-      return `<li>${d.date}: ${dayWritten} written, ${daySkipped} skipped, ${dayErrors} error(s)</li>`;
+      return `<li>${d.date}: ${dayWritten} written, ${dayPending} pending (not yet finalized by the pool), ${daySkipped} already up to date, ${dayErrors} error(s)</li>`;
     })
     .join("");
 
@@ -291,13 +301,18 @@ export const sendPoolCronSummaryEmail = async (params: {
     from:
       `BitFactory Admin <${process.env.SMTP_FROM}>` || "noreply@bitfactory.com",
     to: process.env.SMTP_USER,
-    subject: `${errors.length > 0 ? "⚠️ " : ""}Cron run: ${cronName} - BitFactory`,
+    subject: `${errors.length > 0 ? "⚠️ " : pending.length > 0 ? "⏳ " : ""}Cron run: ${cronName} - BitFactory`,
     html: `
       <h1>${cronName}</h1>
       <p>Ran at ${date.toISOString()}.</p>
-      <p><strong>${written}</strong> written, <strong>${skipped}</strong> already up to date, <strong>${errors.length}</strong> error(s).</p>
+      <p><strong>${written}</strong> written, <strong>${pending.length}</strong> pending (pool hasn't finalized yet), <strong>${skipped}</strong> already up to date, <strong>${errors.length}</strong> error(s).</p>
       <h3>Per day</h3>
       <ul>${dayRows}</ul>
+      ${
+        pending.length > 0
+          ? `<h3 style="color:#e6a817;">Pending — not written yet, will retry</h3><ul>${pendingRows}</ul>`
+          : ""
+      }
       ${
         errors.length > 0
           ? `<h3 style="color:#c62828;">Errors</h3><ul>${errorRows}</ul>`

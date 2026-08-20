@@ -7,10 +7,14 @@ import {
 } from "@/lib/services/poolDailySnapshotService";
 import { sendPoolCronSummaryEmail } from "@/lib/email";
 
-// Pool data for a given UTC day isn't always finalized by the time this runs
-// shortly after midnight, so a trailing window is retried each run — same
-// reasoning and pattern as cron_payback_snapshot. upsertPoolDailySnapshotsForDate
-// skips a subaccount/day that already has real data, so this is safe to repeat.
+// Scheduled for 02:00 UTC, not right at midnight: verified live on
+// 2026-08-20 that Luxor hadn't finalized the just-ended day's data yet at
+// 00:21 UTC (the fetch succeeded but came back empty), so a 2-hour buffer is
+// built into the schedule itself. Even so, pool data isn't always finalized
+// by the time this runs, so a trailing window is retried each run on top of
+// that — same reasoning and pattern as cron_payback_snapshot.
+// upsertPoolDailySnapshotsForDate skips a subaccount/day that already has
+// real data, so this is safe to repeat.
 const RETRY_WINDOW_DAYS = 3;
 
 interface CronDayResult {
@@ -21,9 +25,10 @@ interface CronDayResult {
 /**
  * GET /api/cron_pool_daily_snapshot
  *
- * Vercel cron endpoint, protected by CRON_SECRET. Runs shortly after UTC
- * midnight, syncs PoolSubaccount rows from any PoolAuth added since the last
- * run, then snapshots hashrate/efficiency/uptime/active-workers/revenue into
+ * Vercel cron endpoint, protected by CRON_SECRET. Runs at 02:00 UTC (see
+ * note above on why not closer to midnight), syncs PoolSubaccount rows from
+ * any PoolAuth added since the last run, then snapshots
+ * hashrate/efficiency/uptime/active-workers/revenue into
  * PoolSubaccountDailySnapshot for the previous few completed UTC days across
  * every Luxor subaccount.
  *
@@ -55,9 +60,26 @@ export async function GET(request: NextRequest) {
     const dateKey = targetDate.toISOString().slice(0, 10);
 
     try {
-      const results = await upsertPoolDailySnapshotsForDate(targetDate, [
+      const rawResults = await upsertPoolDailySnapshotsForDate(targetDate, [
         "Luxor",
       ]);
+
+      // Enrich "pending" (fetched OK, pool hadn't finalized this day yet)
+      // with exactly when it'll be retried — the service function knows
+      // WHY a date is pending, but only this route knows the schedule and
+      // where we are in the retry window, so it owns the WHEN.
+      const attemptsRemaining = RETRY_WINDOW_DAYS - daysAgo - 1;
+      const retryNote =
+        attemptsRemaining > 0
+          ? `Will retry automatically on tomorrow's run (02:00 UTC) — ${attemptsRemaining} more attempt${attemptsRemaining === 1 ? "" : "s"} left after that before this date drops out of the 3-day retry window.`
+          : `This was the last automatic retry for this date (3-day retry window now exhausted) — if it's still empty after this, it needs a manual backfill, it will not be retried again on its own.`;
+
+      const results: PoolSnapshotUpsertResult[] = rawResults.map((r) =>
+        r.status === "pending"
+          ? { ...r, note: `${r.note ?? ""} ${retryNote}`.trim() }
+          : r,
+      );
+
       dayResults.push({ date: dateKey, results });
       console.log(
         `[Pool Daily Snapshot Cron] ${dateKey}: ` +
