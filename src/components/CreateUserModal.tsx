@@ -323,9 +323,22 @@ export default function CreateUserModal({
         !formData.franchiseeId &&
         formData.segment !== "CORPORATE" &&
         formData.segment !== "SME" &&
-        formData.segment !== "SELF_MINING"
+        formData.segment !== "SELF_MINING" &&
+        formData.segment !== "POTENTIAL_CUSTOMER"
       ) {
-        setError("Please select a Type (Corporate, SME, or Self Mining)");
+        setError(
+          "Please select a Type (Corporate, SME, Self Mining, or Potential Customer)",
+        );
+        setLoading(false);
+        return;
+      }
+
+      // Subaccount is required for all active customer types
+      if (
+        formData.segment !== "POTENTIAL_CUSTOMER" &&
+        (!formData.luxorSubaccountName || !formData.luxorSubaccountName.trim())
+      ) {
+        setError("Please select a Luxor subaccount for this customer");
         setLoading(false);
         return;
       }
@@ -542,6 +555,12 @@ export default function CreateUserModal({
                       <MenuItem key="SELF_MINING" value="SELF_MINING">
                         Self Mining
                       </MenuItem>,
+                      <MenuItem
+                        key="POTENTIAL_CUSTOMER"
+                        value="POTENTIAL_CUSTOMER"
+                      >
+                        Potential Customer
+                      </MenuItem>,
                     ]
                   )}
                 </Select>
@@ -570,8 +589,15 @@ export default function CreateUserModal({
             {formData.role === "CLIENT" && (
               <>
                 {/* Luxor Subaccount Single-Select */}
-                <FormControl fullWidth>
-                  <InputLabel>Luxor Subaccount (Optional)</InputLabel>
+                <FormControl
+                  fullWidth
+                  required={formData.segment !== "POTENTIAL_CUSTOMER"}
+                >
+                  <InputLabel>
+                    {formData.segment === "POTENTIAL_CUSTOMER"
+                      ? "Luxor Subaccount (Optional)"
+                      : "Luxor Subaccount"}
+                  </InputLabel>
                   <Select
                     value={formData.luxorSubaccountName}
                     onChange={(e) =>
@@ -580,9 +606,17 @@ export default function CreateUserModal({
                         luxorSubaccountName: e.target.value,
                       }))
                     }
-                    label="Luxor Subaccount (Optional)"
+                    label={
+                      formData.segment === "POTENTIAL_CUSTOMER"
+                        ? "Luxor Subaccount (Optional)"
+                        : "Luxor Subaccount"
+                    }
                   >
-                    <MenuItem value="">None</MenuItem>
+                    <MenuItem value="">
+                      {formData.segment === "POTENTIAL_CUSTOMER"
+                        ? "None (Unassigned)"
+                        : "-- Select Subaccount --"}
+                    </MenuItem>
                     {fetchingSubaccounts ? (
                       <MenuItem disabled>
                         <CircularProgress size={20} sx={{ mr: 1 }} />

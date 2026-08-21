@@ -334,9 +334,26 @@ export default function EditCustomerModal({
       !formData.franchiseeId &&
       formData.segment !== "CORPORATE" &&
       formData.segment !== "SME" &&
-      formData.segment !== "SELF_MINING"
+      formData.segment !== "SELF_MINING" &&
+      formData.segment !== "POTENTIAL_CUSTOMER"
     ) {
-      setError("Please select a Type (Corporate, SME, or Self Mining)");
+      setError(
+        "Please select a Type (Corporate, SME, Self Mining, or Potential Customer)",
+      );
+      setLoading(false);
+      return;
+    }
+
+    // Subaccount is required for active customer types
+    const isSubaccountEmpty =
+      !formData.luxorSubaccountName ||
+      formData.luxorSubaccountName === "N/A" ||
+      !formData.luxorSubaccountName.trim();
+
+    if (formData.segment !== "POTENTIAL_CUSTOMER" && isSubaccountEmpty) {
+      setError(
+        "A Luxor subaccount must be assigned for active customer types (Corporate, SME, Self Mining, or Retail)",
+      );
       setLoading(false);
       return;
     }
@@ -516,8 +533,16 @@ export default function EditCustomerModal({
               type="url"
               placeholder="https://example.com"
             />
-            <FormControl fullWidth disabled={fetchingSubaccounts}>
-              <InputLabel>Luxor Subaccount</InputLabel>
+            <FormControl
+              fullWidth
+              disabled={fetchingSubaccounts}
+              required={formData.segment !== "POTENTIAL_CUSTOMER"}
+            >
+              <InputLabel>
+                {formData.segment === "POTENTIAL_CUSTOMER"
+                  ? "Luxor Subaccount (Optional)"
+                  : "Luxor Subaccount"}
+              </InputLabel>
               <Select
                 value={formData.luxorSubaccountName || ""}
                 onChange={(e) =>
@@ -527,9 +552,17 @@ export default function EditCustomerModal({
                       e.target.value === "N/A" ? "" : e.target.value,
                   }))
                 }
-                label="Luxor Subaccount"
+                label={
+                  formData.segment === "POTENTIAL_CUSTOMER"
+                    ? "Luxor Subaccount (Optional)"
+                    : "Luxor Subaccount"
+                }
               >
-                <MenuItem value="N/A">N/A (Unassigned)</MenuItem>
+                <MenuItem value="N/A">
+                  {formData.segment === "POTENTIAL_CUSTOMER"
+                    ? "None (Unassigned)"
+                    : "N/A (Unassigned)"}
+                </MenuItem>
                 {subaccounts.map((sub) => (
                   <MenuItem key={sub.id} value={sub.name}>
                     {sub.name}
@@ -615,6 +648,12 @@ export default function EditCustomerModal({
                     </MenuItem>,
                     <MenuItem key="SELF_MINING" value="SELF_MINING">
                       Self Mining
+                    </MenuItem>,
+                    <MenuItem
+                      key="POTENTIAL_CUSTOMER"
+                      value="POTENTIAL_CUSTOMER"
+                    >
+                      Potential Customer
                     </MenuItem>,
                   ]
                 )}

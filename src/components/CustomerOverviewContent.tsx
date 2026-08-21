@@ -967,7 +967,19 @@ export default function CustomerOverviewContent() {
                     </TableCell>
                     <TableCell>{customer.email}</TableCell>
                     <TableCell>{customer.role}</TableCell>
-                    <TableCell>{customer.segment ?? "—"}</TableCell>
+                    <TableCell>
+                      {customer.segment === "POTENTIAL_CUSTOMER" ? (
+                        <Chip
+                          label="Potential Customer"
+                          size="small"
+                          color="secondary"
+                          variant="outlined"
+                          sx={{ fontWeight: "medium" }}
+                        />
+                      ) : (
+                        (customer.segment ?? "—")
+                      )}
+                    </TableCell>
                     <TableCell>{customer.pools || "Not Set"}</TableCell>
                     <TableCell align="center">{customer.miners}</TableCell>
                     <TableCell align="center">

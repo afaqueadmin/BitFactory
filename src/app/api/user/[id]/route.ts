@@ -45,10 +45,15 @@ export async function PUT(
       body.luxorSubaccountName = null;
     }
 
-    // First get the current user to check if they have a luxor subaccount
+    // First get the current user to check if they have a luxor subaccount and their current segment
     const currentUser = await prisma.user.findUnique({
       where: { id },
-      select: { luxorSubaccountName: true, role: true, franchiseeId: true },
+      select: {
+        luxorSubaccountName: true,
+        role: true,
+        franchiseeId: true,
+        segment: true,
+      },
     });
 
     // franchiseeId is only applicable to CLIENT users (null = direct BitFactory
@@ -81,6 +86,7 @@ export async function PUT(
       | "SME"
       | "SELF_MINING"
       | "RETAIL"
+      | "POTENTIAL_CUSTOMER"
       | undefined = undefined;
     if (currentUser?.role === "CLIENT") {
       const resultingFranchiseeId =
@@ -95,12 +101,13 @@ export async function PUT(
         if (
           body.segment !== "CORPORATE" &&
           body.segment !== "SME" &&
-          body.segment !== "SELF_MINING"
+          body.segment !== "SELF_MINING" &&
+          body.segment !== "POTENTIAL_CUSTOMER"
         ) {
           return NextResponse.json(
             {
               error:
-                "Segment (Corporate, SME, or Self Mining) is required when unassigning a franchise",
+                "Segment (Corporate, SME, Self Mining, or Potential Customer) is required when unassigning a franchise",
             },
             { status: 400 },
           );
@@ -110,14 +117,40 @@ export async function PUT(
         if (
           body.segment !== "CORPORATE" &&
           body.segment !== "SME" &&
-          body.segment !== "SELF_MINING"
+          body.segment !== "SELF_MINING" &&
+          body.segment !== "POTENTIAL_CUSTOMER"
         ) {
           return NextResponse.json(
-            { error: "Segment must be Corporate, SME, or Self Mining" },
+            {
+              error:
+                "Segment must be Corporate, SME, Self Mining, or Potential Customer",
+            },
             { status: 400 },
           );
         }
         segmentUpdate = body.segment;
+      }
+
+      // Check subaccount requirement when the resulting segment is an active customer type
+      const effectiveSegment =
+        segmentUpdate !== undefined ? segmentUpdate : currentUser.segment;
+      const effectiveSubaccount =
+        body.luxorSubaccountName !== undefined
+          ? body.luxorSubaccountName
+          : currentUser.luxorSubaccountName;
+
+      if (
+        effectiveSegment &&
+        effectiveSegment !== "POTENTIAL_CUSTOMER" &&
+        (!effectiveSubaccount || !effectiveSubaccount.trim())
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              "A Luxor subaccount is required for active customer types (Corporate, SME, Self Mining, or Retail)",
+          },
+          { status: 400 },
+        );
       }
     }
 

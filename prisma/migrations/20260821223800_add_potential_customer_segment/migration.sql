@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "Segment" ADD VALUE 'POTENTIAL_CUSTOMER';

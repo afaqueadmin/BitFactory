@@ -979,6 +979,7 @@ enum Segment {
   SELF_MINING
   FRANCHISEE
   RETAIL
+  POTENTIAL_CUSTOMER
 }
 
 enum PaymentType {

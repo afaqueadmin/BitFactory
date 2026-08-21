@@ -109,22 +109,41 @@ export async function POST(request: NextRequest) {
     // forces RETAIL server-side regardless of what was submitted (mutually
     // exclusive with the direct-segment picker); otherwise a direct segment
     // selection is required.
-    let resolvedSegment: "CORPORATE" | "SME" | "SELF_MINING" | "RETAIL" | null =
-      null;
+    let resolvedSegment:
+      | "CORPORATE"
+      | "SME"
+      | "SELF_MINING"
+      | "RETAIL"
+      | "POTENTIAL_CUSTOMER"
+      | null = null;
     if (role === "CLIENT") {
       if (franchiseeId) {
         resolvedSegment = "RETAIL";
       } else if (
         segment === "CORPORATE" ||
         segment === "SME" ||
-        segment === "SELF_MINING"
+        segment === "SELF_MINING" ||
+        segment === "POTENTIAL_CUSTOMER"
       ) {
         resolvedSegment = segment;
       } else {
         return NextResponse.json(
           {
             error:
-              "Segment (Corporate, SME, or Self Mining) is required for CLIENT users without a franchise",
+              "Segment (Corporate, SME, Self Mining, or Potential Customer) is required for CLIENT users without a franchise",
+          },
+          { status: 400 },
+        );
+      }
+
+      // Enforce subaccount requirement for active customer types
+      if (
+        resolvedSegment !== "POTENTIAL_CUSTOMER" &&
+        (!luxorSubaccountName || !luxorSubaccountName.trim())
+      ) {
+        return NextResponse.json(
+          {
+            error: "A Luxor subaccount is required for this customer type",
           },
           { status: 400 },
         );
@@ -179,7 +198,11 @@ export async function POST(request: NextRequest) {
       console.log(`[User Create API] User created in DB: ${newUser.id}`);
     } catch (dbError) {
       console.error("[User Create API] Failed to create user in DB:", dbError);
-      throw new Error("Failed to create user in database");
+      const message =
+        dbError instanceof Error
+          ? dbError.message
+          : "Failed to create user in database";
+      throw new Error(message);
     }
 
     // If client role and initial deposit provided, create cost payment entry
