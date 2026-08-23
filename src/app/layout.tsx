@@ -37,8 +37,18 @@ export const metadata: Metadata = {
     telephone: false,
   },
   icons: {
-    icon: [{ url: "/favicon.svg", sizes: "any", type: "image/svg+xml" }],
-    apple: [{ url: "/favicon.svg", sizes: "any", type: "image/svg+xml" }],
+    icon: [
+      { url: "/icons/app-icon.svg", sizes: "any", type: "image/svg+xml" },
+      { url: "/favicon.svg", sizes: "any", type: "image/svg+xml" },
+    ],
+    apple: [
+      {
+        url: "/icons/apple-touch-icon.svg",
+        sizes: "any",
+        type: "image/svg+xml",
+      },
+      { url: "/icons/app-icon.svg", sizes: "any", type: "image/svg+xml" },
+    ],
     shortcut: "/favicon.svg",
   },
 };

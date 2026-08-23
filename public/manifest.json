@@ -11,17 +11,17 @@
     "minimal-ui"
   ],
   "background_color": "#090d16",
-  "theme_color": "#0f766e",
+  "theme_color": "#090d16",
   "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "/favicon.svg",
+      "src": "/icons/app-icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"
     },
     {
-      "src": "/favicon.svg",
+      "src": "/icons/app-icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "maskable"
@@ -56,21 +56,21 @@
       "short_name": "Dashboard",
       "description": "View live hashrate and earnings",
       "url": "/dashboard",
-      "icons": [{ "src": "/favicon.svg", "sizes": "any" }]
+      "icons": [{ "src": "/icons/app-icon.svg", "sizes": "any" }]
     },
     {
       "name": "Miners",
       "short_name": "Miners",
       "description": "Monitor mining machines",
       "url": "/miners",
-      "icons": [{ "src": "/favicon.svg", "sizes": "any" }]
+      "icons": [{ "src": "/icons/app-icon.svg", "sizes": "any" }]
     },
     {
       "name": "Invoices",
       "short_name": "Invoices",
       "description": "View electricity and hosting invoices",
       "url": "/invoices",
-      "icons": [{ "src": "/favicon.svg", "sizes": "any" }]
+      "icons": [{ "src": "/icons/app-icon.svg", "sizes": "any" }]
     }
   ]
 }
