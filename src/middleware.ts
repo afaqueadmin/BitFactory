@@ -7,6 +7,9 @@ const publicPaths = new Set([
   "/",
   "/login",
   "/api/auth/2fa/validate", // Adding 2FA validation endpoint
+  "/manifest.json",
+  "/sw.js",
+  "/offline.html",
   "/BitfactoryLogo.webp",
   "/file.svg",
   "/globe.svg",
@@ -132,8 +135,8 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // ✅ Allow public assets and login page
-  if (publicPaths.has(pathname)) {
+  // ✅ Allow public assets, icons, and login page
+  if (publicPaths.has(pathname) || pathname.startsWith("/icons/")) {
     // Prevent logged-in users from visiting /login again
     if (pathname === "/login") {
       const token = request.cookies.get("token")?.value;

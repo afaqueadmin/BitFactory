@@ -23,6 +23,9 @@ import TwoFactorVerification from "@/components/TwoFactorVerification";
 import ForgotPasswordModal from "@/components/ForgotPasswordModal";
 import { authenticateWithPasskey } from "@/lib/webauthn/authentication";
 import { isWebAuthnSupported } from "@/lib/webauthn/utils";
+import PwaInstallPrompt, {
+  PwaQuickInstallButton,
+} from "@/components/pwa/PwaInstallPrompt";
 
 const PASSKEY_OFFER_FLAG = "bf_offer_passkey_setup";
 
@@ -315,6 +318,11 @@ export default function Login() {
                 Sign up
               </Button>
             </Box>
+
+            {/* Quick Mobile App Install Pill for Mobile/Tablet */}
+            <Box mt={2} display="flex" justifyContent="center">
+              <PwaQuickInstallButton />
+            </Box>
           </Box>
 
           {/* Passkey unavailable notice */}
@@ -330,6 +338,9 @@ export default function Login() {
           )}
         </Paper>
       )}
+
+      {/* PWA Mobile/Tablet Install Modal Popup */}
+      <PwaInstallPrompt />
     </Box>
   );
 }

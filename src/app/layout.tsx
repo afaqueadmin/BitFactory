@@ -1,5 +1,5 @@
 // app/layout.tsx
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -13,12 +13,32 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#0f766e" },
+    { media: "(prefers-color-scheme: dark)", color: "#090d16" },
+  ],
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  viewportFit: "cover",
+};
+
 export const metadata: Metadata = {
   title: "BitFactory",
   description: "BitFactory - CryptoMiner Dashboard",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "BitFactory",
+  },
+  formatDetection: {
+    telephone: false,
+  },
   icons: {
     icon: [{ url: "/favicon.svg", sizes: "any", type: "image/svg+xml" }],
-    apple: "/favicon.svg", // For Apple devices
+    apple: [{ url: "/favicon.svg", sizes: "any", type: "image/svg+xml" }],
     shortcut: "/favicon.svg",
   },
 };
@@ -27,6 +47,7 @@ import { AppRouterCacheProvider } from "@mui/material-nextjs/v15-appRouter";
 import { AuthProvider } from "@/lib/contexts/auth-context";
 import { ThemeProvider } from "./theme-provider";
 import { Providers } from "@/providers/QueryProvider";
+import PwaRegister from "@/components/pwa/PwaRegister";
 
 export default function RootLayout({
   children,
@@ -42,7 +63,10 @@ export default function RootLayout({
         <AppRouterCacheProvider options={{ key: "mui" }}>
           <AuthProvider>
             <ThemeProvider>
-              <Providers>{children}</Providers>
+              <Providers>
+                <PwaRegister />
+                {children}
+              </Providers>
             </ThemeProvider>
           </AuthProvider>
         </AppRouterCacheProvider>
