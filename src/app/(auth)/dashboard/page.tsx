@@ -442,29 +442,28 @@ export default function DashboardPage() {
               flexDirection: { xs: "column", sm: "row" },
             }}
           >
-            <Typography
-              variant="h4"
-              fontWeight="bold"
-              sx={{
-                background: theme.palette.text.primary,
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-                fontSize: { xs: "1.25rem", sm: "1.6rem", md: "2rem" },
-                textAlign: "left",
-              }}
-            >
-              Mining Performance
-            </Typography>
-
             <Box
               sx={{
                 display: "flex",
-                gap: 2,
-                flexWrap: "wrap",
                 alignItems: "center",
-                justifyContent: { xs: "flex-start", sm: "flex-end" },
+                flexWrap: "wrap",
+                gap: { xs: 1, sm: 2 },
               }}
             >
+              <Typography
+                variant="h4"
+                fontWeight="bold"
+                sx={{
+                  background: theme.palette.text.primary,
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                  fontSize: { xs: "1.25rem", sm: "1.6rem", md: "2rem" },
+                  textAlign: "left",
+                }}
+              >
+                Mining Performance
+              </Typography>
+
               {/* Granularity toggle: Daily / Monthly */}
               <Box sx={{ display: "flex", gap: 0.5 }}>
                 {(["daily", "monthly"] as const).map((g) => (
@@ -500,7 +499,17 @@ export default function DashboardPage() {
                   </button>
                 ))}
               </Box>
+            </Box>
 
+            <Box
+              sx={{
+                display: "flex",
+                gap: 2,
+                flexWrap: "wrap",
+                alignItems: "center",
+                justifyContent: { xs: "flex-start", sm: "flex-end" },
+              }}
+            >
               {/* Chart View Mode Toggle Buttons - Only show if multiple pools */}
               {workersStats.activePoolNames.length > 1 && (
                 <Box
