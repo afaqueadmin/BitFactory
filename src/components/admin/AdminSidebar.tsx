@@ -11,6 +11,7 @@ import {
   Collapse,
   IconButton,
   Tooltip,
+  Badge,
 } from "@mui/material";
 import {
   Dashboard as DashboardIcon,
@@ -39,10 +40,11 @@ import {
   ShowChart as DailySnapshotsIcon,
   Engineering as WorkerMetricsIcon,
   SwapHoriz as PoolTransactionsIcon,
+  SupportAgent as SupportIcon,
 } from "@mui/icons-material";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useUser } from "@/lib/hooks";
+import { useUser, useTickets } from "@/lib/hooks";
 
 interface SidebarItem {
   title: string;
@@ -55,6 +57,7 @@ interface SidebarItem {
   // dedicated FranchiseSidebar under the (franchise) route group.
   roles?: Array<"ADMIN" | "SUPER_ADMIN">;
   openInNewTab?: boolean;
+  badgeCount?: number;
 }
 
 const sidebarItems: SidebarItem[] = [
@@ -80,6 +83,11 @@ const sidebarItems: SidebarItem[] = [
     title: "Incentive Payouts",
     icon: <IncentivesIcon />,
     path: "/incentives/payouts",
+  },
+  {
+    title: "Support Tickets",
+    icon: <SupportIcon />,
+    path: "/tickets",
   },
   {
     title: "Customers",
@@ -276,11 +284,18 @@ export default function AdminSidebar() {
   const pathname = usePathname();
   const [expandedItems, setExpandedItems] = React.useState<string[]>([]);
   const { user } = useUser();
+  const { tickets: openTickets } = useTickets({ status: "OPEN" });
 
-  const visibleSidebarItems = sidebarItems.filter((item) => {
-    const allowedRoles = item.roles ?? ["ADMIN", "SUPER_ADMIN"];
-    return user ? (allowedRoles as string[]).includes(user.role) : false;
-  });
+  const visibleSidebarItems = sidebarItems
+    .filter((item) => {
+      const allowedRoles = item.roles ?? ["ADMIN", "SUPER_ADMIN"];
+      return user ? (allowedRoles as string[]).includes(user.role) : false;
+    })
+    .map((item) =>
+      item.title === "Support Tickets"
+        ? { ...item, badgeCount: openTickets.length }
+        : item,
+    );
 
   const handleExpandClick = (title: string) => {
     if (!sideBarOpen && !isHovered) return;
@@ -352,7 +367,26 @@ export default function AdminSidebar() {
                   justifyContent: "center",
                 }}
               >
-                {item.icon}
+                {item.badgeCount ? (
+                  <Badge
+                    color="error"
+                    badgeContent={item.badgeCount}
+                    max={99}
+                    sx={{
+                      "& .MuiBadge-badge": {
+                        fontSize: "0.65rem",
+                        minWidth: 16,
+                        height: 16,
+                        padding: "0 4px",
+                        borderRadius: 8,
+                      },
+                    }}
+                  >
+                    {item.icon}
+                  </Badge>
+                ) : (
+                  item.icon
+                )}
               </ListItemIcon>
               {isExpanded && (
                 <Box

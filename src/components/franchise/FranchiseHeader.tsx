@@ -10,6 +10,7 @@ import {
   Menu,
   MenuItem,
   CircularProgress,
+  Badge,
 } from "@mui/material";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import Image from "next/image";
@@ -18,6 +19,7 @@ import { useAuth } from "@/lib/contexts/auth-context";
 import LightModeIcon from "@mui/icons-material/LightMode";
 import DarkModeIcon from "@mui/icons-material/DarkMode";
 import { useTheme } from "@/app/theme-provider";
+import { useTickets } from "@/lib/hooks";
 
 const StyledAppBar = styled(AppBar)(({ theme }) => ({
   backgroundColor: theme.palette.background.paper,
@@ -39,6 +41,8 @@ export default function FranchiseHeader() {
   );
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const { darkMode, toggleDarkMode } = useTheme();
+  const { tickets: openTickets } = useTickets({ status: "OPEN" });
+  const openTicketCount = openTickets.length;
 
   const handleAccountClick = (event: React.MouseEvent<HTMLElement>) => {
     setAccountAnchorEl(event.currentTarget);
@@ -91,7 +95,24 @@ export default function FranchiseHeader() {
             color="inherit"
             onClick={handleAccountClick}
           >
-            <AccountCircleIcon />
+            <Badge
+              color="error"
+              badgeContent={openTicketCount}
+              invisible={openTicketCount === 0}
+              max={99}
+              anchorOrigin={{ vertical: "top", horizontal: "right" }}
+              sx={{
+                "& .MuiBadge-badge": {
+                  fontSize: "0.65rem",
+                  minWidth: 16,
+                  height: 16,
+                  padding: "0 4px",
+                  borderRadius: 8,
+                },
+              }}
+            >
+              <AccountCircleIcon />
+            </Badge>
           </StyledIconButton>
           <Menu
             anchorEl={accountAnchorEl}
@@ -113,6 +134,33 @@ export default function FranchiseHeader() {
               }}
             >
               Security Settings
+            </MenuItem>
+            <MenuItem
+              onClick={() => {
+                router.push("/franchise/support");
+                handleClose();
+              }}
+              sx={{ display: "flex", justifyContent: "space-between", gap: 2 }}
+            >
+              Support
+              {openTicketCount > 0 && (
+                <Badge
+                  color="error"
+                  badgeContent={openTicketCount}
+                  max={99}
+                  sx={{
+                    "& .MuiBadge-badge": {
+                      position: "static",
+                      transform: "none",
+                      fontSize: "0.65rem",
+                      minWidth: 16,
+                      height: 16,
+                      padding: "0 4px",
+                      borderRadius: 8,
+                    },
+                  }}
+                />
+              )}
             </MenuItem>
             <MenuItem
               onClick={handleLogout}

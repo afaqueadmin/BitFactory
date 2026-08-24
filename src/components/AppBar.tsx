@@ -369,6 +369,9 @@ export default function AppBarComponent() {
           >
             Security Settings
           </MenuItem>
+          <MenuItem component={Link} href="/support" onClick={handleClose}>
+            Support
+          </MenuItem>
           <MenuItem
             onClick={handleLogout}
             disabled={isLoggingOut}

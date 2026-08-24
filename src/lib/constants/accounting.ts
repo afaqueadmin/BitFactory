@@ -211,6 +211,12 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   [AuditAction.MEMO_CREATED]: "Memo Created",
   [AuditAction.MEMO_SENT]: "Memo Emailed to Customer",
   [AuditAction.MEMO_VOIDED]: "Memo Voided",
+  [AuditAction.TICKET_CREATED]: "Support Ticket Created",
+  [AuditAction.TICKET_REPLIED]: "Support Ticket Reply Added",
+  [AuditAction.TICKET_ASSIGNED]: "Support Ticket Assigned",
+  [AuditAction.TICKET_STATUS_CHANGED]: "Support Ticket Status Changed",
+  [AuditAction.TICKET_PRIORITY_CHANGED]: "Support Ticket Priority Changed",
+  [AuditAction.TICKET_CLOSED]: "Support Ticket Closed",
 };
 
 // ============================================================================

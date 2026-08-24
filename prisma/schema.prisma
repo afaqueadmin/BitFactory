@@ -79,6 +79,10 @@ model User {
   incentiveRatesUpdated      FranchiseIncentiveRate[]     @relation("incentiveRatesUpdated")
   incentiveEntriesAsClient   IncentiveEntry[]             @relation("incentiveEntriesClient")
   incentivePayoutsCreated    IncentivePayoutBatch[]       @relation("incentivePayoutsCreated")
+  ticketsRaised              SupportTicket[]              @relation("ticketsRaised")
+  ticketsAssigned            SupportTicket[]              @relation("ticketsAssigned")
+  ticketsRaisedOnBehalf      SupportTicket[]              @relation("ticketsOnBehalfOf")
+  ticketMessages             TicketMessage[]              @relation("ticketMessagesAuthored")
 
   @@index([isDeleted])
   @@index([franchiseeId])
@@ -109,6 +113,7 @@ model Franchise {
   incentiveRates         FranchiseIncentiveRate[]
   incentiveEntries       IncentiveEntry[]
   incentivePayoutBatches IncentivePayoutBatch[]
+  tickets                SupportTicket[]
 
   @@index([franchiseeId])
   @@index([createdById])
@@ -319,6 +324,7 @@ model Miner {
   user             User                    @relation(fields: [userId], references: [id])
   pool             Pool?                   @relation(fields: [poolId], references: [id])
   repairNotes      MinerRepairNote[]       @relation("MinerRepairNotes")
+  tickets          SupportTicket[]
 
   @@unique([name, userId])
   @@index([hardwareId])
@@ -652,6 +658,7 @@ model Invoice {
   updatedAt              DateTime              @updatedAt
   notifications          InvoiceNotification[] @relation("invoiceNotifications")
   costPayments           CostPayment[]         @relation("invoiceCostPayments")
+  tickets                SupportTicket[]
   confirmoPayment        ConfirmoPayment?
   emailSendResults       EmailSendResult[]     @relation("emailSendResults")
   lineItems              InvoiceLineItem[]
@@ -1070,6 +1077,12 @@ enum AuditAction {
   MEMO_CREATED
   MEMO_SENT
   MEMO_VOIDED
+  TICKET_CREATED
+  TICKET_REPLIED
+  TICKET_ASSIGNED
+  TICKET_STATUS_CHANGED
+  TICKET_PRIORITY_CHANGED
+  TICKET_CLOSED
 }
 
 enum NotificationType {
@@ -1271,4 +1284,100 @@ model MinerRepairNote {
   @@index([minerId])
   @@index([createdById])
   @@map("miner_repair_notes")
+}
+
+// A support ticket raised by a CLIENT or FRANCHISEE (acting for their own
+// mining account). When raisedBy belongs to a franchise, franchiseId is
+// denormalized onto the ticket so both the franchisee (scoped to their own
+// franchise) and admin (unscoped) can query the same rows - support is
+// visible to both simultaneously, admin can act on any ticket at any time.
+// Optional minerId pins the ticket to a specific ASIC for hardware/pool
+// issues, giving admins instant context instead of asking which machine.
+// Optional invoiceId does the same for billing disputes - pins to the
+// specific invoice instead of asking which one. Optional onBehalfOfUserId
+// is set when a FRANCHISEE raises a ticket for one of their own onboarded
+// clients rather than for their own account - raisedById stays the actual
+// person who submitted it (the franchisee), onBehalfOfUserId is the
+// customer the ticket concerns, so both the franchisee and that customer
+// can see it.
+model SupportTicket {
+  id               String          @id @default(cuid())
+  raisedById       String
+  raisedBy         User            @relation("ticketsRaised", fields: [raisedById], references: [id])
+  onBehalfOfUserId String?
+  onBehalfOf       User?           @relation("ticketsOnBehalfOf", fields: [onBehalfOfUserId], references: [id])
+  franchiseId      String?
+  franchise        Franchise?      @relation(fields: [franchiseId], references: [id])
+  minerId          String?
+  miner            Miner?          @relation(fields: [minerId], references: [id])
+  invoiceId        String?
+  invoice          Invoice?        @relation(fields: [invoiceId], references: [id])
+  subject          String
+  category         TicketCategory
+  priority         TicketPriority  @default(NORMAL)
+  status           TicketStatus    @default(OPEN)
+  assignedToId     String?
+  assignedTo       User?           @relation("ticketsAssigned", fields: [assignedToId], references: [id])
+  messages         TicketMessage[]
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  closedAt         DateTime?
+
+  @@index([raisedById])
+  @@index([onBehalfOfUserId])
+  @@index([franchiseId])
+  @@index([minerId])
+  @@index([invoiceId])
+  @@index([status])
+  @@index([assignedToId])
+  @@index([createdAt])
+  @@map("support_tickets")
+}
+
+// A message in a ticket's thread. authorId is null for system-generated
+// entries (e.g. a live pool telemetry snapshot attached at ticket creation)
+// - those are always isInternal since there's no customer-authored content
+// to show them. isInternal lets an ADMIN/FRANCHISEE leave a note (e.g.
+// escalating to a facility technician) that the CLIENT never sees, without
+// needing a second message type.
+model TicketMessage {
+  id                 String        @id @default(cuid())
+  ticketId           String
+  ticket             SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  authorId           String?
+  author             User?         @relation("ticketMessagesAuthored", fields: [authorId], references: [id])
+  body               String        @db.Text
+  isInternal         Boolean       @default(false)
+  isSystemGenerated  Boolean       @default(false)
+  metadata           Json?
+  attachmentUrl      String?
+  attachmentPublicId String?
+  createdAt          DateTime      @default(now())
+
+  @@index([ticketId])
+  @@index([authorId])
+  @@map("ticket_messages")
+}
+
+enum TicketCategory {
+  HARDWARE_MINER
+  BILLING_INVOICE
+  POOL_HASHRATE
+  ACCOUNT
+  OTHER
+}
+
+enum TicketPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  WAITING_ON_CUSTOMER
+  RESOLVED
+  CLOSED
 }

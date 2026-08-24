@@ -35,11 +35,15 @@ const clientPaths = [
   "/miners",
   "/payback-analysis",
   "/security-setting",
+  "/support",
   "/transaction",
   "/wallet",
   // Add client-specific public paths if any
 ];
-const clientDynamicPatterns = [new URLPattern({ pathname: "/invoices/:id*" })];
+const clientDynamicPatterns = [
+  new URLPattern({ pathname: "/invoices/:id*" }),
+  new URLPattern({ pathname: "/support/:id*" }),
+];
 
 const securePaths = {
   CLIENT: new Set<string>(clientPaths),
@@ -70,6 +74,7 @@ const securePaths = {
     "/braiins-workers",
     "/activity-log",
     "/incentives/payouts",
+    "/tickets",
     // Add admin-specific public paths if any
   ]),
   // Franchisee: their own dashboard/account/customers/miners pages under
@@ -84,6 +89,7 @@ const securePaths = {
     "/franchise/customers",
     "/franchise/miners",
     "/franchise/incentives",
+    "/franchise/support",
     ...clientPaths,
   ]),
 }; // Add admin-specific public paths if any
@@ -97,8 +103,12 @@ const dynamicPatternsPaths = {
     new URLPattern({ pathname: "/groups/:id*" }),
     new URLPattern({ pathname: "/franchisees/:id" }),
     new URLPattern({ pathname: "/franchisees/:id/incentives" }),
+    new URLPattern({ pathname: "/tickets/:id*" }),
   ],
-  FRANCHISEE: [...clientDynamicPatterns],
+  FRANCHISEE: [
+    ...clientDynamicPatterns,
+    new URLPattern({ pathname: "/franchise/support/:id*" }),
+  ],
 };
 
 // Role-based default redirects

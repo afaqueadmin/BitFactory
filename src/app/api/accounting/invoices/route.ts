@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
 import { InvoiceStatus, AuditAction, Prisma } from "@prisma/client";
+import { assertFranchiseeOwnsCustomer } from "@/lib/franchiseeScope";
 
 function normalizeBillingMonth(billingMonth: string | Date): Date {
   const parsedBillingMonth = new Date(billingMonth);
@@ -29,6 +30,15 @@ export async function GET(request: NextRequest) {
     const userRole = decoded.role;
 
     if (customerId && userRole === "CLIENT" && customerId != decoded.userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    if (
+      customerId &&
+      userRole === "FRANCHISEE" &&
+      customerId !== decoded.userId &&
+      !(await assertFranchiseeOwnsCustomer(decoded.userId, customerId))
+    ) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
