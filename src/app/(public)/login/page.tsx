@@ -26,6 +26,7 @@ import { isWebAuthnSupported } from "@/lib/webauthn/utils";
 import PwaInstallPrompt, {
   PwaQuickInstallButton,
 } from "@/components/pwa/PwaInstallPrompt";
+import { PwaInstallProvider } from "@/components/pwa/PwaInstallContext";
 
 const PASSKEY_OFFER_FLAG = "bf_offer_passkey_setup";
 
@@ -150,6 +151,7 @@ export default function Login() {
   };
 
   return (
+    <PwaInstallProvider>
     <Box
       sx={{
         minHeight: "100vh",
@@ -342,5 +344,6 @@ export default function Login() {
       {/* PWA Mobile/Tablet Install Modal Popup */}
       <PwaInstallPrompt />
     </Box>
+    </PwaInstallProvider>
   );
 }

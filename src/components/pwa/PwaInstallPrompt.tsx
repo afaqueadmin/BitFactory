@@ -17,7 +17,7 @@ import {
 import type { TransitionProps } from "@mui/material/transitions";
 import CloseIcon from "@mui/icons-material/Close";
 import IosShareIcon from "@mui/icons-material/IosShare";
-import { usePwaInstall } from "./usePwaInstall";
+import { usePwaInstallContext } from "./PwaInstallContext";
 
 const SlideTransition = React.forwardRef(function SlideTransition(
   props: TransitionProps & {
@@ -38,7 +38,7 @@ export default function PwaInstallPrompt() {
     isOpen,
     promptInstall,
     dismissPrompt,
-  } = usePwaInstall();
+  } = usePwaInstallContext();
 
   const [installing, setInstalling] = useState(false);
   const [showManualFallback, setShowManualFallback] = useState(false);
@@ -285,7 +285,7 @@ export default function PwaInstallPrompt() {
  */
 export function PwaQuickInstallButton() {
   const { isStandalone, isMobileOrTablet, isInstalled, openPrompt } =
-    usePwaInstall();
+    usePwaInstallContext();
 
   if (isStandalone || !isMobileOrTablet || isInstalled) {
     return null;
