@@ -62,6 +62,7 @@ export function usePwaInstall() {
     setIsIos(isIosDevice);
 
     // 4. Check dismissal history
+    let timer: ReturnType<typeof setTimeout> | undefined;
     const dismissedTimeStr = localStorage.getItem(DISMISS_STORAGE_KEY);
     if (dismissedTimeStr) {
       const dismissedTime = parseInt(dismissedTimeStr, 10);
@@ -69,13 +70,11 @@ export function usePwaInstall() {
       setIsDismissed(isStillSnoozed);
       if (!isStillSnoozed && mobileOrTablet && !isStandalone) {
         // Auto open prompt after a gentle delay
-        const timer = setTimeout(() => setIsOpen(true), 1600);
-        return () => clearTimeout(timer);
+        timer = setTimeout(() => setIsOpen(true), 1600);
       }
     } else if (mobileOrTablet && !isStandalone) {
       setIsDismissed(false);
-      const timer = setTimeout(() => setIsOpen(true), 1600);
-      return () => clearTimeout(timer);
+      timer = setTimeout(() => setIsOpen(true), 1600);
     }
 
     // 5. Intercept BeforeInstallPromptEvent (Chromium / Android)
@@ -96,6 +95,7 @@ export function usePwaInstall() {
     window.addEventListener("appinstalled", handleAppInstalled);
 
     return () => {
+      if (timer) clearTimeout(timer);
       window.removeEventListener(
         "beforeinstallprompt",
         handleBeforeInstallPrompt,

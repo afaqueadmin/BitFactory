@@ -34,12 +34,14 @@ export default function PwaInstallPrompt() {
     isMobileOrTablet,
     isIos,
     isInstalled,
+    canInstall,
     isOpen,
     promptInstall,
     dismissPrompt,
   } = usePwaInstall();
 
   const [installing, setInstalling] = useState(false);
+  const [showManualFallback, setShowManualFallback] = useState(false);
   const theme = useTheme();
   const isSmallScreen = useMediaQuery(theme.breakpoints.down("sm"));
 
@@ -50,6 +52,14 @@ export default function PwaInstallPrompt() {
 
   const handleInstallClick = async () => {
     if (isIos) {
+      return;
+    }
+
+    // The browser hasn't handed us a native install prompt to trigger
+    // (e.g. it already fired before this component mounted). Fall back
+    // to instructing the user rather than silently doing nothing.
+    if (!canInstall) {
+      setShowManualFallback(true);
       return;
     }
 
@@ -197,6 +207,33 @@ export default function PwaInstallPrompt() {
         ) : (
           /* Android / Standard 1-Tap Install */
           <Box>
+            {showManualFallback && (
+              <Box
+                sx={{
+                  p: 2,
+                  borderRadius: 2.5,
+                  bgcolor: "#f8fafc",
+                  border: "1px solid #e2e8f0",
+                  mb: 2,
+                  textAlign: "center",
+                }}
+              >
+                <Typography
+                  variant="body2"
+                  sx={{
+                    color: "#334155",
+                    fontSize: "0.875rem",
+                    lineHeight: 1.6,
+                  }}
+                >
+                  Your browser didn&apos;t offer an automatic install this
+                  time. Open the browser menu (⋮) and choose{" "}
+                  <strong>Add to Home screen</strong> or{" "}
+                  <strong>Install app</strong>.
+                </Typography>
+              </Box>
+            )}
+
             <Button
               fullWidth
               variant="contained"
