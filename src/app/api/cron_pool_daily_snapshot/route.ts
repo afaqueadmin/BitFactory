@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
-  ensurePoolSubaccounts,
   getPreviousCompletedUtcDay,
   upsertPoolDailySnapshotsForDate,
   PoolSnapshotUpsertResult,
 } from "@/lib/services/poolDailySnapshotService";
 import { sendPoolCronSummaryEmail } from "@/lib/email";
 
-// Scheduled for 03:00 UTC, not right at midnight — moved back based on live
-// evidence of how late Luxor finalizes the just-ended day:
+// Scheduled for 05:00 UTC, not right at midnight — moved back repeatedly
+// based on live evidence of how late Luxor finalizes the just-ended day:
 //   2026-08-20: still empty at 00:21 UTC (~20 min after midnight)
 //   2026-08-23: still empty at 02:01 UTC (~2h after midnight) for ALL 17
 //     subaccounts — the 2-hour buffer wasn't enough either.
@@ -27,12 +26,16 @@ interface CronDayResult {
 /**
  * GET /api/cron_pool_daily_snapshot
  *
- * Vercel cron endpoint, protected by CRON_SECRET. Runs at 03:00 UTC (see
- * note above on why not closer to midnight), syncs PoolSubaccount rows from
- * any PoolAuth added since the last run, then snapshots
+ * Vercel cron endpoint, protected by CRON_SECRET. Runs at 05:00 UTC (see
+ * note above on why not closer to midnight), snapshots
  * hashrate/efficiency/uptime/active-workers/revenue into
  * PoolSubaccountDailySnapshot for the previous few completed UTC days across
  * every Luxor subaccount.
+ *
+ * Does not call ensurePoolSubaccounts() — that now runs in
+ * cron_pool_worker_status (23:35 UTC, the earliest cron in the daily cycle),
+ * so every cron that runs after it, across all pool crons, sees a
+ * same-day-added customer instead of just this one.
  *
  * Luxor only — see cron_pool_daily_snapshot_braiins for Braiins, kept as a
  * separate route so it can be scheduled independently (currently dormant:
@@ -42,15 +45,6 @@ export async function GET(request: NextRequest) {
   const authHeader = request.headers.get("authorization");
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return new Response("Unauthorized", { status: 401 });
-  }
-
-  try {
-    await ensurePoolSubaccounts();
-  } catch (error) {
-    console.error(
-      "[Pool Daily Snapshot Cron] ensurePoolSubaccounts failed:",
-      error,
-    );
   }
 
   const latestDay = getPreviousCompletedUtcDay();
@@ -73,7 +67,7 @@ export async function GET(request: NextRequest) {
       const attemptsRemaining = RETRY_WINDOW_DAYS - daysAgo - 1;
       const retryNote =
         attemptsRemaining > 0
-          ? `Will retry automatically on tomorrow's run (03:00 UTC) — ${attemptsRemaining} more attempt${attemptsRemaining === 1 ? "" : "s"} left after that before this date drops out of the 3-day retry window.`
+          ? `Will retry automatically on tomorrow's run (05:00 UTC) — ${attemptsRemaining} more attempt${attemptsRemaining === 1 ? "" : "s"} left after that before this date drops out of the 3-day retry window.`
           : `This was the last automatic retry for this date (3-day retry window now exhausted) — if it's still empty after this, it needs a manual backfill, it will not be retried again on its own.`;
 
       const results: PoolSnapshotUpsertResult[] = rawResults.map((r) =>

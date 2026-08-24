@@ -10,7 +10,7 @@
     },
     {
       "path": "/api/cron_pool_daily_snapshot",
-      "schedule": "0 3 * * *"
+      "schedule": "0 5 * * *"
     },
     {
       "path": "/api/cron_pool_worker_transactions",

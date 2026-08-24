@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { upsertTodayWorkerStatus } from "@/lib/services/poolWorkerAndTransactionService";
+import { ensurePoolSubaccounts } from "@/lib/services/poolDailySnapshotService";
 import { sendPoolCronSummaryEmail } from "@/lib/email";
 
 /**
@@ -13,6 +14,13 @@ import { sendPoolCronSummaryEmail } from "@/lib/email";
  * that day's worker status is gone permanently; there is no "catch up
  * tomorrow" path (same shape as cron_pool_hashprice_balance).
  *
+ * Also calls ensurePoolSubaccounts() — this is the earliest-running pool
+ * cron in the daily cycle (23:35 UTC), so syncing PoolSubaccount rows for
+ * any newly-added customer here, rather than in cron_pool_daily_snapshot,
+ * means every other pool cron that runs later that same cycle (worker
+ * transactions, daily snapshot, hashprice/balance) sees them too, instead
+ * of only whichever cron happened to own the sync.
+ *
  * Luxor only — no Braiins worker endpoint exists at all, historical or
  * current-state.
  */
@@ -20,6 +28,12 @@ export async function GET(request: NextRequest) {
   const authHeader = request.headers.get("authorization");
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return new Response("Unauthorized", { status: 401 });
+  }
+
+  try {
+    await ensurePoolSubaccounts();
+  } catch (error) {
+    console.error("[Worker Status Cron] ensurePoolSubaccounts failed:", error);
   }
 
   const results = await upsertTodayWorkerStatus();

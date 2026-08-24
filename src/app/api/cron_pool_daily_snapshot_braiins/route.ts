@@ -23,8 +23,8 @@ interface CronDayResult {
  * would just produce zero-value rows. Activate later by adding a schedule
  * entry for this path in vercel.json — no code changes needed.
  *
- * Does not call ensurePoolSubaccounts() — the Luxor cron already keeps
- * PoolSubaccount rows in sync for both pools regardless of which
+ * Does not call ensurePoolSubaccounts() — cron_pool_worker_status already
+ * keeps PoolSubaccount rows in sync for both pools regardless of which
  * snapshot cron is scheduled.
  */
 export async function GET(request: NextRequest) {
