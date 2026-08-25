@@ -178,7 +178,7 @@ export async function fetchLuxorSeries(
   }
 
   return points
-    .filter((p) => p.t >= window.start.getTime() && p.t <= window.end.getTime())
+    .filter((p) => p.t >= window.start.getTime() && p.t < window.end.getTime())
     .sort((a, b) => a.t - b.t);
 }
 
@@ -234,7 +234,7 @@ async function fetchLuxorSeriesLive(
   }
 
   return points
-    .filter((p) => p.t >= window.start.getTime() && p.t <= window.end.getTime())
+    .filter((p) => p.t >= window.start.getTime() && p.t < window.end.getTime())
     .sort((a, b) => a.t - b.t);
 }
 
@@ -298,7 +298,7 @@ export async function fetchLuxorUptime(
   }
 
   return points
-    .filter((p) => p.t >= window.start.getTime() && p.t <= window.end.getTime())
+    .filter((p) => p.t >= window.start.getTime() && p.t < window.end.getTime())
     .sort((a, b) => a.t - b.t);
 }
 
@@ -343,7 +343,7 @@ async function fetchLuxorUptimeLive(
   }
 
   return points
-    .filter((p) => p.t >= window.start.getTime() && p.t <= window.end.getTime())
+    .filter((p) => p.t >= window.start.getTime() && p.t < window.end.getTime())
     .sort((a, b) => a.t - b.t);
 }
 
@@ -423,7 +423,7 @@ export async function fetchBraiinsSeries(
   }
 
   return [...dbPoints, ...liveSeries].filter(
-    (p) => p.t >= window.start.getTime() && p.t <= window.end.getTime(),
+    (p) => p.t >= window.start.getTime() && p.t < window.end.getTime(),
   );
 }
 
@@ -533,7 +533,7 @@ async function fetchWorkerLuxorSeriesLive(
       (p) =>
         Number.isFinite(p.t) &&
         p.t >= window.start.getTime() &&
-        p.t <= window.end.getTime(),
+        p.t < window.end.getTime(),
     )
     .sort((a, b) => a.t - b.t);
 }
@@ -594,7 +594,7 @@ export async function fetchWorkerLuxorSeries(
   }
 
   return points
-    .filter((p) => p.t >= window.start.getTime() && p.t <= window.end.getTime())
+    .filter((p) => p.t >= window.start.getTime() && p.t < window.end.getTime())
     .sort((a, b) => a.t - b.t);
 }
 
