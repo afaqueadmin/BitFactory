@@ -17,6 +17,9 @@ import ProfitLossChart from "@/components/ProfitLossChart";
 import { useUser } from "@/lib/hooks/useUser";
 import { LuxorPaymentSettings } from "@/lib/types/wallet";
 import { useBitcoinLivePrice } from "@/components/useBitcoinLivePrice";
+import { useWalletChangeRequests } from "@/lib/hooks/useWalletChangeRequests";
+import RequestWalletChangeModal from "@/components/wallet/RequestWalletChangeModal";
+import WalletChangeRequestHistory from "@/components/wallet/WalletChangeRequestHistory";
 
 interface PoolBreakdown {
   totalEarnings: number;
@@ -70,6 +73,13 @@ export default function WalletPage() {
   const [statementEndDate, setStatementEndDate] = useState<string>("");
   const [statementError, setStatementError] = useState<string | null>(null);
   const [statementDownloading, setStatementDownloading] = useState(false);
+
+  // Wallet change request state
+  const [requestChangeOpen, setRequestChangeOpen] = useState(false);
+  const { requests: walletChangeRequests } = useWalletChangeRequests({
+    status: "PENDING",
+  });
+  const hasPendingWalletChange = walletChangeRequests.length > 0;
 
   const { user } = useUser();
   // const theme = useTheme();
@@ -530,17 +540,44 @@ export default function WalletPage() {
                 {walletError}
               </Typography>
             ) : (
-              <Typography
-                variant="body2"
-                sx={{
-                  wordBreak: "break-all",
-                  mt: 1,
-                  fontFamily: "monospace",
-                  fontSize: { xs: "0.85rem", sm: "1rem" },
-                }}
-              >
-                {getPrimaryWalletAddress()}
-              </Typography>
+              <>
+                <Typography
+                  variant="body2"
+                  sx={{
+                    wordBreak: "break-all",
+                    mt: 1,
+                    fontFamily: "monospace",
+                    fontSize: { xs: "0.85rem", sm: "1rem" },
+                  }}
+                >
+                  {getPrimaryWalletAddress()}
+                </Typography>
+                {hasPendingWalletChange ? (
+                  <Typography
+                    variant="caption"
+                    sx={{ mt: 1, display: "block", opacity: 0.9 }}
+                  >
+                    Change requested — pending admin review
+                  </Typography>
+                ) : (
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={() => setRequestChangeOpen(true)}
+                    sx={{
+                      mt: 1.5,
+                      color: "white",
+                      borderColor: "rgba(255,255,255,0.6)",
+                      "&:hover": {
+                        borderColor: "white",
+                        backgroundColor: "rgba(255,255,255,0.1)",
+                      },
+                    }}
+                  >
+                    Request Change
+                  </Button>
+                )}
+              </>
             )}
           </Paper>
         </Box>
@@ -866,6 +903,20 @@ export default function WalletPage() {
       {/* Transaction History */}
       {/* TODO: Enable Transaction History from Luxor API in the future */}
       {/* <TransactionHistory limit={50} /> */}
+
+      {/* Wallet Change Requests */}
+      <Box sx={{ width: "100%", mt: { xs: 2, md: 4 } }}>
+        <Typography variant="h6" fontWeight="bold" sx={{ mb: 2 }}>
+          Wallet Change Requests
+        </Typography>
+        <WalletChangeRequestHistory />
+      </Box>
+
+      <RequestWalletChangeModal
+        open={requestChangeOpen}
+        onClose={() => setRequestChangeOpen(false)}
+        currentAddress={getPrimaryWalletAddress()}
+      />
 
       {/* Electricity Cost Table */}
       <ElectricityCostTable />

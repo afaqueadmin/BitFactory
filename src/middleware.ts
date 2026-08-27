@@ -75,6 +75,7 @@ const securePaths = {
     "/activity-log",
     "/incentives/payouts",
     "/tickets",
+    "/wallet-requests",
     // Add admin-specific public paths if any
   ]),
   // Franchisee: their own dashboard/account/customers/miners pages under

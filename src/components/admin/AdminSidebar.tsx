@@ -41,10 +41,11 @@ import {
   Engineering as WorkerMetricsIcon,
   SwapHoriz as PoolTransactionsIcon,
   SupportAgent as SupportIcon,
+  AccountBalanceWallet as WalletRequestsIcon,
 } from "@mui/icons-material";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useUser, useTickets } from "@/lib/hooks";
+import { useUser, useTickets, useWalletChangeRequests } from "@/lib/hooks";
 
 interface SidebarItem {
   title: string;
@@ -88,6 +89,11 @@ const sidebarItems: SidebarItem[] = [
     title: "Support Tickets",
     icon: <SupportIcon />,
     path: "/tickets",
+  },
+  {
+    title: "Wallet Requests",
+    icon: <WalletRequestsIcon />,
+    path: "/wallet-requests",
   },
   {
     title: "Customers",
@@ -285,17 +291,24 @@ export default function AdminSidebar() {
   const [expandedItems, setExpandedItems] = React.useState<string[]>([]);
   const { user } = useUser();
   const { tickets: openTickets } = useTickets({ status: "OPEN" });
+  const { requests: pendingWalletRequests } = useWalletChangeRequests({
+    status: "PENDING",
+  });
 
   const visibleSidebarItems = sidebarItems
     .filter((item) => {
       const allowedRoles = item.roles ?? ["ADMIN", "SUPER_ADMIN"];
       return user ? (allowedRoles as string[]).includes(user.role) : false;
     })
-    .map((item) =>
-      item.title === "Support Tickets"
-        ? { ...item, badgeCount: openTickets.length }
-        : item,
-    );
+    .map((item) => {
+      if (item.title === "Support Tickets") {
+        return { ...item, badgeCount: openTickets.length };
+      }
+      if (item.title === "Wallet Requests") {
+        return { ...item, badgeCount: pendingWalletRequests.length };
+      }
+      return item;
+    });
 
   const handleExpandClick = (title: string) => {
     if (!sideBarOpen && !isHovered) return;

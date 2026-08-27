@@ -83,6 +83,8 @@ model User {
   ticketsAssigned            SupportTicket[]              @relation("ticketsAssigned")
   ticketsRaisedOnBehalf      SupportTicket[]              @relation("ticketsOnBehalfOf")
   ticketMessages             TicketMessage[]              @relation("ticketMessagesAuthored")
+  walletChangeRequests       WalletChangeRequest[]        @relation("walletChangeRequests")
+  walletChangeRequestsReviewed WalletChangeRequest[]       @relation("walletChangeRequestsReviewed")
 
   @@index([isDeleted])
   @@index([franchiseeId])
@@ -157,6 +159,36 @@ enum RequestStatus {
   PENDING
   APPROVED
   REJECTED
+}
+
+// A client-submitted request to change the payout wallet address on their
+// Luxor subaccount. currentAddress snapshots the live Luxor address at
+// request time so the request row itself is a permanent audit record of
+// what the address was and what it changed to - no separate history table.
+// On approval, the address is pushed to Luxor directly (see
+// /api/wallet/change-requests/[id]/approve) and appliedAt is stamped.
+// Braiins is out of scope: braiins.ts has no equivalent "configured payout
+// address" API to read or write against.
+model WalletChangeRequest {
+  id               String        @id @default(cuid())
+  userId           String
+  user             User          @relation("walletChangeRequests", fields: [userId], references: [id])
+  currency         String        @default("BTC")
+  currentAddress   String?
+  requestedAddress String
+  reason           String?       @db.Text
+  status           RequestStatus @default(PENDING)
+  rejectionReason  String?
+  reviewedById     String?
+  reviewedBy       User?         @relation("walletChangeRequestsReviewed", fields: [reviewedById], references: [id])
+  reviewedAt       DateTime?
+  appliedAt        DateTime?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@map("wallet_change_requests")
 }
 
 model TokenBlacklist {
@@ -1083,6 +1115,9 @@ enum AuditAction {
   TICKET_STATUS_CHANGED
   TICKET_PRIORITY_CHANGED
   TICKET_CLOSED
+  WALLET_CHANGE_REQUESTED
+  WALLET_CHANGE_APPROVED
+  WALLET_CHANGE_REJECTED
 }
 
 enum NotificationType {

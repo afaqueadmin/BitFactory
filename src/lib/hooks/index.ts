@@ -17,3 +17,8 @@ export {
 export { useAccountStatement, useGenerateInvoice } from "./useStatements";
 export { useUser } from "./useUser";
 export { useTickets, useTicket, useCreateTicket } from "./useTickets";
+export {
+  useWalletChangeRequests,
+  useCreateWalletChangeRequest,
+  useReviewWalletChangeRequest,
+} from "./useWalletChangeRequests";
