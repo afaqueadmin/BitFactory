@@ -36,6 +36,7 @@ import {
   PaybackStrategyKey,
   STRATEGY_COPY,
 } from "@/lib/helpers/paybackStrategyCopy";
+import { fetchLiveBtcPrice } from "@/lib/services/btcPriceService";
 import {
   MinerModel,
   MINER_LABELS,
@@ -265,13 +266,9 @@ export default function PaybackAnalysisCompanyPage() {
     try {
       setIsRefreshing(true);
       setLastUpdated(new Date());
-      const response = await fetch(
-        "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT",
-      );
-      if (!response.ok) return;
-      const data = (await response.json()) as { price: string };
+      const data = await fetchLiveBtcPrice();
       const price = Number(data.price);
-      if (!Number.isFinite(price)) return;
+      if (!Number.isFinite(price) || price <= 0) return;
       setLiveBtcPriceValue(price);
       setLiveBtcPrice(
         new Intl.NumberFormat("en-US", {
@@ -280,6 +277,11 @@ export default function PaybackAnalysisCompanyPage() {
           minimumFractionDigits: 2,
           maximumFractionDigits: 2,
         }).format(price),
+      );
+    } catch (err) {
+      console.warn(
+        "[Admin Payback Analysis] Failed to fetch live BTC price:",
+        err,
       );
     } finally {
       setIsRefreshing(false);

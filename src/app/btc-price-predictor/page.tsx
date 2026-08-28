@@ -35,7 +35,11 @@ function SectionHeading({
       }}
     >
       {icon}
-      <Typography variant="h6" fontWeight="bold">
+      <Typography
+        variant="h6"
+        fontWeight="bold"
+        sx={{ fontSize: { xs: "1.05rem", sm: "1.25rem" } }}
+      >
         {title}
       </Typography>
     </Box>
@@ -49,9 +53,15 @@ export default function BTCPricePredictorPage() {
   const { articles, isLoading: newsLoading, isError: newsError } = useBtcNews();
 
   const paperSx = {
-    p: { xs: 2, sm: 3 },
-    borderRadius: 2,
+    p: { xs: 1.75, sm: 2.5 },
+    borderRadius: 2.5,
     backgroundColor: isDark ? theme.palette.grey[900] : "#ffffff",
+    border: `1px solid ${
+      isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.07)"
+    }`,
+    boxShadow: isDark
+      ? "0 4px 20px rgba(0,0,0,0.4)"
+      : "0 2px 12px rgba(0,0,0,0.04)",
   };
 
   return (

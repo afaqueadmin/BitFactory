@@ -431,209 +431,250 @@ export default function DashboardPage() {
         </Box>
 
         {/* Chart Section with Main Heading */}
-        <Box sx={{ mt: { xs: 2, md: 4 } }}>
+        <Box sx={{ mt: { xs: 2.5, md: 4 } }}>
           <Box
             sx={{
               display: "flex",
               justifyContent: "space-between",
-              alignItems: { xs: "flex-start", sm: "center" },
-              mb: { xs: 2, md: 3 },
-              gap: { xs: 1, md: 2 },
+              alignItems: { xs: "stretch", sm: "center" },
+              mb: { xs: 1.5, sm: 2, md: 2.5 },
+              gap: 1.5,
               flexDirection: { xs: "column", sm: "row" },
             }}
           >
+            {/* Top row / Left on desktop: Title + Granularity Toggle */}
             <Box
               sx={{
                 display: "flex",
                 alignItems: "center",
+                justifyContent: "space-between",
                 flexWrap: "wrap",
-                gap: { xs: 1, sm: 2 },
+                gap: 1.5,
               }}
             >
               <Typography
-                variant="h4"
+                variant="h5"
                 fontWeight="bold"
                 sx={{
-                  background: theme.palette.text.primary,
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                  fontSize: { xs: "1.25rem", sm: "1.6rem", md: "2rem" },
-                  textAlign: "left",
+                  color: theme.palette.text.primary,
+                  fontSize: { xs: "1.2rem", sm: "1.45rem", md: "1.75rem" },
+                  letterSpacing: "-0.02em",
                 }}
               >
                 Mining Performance
               </Typography>
 
               {/* Granularity toggle: Daily / Monthly */}
-              <Box sx={{ display: "flex", gap: 0.5 }}>
-                {(["daily", "monthly"] as const).map((g) => (
-                  <button
-                    key={g}
-                    onClick={() => setGranularity(g)}
-                    style={{
-                      padding: "6px 12px",
-                      borderRadius: "6px",
-                      border: "none",
-                      cursor: "pointer",
-                      fontSize: "0.8rem",
-                      fontWeight: granularity === g ? 600 : 400,
-                      backgroundColor:
-                        granularity === g
-                          ? theme.palette.primary.main
-                          : theme.palette.mode === "dark"
-                            ? "rgba(255,255,255,0.1)"
-                            : "rgba(0,0,0,0.05)",
-                      color:
-                        granularity === g
-                          ? theme.palette.primary.contrastText
-                          : theme.palette.text.primary,
-                      transition: "all 0.2s",
-                    }}
-                    title={
-                      g === "daily"
-                        ? "Show the last 31 days"
-                        : "Show every fully-closed month"
-                    }
-                  >
-                    {g === "daily" ? "Daily" : "Monthly"}
-                  </button>
-                ))}
+              <Box
+                sx={{
+                  display: "inline-flex",
+                  p: 0.5,
+                  borderRadius: 3,
+                  backgroundColor:
+                    theme.palette.mode === "dark"
+                      ? "rgba(255, 255, 255, 0.06)"
+                      : "rgba(0, 0, 0, 0.05)",
+                  border: `1px solid ${
+                    theme.palette.mode === "dark"
+                      ? "rgba(255, 255, 255, 0.08)"
+                      : "rgba(0, 0, 0, 0.06)"
+                  }`,
+                }}
+              >
+                {(["daily", "monthly"] as const).map((g) => {
+                  const active = granularity === g;
+                  return (
+                    <Box
+                      component="button"
+                      key={g}
+                      onClick={() => setGranularity(g)}
+                      sx={{
+                        px: { xs: 1.5, sm: 2 },
+                        py: { xs: 0.6, sm: 0.75 },
+                        borderRadius: 2.5,
+                        border: "none",
+                        cursor: "pointer",
+                        fontSize: { xs: "0.75rem", sm: "0.8rem" },
+                        fontWeight: active ? 700 : 500,
+                        backgroundColor: active
+                          ? "primary.main"
+                          : "transparent",
+                        color: active
+                          ? "primary.contrastText"
+                          : "text.secondary",
+                        boxShadow: active
+                          ? "0 2px 8px rgba(0, 198, 255, 0.35)"
+                          : "none",
+                        transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+                        "&:hover": {
+                          color: active
+                            ? "primary.contrastText"
+                            : "text.primary",
+                        },
+                      }}
+                      title={
+                        g === "daily"
+                          ? "Show the last 31 days"
+                          : "Show every fully-closed month"
+                      }
+                    >
+                      {g === "daily" ? "Daily" : "Monthly"}
+                    </Box>
+                  );
+                })}
               </Box>
             </Box>
 
-            <Box
-              sx={{
-                display: "flex",
-                gap: 2,
-                flexWrap: "wrap",
-                alignItems: "center",
-                justifyContent: { xs: "flex-start", sm: "flex-end" },
-              }}
-            >
-              {/* Chart View Mode Toggle Buttons - Only show if multiple pools */}
-              {workersStats.activePoolNames.length > 1 && (
+            {/* Pool Selector Pills - Horizontal scrollable on mobile if needed */}
+            {workersStats.activePoolNames.length > 1 && (
+              <Box
+                sx={{
+                  display: "flex",
+                  gap: 0.75,
+                  overflowX: "auto",
+                  pb: { xs: 0.5, sm: 0 },
+                  scrollbarWidth: "none",
+                  "&::-webkit-scrollbar": { display: "none" },
+                  justifyContent: { xs: "flex-start", sm: "flex-end" },
+                }}
+              >
                 <Box
+                  component="button"
+                  onClick={() => setChartMode("total")}
                   sx={{
-                    display: "flex",
-                    gap: 1,
-                    flexWrap: "wrap",
-                    justifyContent: { xs: "flex-start", sm: "flex-end" },
+                    px: { xs: 1.25, sm: 1.75 },
+                    py: { xs: 0.6, sm: 0.75 },
+                    borderRadius: 2.5,
+                    border: "none",
+                    cursor: "pointer",
+                    fontSize: { xs: "0.75rem", sm: "0.8rem" },
+                    fontWeight: chartMode === "total" ? 700 : 500,
+                    whiteSpace: "nowrap",
+                    backgroundColor:
+                      chartMode === "total"
+                        ? "primary.main"
+                        : theme.palette.mode === "dark"
+                          ? "rgba(255, 255, 255, 0.06)"
+                          : "rgba(0, 0, 0, 0.05)",
+                    color:
+                      chartMode === "total"
+                        ? "primary.contrastText"
+                        : "text.secondary",
+                    boxShadow:
+                      chartMode === "total"
+                        ? "0 2px 8px rgba(0, 198, 255, 0.35)"
+                        : "none",
+                    transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
                   }}
+                  title="Show total earnings from all pools"
                 >
-                  <button
-                    onClick={() => setChartMode("total")}
-                    style={{
-                      padding: "6px 12px",
-                      borderRadius: "6px",
-                      border: "none",
-                      cursor: "pointer",
-                      fontSize: "0.8rem",
-                      fontWeight: chartMode === "total" ? 600 : 400,
-                      backgroundColor:
-                        chartMode === "total"
-                          ? theme.palette.primary.main
-                          : theme.palette.mode === "dark"
-                            ? "rgba(255,255,255,0.1)"
-                            : "rgba(0,0,0,0.05)",
-                      color:
-                        chartMode === "total"
-                          ? theme.palette.primary.contrastText
-                          : theme.palette.text.primary,
-                      transition: "all 0.2s",
-                    }}
-                    title="Show total earnings from all pools"
-                  >
-                    Total
-                  </button>
-
-                  {workersStats.activePoolNames.includes("Luxor") && (
-                    <button
-                      onClick={() => setChartMode("luxor")}
-                      style={{
-                        padding: "6px 12px",
-                        borderRadius: "6px",
-                        border: "none",
-                        cursor: "pointer",
-                        fontSize: "0.8rem",
-                        fontWeight: chartMode === "luxor" ? 600 : 400,
-                        backgroundColor:
-                          chartMode === "luxor"
-                            ? "#1565C0"
-                            : theme.palette.mode === "dark"
-                              ? "rgba(255,255,255,0.1)"
-                              : "rgba(0,0,0,0.05)",
-                        color:
-                          chartMode === "luxor"
-                            ? "#FFFFFF"
-                            : theme.palette.text.primary,
-                        transition: "all 0.2s",
-                      }}
-                      title="Show Luxor pool earnings only"
-                    >
-                      🔷 Luxor
-                    </button>
-                  )}
-
-                  {workersStats.activePoolNames.includes("Braiins") && (
-                    <button
-                      onClick={() => setChartMode("braiins")}
-                      style={{
-                        padding: "6px 12px",
-                        borderRadius: "6px",
-                        border: "none",
-                        cursor: "pointer",
-                        fontSize: "0.8rem",
-                        fontWeight: chartMode === "braiins" ? 600 : 400,
-                        backgroundColor:
-                          chartMode === "braiins"
-                            ? "#FFA500"
-                            : theme.palette.mode === "dark"
-                              ? "rgba(255,255,255,0.1)"
-                              : "rgba(0,0,0,0.05)",
-                        color:
-                          chartMode === "braiins"
-                            ? "#FFFFFF"
-                            : theme.palette.text.primary,
-                        transition: "all 0.2s",
-                      }}
-                      title="Show Braiins pool earnings only"
-                    >
-                      🔶 Braiins
-                    </button>
-                  )}
-
-                  <button
-                    onClick={() => setChartMode("sideBySide")}
-                    style={{
-                      padding: "6px 12px",
-                      borderRadius: "6px",
-                      border: "none",
-                      cursor: "pointer",
-                      fontSize: "0.8rem",
-                      fontWeight: chartMode === "sideBySide" ? 600 : 400,
-                      backgroundColor:
-                        chartMode === "sideBySide"
-                          ? theme.palette.success.main
-                          : theme.palette.mode === "dark"
-                            ? "rgba(255,255,255,0.1)"
-                            : "rgba(0,0,0,0.05)",
-                      color:
-                        chartMode === "sideBySide"
-                          ? theme.palette.success.contrastText
-                          : theme.palette.text.primary,
-                      transition: "all 0.2s",
-                    }}
-                    title="Show side-by-side comparison of both pools"
-                  >
-                    Side by Side
-                  </button>
+                  All Pools
                 </Box>
-              )}
-            </Box>
+
+                {workersStats.activePoolNames.includes("Luxor") && (
+                  <Box
+                    component="button"
+                    onClick={() => setChartMode("luxor")}
+                    sx={{
+                      px: { xs: 1.25, sm: 1.75 },
+                      py: { xs: 0.6, sm: 0.75 },
+                      borderRadius: 2.5,
+                      border: "none",
+                      cursor: "pointer",
+                      fontSize: { xs: "0.75rem", sm: "0.8rem" },
+                      fontWeight: chartMode === "luxor" ? 700 : 500,
+                      whiteSpace: "nowrap",
+                      backgroundColor:
+                        chartMode === "luxor"
+                          ? "#1565C0"
+                          : theme.palette.mode === "dark"
+                            ? "rgba(255, 255, 255, 0.06)"
+                            : "rgba(0, 0, 0, 0.05)",
+                      color:
+                        chartMode === "luxor" ? "#FFFFFF" : "text.secondary",
+                      boxShadow:
+                        chartMode === "luxor"
+                          ? "0 2px 8px rgba(21, 101, 192, 0.4)"
+                          : "none",
+                      transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+                    }}
+                    title="Show Luxor pool earnings only"
+                  >
+                    🔷 Luxor
+                  </Box>
+                )}
+
+                {workersStats.activePoolNames.includes("Braiins") && (
+                  <Box
+                    component="button"
+                    onClick={() => setChartMode("braiins")}
+                    sx={{
+                      px: { xs: 1.25, sm: 1.75 },
+                      py: { xs: 0.6, sm: 0.75 },
+                      borderRadius: 2.5,
+                      border: "none",
+                      cursor: "pointer",
+                      fontSize: { xs: "0.75rem", sm: "0.8rem" },
+                      fontWeight: chartMode === "braiins" ? 700 : 500,
+                      whiteSpace: "nowrap",
+                      backgroundColor:
+                        chartMode === "braiins"
+                          ? "#FB8C00"
+                          : theme.palette.mode === "dark"
+                            ? "rgba(255, 255, 255, 0.06)"
+                            : "rgba(0, 0, 0, 0.05)",
+                      color:
+                        chartMode === "braiins" ? "#FFFFFF" : "text.secondary",
+                      boxShadow:
+                        chartMode === "braiins"
+                          ? "0 2px 8px rgba(251, 140, 0, 0.4)"
+                          : "none",
+                      transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+                    }}
+                    title="Show Braiins pool earnings only"
+                  >
+                    🔶 Braiins
+                  </Box>
+                )}
+
+                <Box
+                  component="button"
+                  onClick={() => setChartMode("sideBySide")}
+                  sx={{
+                    px: { xs: 1.25, sm: 1.75 },
+                    py: { xs: 0.6, sm: 0.75 },
+                    borderRadius: 2.5,
+                    border: "none",
+                    cursor: "pointer",
+                    fontSize: { xs: "0.75rem", sm: "0.8rem" },
+                    fontWeight: chartMode === "sideBySide" ? 700 : 500,
+                    whiteSpace: "nowrap",
+                    backgroundColor:
+                      chartMode === "sideBySide"
+                        ? "success.main"
+                        : theme.palette.mode === "dark"
+                          ? "rgba(255, 255, 255, 0.06)"
+                          : "rgba(0, 0, 0, 0.05)",
+                    color:
+                      chartMode === "sideBySide"
+                        ? "success.contrastText"
+                        : "text.secondary",
+                    boxShadow:
+                      chartMode === "sideBySide"
+                        ? "0 2px 8px rgba(0, 200, 83, 0.35)"
+                        : "none",
+                    transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+                  }}
+                  title="Show side-by-side comparison of both pools"
+                >
+                  Side by Side
+                </Box>
+              </Box>
+            )}
           </Box>
 
           <MiningEarningsChart
-            height={isMobile ? 340 : 520}
+            height={isMobile ? 320 : 440}
             days={31}
             viewMode={chartMode}
             granularity={granularity}

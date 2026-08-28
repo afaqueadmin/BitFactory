@@ -595,45 +595,174 @@ export default function HashrateHistoryChart({
       <Box
         sx={{
           display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          flexWrap: "wrap",
-          gap: 1.5,
+          flexDirection: "column",
+          gap: { xs: 1.25, sm: 1.75 },
           mb: 2,
         }}
       >
-        <Typography
-          variant="h6"
-          sx={{ fontWeight: 600, fontSize: { xs: "1rem", sm: "1.15rem" } }}
-        >
-          {/* "A", "A & B", "A, B & C" — not "A & B & C". */}
-          {(() => {
-            const parts = [
-              "Hashrate",
-              hasEfficiency && "Shares Efficiency",
-              hasUptime && "Uptime",
-            ].filter(Boolean) as string[];
-            return parts.length > 1
-              ? `${parts.slice(0, -1).join(", ")} & ${parts[parts.length - 1]}`
-              : parts[0];
-          })()}
-        </Typography>
-
+        {/* Tier 1: Title and Right Action Icons */}
         <Box
           sx={{
             display: "flex",
             alignItems: "center",
+            justifyContent: "space-between",
             gap: 1,
-            flexWrap: "wrap",
           }}
         >
+          <Typography
+            variant="h6"
+            sx={{
+              fontWeight: 700,
+              fontSize: { xs: "0.95rem", sm: "1.15rem" },
+              letterSpacing: "-0.01em",
+            }}
+          >
+            {/* "A", "A & B", "A, B & C" — not "A & B & C". */}
+            {(() => {
+              const parts = [
+                "Hashrate",
+                hasEfficiency && "Shares Efficiency",
+                hasUptime && "Uptime",
+              ].filter(Boolean) as string[];
+              return parts.length > 1
+                ? `${parts.slice(0, -1).join(", ")} & ${parts[parts.length - 1]}`
+                : parts[0];
+            })()}
+          </Typography>
+
+          {/* Quick Action Icons: Chart/Table, CSV, Fullscreen */}
+          <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+            {/* Chart / table toggle */}
+            <Box
+              sx={{
+                display: "flex",
+                borderRadius: 1.5,
+                border: `1px solid ${theme.palette.divider}`,
+              }}
+            >
+              <MuiTooltip title="Chart view">
+                <IconButton
+                  size="small"
+                  onClick={() => setView("chart")}
+                  color={view === "chart" ? "primary" : "default"}
+                  sx={{ p: { xs: 0.5, sm: 0.75 } }}
+                >
+                  <ShowChartIcon fontSize="small" />
+                </IconButton>
+              </MuiTooltip>
+              <MuiTooltip title="Table view">
+                <IconButton
+                  size="small"
+                  onClick={() => setView("table")}
+                  color={view === "table" ? "primary" : "default"}
+                  sx={{ p: { xs: 0.5, sm: 0.75 } }}
+                >
+                  <TableChartIcon fontSize="small" />
+                </IconButton>
+              </MuiTooltip>
+            </Box>
+
+            <MuiTooltip title="Download CSV">
+              <span>
+                <IconButton
+                  size="small"
+                  onClick={handleDownloadCsv}
+                  disabled={!hasData}
+                  sx={{ p: { xs: 0.5, sm: 0.75 } }}
+                >
+                  <DownloadIcon fontSize="small" />
+                </IconButton>
+              </span>
+            </MuiTooltip>
+
+            <MuiTooltip title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}>
+              <IconButton
+                size="small"
+                onClick={toggleFullscreen}
+                sx={{ p: { xs: 0.5, sm: 0.75 } }}
+              >
+                {isFullscreen ? (
+                  <FullscreenExitIcon fontSize="small" />
+                ) : (
+                  <FullscreenIcon fontSize="small" />
+                )}
+              </IconButton>
+            </MuiTooltip>
+          </Box>
+        </Box>
+
+        {/* Tier 2: Period Pills & Range Navigation */}
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: 1,
+          }}
+        >
+          {/* Period buttons */}
+          <Box
+            sx={{
+              display: "flex",
+              gap: 0.5,
+              overflowX: "auto",
+              pb: { xs: 0.25, sm: 0 },
+              scrollbarWidth: "none",
+              "&::-webkit-scrollbar": { display: "none" },
+            }}
+          >
+            {PERIODS.map((p) => (
+              <Button
+                key={p}
+                size="small"
+                onClick={() => selectPeriod(p)}
+                variant={period === p ? "contained" : "outlined"}
+                sx={{
+                  minWidth: { xs: 32, sm: 42 },
+                  px: { xs: 0.6, sm: 1.25 },
+                  py: { xs: 0.4, sm: 0.6 },
+                  borderRadius: 2,
+                  fontSize: { xs: "0.68rem", sm: "0.75rem" },
+                  fontWeight: period === p ? 700 : 500,
+                  boxShadow:
+                    period === p ? "0 2px 6px rgba(0,198,255,0.3)" : "none",
+                }}
+              >
+                {p}
+              </Button>
+            ))}
+
+            <MuiTooltip title="Custom date range">
+              <IconButton
+                size="small"
+                onClick={() => {
+                  setShowRangePicker((open) => !open);
+                  if (!draftFrom) setDraftFrom(toDateInput(window_.start));
+                  if (!draftTo) setDraftTo(toDateInput(new Date()));
+                }}
+                color={customRange ? "primary" : "default"}
+                sx={{
+                  p: { xs: 0.4, sm: 0.6 },
+                  border: `1px solid ${customRange ? theme.palette.primary.main : theme.palette.divider}`,
+                  borderRadius: 2,
+                }}
+              >
+                <DateRangeIcon sx={{ fontSize: { xs: 16, sm: 18 } }} />
+              </IconButton>
+            </MuiTooltip>
+          </Box>
+
           {/* Range navigation */}
           <Box
             sx={{
               display: "flex",
               alignItems: "center",
-              borderRadius: 1.5,
+              borderRadius: 2,
               border: `1px solid ${theme.palette.divider}`,
+              backgroundColor: isDark
+                ? "rgba(255,255,255,0.03)"
+                : "rgba(0,0,0,0.02)",
             }}
           >
             <IconButton
@@ -641,16 +770,19 @@ export default function HashrateHistoryChart({
               onClick={() => setOffset((o) => o + 1)}
               disabled={!canGoOlder}
               aria-label="Previous period"
+              sx={{ p: { xs: 0.4, sm: 0.5 } }}
             >
-              <ChevronLeftIcon fontSize="small" />
+              <ChevronLeftIcon sx={{ fontSize: { xs: 16, sm: 18 } }} />
             </IconButton>
             <Typography
               variant="body2"
               sx={{
-                px: 1,
-                minWidth: { xs: 84, sm: 118 },
+                px: 0.75,
+                minWidth: { xs: 75, sm: 110 },
                 textAlign: "center",
                 whiteSpace: "nowrap",
+                fontSize: { xs: "0.72rem", sm: "0.82rem" },
+                fontWeight: 600,
               }}
             >
               {rangeLabel || "—"}
@@ -660,93 +792,11 @@ export default function HashrateHistoryChart({
               onClick={() => setOffset((o) => Math.max(0, o - 1))}
               disabled={!canGoNewer}
               aria-label="Next period"
+              sx={{ p: { xs: 0.4, sm: 0.5 } }}
             >
-              <ChevronRightIcon fontSize="small" />
+              <ChevronRightIcon sx={{ fontSize: { xs: 16, sm: 18 } }} />
             </IconButton>
           </Box>
-
-          {/* Period buttons */}
-          <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap" }}>
-            {PERIODS.map((p) => (
-              <Button
-                key={p}
-                size="small"
-                onClick={() => selectPeriod(p)}
-                variant={period === p ? "contained" : "outlined"}
-                sx={{
-                  minWidth: { xs: 34, sm: 44 },
-                  px: { xs: 0.75, sm: 1.25 },
-                  fontSize: { xs: "0.68rem", sm: "0.75rem" },
-                }}
-              >
-                {p}
-              </Button>
-            ))}
-          </Box>
-
-          <MuiTooltip title="Custom date range">
-            <IconButton
-              size="small"
-              onClick={() => {
-                setShowRangePicker((open) => !open);
-                if (!draftFrom) setDraftFrom(toDateInput(window_.start));
-                if (!draftTo) setDraftTo(toDateInput(new Date()));
-              }}
-              color={customRange ? "primary" : "default"}
-            >
-              <DateRangeIcon fontSize="small" />
-            </IconButton>
-          </MuiTooltip>
-
-          {/* Chart / table toggle */}
-          <Box
-            sx={{
-              display: "flex",
-              borderRadius: 1.5,
-              border: `1px solid ${theme.palette.divider}`,
-            }}
-          >
-            <MuiTooltip title="Chart view">
-              <IconButton
-                size="small"
-                onClick={() => setView("chart")}
-                color={view === "chart" ? "primary" : "default"}
-              >
-                <ShowChartIcon fontSize="small" />
-              </IconButton>
-            </MuiTooltip>
-            <MuiTooltip title="Table view">
-              <IconButton
-                size="small"
-                onClick={() => setView("table")}
-                color={view === "table" ? "primary" : "default"}
-              >
-                <TableChartIcon fontSize="small" />
-              </IconButton>
-            </MuiTooltip>
-          </Box>
-
-          <MuiTooltip title="Download CSV">
-            <span>
-              <IconButton
-                size="small"
-                onClick={handleDownloadCsv}
-                disabled={!hasData}
-              >
-                <DownloadIcon fontSize="small" />
-              </IconButton>
-            </span>
-          </MuiTooltip>
-
-          <MuiTooltip title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}>
-            <IconButton size="small" onClick={toggleFullscreen}>
-              {isFullscreen ? (
-                <FullscreenExitIcon fontSize="small" />
-              ) : (
-                <FullscreenIcon fontSize="small" />
-              )}
-            </IconButton>
-          </MuiTooltip>
         </Box>
       </Box>
 
@@ -809,6 +859,115 @@ export default function HashrateHistoryChart({
         </Box>
       )}
 
+      {/* Quick Summary KPIs for Hashrate and Efficiency */}
+      {!isLoading && !isError && hasData && (
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: {
+              xs: "1fr 1fr",
+              sm: hasPercentAxis ? "repeat(3, 1fr)" : "repeat(2, 1fr)",
+            },
+            gap: { xs: 1, sm: 1.5 },
+            mb: { xs: 1.75, sm: 2 },
+            p: { xs: 1.25, sm: 1.5 },
+            borderRadius: 2,
+            backgroundColor: isDark
+              ? "rgba(255, 255, 255, 0.03)"
+              : "rgba(0, 0, 0, 0.02)",
+            border: `1px solid ${
+              isDark ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.05)"
+            }`,
+          }}
+        >
+          <Box>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{
+                fontSize: { xs: "0.68rem", sm: "0.75rem" },
+                fontWeight: 500,
+                display: "block",
+              }}
+            >
+              Peak Hashrate
+            </Typography>
+            <Typography
+              variant="body2"
+              sx={{
+                fontWeight: 700,
+                fontSize: { xs: "0.85rem", sm: "0.95rem" },
+                color: theme.palette.text.primary,
+                mt: 0.25,
+              }}
+            >
+              {(() => {
+                const maxVal = Math.max(
+                  ...chartData.flatMap((r) => [r.luxor || 0, r.braiins || 0]),
+                );
+                return `${(maxVal / unit.divisor).toFixed(2)} ${unit.label}`;
+              })()}
+            </Typography>
+          </Box>
+
+          <Box>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{
+                fontSize: { xs: "0.68rem", sm: "0.75rem" },
+                fontWeight: 500,
+                display: "block",
+              }}
+            >
+              Latest Hashrate
+            </Typography>
+            <Typography
+              variant="body2"
+              sx={{
+                fontWeight: 700,
+                fontSize: { xs: "0.85rem", sm: "0.95rem" },
+                color: "primary.main",
+                mt: 0.25,
+              }}
+            >
+              {(() => {
+                const latest = chartData[chartData.length - 1];
+                const val = (latest?.luxor || 0) + (latest?.braiins || 0);
+                return `${(val / unit.divisor).toFixed(2)} ${unit.label}`;
+              })()}
+            </Typography>
+          </Box>
+
+          {hasPercentAxis && (
+            <Box sx={{ display: { xs: "none", sm: "block" } }}>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ fontSize: "0.75rem", fontWeight: 500, display: "block" }}
+              >
+                {hasEfficiency ? "Shares Efficiency" : "Uptime"}
+              </Typography>
+              <Typography
+                variant="body2"
+                sx={{
+                  fontWeight: 700,
+                  fontSize: "0.95rem",
+                  color: hasEfficiency ? EFFICIENCY_COLOR : UPTIME_COLOR,
+                  mt: 0.25,
+                }}
+              >
+                {(() => {
+                  const latest = chartData[chartData.length - 1];
+                  const eff = latest?.efficiency ?? latest?.uptime;
+                  return eff != null ? `${eff.toFixed(2)} %` : "—";
+                })()}
+              </Typography>
+            </Box>
+          )}
+        </Box>
+      )}
+
       {/* ── Body ──────────────────────────────────────────────────────── */}
       {isError && (
         <Alert severity="error" sx={{ mb: 2 }}>
@@ -820,12 +979,17 @@ export default function HashrateHistoryChart({
         <Box
           sx={{
             display: "flex",
+            flexDirection: "column",
             justifyContent: "center",
             alignItems: "center",
             height: chartHeight,
+            gap: 1.5,
           }}
         >
-          <CircularProgress />
+          <CircularProgress size={32} thickness={4} />
+          <Typography variant="caption" color="text.secondary">
+            Loading hashrate history...
+          </Typography>
         </Box>
       )}
 
@@ -850,6 +1014,7 @@ export default function HashrateHistoryChart({
             width: "100%",
             opacity: isFetching ? 0.6 : 1,
             transition: "opacity 0.2s",
+            touchAction: "pan-y",
           }}
         >
           <ResponsiveContainer width="100%" height={chartHeight}>
@@ -857,8 +1022,8 @@ export default function HashrateHistoryChart({
               data={chartData}
               margin={{
                 top: 10,
-                right: isMobile ? 4 : 12,
-                left: isMobile ? 0 : 8,
+                right: hasPercentAxis ? (isMobile ? 2 : 12) : isMobile ? 8 : 16,
+                left: isMobile ? -20 : 0,
                 bottom: 0,
               }}
             >
@@ -871,11 +1036,7 @@ export default function HashrateHistoryChart({
                   x2="0"
                   y2="1"
                 >
-                  <stop
-                    offset="0%"
-                    stopColor={LUXOR_COLOR}
-                    stopOpacity={0.15}
-                  />
+                  <stop offset="0%" stopColor={LUXOR_COLOR} stopOpacity={0.2} />
                   <stop
                     offset="100%"
                     stopColor={LUXOR_COLOR}
@@ -892,7 +1053,7 @@ export default function HashrateHistoryChart({
                   <stop
                     offset="0%"
                     stopColor={BRAIINS_COLOR}
-                    stopOpacity={0.15}
+                    stopOpacity={0.2}
                   />
                   <stop
                     offset="100%"
@@ -920,7 +1081,7 @@ export default function HashrateHistoryChart({
                   fill: theme.palette.text.secondary,
                 }}
                 tickLine={false}
-                minTickGap={isMobile ? 8 : 12}
+                minTickGap={isMobile ? 12 : 16}
               />
 
               <YAxis
@@ -930,10 +1091,12 @@ export default function HashrateHistoryChart({
                   fill: theme.palette.text.secondary,
                 }}
                 tickFormatter={(value: number) =>
-                  (value / unit.divisor).toFixed(2)
+                  (value / unit.divisor).toFixed(isMobile ? 1 : 2)
                 }
-                width={isMobile ? 46 : 64}
+                width={isMobile ? 42 : 64}
                 domain={["auto", "auto"]}
+                tickLine={false}
+                axisLine={false}
               />
 
               {hasPercentAxis && (
@@ -945,9 +1108,9 @@ export default function HashrateHistoryChart({
                     fill: theme.palette.text.secondary,
                   }}
                   tickFormatter={(value: number) => `${value}%`}
-                  width={isMobile ? 38 : 50}
-                  // Integer ticks only: fractional ticks round to the same
-                  // label twice ("99" directly above "99").
+                  width={isMobile ? 36 : 48}
+                  tickLine={false}
+                  axisLine={false}
                   allowDecimals={false}
                   domain={[
                     (dataMin: number) => Math.max(0, Math.floor(dataMin - 1)),
@@ -957,25 +1120,115 @@ export default function HashrateHistoryChart({
               )}
 
               <Tooltip
-                contentStyle={{
-                  backgroundColor: isDark ? theme.palette.grey[900] : "#fff",
-                  border: `1px solid ${theme.palette.divider}`,
-                  borderRadius: 8,
-                  fontSize: "0.8rem",
-                }}
-                labelFormatter={(value) => formatTimestamp(Number(value))}
-                formatter={(value, name) => {
-                  const numeric = Number(value);
-                  if (name === "Shares Efficiency" || name === "Uptime") {
-                    return [`${numeric.toFixed(2)} %`, name];
-                  }
-                  // The series name already carries the unit for the legend;
-                  // strip it here so the tooltip doesn't say it twice.
-                  const label = String(name).replace(/\s*\(.*\)$/, "");
-                  return [
-                    `${(numeric / unit.divisor).toFixed(2)} ${unit.label}`,
-                    label,
-                  ];
+                content={({ active, payload, label }) => {
+                  if (!active || !payload || !payload.length) return null;
+                  const validEntries = payload.filter(
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    (p: any) =>
+                      p.value != null && !isHidden(p.dataKey as SeriesKey),
+                  );
+                  if (!validEntries.length) return null;
+
+                  return (
+                    <Box
+                      sx={{
+                        backgroundColor: isDark
+                          ? "rgba(15, 23, 42, 0.95)"
+                          : "rgba(255, 255, 255, 0.98)",
+                        backdropFilter: "blur(10px)",
+                        border: `1px solid ${
+                          isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.1)"
+                        }`,
+                        borderRadius: 2,
+                        boxShadow: isDark
+                          ? "0 8px 32px rgba(0,0,0,0.6)"
+                          : "0 8px 24px rgba(0,0,0,0.1)",
+                        px: 1.5,
+                        py: 1,
+                        minWidth: 140,
+                      }}
+                    >
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          fontWeight: 700,
+                          color: "text.primary",
+                          display: "block",
+                          borderBottom: `1px solid ${theme.palette.divider}`,
+                          pb: 0.5,
+                          mb: 0.75,
+                          fontSize: "0.75rem",
+                        }}
+                      >
+                        {formatTimestamp(Number(label))}
+                      </Typography>
+
+                      <Box
+                        sx={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 0.5,
+                        }}
+                      >
+                        {validEntries.map((entry) => {
+                          const numeric = Number(entry.value);
+                          const isPercent =
+                            entry.dataKey === "efficiency" ||
+                            entry.dataKey === "uptime";
+                          const formattedValue = isPercent
+                            ? `${numeric.toFixed(2)} %`
+                            : `${(numeric / unit.divisor).toFixed(2)} ${unit.label}`;
+
+                          return (
+                            <Box
+                              key={entry.dataKey}
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                gap: 1.5,
+                              }}
+                            >
+                              <Box
+                                sx={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 0.75,
+                                }}
+                              >
+                                <Box
+                                  sx={{
+                                    width: 8,
+                                    height: 8,
+                                    borderRadius: "50%",
+                                    backgroundColor: entry.color,
+                                  }}
+                                />
+                                <Typography
+                                  variant="caption"
+                                  color="text.secondary"
+                                  sx={{ fontSize: "0.72rem" }}
+                                >
+                                  {entry.name}
+                                </Typography>
+                              </Box>
+                              <Typography
+                                variant="caption"
+                                sx={{
+                                  fontWeight: 700,
+                                  fontFamily: "monospace",
+                                  color: "text.primary",
+                                  fontSize: "0.75rem",
+                                }}
+                              >
+                                {formattedValue}
+                              </Typography>
+                            </Box>
+                          );
+                        })}
+                      </Box>
+                    </Box>
+                  );
                 }}
               />
 
@@ -1033,9 +1286,6 @@ export default function HashrateHistoryChart({
                   stroke={EFFICIENCY_COLOR}
                   strokeWidth={2}
                   strokeDasharray="4.5 4.5"
-                  // Recharts' draw-in animation rewrites stroke-dasharray to
-                  // animate the line, which collapsed the dashes to a solid
-                  // stroke on some windows. Static rendering keeps the dash.
                   isAnimationActive={false}
                   dot={false}
                   connectNulls
@@ -1052,14 +1302,7 @@ export default function HashrateHistoryChart({
                   name="Uptime"
                   stroke={UPTIME_COLOR}
                   strokeWidth={2}
-                  // Solid, to stay distinguishable from the dashed efficiency
-                  // line it shares the percentage axis with.
                   isAnimationActive={false}
-                  // Uptime is one point per day, unlike the finer hashrate/
-                  // efficiency series it shares the chart with — a dot on
-                  // every point makes each day's value easy to pick out, and
-                  // keeps a single-day window (e.g. a new week a few hours
-                  // in) visible even with nothing to connect a line to yet.
                   dot={{ r: 3, fill: UPTIME_COLOR, strokeWidth: 0 }}
                   connectNulls
                   activeDot={{ r: 4 }}
@@ -1076,7 +1319,7 @@ export default function HashrateHistoryChart({
               display: "flex",
               justifyContent: "center",
               flexWrap: "wrap",
-              gap: 1,
+              gap: 0.75,
               mt: 1.5,
             }}
           >
@@ -1091,12 +1334,12 @@ export default function HashrateHistoryChart({
                     display: "flex",
                     alignItems: "center",
                     gap: 0.75,
-                    px: 1.25,
-                    py: 0.5,
+                    px: { xs: 1, sm: 1.25 },
+                    py: 0.4,
                     borderRadius: 999,
-                    fontSize: "0.78rem",
+                    fontSize: { xs: "0.72rem", sm: "0.78rem" },
                     fontWeight: 500,
-                    lineHeight: 1.6,
+                    lineHeight: 1.5,
                     border: "1px solid",
                     borderColor: off ? "divider" : item.color,
                     backgroundColor: off
@@ -1113,7 +1356,7 @@ export default function HashrateHistoryChart({
                   <Box
                     component="span"
                     sx={{
-                      width: 16,
+                      width: 14,
                       borderTop: "3px",
                       borderTopStyle: item.dashed ? "dashed" : "solid",
                       borderTopColor: off

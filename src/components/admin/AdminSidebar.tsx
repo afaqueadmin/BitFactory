@@ -12,6 +12,8 @@ import {
   IconButton,
   Tooltip,
   Badge,
+  Drawer,
+  Typography,
 } from "@mui/material";
 import {
   Dashboard as DashboardIcon,
@@ -42,10 +44,12 @@ import {
   SwapHoriz as PoolTransactionsIcon,
   SupportAgent as SupportIcon,
   AccountBalanceWallet as WalletRequestsIcon,
+  Close as CloseIcon,
 } from "@mui/icons-material";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useUser, useTickets, useWalletChangeRequests } from "@/lib/hooks";
+import { useAdminNav } from "@/lib/contexts/admin-nav-context";
 
 interface SidebarItem {
   title: string;
@@ -290,6 +294,7 @@ export default function AdminSidebar() {
   const pathname = usePathname();
   const [expandedItems, setExpandedItems] = React.useState<string[]>([]);
   const { user } = useUser();
+  const { mobileOpen, setMobileOpen } = useAdminNav();
   const { tickets: openTickets } = useTickets({ status: "OPEN" });
   const { requests: pendingWalletRequests } = useWalletChangeRequests({
     status: "PENDING",
@@ -310,8 +315,8 @@ export default function AdminSidebar() {
       return item;
     });
 
-  const handleExpandClick = (title: string) => {
-    if (!sideBarOpen && !isHovered) return;
+  const handleExpandClick = (title: string, isMobile = false) => {
+    if (!isMobile && !sideBarOpen && !isHovered) return;
     setExpandedItems((prev) =>
       prev.includes(title)
         ? prev.filter((item) => item !== title)
@@ -340,8 +345,8 @@ export default function AdminSidebar() {
     }
   };
 
-  const renderSidebarItems = (items: SidebarItem[]) => {
-    const isExpanded = sideBarOpen || isHovered;
+  const renderSidebarItems = (items: SidebarItem[], isMobile = false) => {
+    const isExpanded = isMobile || sideBarOpen || isHovered;
     return items.map((item) => (
       <React.Fragment key={item.title}>
         <ListItem disablePadding>
@@ -351,16 +356,23 @@ export default function AdminSidebar() {
               href={item.path || "#"}
               target={item.openInNewTab ? "_blank" : undefined}
               rel={item.openInNewTab ? "noopener noreferrer" : undefined}
-              onClick={() => item.items && handleExpandClick(item.title)}
+              onClick={() => {
+                if (item.items) {
+                  handleExpandClick(item.title, isMobile);
+                } else if (isMobile) {
+                  setMobileOpen(false);
+                }
+              }}
               selected={item.path === pathname}
               sx={{
-                borderRadius: 1,
+                borderRadius: 1.5,
                 mb: 0.5,
                 color: "text.secondary",
                 minHeight: 44,
                 "&.Mui-selected": {
                   color: "primary.main",
                   bgcolor: "action.selected",
+                  fontWeight: 600,
                   "& .MuiListItemIcon-root": {
                     color: "primary.main",
                   },
@@ -454,17 +466,23 @@ export default function AdminSidebar() {
                   <ListItemButton
                     component={Link}
                     href={subItem.path || "#"}
+                    onClick={() => {
+                      if (isMobile) {
+                        setMobileOpen(false);
+                      }
+                    }}
                     selected={subItem.path === pathname}
                     sx={{
                       pl: 4,
                       py: 1,
-                      borderRadius: 1,
+                      borderRadius: 1.5,
                       mb: 0.5,
                       color: "text.secondary",
                       minHeight: 40,
                       "&.Mui-selected": {
                         color: "primary.main",
                         bgcolor: "action.selected",
+                        fontWeight: 600,
                         "& .MuiListItemIcon-root": {
                           color: "primary.main",
                         },
@@ -489,7 +507,7 @@ export default function AdminSidebar() {
                       <ListItemText
                         primary={subItem.title}
                         primaryTypographyProps={{
-                          fontSize: "0.875rem",
+                          fontSize: "0.85rem",
                           fontWeight: subItem.path === pathname ? 600 : 400,
                         }}
                       />
@@ -505,71 +523,120 @@ export default function AdminSidebar() {
   };
 
   return (
-    <Box
-      component="nav"
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-      sx={{
-        width: sideBarOpen || isHovered ? 280 : 72,
-        flexShrink: 0,
-        borderRight: 1,
-        borderColor: "divider",
-        bgcolor: "background.paper",
-        overflow: "hidden",
-        transition: (theme) =>
-          theme.transitions.create(["width"], {
-            easing: theme.transitions.easing.sharp,
-            duration: theme.transitions.duration.standard,
-          }),
-        "&:hover": {
-          overflowY: "auto",
-        },
-        "&::-webkit-scrollbar": {
-          width: "4px",
-        },
-        "&::-webkit-scrollbar-track": {
-          background: "transparent",
-        },
-        "&::-webkit-scrollbar-thumb": {
-          background: "rgba(0,0,0,0.2)",
-          borderRadius: "2px",
-        },
-        "&:hover::-webkit-scrollbar-thumb": {
-          background: "rgba(0,0,0,0.3)",
-        },
-      }}
-    >
-      <Box
+    <>
+      {/* Mobile Drawer (xs, sm) */}
+      <Drawer
+        variant="temporary"
+        open={mobileOpen}
+        onClose={() => setMobileOpen(false)}
+        ModalProps={{ keepMounted: true }}
         sx={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          mb: 3,
-          position: "relative",
+          display: { xs: "block", md: "none" },
+          "& .MuiDrawer-paper": {
+            boxSizing: "border-box",
+            width: 280,
+            backgroundColor: "background.paper",
+            backgroundImage: "none",
+            p: 1.5,
+          },
         }}
       >
-        <IconButton
-          onClick={toggleCollapse}
+        <Box
           sx={{
-            backgroundColor: "transparent", // Ensures no background color
-            "&:hover": {
-              backgroundColor: "transparent", // Removes hover background effect
-            },
-            mt: 13,
-            position: "absolute",
-            right: 0,
-            zIndex: 1,
             display: "flex",
-            gap: 0.5,
+            alignItems: "center",
+            justifyContent: "space-between",
+            px: 1,
+            py: 1,
+            mb: 1,
+            borderBottom: 1,
+            borderColor: "divider",
           }}
         >
-          {sideBarOpen || isHovered ? <ChevronLeft /> : <ChevronRight />}
-          {sideBarOpen && <LockIcon sx={{ fontSize: "0.75rem" }} />}
-        </IconButton>
+          <Typography variant="subtitle1" fontWeight="700">
+            Admin Navigation
+          </Typography>
+          <IconButton
+            size="small"
+            onClick={() => setMobileOpen(false)}
+            aria-label="close drawer"
+          >
+            <CloseIcon />
+          </IconButton>
+        </Box>
+        <List sx={{ px: 0 }}>
+          {renderSidebarItems(visibleSidebarItems, true)}
+        </List>
+      </Drawer>
+
+      {/* Desktop Collapsible Sidebar (md and up) */}
+      <Box
+        component="nav"
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        sx={{
+          display: { xs: "none", md: "block" },
+          width: sideBarOpen || isHovered ? 280 : 72,
+          flexShrink: 0,
+          borderRight: 1,
+          borderColor: "divider",
+          bgcolor: "background.paper",
+          overflow: "hidden",
+          transition: (theme) =>
+            theme.transitions.create(["width"], {
+              easing: theme.transitions.easing.sharp,
+              duration: theme.transitions.duration.standard,
+            }),
+          "&:hover": {
+            overflowY: "auto",
+          },
+          "&::-webkit-scrollbar": {
+            width: "4px",
+          },
+          "&::-webkit-scrollbar-track": {
+            background: "transparent",
+          },
+          "&::-webkit-scrollbar-thumb": {
+            background: "rgba(0,0,0,0.2)",
+            borderRadius: "2px",
+          },
+          "&:hover::-webkit-scrollbar-thumb": {
+            background: "rgba(0,0,0,0.3)",
+          },
+        }}
+      >
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            mb: 3,
+            position: "relative",
+          }}
+        >
+          <IconButton
+            onClick={toggleCollapse}
+            sx={{
+              backgroundColor: "transparent",
+              "&:hover": {
+                backgroundColor: "transparent",
+              },
+              mt: 13,
+              position: "absolute",
+              right: 0,
+              zIndex: 1,
+              display: "flex",
+              gap: 0.5,
+            }}
+          >
+            {sideBarOpen || isHovered ? <ChevronLeft /> : <ChevronRight />}
+            {sideBarOpen && <LockIcon sx={{ fontSize: "0.75rem" }} />}
+          </IconButton>
+        </Box>
+        <List sx={{ px: sideBarOpen || isHovered ? 2 : 1 }}>
+          {renderSidebarItems(visibleSidebarItems, false)}
+        </List>
       </Box>
-      <List sx={{ px: sideBarOpen || isHovered ? 2 : 1 }}>
-        {renderSidebarItems(visibleSidebarItems)}
-      </List>
-    </Box>
+    </>
   );
 }

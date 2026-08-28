@@ -20,7 +20,10 @@ import {
   useMediaQuery,
   CircularProgress,
   Alert,
+  Stack,
 } from "@mui/material";
+import TrendingUpIcon from "@mui/icons-material/TrendingUp";
+import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
 
 interface DailyPerformanceData {
   date: string;
@@ -43,16 +46,58 @@ interface MiningEarningsChartProps {
 }
 
 export default function MiningEarningsChart({
-  height = 300,
-  days = 10, // Default to 10 days as per Luxor API request
+  height = 340,
+  days = 10,
   viewMode = "total",
   granularity = "daily",
 }: MiningEarningsChartProps) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const isTablet = useMediaQuery(theme.breakpoints.down("md"));
   const [miningData, setMiningData] = useState<DailyPerformanceData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Calculate summary metrics for the active data
+  const summaryMetrics = React.useMemo(() => {
+    if (!miningData.length) {
+      return { total: 0, avg: 0, count: 0 };
+    }
+
+    let total = 0;
+    if (viewMode === "luxor") {
+      total = miningData.reduce(
+        (sum, item) =>
+          sum +
+          (item.breakdown?.luxor || 0) +
+          (item.breakdown?.luxorRebate || 0),
+        0,
+      );
+    } else if (viewMode === "braiins") {
+      total = miningData.reduce(
+        (sum, item) => sum + (item.breakdown?.braiins || 0),
+        0,
+      );
+    } else {
+      total = miningData.reduce(
+        (sum, item) =>
+          sum +
+          (item.breakdown
+            ? item.breakdown.luxor +
+              item.breakdown.braiins +
+              item.breakdown.luxorRebate
+            : item.earnings),
+        0,
+      );
+    }
+
+    const avg = total / miningData.length;
+    return {
+      total,
+      avg,
+      count: miningData.length,
+    };
+  }, [miningData, viewMode]);
 
   const { yMin, yMax } = React.useMemo(() => {
     if (!miningData.length) {
@@ -62,7 +107,6 @@ export default function MiningEarningsChart({
     let values: number[] = [];
 
     if (viewMode === "sideBySide") {
-      // In side-by-side mode, use both luxor (incl. rebate stack) and braiins values
       values = miningData
         .flatMap((item) => [
           (item.breakdown?.luxor || 0) + (item.breakdown?.luxorRebate || 0),
@@ -70,7 +114,6 @@ export default function MiningEarningsChart({
         ])
         .filter((value) => Number.isFinite(value));
     } else if (viewMode === "luxor") {
-      // Luxor bar is stacked with its rebate segment on top
       values = miningData
         .map(
           (item) =>
@@ -82,9 +125,16 @@ export default function MiningEarningsChart({
         .map((item) => item.breakdown?.braiins || 0)
         .filter((value) => Number.isFinite(value));
     } else {
-      // total mode
       values = miningData
-        .map((item) => Number(item.earnings))
+        .map((item) =>
+          Number(
+            item.breakdown
+              ? item.breakdown.luxor +
+                  item.breakdown.braiins +
+                  item.breakdown.luxorRebate
+              : item.earnings,
+          ),
+        )
         .filter((value) => Number.isFinite(value));
     }
 
@@ -95,7 +145,7 @@ export default function MiningEarningsChart({
     const min = Math.min(...values);
     const max = Math.max(...values);
     const range = max - min || Math.max(max * 0.05, 0.00000001);
-    const padding = range * 0.7;
+    const padding = range * 0.4;
 
     return {
       yMin: Math.max(0, min - padding),
@@ -113,10 +163,6 @@ export default function MiningEarningsChart({
         const query =
           granularity === "monthly" ? "granularity=monthly" : `days=${days}`;
 
-        console.log(
-          `[MiningEarningsChart] Fetching mining performance data (${query})`,
-        );
-
         const response = await fetch(`/api/mining/daily-performance?${query}`, {
           method: "GET",
           headers: {
@@ -124,13 +170,8 @@ export default function MiningEarningsChart({
           },
         });
 
-        console.log(
-          `[MiningEarningsChart] API Response Status: ${response.status} ${response.statusText}`,
-        );
-
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
-          console.error(`[MiningEarningsChart] API Error Response:`, errorData);
           throw new Error(
             errorData.error ||
               `Failed to fetch mining data: ${response.statusText}`,
@@ -138,13 +179,8 @@ export default function MiningEarningsChart({
         }
 
         const data = await response.json();
-        console.log(`[MiningEarningsChart] Raw API Response:`, data);
 
         if (data.success && Array.isArray(data.data)) {
-          console.log(
-            `[MiningEarningsChart] Fetched ${data.data.length} days of performance data`,
-          );
-          console.log("[MiningEarningsChart] Summary:", data.summary);
           setMiningData(data.data);
         } else {
           throw new Error(data.error || "Failed to fetch mining data");
@@ -163,42 +199,183 @@ export default function MiningEarningsChart({
     fetchMiningData();
   }, [days, granularity]);
 
+  // Dynamic X-axis interval to prevent tick collisions on mobile
+  const xAxisInterval = React.useMemo(() => {
+    if (!isMobile) return 0;
+    if (granularity === "monthly") return 0;
+    const len = miningData.length;
+    if (len <= 7) return 0;
+    if (len <= 15) return 1;
+    if (len <= 22) return 2;
+    return Math.floor(len / 6); // Display around 5-6 points on mobile
+  }, [isMobile, granularity, miningData.length]);
+
+  const maxBarWidth = isMobile
+    ? viewMode === "sideBySide"
+      ? 8
+      : 12
+    : isTablet
+      ? 16
+      : 22;
+
+  const chartHeight = isMobile ? Math.max(260, height - 60) : height;
+
   return (
     <Paper
+      elevation={0}
       sx={{
-        p: { xs: 1.5, sm: 3 },
+        p: { xs: 1.5, sm: 2.5, md: 3 },
         width: "100%",
-        minHeight: height + (isMobile ? 80 : 120),
         display: "flex",
         flexDirection: "column",
-        alignItems: "center",
         background:
           theme.palette.mode === "dark"
-            ? "linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%)"
-            : "linear-gradient(135deg, rgba(0,198,255,0.02) 0%, rgba(0,114,255,0.02) 100%)",
-        backdropFilter: "blur(10px)",
-        border: `1px solid ${theme.palette.mode === "dark" ? "rgba(255,255,255,0.1)" : "rgba(0,198,255,0.1)"}`,
-        borderRadius: 3,
+            ? "linear-gradient(145deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.8) 100%)"
+            : "linear-gradient(145deg, rgba(255, 255, 255, 0.95) 0%, rgba(240, 249, 255, 0.9) 100%)",
+        backdropFilter: "blur(12px)",
+        border: `1px solid ${
+          theme.palette.mode === "dark"
+            ? "rgba(255, 255, 255, 0.08)"
+            : "rgba(0, 198, 255, 0.15)"
+        }`,
+        borderRadius: { xs: 2.5, md: 3 },
+        boxShadow:
+          theme.palette.mode === "dark"
+            ? "0 8px 32px rgba(0, 0, 0, 0.3)"
+            : "0 8px 24px rgba(0, 114, 255, 0.06)",
+        overflow: "hidden",
       }}
     >
+      {/* Quick Summary KPIs on mobile & desktop */}
+      {!loading && !error && miningData.length > 0 && (
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(3, 1fr)" },
+            gap: { xs: 1, sm: 1.5 },
+            mb: { xs: 2, sm: 2.5 },
+            p: { xs: 1.25, sm: 1.5 },
+            borderRadius: 2,
+            backgroundColor:
+              theme.palette.mode === "dark"
+                ? "rgba(255, 255, 255, 0.03)"
+                : "rgba(0, 0, 0, 0.02)",
+            border: `1px solid ${
+              theme.palette.mode === "dark"
+                ? "rgba(255, 255, 255, 0.05)"
+                : "rgba(0, 0, 0, 0.04)"
+            }`,
+          }}
+        >
+          <Box>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{
+                fontSize: { xs: "0.7rem", sm: "0.75rem" },
+                fontWeight: 500,
+                display: "flex",
+                alignItems: "center",
+                gap: 0.5,
+              }}
+            >
+              <TrendingUpIcon sx={{ fontSize: 14, color: "primary.main" }} />
+              Period Total
+            </Typography>
+            <Typography
+              variant="body2"
+              sx={{
+                fontWeight: 700,
+                fontSize: { xs: "0.85rem", sm: "1rem" },
+                color: theme.palette.text.primary,
+                mt: 0.25,
+              }}
+            >
+              ₿{summaryMetrics.total.toFixed(8)}
+            </Typography>
+          </Box>
+
+          <Box>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{
+                fontSize: { xs: "0.7rem", sm: "0.75rem" },
+                fontWeight: 500,
+                display: "flex",
+                alignItems: "center",
+                gap: 0.5,
+              }}
+            >
+              <CalendarTodayIcon sx={{ fontSize: 13, color: "success.main" }} />
+              {granularity === "monthly" ? "Monthly Avg" : "Daily Avg"}
+            </Typography>
+            <Typography
+              variant="body2"
+              sx={{
+                fontWeight: 700,
+                fontSize: { xs: "0.85rem", sm: "1rem" },
+                color: theme.palette.text.primary,
+                mt: 0.25,
+              }}
+            >
+              ₿{summaryMetrics.avg.toFixed(8)}
+            </Typography>
+          </Box>
+
+          <Box
+            sx={{
+              display: { xs: "none", sm: "block" },
+            }}
+          >
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ fontSize: "0.75rem", fontWeight: 500 }}
+            >
+              Data Points
+            </Typography>
+            <Typography
+              variant="body2"
+              sx={{
+                fontWeight: 700,
+                fontSize: "1rem",
+                color: theme.palette.text.primary,
+                mt: 0.25,
+              }}
+            >
+              {summaryMetrics.count}{" "}
+              {granularity === "monthly" ? "Months" : "Days"}
+            </Typography>
+          </Box>
+        </Box>
+      )}
+
       {/* Loading State */}
       {loading && (
         <Box
           sx={{
             display: "flex",
+            flexDirection: "column",
             justifyContent: "center",
             alignItems: "center",
-            height,
+            height: chartHeight,
+            gap: 1.5,
           }}
         >
-          <CircularProgress />
+          <CircularProgress size={36} thickness={4} />
+          <Typography variant="caption" color="text.secondary">
+            Loading mining performance...
+          </Typography>
         </Box>
       )}
 
       {/* Error State */}
       {error && !loading && (
-        <Box sx={{ height }}>
-          <Alert severity="error">{error}</Alert>
+        <Box sx={{ py: 3, width: "100%" }}>
+          <Alert severity="error" sx={{ borderRadius: 2 }}>
+            {error}
+          </Alert>
         </Box>
       )}
 
@@ -207,28 +384,37 @@ export default function MiningEarningsChart({
         <Box
           sx={{
             display: "flex",
+            flexDirection: "column",
             justifyContent: "center",
             alignItems: "center",
-            height,
+            height: chartHeight,
+            gap: 1,
           }}
         >
-          <Typography color="text.secondary">
-            No mining data available yet
+          <Typography variant="body2" color="text.secondary" fontWeight={500}>
+            No mining performance records available for this period.
           </Typography>
         </Box>
       )}
 
       {/* Chart */}
       {!loading && !error && miningData.length > 0 && (
-        <Box sx={{ flex: 1, width: "100%", height }}>
-          <ResponsiveContainer width="100%" height={height}>
+        <Box
+          sx={{
+            width: "100%",
+            height: chartHeight,
+            touchAction: "pan-y", // Allow smooth vertical scroll on mobile while touching chart
+          }}
+        >
+          <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={miningData}
+              barCategoryGap={isMobile ? "15%" : "22%"}
               margin={{
-                top: 20,
-                right: isMobile ? 8 : 30,
-                left: isMobile ? 10 : 60,
-                bottom: 0,
+                top: 10,
+                right: isMobile ? 4 : 20,
+                left: isMobile ? -14 : 20,
+                bottom: isMobile ? 10 : 20,
               }}
             >
               <defs>
@@ -239,33 +425,64 @@ export default function MiningEarningsChart({
                   x2="0"
                   y2="1"
                 >
-                  <stop offset="5%" stopColor="#00C6FF" stopOpacity={0.9} />
-                  <stop offset="95%" stopColor="#00C6FF" stopOpacity={0.3} />
+                  <stop offset="0%" stopColor="#00C6FF" stopOpacity={0.95} />
+                  <stop offset="100%" stopColor="#0072FF" stopOpacity={0.4} />
                 </linearGradient>
-                <linearGradient id="costsGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#FF6B6B" stopOpacity={0.9} />
-                  <stop offset="95%" stopColor="#FF6B6B" stopOpacity={0.3} />
+                <linearGradient id="luxorGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#1E88E5" stopOpacity={0.95} />
+                  <stop offset="100%" stopColor="#1565C0" stopOpacity={0.4} />
+                </linearGradient>
+                <linearGradient
+                  id="braiinsGradient"
+                  x1="0"
+                  y1="0"
+                  x2="0"
+                  y2="1"
+                >
+                  <stop offset="0%" stopColor="#FFB300" stopOpacity={0.95} />
+                  <stop offset="100%" stopColor="#FB8C00" stopOpacity={0.4} />
+                </linearGradient>
+                <linearGradient id="rebateGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#FF5252" stopOpacity={0.95} />
+                  <stop offset="100%" stopColor="#D32F2F" stopOpacity={0.4} />
                 </linearGradient>
               </defs>
 
               <CartesianGrid
                 strokeDasharray="3 3"
-                stroke={theme.palette.mode === "dark" ? "#333" : "#f0f0f0"}
+                vertical={false}
+                stroke={
+                  theme.palette.mode === "dark"
+                    ? "rgba(255, 255, 255, 0.07)"
+                    : "rgba(0, 0, 0, 0.05)"
+                }
               />
 
               <XAxis
                 dataKey="date"
+                interval={xAxisInterval}
                 tick={{
-                  fontSize: isMobile ? 9 : 11,
+                  fontSize: isMobile ? 10 : 11,
                   fill: theme.palette.text.secondary,
                 }}
                 tickFormatter={(value: string | number) => {
                   try {
                     const date = new Date(value);
-                    return granularity === "monthly"
+                    if (granularity === "monthly") {
+                      return isMobile
+                        ? date.toLocaleDateString("en-US", {
+                            month: "short",
+                            year: "2-digit",
+                          })
+                        : date.toLocaleDateString("en-US", {
+                            month: "short",
+                            year: "numeric",
+                          });
+                    }
+                    return isMobile
                       ? date.toLocaleDateString("en-US", {
-                          month: "short",
-                          year: "numeric",
+                          month: "numeric",
+                          day: "numeric",
                         })
                       : date.toLocaleDateString("en-US", {
                           month: "short",
@@ -275,40 +492,52 @@ export default function MiningEarningsChart({
                     return String(value);
                   }
                 }}
-                angle={-45}
+                angle={isMobile ? -25 : -35}
                 textAnchor="end"
-                height={isMobile ? 50 : 80}
+                height={isMobile ? 40 : 50}
+                tickLine={false}
+                axisLine={{
+                  stroke:
+                    theme.palette.mode === "dark"
+                      ? "rgba(255,255,255,0.1)"
+                      : "rgba(0,0,0,0.1)",
+                }}
               />
 
               <YAxis
                 tick={{
-                  fontSize: isMobile ? 8 : 11,
+                  fontSize: isMobile ? 9 : 11,
                   fill: theme.palette.text.secondary,
                 }}
                 domain={[yMin, yMax]}
-                tickCount={isMobile ? 6 : 12}
-                width={isMobile ? 58 : 80}
+                tickCount={isMobile ? 5 : 8}
+                width={isMobile ? 52 : 72}
+                tickLine={false}
+                axisLine={false}
                 label={
                   isMobile
                     ? undefined
                     : {
                         value: "Revenue (BTC)",
                         angle: -90,
-                        position: "left",
-                        offset: 24,
+                        position: "insideLeft",
+                        offset: 10,
                         style: {
                           textAnchor: "middle",
                           fill: theme.palette.text.secondary,
                           fontSize: 12,
+                          fontWeight: 500,
                         },
                       }
                 }
                 tickFormatter={(value) => {
                   if (value === 0) return "0";
-                  if (value < 0.00009) {
-                    return value.toExponential(1);
+                  if (value < 0.00001) return value.toExponential(1);
+                  if (isMobile) {
+                    // Cleaner compact format on mobile
+                    return value.toFixed(5);
                   }
-                  return value.toFixed(8);
+                  return value.toFixed(7);
                 }}
               />
 
@@ -324,7 +553,7 @@ export default function MiningEarningsChart({
                     if (entry.name === "LuxOS Rebate") {
                       return Number(entry.value) > 0;
                     }
-                    return entry.value != null;
+                    return entry.value != null && Number(entry.value) > 0;
                   });
 
                   if (!entries.length) {
@@ -349,40 +578,146 @@ export default function MiningEarningsChart({
                     // keep raw label
                   }
 
+                  const totalInTooltip = entries.reduce(
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    (acc: number, curr: any) => acc + Number(curr.value || 0),
+                    0,
+                  );
+
                   return (
                     <Box
                       sx={{
-                        backgroundColor: theme.palette.background.paper,
-                        border: `1px solid ${theme.palette.divider}`,
-                        borderRadius: "8px",
-                        boxShadow: theme.shadows[4],
-                        px: 1.5,
-                        py: 1,
+                        backgroundColor:
+                          theme.palette.mode === "dark"
+                            ? "rgba(15, 23, 42, 0.95)"
+                            : "rgba(255, 255, 255, 0.98)",
+                        backdropFilter: "blur(12px)",
+                        border: `1px solid ${
+                          theme.palette.mode === "dark"
+                            ? "rgba(255, 255, 255, 0.15)"
+                            : "rgba(0, 0, 0, 0.1)"
+                        }`,
+                        borderRadius: "10px",
+                        boxShadow:
+                          theme.palette.mode === "dark"
+                            ? "0 8px 32px rgba(0,0,0,0.6)"
+                            : "0 8px 24px rgba(0,0,0,0.12)",
+                        px: 1.75,
+                        py: 1.25,
+                        minWidth: 150,
                       }}
                     >
                       <Typography
-                        variant="body2"
-                        sx={{ fontWeight: 600, mb: 0.5 }}
+                        variant="caption"
+                        sx={{
+                          fontWeight: 700,
+                          color: "text.primary",
+                          display: "block",
+                          borderBottom: `1px solid ${theme.palette.divider}`,
+                          pb: 0.5,
+                          mb: 0.75,
+                        }}
                       >
                         {dateLabel}
                       </Typography>
-                      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                      {entries.map((entry: any) => (
-                        <Typography
-                          key={entry.name}
-                          variant="body2"
-                          sx={{ color: entry.color }}
-                        >
-                          {entry.name}: ₿{Number(entry.value).toFixed(8)}
-                        </Typography>
-                      ))}
+
+                      <Stack spacing={0.5}>
+                        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                        {entries.map((entry: any) => (
+                          <Box
+                            key={entry.name}
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              gap: 1.5,
+                            }}
+                          >
+                            <Box
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 0.75,
+                              }}
+                            >
+                              <Box
+                                sx={{
+                                  width: 8,
+                                  height: 8,
+                                  borderRadius: "50%",
+                                  backgroundColor: entry.color || "#00C6FF",
+                                }}
+                              />
+                              <Typography
+                                variant="caption"
+                                sx={{
+                                  color: "text.secondary",
+                                  fontWeight: 500,
+                                }}
+                              >
+                                {entry.name}
+                              </Typography>
+                            </Box>
+                            <Typography
+                              variant="caption"
+                              sx={{
+                                fontWeight: 700,
+                                color: "text.primary",
+                                fontFamily: "monospace",
+                              }}
+                            >
+                              ₿{Number(entry.value).toFixed(8)}
+                            </Typography>
+                          </Box>
+                        ))}
+
+                        {entries.length > 1 && (
+                          <Box
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              borderTop: `1px dashed ${theme.palette.divider}`,
+                              pt: 0.5,
+                              mt: 0.5,
+                            }}
+                          >
+                            <Typography
+                              variant="caption"
+                              sx={{ fontWeight: 700, color: "text.primary" }}
+                            >
+                              Total
+                            </Typography>
+                            <Typography
+                              variant="caption"
+                              sx={{
+                                fontWeight: 800,
+                                color: "primary.main",
+                                fontFamily: "monospace",
+                              }}
+                            >
+                              ₿{totalInTooltip.toFixed(8)}
+                            </Typography>
+                          </Box>
+                        )}
+                      </Stack>
                     </Box>
                   );
                 }}
-                cursor={{ fill: "rgba(0,198,255,0.1)" }}
+                cursor={{
+                  fill:
+                    theme.palette.mode === "dark"
+                      ? "rgba(255, 255, 255, 0.05)"
+                      : "rgba(0, 198, 255, 0.08)",
+                }}
               />
 
-              <Legend />
+              <Legend
+                wrapperStyle={{
+                  fontSize: isMobile ? "0.75rem" : "0.85rem",
+                  paddingTop: isMobile ? "4px" : "12px",
+                }}
+              />
 
               {/* Total earnings view - default. Revenue and LuxOS Rebate
                   are stacked into a single bar per day. */}
@@ -400,17 +735,17 @@ export default function MiningEarningsChart({
                         : "Daily Revenue"
                     }
                     stackId="revenue"
-                    barSize={18}
-                    radius={[0, 0, 6, 6]}
+                    maxBarSize={maxBarWidth}
+                    radius={[0, 0, 4, 4]}
                     fill="url(#earningsGradient)"
                   />
                   <Bar
                     dataKey="breakdown.luxorRebate"
                     name="LuxOS Rebate"
                     stackId="revenue"
-                    barSize={18}
-                    radius={[6, 6, 0, 0]}
-                    fill={theme.palette.error.main}
+                    maxBarSize={maxBarWidth}
+                    radius={[4, 4, 0, 0]}
+                    fill="url(#rebateGradient)"
                   />
                 </>
               )}
@@ -422,17 +757,17 @@ export default function MiningEarningsChart({
                     dataKey="breakdown.luxor"
                     name="Luxor Revenue"
                     stackId="luxor"
-                    barSize={18}
-                    radius={[0, 0, 6, 6]}
-                    fill="#1565C0"
+                    maxBarSize={maxBarWidth}
+                    radius={[0, 0, 4, 4]}
+                    fill="url(#luxorGradient)"
                   />
                   <Bar
                     dataKey="breakdown.luxorRebate"
                     name="LuxOS Rebate"
                     stackId="luxor"
-                    barSize={18}
-                    radius={[6, 6, 0, 0]}
-                    fill={theme.palette.error.main}
+                    maxBarSize={maxBarWidth}
+                    radius={[4, 4, 0, 0]}
+                    fill="url(#rebateGradient)"
                   />
                 </>
               )}
@@ -442,9 +777,9 @@ export default function MiningEarningsChart({
                 <Bar
                   dataKey="breakdown.braiins"
                   name="Braiins Revenue"
-                  barSize={18}
-                  radius={[6, 6, 0, 0]}
-                  fill="#FFA500"
+                  maxBarSize={maxBarWidth}
+                  radius={[4, 4, 0, 0]}
+                  fill="url(#braiinsGradient)"
                 />
               )}
 
@@ -455,31 +790,27 @@ export default function MiningEarningsChart({
                     dataKey="breakdown.luxor"
                     name="Luxor"
                     stackId="luxor"
-                    radius={[0, 0, 6, 6]}
-                    fill="#1565C0"
+                    maxBarSize={maxBarWidth}
+                    radius={[0, 0, 4, 4]}
+                    fill="url(#luxorGradient)"
                   />
                   <Bar
                     dataKey="breakdown.luxorRebate"
                     name="LuxOS Rebate"
                     stackId="luxor"
-                    radius={[6, 6, 0, 0]}
-                    fill={theme.palette.error.main}
+                    maxBarSize={maxBarWidth}
+                    radius={[4, 4, 0, 0]}
+                    fill="url(#rebateGradient)"
                   />
                   <Bar
                     dataKey="breakdown.braiins"
                     name="Braiins"
-                    radius={[6, 6, 0, 0]}
-                    fill="#FFA500"
+                    maxBarSize={maxBarWidth}
+                    radius={[4, 4, 0, 0]}
+                    fill="url(#braiinsGradient)"
                   />
                 </>
               )}
-              {/* <Bar
-                dataKey="costs"
-                name="Costs"
-                barSize={18}
-                radius={[6, 6, 0, 0]}
-                fill="url(#costsGradient)"
-              /> */}
             </BarChart>
           </ResponsiveContainer>
         </Box>

@@ -9,9 +9,13 @@ import {
   Button,
   TextField,
   Alert,
-  ToggleButton,
-  ToggleButtonGroup,
+  IconButton,
+  Tooltip,
+  useTheme,
 } from "@mui/material";
+import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import CheckIcon from "@mui/icons-material/Check";
+import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
 import ElectricityCostTable from "@/components/ElectricityCostTable";
 import ProfitLossChart from "@/components/ProfitLossChart";
 import { useUser } from "@/lib/hooks/useUser";
@@ -53,6 +57,8 @@ interface Revenue24h {
 }
 
 export default function WalletPage() {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
   const [summary, setSummary] = useState<EarningsSummary | null>(null);
   const [revenue24h, setRevenue24h] = useState<Revenue24h | null>(null);
   const [walletSettings, setWalletSettings] =
@@ -67,6 +73,7 @@ export default function WalletPage() {
   const [error, setError] = useState<string | null>(null);
   const [revenue24hError, setRevenue24hError] = useState<string | null>(null);
   const [walletError, setWalletError] = useState<string | null>(null);
+  const [copiedAddress, setCopiedAddress] = useState(false);
 
   // Statement download state
   const [statementStartDate, setStatementStartDate] = useState<string>("");
@@ -285,7 +292,6 @@ export default function WalletPage() {
   }
 
   const { btcLiveData, BtcLivePriceComponent } = useBitcoinLivePrice();
-  const minCardHeight = 140;
   const btcPriceUsd = btcLiveData?.price
     ? typeof btcLiveData.price === "string"
       ? parseFloat(btcLiveData.price)
@@ -359,6 +365,15 @@ export default function WalletPage() {
     }
   };
 
+  const handleCopyAddress = () => {
+    const address = getPrimaryWalletAddress();
+    if (address && address !== "Not configured") {
+      navigator.clipboard.writeText(address);
+      setCopiedAddress(true);
+      setTimeout(() => setCopiedAddress(false), 2000);
+    }
+  };
+
   return (
     <Box
       component="main"
@@ -367,17 +382,18 @@ export default function WalletPage() {
         p: { xs: 1.5, sm: 2, md: 3 },
         mt: { xs: 1, md: 2 },
         backgroundColor: (theme) =>
-          theme.palette.mode === "light" ? "#f5f5f5" : theme.palette.grey[900],
+          theme.palette.mode === "light" ? "#f8fafc" : theme.palette.grey[950],
         minHeight: "100vh",
       }}
     >
+      {/* ── Page Header ────────────────────────────────────────────── */}
       <Box
         sx={{
           display: "flex",
           justifyContent: "space-between",
-          alignItems: { xs: "flex-start", sm: "flex-start" },
+          alignItems: { xs: "stretch", sm: "flex-start" },
           flexDirection: { xs: "column", sm: "row" },
-          gap: { xs: 1.5, sm: 0 },
+          gap: { xs: 1.5, sm: 2 },
           mb: { xs: 2, md: 3 },
         }}
       >
@@ -385,421 +401,637 @@ export default function WalletPage() {
           <Typography
             variant="h4"
             fontWeight="bold"
-            gutterBottom
-            sx={{ fontSize: { xs: "1.6rem", sm: "2rem", md: "2.125rem" } }}
+            sx={{
+              fontSize: { xs: "1.45rem", sm: "1.85rem", md: "2.125rem" },
+              letterSpacing: "-0.02em",
+            }}
           >
             Wallet
           </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Overview of your mining earnings and transactions.
+          <Typography
+            variant="body2"
+            color="text.secondary"
+            sx={{ fontSize: { xs: "0.8rem", sm: "0.875rem" } }}
+          >
+            Overview of your mining earnings, payouts, and financial records.
           </Typography>
         </Box>
+
         <Box
           sx={{
             display: "flex",
-            gap: 1.5,
+            gap: 1.25,
             alignItems: "center",
             flexWrap: "wrap",
           }}
         >
           {activePoolNames.length > 1 && (
-            <ToggleButtonGroup
-              value={poolMode}
-              exclusive
-              onChange={(e, newMode) => {
-                if (newMode !== null) {
-                  setPoolMode(newMode);
-                }
+            <Box
+              sx={{
+                display: "inline-flex",
+                p: 0.5,
+                borderRadius: 3,
+                backgroundColor: isDark
+                  ? "rgba(255, 255, 255, 0.05)"
+                  : "rgba(0, 0, 0, 0.04)",
+                border: `1px solid ${
+                  isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)"
+                }`,
+                gap: 0.5,
               }}
-              size="small"
             >
-              <ToggleButton value="total">Total</ToggleButton>
-              {activePoolNames.includes("Luxor") && (
-                <ToggleButton value="luxor">Luxor</ToggleButton>
-              )}
-              {activePoolNames.includes("Braiins") && (
-                <ToggleButton value="braiins">Braiins</ToggleButton>
-              )}
-            </ToggleButtonGroup>
+              {[
+                { key: "total", label: "Total" },
+                ...(activePoolNames.includes("Luxor")
+                  ? [{ key: "luxor", label: "🔷 Luxor" }]
+                  : []),
+                ...(activePoolNames.includes("Braiins")
+                  ? [{ key: "braiins", label: "🔶 Braiins" }]
+                  : []),
+              ].map((item) => {
+                const active = poolMode === item.key;
+                return (
+                  <Button
+                    key={item.key}
+                    size="small"
+                    onClick={() =>
+                      setPoolMode(item.key as "total" | "luxor" | "braiins")
+                    }
+                    sx={{
+                      px: { xs: 1.25, sm: 1.75 },
+                      py: { xs: 0.4, sm: 0.6 },
+                      borderRadius: 2.5,
+                      fontSize: { xs: "0.72rem", sm: "0.8rem" },
+                      fontWeight: active ? 700 : 500,
+                      textTransform: "none",
+                      color: active
+                        ? theme.palette.primary.contrastText
+                        : theme.palette.text.secondary,
+                      backgroundColor: active
+                        ? theme.palette.primary.main
+                        : "transparent",
+                      boxShadow: active
+                        ? "0 2px 8px rgba(0, 198, 255, 0.35)"
+                        : "none",
+                      "&:hover": {
+                        backgroundColor: active
+                          ? theme.palette.primary.dark
+                          : isDark
+                            ? "rgba(255,255,255,0.06)"
+                            : "rgba(0,0,0,0.04)",
+                      },
+                    }}
+                  >
+                    {item.label}
+                  </Button>
+                );
+              })}
+            </Box>
           )}
-          {BtcLivePriceComponent}
+
+          <Box sx={{ width: { xs: "100%", sm: "auto" } }}>
+            {BtcLivePriceComponent}
+          </Box>
         </Box>
       </Box>
 
       {error && (
-        <Paper
-          sx={{
-            p: 2,
-            mt: 2,
-            backgroundColor: "#ffebee",
-            borderLeft: "4px solid #d32f2f",
-            color: "#d32f2f",
-          }}
-        >
-          <Typography variant="body2">
-            <strong>Error loading earnings:</strong> {error}
-          </Typography>
-        </Paper>
+        <Alert severity="error" sx={{ mb: 2 }}>
+          <strong>Error loading earnings:</strong> {error}
+        </Alert>
       )}
 
+      {/* ── KPI Summary Cards ───────────────────────────────────────── */}
       <Box
         sx={{
           display: "grid",
-          gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
-          gap: { xs: 1.5, sm: 2, md: 3 },
+          gridTemplateColumns: {
+            xs: "1fr",
+            sm: "repeat(2, 1fr)",
+            lg: "repeat(3, 1fr)",
+          },
+          gap: { xs: 1.5, sm: 2 },
           mt: 2,
         }}
       >
-        {/* Top Row: Total Earnings & Primary Wallet Address */}
-        <Box>
-          <Paper
+        {/* Card 1: Total Earnings */}
+        <Paper
+          sx={{
+            p: { xs: 2, sm: 2.5 },
+            borderRadius: 3,
+            background: isDark
+              ? "linear-gradient(135deg, rgba(30, 58, 138, 0.85) 0%, rgba(15, 23, 42, 0.95) 100%)"
+              : "linear-gradient(135deg, #1e40af 0%, #3b82f6 100%)",
+            color: "white",
+            border: `1px solid ${
+              isDark ? "rgba(59, 130, 246, 0.3)" : "rgba(255,255,255,0.2)"
+            }`,
+            boxShadow: "0 4px 20px rgba(30, 64, 175, 0.15)",
+            position: "relative",
+            overflow: "hidden",
+          }}
+        >
+          <Typography
+            variant="caption"
             sx={{
-              p: { xs: 2, sm: 3 },
-              borderRadius: 2,
-              backgroundColor: (theme) =>
-                theme.palette.mode === "light" ? "#2196f3" : "#1565c0",
-              color: "white",
-              minHeight: { xs: "auto", sm: minCardHeight },
+              opacity: 0.85,
+              fontWeight: 600,
+              fontSize: { xs: "0.75rem", sm: "0.82rem" },
+              letterSpacing: "0.03em",
+              textTransform: "uppercase",
+              display: "block",
             }}
           >
-            <Typography
-              variant="subtitle2"
-              sx={{ opacity: 0.9, fontSize: { xs: "0.85rem", sm: "0.95rem" } }}
-            >
-              Total Earnings
-              {poolMode !== "total" && ` (${poolMode.toUpperCase()})`}
-            </Typography>
-            {isLoading ? (
-              <Box
-                sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1 }}
-              >
-                <CircularProgress size={20} sx={{ color: "white" }} />
-                <Typography variant="body2">Loading...</Typography>
-              </Box>
-            ) : (
-              <Box sx={{ mt: 0.5 }}>
-                <Typography
-                  sx={{
-                    fontWeight: 800,
-                    fontSize: { xs: "1.25rem", sm: "1.5rem" },
-                  }}
-                >
-                  ₿ {getTotalEarnings().toFixed(8)}
-                </Typography>
-                <Typography
-                  sx={{
-                    fontWeight: 600,
-                    fontSize: { xs: "1.05rem", sm: "1.2rem" },
-                    opacity: 0.9,
-                  }}
-                >
-                  $
-                  {getTotalEarnings() && btcLiveData?.price
-                    ? (getTotalEarnings() * btcLiveData.price).toFixed(2)
-                    : "0.00"}
-                </Typography>
-              </Box>
-            )}
-          </Paper>
-        </Box>
+            Total Earnings{" "}
+            {poolMode !== "total" && `(${poolMode.toUpperCase()})`}
+          </Typography>
 
-        <Box>
-          <Paper
+          {isLoading ? (
+            <Box
+              sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1.5 }}
+            >
+              <CircularProgress size={18} sx={{ color: "white" }} />
+              <Typography variant="body2">Loading...</Typography>
+            </Box>
+          ) : (
+            <Box sx={{ mt: 1 }}>
+              <Typography
+                sx={{
+                  fontWeight: 800,
+                  fontSize: { xs: "1.35rem", sm: "1.65rem" },
+                  letterSpacing: "-0.01em",
+                }}
+              >
+                ₿ {getTotalEarnings().toFixed(8)}
+              </Typography>
+              <Typography
+                sx={{
+                  fontWeight: 600,
+                  fontSize: { xs: "0.95rem", sm: "1.05rem" },
+                  opacity: 0.9,
+                  mt: 0.25,
+                }}
+              >
+                ≈ $
+                {getTotalEarnings() && btcLiveData?.price
+                  ? (getTotalEarnings() * btcLiveData.price).toLocaleString(
+                      undefined,
+                      { minimumFractionDigits: 2, maximumFractionDigits: 2 },
+                    )
+                  : "0.00"}
+              </Typography>
+            </Box>
+          )}
+        </Paper>
+
+        {/* Card 2: Primary Wallet Address */}
+        <Paper
+          sx={{
+            p: { xs: 2, sm: 2.5 },
+            borderRadius: 3,
+            background: isDark
+              ? "linear-gradient(135deg, rgba(120, 53, 15, 0.85) 0%, rgba(15, 23, 42, 0.95) 100%)"
+              : "linear-gradient(135deg, #d97706 0%, #f59e0b 100%)",
+            color: "white",
+            border: `1px solid ${
+              isDark ? "rgba(245, 158, 11, 0.3)" : "rgba(255,255,255,0.2)"
+            }`,
+            boxShadow: "0 4px 20px rgba(217, 119, 6, 0.15)",
+            opacity: poolMode === "braiins" ? 0.65 : 1,
+            position: "relative",
+            overflow: "hidden",
+          }}
+        >
+          <Box
             sx={{
-              p: { xs: 2, sm: 3 },
-              borderRadius: 2,
-              backgroundColor: (theme) =>
-                theme.palette.mode === "light" ? "#ffb300" : "#ff8f00",
-              color: "white",
-              opacity: poolMode === "braiins" ? 0.6 : 1,
-              minHeight: { xs: "auto", sm: minCardHeight },
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
             }}
           >
             <Typography
-              variant="subtitle2"
-              sx={{ opacity: 0.9, fontSize: { xs: "0.85rem", sm: "0.95rem" } }}
+              variant="caption"
+              sx={{
+                opacity: 0.85,
+                fontWeight: 600,
+                fontSize: { xs: "0.75rem", sm: "0.82rem" },
+                letterSpacing: "0.03em",
+                textTransform: "uppercase",
+              }}
             >
               Primary Wallet Address
             </Typography>
-            {poolMode === "braiins" ? (
-              <Typography
-                variant="body2"
-                sx={{ mt: 1, fontFamily: "monospace" }}
-              >
-                Not available for Braiins
-              </Typography>
-            ) : walletLoading ? (
-              <Box
-                sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1 }}
-              >
-                <CircularProgress size={20} sx={{ color: "white" }} />
-                <Typography variant="body2">Loading...</Typography>
-              </Box>
-            ) : walletError ? (
-              <Typography variant="body2" sx={{ mt: 1 }}>
-                {walletError}
-              </Typography>
-            ) : (
-              <>
-                <Typography
-                  variant="body2"
-                  sx={{
-                    wordBreak: "break-all",
-                    mt: 1,
-                    fontFamily: "monospace",
-                    fontSize: { xs: "0.85rem", sm: "1rem" },
-                  }}
-                >
-                  {getPrimaryWalletAddress()}
-                </Typography>
-                {hasPendingWalletChange ? (
-                  <Typography
-                    variant="caption"
-                    sx={{ mt: 1, display: "block", opacity: 0.9 }}
-                  >
-                    Change requested — pending admin review
-                  </Typography>
-                ) : (
-                  <Button
+            {getPrimaryWalletAddress() !== "Not configured" &&
+              poolMode !== "braiins" && (
+                <Tooltip title={copiedAddress ? "Copied!" : "Copy Address"}>
+                  <IconButton
                     size="small"
-                    variant="outlined"
-                    onClick={() => setRequestChangeOpen(true)}
+                    onClick={handleCopyAddress}
                     sx={{
-                      mt: 1.5,
                       color: "white",
-                      borderColor: "rgba(255,255,255,0.6)",
-                      "&:hover": {
-                        borderColor: "white",
-                        backgroundColor: "rgba(255,255,255,0.1)",
-                      },
+                      p: 0.5,
+                      backgroundColor: "rgba(255,255,255,0.15)",
+                      "&:hover": { backgroundColor: "rgba(255,255,255,0.25)" },
                     }}
                   >
-                    Request Change
-                  </Button>
-                )}
-              </>
-            )}
-          </Paper>
-        </Box>
+                    {copiedAddress ? (
+                      <CheckIcon sx={{ fontSize: 16 }} />
+                    ) : (
+                      <ContentCopyIcon sx={{ fontSize: 16 }} />
+                    )}
+                  </IconButton>
+                </Tooltip>
+              )}
+          </Box>
 
-        {/* Bottom Row: Revenue (24 hours) & Pending Payouts */}
-        <Box>
-          <Paper
-            sx={{
-              p: { xs: 2, sm: 3 },
-              borderRadius: 2,
-              backgroundColor: (theme) =>
-                theme.palette.mode === "light" ? "#9c27b0" : "#6a1b9a",
-              color: "white",
-            }}
-          >
+          {poolMode === "braiins" ? (
             <Typography
-              variant="subtitle2"
-              sx={{ opacity: 0.9, fontSize: { xs: "0.85rem", sm: "0.95rem" } }}
+              variant="body2"
+              sx={{ mt: 1.5, fontFamily: "monospace", opacity: 0.9 }}
             >
-              Revenue (24 Hours)
-              {poolMode !== "total" && ` (${poolMode.toUpperCase()})`}
+              Not available for Braiins
             </Typography>
-            {revenue24hLoading ? (
-              <Box
-                sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1 }}
+          ) : walletLoading ? (
+            <Box
+              sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1.5 }}
+            >
+              <CircularProgress size={18} sx={{ color: "white" }} />
+              <Typography variant="body2">Loading...</Typography>
+            </Box>
+          ) : walletError ? (
+            <Typography variant="body2" sx={{ mt: 1.5 }}>
+              {walletError}
+            </Typography>
+          ) : (
+            <>
+              <Typography
+                variant="body2"
+                sx={{
+                  wordBreak: "break-all",
+                  mt: 1,
+                  fontFamily: "monospace",
+                  fontSize: { xs: "0.78rem", sm: "0.85rem" },
+                  lineHeight: 1.4,
+                  backgroundColor: "rgba(0,0,0,0.15)",
+                  p: 0.75,
+                  borderRadius: 1.5,
+                }}
               >
-                <CircularProgress size={20} sx={{ color: "white" }} />
-                <Typography variant="body2">Loading...</Typography>
-              </Box>
-            ) : revenue24hError ? (
-              <Typography variant="body2" sx={{ mt: 1 }}>
-                {revenue24hError}
+                {getPrimaryWalletAddress()}
               </Typography>
-            ) : (
-              <Box sx={{ mt: 0.5 }}>
-                <Typography
-                  sx={{
-                    fontWeight: 800,
-                    fontSize: { xs: "1.25rem", sm: "1.5rem" },
-                  }}
-                >
-                  ₿ {getRevenue24h().toFixed(8)}
-                </Typography>
-                <Typography
-                  sx={{
-                    fontWeight: 600,
-                    fontSize: { xs: "1.05rem", sm: "1.2rem" },
-                    opacity: 0.9,
-                  }}
-                >
-                  $
-                  {getRevenue24h() && btcLiveData?.price
-                    ? (getRevenue24h() * btcLiveData.price).toFixed(2)
-                    : "0.00"}
-                </Typography>
-              </Box>
-            )}
-          </Paper>
-        </Box>
 
-        <Box>
-          <Paper
+              {hasPendingWalletChange ? (
+                <Typography
+                  variant="caption"
+                  sx={{
+                    mt: 1,
+                    display: "inline-block",
+                    backgroundColor: "rgba(255,255,255,0.2)",
+                    px: 1,
+                    py: 0.25,
+                    borderRadius: 1,
+                    fontWeight: 600,
+                  }}
+                >
+                  ⏳ Change pending review
+                </Typography>
+              ) : (
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={() => setRequestChangeOpen(true)}
+                  sx={{
+                    mt: 1,
+                    color: "white",
+                    borderColor: "rgba(255,255,255,0.5)",
+                    borderRadius: 2,
+                    fontSize: "0.72rem",
+                    py: 0.3,
+                    textTransform: "none",
+                    fontWeight: 600,
+                    "&:hover": {
+                      borderColor: "white",
+                      backgroundColor: "rgba(255,255,255,0.15)",
+                    },
+                  }}
+                >
+                  Request Change
+                </Button>
+              )}
+            </>
+          )}
+        </Paper>
+
+        {/* Card 3: Revenue (24 Hours) */}
+        <Paper
+          sx={{
+            p: { xs: 2, sm: 2.5 },
+            borderRadius: 3,
+            background: isDark
+              ? "linear-gradient(135deg, rgba(88, 28, 135, 0.85) 0%, rgba(15, 23, 42, 0.95) 100%)"
+              : "linear-gradient(135deg, #7c3aed 0%, #a855f7 100%)",
+            color: "white",
+            border: `1px solid ${
+              isDark ? "rgba(168, 85, 247, 0.3)" : "rgba(255,255,255,0.2)"
+            }`,
+            boxShadow: "0 4px 20px rgba(124, 58, 237, 0.15)",
+          }}
+        >
+          <Typography
+            variant="caption"
             sx={{
-              p: { xs: 2, sm: 3 },
-              borderRadius: 2,
-              backgroundColor: (theme) =>
-                theme.palette.mode === "light" ? "#4caf50" : "#2e7d32",
-              color: "white",
+              opacity: 0.85,
+              fontWeight: 600,
+              fontSize: { xs: "0.75rem", sm: "0.82rem" },
+              letterSpacing: "0.03em",
+              textTransform: "uppercase",
+              display: "block",
             }}
           >
+            Revenue (24 Hours){" "}
+            {poolMode !== "total" && `(${poolMode.toUpperCase()})`}
+          </Typography>
+
+          {revenue24hLoading ? (
+            <Box
+              sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1.5 }}
+            >
+              <CircularProgress size={18} sx={{ color: "white" }} />
+              <Typography variant="body2">Loading...</Typography>
+            </Box>
+          ) : revenue24hError ? (
+            <Typography variant="body2" sx={{ mt: 1.5 }}>
+              {revenue24hError}
+            </Typography>
+          ) : (
+            <Box sx={{ mt: 1 }}>
+              <Typography
+                sx={{
+                  fontWeight: 800,
+                  fontSize: { xs: "1.35rem", sm: "1.65rem" },
+                  letterSpacing: "-0.01em",
+                }}
+              >
+                ₿ {getRevenue24h().toFixed(8)}
+              </Typography>
+              <Typography
+                sx={{
+                  fontWeight: 600,
+                  fontSize: { xs: "0.95rem", sm: "1.05rem" },
+                  opacity: 0.9,
+                  mt: 0.25,
+                }}
+              >
+                ≈ $
+                {getRevenue24h() && btcLiveData?.price
+                  ? (getRevenue24h() * btcLiveData.price).toLocaleString(
+                      undefined,
+                      { minimumFractionDigits: 2, maximumFractionDigits: 2 },
+                    )
+                  : "0.00"}
+              </Typography>
+            </Box>
+          )}
+        </Paper>
+
+        {/* Card 4: Pending Payouts */}
+        <Paper
+          sx={{
+            p: { xs: 2, sm: 2.5 },
+            borderRadius: 3,
+            background: isDark
+              ? "linear-gradient(135deg, rgba(6, 78, 59, 0.85) 0%, rgba(15, 23, 42, 0.95) 100%)"
+              : "linear-gradient(135deg, #059669 0%, #10b981 100%)",
+            color: "white",
+            border: `1px solid ${
+              isDark ? "rgba(16, 185, 129, 0.3)" : "rgba(255,255,255,0.2)"
+            }`,
+            boxShadow: "0 4px 20px rgba(5, 150, 105, 0.15)",
+          }}
+        >
+          <Typography
+            variant="caption"
+            sx={{
+              opacity: 0.85,
+              fontWeight: 600,
+              fontSize: { xs: "0.75rem", sm: "0.82rem" },
+              letterSpacing: "0.03em",
+              textTransform: "uppercase",
+              display: "block",
+            }}
+          >
+            Pending Payouts{" "}
+            {poolMode !== "total" && `(${poolMode.toUpperCase()})`}
+          </Typography>
+
+          {isLoading ? (
+            <Box
+              sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1.5 }}
+            >
+              <CircularProgress size={18} sx={{ color: "white" }} />
+              <Typography variant="body2">Loading...</Typography>
+            </Box>
+          ) : (
+            <Box sx={{ mt: 1 }}>
+              <Typography
+                sx={{
+                  fontWeight: 800,
+                  fontSize: { xs: "1.35rem", sm: "1.65rem" },
+                  letterSpacing: "-0.01em",
+                }}
+              >
+                ₿ {getPendingPayouts().toFixed(8)}
+              </Typography>
+              <Typography
+                sx={{
+                  fontWeight: 600,
+                  fontSize: { xs: "0.95rem", sm: "1.05rem" },
+                  opacity: 0.9,
+                  mt: 0.25,
+                }}
+              >
+                ≈ $
+                {getPendingPayouts() && btcLiveData?.price
+                  ? (getPendingPayouts() * btcLiveData.price).toLocaleString(
+                      undefined,
+                      { minimumFractionDigits: 2, maximumFractionDigits: 2 },
+                    )
+                  : "0.00"}
+              </Typography>
+            </Box>
+          )}
+        </Paper>
+
+        {/* Card 5: Payment Frequency */}
+        <Paper
+          sx={{
+            p: { xs: 2, sm: 2.5 },
+            borderRadius: 3,
+            background: isDark
+              ? "linear-gradient(135deg, rgba(124, 45, 18, 0.85) 0%, rgba(15, 23, 42, 0.95) 100%)"
+              : "linear-gradient(135deg, #ea580c 0%, #f97316 100%)",
+            color: "white",
+            border: `1px solid ${
+              isDark ? "rgba(249, 115, 22, 0.3)" : "rgba(255,255,255,0.2)"
+            }`,
+            boxShadow: "0 4px 20px rgba(234, 88, 12, 0.15)",
+            opacity: poolMode === "braiins" ? 0.65 : 1,
+          }}
+        >
+          <Typography
+            variant="caption"
+            sx={{
+              opacity: 0.85,
+              fontWeight: 600,
+              fontSize: { xs: "0.75rem", sm: "0.82rem" },
+              letterSpacing: "0.03em",
+              textTransform: "uppercase",
+              display: "block",
+            }}
+          >
+            Payment Frequency
+          </Typography>
+
+          {poolMode === "braiins" ? (
             <Typography
-              variant="subtitle2"
-              sx={{ opacity: 0.9, fontSize: { xs: "0.85rem", sm: "0.95rem" } }}
+              variant="body2"
+              sx={{ mt: 1.5, fontFamily: "monospace", opacity: 0.9 }}
             >
-              Pending Payouts
-              {poolMode !== "total" && ` (${poolMode.toUpperCase()})`}
+              Not available for Braiins
             </Typography>
-            {isLoading ? (
-              <Box
-                sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1 }}
+          ) : walletLoading ? (
+            <Box
+              sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1.5 }}
+            >
+              <CircularProgress size={18} sx={{ color: "white" }} />
+              <Typography variant="body2">Loading...</Typography>
+            </Box>
+          ) : walletError ? (
+            <Typography variant="body2" sx={{ mt: 1.5 }}>
+              Unable to load
+            </Typography>
+          ) : (
+            <Box sx={{ mt: 1 }}>
+              <Typography
+                sx={{
+                  fontWeight: 800,
+                  fontSize: { xs: "1.25rem", sm: "1.45rem" },
+                }}
               >
-                <CircularProgress size={20} sx={{ color: "white" }} />
-                <Typography variant="body2">Loading...</Typography>
-              </Box>
-            ) : (
-              <Box sx={{ mt: 0.5 }}>
-                <Typography
-                  sx={{
-                    fontWeight: 800,
-                    fontSize: { xs: "1.25rem", sm: "1.5rem" },
-                  }}
-                >
-                  ₿ {getPendingPayouts().toFixed(8)}
-                </Typography>
-                <Typography
-                  sx={{
-                    fontWeight: 600,
-                    fontSize: { xs: "1.05rem", sm: "1.2rem" },
-                    opacity: 0.9,
-                  }}
-                >
-                  $
-                  {getPendingPayouts() && btcLiveData?.price
-                    ? (getPendingPayouts() * btcLiveData.price).toFixed(2)
-                    : "0.00"}
-                </Typography>
-              </Box>
-            )}
-          </Paper>
-        </Box>
-
-        {/* Third Row: Payment Frequency & Next Payout */}
-        <Box>
-          <Paper
-            sx={{
-              p: { xs: 2, sm: 3 },
-              borderRadius: 2,
-              backgroundColor: (theme) =>
-                theme.palette.mode === "light" ? "#ff6f00" : "#e65100",
-              color: "white",
-              minHeight: { xs: "auto", sm: minCardHeight },
-              opacity: poolMode === "braiins" ? 0.6 : 1,
-            }}
-          >
-            <Typography variant="subtitle1">Payment Frequency</Typography>
-            {poolMode === "braiins" ? (
-              <Typography variant="h5" fontWeight="bold" sx={{ mt: 1 }}>
-                Not available
-              </Typography>
-            ) : walletLoading ? (
-              <Box
-                sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1 }}
-              >
-                <CircularProgress size={24} sx={{ color: "white" }} />
-                <Typography variant="body2">Loading...</Typography>
-              </Box>
-            ) : walletError ? (
-              <Typography variant="body2" sx={{ mt: 1 }}>
-                Unable to load
-              </Typography>
-            ) : (
-              <Typography variant="h5" fontWeight="bold" sx={{ mt: 1 }}>
                 {walletSettings?.payment_frequency
                   ? toProperCase(walletSettings.payment_frequency)
                   : "Not set"}
               </Typography>
-            )}
-            {poolMode !== "braiins" &&
-              walletSettings?.payment_frequency === "WEEKLY" &&
-              walletSettings?.day_of_week && (
-                <Typography variant="body2" sx={{ mt: 1, opacity: 0.9 }}>
-                  Every {toProperCase(walletSettings.day_of_week)}
-                </Typography>
-              )}
-          </Paper>
-        </Box>
+              {walletSettings?.payment_frequency === "WEEKLY" &&
+                walletSettings?.day_of_week && (
+                  <Typography
+                    variant="caption"
+                    sx={{ mt: 0.5, opacity: 0.9, display: "block" }}
+                  >
+                    Every {toProperCase(walletSettings.day_of_week)}
+                  </Typography>
+                )}
+            </Box>
+          )}
+        </Paper>
 
-        <Box>
-          <Paper
+        {/* Card 6: Next Payout */}
+        <Paper
+          sx={{
+            p: { xs: 2, sm: 2.5 },
+            borderRadius: 3,
+            background: isDark
+              ? "linear-gradient(135deg, rgba(19, 78, 74, 0.85) 0%, rgba(15, 23, 42, 0.95) 100%)"
+              : "linear-gradient(135deg, #0d9488 0%, #14b8a6 100%)",
+            color: "white",
+            border: `1px solid ${
+              isDark ? "rgba(20, 184, 166, 0.3)" : "rgba(255,255,255,0.2)"
+            }`,
+            boxShadow: "0 4px 20px rgba(13, 148, 136, 0.15)",
+            opacity: poolMode === "braiins" ? 0.65 : 1,
+          }}
+        >
+          <Typography
+            variant="caption"
             sx={{
-              p: { xs: 2, sm: 3 },
-              borderRadius: 2,
-              backgroundColor: (theme) =>
-                theme.palette.mode === "light" ? "#00796b" : "#004d40",
-              color: "white",
-              minHeight: { xs: "auto", sm: minCardHeight },
-              opacity: poolMode === "braiins" ? 0.6 : 1,
+              opacity: 0.85,
+              fontWeight: 600,
+              fontSize: { xs: "0.75rem", sm: "0.82rem" },
+              letterSpacing: "0.03em",
+              textTransform: "uppercase",
+              display: "block",
             }}
           >
-            <Typography variant="subtitle1">Next Payout</Typography>
-            {poolMode === "braiins" ? (
-              <Typography variant="h6" fontWeight="bold" sx={{ mt: 1 }}>
-                Not available
-              </Typography>
-            ) : walletLoading ? (
-              <Box
-                sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1 }}
+            Next Payout
+          </Typography>
+
+          {poolMode === "braiins" ? (
+            <Typography
+              variant="body2"
+              sx={{ mt: 1.5, fontFamily: "monospace", opacity: 0.9 }}
+            >
+              Not available for Braiins
+            </Typography>
+          ) : walletLoading ? (
+            <Box
+              sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1.5 }}
+            >
+              <CircularProgress size={18} sx={{ color: "white" }} />
+              <Typography variant="body2">Loading...</Typography>
+            </Box>
+          ) : walletError ? (
+            <Typography variant="body2" sx={{ mt: 1.5 }}>
+              Unable to load
+            </Typography>
+          ) : walletSettings?.next_payout_at ? (
+            <Box sx={{ mt: 1 }}>
+              <Typography
+                sx={{
+                  fontWeight: 800,
+                  fontSize: { xs: "1.1rem", sm: "1.3rem" },
+                }}
               >
-                <CircularProgress size={24} sx={{ color: "white" }} />
-                <Typography variant="body2">Loading...</Typography>
-              </Box>
-            ) : walletError ? (
-              <Typography variant="body2" sx={{ mt: 1 }}>
-                Unable to load
+                {payoutDate.toLocaleDateString("en-US", {
+                  weekday: "short",
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                })}
               </Typography>
-            ) : walletSettings?.next_payout_at ? (
-              <Box sx={{ mt: 1 }}>
-                <Typography variant="h6" fontWeight="bold">
-                  {payoutDate.toLocaleDateString("en-US", {
-                    weekday: "short",
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric",
-                  })}
-                </Typography>
-                <Typography variant="body2" sx={{ mt: 0.5, opacity: 0.9 }}>
-                  {payoutDate.toLocaleTimeString("en-US", {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}{" "}
-                  -{" "}
-                  {twoHoursLaterPayoutDate.toLocaleTimeString("en-US", {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}{" "}
-                  (
-                  {new Intl.DateTimeFormat("en-US", {
-                    timeZoneName: "shortOffset",
-                  })
-                    .formatToParts(payoutDate)
-                    .find((part) => part.type === "timeZoneName")?.value ||
-                    "GMT"}
-                  )
-                </Typography>
-              </Box>
-            ) : (
-              <Typography variant="h6" fontWeight="bold" sx={{ mt: 1 }}>
-                Not scheduled
+              <Typography
+                variant="caption"
+                sx={{ mt: 0.5, opacity: 0.9, display: "block" }}
+              >
+                {payoutDate.toLocaleTimeString("en-US", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}{" "}
+                -{" "}
+                {twoHoursLaterPayoutDate.toLocaleTimeString("en-US", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}{" "}
+                (
+                {new Intl.DateTimeFormat("en-US", {
+                  timeZoneName: "shortOffset",
+                })
+                  .formatToParts(payoutDate)
+                  .find((part) => part.type === "timeZoneName")?.value || "GMT"}
+                )
               </Typography>
-            )}
-          </Paper>
-        </Box>
+            </Box>
+          ) : (
+            <Typography
+              sx={{
+                fontWeight: 700,
+                fontSize: { xs: "1.1rem", sm: "1.25rem" },
+                mt: 1,
+              }}
+            >
+              Not scheduled
+            </Typography>
+          )}
+        </Paper>
       </Box>
 
       {/* Profit & Loss Overview */}
@@ -809,22 +1041,35 @@ export default function WalletPage() {
       />
 
       {/* Statement Download Section */}
-      <Box sx={{ width: "100%", mt: { xs: 2, md: 4 } }}>
+      <Box sx={{ width: "100%", mt: { xs: 2.5, md: 4 } }}>
         <Paper
           sx={{
             p: { xs: 2, sm: 3 },
-            borderRadius: 2,
-            backgroundColor: (theme) =>
-              theme.palette.mode === "light"
-                ? "rgba(33, 150, 243, 0.05)"
-                : "rgba(33, 150, 243, 0.1)",
+            borderRadius: 3,
+            backgroundColor: isDark
+              ? "rgba(33, 150, 243, 0.06)"
+              : "rgba(33, 150, 243, 0.04)",
+            border: `1px solid ${
+              isDark ? "rgba(33, 150, 243, 0.2)" : "rgba(33, 150, 243, 0.15)"
+            }`,
             borderLeft: "4px solid #2196f3",
           }}
         >
-          <Typography variant="h6" fontWeight="bold" sx={{ mb: 2 }}>
-            Download Account Statement
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, mb: 1 }}>
+            <PictureAsPdfIcon sx={{ color: "primary.main", fontSize: 24 }} />
+            <Typography
+              variant="h6"
+              fontWeight="700"
+              sx={{ fontSize: { xs: "1rem", sm: "1.15rem" } }}
+            >
+              Download Account Statement
+            </Typography>
+          </Box>
+          <Typography
+            variant="body2"
+            color="text.secondary"
+            sx={{ mb: 2, fontSize: { xs: "0.8rem", sm: "0.875rem" } }}
+          >
             Select a date range (max 12 months) to generate and download your
             account statement as PDF.
           </Typography>
@@ -839,7 +1084,7 @@ export default function WalletPage() {
             sx={{
               display: "grid",
               gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr auto" },
-              gap: 2,
+              gap: 1.5,
               alignItems: "flex-end",
             }}
           >
@@ -851,9 +1096,7 @@ export default function WalletPage() {
                 setStatementStartDate(e.target.value);
                 setStatementError(null);
               }}
-              InputLabelProps={{
-                shrink: true,
-              }}
+              slotProps={{ inputLabel: { shrink: true } }}
               inputProps={{
                 max: new Date().toISOString().split("T")[0],
               }}
@@ -868,9 +1111,7 @@ export default function WalletPage() {
                 setStatementEndDate(e.target.value);
                 setStatementError(null);
               }}
-              InputLabelProps={{
-                shrink: true,
-              }}
+              slotProps={{ inputLabel: { shrink: true } }}
               inputProps={{
                 max: new Date().toISOString().split("T")[0],
               }}
@@ -885,12 +1126,19 @@ export default function WalletPage() {
                 statementDownloading || !statementStartDate || !statementEndDate
               }
               fullWidth
-              sx={{ whiteSpace: "nowrap" }}
+              sx={{
+                whiteSpace: "nowrap",
+                borderRadius: 2,
+                py: { xs: 1, sm: 0.9 },
+                fontWeight: 600,
+                textTransform: "none",
+                boxShadow: "0 2px 8px rgba(0,198,255,0.3)",
+              }}
             >
               {statementDownloading ? (
                 <>
-                  <CircularProgress size={18} sx={{ mr: 1 }} />
-                  Generating...
+                  <CircularProgress size={18} sx={{ mr: 1, color: "white" }} />
+                  Generating PDF...
                 </>
               ) : (
                 "Download PDF"
@@ -900,13 +1148,13 @@ export default function WalletPage() {
         </Paper>
       </Box>
 
-      {/* Transaction History */}
-      {/* TODO: Enable Transaction History from Luxor API in the future */}
-      {/* <TransactionHistory limit={50} /> */}
-
       {/* Wallet Change Requests */}
-      <Box sx={{ width: "100%", mt: { xs: 2, md: 4 } }}>
-        <Typography variant="h6" fontWeight="bold" sx={{ mb: 2 }}>
+      <Box sx={{ width: "100%", mt: { xs: 2.5, md: 4 } }}>
+        <Typography
+          variant="h6"
+          fontWeight="700"
+          sx={{ mb: 1.5, fontSize: { xs: "1rem", sm: "1.2rem" } }}
+        >
           Wallet Change Requests
         </Typography>
         <WalletChangeRequestHistory />

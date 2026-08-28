@@ -36,11 +36,13 @@ const ChangeChip = ({
   return (
     <Chip
       size="small"
-      label={`${label} ${isUp ? "+" : ""}${value.toFixed(2)}%`}
+      label={`${label}: ${isUp ? "+" : ""}${value.toFixed(2)}%`}
       sx={{
-        fontWeight: 600,
+        fontWeight: 700,
+        fontSize: { xs: "0.7rem", sm: "0.75rem" },
         color: "#fff",
         backgroundColor: isUp ? "#4caf50" : "#f44336",
+        height: 24,
       }}
     />
   );
@@ -74,7 +76,17 @@ export default function CoinGeckoStatsCard({
 
   return (
     <Box>
-      <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mb: 2 }}>
+      <Box
+        sx={{
+          display: "flex",
+          gap: 0.75,
+          overflowX: "auto",
+          pb: 0.5,
+          mb: 2,
+          scrollbarWidth: "none",
+          "&::-webkit-scrollbar": { display: "none" },
+        }}
+      >
         <ChangeChip label="1h" value={data.priceChangePercentage1h} />
         <ChangeChip label="24h" value={data.priceChangePercentage24h} />
         <ChangeChip label="7d" value={data.priceChangePercentage7d} />
@@ -87,34 +99,86 @@ export default function CoinGeckoStatsCard({
           gridTemplateColumns: "1fr 1fr",
           gap: 1.5,
           mb: 2,
+          backgroundColor: isDark
+            ? "rgba(255, 255, 255, 0.02)"
+            : "rgba(0, 0, 0, 0.02)",
+          p: 1.5,
+          borderRadius: 2,
+          border: `1px solid ${
+            isDark ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.04)"
+          }`,
         }}
       >
         <Box>
-          <Typography variant="caption" color="text.secondary">
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{
+              fontSize: { xs: "0.68rem", sm: "0.75rem" },
+              display: "block",
+            }}
+          >
             Market Cap Rank
           </Typography>
-          <Typography variant="body1" fontWeight="bold">
+          <Typography
+            variant="body1"
+            fontWeight="800"
+            color="primary.main"
+            sx={{ fontSize: { xs: "0.95rem", sm: "1.1rem" }, mt: 0.25 }}
+          >
             {data.marketCapRank ? `#${data.marketCapRank}` : "—"}
           </Typography>
         </Box>
         <Box>
-          <Typography variant="caption" color="text.secondary">
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{
+              fontSize: { xs: "0.68rem", sm: "0.75rem" },
+              display: "block",
+            }}
+          >
             All-Time High
           </Typography>
-          <Typography variant="body1" fontWeight="bold">
+          <Typography
+            variant="body1"
+            fontWeight="700"
+            sx={{ fontSize: { xs: "0.85rem", sm: "0.95rem" }, mt: 0.25 }}
+          >
             {formatCurrency(data.ath)}{" "}
-            <Typography component="span" variant="caption" color="#f44336">
+            <Typography
+              component="span"
+              variant="caption"
+              color="#f44336"
+              sx={{ fontSize: "0.7rem", fontWeight: 700 }}
+            >
               ({data.athChangePercentage.toFixed(1)}%)
             </Typography>
           </Typography>
         </Box>
-        <Box>
-          <Typography variant="caption" color="text.secondary">
+        <Box sx={{ gridColumn: "1 / -1" }}>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{
+              fontSize: { xs: "0.68rem", sm: "0.75rem" },
+              display: "block",
+            }}
+          >
             All-Time Low
           </Typography>
-          <Typography variant="body1" fontWeight="bold">
+          <Typography
+            variant="body1"
+            fontWeight="700"
+            sx={{ fontSize: { xs: "0.85rem", sm: "0.95rem" }, mt: 0.25 }}
+          >
             {formatCurrency(data.atl)}{" "}
-            <Typography component="span" variant="caption" color="#4caf50">
+            <Typography
+              component="span"
+              variant="caption"
+              color="#4caf50"
+              sx={{ fontSize: "0.7rem", fontWeight: 700 }}
+            >
               (+{data.atlChangePercentage.toFixed(0)}%)
             </Typography>
           </Typography>
@@ -122,8 +186,12 @@ export default function CoinGeckoStatsCard({
       </Box>
 
       {upVotes != null && downVotes != null && (
-        <Box>
-          <Typography variant="caption" color="text.secondary">
+        <Box sx={{ mt: 1 }}>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ fontWeight: 600, fontSize: { xs: "0.7rem", sm: "0.75rem" } }}
+          >
             Community Sentiment
           </Typography>
           <Box
@@ -132,7 +200,7 @@ export default function CoinGeckoStatsCard({
               height: 8,
               borderRadius: 4,
               overflow: "hidden",
-              mt: 0.5,
+              mt: 0.75,
               backgroundColor: isDark
                 ? theme.palette.grey[700]
                 : theme.palette.grey[300],
@@ -144,10 +212,16 @@ export default function CoinGeckoStatsCard({
           <Box
             sx={{ display: "flex", justifyContent: "space-between", mt: 0.5 }}
           >
-            <Typography variant="caption" sx={{ color: "#4caf50" }}>
+            <Typography
+              variant="caption"
+              sx={{ color: "#4caf50", fontWeight: 700, fontSize: "0.72rem" }}
+            >
               {upVotes.toFixed(0)}% Bullish
             </Typography>
-            <Typography variant="caption" sx={{ color: "#f44336" }}>
+            <Typography
+              variant="caption"
+              sx={{ color: "#f44336", fontWeight: 700, fontSize: "0.72rem" }}
+            >
               {downVotes.toFixed(0)}% Bearish
             </Typography>
           </Box>
@@ -157,7 +231,7 @@ export default function CoinGeckoStatsCard({
       <Typography
         variant="caption"
         color="text.secondary"
-        sx={{ display: "block", mt: 2 }}
+        sx={{ display: "block", mt: 2, fontSize: "0.7rem", opacity: 0.8 }}
       >
         Source: CoinGecko
       </Typography>

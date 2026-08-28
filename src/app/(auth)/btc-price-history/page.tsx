@@ -62,6 +62,7 @@ import {
   AreaChart,
 } from "recharts";
 import { useBinanceKlines, KlineData } from "@/hooks/useBinanceKlines";
+import { fetchLiveBtc24hStats } from "@/lib/services/btcPriceService";
 
 interface ChartData {
   timestamp: number;
@@ -135,29 +136,16 @@ export default function BtcPriceHistoryPage() {
   const { klines, isLoading, isError, error } =
     useBinanceKlines(selectedTimeframe);
 
-  // Fetch live current price and 24h stats from Binance
+  // Fetch live current price and 24h stats with resilient multi-provider fallback
   React.useEffect(() => {
     const fetchPriceData = async () => {
       try {
-        // Fetch live current price (independent of timeframe)
-        const tickerResponse = await fetch(
-          "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT",
-        );
-        const tickerData = await tickerResponse.json();
-        const price = parseFloat(tickerData.price);
-        if (Number.isFinite(price)) {
-          setCurrentPrice(price);
+        const stats = await fetchLiveBtc24hStats();
+        if (Number.isFinite(stats.price) && stats.price > 0) {
+          setCurrentPrice(stats.price);
         }
-
-        // Fetch 24h stats (consistent across all timeframes)
-        const statsResponse = await fetch(
-          "https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT",
-        );
-        const statsData = await statsResponse.json();
-        const changeValue = parseFloat(statsData.priceChange);
-        const changePercentValue = parseFloat(statsData.priceChangePercent);
-        setChange24h(changeValue);
-        setChangePercent24h(changePercentValue);
+        setChange24h(stats.priceChange);
+        setChangePercent24h(stats.priceChangePercent);
       } catch (err) {
         console.error("Failed to fetch price data:", err);
       }

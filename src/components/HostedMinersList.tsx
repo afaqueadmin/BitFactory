@@ -579,38 +579,54 @@ export default function HostedMinersList({
       <Box
         sx={{
           display: "flex",
-          flexWrap: "wrap",
-          gap: 1,
-          mb: 3,
+          gap: 0.75,
+          overflowX: "auto",
+          pb: { xs: 0.5, sm: 0 },
+          mb: { xs: 2, sm: 3 },
+          scrollbarWidth: "none",
+          "&::-webkit-scrollbar": { display: "none" },
         }}
       >
-        {filterValuesWithCounts.map(({ value, count }) => (
-          <Button
-            key={value}
-            variant="contained"
-            onClick={() => setActiveFilter(value)}
-            size="small"
-            sx={{
-              textTransform: "none",
-              fontWeight: 500,
-              fontSize: { xs: "0.7rem", sm: "0.8rem" },
-              px: { xs: 1, sm: 1.5 },
-              py: { xs: 0.5, sm: 0.75 },
-              minWidth: 0,
-              ...(activeFilter === value && {
-                backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                color: theme.palette.primary.main,
-                borderColor: theme.palette.primary.main,
-              }),
-            }}
-          >
-            {value} ({count})
-          </Button>
-        ))}
+        {filterValuesWithCounts.map(({ value, count }) => {
+          const active = activeFilter === value;
+          return (
+            <Button
+              key={value}
+              variant={active ? "contained" : "outlined"}
+              onClick={() => setActiveFilter(value)}
+              size="small"
+              sx={{
+                textTransform: "none",
+                fontWeight: active ? 700 : 500,
+                fontSize: { xs: "0.72rem", sm: "0.78rem" },
+                px: { xs: 1.25, sm: 1.75 },
+                py: { xs: 0.5, sm: 0.65 },
+                borderRadius: 2.5,
+                whiteSpace: "nowrap",
+                flexShrink: 0,
+                backgroundColor: active
+                  ? theme.palette.primary.main
+                  : theme.palette.mode === "dark"
+                    ? "rgba(255, 255, 255, 0.04)"
+                    : "rgba(0, 0, 0, 0.03)",
+                color: active
+                  ? theme.palette.primary.contrastText
+                  : theme.palette.text.secondary,
+                borderColor: active
+                  ? theme.palette.primary.main
+                  : theme.palette.divider,
+                boxShadow: active ? "0 2px 8px rgba(0, 198, 255, 0.3)" : "none",
+                transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+              }}
+            >
+              {value} ({count})
+            </Button>
+          );
+        })}
       </Box>
 
       {/* Miners List */}
-      <Box sx={{ mt: { xs: 2, md: 4 } }}>
+      <Box sx={{ mt: { xs: 1, md: 2 } }}>
         {loading ? (
           <Box
             sx={{
@@ -635,26 +651,29 @@ export default function HostedMinersList({
               expanded={expandedMinerIds.has(miner.id)}
               onChange={(_, isExpanded) => toggleExpanded(miner.id, isExpanded)}
               sx={{
-                mb: 2,
+                mb: 1.5,
                 border: `1px solid ${alpha(theme.palette.divider, 0.12)}`,
-                borderRadius: 2,
+                borderRadius: "12px !important",
+                overflow: "hidden",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
                 "&:before": {
                   display: "none",
                 },
                 "&.Mui-expanded": {
-                  margin: "0 0 16px 0",
+                  margin: "0 0 12px 0",
                 },
               }}
             >
               <AccordionSummary
                 expandIcon={<ExpandMoreIcon />}
                 sx={{
-                  px: { xs: 2, sm: 3 },
-                  py: { xs: 1.5, sm: 2 },
+                  px: { xs: 1.5, sm: 2.5 },
+                  py: { xs: 1, sm: 1.5 },
                   "& .MuiAccordionSummary-content": {
-                    alignItems: "flex-start",
+                    alignItems: "center",
                     justifyContent: "space-between",
                     gap: 1,
+                    my: { xs: 0.5, sm: 1 },
                   },
                 }}
               >
@@ -664,15 +683,15 @@ export default function HostedMinersList({
                       display: "flex",
                       alignItems: "center",
                       gap: 1,
-                      mb: 0.75,
+                      mb: 0.5,
                       flexWrap: "wrap",
                     }}
                   >
                     <Typography
                       variant="h6"
-                      fontWeight="600"
+                      fontWeight="700"
                       sx={{
-                        fontSize: { xs: "0.95rem", sm: "1.1rem" },
+                        fontSize: { xs: "0.92rem", sm: "1.05rem" },
                         lineHeight: 1.3,
                       }}
                     >
@@ -685,25 +704,30 @@ export default function HostedMinersList({
                   <Box
                     sx={{
                       display: "flex",
-                      flexDirection: { xs: "column", sm: "row" },
-                      gap: { xs: 0.25, sm: 0 },
+                      flexWrap: "wrap",
+                      gap: { xs: 1, sm: 2 },
+                      rowGap: 0.25,
                     }}
                   >
                     <Typography
-                      variant="body2"
+                      variant="caption"
                       color="text.secondary"
-                      sx={{ mr: { sm: 2 } }}
+                      sx={{ fontSize: { xs: "0.75rem", sm: "0.82rem" } }}
                     >
                       <strong>Worker:</strong> {miner.workerName}
                     </Typography>
                     <Typography
-                      variant="body2"
+                      variant="caption"
                       color="text.secondary"
-                      sx={{ mr: { sm: 2 } }}
+                      sx={{ fontSize: { xs: "0.75rem", sm: "0.82rem" } }}
                     >
                       <strong>Location:</strong> {miner.location}
                     </Typography>
-                    <Typography variant="body2" color="text.secondary">
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{ fontSize: { xs: "0.75rem", sm: "0.82rem" } }}
+                    >
                       <strong>Pool:</strong> {miner.connectedPool}
                     </Typography>
                   </Box>
@@ -720,19 +744,21 @@ export default function HostedMinersList({
                 </Box>
               </AccordionSummary>
 
-              <AccordionDetails sx={{ px: { xs: 1.5, sm: 3 }, py: 2, pt: 0 }}>
+              <AccordionDetails
+                sx={{ px: { xs: 1.25, sm: 2.5 }, py: 1.5, pt: 0 }}
+              >
                 <Box
                   sx={{
-                    backgroundColor: alpha(theme.palette.background.paper, 0.5),
+                    backgroundColor: alpha(theme.palette.background.paper, 0.6),
                     borderRadius: 2,
-                    p: { xs: 2, sm: 3 },
+                    p: { xs: 1.5, sm: 2.5 },
                     border: `1px solid ${alpha(theme.palette.divider, 0.08)}`,
                   }}
                 >
                   <Typography
-                    variant="h6"
-                    fontWeight="600"
-                    sx={{ mb: 2, fontSize: { xs: "0.9rem", sm: "1.1rem" } }}
+                    variant="subtitle2"
+                    fontWeight="700"
+                    sx={{ mb: 1.5, fontSize: { xs: "0.85rem", sm: "0.95rem" } }}
                   >
                     Miner Details
                   </Typography>
@@ -743,36 +769,44 @@ export default function HostedMinersList({
                       gridTemplateColumns: {
                         xs: "1fr 1fr",
                         sm: "repeat(3, 1fr)",
-                        md: "repeat(6, auto)",
+                        md: "repeat(6, 1fr)",
                       },
-                      gap: { xs: 2, sm: 3 },
+                      gap: { xs: 1.5, sm: 2.5 },
                     }}
                   >
                     <Box>
                       <Typography
-                        variant="body2"
+                        variant="caption"
                         color="text.secondary"
-                        sx={{ mb: 0.5 }}
+                        sx={{ mb: 0.25, display: "block", fontSize: "0.72rem" }}
                       >
                         Firmware
                       </Typography>
-                      <Typography variant="body2" fontWeight="500">
+                      <Typography
+                        variant="body2"
+                        fontWeight="600"
+                        sx={{ fontSize: { xs: "0.8rem", sm: "0.875rem" } }}
+                      >
                         {miner.firmware || "N/A"}
                       </Typography>
                     </Box>
 
                     <Box>
                       <Typography
-                        variant="body2"
+                        variant="caption"
                         color="text.secondary"
-                        sx={{ mb: 0.5 }}
+                        sx={{ mb: 0.25, display: "block", fontSize: "0.72rem" }}
                       >
                         Serial No.
                       </Typography>
                       <Typography
                         variant="body2"
-                        fontWeight="500"
-                        sx={{ fontFamily: "monospace", wordBreak: "break-all" }}
+                        fontWeight="600"
+                        sx={{
+                          fontFamily: "monospace",
+                          wordBreak: "break-all",
+                          fontSize: { xs: "0.75rem", sm: "0.85rem" },
+                        }}
                       >
                         {miner.serialNumber || "—"}
                       </Typography>
@@ -780,16 +814,20 @@ export default function HostedMinersList({
 
                     <Box>
                       <Typography
-                        variant="body2"
+                        variant="caption"
                         color="text.secondary"
-                        sx={{ mb: 0.5 }}
+                        sx={{ mb: 0.25, display: "block", fontSize: "0.72rem" }}
                       >
                         MAC Address
                       </Typography>
                       <Typography
                         variant="body2"
-                        fontWeight="500"
-                        sx={{ fontFamily: "monospace", wordBreak: "break-all" }}
+                        fontWeight="600"
+                        sx={{
+                          fontFamily: "monospace",
+                          wordBreak: "break-all",
+                          fontSize: { xs: "0.75rem", sm: "0.85rem" },
+                        }}
                       >
                         {miner.macAddress || "—"}
                       </Typography>
@@ -797,29 +835,35 @@ export default function HostedMinersList({
 
                     <Box>
                       <Typography
-                        variant="body2"
+                        variant="caption"
                         color="text.secondary"
-                        sx={{ mb: 0.5 }}
+                        sx={{ mb: 0.25, display: "block", fontSize: "0.72rem" }}
                       >
                         Hash Rate
                       </Typography>
-                      <Typography variant="body2" fontWeight="500">
+                      <Typography
+                        variant="body2"
+                        fontWeight="700"
+                        color="primary.main"
+                        sx={{ fontSize: { xs: "0.8rem", sm: "0.875rem" } }}
+                      >
                         {miner.hashRate || "N/A"}
                       </Typography>
                     </Box>
 
                     <Box>
                       <Typography
-                        variant="body2"
+                        variant="caption"
                         color="text.secondary"
-                        sx={{ mb: 0.5 }}
+                        sx={{ mb: 0.25, display: "block", fontSize: "0.72rem" }}
                       >
                         Status
                       </Typography>
                       <Typography
                         variant="body2"
-                        fontWeight="500"
+                        fontWeight="700"
                         sx={{
+                          fontSize: { xs: "0.8rem", sm: "0.875rem" },
                           color:
                             miner.status === "Active"
                               ? theme.palette.success.main
@@ -830,31 +874,34 @@ export default function HostedMinersList({
                       </Typography>
                     </Box>
 
-                    <Box>
+                    <Box sx={{ gridColumn: { xs: "1 / -1", sm: "auto" } }}>
                       <Typography
-                        variant="body2"
+                        variant="caption"
                         color="text.secondary"
-                        sx={{ mb: 0.5 }}
+                        sx={{ mb: 0.5, display: "block", fontSize: "0.72rem" }}
                       >
-                        Action
+                        Actions
                       </Typography>
                       <Box
                         sx={{
                           display: "flex",
-                          flexDirection: "column",
+                          flexDirection: { xs: "row", sm: "column" },
                           gap: 1,
                         }}
                       >
                         <Button
                           variant="outlined"
                           size="small"
+                          fullWidth
                           onClick={() =>
                             handleOpenNotes(miner.id, miner.workerName)
                           }
                           sx={{
                             textTransform: "none",
                             borderRadius: 2,
-                            fontSize: { xs: "0.7rem", sm: "0.8rem" },
+                            py: 0.6,
+                            fontSize: { xs: "0.72rem", sm: "0.78rem" },
+                            fontWeight: 600,
                           }}
                         >
                           {repairButtonLabel}
@@ -863,13 +910,16 @@ export default function HostedMinersList({
                           <Button
                             variant="outlined"
                             size="small"
+                            fullWidth
                             onClick={() =>
                               handleOpenPoolHistory(miner.id, miner.workerName)
                             }
                             sx={{
                               textTransform: "none",
                               borderRadius: 2,
-                              fontSize: { xs: "0.7rem", sm: "0.8rem" },
+                              py: 0.6,
+                              fontSize: { xs: "0.72rem", sm: "0.78rem" },
+                              fontWeight: 600,
                             }}
                           >
                             Pool History
@@ -884,7 +934,9 @@ export default function HostedMinersList({
                     subaccount-level chart on the main /miners page. Only
                     fetches once this miner's accordion is actually open. */}
                 {!isAdminView && expandedMinerIds.has(miner.id) && (
-                  <HashrateHistoryChart minerId={miner.id} height={320} />
+                  <Box sx={{ mt: 2 }}>
+                    <HashrateHistoryChart minerId={miner.id} height={300} />
+                  </Box>
                 )}
               </AccordionDetails>
             </Accordion>

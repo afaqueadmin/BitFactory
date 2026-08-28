@@ -4,6 +4,7 @@ import { verifyJwtToken } from "@/lib/jwt";
 import { WorkersResponse, SummaryResponse } from "@/lib/luxor";
 import { BraiinsClient } from "@/lib/braiins";
 import { franchiseeUserFilter } from "@/lib/franchiseeScope";
+import { fetchLiveBtcPrice } from "@/lib/services/btcPriceService";
 
 interface PoolData {
   workers: {
@@ -463,54 +464,14 @@ async function fetchRevenueForSubaccountNames(
 
 /**
  * Helper: Fetch the current BTC/USD price for converting self-mining BTC
- * revenue to USD. Tries Binance first (same ticker used by
- * useBitcoinLivePrice on the client), then falls back to CoinGecko since
- * Binance blocks requests from many server/datacenter IPs even though it
- * works fine from a browser.
+ * revenue to USD with multi-provider fallback.
  */
 async function fetchCurrentBtcPriceUsd(): Promise<number | null> {
   try {
-    const response = await fetch(
-      "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT",
-    );
-    if (response.ok) {
-      const data = await response.json();
-      const price = parseFloat(data.price);
-      if (Number.isFinite(price)) {
-        return price;
-      }
-    } else {
-      console.error(
-        "[Admin Dashboard] BTC price fetch failed (Binance):",
-        response.status,
-      );
-    }
+    const data = await fetchLiveBtcPrice();
+    return Number.isFinite(data.price) && data.price > 0 ? data.price : null;
   } catch (error) {
-    console.error(
-      "[Admin Dashboard] Error fetching BTC price (Binance):",
-      error,
-    );
-  }
-
-  try {
-    const response = await fetch(
-      "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd",
-    );
-    if (!response.ok) {
-      console.error(
-        "[Admin Dashboard] BTC price fetch failed (CoinGecko):",
-        response.status,
-      );
-      return null;
-    }
-    const data = await response.json();
-    const price = data?.bitcoin?.usd;
-    return Number.isFinite(price) ? price : null;
-  } catch (error) {
-    console.error(
-      "[Admin Dashboard] Error fetching BTC price (CoinGecko):",
-      error,
-    );
+    console.error("[Admin Dashboard] Error fetching BTC price:", error);
     return null;
   }
 }

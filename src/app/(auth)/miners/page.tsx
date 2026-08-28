@@ -197,20 +197,21 @@ export default function Miners() {
   return (
     <Box
       sx={{
-        p: { xs: 1.5, sm: 2, md: 3 },
-        mt: { xs: 1, md: 2 },
+        p: { xs: 1.5, sm: 2.5, md: 3 },
+        mt: { xs: 0.5, md: 1 },
         minHeight: "100vh",
       }}
     >
       {/* Page Heading */}
-      <Box sx={{ mb: { xs: 2, md: 4 } }}>
+      <Box sx={{ mb: { xs: 2, md: 3 } }}>
         <Typography
-          variant="h3"
+          variant="h4"
           component="h1"
           sx={{
             fontWeight: "bold",
             color: "text.primary",
-            fontSize: { xs: "1.75rem", sm: "2.5rem", md: "3rem" },
+            fontSize: { xs: "1.5rem", sm: "2rem", md: "2.5rem" },
+            letterSpacing: "-0.02em",
           }}
         >
           Miners
@@ -222,83 +223,106 @@ export default function Miners() {
         <Box
           sx={{
             display: "flex",
-            gap: 1,
-            mb: { xs: 2, md: 4 },
-            flexWrap: "wrap",
+            gap: 0.75,
+            mb: { xs: 2, md: 3 },
+            overflowX: "auto",
+            pb: { xs: 0.5, sm: 0 },
+            scrollbarWidth: "none",
+            "&::-webkit-scrollbar": { display: "none" },
           }}
         >
-          <button
+          <Box
+            component="button"
             onClick={() => setPoolMode("total")}
-            style={{
-              padding: "6px 12px",
-              borderRadius: "6px",
+            sx={{
+              px: { xs: 1.5, sm: 2 },
+              py: { xs: 0.6, sm: 0.75 },
+              borderRadius: 2.5,
               border: "none",
               cursor: "pointer",
-              fontWeight: poolMode === "total" ? 600 : 400,
+              fontSize: { xs: "0.75rem", sm: "0.8rem" },
+              fontWeight: poolMode === "total" ? 700 : 500,
+              whiteSpace: "nowrap",
               backgroundColor:
                 poolMode === "total"
-                  ? theme.palette.primary.main
+                  ? "primary.main"
                   : theme.palette.mode === "dark"
-                    ? "rgba(255,255,255,0.1)"
-                    : "rgba(0,0,0,0.05)",
+                    ? "rgba(255, 255, 255, 0.06)"
+                    : "rgba(0, 0, 0, 0.05)",
               color:
                 poolMode === "total"
-                  ? theme.palette.primary.contrastText
-                  : theme.palette.text.primary,
-              transition: "all 0.2s",
+                  ? "primary.contrastText"
+                  : "text.secondary",
+              boxShadow:
+                poolMode === "total"
+                  ? "0 2px 8px rgba(0, 198, 255, 0.35)"
+                  : "none",
+              transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
             }}
           >
             Total
-          </button>
+          </Box>
 
           {data.activePoolNames.includes("Luxor") && (
-            <button
+            <Box
+              component="button"
               onClick={() => setPoolMode("luxor")}
-              style={{
-                padding: "6px 12px",
-                borderRadius: "6px",
+              sx={{
+                px: { xs: 1.5, sm: 2 },
+                py: { xs: 0.6, sm: 0.75 },
+                borderRadius: 2.5,
                 border: "none",
                 cursor: "pointer",
-                fontWeight: poolMode === "luxor" ? 600 : 400,
+                fontSize: { xs: "0.75rem", sm: "0.8rem" },
+                fontWeight: poolMode === "luxor" ? 700 : 500,
+                whiteSpace: "nowrap",
                 backgroundColor:
                   poolMode === "luxor"
                     ? "#1565C0"
                     : theme.palette.mode === "dark"
-                      ? "rgba(255,255,255,0.1)"
-                      : "rgba(0,0,0,0.05)",
-                color:
-                  poolMode === "luxor" ? "#FFFFFF" : theme.palette.text.primary,
-                transition: "all 0.2s",
+                      ? "rgba(255, 255, 255, 0.06)"
+                      : "rgba(0, 0, 0, 0.05)",
+                color: poolMode === "luxor" ? "#FFFFFF" : "text.secondary",
+                boxShadow:
+                  poolMode === "luxor"
+                    ? "0 2px 8px rgba(21, 101, 192, 0.4)"
+                    : "none",
+                transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
               }}
             >
               🔷 Luxor
-            </button>
+            </Box>
           )}
 
           {data.activePoolNames.includes("Braiins") && (
-            <button
+            <Box
+              component="button"
               onClick={() => setPoolMode("braiins")}
-              style={{
-                padding: "6px 12px",
-                borderRadius: "6px",
+              sx={{
+                px: { xs: 1.5, sm: 2 },
+                py: { xs: 0.6, sm: 0.75 },
+                borderRadius: 2.5,
                 border: "none",
                 cursor: "pointer",
-                fontWeight: poolMode === "braiins" ? 600 : 400,
+                fontSize: { xs: "0.75rem", sm: "0.8rem" },
+                fontWeight: poolMode === "braiins" ? 700 : 500,
+                whiteSpace: "nowrap",
                 backgroundColor:
                   poolMode === "braiins"
-                    ? "#FFA500"
+                    ? "#FB8C00"
                     : theme.palette.mode === "dark"
-                      ? "rgba(255,255,255,0.1)"
-                      : "rgba(0,0,0,0.05)",
-                color:
+                      ? "rgba(255, 255, 255, 0.06)"
+                      : "rgba(0, 0, 0, 0.05)",
+                color: poolMode === "braiins" ? "#FFFFFF" : "text.secondary",
+                boxShadow:
                   poolMode === "braiins"
-                    ? "#FFFFFF"
-                    : theme.palette.text.primary,
-                transition: "all 0.2s",
+                    ? "0 2px 8px rgba(251, 140, 0, 0.4)"
+                    : "none",
+                transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
               }}
             >
               🔶 Braiins
-            </button>
+            </Box>
           )}
         </Box>
       )}
@@ -344,77 +368,167 @@ export default function Miners() {
         data.pools && (
           <Box
             sx={{
-              display: "flex",
-              gap: { xs: 2, md: 3 },
-              mb: { xs: 2, md: 4 },
-              flexDirection: { xs: "column", sm: "row" },
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
+              gap: { xs: 1.5, sm: 2, md: 3 },
+              mb: { xs: 2.5, md: 4 },
             }}
           >
             {/* Luxor Comparison Card */}
             <Box
               sx={{
-                flex: 1,
-                p: { xs: 2, sm: 3 },
-                borderRadius: 2,
+                p: { xs: 1.75, sm: 2.5 },
+                borderRadius: 2.5,
                 backgroundColor:
                   theme.palette.mode === "dark"
-                    ? "rgba(0, 102, 255, 0.1)"
-                    : "rgba(0, 102, 255, 0.05)",
-                border: "2px solid #1565C0",
+                    ? "rgba(21, 101, 192, 0.1)"
+                    : "rgba(21, 101, 192, 0.04)",
+                border: `1px solid ${
+                  theme.palette.mode === "dark"
+                    ? "rgba(21, 101, 192, 0.4)"
+                    : "rgba(21, 101, 192, 0.25)"
+                }`,
+                backdropFilter: "blur(8px)",
               }}
             >
               <Typography
-                variant="h6"
-                sx={{ fontWeight: 600, mb: 2, color: "#1565C0" }}
+                variant="subtitle1"
+                sx={{
+                  fontWeight: 700,
+                  mb: 1.5,
+                  color: "#1565C0",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 0.75,
+                }}
               >
                 🔷 Luxor Pool
               </Typography>
-              <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                <Typography variant="body2" color="text.secondary">
-                  Miners: <strong>{data.pools.luxor.miners}</strong>
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Hashrate:{" "}
-                  <strong>{formatHashrate(data.pools.luxor.hashrate)}</strong>
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Active:{" "}
-                  <strong>{data.pools.luxor.activeWorkers} workers</strong>
-                </Typography>
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(3, 1fr)",
+                  gap: 1,
+                }}
+              >
+                <Box>
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ display: "block", fontSize: "0.72rem" }}
+                  >
+                    Miners
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                    {data.pools.luxor.miners}
+                  </Typography>
+                </Box>
+                <Box>
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ display: "block", fontSize: "0.72rem" }}
+                  >
+                    Hashrate
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                    {formatHashrate(data.pools.luxor.hashrate)}
+                  </Typography>
+                </Box>
+                <Box>
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ display: "block", fontSize: "0.72rem" }}
+                  >
+                    Active
+                  </Typography>
+                  <Typography
+                    variant="body2"
+                    sx={{ fontWeight: 700, color: "success.main" }}
+                  >
+                    {data.pools.luxor.activeWorkers}
+                  </Typography>
+                </Box>
               </Box>
             </Box>
 
             {/* Braiins Comparison Card */}
             <Box
               sx={{
-                flex: 1,
-                p: { xs: 2, sm: 3 },
-                borderRadius: 2,
+                p: { xs: 1.75, sm: 2.5 },
+                borderRadius: 2.5,
                 backgroundColor:
                   theme.palette.mode === "dark"
                     ? "rgba(255, 165, 0, 0.1)"
-                    : "rgba(255, 165, 0, 0.05)",
-                border: "2px solid #FFA500",
+                    : "rgba(255, 165, 0, 0.04)",
+                border: `1px solid ${
+                  theme.palette.mode === "dark"
+                    ? "rgba(255, 165, 0, 0.4)"
+                    : "rgba(255, 165, 0, 0.25)"
+                }`,
+                backdropFilter: "blur(8px)",
               }}
             >
               <Typography
-                variant="h6"
-                sx={{ fontWeight: 600, mb: 2, color: "#FFA500" }}
+                variant="subtitle1"
+                sx={{
+                  fontWeight: 700,
+                  mb: 1.5,
+                  color: "#FB8C00",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 0.75,
+                }}
               >
                 🔶 Braiins Pool
               </Typography>
-              <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                <Typography variant="body2" color="text.secondary">
-                  Miners: <strong>{data.pools.braiins.miners}</strong>
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Hashrate:{" "}
-                  <strong>{formatHashrate(data.pools.braiins.hashrate)}</strong>
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Active:{" "}
-                  <strong>{data.pools.braiins.activeWorkers} workers</strong>
-                </Typography>
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(3, 1fr)",
+                  gap: 1,
+                }}
+              >
+                <Box>
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ display: "block", fontSize: "0.72rem" }}
+                  >
+                    Miners
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                    {data.pools.braiins.miners}
+                  </Typography>
+                </Box>
+                <Box>
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ display: "block", fontSize: "0.72rem" }}
+                  >
+                    Hashrate
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                    {formatHashrate(data.pools.braiins.hashrate)}
+                  </Typography>
+                </Box>
+                <Box>
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ display: "block", fontSize: "0.72rem" }}
+                  >
+                    Active
+                  </Typography>
+                  <Typography
+                    variant="body2"
+                    sx={{ fontWeight: 700, color: "success.main" }}
+                  >
+                    {data.pools.braiins.activeWorkers}
+                  </Typography>
+                </Box>
               </Box>
             </Box>
           </Box>
@@ -422,87 +536,112 @@ export default function Miners() {
 
       {/* Miner Filter Buttons - Only show if multiple pools */}
       {data.activePoolNames && data.activePoolNames.length > 1 && (
-        <Box sx={{ display: "flex", gap: 1, mb: 3, flexWrap: "wrap" }}>
-          <button
+        <Box
+          sx={{
+            display: "flex",
+            gap: 0.75,
+            mb: 2.5,
+            overflowX: "auto",
+            pb: { xs: 0.5, sm: 0 },
+            scrollbarWidth: "none",
+            "&::-webkit-scrollbar": { display: "none" },
+          }}
+        >
+          <Box
+            component="button"
             onClick={() => setMinerFilter("all")}
-            style={{
-              padding: "6px 12px",
-              fontSize: "12px",
-              borderRadius: "4px",
+            sx={{
+              px: { xs: 1.5, sm: 2 },
+              py: { xs: 0.6, sm: 0.75 },
+              borderRadius: 2.5,
               border: "none",
               cursor: "pointer",
-              fontWeight: minerFilter === "all" ? 600 : 400,
+              fontSize: { xs: "0.75rem", sm: "0.8rem" },
+              fontWeight: minerFilter === "all" ? 700 : 500,
+              whiteSpace: "nowrap",
               backgroundColor:
                 minerFilter === "all"
-                  ? theme.palette.primary.main
+                  ? "primary.main"
                   : theme.palette.mode === "dark"
-                    ? "rgba(255,255,255,0.1)"
-                    : "rgba(0,0,0,0.05)",
+                    ? "rgba(255, 255, 255, 0.06)"
+                    : "rgba(0, 0, 0, 0.05)",
               color:
                 minerFilter === "all"
-                  ? theme.palette.primary.contrastText
-                  : theme.palette.text.primary,
-              transition: "all 0.2s",
+                  ? "primary.contrastText"
+                  : "text.secondary",
+              boxShadow:
+                minerFilter === "all"
+                  ? "0 2px 8px rgba(0, 198, 255, 0.35)"
+                  : "none",
+              transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
             }}
           >
             All Miners (
             {(data.pools?.luxor?.miners || 0) +
               (data.pools?.braiins?.miners || 0)}
             )
-          </button>
+          </Box>
 
           {data.activePoolNames.includes("Luxor") && (
-            <button
+            <Box
+              component="button"
               onClick={() => setMinerFilter("luxor")}
-              style={{
-                padding: "6px 12px",
-                fontSize: "12px",
-                borderRadius: "4px",
+              sx={{
+                px: { xs: 1.5, sm: 2 },
+                py: { xs: 0.6, sm: 0.75 },
+                borderRadius: 2.5,
                 border: "none",
                 cursor: "pointer",
-                fontWeight: minerFilter === "luxor" ? 600 : 400,
+                fontSize: { xs: "0.75rem", sm: "0.8rem" },
+                fontWeight: minerFilter === "luxor" ? 700 : 500,
+                whiteSpace: "nowrap",
                 backgroundColor:
                   minerFilter === "luxor"
                     ? "#1565C0"
                     : theme.palette.mode === "dark"
-                      ? "rgba(255,255,255,0.1)"
-                      : "rgba(0,0,0,0.05)",
-                color:
+                      ? "rgba(255, 255, 255, 0.06)"
+                      : "rgba(0, 0, 0, 0.05)",
+                color: minerFilter === "luxor" ? "#FFFFFF" : "text.secondary",
+                boxShadow:
                   minerFilter === "luxor"
-                    ? "#FFFFFF"
-                    : theme.palette.text.primary,
-                transition: "all 0.2s",
+                    ? "0 2px 8px rgba(21, 101, 192, 0.4)"
+                    : "none",
+                transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
               }}
             >
               🔷 Luxor ({data.pools?.luxor?.miners || 0})
-            </button>
+            </Box>
           )}
 
           {data.activePoolNames.includes("Braiins") && (
-            <button
+            <Box
+              component="button"
               onClick={() => setMinerFilter("braiins")}
-              style={{
-                padding: "6px 12px",
-                fontSize: "12px",
-                borderRadius: "4px",
+              sx={{
+                px: { xs: 1.5, sm: 2 },
+                py: { xs: 0.6, sm: 0.75 },
+                borderRadius: 2.5,
                 border: "none",
                 cursor: "pointer",
-                fontWeight: minerFilter === "braiins" ? 600 : 400,
+                fontSize: { xs: "0.75rem", sm: "0.8rem" },
+                fontWeight: minerFilter === "braiins" ? 700 : 500,
+                whiteSpace: "nowrap",
                 backgroundColor:
                   minerFilter === "braiins"
-                    ? "#FFA500"
+                    ? "#FB8C00"
                     : theme.palette.mode === "dark"
-                      ? "rgba(255,255,255,0.1)"
-                      : "rgba(0,0,0,0.05)",
-                color:
+                      ? "rgba(255, 255, 255, 0.06)"
+                      : "rgba(0, 0, 0, 0.05)",
+                color: minerFilter === "braiins" ? "#FFFFFF" : "text.secondary",
+                boxShadow:
                   minerFilter === "braiins"
-                    ? "#FFFFFF"
-                    : theme.palette.text.primary,
-                transition: "all 0.2s",
+                    ? "0 2px 8px rgba(251, 140, 0, 0.4)"
+                    : "none",
+                transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
               }}
             >
               🔶 Braiins ({data.pools?.braiins?.miners || 0})
-            </button>
+            </Box>
           )}
         </Box>
       )}

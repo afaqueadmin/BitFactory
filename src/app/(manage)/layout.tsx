@@ -4,6 +4,7 @@ import AdminHeader from "@/components/admin/AdminHeader";
 import AdminSidebar from "@/components/admin/AdminSidebar";
 import PasskeySetupPrompt from "@/components/PasskeySetupPrompt";
 import { Box } from "@mui/material";
+import { AdminNavProvider } from "@/lib/contexts/admin-nav-context";
 
 export default function ManageLayout({
   children,
@@ -11,32 +12,24 @@ export default function ManageLayout({
   children: React.ReactNode;
 }) {
   return (
-    <>
+    <AdminNavProvider>
       <AdminHeader />
       <PasskeySetupPrompt />
-      <Box sx={{ display: "flex" }}>
+      <Box sx={{ display: "flex", minHeight: "calc(100vh - 64px)" }}>
         <AdminSidebar />
         <Box
           component="main"
           sx={{
             flex: 1,
             width: "100%",
-            // flexGrow: 1,
-            // pl: sideBarOpen ? '280px' : '72px', // Width of the sidebar
-            // minHeight: '90vh',
+            minWidth: 0,
+            overflowX: "hidden",
             bgcolor: "background.default",
           }}
         >
-          {/*<Box*/}
-          {/*    sx={{*/}
-          {/*        px: { xs: 2, md: 4 },*/}
-          {/*        pt: { xs: 2, md: 3 },*/}
-          {/*    }}*/}
-          {/*>*/}
           {children}
-          {/*</Box>*/}
         </Box>
       </Box>
-    </>
+    </AdminNavProvider>
   );
 }

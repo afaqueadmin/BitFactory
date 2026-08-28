@@ -5,12 +5,19 @@ import { Box } from "@mui/material";
 
 export default function PolymarketEmbed() {
   return (
-    <Box sx={{ width: "100%", overflow: "hidden", borderRadius: 1 }}>
+    <Box
+      sx={{
+        width: "100%",
+        overflow: "hidden",
+        borderRadius: 2,
+        backgroundColor: "rgba(0,0,0,0.2)",
+      }}
+    >
       <Box
         sx={{
           position: "relative",
           width: "100%",
-          height: { xs: "600px", sm: "550px", md: "500px" },
+          height: { xs: "520px", sm: "520px", md: "500px" },
           maxWidth: 700,
           mx: "auto",
         }}

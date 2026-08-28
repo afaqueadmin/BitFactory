@@ -2,9 +2,10 @@ import { CircularProgress, Paper, Typography } from "@mui/material";
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { BtcPrice } from "@/types/types";
+import { fetchLiveBtcPrice } from "@/lib/services/btcPriceService";
 
 export const useBitcoinLivePrice = () => {
-  // Fetch BTC price using TanStack Query
+  // Fetch BTC price using TanStack Query with resilient multi-provider fallback
   const {
     data: btcLiveData,
     isLoading: btcPriceLoading,
@@ -12,21 +13,16 @@ export const useBitcoinLivePrice = () => {
   } = useQuery<BtcPrice>({
     queryKey: ["btcprice"],
     queryFn: async () => {
-      // const response = await fetch("/api/btcprice");
-      const response = await fetch(
-        "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT",
-      );
-      if (!response.ok) {
-        throw new Error("Failed to fetch BTC price");
-      }
-      return response.json();
+      return await fetchLiveBtcPrice();
     },
     staleTime: 1000 * 60 * 5, // 5 minutes
-    refetchInterval: 1000 * 60 * 5, // Refetch every 5 minutes. Enable this to fetch live data periodically
+    refetchInterval: 1000 * 60 * 5, // Refetch every 5 minutes
   });
 
   return {
     btcLiveData,
+    btcPriceLoading,
+    btcPriceError,
     BtcLivePriceComponent: (
       <Paper
         sx={{

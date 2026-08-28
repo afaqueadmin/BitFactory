@@ -374,14 +374,19 @@ export default function ElectricityCostTable({
       <Paper
         sx={{
           width: "100%",
-          borderRadius: 2,
+          borderRadius: 2.5,
           overflow: "hidden",
-          boxShadow: theme.shadows[2],
+          border: `1px solid ${
+            theme.palette.mode === "dark"
+              ? "rgba(255, 255, 255, 0.08)"
+              : "rgba(0, 0, 0, 0.08)"
+          }`,
+          boxShadow: theme.shadows[1],
         }}
       >
         {loading ? (
           <Box sx={{ display: "flex", justifyContent: "center", p: 4 }}>
-            <CircularProgress />
+            <CircularProgress size={28} />
           </Box>
         ) : data.length === 0 ? (
           <Box sx={{ p: 3, textAlign: "center" }}>
@@ -393,7 +398,7 @@ export default function ElectricityCostTable({
           <>
             <TableContainer>
               <Table
-                sx={{ minWidth: { xs: 320, sm: 750 } }}
+                sx={{ minWidth: { xs: 300, sm: 700 } }}
                 aria-labelledby="tableTitle"
                 size="small"
               >
@@ -419,25 +424,34 @@ export default function ElectricityCostTable({
                           component="th"
                           scope="row"
                           sx={{
-                            py: { xs: 1.5, sm: 2 },
-                            px: { xs: 1.5, sm: 2 },
+                            py: { xs: 1.25, sm: 1.75 },
+                            px: { xs: 1.25, sm: 2 },
                           }}
                         >
-                          <Typography variant="body2" fontWeight="medium">
+                          <Typography
+                            variant="body2"
+                            fontWeight="600"
+                            sx={{ fontSize: { xs: "0.78rem", sm: "0.875rem" } }}
+                          >
                             {row.date}
                           </Typography>
                         </TableCell>
                         <TableCell
                           sx={{
-                            py: { xs: 1.5, sm: 2 },
-                            px: { xs: 1.5, sm: 2 },
+                            py: { xs: 1.25, sm: 1.75 },
+                            px: { xs: 1.25, sm: 2 },
                           }}
                         >
-                          <Typography variant="body2">{row.type}</Typography>
+                          <Typography
+                            variant="body2"
+                            sx={{ fontSize: { xs: "0.78rem", sm: "0.875rem" } }}
+                          >
+                            {row.type}
+                          </Typography>
                         </TableCell>
                         <TableCell
                           sx={{
-                            py: { xs: 1.5, sm: 2 },
+                            py: { xs: 1.25, sm: 1.75 },
                             display: { xs: "none", sm: "table-cell" },
                           }}
                         >
@@ -448,14 +462,17 @@ export default function ElectricityCostTable({
                         <TableCell
                           align="right"
                           sx={{
-                            py: { xs: 1.5, sm: 2 },
-                            px: { xs: 1.5, sm: 2 },
+                            py: { xs: 1.25, sm: 1.75 },
+                            px: { xs: 1.25, sm: 2 },
                           }}
                         >
                           <Typography
                             variant="body2"
-                            fontWeight="medium"
-                            sx={{ color: getAmountColor(row.amount) }}
+                            fontWeight="700"
+                            sx={{
+                              color: getAmountColor(row.amount),
+                              fontSize: { xs: "0.78rem", sm: "0.875rem" },
+                            }}
                           >
                             {row.amount}
                           </Typography>
@@ -463,21 +480,24 @@ export default function ElectricityCostTable({
                         <TableCell
                           align="right"
                           sx={{
-                            py: { xs: 1.5, sm: 2 },
-                            px: { xs: 1.5, sm: 2 },
+                            py: { xs: 1.25, sm: 1.75 },
+                            px: { xs: 1.25, sm: 2 },
                           }}
                         >
                           <Typography
                             variant="body2"
-                            fontWeight="medium"
-                            sx={{ color: getBalanceColor(row.balance) }}
+                            fontWeight="700"
+                            sx={{
+                              color: getBalanceColor(row.balance),
+                              fontSize: { xs: "0.78rem", sm: "0.875rem" },
+                            }}
                           >
                             {row.balance}
                           </Typography>
                         </TableCell>
                         <TableCell
                           sx={{
-                            py: { xs: 1.5, sm: 2 },
+                            py: { xs: 1.25, sm: 1.75 },
                             display: { xs: "none", sm: "table-cell" },
                           }}
                         >
@@ -501,7 +521,7 @@ export default function ElectricityCostTable({
               </Table>
             </TableContainer>
             <TablePagination
-              rowsPerPageOptions={[10, 25, 50, { value: 9999, label: "Max" }]}
+              rowsPerPageOptions={[10, 25, 50, { value: 9999, label: "All" }]}
               component="div"
               count={totalCount}
               rowsPerPage={rowsPerPage}
@@ -511,14 +531,19 @@ export default function ElectricityCostTable({
               sx={{
                 borderTop: `1px solid ${theme.palette.divider}`,
                 "& .MuiTablePagination-toolbar": {
-                  paddingLeft: 2,
-                  paddingRight: 1,
+                  paddingLeft: { xs: 1, sm: 2 },
+                  paddingRight: { xs: 1, sm: 1 },
+                  flexWrap: "wrap",
+                  minHeight: { xs: 48, sm: 52 },
                 },
                 "& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows":
                   {
                     margin: 0,
-                    fontSize: "0.875rem",
+                    fontSize: { xs: "0.75rem", sm: "0.875rem" },
                   },
+                "& .MuiTablePagination-actions": {
+                  marginLeft: { xs: 1, sm: 2 },
+                },
               }}
             />
           </>

@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { fetchLiveBtcKlines } from "@/lib/services/btcPriceService";
 
 export interface KlineData {
   openTime: number;
@@ -37,17 +38,11 @@ export const useBinanceKlines = (timeframe: string = "24H") => {
     queryKey: ["binance-klines", timeframe],
     queryFn: async () => {
       try {
-        console.log(`[Binance Klines] Fetching ${timeframe} data...`);
-
-        const response = await fetch(
-          `https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${config.interval}&limit=${config.limit}`,
+        console.log(
+          `[Binance Klines] Fetching ${timeframe} data with fallbacks...`,
         );
 
-        if (!response.ok) {
-          throw new Error(`Binance API error: ${response.statusText}`);
-        }
-
-        const data = await response.json();
+        const data = await fetchLiveBtcKlines(config.interval, config.limit);
 
         console.log(
           `[Binance Klines] Received ${data.length} candles for ${timeframe}`,

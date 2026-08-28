@@ -396,7 +396,7 @@ export default function AdminDashboard() {
     <>
       <Box
         sx={{
-          p: 4,
+          p: { xs: 1.5, sm: 2.5, md: 3.5 },
           backgroundColor:
             theme.palette.mode === "dark"
               ? theme.palette.background.default
@@ -405,129 +405,135 @@ export default function AdminDashboard() {
         }}
       >
         {error && (
-          <Alert severity="error" sx={{ mb: 3 }}>
+          <Alert severity="error" sx={{ mb: 2.5, borderRadius: 2 }}>
             {error?.message || "An error occurred"}
           </Alert>
         )}
 
-        {/* Pool Mode Toggle Buttons + Color Legend */}
+        {/* Pool Mode Segmented Controls + Color Legend */}
         <Box
           sx={{
             display: "flex",
-            alignItems: "center",
+            flexDirection: { xs: "column", md: "row" },
+            alignItems: { xs: "stretch", md: "center" },
+            justifyContent: "space-between",
             gap: 2,
-            mb: 4,
-            flexWrap: "wrap",
+            mb: { xs: 2.5, md: 3.5 },
           }}
         >
-          <button
-            onClick={() => setPoolMode("total")}
-            style={{
-              padding: "8px 16px",
-              borderRadius: "6px",
-              border: "none",
-              cursor: "pointer",
-              fontWeight: poolMode === "total" ? 600 : 400,
-              backgroundColor:
-                poolMode === "total"
-                  ? "#9C27B0"
-                  : theme.palette.mode === "dark"
-                    ? "rgba(255,255,255,0.1)"
-                    : "rgba(0,0,0,0.05)",
-              color:
-                poolMode === "total" ? "#FFFFFF" : theme.palette.text.primary,
-              transition: "all 0.2s",
-            }}
-          >
-            All Pools
-          </button>
-
-          <button
-            onClick={() => setPoolMode("luxor")}
-            style={{
-              padding: "8px 16px",
-              borderRadius: "6px",
-              border: "none",
-              cursor: "pointer",
-              fontWeight: poolMode === "luxor" ? 600 : 400,
-              backgroundColor:
-                poolMode === "luxor"
-                  ? "#1565C0"
-                  : theme.palette.mode === "dark"
-                    ? "rgba(255,255,255,0.1)"
-                    : "rgba(0,0,0,0.05)",
-              color:
-                poolMode === "luxor" ? "#FFFFFF" : theme.palette.text.primary,
-              transition: "all 0.2s",
-            }}
-          >
-            🔷 Luxor
-          </button>
-
-          <button
-            onClick={() => setPoolMode("braiins")}
-            style={{
-              padding: "8px 16px",
-              borderRadius: "6px",
-              border: "none",
-              cursor: "pointer",
-              fontWeight: poolMode === "braiins" ? 600 : 400,
-              backgroundColor:
-                poolMode === "braiins"
-                  ? "#FFA500"
-                  : theme.palette.mode === "dark"
-                    ? "rgba(255,255,255,0.1)"
-                    : "rgba(0,0,0,0.05)",
-              color:
-                poolMode === "braiins"
-                  ? "rgba(0,0,0,0.87)"
-                  : theme.palette.text.primary,
-              transition: "all 0.2s",
-            }}
-          >
-            🟧 Braiins
-          </button>
-
-          {/* Divider */}
+          {/* Segmented Pill Switcher */}
           <Box
             sx={{
-              width: "1px",
-              height: 28,
-              backgroundColor: theme.palette.divider,
-              mx: 1,
+              display: "inline-flex",
+              alignItems: "center",
+              p: 0.5,
+              borderRadius: 999,
+              backgroundColor:
+                theme.palette.mode === "dark"
+                  ? "rgba(255, 255, 255, 0.06)"
+                  : "rgba(0, 0, 0, 0.05)",
+              border: `1px solid ${
+                theme.palette.mode === "dark"
+                  ? "rgba(255, 255, 255, 0.08)"
+                  : "rgba(0, 0, 0, 0.08)"
+              }`,
+              width: { xs: "100%", sm: "fit-content" },
             }}
-          />
+          >
+            {[
+              {
+                key: "total",
+                label: "All Pools",
+                activeBg: "#9C27B0",
+                color: "#fff",
+              },
+              {
+                key: "luxor",
+                label: "🔷 Luxor",
+                activeBg: "#1565C0",
+                color: "#fff",
+              },
+              {
+                key: "braiins",
+                label: "🟧 Braiins",
+                activeBg: "#FFA500",
+                color: "#111",
+              },
+            ].map(({ key, label, activeBg, color }) => {
+              const active = poolMode === key;
+              return (
+                <Box
+                  key={key}
+                  component="button"
+                  onClick={() =>
+                    setPoolMode(key as "total" | "luxor" | "braiins")
+                  }
+                  sx={{
+                    flex: { xs: 1, sm: "initial" },
+                    py: { xs: 0.85, sm: 0.75 },
+                    px: { xs: 1.5, sm: 2 },
+                    borderRadius: 999,
+                    border: "none",
+                    cursor: "pointer",
+                    fontWeight: active ? 700 : 500,
+                    fontSize: { xs: "0.8rem", sm: "0.85rem" },
+                    backgroundColor: active ? activeBg : "transparent",
+                    color: active ? color : theme.palette.text.secondary,
+                    boxShadow: active ? "0 2px 8px rgba(0,0,0,0.2)" : "none",
+                    transition: "all 0.2s ease",
+                    whiteSpace: "nowrap",
+                    textAlign: "center",
+                    "&:hover": {
+                      color: active ? color : theme.palette.text.primary,
+                    },
+                  }}
+                >
+                  {label}
+                </Box>
+              );
+            })}
+          </Box>
 
           {/* Color Legend */}
-          {[
-            { color: "#757575", label: "DB value" },
-            { color: "#9C27B0", label: "Luxor + Braiins combined" },
-            { color: "#1565C0", label: "Luxor only" },
-            { color: "#FFA500", label: "Braiins only" },
-          ].map(({ color, label }) => (
-            <Box
-              key={color}
-              sx={{ display: "flex", alignItems: "center", gap: 0.75 }}
-            >
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: { xs: 1.25, sm: 2 },
+              flexWrap: "wrap",
+            }}
+          >
+            {[
+              { color: "#757575", label: "DB value" },
+              { color: "#9C27B0", label: "Combined" },
+              { color: "#1565C0", label: "Luxor" },
+              { color: "#FFA500", label: "Braiins" },
+            ].map(({ color, label }) => (
               <Box
-                sx={{
-                  width: 12,
-                  height: 12,
-                  borderRadius: "2px",
-                  backgroundColor: color,
-                  flexShrink: 0,
-                }}
-              />
-              <span
-                style={{
-                  fontSize: "0.75rem",
-                  color: theme.palette.text.secondary,
-                }}
+                key={color}
+                sx={{ display: "flex", alignItems: "center", gap: 0.75 }}
               >
-                {label}
-              </span>
-            </Box>
-          ))}
+                <Box
+                  sx={{
+                    width: 10,
+                    height: 10,
+                    borderRadius: "3px",
+                    backgroundColor: color,
+                    flexShrink: 0,
+                  }}
+                />
+                <span
+                  style={{
+                    fontSize: "0.72rem",
+                    color: theme.palette.text.secondary,
+                    fontWeight: 500,
+                  }}
+                >
+                  {label}
+                </span>
+              </Box>
+            ))}
+          </Box>
         </Box>
 
         <Box
@@ -539,7 +545,7 @@ export default function AdminDashboard() {
               md: "repeat(2, 1fr)",
               lg: "repeat(4, 1fr)",
             },
-            gap: { xs: 2, sm: 3 },
+            gap: { xs: 1.5, sm: 2, md: 2.5 },
             maxWidth: { sm: "100%", lg: 1400 },
             mx: "auto",
           }}

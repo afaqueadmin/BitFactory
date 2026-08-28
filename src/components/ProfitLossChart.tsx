@@ -15,6 +15,7 @@ import {
   Typography,
   Box,
   useTheme,
+  useMediaQuery,
   CircularProgress,
   Alert,
 } from "@mui/material";
@@ -46,6 +47,8 @@ export default function ProfitLossChart({
   btcPriceUsd,
 }: ProfitLossChartProps) {
   const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const isDark = theme.palette.mode === "dark";
   const [data, setData] = useState<ProfitLossResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -126,13 +129,20 @@ export default function ProfitLossChart({
   return (
     <Paper
       sx={{
-        p: { xs: 1.5, sm: 3 },
+        p: { xs: 1.75, sm: 3 },
         width: "100%",
         mt: { xs: 2, md: 3 },
         borderRadius: 3,
+        border: `1px solid ${
+          isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)"
+        }`,
       }}
     >
-      <Typography variant="h6" fontWeight="bold" sx={{ mb: 2 }}>
+      <Typography
+        variant="h6"
+        fontWeight="700"
+        sx={{ mb: 2, fontSize: { xs: "1rem", sm: "1.2rem" } }}
+      >
         Profit &amp; Loss
       </Typography>
 
@@ -148,30 +158,54 @@ export default function ProfitLossChart({
           <Box
             sx={{
               display: "grid",
-              gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(5, 1fr)" },
-              gap: 1.5,
+              gridTemplateColumns: {
+                xs: "1fr 1fr",
+                sm: "repeat(3, 1fr)",
+                md: "repeat(5, 1fr)",
+              },
+              gap: { xs: 1, sm: 1.5 },
               mb: 2.5,
             }}
           >
-            {cards.map((card) => (
+            {cards.map((card, idx) => (
               <Box
                 key={card.label}
                 sx={{
-                  p: 1.25,
+                  p: { xs: 1, sm: 1.25 },
                   borderRadius: 2,
-                  backgroundColor: "action.hover",
+                  backgroundColor: isDark
+                    ? "rgba(255, 255, 255, 0.03)"
+                    : "rgba(0, 0, 0, 0.02)",
+                  border: `1px solid ${
+                    isDark ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.04)"
+                  }`,
                   borderLeft: card.color
                     ? `3px solid ${card.color}`
                     : undefined,
+                  ...(idx === cards.length - 1
+                    ? { gridColumn: { xs: "1 / -1", sm: "auto" } }
+                    : {}),
                 }}
               >
-                <Typography variant="caption" color="text.secondary">
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{
+                    fontSize: { xs: "0.68rem", sm: "0.75rem" },
+                    display: "block",
+                    fontWeight: 500,
+                  }}
+                >
                   {card.label}
                 </Typography>
                 <Typography
                   variant="body1"
-                  fontWeight="bold"
-                  sx={{ color: card.color }}
+                  fontWeight="700"
+                  sx={{
+                    color: card.color,
+                    fontSize: { xs: "0.9rem", sm: "1.05rem" },
+                    mt: 0.25,
+                  }}
                 >
                   {formatValue(card.value, "currency")}
                 </Typography>
@@ -180,17 +214,28 @@ export default function ProfitLossChart({
           </Box>
 
           {/* Horizontal bars: Total Spent (electricity + hardware) vs Revenue */}
-          <Box sx={{ width: "100%", height: 160 }}>
+          <Box
+            sx={{
+              width: "100%",
+              height: isMobile ? 170 : 160,
+              touchAction: "pan-y",
+            }}
+          >
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={chartData}
                 layout="vertical"
-                margin={{ top: 0, right: 24, left: 0, bottom: 0 }}
-                barCategoryGap="35%"
+                margin={{
+                  top: 0,
+                  right: isMobile ? 12 : 24,
+                  left: isMobile ? -14 : 0,
+                  bottom: 0,
+                }}
+                barCategoryGap="30%"
               >
                 <CartesianGrid
                   horizontal={false}
-                  stroke={theme.palette.mode === "dark" ? "#333" : "#e8e8e8"}
+                  stroke={isDark ? "rgba(255,255,255,0.08)" : "#e8e8e8"}
                 />
                 <XAxis
                   type="number"
@@ -198,14 +243,17 @@ export default function ProfitLossChart({
                   tickFormatter={(value: number) =>
                     `$${value >= 1000 ? `${Math.round(value / 1000)}k` : value}`
                   }
-                  tick={{ fontSize: 12, fill: theme.palette.text.secondary }}
+                  tick={{
+                    fontSize: isMobile ? 10 : 12,
+                    fill: theme.palette.text.secondary,
+                  }}
                   axisLine={{ stroke: theme.palette.divider }}
                   tickLine={false}
                   label={{
                     value: "USD",
                     position: "insideBottomRight",
                     offset: -5,
-                    fontSize: 11,
+                    fontSize: 10,
                     fill: theme.palette.text.secondary,
                   }}
                 />
@@ -214,15 +262,21 @@ export default function ProfitLossChart({
                   type="category"
                   axisLine={{ stroke: theme.palette.divider }}
                   tickLine={false}
-                  width={90}
-                  tick={{ fontSize: 13, fill: theme.palette.text.primary }}
+                  width={isMobile ? 76 : 90}
+                  tick={{
+                    fontSize: isMobile ? 11 : 13,
+                    fill: theme.palette.text.primary,
+                    fontWeight: 600,
+                  }}
                 />
                 <Tooltip
                   formatter={(value) => formatValue(Number(value), "currency")}
                   contentStyle={{
-                    backgroundColor: theme.palette.background.paper,
+                    backgroundColor: isDark ? "rgba(15, 23, 42, 0.95)" : "#fff",
                     border: `1px solid ${theme.palette.divider}`,
                     borderRadius: 8,
+                    fontSize: "0.8rem",
+                    boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
                   }}
                 />
                 <Bar
@@ -230,31 +284,38 @@ export default function ProfitLossChart({
                   name="Electricity"
                   stackId="row"
                   fill={COLOR_ELECTRICITY}
-                  radius={[6, 0, 0, 6]}
-                  barSize={36}
+                  radius={[4, 0, 0, 4]}
+                  barSize={isMobile ? 26 : 34}
                 />
                 <Bar
                   dataKey="hardware"
                   name="Hardware"
                   stackId="row"
                   fill={COLOR_HARDWARE}
-                  radius={[0, 6, 6, 0]}
-                  barSize={36}
+                  radius={[0, 4, 4, 0]}
+                  barSize={isMobile ? 26 : 34}
                 />
                 <Bar
                   dataKey="revenue"
                   name="Revenue"
                   stackId="row"
                   fill={COLOR_REVENUE}
-                  radius={[6, 6, 6, 6]}
-                  barSize={36}
+                  radius={[4, 4, 4, 4]}
+                  barSize={isMobile ? 26 : 34}
                 />
               </BarChart>
             </ResponsiveContainer>
           </Box>
 
           {/* Legend */}
-          <Box sx={{ display: "flex", gap: 2.5, flexWrap: "wrap", mt: 1 }}>
+          <Box
+            sx={{
+              display: "flex",
+              gap: { xs: 1.5, sm: 2.5 },
+              flexWrap: "wrap",
+              mt: 1.5,
+            }}
+          >
             {[
               { label: "Electricity", color: COLOR_ELECTRICITY },
               { label: "Hardware", color: COLOR_HARDWARE },
@@ -266,13 +327,17 @@ export default function ProfitLossChart({
               >
                 <Box
                   sx={{
-                    width: 10,
-                    height: 10,
-                    borderRadius: "2px",
+                    width: 9,
+                    height: 9,
+                    borderRadius: "50%",
                     backgroundColor: item.color,
                   }}
                 />
-                <Typography variant="caption" color="text.secondary">
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ fontSize: "0.75rem", fontWeight: 500 }}
+                >
                   {item.label}
                 </Typography>
               </Box>
