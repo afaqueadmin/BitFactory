@@ -1170,7 +1170,7 @@ export default function HashrateHistoryChart({
                           gap: 0.5,
                         }}
                       >
-                        {validEntries.map((entry) => {
+                        {validEntries.map((entry, idx) => {
                           const numeric = Number(entry.value);
                           const isPercent =
                             entry.dataKey === "efficiency" ||
@@ -1181,7 +1181,7 @@ export default function HashrateHistoryChart({
 
                           return (
                             <Box
-                              key={entry.dataKey}
+                              key={String(entry.dataKey || idx)}
                               sx={{
                                 display: "flex",
                                 alignItems: "center",

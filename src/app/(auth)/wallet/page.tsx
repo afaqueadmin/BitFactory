@@ -382,7 +382,9 @@ export default function WalletPage() {
         p: { xs: 1.5, sm: 2, md: 3 },
         mt: { xs: 1, md: 2 },
         backgroundColor: (theme) =>
-          theme.palette.mode === "light" ? "#f8fafc" : theme.palette.grey[950],
+          theme.palette.mode === "light"
+            ? "#f8fafc"
+            : theme.palette.background.default,
         minHeight: "100vh",
       }}
     >
