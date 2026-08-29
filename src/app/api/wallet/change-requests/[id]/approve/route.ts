@@ -7,8 +7,14 @@
  * the requested address - leaving address_id/address_name/revenue_allocation
  * and any other split-payout addresses untouched - then PUTs the full
  * addresses array back via updatePaymentSettings (Luxor's API is a full
- * array replace, not a single-field patch). Only marks the request APPROVED
- * if the Luxor call succeeds. ADMIN/SUPER_ADMIN only.
+ * array replace, not a single-field patch).
+ *
+ * The row is claimed via a status-guarded updateMany *before* calling Luxor,
+ * so two concurrent approve calls on the same request can't both reach
+ * Luxor: only the caller whose updateMany actually matched a PENDING row
+ * proceeds, the other gets "already reviewed" immediately. If the Luxor
+ * call then fails, the claim is reverted back to PENDING so the request
+ * isn't left stuck APPROVED-but-not-applied. ADMIN/SUPER_ADMIN only.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -18,6 +24,7 @@ import { verifyJwtToken } from "@/lib/jwt";
 import { createLuxorClient, LuxorError } from "@/lib/luxor";
 import { walletCache } from "@/lib/cache";
 import { resolveLuxorIdentifier, selectPrimaryAddress } from "@/lib/wallet";
+import { sendWalletChangeRequestApprovedEmail } from "@/lib/email";
 
 async function requireAdmin(request: NextRequest) {
   const token = request.cookies.get("token")?.value;
@@ -50,6 +57,7 @@ export async function POST(
 
     const walletChangeRequest = await prisma.walletChangeRequest.findUnique({
       where: { id },
+      include: { user: { select: { email: true } } },
     });
     if (!walletChangeRequest) {
       return NextResponse.json(
@@ -57,7 +65,17 @@ export async function POST(
         { status: 404 },
       );
     }
-    if (walletChangeRequest.status !== "PENDING") {
+
+    const now = new Date();
+    const claim = await prisma.walletChangeRequest.updateMany({
+      where: { id, status: "PENDING" },
+      data: {
+        status: "APPROVED",
+        reviewedById: auth.decoded.userId,
+        reviewedAt: now,
+      },
+    });
+    if (claim.count === 0) {
       return NextResponse.json(
         {
           success: false,
@@ -67,10 +85,17 @@ export async function POST(
       );
     }
 
+    const revertClaim = () =>
+      prisma.walletChangeRequest.update({
+        where: { id },
+        data: { status: "PENDING", reviewedById: null, reviewedAt: null },
+      });
+
     const luxorIdentifier = await resolveLuxorIdentifier(
       walletChangeRequest.userId,
     );
     if (!luxorIdentifier) {
+      await revertClaim();
       return NextResponse.json(
         {
           success: false,
@@ -90,6 +115,7 @@ export async function POST(
 
       const primary = selectPrimaryAddress(currentSettings.addresses);
       if (!primary) {
+        await revertClaim();
         return NextResponse.json(
           {
             success: false,
@@ -119,6 +145,7 @@ export async function POST(
         "[Wallet Change Requests API] Luxor update failed:",
         error instanceof LuxorError ? error.message : error,
       );
+      await revertClaim();
       return NextResponse.json(
         {
           success: false,
@@ -135,16 +162,10 @@ export async function POST(
       `wallet_${walletChangeRequest.userId}_${walletChangeRequest.currency}`,
     );
 
-    const now = new Date();
     const updated = await prisma.$transaction(async (tx) => {
       const result = await tx.walletChangeRequest.update({
         where: { id },
-        data: {
-          status: "APPROVED",
-          reviewedById: auth.decoded.userId,
-          reviewedAt: now,
-          appliedAt: now,
-        },
+        data: { appliedAt: now },
       });
 
       await tx.auditLog.create({
@@ -165,6 +186,19 @@ export async function POST(
 
       return result;
     });
+
+    try {
+      await sendWalletChangeRequestApprovedEmail(
+        walletChangeRequest.user.email,
+        walletChangeRequest.currentAddress,
+        walletChangeRequest.requestedAddress,
+      );
+    } catch (emailError) {
+      console.error(
+        "[Wallet Change Requests API] Failed to send approved email:",
+        emailError,
+      );
+    }
 
     return NextResponse.json({
       success: true,

@@ -23,6 +23,7 @@ interface UserData {
   profileImage: string | null;
   profileImageId: string | null;
   role: "ADMIN" | "SUPER_ADMIN" | "CLIENT" | "FRANCHISEE";
+  twoFactorEnabled: boolean;
 }
 
 interface UserResponse {

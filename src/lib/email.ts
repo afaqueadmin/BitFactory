@@ -154,6 +154,97 @@ export const sendPasswordResetEmail = async (
   }
 };
 
+export const sendWalletChangeRequestSubmittedEmail = async (
+  email: string,
+  requestedAddress: string,
+) => {
+  const mailOptions = {
+    from:
+      `BitFactory Admin <${process.env.SMTP_FROM}>` || "noreply@bitfactory.com",
+    to: email,
+    subject: "Wallet Change Request Received - BitFactory",
+    html: `
+      <h1>Wallet Change Request Received</h1>
+      <p>We've received a request to change your payout wallet address to:</p>
+      <p><strong>${requestedAddress}</strong></p>
+      <p>This change will not take effect until an administrator reviews and approves it.</p>
+      <p>If you did not request this, please contact our support team immediately.</p>
+      <br>
+      <p>Best regards,</p>
+      <p>The BitFactory Team</p>
+    `,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    return { success: true };
+  } catch (error) {
+    console.error("Error sending wallet change submitted email:", error);
+    return { success: false, error };
+  }
+};
+
+export const sendWalletChangeRequestApprovedEmail = async (
+  email: string,
+  oldAddress: string | null,
+  newAddress: string,
+) => {
+  const mailOptions = {
+    from:
+      `BitFactory Admin <${process.env.SMTP_FROM}>` || "noreply@bitfactory.com",
+    to: email,
+    subject: "Wallet Address Updated - BitFactory",
+    html: `
+      <h1>Wallet Address Updated</h1>
+      <p>Your payout wallet address has been changed:</p>
+      <p><strong>Previous:</strong> ${oldAddress || "Not configured"}</p>
+      <p><strong>New:</strong> ${newAddress}</p>
+      <p>This change is now live and future payouts will be sent to the new address.</p>
+      <p><strong>If you did not request this, please contact our support team immediately.</strong></p>
+      <br>
+      <p>Best regards,</p>
+      <p>The BitFactory Team</p>
+    `,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    return { success: true };
+  } catch (error) {
+    console.error("Error sending wallet change approved email:", error);
+    return { success: false, error };
+  }
+};
+
+export const sendWalletChangeRequestRejectedEmail = async (
+  email: string,
+  rejectionReason: string,
+) => {
+  const mailOptions = {
+    from:
+      `BitFactory Admin <${process.env.SMTP_FROM}>` || "noreply@bitfactory.com",
+    to: email,
+    subject: "Wallet Change Request Rejected - BitFactory",
+    html: `
+      <h1>Wallet Change Request Rejected</h1>
+      <p>Your recent wallet change request was reviewed and rejected by an administrator.</p>
+      <p><strong>Reason:</strong> ${rejectionReason}</p>
+      <p>Your payout wallet address has not been changed. If you have questions, please contact our support team.</p>
+      <br>
+      <p>Best regards,</p>
+      <p>The BitFactory Team</p>
+    `,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    return { success: true };
+  } catch (error) {
+    console.error("Error sending wallet change rejected email:", error);
+    return { success: false, error };
+  }
+};
+
 export const sendInvoiceEmail = async (
   email: string,
   customerName: string,

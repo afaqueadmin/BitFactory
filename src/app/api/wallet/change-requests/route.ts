@@ -6,19 +6,29 @@
  *     the wallet page never lets them view/request for someone else).
  *   - ADMIN/SUPER_ADMIN: every request, optionally filtered by ?status=.
  *
- * POST: submit a new wallet change request. CLIENT/FRANCHISEE only. Snapshots
- * the user's live primary Luxor address into currentAddress at submission
- * time, so the request row is itself a permanent before/after record. Only
- * one PENDING request per user at a time.
+ * POST: submit a new wallet change request. CLIENT/FRANCHISEE only. Requires
+ * step-up re-authentication (current password, or a 2FA code/backup code for
+ * users with 2FA enabled - server decides which based on the user's own
+ * twoFactorEnabled flag, never the client) and a checksum-valid mainnet
+ * Bitcoin address, on top of the session cookie - this redirects a client's
+ * real payout destination, so a live session alone isn't enough, matching
+ * the step-up already required by /api/user/change-password. Snapshots the
+ * user's live primary Luxor address into currentAddress at submission time,
+ * so the request row is itself a permanent before/after record. Only one
+ * PENDING request per user at a time.
  *
  * Braiins is out of scope - see src/lib/wallet.ts.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { AuditAction, Prisma } from "@prisma/client";
+import { compare } from "bcrypt";
+import speakeasy from "speakeasy";
+import { validate, Network } from "bitcoin-address-validation";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
 import { fetchCurrentPrimaryAddress } from "@/lib/wallet";
+import { sendWalletChangeRequestSubmittedEmail } from "@/lib/email";
 
 const STATUSES = new Set(["PENDING", "APPROVED", "REJECTED"]);
 
@@ -94,10 +104,13 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json().catch(() => ({}));
-    const { requestedAddress, reason } = body as {
-      requestedAddress?: string;
-      reason?: string;
-    };
+    const { requestedAddress, reason, currentPassword, twoFactorToken } =
+      body as {
+        requestedAddress?: string;
+        reason?: string;
+        currentPassword?: string;
+        twoFactorToken?: string;
+      };
 
     if (
       !requestedAddress ||
@@ -110,11 +123,11 @@ export async function POST(request: NextRequest) {
       );
     }
     const trimmedAddress = requestedAddress.trim();
-    if (trimmedAddress.length < 26 || trimmedAddress.length > 70) {
+    if (!validate(trimmedAddress, Network.mainnet)) {
       return NextResponse.json(
         {
           success: false,
-          error: "requestedAddress must be between 26 and 70 characters",
+          error: "That doesn't look like a valid Bitcoin address",
         },
         { status: 400 },
       );
@@ -128,6 +141,93 @@ export async function POST(request: NextRequest) {
         { success: false, error: "reason must not exceed 1000 characters" },
         { status: 400 },
       );
+    }
+
+    // ── Step-up re-authentication ──────────────────────────────────────
+    // Which method is required is decided from the user's own record, never
+    // from what the client claims - so a caller can't dodge 2FA just by
+    // sending currentPassword instead of twoFactorToken.
+    const authUser = await prisma.user.findUnique({
+      where: { id: auth.decoded.userId },
+      select: {
+        email: true,
+        password: true,
+        twoFactorEnabled: true,
+        twoFactorSecret: true,
+        twoFactorBackupCodes: true,
+      },
+    });
+    if (!authUser) {
+      return NextResponse.json(
+        { success: false, error: "User not found" },
+        { status: 404 },
+      );
+    }
+
+    let verifiedVia: "2FA" | "PASSWORD";
+
+    if (authUser.twoFactorEnabled) {
+      if (!twoFactorToken || typeof twoFactorToken !== "string") {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "A 2FA code is required to request a wallet change",
+            code: "TWO_FACTOR_REQUIRED",
+          },
+          { status: 400 },
+        );
+      }
+
+      const isBackupCode =
+        authUser.twoFactorBackupCodes?.includes(twoFactorToken);
+      if (isBackupCode) {
+        await prisma.user.update({
+          where: { id: auth.decoded.userId },
+          data: {
+            twoFactorBackupCodes: {
+              set: authUser.twoFactorBackupCodes.filter(
+                (code) => code !== twoFactorToken,
+              ),
+            },
+          },
+        });
+      } else {
+        const verified =
+          !!authUser.twoFactorSecret &&
+          speakeasy.totp.verify({
+            secret: authUser.twoFactorSecret,
+            encoding: "base32",
+            token: twoFactorToken,
+            window: 1,
+          });
+        if (!verified) {
+          return NextResponse.json(
+            { success: false, error: "Invalid authentication code" },
+            { status: 400 },
+          );
+        }
+      }
+      verifiedVia = "2FA";
+    } else {
+      if (!currentPassword || typeof currentPassword !== "string") {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "Your current password is required to request a wallet change",
+            code: "PASSWORD_REQUIRED",
+          },
+          { status: 400 },
+        );
+      }
+      const passwordValid = await compare(currentPassword, authUser.password);
+      if (!passwordValid) {
+        return NextResponse.json(
+          { success: false, error: "Current password is incorrect" },
+          { status: 400 },
+        );
+      }
+      verifiedVia = "PASSWORD";
     }
 
     const existingPending = await prisma.walletChangeRequest.findFirst({
@@ -169,12 +269,25 @@ export async function POST(request: NextRequest) {
           description: `Wallet change requested: ${currentAddress ?? "(not configured)"} -> ${trimmedAddress}`,
           changes: JSON.stringify({
             requestedAddress: { from: currentAddress, to: trimmedAddress },
+            verifiedVia,
           }),
         },
       });
 
       return walletChangeRequest;
     });
+
+    try {
+      await sendWalletChangeRequestSubmittedEmail(
+        authUser.email,
+        trimmedAddress,
+      );
+    } catch (emailError) {
+      console.error(
+        "[Wallet Change Requests API] Failed to send submitted email:",
+        emailError,
+      );
+    }
 
     return NextResponse.json(
       {

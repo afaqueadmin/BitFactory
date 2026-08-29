@@ -50,6 +50,8 @@ export function useCreateWalletChangeRequest() {
     mutationFn: async (input: {
       requestedAddress: string;
       reason?: string;
+      currentPassword?: string;
+      twoFactorToken?: string;
     }) => {
       const res = await fetch("/api/wallet/change-requests", {
         method: "POST",

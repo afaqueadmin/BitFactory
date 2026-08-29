@@ -2,7 +2,10 @@
  * POST /api/wallet/change-requests/[id]/reject
  *
  * Rejects a PENDING wallet change request. Nothing is pushed to Luxor - the
- * live address is left exactly as it was. ADMIN/SUPER_ADMIN only.
+ * live address is left exactly as it was. The status update is guarded by a
+ * status-conditioned updateMany (not a separate check-then-write), so two
+ * concurrent reject/approve calls on the same request can't both succeed.
+ * ADMIN/SUPER_ADMIN only.
  *
  * Body: { rejectionReason: string }
  */
@@ -11,6 +14,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { AuditAction } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
+import { sendWalletChangeRequestRejectedEmail } from "@/lib/email";
 
 async function requireAdmin(request: NextRequest) {
   const token = request.cookies.get("token")?.value;
@@ -56,6 +60,7 @@ export async function POST(
 
     const walletChangeRequest = await prisma.walletChangeRequest.findUnique({
       where: { id },
+      include: { user: { select: { email: true } } },
     });
     if (!walletChangeRequest) {
       return NextResponse.json(
@@ -63,7 +68,20 @@ export async function POST(
         { status: 404 },
       );
     }
-    if (walletChangeRequest.status !== "PENDING") {
+
+    const trimmedReason = rejectionReason.trim();
+    const now = new Date();
+
+    const claim = await prisma.walletChangeRequest.updateMany({
+      where: { id, status: "PENDING" },
+      data: {
+        status: "REJECTED",
+        rejectionReason: trimmedReason,
+        reviewedById: auth.decoded.userId,
+        reviewedAt: now,
+      },
+    });
+    if (claim.count === 0) {
       return NextResponse.json(
         {
           success: false,
@@ -73,28 +91,30 @@ export async function POST(
       );
     }
 
-    const updated = await prisma.$transaction(async (tx) => {
-      const result = await tx.walletChangeRequest.update({
-        where: { id },
-        data: {
-          status: "REJECTED",
-          rejectionReason: rejectionReason.trim(),
-          reviewedById: auth.decoded.userId,
-          reviewedAt: new Date(),
-        },
-      });
+    await prisma.auditLog.create({
+      data: {
+        action: AuditAction.WALLET_CHANGE_REJECTED,
+        entityType: "WalletChangeRequest",
+        entityId: id,
+        userId: auth.decoded.userId,
+        description: `Wallet change request rejected: ${trimmedReason}`,
+      },
+    });
 
-      await tx.auditLog.create({
-        data: {
-          action: AuditAction.WALLET_CHANGE_REJECTED,
-          entityType: "WalletChangeRequest",
-          entityId: id,
-          userId: auth.decoded.userId,
-          description: `Wallet change request rejected: ${rejectionReason.trim()}`,
-        },
-      });
+    try {
+      await sendWalletChangeRequestRejectedEmail(
+        walletChangeRequest.user.email,
+        trimmedReason,
+      );
+    } catch (emailError) {
+      console.error(
+        "[Wallet Change Requests API] Failed to send rejected email:",
+        emailError,
+      );
+    }
 
-      return result;
+    const updated = await prisma.walletChangeRequest.findUnique({
+      where: { id },
     });
 
     return NextResponse.json({

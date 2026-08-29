@@ -14,6 +14,7 @@ import {
   Typography,
 } from "@mui/material";
 import { useCreateWalletChangeRequest } from "@/lib/hooks/useWalletChangeRequests";
+import { useUser } from "@/lib/hooks/useUser";
 
 interface RequestWalletChangeModalProps {
   open: boolean;
@@ -27,14 +28,20 @@ export default function RequestWalletChangeModal({
   currentAddress,
 }: RequestWalletChangeModalProps) {
   const createRequest = useCreateWalletChangeRequest();
+  const { user } = useUser();
+  const requires2fa = !!user?.twoFactorEnabled;
 
   const [requestedAddress, setRequestedAddress] = useState("");
   const [reason, setReason] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [twoFactorToken, setTwoFactorToken] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const resetAndClose = () => {
     setRequestedAddress("");
     setReason("");
+    setCurrentPassword("");
+    setTwoFactorToken("");
     setError(null);
     onClose();
   };
@@ -46,14 +53,20 @@ export default function RequestWalletChangeModal({
       setError("New wallet address is required");
       return;
     }
-    if (trimmed.length < 26 || trimmed.length > 70) {
-      setError("Wallet address must be between 26 and 70 characters");
+    if (requires2fa && !twoFactorToken.trim()) {
+      setError("A 2FA code is required to request a wallet change");
+      return;
+    }
+    if (!requires2fa && !currentPassword) {
+      setError("Your current password is required to request a wallet change");
       return;
     }
     try {
       await createRequest.mutateAsync({
         requestedAddress: trimmed,
         reason: reason.trim() || undefined,
+        currentPassword: requires2fa ? undefined : currentPassword,
+        twoFactorToken: requires2fa ? twoFactorToken.trim() : undefined,
       });
       resetAndClose();
     } catch (err) {
@@ -99,6 +112,28 @@ export default function RequestWalletChangeModal({
             minRows={2}
             inputProps={{ maxLength: 1000 }}
           />
+
+          {requires2fa ? (
+            <TextField
+              label="2FA Code"
+              value={twoFactorToken}
+              onChange={(e) => setTwoFactorToken(e.target.value)}
+              fullWidth
+              required
+              helperText="Enter the code from your authenticator app, or a backup code"
+              inputProps={{ maxLength: 10 }}
+            />
+          ) : (
+            <TextField
+              label="Current Password"
+              type="password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              fullWidth
+              required
+              helperText="Confirm it's you before we submit this request"
+            />
+          )}
         </Box>
       </DialogContent>
       <DialogActions>
