@@ -15,6 +15,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
 import { franchiseeMinerFilter } from "@/lib/franchiseeScope";
+import { WorkersResponse } from "@/lib/luxor";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -72,6 +73,66 @@ async function verifyAdminAuth(
     }
     throw new Error("Invalid token");
   }
+}
+
+/**
+ * Helper: Fetch live worker statuses from Luxor for a set of subaccount names
+ *
+ * Mirrors the server-to-server call pattern used in
+ * src/app/api/admin/dashboard/route.ts: build a request against the
+ * internal /api/luxor proxy, forwarding the original request's headers so
+ * the caller's auth cookie is preserved, then hit it via `fetch`.
+ *
+ * @returns Map of "subaccountName::workerName" -> Luxor worker status
+ *          (e.g. "ACTIVE" / "INACTIVE"), or an empty map on failure.
+ */
+async function fetchLuxorWorkerStatuses(
+  request: NextRequest,
+  subaccountNames: string[],
+): Promise<Map<string, string>> {
+  const statusByKey = new Map<string, string>();
+
+  if (subaccountNames.length === 0) {
+    return statusByKey;
+  }
+
+  try {
+    const url = new URL("/api/luxor", request.url);
+    url.searchParams.set("endpoint", "workers");
+    url.searchParams.set("currency", "BTC");
+    url.searchParams.set("subaccount_names", subaccountNames.join(","));
+    url.searchParams.set("page_number", "1");
+    url.searchParams.set("page_size", "1000");
+
+    const luxorRequest = new NextRequest(url, {
+      method: "GET",
+      headers: request.headers,
+    });
+
+    const response = await fetch(luxorRequest);
+
+    if (!response.ok) {
+      console.error(
+        `[Miners API] Luxor workers fetch failed: ${response.status}`,
+      );
+      return statusByKey;
+    }
+
+    const result = await response.json();
+    if (result.success && result.data) {
+      const data = result.data as WorkersResponse;
+      for (const worker of data.workers || []) {
+        statusByKey.set(
+          `${worker.subaccount_name}::${worker.name}`,
+          worker.status,
+        );
+      }
+    }
+  } catch (error) {
+    console.error("[Miners API] Error fetching Luxor worker statuses:", error);
+  }
+
+  return statusByKey;
 }
 
 /**
@@ -253,17 +314,50 @@ export async function GET(
       orderBy,
     });
 
+    // Fetch live Luxor worker statuses for AUTO miners, keyed by
+    // "subaccountName::workerName", so an AUTO miner with no active Luxor
+    // session (INACTIVE) can be surfaced as UNDER_MAINTENANCE below.
+    const autoMinerSubaccountNames = Array.from(
+      new Set(
+        miners
+          .filter((miner) => miner.status === "AUTO")
+          .map(
+            (miner) =>
+              miner.user.poolAuths[0]?.authKey ||
+              miner.user.luxorSubaccountName,
+          )
+          .filter((name): name is string => !!name),
+      ),
+    );
+    const luxorWorkerStatusByKey = await fetchLuxorWorkerStatuses(
+      request,
+      autoMinerSubaccountNames,
+    );
+
     // Transform miners to include latest rate_per_kwh, and resolve the
     // customer's Luxor subaccount from PoolAuth (falling back to the legacy
     // field) so the response shape stays unchanged for existing consumers.
     const transformedMiners = miners.map((miner) => {
       const { poolAuths, ...user } = miner.user;
+      const luxorSubaccountName =
+        poolAuths[0]?.authKey || miner.user.luxorSubaccountName;
+
+      let status = miner.status;
+      if (status === "AUTO" && luxorSubaccountName) {
+        const liveStatus = luxorWorkerStatusByKey.get(
+          `${luxorSubaccountName}::${miner.name}`,
+        );
+        if (liveStatus === "INACTIVE") {
+          status = "UNDER_MAINTENANCE";
+        }
+      }
+
       return {
         ...miner,
+        status,
         user: {
           ...user,
-          luxorSubaccountName:
-            poolAuths[0]?.authKey || miner.user.luxorSubaccountName,
+          luxorSubaccountName,
         },
         rate_per_kwh:
           miner.rateHistory && miner.rateHistory.length > 0
