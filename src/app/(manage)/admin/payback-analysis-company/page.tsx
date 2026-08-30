@@ -737,25 +737,43 @@ export default function PaybackAnalysisCompanyPage() {
     }
   }
 
-  // Filter rows based on selected OS
-  const staticRows = allStaticRows.filter((row) => {
-    if (selectedOS === "STOCK" && row.label.includes("Stock OS")) return true;
-    if (selectedOS === "CUSTOM" && row.label.includes("Custom OS")) return true;
-    return false;
-  });
+  const cleanLabel = (label: string) =>
+    label
+      .replace(/\s*\(Stock OS\)/gi, "")
+      .replace(/\s*\(Custom OS\)/gi, "")
+      .replace(/\s*\(Lux OS\)/gi, "");
 
-  const dynamicRows = allDynamicRows.filter((row) => {
-    if (
-      row.label === "Electricity & Hosting Charges" ||
-      row.label === "Machine Depreciation" ||
-      row.label === "Lifetime Electricity & Hosting Charges" ||
-      row.label.startsWith("Loan ")
-    )
-      return true;
-    if (selectedOS === "STOCK" && row.label.includes("Stock OS")) return true;
-    if (selectedOS === "CUSTOM" && row.label.includes("Custom OS")) return true;
-    return false;
-  });
+  // Filter rows based on selected OS
+  const staticRows = allStaticRows
+    .filter((row) => {
+      if (selectedOS === "STOCK" && row.label.includes("Stock OS")) return true;
+      if (selectedOS === "CUSTOM" && row.label.includes("Custom OS"))
+        return true;
+      return false;
+    })
+    .map((row) => ({
+      ...row,
+      label: cleanLabel(row.label),
+    }));
+
+  const dynamicRows = allDynamicRows
+    .filter((row) => {
+      if (
+        row.label === "Electricity & Hosting Charges" ||
+        row.label === "Machine Depreciation" ||
+        row.label === "Lifetime Electricity & Hosting Charges" ||
+        row.label.startsWith("Loan ")
+      )
+        return true;
+      if (selectedOS === "STOCK" && row.label.includes("Stock OS")) return true;
+      if (selectedOS === "CUSTOM" && row.label.includes("Custom OS"))
+        return true;
+      return false;
+    })
+    .map((row) => ({
+      ...row,
+      label: cleanLabel(row.label),
+    }));
 
   const tableRows = [btcPriceRow, rewardRow, ...staticRows, ...dynamicRows];
 
@@ -1183,16 +1201,10 @@ export default function PaybackAnalysisCompanyPage() {
                   <TableCell
                     sx={{
                       fontWeight: 700,
-                      minWidth: { xs: 140, sm: 220 },
-                      fontSize: { xs: "0.7rem", sm: "0.8rem" },
-                      px: { xs: 0.75, sm: 1.25 },
-                      position: "sticky",
-                      left: 0,
-                      zIndex: 1,
-                      backgroundColor:
-                        theme.palette.mode === "dark"
-                          ? theme.palette.grey[900]
-                          : theme.palette.background.paper,
+                      minWidth: { xs: 130, sm: 200 },
+                      fontSize: { xs: "0.75rem", sm: "0.85rem" },
+                      px: { xs: 1, sm: 1.5 },
+                      whiteSpace: "nowrap",
                     }}
                   >
                     Metric
@@ -1202,9 +1214,9 @@ export default function PaybackAnalysisCompanyPage() {
                       key={column}
                       sx={{
                         fontWeight: 700,
-                        fontSize: { xs: "0.6rem", sm: "0.75rem" },
+                        fontSize: { xs: "0.65rem", sm: "0.75rem" },
                         lineHeight: 1.25,
-                        px: { xs: 0.5, sm: 1 },
+                        px: { xs: 0.75, sm: 1.25 },
                         borderLeft: `1px solid ${theme.palette.divider}`,
                         whiteSpace: "pre-line",
                       }}
@@ -1229,18 +1241,9 @@ export default function PaybackAnalysisCompanyPage() {
                     <TableCell
                       sx={{
                         fontWeight: 600,
-                        fontSize: { xs: "0.65rem", sm: "0.8rem" },
+                        fontSize: { xs: "0.7rem", sm: "0.8rem" },
                         whiteSpace: "nowrap",
-                        px: { xs: 0.75, sm: 1.25 },
-                        position: "sticky",
-                        left: 0,
-                        zIndex: 1,
-                        backgroundColor:
-                          row.label === "Reward (BTC/PH/Day)"
-                            ? "rgba(103, 177, 42, 0.35)"
-                            : theme.palette.mode === "dark"
-                              ? theme.palette.grey[900]
-                              : theme.palette.background.paper,
+                        px: { xs: 1, sm: 1.5 },
                       }}
                     >
                       {row.label}

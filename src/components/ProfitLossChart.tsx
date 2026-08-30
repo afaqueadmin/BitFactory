@@ -18,6 +18,7 @@ import {
   useMediaQuery,
   CircularProgress,
   Alert,
+  Chip,
 } from "@mui/material";
 import { formatValue } from "@/lib/helpers/formatValue";
 
@@ -25,6 +26,7 @@ interface ProfitLossTotals {
   electricityCostTotal: number;
   hardwareCostTotal: number;
   totalCosts: number;
+  isSelfMining?: boolean;
 }
 
 interface ProfitLossResponse {
@@ -82,6 +84,7 @@ export default function ProfitLossChart({
     fetchProfitLoss();
   }, []);
 
+  const isSelfMining = Boolean(data?.totals.isSelfMining);
   const revenueUsd = totalEarningsBtc * (btcPriceUsd || 0);
   const electricityCost = data?.totals.electricityCostTotal ?? 0;
   const hardwareCost = data?.totals.hardwareCostTotal ?? 0;
@@ -106,25 +109,45 @@ export default function ProfitLossChart({
 
   const axisMax = Math.max(totalCosts, revenueUsd) * 1.1 || 1;
 
-  const cards = [
-    { label: "BTC Mined Revenue", value: revenueUsd, color: COLOR_REVENUE },
-    {
-      label: "Electricity Paid",
-      value: electricityCost,
-      color: COLOR_ELECTRICITY,
-    },
-    { label: "Hardware Paid", value: hardwareCost, color: COLOR_HARDWARE },
-    {
-      label: "Gross Profit",
-      value: grossProfit,
-      color: grossProfit >= 0 ? COLOR_PROFIT : COLOR_LOSS,
-    },
-    {
-      label: netProfitLoss >= 0 ? "Net Profit" : "Net Cash Flow",
-      value: netProfitLoss,
-      color: netProfitLoss >= 0 ? COLOR_PROFIT : COLOR_LOSS,
-    },
-  ];
+  const cards = isSelfMining
+    ? [
+        { label: "BTC Mined Revenue", value: revenueUsd, color: COLOR_REVENUE },
+        {
+          label: "Electricity (Internal)",
+          value: 0,
+          color: COLOR_ELECTRICITY,
+          subtext: "Excluded",
+        },
+        {
+          label: "Hardware Paid",
+          value: hardwareCost,
+          color: COLOR_HARDWARE,
+        },
+        {
+          label: netProfitLoss >= 0 ? "Net Profit" : "Net Cash Flow",
+          value: netProfitLoss,
+          color: netProfitLoss >= 0 ? COLOR_PROFIT : COLOR_LOSS,
+        },
+      ]
+    : [
+        { label: "BTC Mined Revenue", value: revenueUsd, color: COLOR_REVENUE },
+        {
+          label: "Electricity Paid",
+          value: electricityCost,
+          color: COLOR_ELECTRICITY,
+        },
+        { label: "Hardware Paid", value: hardwareCost, color: COLOR_HARDWARE },
+        {
+          label: "Gross Profit",
+          value: grossProfit,
+          color: grossProfit >= 0 ? COLOR_PROFIT : COLOR_LOSS,
+        },
+        {
+          label: netProfitLoss >= 0 ? "Net Profit" : "Net Cash Flow",
+          value: netProfitLoss,
+          color: netProfitLoss >= 0 ? COLOR_PROFIT : COLOR_LOSS,
+        },
+      ];
 
   return (
     <Paper
@@ -138,13 +161,38 @@ export default function ProfitLossChart({
         }`,
       }}
     >
-      <Typography
-        variant="h6"
-        fontWeight="700"
-        sx={{ mb: 2, fontSize: { xs: "1rem", sm: "1.2rem" } }}
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          flexWrap: "wrap",
+          gap: 1,
+          mb: 2,
+        }}
       >
-        Profit &amp; Loss
-      </Typography>
+        <Typography
+          variant="h6"
+          fontWeight="700"
+          sx={{ fontSize: { xs: "1rem", sm: "1.2rem" } }}
+        >
+          Profit &amp; Loss
+        </Typography>
+
+        {isSelfMining && (
+          <Chip
+            label="Self-Mining Account (Internal Bills Excluded)"
+            size="small"
+            color="primary"
+            variant="outlined"
+            sx={{
+              fontWeight: 600,
+              fontSize: { xs: "0.68rem", sm: "0.75rem" },
+              height: 24,
+            }}
+          />
+        )}
+      </Box>
 
       {loading ? (
         <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
@@ -160,8 +208,8 @@ export default function ProfitLossChart({
               display: "grid",
               gridTemplateColumns: {
                 xs: "1fr 1fr",
-                sm: "repeat(3, 1fr)",
-                md: "repeat(5, 1fr)",
+                sm: isSelfMining ? "repeat(4, 1fr)" : "repeat(3, 1fr)",
+                md: isSelfMining ? "repeat(4, 1fr)" : "repeat(5, 1fr)",
               },
               gap: { xs: 1, sm: 1.5 },
               mb: 2.5,
@@ -182,22 +230,47 @@ export default function ProfitLossChart({
                   borderLeft: card.color
                     ? `3px solid ${card.color}`
                     : undefined,
-                  ...(idx === cards.length - 1
+                  ...(idx === cards.length - 1 && !isSelfMining
                     ? { gridColumn: { xs: "1 / -1", sm: "auto" } }
                     : {}),
                 }}
               >
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
+                <Box
                   sx={{
-                    fontSize: { xs: "0.68rem", sm: "0.75rem" },
-                    display: "block",
-                    fontWeight: 500,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
                   }}
                 >
-                  {card.label}
-                </Typography>
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{
+                      fontSize: { xs: "0.68rem", sm: "0.75rem" },
+                      display: "block",
+                      fontWeight: 500,
+                    }}
+                  >
+                    {card.label}
+                  </Typography>
+                  {"subtext" in card && card.subtext && (
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        fontSize: "0.62rem",
+                        color: "text.secondary",
+                        bgcolor: isDark
+                          ? "rgba(255,255,255,0.06)"
+                          : "rgba(0,0,0,0.06)",
+                        px: 0.5,
+                        borderRadius: 0.5,
+                        fontWeight: 600,
+                      }}
+                    >
+                      {card.subtext}
+                    </Typography>
+                  )}
+                </Box>
                 <Typography
                   variant="body1"
                   fontWeight="700"
@@ -279,20 +352,22 @@ export default function ProfitLossChart({
                     boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
                   }}
                 />
-                <Bar
-                  dataKey="electricity"
-                  name="Electricity"
-                  stackId="row"
-                  fill={COLOR_ELECTRICITY}
-                  radius={[4, 0, 0, 4]}
-                  barSize={isMobile ? 26 : 34}
-                />
+                {!isSelfMining && (
+                  <Bar
+                    dataKey="electricity"
+                    name="Electricity"
+                    stackId="row"
+                    fill={COLOR_ELECTRICITY}
+                    radius={[4, 0, 0, 4]}
+                    barSize={isMobile ? 26 : 34}
+                  />
+                )}
                 <Bar
                   dataKey="hardware"
                   name="Hardware"
                   stackId="row"
                   fill={COLOR_HARDWARE}
-                  radius={[0, 4, 4, 0]}
+                  radius={isSelfMining ? [4, 4, 4, 4] : [0, 4, 4, 0]}
                   barSize={isMobile ? 26 : 34}
                 />
                 <Bar
@@ -316,11 +391,17 @@ export default function ProfitLossChart({
               mt: 1.5,
             }}
           >
-            {[
-              { label: "Electricity", color: COLOR_ELECTRICITY },
-              { label: "Hardware", color: COLOR_HARDWARE },
-              { label: "Revenue", color: COLOR_REVENUE },
-            ].map((item) => (
+            {(isSelfMining
+              ? [
+                  { label: "Hardware Outlay", color: COLOR_HARDWARE },
+                  { label: "BTC Revenue", color: COLOR_REVENUE },
+                ]
+              : [
+                  { label: "Electricity", color: COLOR_ELECTRICITY },
+                  { label: "Hardware", color: COLOR_HARDWARE },
+                  { label: "Revenue", color: COLOR_REVENUE },
+                ]
+            ).map((item) => (
               <Box
                 key={item.label}
                 sx={{ display: "flex", alignItems: "center", gap: 0.75 }}
