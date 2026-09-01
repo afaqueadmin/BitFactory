@@ -11,10 +11,6 @@ export const dynamic = "force-dynamic";
  * invoices plus all paid hardware sales invoices. Revenue (all-time BTC
  * mined) is already available client-side via /api/wallet/earnings-summary,
  * so it isn't duplicated here.
- *
- * For SELF_MINING accounts (e.g. Higgs Self Mining / company account),
- * electricity invoices are internal operational records and not customer-paid bills,
- * so electricityCostTotal is automatically excluded (0).
  */
 export async function GET(request: NextRequest) {
   try {
@@ -32,24 +28,15 @@ export async function GET(request: NextRequest) {
 
     const userId = decoded.userId;
 
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { segment: true },
-    });
-
-    const isSelfMining = user?.segment === "SELF_MINING";
-
     const [electricityInvoices, hardwareInvoices] = await Promise.all([
-      isSelfMining
-        ? Promise.resolve([])
-        : prisma.invoice.findMany({
-            where: {
-              userId,
-              invoiceType: "ELECTRICITY_CHARGES",
-              status: "PAID",
-            },
-            select: { totalAmount: true },
-          }),
+      prisma.invoice.findMany({
+        where: {
+          userId,
+          invoiceType: "ELECTRICITY_CHARGES",
+          status: "PAID",
+        },
+        select: { totalAmount: true },
+      }),
       prisma.invoice.findMany({
         where: { userId, invoiceType: "HARDWARE_SALES", status: "PAID" },
         select: { totalAmount: true },
@@ -73,7 +60,6 @@ export async function GET(request: NextRequest) {
           totalCosts: parseFloat(
             (electricityCostTotal + hardwareCostTotal).toFixed(2),
           ),
-          isSelfMining,
         },
       },
       { headers: { "Cache-Control": "no-store" } },
