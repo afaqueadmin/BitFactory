@@ -494,6 +494,68 @@ export const sendWorkerTransactionCronSummaryEmail = async (params: {
   }
 };
 
+interface HashrateBenchmarkAlertSummary {
+  minerName: string;
+  customerName: string | null;
+  date: string;
+  actualHashrateThs: number;
+  benchmarkHashrateThs: number;
+  shortfallPct: number;
+}
+
+/**
+ * Summary email for cron_hashrate_benchmark_alert. Reads only from
+ * PoolWorkerDailyMetric/MinerHashrateBenchmark (never calls a pool API
+ * itself), so this always has a result to report even when nothing is below
+ * benchmark - matching the other pool-cron summary emails' always-send
+ * behavior.
+ */
+export const sendHashrateBenchmarkAlertEmail = async (params: {
+  checkedMiners: number;
+  daysChecked: string[];
+  alerts: HashrateBenchmarkAlertSummary[];
+}) => {
+  const { checkedMiners, daysChecked, alerts } = params;
+  const date = new Date();
+
+  const alertRows = alerts
+    .map(
+      (a) =>
+        `<li>${a.minerName}${a.customerName ? ` (${a.customerName})` : ""} — ${a.date}: ${a.actualHashrateThs.toFixed(2)} TH/s vs benchmark ${a.benchmarkHashrateThs.toFixed(2)} TH/s (${a.shortfallPct.toFixed(1)}% below)</li>`,
+    )
+    .join("");
+
+  const mailOptions = {
+    from:
+      `BitFactory Admin <${process.env.SMTP_FROM}>` || "noreply@bitfactory.com",
+    to: process.env.SMTP_USER,
+    subject: `${alerts.length > 0 ? "⚠️ " : ""}Cron run: cron_hashrate_benchmark_alert - BitFactory`,
+    html: `
+      <h1>cron_hashrate_benchmark_alert</h1>
+      <p>Ran at ${date.toISOString()}, checking ${checkedMiners} miner(s) with a configured benchmark over ${daysChecked.join(", ")}.</p>
+      ${
+        alerts.length > 0
+          ? `<h3 style="color:#c62828;">${alerts.length} miner-day(s) below benchmark</h3><ul>${alertRows}</ul>`
+          : `<p>All monitored miners were at or above their configured benchmark.</p>`
+      }
+      <br>
+      <p>Best regards,</p>
+      <p>The BitFactory Team</p>
+    `,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    return { success: true };
+  } catch (error) {
+    console.error(
+      "Error sending cron_hashrate_benchmark_alert summary email:",
+      error,
+    );
+    return { success: false, error };
+  }
+};
+
 // Send invoice cancellation email
 export const sendInvoiceCancellationEmail = async (
   email: string,

@@ -18,6 +18,7 @@ export type MinerSortField =
   | "hashRate"
   | "status"
   | "ratePerKwh"
+  | "benchmarkHashrate"
   | "createdAt";
 
 /**
@@ -78,6 +79,7 @@ interface Miner {
   updatedAt: string;
   isDeleted: boolean;
   rate_per_kwh?: number;
+  benchmarkHashrate?: number;
   serialNumber?: string | null;
   macAddress?: string | null;
   user?: User;
@@ -145,6 +147,9 @@ function getSortValue(miner: Miner, field: MinerSortField): string | number {
 
     case "ratePerKwh":
       return Number(miner.rate_per_kwh || 0);
+
+    case "benchmarkHashrate":
+      return Number(miner.benchmarkHashrate || 0);
 
     case "createdAt":
       return new Date(miner.createdAt).getTime();
@@ -220,6 +225,7 @@ export function getSortFieldLabel(field: MinerSortField): string {
     hashRate: "Hash Rate",
     status: "Status",
     ratePerKwh: "Rate per kWh",
+    benchmarkHashrate: "Benchmark Hashrate",
     createdAt: "Created Date",
   };
 
@@ -242,6 +248,7 @@ export function getAllSortFields(): MinerSortField[] {
     "hashRate",
     "status",
     "ratePerKwh",
+    "benchmarkHashrate",
     "createdAt",
   ];
 }

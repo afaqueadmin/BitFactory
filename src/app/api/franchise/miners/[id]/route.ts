@@ -79,6 +79,7 @@ export async function PUT(
       spaceId,
       status,
       rate_per_kwh,
+      benchmarkHashrate,
       poolId,
       serialNumber,
       macAddress,
@@ -94,6 +95,25 @@ export async function PUT(
         );
       }
       ratePerKwhValue = rateValue;
+    }
+
+    let benchmarkHashrateValue: number | null = null;
+    if (
+      benchmarkHashrate !== undefined &&
+      benchmarkHashrate !== null &&
+      benchmarkHashrate !== ""
+    ) {
+      const benchmarkValue = Number(benchmarkHashrate);
+      if (isNaN(benchmarkValue) || benchmarkValue <= 0) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "benchmarkHashrate must be a positive number",
+          },
+          { status: 400 },
+        );
+      }
+      benchmarkHashrateValue = benchmarkValue;
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -265,7 +285,11 @@ export async function PUT(
       updateData.poolId = poolId;
     }
 
-    if (Object.keys(updateData).length === 0 && ratePerKwhValue === null) {
+    if (
+      Object.keys(updateData).length === 0 &&
+      ratePerKwhValue === null &&
+      benchmarkHashrateValue === null
+    ) {
       return NextResponse.json(
         { success: false, error: "No fields to update" },
         { status: 400 },
@@ -298,6 +322,26 @@ export async function PUT(
         if (!latestRate || currentRate !== ratePerKwhValue) {
           await tx.minerRateHistory.create({
             data: { minerId: id, rate_per_kwh: ratePerKwhValue },
+          });
+        }
+      }
+
+      if (benchmarkHashrateValue !== null) {
+        const latestBenchmark = await tx.minerHashrateBenchmark.findFirst({
+          where: { minerId: id },
+          orderBy: { createdAt: "desc" },
+          select: { benchmarkHashrate: true },
+        });
+        const currentBenchmark =
+          latestBenchmark &&
+          parseFloat(latestBenchmark.benchmarkHashrate.toString());
+        if (!latestBenchmark || currentBenchmark !== benchmarkHashrateValue) {
+          await tx.minerHashrateBenchmark.create({
+            data: {
+              minerId: id,
+              benchmarkHashrate: benchmarkHashrateValue,
+              createdById: auth.decoded.userId,
+            },
           });
         }
       }
@@ -343,13 +387,27 @@ export async function PUT(
           hardware: {
             select: { id: true, model: true, powerUsage: true, hashRate: true },
           },
+          hashrateBenchmarks: {
+            select: { benchmarkHashrate: true, createdAt: true },
+            orderBy: { createdAt: "desc" },
+            take: 1,
+          },
         },
       });
     });
 
+    const { hashrateBenchmarks, ...updatedMinerRest } = updatedMiner;
+    const transformedMiner = {
+      ...updatedMinerRest,
+      benchmarkHashrate:
+        hashrateBenchmarks.length > 0
+          ? hashrateBenchmarks[0].benchmarkHashrate
+          : undefined,
+    };
+
     return NextResponse.json({
       success: true,
-      data: updatedMiner,
+      data: transformedMiner,
       timestamp: new Date().toISOString(),
     });
   } catch (error) {

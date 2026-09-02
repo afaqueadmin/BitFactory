@@ -8,83 +8,84 @@ datasource db {
 }
 
 model User {
-  id                         String                       @id @default(cuid())
-  email                      String                       @unique
-  name                       String?
-  password                   String
-  createdAt                  DateTime                     @default(now())
-  updatedAt                  DateTime                     @updatedAt
-  companyName                String?
-  profileImage               String?
-  profileImageId             String?
-  city                       String?
-  country                    String?
-  dateOfBirth                DateTime?
-  phoneNumber                String?
-  streetAddress              String?
-  twoFactorEnabled           Boolean                      @default(false)
-  twoFactorSecret            String?
-  twoFactorBackupCodes       String[]
-  role                       Role                         @default(CLIENT)
-  idNumber                   String?
-  luxorSubaccountName        String?
-  companyUrl                 String?
-  isDeleted                  Boolean                      @default(false)
-  franchiseeId               String?
-  franchisee                 Franchise?                   @relation("FranchiseUsers", fields: [franchiseeId], references: [id])
-  segment                    Segment?
-  auditLogs                  AuditLog[]                   @relation("auditLogs")
-  costPayments               CostPayment[]
-  pricingCreated             CustomerPricingConfig[]      @relation("pricingConfigsCreated")
-  pricingUpdated             CustomerPricingConfig[]      @relation("pricingConfigsUpdated")
-  pricingConfigs             CustomerPricingConfig[]      @relation("pricingConfigs")
-  createdGroups              Group[]
-  franchisesOwned            Franchise[]                  @relation("FranchiseFranchisee")
-  franchisesCreated          Franchise[]                  @relation("FranchiseCreatedBy")
-  hardwareProcurementHistory HardwareProcurementHistory[]
-  invoicesCreated            Invoice[]                    @relation("invoicesCreated")
-  invoicesUpdated            Invoice[]                    @relation("invoicesUpdated")
-  invoices                   Invoice[]                    @relation("invoices")
-  memos                      Memo[]                       @relation("memos")
-  memosCreated               Memo[]                       @relation("memosCreated")
-  memosVoided                Memo[]                       @relation("memosVoided")
-  vendorInvoicesCreated      VendorInvoice[]              @relation("vendorInvoicesCreated")
-  vendorInvoicesUpdated      VendorInvoice[]              @relation("vendorInvoicesUpdated")
-  hardwarePurchasesCreated   HardwarePurchaseInvoice[]    @relation("hardwarePurchasesCreated")
-  hardwarePurchasesUpdated   HardwarePurchaseInvoice[]    @relation("hardwarePurchasesUpdated")
-  createdMinerHistory        MinerOwnershipHistory[]      @relation("createdBy")
-  ownedMinerHistory          MinerOwnershipHistory[]      @relation("owner")
-  miners                     Miner[]
-  emailSendRunsCreated       EmailSendRun[]               @relation("emailSendRunsCreated")
-  emailSendResults           EmailSendResult[]            @relation("emailSendResults")
-  recurringCreated           RecurringInvoice[]           @relation("recurringInvoicesCreated")
-  recurringUpdated           RecurringInvoice[]           @relation("recurringInvoicesUpdated")
-  recurringInvoices          RecurringInvoice[]           @relation("recurringInvoices")
-  blacklisted                TokenBlacklist[]
-  activities                 UserActivity[]
-  sessions                   UserSession[]
-  paymentDetailsUpdates      PaymentDetails[]
-  poolAuths                  PoolAuth[]
-  poolSubaccounts            PoolSubaccount[]
-  webauthnCredentials        WebAuthnCredential[]
-  invoicedAmount             Decimal                      @db.Decimal(12, 2)
-  createdRepairNotes         MinerRepairNote[]            @relation("CreatedRepairNotes")
-  createdMinerPoolHistory    MinerPoolHistory[]           @relation("MinerPoolHistoryCreatedBy")
-  addedGroupSubaccounts      GroupSubaccount[]            @relation("GroupSubaccountAddedBy")
-  groupMemberships           GroupSubaccount[]            @relation("GroupSubaccountUser")
-  customerRequestsSubmitted  FranchiseCustomerRequest[]   @relation("CustomerRequestsSubmitted")
-  customerRequestsReviewed   FranchiseCustomerRequest[]   @relation("CustomerRequestsReviewed")
-  customerRequestCreatedFrom FranchiseCustomerRequest?    @relation("CustomerRequestsCreatedUser")
-  incentiveRatesCreated      FranchiseIncentiveRate[]     @relation("incentiveRatesCreated")
-  incentiveRatesUpdated      FranchiseIncentiveRate[]     @relation("incentiveRatesUpdated")
-  incentiveEntriesAsClient   IncentiveEntry[]             @relation("incentiveEntriesClient")
-  incentivePayoutsCreated    IncentivePayoutBatch[]       @relation("incentivePayoutsCreated")
-  ticketsRaised              SupportTicket[]              @relation("ticketsRaised")
-  ticketsAssigned            SupportTicket[]              @relation("ticketsAssigned")
-  ticketsRaisedOnBehalf      SupportTicket[]              @relation("ticketsOnBehalfOf")
-  ticketMessages             TicketMessage[]              @relation("ticketMessagesAuthored")
-  walletChangeRequests       WalletChangeRequest[]        @relation("walletChangeRequests")
-  walletChangeRequestsReviewed WalletChangeRequest[]       @relation("walletChangeRequestsReviewed")
+  id                           String                       @id @default(cuid())
+  email                        String                       @unique
+  name                         String?
+  password                     String
+  createdAt                    DateTime                     @default(now())
+  updatedAt                    DateTime                     @updatedAt
+  companyName                  String?
+  profileImage                 String?
+  profileImageId               String?
+  city                         String?
+  country                      String?
+  dateOfBirth                  DateTime?
+  phoneNumber                  String?
+  streetAddress                String?
+  twoFactorEnabled             Boolean                      @default(false)
+  twoFactorSecret              String?
+  twoFactorBackupCodes         String[]
+  role                         Role                         @default(CLIENT)
+  idNumber                     String?
+  luxorSubaccountName          String?
+  companyUrl                   String?
+  isDeleted                    Boolean                      @default(false)
+  franchiseeId                 String?
+  franchisee                   Franchise?                   @relation("FranchiseUsers", fields: [franchiseeId], references: [id])
+  segment                      Segment?
+  auditLogs                    AuditLog[]                   @relation("auditLogs")
+  costPayments                 CostPayment[]
+  pricingCreated               CustomerPricingConfig[]      @relation("pricingConfigsCreated")
+  pricingUpdated               CustomerPricingConfig[]      @relation("pricingConfigsUpdated")
+  pricingConfigs               CustomerPricingConfig[]      @relation("pricingConfigs")
+  createdGroups                Group[]
+  franchisesOwned              Franchise[]                  @relation("FranchiseFranchisee")
+  franchisesCreated            Franchise[]                  @relation("FranchiseCreatedBy")
+  hardwareProcurementHistory   HardwareProcurementHistory[]
+  invoicesCreated              Invoice[]                    @relation("invoicesCreated")
+  invoicesUpdated              Invoice[]                    @relation("invoicesUpdated")
+  invoices                     Invoice[]                    @relation("invoices")
+  memos                        Memo[]                       @relation("memos")
+  memosCreated                 Memo[]                       @relation("memosCreated")
+  memosVoided                  Memo[]                       @relation("memosVoided")
+  vendorInvoicesCreated        VendorInvoice[]              @relation("vendorInvoicesCreated")
+  vendorInvoicesUpdated        VendorInvoice[]              @relation("vendorInvoicesUpdated")
+  hardwarePurchasesCreated     HardwarePurchaseInvoice[]    @relation("hardwarePurchasesCreated")
+  hardwarePurchasesUpdated     HardwarePurchaseInvoice[]    @relation("hardwarePurchasesUpdated")
+  createdMinerHistory          MinerOwnershipHistory[]      @relation("createdBy")
+  ownedMinerHistory            MinerOwnershipHistory[]      @relation("owner")
+  miners                       Miner[]
+  emailSendRunsCreated         EmailSendRun[]               @relation("emailSendRunsCreated")
+  emailSendResults             EmailSendResult[]            @relation("emailSendResults")
+  recurringCreated             RecurringInvoice[]           @relation("recurringInvoicesCreated")
+  recurringUpdated             RecurringInvoice[]           @relation("recurringInvoicesUpdated")
+  recurringInvoices            RecurringInvoice[]           @relation("recurringInvoices")
+  blacklisted                  TokenBlacklist[]
+  activities                   UserActivity[]
+  sessions                     UserSession[]
+  paymentDetailsUpdates        PaymentDetails[]
+  poolAuths                    PoolAuth[]
+  poolSubaccounts              PoolSubaccount[]
+  webauthnCredentials          WebAuthnCredential[]
+  invoicedAmount               Decimal                      @db.Decimal(12, 2)
+  createdRepairNotes           MinerRepairNote[]            @relation("CreatedRepairNotes")
+  createdMinerPoolHistory      MinerPoolHistory[]           @relation("MinerPoolHistoryCreatedBy")
+  createdHashrateBenchmarks    MinerHashrateBenchmark[]     @relation("MinerHashrateBenchmarkCreatedBy")
+  addedGroupSubaccounts        GroupSubaccount[]            @relation("GroupSubaccountAddedBy")
+  groupMemberships             GroupSubaccount[]            @relation("GroupSubaccountUser")
+  customerRequestsSubmitted    FranchiseCustomerRequest[]   @relation("CustomerRequestsSubmitted")
+  customerRequestsReviewed     FranchiseCustomerRequest[]   @relation("CustomerRequestsReviewed")
+  customerRequestCreatedFrom   FranchiseCustomerRequest?    @relation("CustomerRequestsCreatedUser")
+  incentiveRatesCreated        FranchiseIncentiveRate[]     @relation("incentiveRatesCreated")
+  incentiveRatesUpdated        FranchiseIncentiveRate[]     @relation("incentiveRatesUpdated")
+  incentiveEntriesAsClient     IncentiveEntry[]             @relation("incentiveEntriesClient")
+  incentivePayoutsCreated      IncentivePayoutBatch[]       @relation("incentivePayoutsCreated")
+  ticketsRaised                SupportTicket[]              @relation("ticketsRaised")
+  ticketsAssigned              SupportTicket[]              @relation("ticketsAssigned")
+  ticketsRaisedOnBehalf        SupportTicket[]              @relation("ticketsOnBehalfOf")
+  ticketMessages               TicketMessage[]              @relation("ticketMessagesAuthored")
+  walletChangeRequests         WalletChangeRequest[]        @relation("walletChangeRequests")
+  walletChangeRequestsReviewed WalletChangeRequest[]        @relation("walletChangeRequestsReviewed")
 
   @@index([isDeleted])
   @@index([franchiseeId])
@@ -335,28 +336,30 @@ model Hardware {
 }
 
 model Miner {
-  id               String                  @id @default(cuid())
-  name             String
-  status           String                  @default("DEPLOYMENT_IN_PROGRESS")
-  userId           String
-  spaceId          String
-  createdAt        DateTime                @default(now())
-  updatedAt        DateTime                @updatedAt
-  hardwareId       String
-  isDeleted        Boolean                 @default(false)
-  poolId           String?
-  poolAuth         String?
-  serialNumber     String?
-  macAddress       String?
-  ownershipHistory MinerOwnershipHistory[]
-  rateHistory      MinerRateHistory[]
-  poolHistory      MinerPoolHistory[]
-  hardware         Hardware                @relation(fields: [hardwareId], references: [id])
-  space            Space                   @relation(fields: [spaceId], references: [id])
-  user             User                    @relation(fields: [userId], references: [id])
-  pool             Pool?                   @relation(fields: [poolId], references: [id])
-  repairNotes      MinerRepairNote[]       @relation("MinerRepairNotes")
-  tickets          SupportTicket[]
+  id                 String                   @id @default(cuid())
+  name               String
+  status             String                   @default("DEPLOYMENT_IN_PROGRESS")
+  userId             String
+  spaceId            String
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+  hardwareId         String
+  isDeleted          Boolean                  @default(false)
+  poolId             String?
+  poolAuth           String?
+  serialNumber       String?
+  macAddress         String?
+  ownershipHistory   MinerOwnershipHistory[]
+  rateHistory        MinerRateHistory[]
+  poolHistory        MinerPoolHistory[]
+  hashrateBenchmarks MinerHashrateBenchmark[]
+  hashrateAlertLogs  MinerHashrateAlertLog[]
+  hardware           Hardware                 @relation(fields: [hardwareId], references: [id])
+  space              Space                    @relation(fields: [spaceId], references: [id])
+  user               User                     @relation(fields: [userId], references: [id])
+  pool               Pool?                    @relation(fields: [poolId], references: [id])
+  repairNotes        MinerRepairNote[]        @relation("MinerRepairNotes")
+  tickets            SupportTicket[]
 
   @@unique([name, userId])
   @@index([hardwareId])
@@ -608,6 +611,51 @@ model MinerPoolHistory {
   @@index([poolId])
   @@index([createdById])
   @@map("miner_pool_history")
+}
+
+// ============================================================================
+// Miner hashrate benchmark alerting.
+//
+// MinerHashrateBenchmark is a history table (mirrors MinerRateHistory): the
+// latest row per miner (by createdAt) is the active benchmark, in TH/s to
+// match Hardware.hashRate and the rest of the admin UI's convention — the
+// pool tables (PoolWorkerDailyMetric.hashrate) are in H/s and must be
+// converted before comparing.
+//
+// MinerHashrateAlertLog records which (miner, date) pairs have already been
+// notified, so the alert cron (which re-scans a rolling window each run,
+// since it does not run inside cron_pool_worker_transactions and can't rely
+// on "just wrote this row") never sends a duplicate email for the same day.
+// ============================================================================
+
+model MinerHashrateBenchmark {
+  id                String   @id @default(cuid())
+  minerId           String
+  benchmarkHashrate Decimal  @db.Decimal(10, 2) // TH/s
+  createdAt         DateTime @default(now())
+  createdById       String
+
+  miner     Miner @relation(fields: [minerId], references: [id], onDelete: Cascade)
+  createdBy User  @relation("MinerHashrateBenchmarkCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@index([minerId])
+  @@index([minerId, createdAt(sort: Desc)])
+  @@map("miner_hashrate_benchmarks")
+}
+
+model MinerHashrateAlertLog {
+  id                String   @id @default(cuid())
+  minerId           String
+  date              DateTime @db.Date
+  actualHashrate    Decimal  @db.Decimal(10, 2) // TH/s, converted from PoolWorkerDailyMetric.hashrate (H/s)
+  benchmarkHashrate Decimal  @db.Decimal(10, 2) // TH/s, the benchmark that was in effect when this alert fired
+  notifiedAt        DateTime @default(now())
+
+  miner Miner @relation(fields: [minerId], references: [id], onDelete: Cascade)
+
+  @@unique([minerId, date])
+  @@index([minerId])
+  @@map("miner_hashrate_alert_logs")
 }
 
 model HardwareProcurementHistory {

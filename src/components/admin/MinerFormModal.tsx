@@ -51,6 +51,7 @@ interface MinerFormData {
   poolId: string;
   status: "AUTO" | "DEPLOYMENT_IN_PROGRESS" | "UNDER_MAINTENANCE";
   rate_per_kwh: string | number;
+  benchmarkHashrate: string | number;
   serialNumber: string;
   macAddress: string;
 }
@@ -96,6 +97,7 @@ interface Miner {
   spaceId: string;
   poolId?: string | null;
   rate_per_kwh?: number;
+  benchmarkHashrate?: number;
   serialNumber?: string | null;
   macAddress?: string | null;
   createdAt: string;
@@ -142,6 +144,7 @@ export default function MinerFormModal({
     poolId: "",
     status: "DEPLOYMENT_IN_PROGRESS",
     rate_per_kwh: "",
+    benchmarkHashrate: "",
     serialNumber: "",
     macAddress: "",
   });
@@ -183,6 +186,7 @@ export default function MinerFormModal({
         poolId: miner.poolId || "",
         status: miner.status,
         rate_per_kwh: miner.rate_per_kwh || "",
+        benchmarkHashrate: miner.benchmarkHashrate || "",
         serialNumber: miner.serialNumber || "",
         macAddress: miner.macAddress || "",
       });
@@ -198,6 +202,7 @@ export default function MinerFormModal({
         poolId: "",
         status: "DEPLOYMENT_IN_PROGRESS",
         rate_per_kwh: "",
+        benchmarkHashrate: "",
         serialNumber: "",
         macAddress: "",
       });
@@ -274,6 +279,15 @@ export default function MinerFormModal({
       }
     }
 
+    // Benchmark hashrate is optional; if provided, must be a positive number
+    if (formData.benchmarkHashrate) {
+      const benchmark = Number(formData.benchmarkHashrate);
+      if (isNaN(benchmark) || benchmark <= 0) {
+        setError("Benchmark hashrate must be a positive number");
+        return false;
+      }
+    }
+
     return true;
   };
 
@@ -300,6 +314,7 @@ export default function MinerFormModal({
         poolId?: string;
         status: string;
         rate_per_kwh?: number;
+        benchmarkHashrate?: number;
         serialNumber?: string;
         macAddress?: string;
       } = {
@@ -320,6 +335,11 @@ export default function MinerFormModal({
       // Include rate_per_kwh if provided
       if (formData.rate_per_kwh) {
         body.rate_per_kwh = Number(formData.rate_per_kwh);
+      }
+
+      // Include benchmarkHashrate if provided
+      if (formData.benchmarkHashrate) {
+        body.benchmarkHashrate = Number(formData.benchmarkHashrate);
       }
 
       const response = await fetch(url, {
@@ -550,6 +570,23 @@ export default function MinerFormModal({
                 ? "Optional: leave empty to keep current rate"
                 : "Required for cost calculation"
             }
+          />
+
+          <TextField
+            fullWidth
+            label="Benchmark Hashrate (TH/s)"
+            name="benchmarkHashrate"
+            type="number"
+            value={formData.benchmarkHashrate}
+            onChange={handleChange}
+            placeholder="e.g., 200.00"
+            margin="normal"
+            disabled={loading || isLoading}
+            inputProps={{
+              step: 0.01,
+              min: 0,
+            }}
+            helperText="Optional: expected daily hashrate used to alert admins when this miner underperforms"
           />
 
           <TextField

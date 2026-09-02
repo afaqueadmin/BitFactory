@@ -95,6 +95,11 @@ export async function GET(
           select: { rate_per_kwh: true, createdAt: true },
           orderBy: { createdAt: "desc" },
         },
+        hashrateBenchmarks: {
+          select: { benchmarkHashrate: true, createdAt: true },
+          orderBy: { createdAt: "desc" },
+          take: 1,
+        },
         pool: {
           select: { id: true, name: true, apiUrl: true, description: true },
         },
@@ -107,6 +112,10 @@ export async function GET(
       rate_per_kwh:
         miner.rateHistory && miner.rateHistory.length > 0
           ? miner.rateHistory[0].rate_per_kwh
+          : undefined,
+      benchmarkHashrate:
+        miner.hashrateBenchmarks && miner.hashrateBenchmarks.length > 0
+          ? miner.hashrateBenchmarks[0].benchmarkHashrate
           : undefined,
     }));
 
@@ -144,6 +153,7 @@ export async function POST(
       spaceId,
       status,
       rate_per_kwh,
+      benchmarkHashrate,
       poolId,
       serialNumber,
       macAddress,
@@ -191,6 +201,24 @@ export async function POST(
         { success: false, error: "rate_per_kwh must be a positive number" },
         { status: 400 },
       );
+    }
+
+    let benchmarkHashrateValue: number | null = null;
+    if (
+      benchmarkHashrate !== undefined &&
+      benchmarkHashrate !== null &&
+      benchmarkHashrate !== ""
+    ) {
+      benchmarkHashrateValue = Number(benchmarkHashrate);
+      if (isNaN(benchmarkHashrateValue) || benchmarkHashrateValue <= 0) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "benchmarkHashrate must be a positive number",
+          },
+          { status: 400 },
+        );
+      }
     }
 
     // The target customer MUST belong to this franchisee — never trust the
@@ -296,6 +324,16 @@ export async function POST(
       await tx.minerRateHistory.create({
         data: { minerId: newMiner.id, rate_per_kwh: ratePerKwh },
       });
+
+      if (benchmarkHashrateValue !== null) {
+        await tx.minerHashrateBenchmark.create({
+          data: {
+            minerId: newMiner.id,
+            benchmarkHashrate: benchmarkHashrateValue,
+            createdById: auth.decoded.userId,
+          },
+        });
+      }
 
       await tx.minerOwnershipHistory.create({
         data: {

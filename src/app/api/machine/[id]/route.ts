@@ -78,6 +78,7 @@ async function verifyAdminAuth(request: NextRequest) {
  *   spaceId?: string
  *   status?: string (AUTO, DEPLOYMENT_IN_PROGRESS, or UNDER_MAINTENANCE)
  *   rate_per_kwh?: number (positive number, creates new history entry if provided and different from latest)
+ *   benchmarkHashrate?: number (TH/s, positive number, creates new history entry if provided and different from latest)
  *   poolId?: string (ID of the mining pool, or null to unassign)
  *   serialNumber?: string
  *   macAddress?: string
@@ -139,6 +140,7 @@ export async function PUT(
       spaceId,
       status,
       rate_per_kwh,
+      benchmarkHashrate,
       poolId,
       serialNumber,
       macAddress,
@@ -161,6 +163,29 @@ export async function PUT(
         );
       }
       ratePerKwhValue = rateValue;
+    }
+
+    // Validate benchmarkHashrate if provided (optional)
+    let benchmarkHashrateValue: number | null = null;
+    if (
+      benchmarkHashrate !== undefined &&
+      benchmarkHashrate !== null &&
+      benchmarkHashrate !== ""
+    ) {
+      const benchmarkValue = Number(benchmarkHashrate);
+      if (isNaN(benchmarkValue) || benchmarkValue <= 0) {
+        console.error(
+          "[Miners API] PUT: Invalid benchmarkHashrate - must be positive number",
+        );
+        return NextResponse.json<ApiResponse>(
+          {
+            success: false,
+            error: "benchmarkHashrate must be a positive number",
+          },
+          { status: 400 },
+        );
+      }
+      benchmarkHashrateValue = benchmarkValue;
     }
 
     // Build update data with only provided fields
@@ -381,7 +406,11 @@ export async function PUT(
     }
 
     // If no fields to update, return error
-    if (Object.keys(updateData).length === 0 && ratePerKwhValue === null) {
+    if (
+      Object.keys(updateData).length === 0 &&
+      ratePerKwhValue === null &&
+      benchmarkHashrateValue === null
+    ) {
       return NextResponse.json<ApiResponse>(
         { success: false, error: "No fields to update" },
         { status: 400 },
@@ -433,6 +462,33 @@ export async function PUT(
             data: {
               minerId: id,
               rate_per_kwh: ratePerKwhValue,
+            },
+          });
+        }
+      }
+
+      // Handle benchmarkHashrate if provided
+      if (benchmarkHashrateValue !== null) {
+        // Get the latest benchmark for this miner
+        const latestBenchmark = await tx.minerHashrateBenchmark.findFirst({
+          where: { minerId: id },
+          orderBy: { createdAt: "desc" },
+          select: { benchmarkHashrate: true },
+        });
+
+        // Create new benchmark history entry only if it differs or no history exists
+        const currentBenchmark =
+          latestBenchmark &&
+          parseFloat(latestBenchmark.benchmarkHashrate.toString());
+        if (!latestBenchmark || currentBenchmark !== benchmarkHashrateValue) {
+          const token = request.cookies.get("token")?.value;
+          const decoded = await verifyJwtToken(token!);
+
+          await tx.minerHashrateBenchmark.create({
+            data: {
+              minerId: id,
+              benchmarkHashrate: benchmarkHashrateValue,
+              createdById: decoded.userId,
             },
           });
         }
@@ -509,6 +565,16 @@ export async function PUT(
               hashRate: true,
             },
           },
+          hashrateBenchmarks: {
+            select: {
+              benchmarkHashrate: true,
+              createdAt: true,
+            },
+            orderBy: {
+              createdAt: "desc",
+            },
+            take: 1,
+          },
         },
       });
     });
@@ -518,13 +584,18 @@ export async function PUT(
     // Resolve the customer's Luxor subaccount from PoolAuth (falling back to
     // the legacy field) so the response shape stays unchanged for consumers.
     const { poolAuths, ...updatedMinerUser } = updatedMiner.user;
+    const { hashrateBenchmarks, ...updatedMinerRest } = updatedMiner;
     const transformedMiner = {
-      ...updatedMiner,
+      ...updatedMinerRest,
       user: {
         ...updatedMinerUser,
         luxorSubaccountName:
           poolAuths[0]?.authKey || updatedMiner.user.luxorSubaccountName,
       },
+      benchmarkHashrate:
+        hashrateBenchmarks.length > 0
+          ? hashrateBenchmarks[0].benchmarkHashrate
+          : undefined,
     };
 
     return NextResponse.json<ApiResponse>(

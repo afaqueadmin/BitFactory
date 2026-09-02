@@ -68,6 +68,7 @@ interface Miner {
   createdAt: string;
   updatedAt: string;
   rate_per_kwh?: number;
+  benchmarkHashrate?: number;
   serialNumber?: string | null;
   macAddress?: string | null;
   isDeleted: boolean;

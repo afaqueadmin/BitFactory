@@ -113,6 +113,7 @@ interface Miner {
   updatedAt: string;
   isDeleted: boolean;
   rate_per_kwh?: number;
+  benchmarkHashrate?: number;
   serialNumber?: string | null;
   macAddress?: string | null;
   user?: User;
@@ -624,6 +625,31 @@ export default function MinersTable({
                   "&:hover": { backgroundColor: "action.selected" },
                   whiteSpace: "nowrap",
                 }}
+                align="right"
+                onClick={() => handleHeaderClick("benchmarkHashrate")}
+              >
+                Benchmark (TH/s){" "}
+                {sortConfig.field === "benchmarkHashrate" &&
+                  (sortConfig.direction === "asc" ? (
+                    <ArrowUpwardIcon
+                      fontSize="small"
+                      sx={{ verticalAlign: "middle", ml: 0.5 }}
+                    />
+                  ) : (
+                    <ArrowDownwardIcon
+                      fontSize="small"
+                      sx={{ verticalAlign: "middle", ml: 0.5 }}
+                    />
+                  ))}
+              </TableCell>
+              <TableCell
+                sx={{
+                  fontWeight: "bold",
+                  cursor: "pointer",
+                  userSelect: "none",
+                  "&:hover": { backgroundColor: "action.selected" },
+                  whiteSpace: "nowrap",
+                }}
                 align="center"
                 onClick={() => handleHeaderClick("status")}
               >
@@ -673,13 +699,13 @@ export default function MinersTable({
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={12} align="center" sx={{ py: 4 }}>
+                <TableCell colSpan={13} align="center" sx={{ py: 4 }}>
                   <CircularProgress />
                 </TableCell>
               </TableRow>
             ) : memoizedRows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={12} align="center" sx={{ py: 4 }}>
+                <TableCell colSpan={13} align="center" sx={{ py: 4 }}>
                   <Typography color="text.secondary">
                     No miners found. Create one to get started.
                   </Typography>
@@ -777,6 +803,15 @@ export default function MinersTable({
                   <TableCell align="right">
                     {miner.rate_per_kwh ? (
                       `$${Number(miner.rate_per_kwh).toFixed(4)}`
+                    ) : (
+                      <Typography variant="body2" color="text.secondary">
+                        —
+                      </Typography>
+                    )}
+                  </TableCell>
+                  <TableCell align="right">
+                    {miner.benchmarkHashrate ? (
+                      `${Number(miner.benchmarkHashrate).toFixed(2)} TH/s`
                     ) : (
                       <Typography variant="body2" color="text.secondary">
                         —

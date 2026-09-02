@@ -261,6 +261,16 @@ export async function GET(
             createdAt: "desc",
           },
         },
+        hashrateBenchmarks: {
+          select: {
+            benchmarkHashrate: true,
+            createdAt: true,
+          },
+          orderBy: {
+            createdAt: "desc",
+          },
+          take: 1,
+        },
         ownershipHistory: {
           select: {
             id: true,
@@ -363,6 +373,10 @@ export async function GET(
           miner.rateHistory && miner.rateHistory.length > 0
             ? miner.rateHistory[0].rate_per_kwh
             : undefined,
+        benchmarkHashrate:
+          miner.hashrateBenchmarks && miner.hashrateBenchmarks.length > 0
+            ? miner.hashrateBenchmarks[0].benchmarkHashrate
+            : undefined,
       };
     });
 
@@ -406,6 +420,7 @@ export async function GET(
  *   spaceId: string (required) - ID of the space where miner is located
  *   status: string (optional) - AUTO, DEPLOYMENT_IN_PROGRESS, or UNDER_MAINTENANCE (default: DEPLOYMENT_IN_PROGRESS)
  *   rate_per_kwh: number (required) - Electricity rate per kWh in USD (positive number)
+ *   benchmarkHashrate: number (optional) - Expected hashrate benchmark in TH/s for below-benchmark alerting
  *   poolId: string (optional) - ID of the mining pool
  *   serialNumber: string (optional) - Hardware serial number
  *   macAddress: string (optional) - Miner MAC address
@@ -452,6 +467,7 @@ export async function POST(
       spaceId,
       status,
       rate_per_kwh,
+      benchmarkHashrate,
       poolId,
       serialNumber,
       macAddress,
@@ -515,6 +531,28 @@ export async function POST(
         },
         { status: 400 },
       );
+    }
+
+    // Validate benchmarkHashrate is a positive number, if provided (optional)
+    let benchmarkHashrateValue: number | null = null;
+    if (
+      benchmarkHashrate !== undefined &&
+      benchmarkHashrate !== null &&
+      benchmarkHashrate !== ""
+    ) {
+      benchmarkHashrateValue = Number(benchmarkHashrate);
+      if (isNaN(benchmarkHashrateValue) || benchmarkHashrateValue <= 0) {
+        console.error(
+          "[Miners API] POST: Invalid benchmarkHashrate - must be positive number",
+        );
+        return NextResponse.json<ApiResponse>(
+          {
+            success: false,
+            error: "benchmarkHashrate must be a positive number",
+          },
+          { status: 400 },
+        );
+      }
     }
 
     // Verify user exists
@@ -671,6 +709,17 @@ export async function POST(
           rate_per_kwh: ratePerKwh,
         },
       });
+
+      // Create miner hashrate benchmark entry, if provided
+      if (benchmarkHashrateValue !== null) {
+        await tx.minerHashrateBenchmark.create({
+          data: {
+            minerId: newMiner.id,
+            benchmarkHashrate: benchmarkHashrateValue,
+            createdById: authenticatedUserId,
+          },
+        });
+      }
 
       // Create miner ownership history entry
       await tx.minerOwnershipHistory.create({
