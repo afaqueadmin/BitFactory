@@ -2,9 +2,10 @@
  * src/app/(manage)/pool-worker-metrics/page.tsx
  * Pool Worker Daily Metrics Management Page
  *
- * Admin CRUD for PoolWorkerDailyMetric - paginated and filterable
+ * Read-only admin view of PoolWorkerDailyMetric - paginated and filterable
  * (subaccount, worker name, date range) since this table holds tens of
- * thousands of rows.
+ * thousands of rows. Data is populated by the pool sync cron; this page has
+ * no add/edit/delete controls.
  */
 
 "use client";
@@ -14,7 +15,6 @@ import {
   Box,
   Container,
   Typography,
-  Button,
   Stack,
   Alert,
   CircularProgress,
@@ -25,10 +25,6 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
   TextField,
   IconButton,
   Tooltip,
@@ -39,9 +35,6 @@ import {
   Chip,
 } from "@mui/material";
 import {
-  Add as AddIcon,
-  Edit as EditIcon,
-  Delete as DeleteIcon,
   Refresh as RefreshIcon,
   NavigateBefore,
   NavigateNext,
@@ -85,20 +78,6 @@ interface ApiResponse<T = unknown> {
   error?: string;
 }
 
-const emptyForm = {
-  poolSubaccountId: "",
-  workerName: "",
-  externalWorkerId: "",
-  date: "",
-  hashrate: "",
-  efficiency: "",
-  staleShares: "",
-  rejectedShares: "",
-  estRevenue: "",
-  firmware: "",
-  status: "",
-};
-
 const fmt = (v: string | null, digits = 4) =>
   v === null
     ? "—"
@@ -128,17 +107,6 @@ export default function PoolWorkerMetricsPage() {
     totalCount: 0,
     totalPages: 1,
   });
-
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [dialogMode, setDialogMode] = useState<"create" | "edit">("create");
-  const [selected, setSelected] = useState<WorkerMetric | null>(null);
-  const [form, setForm] = useState(emptyForm);
-  const [submitting, setSubmitting] = useState(false);
-  const [dialogMessage, setDialogMessage] = useState<string | null>(null);
-
-  const [deleteTarget, setDeleteTarget] = useState<WorkerMetric | null>(null);
-  const [deleteSubmitting, setDeleteSubmitting] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/pool-subaccounts")
@@ -193,126 +161,6 @@ export default function PoolWorkerMetricsPage() {
     fetchRows();
   };
 
-  const openCreateDialog = () => {
-    setDialogMode("create");
-    setSelected(null);
-    setForm(emptyForm);
-    setDialogMessage(null);
-    setDialogOpen(true);
-  };
-
-  const openEditDialog = (row: WorkerMetric) => {
-    setDialogMode("edit");
-    setSelected(row);
-    setForm({
-      poolSubaccountId: row.poolSubaccountId,
-      workerName: row.workerName,
-      externalWorkerId: row.externalWorkerId ?? "",
-      date: row.date.slice(0, 10),
-      hashrate: row.hashrate ?? "",
-      efficiency: row.efficiency ?? "",
-      staleShares: row.staleShares?.toString() ?? "",
-      rejectedShares: row.rejectedShares?.toString() ?? "",
-      estRevenue: row.estRevenue ?? "",
-      firmware: row.firmware ?? "",
-      status: row.status ?? "",
-    });
-    setDialogMessage(null);
-    setDialogOpen(true);
-  };
-
-  const closeDialog = () => {
-    setDialogOpen(false);
-    setSelected(null);
-    setForm(emptyForm);
-    setDialogMessage(null);
-  };
-
-  const handleSubmit = async () => {
-    if (dialogMode === "create" && !form.poolSubaccountId) {
-      setDialogMessage("Subaccount is required");
-      return;
-    }
-    if (!form.workerName.trim()) {
-      setDialogMessage("Worker name is required");
-      return;
-    }
-    if (!form.date) {
-      setDialogMessage("Date is required");
-      return;
-    }
-
-    setSubmitting(true);
-    setDialogMessage(null);
-
-    try {
-      const isEdit = dialogMode === "edit" && selected;
-      const response = await fetch(
-        isEdit
-          ? `/api/pool-worker-metrics/${selected!.id}`
-          : "/api/pool-worker-metrics",
-        {
-          method: isEdit ? "PUT" : "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            ...(isEdit ? {} : { poolSubaccountId: form.poolSubaccountId }),
-            workerName: form.workerName.trim(),
-            externalWorkerId: form.externalWorkerId.trim(),
-            date: form.date,
-            hashrate: form.hashrate,
-            efficiency: form.efficiency,
-            staleShares: form.staleShares,
-            rejectedShares: form.rejectedShares,
-            estRevenue: form.estRevenue,
-            firmware: form.firmware.trim(),
-            status: form.status.trim(),
-          }),
-        },
-      );
-
-      const data: ApiResponse<WorkerMetric> = await response.json();
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || "Failed to save worker metric");
-      }
-
-      await fetchRows();
-      closeDialog();
-    } catch (err) {
-      setDialogMessage(
-        err instanceof Error ? err.message : "Unknown error occurred",
-      );
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleDelete = async () => {
-    if (!deleteTarget) return;
-    setDeleteSubmitting(true);
-    setDeleteError(null);
-
-    try {
-      const response = await fetch(
-        `/api/pool-worker-metrics/${deleteTarget.id}`,
-        {
-          method: "DELETE",
-        },
-      );
-      const data: ApiResponse = await response.json();
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || "Failed to delete worker metric");
-      }
-      await fetchRows();
-      setDeleteTarget(null);
-    } catch (err) {
-      setDeleteError(
-        err instanceof Error ? err.message : "Unknown error occurred",
-      );
-    } finally {
-      setDeleteSubmitting(false);
-    }
-  };
-
   return (
     <Container maxWidth="xl" sx={{ py: 4 }}>
       <Stack
@@ -328,23 +176,15 @@ export default function PoolWorkerMetricsPage() {
           <Typography variant="body2" color="text.secondary">
             Per-worker daily hashrate, efficiency and estimated revenue history.
             Stale/rejected shares, firmware and status are only available from
-            the day the sync cron started (no historical endpoint exists).
+            the day the sync cron started (no historical endpoint exists). View
+            only.
           </Typography>
         </Box>
-        <Stack direction="row" spacing={1}>
-          <Tooltip title="Refresh">
-            <IconButton onClick={handleRefresh} disabled={isRefreshing}>
-              <RefreshIcon />
-            </IconButton>
-          </Tooltip>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={openCreateDialog}
-          >
-            Add Metric
-          </Button>
-        </Stack>
+        <Tooltip title="Refresh">
+          <IconButton onClick={handleRefresh} disabled={isRefreshing}>
+            <RefreshIcon />
+          </IconButton>
+        </Tooltip>
       </Stack>
 
       {error && (
@@ -424,19 +264,18 @@ export default function PoolWorkerMetricsPage() {
                 <TableCell align="right">Est. Revenue</TableCell>
                 <TableCell>Firmware</TableCell>
                 <TableCell>Status</TableCell>
-                <TableCell align="right">Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={11} align="center" sx={{ py: 6 }}>
+                  <TableCell colSpan={10} align="center" sx={{ py: 6 }}>
                     <CircularProgress size={28} />
                   </TableCell>
                 </TableRow>
               ) : rows.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={11} align="center" sx={{ py: 4 }}>
+                  <TableCell colSpan={10} align="center" sx={{ py: 4 }}>
                     <Typography color="text.secondary">
                       No worker metrics found.
                     </Typography>
@@ -476,31 +315,6 @@ export default function PoolWorkerMetricsPage() {
                     </TableCell>
                     <TableCell>{row.firmware || "—"}</TableCell>
                     <TableCell>{row.status || "—"}</TableCell>
-                    <TableCell align="right">
-                      <Tooltip title="Edit">
-                        <IconButton
-                          size="small"
-                          onClick={() => openEditDialog(row)}
-                        >
-                          <EditIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Delete is disabled for now">
-                        <span>
-                          <IconButton
-                            size="small"
-                            color="error"
-                            disabled
-                            onClick={() => {
-                              setDeleteError(null);
-                              setDeleteTarget(row);
-                            }}
-                          >
-                            <DeleteIcon fontSize="small" />
-                          </IconButton>
-                        </span>
-                      </Tooltip>
-                    </TableCell>
                   </TableRow>
                 ))
               )}
@@ -537,166 +351,6 @@ export default function PoolWorkerMetricsPage() {
           </Stack>
         </Stack>
       </Paper>
-
-      {/* Create/Edit Dialog */}
-      <Dialog open={dialogOpen} onClose={closeDialog} fullWidth maxWidth="sm">
-        <DialogTitle>
-          {dialogMode === "create" ? "Add Worker Metric" : "Edit Worker Metric"}
-        </DialogTitle>
-        <DialogContent>
-          <Stack spacing={2} sx={{ mt: 1 }}>
-            {dialogMessage && <Alert severity="error">{dialogMessage}</Alert>}
-
-            <FormControl fullWidth disabled={dialogMode === "edit"}>
-              <InputLabel>Subaccount</InputLabel>
-              <Select
-                label="Subaccount"
-                value={form.poolSubaccountId}
-                onChange={(e) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    poolSubaccountId: e.target.value,
-                  }))
-                }
-              >
-                {subaccounts.map((s) => (
-                  <MenuItem key={s.id} value={s.id}>
-                    {s.pool.name} / {s.subaccountName}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-
-            <TextField
-              label="Worker Name"
-              value={form.workerName}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, workerName: e.target.value }))
-              }
-              fullWidth
-              disabled={dialogMode === "edit"}
-            />
-            <TextField
-              label="External Worker ID"
-              value={form.externalWorkerId}
-              onChange={(e) =>
-                setForm((prev) => ({
-                  ...prev,
-                  externalWorkerId: e.target.value,
-                }))
-              }
-              fullWidth
-              helperText="Luxor's worker id, if known"
-            />
-            <TextField
-              label="Date"
-              type="date"
-              InputLabelProps={{ shrink: true }}
-              value={form.date}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, date: e.target.value }))
-              }
-              fullWidth
-              disabled={dialogMode === "edit"}
-            />
-            <TextField
-              label="Hashrate (H/s)"
-              value={form.hashrate}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, hashrate: e.target.value }))
-              }
-              fullWidth
-            />
-            <TextField
-              label="Efficiency (%)"
-              value={form.efficiency}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, efficiency: e.target.value }))
-              }
-              fullWidth
-            />
-            <TextField
-              label="Stale Shares"
-              value={form.staleShares}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, staleShares: e.target.value }))
-              }
-              fullWidth
-            />
-            <TextField
-              label="Rejected Shares"
-              value={form.rejectedShares}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, rejectedShares: e.target.value }))
-              }
-              fullWidth
-            />
-            <TextField
-              label="Estimated Revenue (BTC)"
-              value={form.estRevenue}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, estRevenue: e.target.value }))
-              }
-              fullWidth
-            />
-            <TextField
-              label="Firmware"
-              value={form.firmware}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, firmware: e.target.value }))
-              }
-              fullWidth
-            />
-            <TextField
-              label="Status"
-              value={form.status}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, status: e.target.value }))
-              }
-              fullWidth
-              helperText="e.g. ACTIVE / INACTIVE"
-            />
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={closeDialog}>Cancel</Button>
-          <Button
-            variant="contained"
-            onClick={handleSubmit}
-            disabled={submitting}
-          >
-            {submitting ? "Saving..." : "Save"}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Delete Confirmation */}
-      <Dialog open={!!deleteTarget} onClose={() => setDeleteTarget(null)}>
-        <DialogTitle>Delete Worker Metric</DialogTitle>
-        <DialogContent>
-          {deleteError && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {deleteError}
-            </Alert>
-          )}
-          <Typography>
-            Delete the metric for <strong>{deleteTarget?.workerName}</strong> on{" "}
-            <strong>{deleteTarget?.date.slice(0, 10)}</strong>? This cannot be
-            undone.
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteTarget(null)}>Cancel</Button>
-          <Button
-            color="error"
-            variant="contained"
-            onClick={handleDelete}
-            disabled={deleteSubmitting}
-          >
-            {deleteSubmitting ? "Deleting..." : "Delete"}
-          </Button>
-        </DialogActions>
-      </Dialog>
     </Container>
   );
 }

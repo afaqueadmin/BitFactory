@@ -1,10 +1,9 @@
 /**
  * Pool Subaccount [id] API Routes
  *
- * GET/PUT/DELETE for a single PoolSubaccount. Admin/Super Admin only.
- * Deleting cascades to its daily snapshots, worker metrics and transactions
- * (enforced at the DB level via onDelete: Cascade) - the UI must confirm
- * this explicitly before calling DELETE.
+ * Read-only GET for a single PoolSubaccount. Admin/Super Admin only.
+ * No write endpoints are exposed here - rows are populated by the pool sync
+ * cron.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -84,101 +83,6 @@ export async function GET(
         : 500;
     return NextResponse.json<ApiResponse>(
       { success: false, error: msg },
-      { status },
-    );
-  }
-}
-
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  try {
-    await verifyAdminAuth(request);
-    const { id } = await params;
-    const body = await request.json();
-    const {
-      subaccountName,
-      userId,
-      poolAuthId,
-      currency,
-      walletAddress,
-      paymentFrequency,
-      dayOfWeek,
-    } = body;
-
-    if (
-      !subaccountName ||
-      typeof subaccountName !== "string" ||
-      !subaccountName.trim()
-    ) {
-      return NextResponse.json<ApiResponse>(
-        { success: false, error: "subaccountName is required" },
-        { status: 400 },
-      );
-    }
-
-    const subaccount = await prisma.poolSubaccount.update({
-      where: { id },
-      data: {
-        subaccountName: subaccountName.trim(),
-        userId: userId || null,
-        poolAuthId: poolAuthId || null,
-        currency: currency?.trim() || "BTC",
-        walletAddress: walletAddress?.trim() || null,
-        paymentFrequency: paymentFrequency?.trim() || null,
-        dayOfWeek: dayOfWeek?.trim() || null,
-      },
-      select: poolSubaccountSelect,
-    });
-
-    return NextResponse.json<ApiResponse>({ success: true, data: subaccount });
-  } catch (error) {
-    const msg =
-      error instanceof Error ? error.message : "Internal server error";
-    const status = msg.includes("Forbidden")
-      ? 403
-      : msg.includes("Unauthorized")
-        ? 401
-        : msg.includes("Record to update not found")
-          ? 404
-          : 500;
-    return NextResponse.json<ApiResponse>(
-      {
-        success: false,
-        error: status === 404 ? "Pool subaccount not found" : msg,
-      },
-      { status },
-    );
-  }
-}
-
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  try {
-    await verifyAdminAuth(request);
-    const { id } = await params;
-
-    await prisma.poolSubaccount.delete({ where: { id } });
-
-    return NextResponse.json<ApiResponse>({ success: true });
-  } catch (error) {
-    const msg =
-      error instanceof Error ? error.message : "Internal server error";
-    const status = msg.includes("Forbidden")
-      ? 403
-      : msg.includes("Unauthorized")
-        ? 401
-        : msg.includes("Record to delete does not exist")
-          ? 404
-          : 500;
-    return NextResponse.json<ApiResponse>(
-      {
-        success: false,
-        error: status === 404 ? "Pool subaccount not found" : msg,
-      },
       { status },
     );
   }

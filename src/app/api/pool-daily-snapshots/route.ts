@@ -1,13 +1,13 @@
 /**
  * Pool Subaccount Daily Snapshots API Routes
  *
- * CRUD for PoolSubaccountDailySnapshot. Admin/Super Admin only.
+ * Read-only API for PoolSubaccountDailySnapshot. Admin/Super Admin only.
  * List is paginated and filterable (poolSubaccountId, date range) since this
- * table holds thousands of rows.
+ * table holds thousands of rows. Rows are populated by the pool sync cron;
+ * no write endpoints are exposed here.
  *
  * Endpoints:
  * - GET /api/pool-daily-snapshots?page=&pageSize=&poolSubaccountId=&startDate=&endDate=
- * - POST /api/pool-daily-snapshots - create a snapshot row
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -124,98 +124,6 @@ export async function GET(request: NextRequest) {
         : 500;
     return NextResponse.json<ApiResponse>(
       { success: false, error: msg },
-      { status },
-    );
-  }
-}
-
-export async function POST(request: NextRequest) {
-  try {
-    await verifyAdminAuth(request);
-
-    const body = await request.json();
-    const {
-      poolSubaccountId,
-      date,
-      hashrate,
-      efficiency,
-      uptime,
-      activeWorkers,
-      hashprice,
-      balance,
-      miningRevenue,
-      referralRevenue,
-      otherRevenue,
-    } = body;
-
-    if (!poolSubaccountId || typeof poolSubaccountId !== "string") {
-      return NextResponse.json<ApiResponse>(
-        { success: false, error: "poolSubaccountId is required" },
-        { status: 400 },
-      );
-    }
-    if (!date) {
-      return NextResponse.json<ApiResponse>(
-        { success: false, error: "date is required" },
-        { status: 400 },
-      );
-    }
-
-    const mining = miningRevenue ? Number(miningRevenue) : 0;
-    const referral = referralRevenue ? Number(referralRevenue) : 0;
-    const other = otherRevenue ? Number(otherRevenue) : 0;
-
-    const snapshot = await prisma.poolSubaccountDailySnapshot.create({
-      data: {
-        poolSubaccountId,
-        date: new Date(`${date}T00:00:00.000Z`),
-        hashrate:
-          hashrate === "" || hashrate === undefined ? null : Number(hashrate),
-        efficiency:
-          efficiency === "" || efficiency === undefined
-            ? null
-            : Number(efficiency),
-        uptime: uptime === "" || uptime === undefined ? null : Number(uptime),
-        activeWorkers:
-          activeWorkers === "" || activeWorkers === undefined
-            ? null
-            : Number(activeWorkers),
-        hashprice:
-          hashprice === "" || hashprice === undefined
-            ? null
-            : Number(hashprice),
-        balance:
-          balance === "" || balance === undefined ? null : Number(balance),
-        miningRevenue: mining,
-        referralRevenue: referral,
-        otherRevenue: other,
-        totalRevenue: mining + referral + other,
-      },
-      select: snapshotSelect,
-    });
-
-    return NextResponse.json<ApiResponse>(
-      { success: true, data: snapshot },
-      { status: 201 },
-    );
-  } catch (error) {
-    const msg =
-      error instanceof Error ? error.message : "Internal server error";
-    const status = msg.includes("Forbidden")
-      ? 403
-      : msg.includes("Unauthorized")
-        ? 401
-        : msg.includes("Unique constraint")
-          ? 409
-          : 500;
-    return NextResponse.json<ApiResponse>(
-      {
-        success: false,
-        error:
-          status === 409
-            ? "A snapshot already exists for this subaccount and date"
-            : msg,
-      },
       { status },
     );
   }

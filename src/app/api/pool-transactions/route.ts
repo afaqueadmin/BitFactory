@@ -1,17 +1,15 @@
 /**
  * Pool Transactions API Routes
  *
- * CRUD for PoolTransaction - the raw ledger of pool-side transactions
- * (payouts, fees, revenue accrual). Admin/Super Admin only.
+ * Read-only API for PoolTransaction - the raw ledger of pool-side
+ * transactions (payouts, fees, revenue accrual). Admin/Super Admin only.
  * List is paginated and filterable (poolSubaccountId, category,
  * transactionType, date range) since this table holds thousands of rows.
- *
- * poolId is always derived from the selected poolSubaccount server-side,
- * never taken from the client, so the two can't drift out of sync.
+ * Rows are populated by the pool sync cron; no write endpoints are exposed
+ * here.
  *
  * Endpoints:
  * - GET /api/pool-transactions?page=&pageSize=&poolSubaccountId=&category=&transactionType=&startDate=&endDate=
- * - POST /api/pool-transactions - create a transaction row
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -130,108 +128,6 @@ export async function GET(request: NextRequest) {
         : 500;
     return NextResponse.json<ApiResponse>(
       { success: false, error: msg },
-      { status },
-    );
-  }
-}
-
-export async function POST(request: NextRequest) {
-  try {
-    await verifyAdminAuth(request);
-
-    const body = await request.json();
-    const {
-      poolSubaccountId,
-      externalTransactionId,
-      transactionType,
-      category,
-      amount,
-      usdEquivalent,
-      addressName,
-      status,
-      occurredAt,
-    } = body;
-
-    if (!poolSubaccountId || typeof poolSubaccountId !== "string") {
-      return NextResponse.json<ApiResponse>(
-        { success: false, error: "poolSubaccountId is required" },
-        { status: 400 },
-      );
-    }
-    if (!transactionType || !["credit", "debit"].includes(transactionType)) {
-      return NextResponse.json<ApiResponse>(
-        {
-          success: false,
-          error: "transactionType must be 'credit' or 'debit'",
-        },
-        { status: 400 },
-      );
-    }
-    if (amount === undefined || amount === "" || Number.isNaN(Number(amount))) {
-      return NextResponse.json<ApiResponse>(
-        { success: false, error: "amount is required and must be numeric" },
-        { status: 400 },
-      );
-    }
-    if (!occurredAt) {
-      return NextResponse.json<ApiResponse>(
-        { success: false, error: "occurredAt is required" },
-        { status: 400 },
-      );
-    }
-
-    const poolSubaccount = await prisma.poolSubaccount.findUnique({
-      where: { id: poolSubaccountId },
-      select: { poolId: true },
-    });
-    if (!poolSubaccount) {
-      return NextResponse.json<ApiResponse>(
-        { success: false, error: "poolSubaccountId does not exist" },
-        { status: 400 },
-      );
-    }
-
-    const transaction = await prisma.poolTransaction.create({
-      data: {
-        poolId: poolSubaccount.poolId,
-        poolSubaccountId,
-        externalTransactionId: externalTransactionId?.trim() || null,
-        transactionType,
-        category: category?.trim() || null,
-        amount: Number(amount),
-        usdEquivalent:
-          usdEquivalent === "" || usdEquivalent === undefined
-            ? null
-            : Number(usdEquivalent),
-        addressName: addressName?.trim() || null,
-        status: status?.trim() || null,
-        occurredAt: new Date(occurredAt),
-      },
-      select: transactionSelect,
-    });
-
-    return NextResponse.json<ApiResponse>(
-      { success: true, data: transaction },
-      { status: 201 },
-    );
-  } catch (error) {
-    const msg =
-      error instanceof Error ? error.message : "Internal server error";
-    const status = msg.includes("Forbidden")
-      ? 403
-      : msg.includes("Unauthorized")
-        ? 401
-        : msg.includes("Unique constraint")
-          ? 409
-          : 500;
-    return NextResponse.json<ApiResponse>(
-      {
-        success: false,
-        error:
-          status === 409
-            ? "A matching transaction already exists (duplicate)"
-            : msg,
-      },
       { status },
     );
   }

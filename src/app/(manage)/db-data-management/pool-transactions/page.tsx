@@ -2,9 +2,11 @@
  * src/app/(manage)/pool-transactions/page.tsx
  * Pool Transactions Management Page
  *
- * Admin CRUD for PoolTransaction - the raw pool-side ledger (payouts, fees,
- * revenue accrual). Paginated and filterable (subaccount, category, type,
- * date range) since this table holds thousands of rows.
+ * Read-only admin view of PoolTransaction - the raw pool-side ledger
+ * (payouts, fees, revenue accrual). Paginated and filterable (subaccount,
+ * category, type, date range) since this table holds thousands of rows.
+ * Data is populated by the pool sync cron; this page has no
+ * add/edit/delete controls.
  */
 
 "use client";
@@ -14,7 +16,6 @@ import {
   Box,
   Container,
   Typography,
-  Button,
   Stack,
   Alert,
   CircularProgress,
@@ -25,10 +26,6 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
   TextField,
   IconButton,
   Tooltip,
@@ -39,9 +36,6 @@ import {
   Chip,
 } from "@mui/material";
 import {
-  Add as AddIcon,
-  Edit as EditIcon,
-  Delete as DeleteIcon,
   Refresh as RefreshIcon,
   NavigateBefore,
   NavigateNext,
@@ -84,18 +78,6 @@ interface ApiResponse<T = unknown> {
   error?: string;
 }
 
-const emptyForm = {
-  poolSubaccountId: "",
-  externalTransactionId: "",
-  transactionType: "credit",
-  category: "",
-  amount: "",
-  usdEquivalent: "",
-  addressName: "",
-  status: "",
-  occurredAt: "",
-};
-
 const fmt = (v: string | null, digits = 8) =>
   v === null
     ? "—"
@@ -120,19 +102,6 @@ export default function PoolTransactionsPage() {
     totalCount: 0,
     totalPages: 1,
   });
-
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [dialogMode, setDialogMode] = useState<"create" | "edit">("create");
-  const [selected, setSelected] = useState<PoolTransaction | null>(null);
-  const [form, setForm] = useState(emptyForm);
-  const [submitting, setSubmitting] = useState(false);
-  const [dialogMessage, setDialogMessage] = useState<string | null>(null);
-
-  const [deleteTarget, setDeleteTarget] = useState<PoolTransaction | null>(
-    null,
-  );
-  const [deleteSubmitting, setDeleteSubmitting] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/pool-subaccounts")
@@ -189,122 +158,6 @@ export default function PoolTransactionsPage() {
     fetchRows();
   };
 
-  const openCreateDialog = () => {
-    setDialogMode("create");
-    setSelected(null);
-    setForm(emptyForm);
-    setDialogMessage(null);
-    setDialogOpen(true);
-  };
-
-  const openEditDialog = (row: PoolTransaction) => {
-    setDialogMode("edit");
-    setSelected(row);
-    setForm({
-      poolSubaccountId: row.poolSubaccountId,
-      externalTransactionId: row.externalTransactionId ?? "",
-      transactionType: row.transactionType,
-      category: row.category ?? "",
-      amount: row.amount,
-      usdEquivalent: row.usdEquivalent ?? "",
-      addressName: row.addressName ?? "",
-      status: row.status ?? "",
-      occurredAt: row.occurredAt.slice(0, 16),
-    });
-    setDialogMessage(null);
-    setDialogOpen(true);
-  };
-
-  const closeDialog = () => {
-    setDialogOpen(false);
-    setSelected(null);
-    setForm(emptyForm);
-    setDialogMessage(null);
-  };
-
-  const handleSubmit = async () => {
-    if (dialogMode === "create" && !form.poolSubaccountId) {
-      setDialogMessage("Subaccount is required");
-      return;
-    }
-    if (!form.amount) {
-      setDialogMessage("Amount is required");
-      return;
-    }
-    if (!form.occurredAt) {
-      setDialogMessage("Occurred at is required");
-      return;
-    }
-
-    setSubmitting(true);
-    setDialogMessage(null);
-
-    try {
-      const isEdit = dialogMode === "edit" && selected;
-      const response = await fetch(
-        isEdit
-          ? `/api/pool-transactions/${selected!.id}`
-          : "/api/pool-transactions",
-        {
-          method: isEdit ? "PUT" : "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            ...(isEdit ? {} : { poolSubaccountId: form.poolSubaccountId }),
-            externalTransactionId: form.externalTransactionId.trim(),
-            transactionType: form.transactionType,
-            category: form.category.trim(),
-            amount: form.amount,
-            usdEquivalent: form.usdEquivalent,
-            addressName: form.addressName.trim(),
-            status: form.status.trim(),
-            occurredAt: new Date(form.occurredAt).toISOString(),
-          }),
-        },
-      );
-
-      const data: ApiResponse<PoolTransaction> = await response.json();
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || "Failed to save transaction");
-      }
-
-      await fetchRows();
-      closeDialog();
-    } catch (err) {
-      setDialogMessage(
-        err instanceof Error ? err.message : "Unknown error occurred",
-      );
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleDelete = async () => {
-    if (!deleteTarget) return;
-    setDeleteSubmitting(true);
-    setDeleteError(null);
-
-    try {
-      const response = await fetch(
-        `/api/pool-transactions/${deleteTarget.id}`,
-        {
-          method: "DELETE",
-        },
-      );
-      const data: ApiResponse = await response.json();
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || "Failed to delete transaction");
-      }
-      await fetchRows();
-      setDeleteTarget(null);
-    } catch (err) {
-      setDeleteError(
-        err instanceof Error ? err.message : "Unknown error occurred",
-      );
-    } finally {
-      setDeleteSubmitting(false);
-    }
-  };
-
   return (
     <Container maxWidth="xl" sx={{ py: 4 }}>
       <Stack
@@ -320,23 +173,14 @@ export default function PoolTransactionsPage() {
           <Typography variant="body2" color="text.secondary">
             Raw pool-side transaction ledger (revenue accrual, payouts, fees).
             Deduped on (subaccount, date, category, type, amount) since Luxor
-            leaves the transaction ID blank on most accrual rows.
+            leaves the transaction ID blank on most accrual rows. View only.
           </Typography>
         </Box>
-        <Stack direction="row" spacing={1}>
-          <Tooltip title="Refresh">
-            <IconButton onClick={handleRefresh} disabled={isRefreshing}>
-              <RefreshIcon />
-            </IconButton>
-          </Tooltip>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={openCreateDialog}
-          >
-            Add Transaction
-          </Button>
-        </Stack>
+        <Tooltip title="Refresh">
+          <IconButton onClick={handleRefresh} disabled={isRefreshing}>
+            <RefreshIcon />
+          </IconButton>
+        </Tooltip>
       </Stack>
 
       {error && (
@@ -438,19 +282,18 @@ export default function PoolTransactionsPage() {
                 <TableCell>Address</TableCell>
                 <TableCell>Status</TableCell>
                 <TableCell>External Tx ID</TableCell>
-                <TableCell align="right">Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={10} align="center" sx={{ py: 6 }}>
+                  <TableCell colSpan={9} align="center" sx={{ py: 6 }}>
                     <CircularProgress size={28} />
                   </TableCell>
                 </TableRow>
               ) : rows.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={10} align="center" sx={{ py: 4 }}>
+                  <TableCell colSpan={9} align="center" sx={{ py: 4 }}>
                     <Typography color="text.secondary">
                       No transactions found.
                     </Typography>
@@ -500,31 +343,6 @@ export default function PoolTransactionsPage() {
                         ? `${row.externalTransactionId.slice(0, 10)}...`
                         : "—"}
                     </TableCell>
-                    <TableCell align="right">
-                      <Tooltip title="Edit">
-                        <IconButton
-                          size="small"
-                          onClick={() => openEditDialog(row)}
-                        >
-                          <EditIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Delete is disabled for now">
-                        <span>
-                          <IconButton
-                            size="small"
-                            color="error"
-                            disabled
-                            onClick={() => {
-                              setDeleteError(null);
-                              setDeleteTarget(row);
-                            }}
-                          >
-                            <DeleteIcon fontSize="small" />
-                          </IconButton>
-                        </span>
-                      </Tooltip>
-                    </TableCell>
                   </TableRow>
                 ))
               )}
@@ -561,160 +379,6 @@ export default function PoolTransactionsPage() {
           </Stack>
         </Stack>
       </Paper>
-
-      {/* Create/Edit Dialog */}
-      <Dialog open={dialogOpen} onClose={closeDialog} fullWidth maxWidth="sm">
-        <DialogTitle>
-          {dialogMode === "create" ? "Add Transaction" : "Edit Transaction"}
-        </DialogTitle>
-        <DialogContent>
-          <Stack spacing={2} sx={{ mt: 1 }}>
-            {dialogMessage && <Alert severity="error">{dialogMessage}</Alert>}
-
-            <FormControl fullWidth disabled={dialogMode === "edit"}>
-              <InputLabel>Subaccount</InputLabel>
-              <Select
-                label="Subaccount"
-                value={form.poolSubaccountId}
-                onChange={(e) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    poolSubaccountId: e.target.value,
-                  }))
-                }
-              >
-                {subaccounts.map((s) => (
-                  <MenuItem key={s.id} value={s.id}>
-                    {s.pool.name} / {s.subaccountName}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-
-            <TextField
-              label="Occurred At"
-              type="datetime-local"
-              InputLabelProps={{ shrink: true }}
-              value={form.occurredAt}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, occurredAt: e.target.value }))
-              }
-              fullWidth
-            />
-
-            <FormControl fullWidth>
-              <InputLabel>Type</InputLabel>
-              <Select
-                label="Type"
-                value={form.transactionType}
-                onChange={(e) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    transactionType: e.target.value,
-                  }))
-                }
-              >
-                <MenuItem value="credit">credit</MenuItem>
-                <MenuItem value="debit">debit</MenuItem>
-              </Select>
-            </FormControl>
-
-            <TextField
-              label="Category"
-              value={form.category}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, category: e.target.value }))
-              }
-              fullWidth
-              helperText="e.g. Miner Revenue, LuxOS Rebate, Transaction Fee, Payment, Payout"
-            />
-            <TextField
-              label="Amount (BTC)"
-              value={form.amount}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, amount: e.target.value }))
-              }
-              fullWidth
-            />
-            <TextField
-              label="USD Equivalent"
-              value={form.usdEquivalent}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, usdEquivalent: e.target.value }))
-              }
-              fullWidth
-            />
-            <TextField
-              label="Address / Wallet"
-              value={form.addressName}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, addressName: e.target.value }))
-              }
-              fullWidth
-            />
-            <TextField
-              label="Status"
-              value={form.status}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, status: e.target.value }))
-              }
-              fullWidth
-              helperText="Braiins payout status: queued / confirmed / failed"
-            />
-            <TextField
-              label="External Transaction ID"
-              value={form.externalTransactionId}
-              onChange={(e) =>
-                setForm((prev) => ({
-                  ...prev,
-                  externalTransactionId: e.target.value,
-                }))
-              }
-              fullWidth
-              helperText="Blank for most Luxor accrual rows - only Payment/Transaction Fee/payouts have one"
-            />
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={closeDialog}>Cancel</Button>
-          <Button
-            variant="contained"
-            onClick={handleSubmit}
-            disabled={submitting}
-          >
-            {submitting ? "Saving..." : "Save"}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Delete Confirmation */}
-      <Dialog open={!!deleteTarget} onClose={() => setDeleteTarget(null)}>
-        <DialogTitle>Delete Transaction</DialogTitle>
-        <DialogContent>
-          {deleteError && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {deleteError}
-            </Alert>
-          )}
-          <Typography>
-            Delete this <strong>{deleteTarget?.category}</strong> transaction of{" "}
-            <strong>{deleteTarget?.amount} BTC</strong> for{" "}
-            <strong>{deleteTarget?.poolSubaccount.subaccountName}</strong>? This
-            cannot be undone.
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteTarget(null)}>Cancel</Button>
-          <Button
-            color="error"
-            variant="contained"
-            onClick={handleDelete}
-            disabled={deleteSubmitting}
-          >
-            {deleteSubmitting ? "Deleting..." : "Delete"}
-          </Button>
-        </DialogActions>
-      </Dialog>
     </Container>
   );
 }

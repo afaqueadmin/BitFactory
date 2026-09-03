@@ -1,17 +1,13 @@
 /**
  * Pool Subaccounts API Routes
  *
- * CRUD for PoolSubaccount - the dimension row identifying a pool account
- * (Luxor subaccount / Braiins account), optionally linked to a User and a
- * PoolAuth credential. Admin/Super Admin only.
- *
- * Pool/User/PoolAuth are referenced read-only here (for display + dropdown
- * selection) - their own CRUD lives at /api/pools, /api/user, /api/pool-auth
- * respectively and is not duplicated here.
+ * Read-only API for PoolSubaccount - the dimension row identifying a pool
+ * account (Luxor subaccount / Braiins account), optionally linked to a User
+ * and a PoolAuth credential. Admin/Super Admin only. Rows are populated by
+ * the pool sync cron; no write endpoints are exposed here.
  *
  * Endpoints:
  * - GET /api/pool-subaccounts - list all pool subaccounts
- * - POST /api/pool-subaccounts - create a pool subaccount
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -70,90 +66,6 @@ export async function GET(request: NextRequest) {
     });
 
     return NextResponse.json<ApiResponse>({ success: true, data: subaccounts });
-  } catch (error) {
-    const msg =
-      error instanceof Error ? error.message : "Internal server error";
-    const status = msg.includes("Forbidden")
-      ? 403
-      : msg.includes("Unauthorized")
-        ? 401
-        : 500;
-    return NextResponse.json<ApiResponse>(
-      { success: false, error: msg },
-      { status },
-    );
-  }
-}
-
-export async function POST(request: NextRequest) {
-  try {
-    await verifyAdminAuth(request);
-
-    const body = await request.json();
-    const {
-      poolId,
-      subaccountName,
-      userId,
-      poolAuthId,
-      currency,
-      walletAddress,
-      paymentFrequency,
-      dayOfWeek,
-    } = body;
-
-    if (!poolId || typeof poolId !== "string") {
-      return NextResponse.json<ApiResponse>(
-        { success: false, error: "poolId is required" },
-        { status: 400 },
-      );
-    }
-    if (
-      !subaccountName ||
-      typeof subaccountName !== "string" ||
-      !subaccountName.trim()
-    ) {
-      return NextResponse.json<ApiResponse>(
-        { success: false, error: "subaccountName is required" },
-        { status: 400 },
-      );
-    }
-
-    const existing = await prisma.poolSubaccount.findUnique({
-      where: {
-        poolId_subaccountName: {
-          poolId,
-          subaccountName: subaccountName.trim(),
-        },
-      },
-    });
-    if (existing) {
-      return NextResponse.json<ApiResponse>(
-        {
-          success: false,
-          error: "A subaccount with this name already exists for this pool",
-        },
-        { status: 409 },
-      );
-    }
-
-    const subaccount = await prisma.poolSubaccount.create({
-      data: {
-        poolId,
-        subaccountName: subaccountName.trim(),
-        userId: userId || null,
-        poolAuthId: poolAuthId || null,
-        currency: currency?.trim() || "BTC",
-        walletAddress: walletAddress?.trim() || null,
-        paymentFrequency: paymentFrequency?.trim() || null,
-        dayOfWeek: dayOfWeek?.trim() || null,
-      },
-      select: poolSubaccountSelect,
-    });
-
-    return NextResponse.json<ApiResponse>(
-      { success: true, data: subaccount },
-      { status: 201 },
-    );
   } catch (error) {
     const msg =
       error instanceof Error ? error.message : "Internal server error";

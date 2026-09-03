@@ -1,13 +1,13 @@
 /**
  * Pool Worker Daily Metrics API Routes
  *
- * CRUD for PoolWorkerDailyMetric. Admin/Super Admin only.
+ * Read-only API for PoolWorkerDailyMetric. Admin/Super Admin only.
  * List is paginated and filterable (poolSubaccountId, workerName, date range)
- * since this table holds tens of thousands of rows.
+ * since this table holds tens of thousands of rows. Rows are populated by
+ * the pool sync cron; no write endpoints are exposed here.
  *
  * Endpoints:
  * - GET /api/pool-worker-metrics?page=&pageSize=&poolSubaccountId=&workerName=&startDate=&endDate=
- * - POST /api/pool-worker-metrics - create a worker-day metric row
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -125,101 +125,6 @@ export async function GET(request: NextRequest) {
         : 500;
     return NextResponse.json<ApiResponse>(
       { success: false, error: msg },
-      { status },
-    );
-  }
-}
-
-export async function POST(request: NextRequest) {
-  try {
-    await verifyAdminAuth(request);
-
-    const body = await request.json();
-    const {
-      poolSubaccountId,
-      workerName,
-      externalWorkerId,
-      date,
-      hashrate,
-      efficiency,
-      staleShares,
-      rejectedShares,
-      estRevenue,
-      firmware,
-      status,
-    } = body;
-
-    if (!poolSubaccountId || typeof poolSubaccountId !== "string") {
-      return NextResponse.json<ApiResponse>(
-        { success: false, error: "poolSubaccountId is required" },
-        { status: 400 },
-      );
-    }
-    if (!workerName || typeof workerName !== "string" || !workerName.trim()) {
-      return NextResponse.json<ApiResponse>(
-        { success: false, error: "workerName is required" },
-        { status: 400 },
-      );
-    }
-    if (!date) {
-      return NextResponse.json<ApiResponse>(
-        { success: false, error: "date is required" },
-        { status: 400 },
-      );
-    }
-
-    const metric = await prisma.poolWorkerDailyMetric.create({
-      data: {
-        poolSubaccountId,
-        workerName: workerName.trim(),
-        externalWorkerId: externalWorkerId?.trim() || null,
-        date: new Date(`${date}T00:00:00.000Z`),
-        hashrate:
-          hashrate === "" || hashrate === undefined ? null : Number(hashrate),
-        efficiency:
-          efficiency === "" || efficiency === undefined
-            ? null
-            : Number(efficiency),
-        staleShares:
-          staleShares === "" || staleShares === undefined
-            ? null
-            : Number(staleShares),
-        rejectedShares:
-          rejectedShares === "" || rejectedShares === undefined
-            ? null
-            : Number(rejectedShares),
-        estRevenue:
-          estRevenue === "" || estRevenue === undefined
-            ? null
-            : Number(estRevenue),
-        firmware: firmware?.trim() || null,
-        status: status?.trim() || null,
-      },
-      select: workerMetricSelect,
-    });
-
-    return NextResponse.json<ApiResponse>(
-      { success: true, data: metric },
-      { status: 201 },
-    );
-  } catch (error) {
-    const msg =
-      error instanceof Error ? error.message : "Internal server error";
-    const status = msg.includes("Forbidden")
-      ? 403
-      : msg.includes("Unauthorized")
-        ? 401
-        : msg.includes("Unique constraint")
-          ? 409
-          : 500;
-    return NextResponse.json<ApiResponse>(
-      {
-        success: false,
-        error:
-          status === 409
-            ? "A metric row already exists for this worker and date"
-            : msg,
-      },
       { status },
     );
   }

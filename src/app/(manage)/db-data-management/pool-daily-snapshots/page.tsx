@@ -2,8 +2,10 @@
  * src/app/(manage)/pool-daily-snapshots/page.tsx
  * Pool Daily Snapshots Management Page
  *
- * Admin CRUD for PoolSubaccountDailySnapshot - paginated and filterable
- * (subaccount, date range) since this table holds thousands of rows.
+ * Read-only admin view of PoolSubaccountDailySnapshot - paginated and
+ * filterable (subaccount, date range) since this table holds thousands of
+ * rows. Data is populated by the pool sync cron; this page has no
+ * add/edit/delete controls.
  */
 
 "use client";
@@ -13,7 +15,6 @@ import {
   Box,
   Container,
   Typography,
-  Button,
   Stack,
   Alert,
   CircularProgress,
@@ -24,10 +25,6 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
   TextField,
   IconButton,
   Tooltip,
@@ -38,9 +35,6 @@ import {
   Chip,
 } from "@mui/material";
 import {
-  Add as AddIcon,
-  Edit as EditIcon,
-  Delete as DeleteIcon,
   Refresh as RefreshIcon,
   NavigateBefore,
   NavigateNext,
@@ -85,20 +79,6 @@ interface ApiResponse<T = unknown> {
   error?: string;
 }
 
-const emptyForm = {
-  poolSubaccountId: "",
-  date: "",
-  hashrate: "",
-  efficiency: "",
-  uptime: "",
-  activeWorkers: "",
-  hashprice: "",
-  balance: "",
-  miningRevenue: "",
-  referralRevenue: "",
-  otherRevenue: "",
-};
-
 const fmt = (v: string | null, digits = 4) =>
   v === null
     ? "—"
@@ -127,17 +107,6 @@ export default function PoolDailySnapshotsPage() {
     totalCount: 0,
     totalPages: 1,
   });
-
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [dialogMode, setDialogMode] = useState<"create" | "edit">("create");
-  const [selected, setSelected] = useState<Snapshot | null>(null);
-  const [form, setForm] = useState(emptyForm);
-  const [submitting, setSubmitting] = useState(false);
-  const [dialogMessage, setDialogMessage] = useState<string | null>(null);
-
-  const [deleteTarget, setDeleteTarget] = useState<Snapshot | null>(null);
-  const [deleteSubmitting, setDeleteSubmitting] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/pool-subaccounts")
@@ -185,122 +154,6 @@ export default function PoolDailySnapshotsPage() {
     fetchRows();
   };
 
-  const openCreateDialog = () => {
-    setDialogMode("create");
-    setSelected(null);
-    setForm(emptyForm);
-    setDialogMessage(null);
-    setDialogOpen(true);
-  };
-
-  const openEditDialog = (row: Snapshot) => {
-    setDialogMode("edit");
-    setSelected(row);
-    setForm({
-      poolSubaccountId: row.poolSubaccountId,
-      date: row.date.slice(0, 10),
-      hashrate: row.hashrate ?? "",
-      efficiency: row.efficiency ?? "",
-      uptime: row.uptime ?? "",
-      activeWorkers: row.activeWorkers?.toString() ?? "",
-      hashprice: row.hashprice ?? "",
-      balance: row.balance ?? "",
-      miningRevenue: row.miningRevenue,
-      referralRevenue: row.referralRevenue,
-      otherRevenue: row.otherRevenue,
-    });
-    setDialogMessage(null);
-    setDialogOpen(true);
-  };
-
-  const closeDialog = () => {
-    setDialogOpen(false);
-    setSelected(null);
-    setForm(emptyForm);
-    setDialogMessage(null);
-  };
-
-  const handleSubmit = async () => {
-    if (dialogMode === "create" && !form.poolSubaccountId) {
-      setDialogMessage("Subaccount is required");
-      return;
-    }
-    if (!form.date) {
-      setDialogMessage("Date is required");
-      return;
-    }
-
-    setSubmitting(true);
-    setDialogMessage(null);
-
-    try {
-      const isEdit = dialogMode === "edit" && selected;
-      const response = await fetch(
-        isEdit
-          ? `/api/pool-daily-snapshots/${selected!.id}`
-          : "/api/pool-daily-snapshots",
-        {
-          method: isEdit ? "PUT" : "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            ...(isEdit ? {} : { poolSubaccountId: form.poolSubaccountId }),
-            date: form.date,
-            hashrate: form.hashrate,
-            efficiency: form.efficiency,
-            uptime: form.uptime,
-            activeWorkers: form.activeWorkers,
-            hashprice: form.hashprice,
-            balance: form.balance,
-            miningRevenue: form.miningRevenue,
-            referralRevenue: form.referralRevenue,
-            otherRevenue: form.otherRevenue,
-          }),
-        },
-      );
-
-      const data: ApiResponse<Snapshot> = await response.json();
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || "Failed to save snapshot");
-      }
-
-      await fetchRows();
-      closeDialog();
-    } catch (err) {
-      setDialogMessage(
-        err instanceof Error ? err.message : "Unknown error occurred",
-      );
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleDelete = async () => {
-    if (!deleteTarget) return;
-    setDeleteSubmitting(true);
-    setDeleteError(null);
-
-    try {
-      const response = await fetch(
-        `/api/pool-daily-snapshots/${deleteTarget.id}`,
-        {
-          method: "DELETE",
-        },
-      );
-      const data: ApiResponse = await response.json();
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || "Failed to delete snapshot");
-      }
-      await fetchRows();
-      setDeleteTarget(null);
-    } catch (err) {
-      setDeleteError(
-        err instanceof Error ? err.message : "Unknown error occurred",
-      );
-    } finally {
-      setDeleteSubmitting(false);
-    }
-  };
-
   return (
     <Container maxWidth="xl" sx={{ py: 4 }}>
       <Stack
@@ -315,23 +168,14 @@ export default function PoolDailySnapshotsPage() {
           </Typography>
           <Typography variant="body2" color="text.secondary">
             Per-subaccount daily hashrate, efficiency, uptime and revenue
-            history.
+            history. View only.
           </Typography>
         </Box>
-        <Stack direction="row" spacing={1}>
-          <Tooltip title="Refresh">
-            <IconButton onClick={handleRefresh} disabled={isRefreshing}>
-              <RefreshIcon />
-            </IconButton>
-          </Tooltip>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={openCreateDialog}
-          >
-            Add Snapshot
-          </Button>
-        </Stack>
+        <Tooltip title="Refresh">
+          <IconButton onClick={handleRefresh} disabled={isRefreshing}>
+            <RefreshIcon />
+          </IconButton>
+        </Tooltip>
       </Stack>
 
       {error && (
@@ -404,19 +248,18 @@ export default function PoolDailySnapshotsPage() {
                 <TableCell align="right">Referral Rev</TableCell>
                 <TableCell align="right">Other Rev</TableCell>
                 <TableCell align="right">Total Rev</TableCell>
-                <TableCell align="right">Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={13} align="center" sx={{ py: 6 }}>
+                  <TableCell colSpan={12} align="center" sx={{ py: 6 }}>
                     <CircularProgress size={28} />
                   </TableCell>
                 </TableRow>
               ) : rows.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={13} align="center" sx={{ py: 4 }}>
+                  <TableCell colSpan={12} align="center" sx={{ py: 4 }}>
                     <Typography color="text.secondary">
                       No snapshots found.
                     </Typography>
@@ -462,31 +305,6 @@ export default function PoolDailySnapshotsPage() {
                     <TableCell align="right" sx={{ fontWeight: 600 }}>
                       {fmt(row.totalRevenue, 8)}
                     </TableCell>
-                    <TableCell align="right">
-                      <Tooltip title="Edit">
-                        <IconButton
-                          size="small"
-                          onClick={() => openEditDialog(row)}
-                        >
-                          <EditIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Delete is disabled for now">
-                        <span>
-                          <IconButton
-                            size="small"
-                            color="error"
-                            disabled
-                            onClick={() => {
-                              setDeleteError(null);
-                              setDeleteTarget(row);
-                            }}
-                          >
-                            <DeleteIcon fontSize="small" />
-                          </IconButton>
-                        </span>
-                      </Tooltip>
-                    </TableCell>
                   </TableRow>
                 ))
               )}
@@ -523,166 +341,6 @@ export default function PoolDailySnapshotsPage() {
           </Stack>
         </Stack>
       </Paper>
-
-      {/* Create/Edit Dialog */}
-      <Dialog open={dialogOpen} onClose={closeDialog} fullWidth maxWidth="sm">
-        <DialogTitle>
-          {dialogMode === "create" ? "Add Snapshot" : "Edit Snapshot"}
-        </DialogTitle>
-        <DialogContent>
-          <Stack spacing={2} sx={{ mt: 1 }}>
-            {dialogMessage && <Alert severity="error">{dialogMessage}</Alert>}
-
-            <FormControl fullWidth disabled={dialogMode === "edit"}>
-              <InputLabel>Subaccount</InputLabel>
-              <Select
-                label="Subaccount"
-                value={form.poolSubaccountId}
-                onChange={(e) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    poolSubaccountId: e.target.value,
-                  }))
-                }
-              >
-                {subaccounts.map((s) => (
-                  <MenuItem key={s.id} value={s.id}>
-                    {s.pool.name} / {s.subaccountName}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-
-            <TextField
-              label="Date"
-              type="date"
-              InputLabelProps={{ shrink: true }}
-              value={form.date}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, date: e.target.value }))
-              }
-              fullWidth
-              disabled={dialogMode === "edit"}
-            />
-
-            <TextField
-              label="Hashrate (H/s)"
-              value={form.hashrate}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, hashrate: e.target.value }))
-              }
-              fullWidth
-            />
-            <TextField
-              label="Efficiency (%)"
-              value={form.efficiency}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, efficiency: e.target.value }))
-              }
-              fullWidth
-            />
-            <TextField
-              label="Uptime (%)"
-              value={form.uptime}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, uptime: e.target.value }))
-              }
-              fullWidth
-            />
-            <TextField
-              label="Active Workers"
-              value={form.activeWorkers}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, activeWorkers: e.target.value }))
-              }
-              fullWidth
-            />
-            <TextField
-              label="Hashprice (BTC/PH/s/day)"
-              value={form.hashprice}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, hashprice: e.target.value }))
-              }
-              fullWidth
-            />
-            <TextField
-              label="Balance (BTC)"
-              value={form.balance}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, balance: e.target.value }))
-              }
-              fullWidth
-            />
-            <TextField
-              label="Mining Revenue (BTC)"
-              value={form.miningRevenue}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, miningRevenue: e.target.value }))
-              }
-              fullWidth
-            />
-            <TextField
-              label="Referral Revenue (BTC)"
-              value={form.referralRevenue}
-              onChange={(e) =>
-                setForm((prev) => ({
-                  ...prev,
-                  referralRevenue: e.target.value,
-                }))
-              }
-              fullWidth
-            />
-            <TextField
-              label="Other Revenue (BTC)"
-              value={form.otherRevenue}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, otherRevenue: e.target.value }))
-              }
-              fullWidth
-              helperText="Total revenue is computed automatically as mining + referral + other"
-            />
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={closeDialog}>Cancel</Button>
-          <Button
-            variant="contained"
-            onClick={handleSubmit}
-            disabled={submitting}
-          >
-            {submitting ? "Saving..." : "Save"}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Delete Confirmation */}
-      <Dialog open={!!deleteTarget} onClose={() => setDeleteTarget(null)}>
-        <DialogTitle>Delete Snapshot</DialogTitle>
-        <DialogContent>
-          {deleteError && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {deleteError}
-            </Alert>
-          )}
-          <Typography>
-            Delete the snapshot for{" "}
-            <strong>{deleteTarget?.poolSubaccount.subaccountName}</strong> on{" "}
-            <strong>{deleteTarget?.date.slice(0, 10)}</strong>? This cannot be
-            undone.
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteTarget(null)}>Cancel</Button>
-          <Button
-            color="error"
-            variant="contained"
-            onClick={handleDelete}
-            disabled={deleteSubmitting}
-          >
-            {deleteSubmitting ? "Deleting..." : "Delete"}
-          </Button>
-        </DialogActions>
-      </Dialog>
     </Container>
   );
 }
