@@ -20,7 +20,15 @@
  * (Braiins has no historical per-worker endpoint at all, only a live one that
  * no cron currently captures - a separate gap, out of scope here). Only
  * status "AUTO" miners are evaluated - DEPLOYMENT_IN_PROGRESS and
- * UNDER_MAINTENANCE miners are expected to not be hashing normally.
+ * UNDER_MAINTENANCE miners are expected to not be hashing normally, so a
+ * missing/low reading there is never alerted on.
+ *
+ * A day with no PoolWorkerDailyMetric row at all is treated as "no data yet"
+ * and skipped - not a false positive. But a row that DOES exist with
+ * hashrate=null and status="INACTIVE" (written by cron_pool_worker_status's
+ * live capture) is a real signal for an AUTO miner: the pool saw it and
+ * reported no hashing, so it counts as 0 TH/s for the comparison rather than
+ * being skipped as missing data.
  */
 
 import { prisma } from "@/lib/prisma";
@@ -109,9 +117,13 @@ export async function checkHashrateBenchmarks(
         where: {
           poolSubaccountId: { in: relevantSubaccountIds },
           date: day,
-          hashrate: { not: null },
         },
-        select: { poolSubaccountId: true, workerName: true, hashrate: true },
+        select: {
+          poolSubaccountId: true,
+          workerName: true,
+          hashrate: true,
+          status: true,
+        },
       }),
       prisma.minerHashrateAlertLog.findMany({
         where: { date: day, minerId: { in: miners.map((m) => m.id) } },
@@ -138,9 +150,18 @@ export async function checkHashrateBenchmarks(
       if (!subaccountId) continue; // owner has no Luxor subaccount - can't evaluate
 
       const metric = metricByKey.get(`${subaccountId}::${miner.name}`);
-      if (!metric || metric.hashrate == null) continue; // no data for this day (yet) - not a false positive
+      if (!metric) continue; // no row at all for this day (yet) - not a false positive
 
-      const actualThs = Number(metric.hashrate) / HS_PER_THS;
+      let actualThs: number;
+      if (metric.hashrate != null) {
+        actualThs = Number(metric.hashrate) / HS_PER_THS;
+      } else if (metric.status === "INACTIVE") {
+        // AUTO miner, pool confirmed no hashing that day - real 0, not missing data.
+        actualThs = 0;
+      } else {
+        continue; // null hashrate with no INACTIVE confirmation - ambiguous, wait for real data
+      }
+
       const benchmarkThs = Number(
         miner.hashrateBenchmarks[0].benchmarkHashrate,
       );

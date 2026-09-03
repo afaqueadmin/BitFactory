@@ -56,7 +56,14 @@ const SUBACCOUNT_1 = { id: "sub-1", userId: "user-1" };
 
 /** Wires up findMany mocks to return per-day fixtures keyed by date. */
 function setupDayFixtures(
-  metricsByDay: Record<string, Array<{ workerName: string; hashrate: number }>>,
+  metricsByDay: Record<
+    string,
+    Array<{
+      workerName: string;
+      hashrate: number | null;
+      status?: string | null;
+    }>
+  >,
   alertedMinerIdsByDay: Record<string, string[]> = {},
 ) {
   workerMetricFindManyMock.mockImplementation(
@@ -66,6 +73,7 @@ function setupDayFixtures(
         poolSubaccountId: SUBACCOUNT_1.id,
         workerName: r.workerName,
         hashrate: r.hashrate,
+        status: r.status ?? null,
       }));
     },
   );
@@ -150,6 +158,48 @@ describe("checkHashrateBenchmarks", () => {
   it("does not flag a miner with no metric row for a day yet (not a false positive)", async () => {
     minerFindManyMock.mockResolvedValue([MINER_A]);
     setupDayFixtures({}); // no PoolWorkerDailyMetric rows at all - cron hasn't written it yet
+
+    const result = await checkHashrateBenchmarks(NOW);
+
+    expect(result.alerts).toEqual([]);
+    expect(alertLogCreateManyMock).not.toHaveBeenCalled();
+  });
+
+  it("treats a null hashrate with status INACTIVE as a real 0 and alerts", async () => {
+    minerFindManyMock.mockResolvedValue([MINER_A]);
+    setupDayFixtures({
+      [dateKey(DAY_0)]: [
+        { workerName: "WorkerA", hashrate: null, status: "INACTIVE" },
+      ],
+    });
+
+    const result = await checkHashrateBenchmarks(NOW);
+
+    expect(result.alerts).toHaveLength(1);
+    expect(result.alerts[0]).toMatchObject({
+      minerId: "miner-a",
+      actualHashrateThs: 0,
+      benchmarkHashrateThs: 200,
+      shortfallPct: 100,
+    });
+    expect(alertLogCreateManyMock).toHaveBeenCalledTimes(1);
+    expect(alertLogCreateManyMock.mock.calls[0][0].data).toEqual([
+      {
+        minerId: "miner-a",
+        date: DAY_0,
+        actualHashrate: 0,
+        benchmarkHashrate: 200,
+      },
+    ]);
+  });
+
+  it("does not flag a null hashrate with no INACTIVE confirmation (still treated as missing data)", async () => {
+    minerFindManyMock.mockResolvedValue([MINER_A]);
+    setupDayFixtures({
+      [dateKey(DAY_0)]: [
+        { workerName: "WorkerA", hashrate: null, status: null },
+      ],
+    });
 
     const result = await checkHashrateBenchmarks(NOW);
 
