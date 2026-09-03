@@ -170,7 +170,7 @@ export async function checkHashrateBenchmarks(
       alerts.push({
         minerId: miner.id,
         minerName: miner.name,
-        customerName: miner.user.companyName || miner.user.name || null,
+        customerName: miner.user.name || miner.user.companyName || null,
         date: formatUtcDateKey(day),
         actualHashrateThs: actualThs,
         benchmarkHashrateThs: benchmarkThs,

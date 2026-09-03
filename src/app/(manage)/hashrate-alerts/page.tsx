@@ -120,11 +120,11 @@ export default function HashrateAlertsPage() {
                   <TableRow key={alert.id}>
                     <TableCell>{alert.miner.name}</TableCell>
                     <TableCell>
-                      {alert.miner.user.companyName ||
-                        alert.miner.user.name ||
+                      {alert.miner.user.name ||
+                        alert.miner.user.companyName ||
                         "—"}
                     </TableCell>
-                    <TableCell>{alert.date}</TableCell>
+                    <TableCell>{alert.date.slice(0, 10)}</TableCell>
                     <TableCell align="right">
                       {Number(alert.actualHashrate).toFixed(2)} TH/s
                     </TableCell>
