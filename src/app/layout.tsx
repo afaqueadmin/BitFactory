@@ -53,17 +53,21 @@ export const metadata: Metadata = {
   },
 };
 
+import { cookies } from "next/headers";
 import { AppRouterCacheProvider } from "@mui/material-nextjs/v15-appRouter";
 import { AuthProvider } from "@/lib/contexts/auth-context";
 import { ThemeProvider } from "./theme-provider";
 import { Providers } from "@/providers/QueryProvider";
 import PwaRegister from "@/components/pwa/PwaRegister";
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const cookieStore = await cookies();
+  const initialDarkMode = cookieStore.get("darkMode")?.value === "true";
+
   return (
     <html lang="en">
       <body
@@ -72,7 +76,7 @@ export default function RootLayout({
       >
         <AppRouterCacheProvider options={{ key: "mui" }}>
           <AuthProvider>
-            <ThemeProvider>
+            <ThemeProvider initialDarkMode={initialDarkMode}>
               <Providers>
                 <PwaRegister />
                 {children}
