@@ -22,3 +22,7 @@ export {
   useCreateWalletChangeRequest,
   useReviewWalletChangeRequest,
 } from "./useWalletChangeRequests";
+export {
+  useHashrateAlerts,
+  useAcknowledgeHashrateAlert,
+} from "./useHashrateAlerts";

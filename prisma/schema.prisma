@@ -71,6 +71,7 @@ model User {
   createdRepairNotes           MinerRepairNote[]            @relation("CreatedRepairNotes")
   createdMinerPoolHistory      MinerPoolHistory[]           @relation("MinerPoolHistoryCreatedBy")
   createdHashrateBenchmarks    MinerHashrateBenchmark[]     @relation("MinerHashrateBenchmarkCreatedBy")
+  acknowledgedHashrateAlerts   MinerHashrateAlertLog[]      @relation("MinerHashrateAlertAcknowledgedBy")
   addedGroupSubaccounts        GroupSubaccount[]            @relation("GroupSubaccountAddedBy")
   groupMemberships             GroupSubaccount[]            @relation("GroupSubaccountUser")
   customerRequestsSubmitted    FranchiseCustomerRequest[]   @relation("CustomerRequestsSubmitted")
@@ -644,17 +645,21 @@ model MinerHashrateBenchmark {
 }
 
 model MinerHashrateAlertLog {
-  id                String   @id @default(cuid())
+  id                String    @id @default(cuid())
   minerId           String
-  date              DateTime @db.Date
-  actualHashrate    Decimal  @db.Decimal(10, 2) // TH/s, converted from PoolWorkerDailyMetric.hashrate (H/s)
-  benchmarkHashrate Decimal  @db.Decimal(10, 2) // TH/s, the benchmark that was in effect when this alert fired
-  notifiedAt        DateTime @default(now())
+  date              DateTime  @db.Date
+  actualHashrate    Decimal   @db.Decimal(10, 2) // TH/s, converted from PoolWorkerDailyMetric.hashrate (H/s)
+  benchmarkHashrate Decimal   @db.Decimal(10, 2) // TH/s, the benchmark that was in effect when this alert fired
+  notifiedAt        DateTime  @default(now())
+  acknowledgedAt    DateTime?
+  acknowledgedById  String?
 
-  miner Miner @relation(fields: [minerId], references: [id], onDelete: Cascade)
+  miner          Miner @relation(fields: [minerId], references: [id], onDelete: Cascade)
+  acknowledgedBy User? @relation("MinerHashrateAlertAcknowledgedBy", fields: [acknowledgedById], references: [id])
 
   @@unique([minerId, date])
   @@index([minerId])
+  @@index([acknowledgedAt])
   @@map("miner_hashrate_alert_logs")
 }
 

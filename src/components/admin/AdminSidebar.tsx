@@ -44,11 +44,17 @@ import {
   SwapHoriz as PoolTransactionsIcon,
   SupportAgent as SupportIcon,
   AccountBalanceWallet as WalletRequestsIcon,
+  TrendingDown as HashrateAlertsIcon,
   Close as CloseIcon,
 } from "@mui/icons-material";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useUser, useTickets, useWalletChangeRequests } from "@/lib/hooks";
+import {
+  useUser,
+  useTickets,
+  useWalletChangeRequests,
+  useHashrateAlerts,
+} from "@/lib/hooks";
 import { useAdminNav } from "@/lib/contexts/admin-nav-context";
 
 interface SidebarItem {
@@ -98,6 +104,11 @@ const sidebarItems: SidebarItem[] = [
     title: "Wallet Requests",
     icon: <WalletRequestsIcon />,
     path: "/wallet-requests",
+  },
+  {
+    title: "Hashrate Alerts",
+    icon: <HashrateAlertsIcon />,
+    path: "/hashrate-alerts",
   },
   {
     title: "Customers",
@@ -299,6 +310,9 @@ export default function AdminSidebar() {
   const { requests: pendingWalletRequests } = useWalletChangeRequests({
     status: "PENDING",
   });
+  const { alerts: pendingHashrateAlerts } = useHashrateAlerts({
+    acknowledged: false,
+  });
 
   const visibleSidebarItems = sidebarItems
     .filter((item) => {
@@ -311,6 +325,9 @@ export default function AdminSidebar() {
       }
       if (item.title === "Wallet Requests") {
         return { ...item, badgeCount: pendingWalletRequests.length };
+      }
+      if (item.title === "Hashrate Alerts") {
+        return { ...item, badgeCount: pendingHashrateAlerts.length };
       }
       return item;
     });
