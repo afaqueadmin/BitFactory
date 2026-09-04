@@ -8,6 +8,7 @@ interface BulkEditRequest {
   updates: {
     spaceId?: string;
     rate_per_kwh?: number | string;
+    benchmarkHashrate?: number | string;
     status?: "AUTO" | "DEPLOYMENT_IN_PROGRESS" | "UNDER_MAINTENANCE";
     poolId?: string | null;
   };
@@ -50,8 +51,9 @@ export async function POST(
 ): Promise<NextResponse<ApiResponse>> {
   try {
     // Verify admin authorization
+    let userId: string;
     try {
-      await verifyAdminAuth(req);
+      ({ userId } = await verifyAdminAuth(req));
     } catch (authError) {
       const errorMsg =
         authError instanceof Error ? authError.message : "Authorization failed";
@@ -99,6 +101,20 @@ export async function POST(
           {
             success: false,
             error: "rate_per_kwh must be a positive number",
+          },
+          { status: 400 },
+        );
+      }
+    }
+
+    // Validate benchmarkHashrate if provided
+    if (updates.benchmarkHashrate !== undefined) {
+      const benchmark = Number(updates.benchmarkHashrate);
+      if (isNaN(benchmark) || benchmark <= 0) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "benchmarkHashrate must be a positive number",
           },
           { status: 400 },
         );
@@ -229,6 +245,36 @@ export async function POST(
       }
     }
 
+    // Handle benchmark hashrate history updates
+    if (updates.benchmarkHashrate !== undefined) {
+      const benchmarkDecimal = new Decimal(
+        Number(updates.benchmarkHashrate).toFixed(2),
+      );
+
+      for (const minerId of minerIds) {
+        // Get latest benchmark for this miner
+        const latestBenchmark = await prisma.minerHashrateBenchmark.findFirst({
+          where: { minerId },
+          orderBy: { createdAt: "desc" },
+          select: { benchmarkHashrate: true },
+        });
+
+        // Only create new history entry if benchmark differs
+        if (
+          !latestBenchmark ||
+          !latestBenchmark.benchmarkHashrate.equals(benchmarkDecimal)
+        ) {
+          await prisma.minerHashrateBenchmark.create({
+            data: {
+              minerId,
+              benchmarkHashrate: benchmarkDecimal,
+              createdById: userId,
+            },
+          });
+        }
+      }
+    }
+
     // Fetch updated miners
     const updatedMiners = await prisma.miner.findMany({
       where: { id: { in: minerIds } },
@@ -239,6 +285,11 @@ export async function POST(
           orderBy: { createdAt: "desc" },
           take: 1,
           select: { rate_per_kwh: true },
+        },
+        hashrateBenchmarks: {
+          orderBy: { createdAt: "desc" },
+          take: 1,
+          select: { benchmarkHashrate: true },
         },
       },
       orderBy: { createdAt: "desc" },
@@ -253,6 +304,9 @@ export async function POST(
       status: miner.status,
       rate_per_kwh: miner.rateHistory[0]?.rate_per_kwh
         ? Number(miner.rateHistory[0].rate_per_kwh)
+        : null,
+      benchmarkHashrate: miner.hashrateBenchmarks[0]?.benchmarkHashrate
+        ? Number(miner.hashrateBenchmarks[0].benchmarkHashrate)
         : null,
       createdAt: miner.createdAt,
     }));

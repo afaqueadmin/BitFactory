@@ -24,6 +24,7 @@ interface BulkEditModalProps {
   onSubmit: (updates: {
     spaceId?: string;
     rate_per_kwh?: number;
+    benchmarkHashrate?: number;
     status?: "AUTO" | "DEPLOYMENT_IN_PROGRESS" | "UNDER_MAINTENANCE";
     poolId?: string | null;
   }) => Promise<void>;
@@ -39,6 +40,7 @@ export function BulkEditModal({
 }: BulkEditModalProps) {
   const [spaceId, setSpaceId] = useState<string>("");
   const [rate, setRate] = useState<string>("");
+  const [benchmark, setBenchmark] = useState<string>("");
   const [poolId, setPoolId] = useState<string>("");
   const [status, setStatus] = useState<
     "AUTO" | "DEPLOYMENT_IN_PROGRESS" | "UNDER_MAINTENANCE" | ""
@@ -51,7 +53,7 @@ export function BulkEditModal({
     setError("");
 
     // Validate that at least one field is filled
-    if (!spaceId && !rate && !status && !poolId) {
+    if (!spaceId && !rate && !benchmark && !status && !poolId) {
       setError("Please select at least one field to update");
       return;
     }
@@ -65,12 +67,22 @@ export function BulkEditModal({
       }
     }
 
+    // Validate benchmark if provided
+    if (benchmark) {
+      const benchmarkNum = Number(benchmark);
+      if (isNaN(benchmarkNum) || benchmarkNum <= 0) {
+        setError("Benchmark must be a positive number");
+        return;
+      }
+    }
+
     try {
       setLoading(true);
       const updates: Record<string, unknown> = {};
 
       if (spaceId) updates.spaceId = spaceId;
       if (rate) updates.rate_per_kwh = Number(rate);
+      if (benchmark) updates.benchmarkHashrate = Number(benchmark);
       if (status) updates.status = status;
       if (poolId) updates.poolId = poolId;
 
@@ -79,6 +91,7 @@ export function BulkEditModal({
       // Reset form
       setSpaceId("");
       setRate("");
+      setBenchmark("");
       setStatus("");
       setPoolId("");
       onClose();
@@ -137,6 +150,27 @@ export function BulkEditModal({
             {rate && (
               <p className="mt-1 text-xs text-gray-500">
                 ${Number(rate).toFixed(6)}/kWh
+              </p>
+            )}
+          </div>
+
+          {/* Benchmark Field */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Benchmark TH/s (Optional)
+            </label>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="e.g., 200.00"
+              value={benchmark}
+              onChange={(e) => setBenchmark(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            {benchmark && (
+              <p className="mt-1 text-xs text-gray-500">
+                {Number(benchmark).toFixed(2)} TH/s
               </p>
             )}
           </div>
