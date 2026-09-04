@@ -485,11 +485,13 @@ export default function MachinePage() {
    * Get unique benchmark hashrates from miners (includes "No Benchmark" option)
    */
   const getUniqueBenchmarks = () => {
-    const hasNoBenchmark = miners.some((m) => !m.benchmarkHashrate);
+    const hasNoBenchmark = miners.some(
+      (m) => m.benchmarkHashrate === undefined || m.benchmarkHashrate === null,
+    );
 
     const benchmarks = new Set<number>();
     miners.forEach((m) => {
-      if (m.benchmarkHashrate) {
+      if (m.benchmarkHashrate !== undefined && m.benchmarkHashrate !== null) {
         benchmarks.add(Number(m.benchmarkHashrate));
       }
     });
@@ -563,12 +565,16 @@ export default function MachinePage() {
     // Filter by selected benchmark
     if (selectedBenchmarkFilter) {
       if (selectedBenchmarkFilter === "NO_BENCHMARK") {
-        filtered = filtered.filter((m) => !m.benchmarkHashrate);
+        filtered = filtered.filter(
+          (m) =>
+            m.benchmarkHashrate === undefined || m.benchmarkHashrate === null,
+        );
       } else {
         const targetBenchmark = parseFloat(selectedBenchmarkFilter);
         filtered = filtered.filter(
           (m) =>
-            m.benchmarkHashrate &&
+            m.benchmarkHashrate !== undefined &&
+            m.benchmarkHashrate !== null &&
             Math.abs(Number(m.benchmarkHashrate) - targetBenchmark) < 0.001,
         );
       }

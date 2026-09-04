@@ -541,14 +541,14 @@ export async function POST(
       benchmarkHashrate !== ""
     ) {
       benchmarkHashrateValue = Number(benchmarkHashrate);
-      if (isNaN(benchmarkHashrateValue) || benchmarkHashrateValue <= 0) {
+      if (isNaN(benchmarkHashrateValue) || benchmarkHashrateValue < 0) {
         console.error(
-          "[Miners API] POST: Invalid benchmarkHashrate - must be positive number",
+          "[Miners API] POST: Invalid benchmarkHashrate - must be zero or a positive number",
         );
         return NextResponse.json<ApiResponse>(
           {
             success: false,
-            error: "benchmarkHashrate must be a positive number",
+            error: "benchmarkHashrate must be zero or a positive number",
           },
           { status: 400 },
         );

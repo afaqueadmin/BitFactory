@@ -810,7 +810,8 @@ export default function MinersTable({
                     )}
                   </TableCell>
                   <TableCell align="right">
-                    {miner.benchmarkHashrate ? (
+                    {miner.benchmarkHashrate !== undefined &&
+                    miner.benchmarkHashrate !== null ? (
                       `${Number(miner.benchmarkHashrate).toFixed(2)} TH/s`
                     ) : (
                       <Typography variant="body2" color="text.secondary">

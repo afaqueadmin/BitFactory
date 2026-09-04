@@ -173,14 +173,14 @@ export async function PUT(
       benchmarkHashrate !== ""
     ) {
       const benchmarkValue = Number(benchmarkHashrate);
-      if (isNaN(benchmarkValue) || benchmarkValue <= 0) {
+      if (isNaN(benchmarkValue) || benchmarkValue < 0) {
         console.error(
-          "[Miners API] PUT: Invalid benchmarkHashrate - must be positive number",
+          "[Miners API] PUT: Invalid benchmarkHashrate - must be zero or a positive number",
         );
         return NextResponse.json<ApiResponse>(
           {
             success: false,
-            error: "benchmarkHashrate must be a positive number",
+            error: "benchmarkHashrate must be zero or a positive number",
           },
           { status: 400 },
         );

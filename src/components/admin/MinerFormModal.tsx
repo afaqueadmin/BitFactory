@@ -186,7 +186,7 @@ export default function MinerFormModal({
         poolId: miner.poolId || "",
         status: miner.status,
         rate_per_kwh: miner.rate_per_kwh || "",
-        benchmarkHashrate: miner.benchmarkHashrate || "",
+        benchmarkHashrate: miner.benchmarkHashrate ?? "",
         serialNumber: miner.serialNumber || "",
         macAddress: miner.macAddress || "",
       });
@@ -279,11 +279,11 @@ export default function MinerFormModal({
       }
     }
 
-    // Benchmark hashrate is optional; if provided, must be a positive number
+    // Benchmark hashrate is optional; if provided, must be zero or positive
     if (formData.benchmarkHashrate) {
       const benchmark = Number(formData.benchmarkHashrate);
-      if (isNaN(benchmark) || benchmark <= 0) {
-        setError("Benchmark hashrate must be a positive number");
+      if (isNaN(benchmark) || benchmark < 0) {
+        setError("Benchmark hashrate must be zero or a positive number");
         return false;
       }
     }
@@ -337,8 +337,9 @@ export default function MinerFormModal({
         body.rate_per_kwh = Number(formData.rate_per_kwh);
       }
 
-      // Include benchmarkHashrate if provided
-      if (formData.benchmarkHashrate) {
+      // Include benchmarkHashrate if provided (0 is a valid value, so check
+      // against "" rather than truthiness)
+      if (formData.benchmarkHashrate !== "") {
         body.benchmarkHashrate = Number(formData.benchmarkHashrate);
       }
 

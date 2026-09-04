@@ -110,11 +110,11 @@ export async function POST(
     // Validate benchmarkHashrate if provided
     if (updates.benchmarkHashrate !== undefined) {
       const benchmark = Number(updates.benchmarkHashrate);
-      if (isNaN(benchmark) || benchmark <= 0) {
+      if (isNaN(benchmark) || benchmark < 0) {
         return NextResponse.json(
           {
             success: false,
-            error: "benchmarkHashrate must be a positive number",
+            error: "benchmarkHashrate must be zero or a positive number",
           },
           { status: 400 },
         );

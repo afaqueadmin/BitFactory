@@ -70,8 +70,8 @@ export function BulkEditModal({
     // Validate benchmark if provided
     if (benchmark) {
       const benchmarkNum = Number(benchmark);
-      if (isNaN(benchmarkNum) || benchmarkNum <= 0) {
-        setError("Benchmark must be a positive number");
+      if (isNaN(benchmarkNum) || benchmarkNum < 0) {
+        setError("Benchmark must be zero or a positive number");
         return;
       }
     }
