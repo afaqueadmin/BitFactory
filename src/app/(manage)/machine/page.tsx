@@ -82,6 +82,7 @@ interface Miner {
   createdAt: string;
   updatedAt: string;
   rate_per_kwh?: number;
+  benchmarkHashrate?: number;
   serialNumber?: string | null;
   macAddress?: string | null;
   isDeleted: boolean;
@@ -140,6 +141,8 @@ export default function MachinePage() {
   const [selectedSpaceFilter, setSelectedSpaceFilter] = useState<string>("");
   const [selectedModelFilter, setSelectedModelFilter] = useState<string>("");
   const [selectedRateFilter, setSelectedRateFilter] = useState<string>("");
+  const [selectedBenchmarkFilter, setSelectedBenchmarkFilter] =
+    useState<string>("");
   const [selectedPoolFilter, setSelectedPoolFilter] = useState<string>("");
   const [selectedSegmentFilter, setSelectedSegmentFilter] =
     useState<string>("");
@@ -430,6 +433,13 @@ export default function MachinePage() {
   };
 
   /**
+   * Handle benchmark filter change
+   */
+  const handleBenchmarkFilterChange = (event: SelectChangeEvent) => {
+    setSelectedBenchmarkFilter(event.target.value);
+  };
+
+  /**
    * Handle pool filter change
    */
   const handlePoolFilterChange = (event: SelectChangeEvent) => {
@@ -469,6 +479,28 @@ export default function MachinePage() {
     return Array.from(rates)
       .sort((a, b) => a - b)
       .map((rate) => rate.toString());
+  };
+
+  /**
+   * Get unique benchmark hashrates from miners (includes "No Benchmark" option)
+   */
+  const getUniqueBenchmarks = () => {
+    const hasNoBenchmark = miners.some((m) => !m.benchmarkHashrate);
+
+    const benchmarks = new Set<number>();
+    miners.forEach((m) => {
+      if (m.benchmarkHashrate) {
+        benchmarks.add(Number(m.benchmarkHashrate));
+      }
+    });
+
+    const benchmarkOptions = Array.from(benchmarks)
+      .sort((a, b) => a - b)
+      .map((benchmark) => benchmark.toString());
+
+    return hasNoBenchmark
+      ? ["NO_BENCHMARK", ...benchmarkOptions]
+      : benchmarkOptions;
   };
 
   /**
@@ -526,6 +558,20 @@ export default function MachinePage() {
           m.rate_per_kwh &&
           Math.abs(Number(m.rate_per_kwh) - targetRate) < 0.0001,
       );
+    }
+
+    // Filter by selected benchmark
+    if (selectedBenchmarkFilter) {
+      if (selectedBenchmarkFilter === "NO_BENCHMARK") {
+        filtered = filtered.filter((m) => !m.benchmarkHashrate);
+      } else {
+        const targetBenchmark = parseFloat(selectedBenchmarkFilter);
+        filtered = filtered.filter(
+          (m) =>
+            m.benchmarkHashrate &&
+            Math.abs(Number(m.benchmarkHashrate) - targetBenchmark) < 0.001,
+        );
+      }
     }
 
     // Filter by selected pool
@@ -750,6 +796,30 @@ export default function MachinePage() {
                         ${parseFloat(rate).toFixed(3)}
                       </MenuItem>
                     ))}
+                  </Select>
+                </FormControl>
+
+                <FormControl sx={{ minWidth: 250 }}>
+                  <InputLabel>Filter by Benchmark</InputLabel>
+                  <Select
+                    value={selectedBenchmarkFilter}
+                    onChange={handleBenchmarkFilterChange}
+                    label="Filter by Benchmark"
+                  >
+                    <MenuItem value="">
+                      <em>All Benchmarks</em>
+                    </MenuItem>
+                    {getUniqueBenchmarks().map((benchmark) =>
+                      benchmark === "NO_BENCHMARK" ? (
+                        <MenuItem key={benchmark} value={benchmark}>
+                          No Benchmark
+                        </MenuItem>
+                      ) : (
+                        <MenuItem key={benchmark} value={benchmark}>
+                          {parseFloat(benchmark).toFixed(2)} TH/s
+                        </MenuItem>
+                      ),
+                    )}
                   </Select>
                 </FormControl>
 
