@@ -5,7 +5,6 @@ import {
   Box,
   Container,
   Typography,
-  Button,
   Stack,
   Alert,
   CircularProgress,
@@ -15,12 +14,8 @@ import {
   MenuItem,
   SelectChangeEvent,
 } from "@mui/material";
-import { Add as AddIcon } from "@mui/icons-material";
-import FranchiseMinerFormModal from "./FranchiseMinerFormModal";
 import MinersTable from "@/components/admin/MinersTable";
 import HashrateHistoryChart from "@/components/HashrateHistoryChart";
-import { BulkEditModal } from "@/components/admin/BulkEditModal";
-import { BulkDeleteModal } from "@/components/admin/BulkDeleteModal";
 
 interface Customer {
   id: string;
@@ -91,16 +86,11 @@ export default function FranchiseMinersContent() {
   const [pools, setPools] = useState<Pool[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [formOpen, setFormOpen] = useState(false);
-  const [selectedMiner, setSelectedMiner] = useState<Miner | null>(null);
-  const [tableError, setTableError] = useState<string | null>(null);
   const [selectedUserFilter, setSelectedUserFilter] = useState("");
   const [selectedSpaceFilter, setSelectedSpaceFilter] = useState("");
   const [selectedModelFilter, setSelectedModelFilter] = useState("");
   const [selectedRateFilter, setSelectedRateFilter] = useState("");
   const [selectedPoolFilter, setSelectedPoolFilter] = useState("");
-  const [showBulkEditModal, setShowBulkEditModal] = useState(false);
-  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
   const [showDeleted, setShowDeleted] = useState(false);
 
   const fetchData = async () => {
@@ -167,96 +157,6 @@ export default function FranchiseMinersContent() {
     fetchData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showDeleted]);
-
-  const handleCreate = () => {
-    setSelectedMiner(null);
-    setFormOpen(true);
-  };
-
-  const handleEdit = (miner: Miner) => {
-    setSelectedMiner(miner);
-    setFormOpen(true);
-  };
-
-  const handleFormClose = () => {
-    setFormOpen(false);
-    setSelectedMiner(null);
-  };
-
-  const handleFormSuccess = () => {
-    handleFormClose();
-    fetchData();
-  };
-
-  const handleDelete = async (minerId: string) => {
-    try {
-      setTableError(null);
-      const response = await fetch(`/api/franchise/miners/${minerId}`, {
-        method: "DELETE",
-      });
-      const data: ApiResponse = await response.json();
-      if (!response.ok) throw new Error(data.error || "Failed to delete miner");
-      await fetchData();
-    } catch (err) {
-      setTableError(
-        err instanceof Error
-          ? err.message
-          : "An error occurred while deleting the miner",
-      );
-    }
-  };
-
-  const handleBulkEdit = async (updates: Record<string, unknown>) => {
-    setTableError(null);
-    const filteredMinerIds = getSortedFilteredMiners().map((m) => m.id);
-    try {
-      const response = await fetch("/api/franchise/miners/bulk-edit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ minerIds: filteredMinerIds, updates }),
-      });
-      const data: ApiResponse = await response.json();
-      if (!response.ok) {
-        const errorMsg = data.error || "Failed to update miners";
-        setTableError(errorMsg);
-        throw new Error(errorMsg);
-      }
-      await fetchData();
-    } catch (err) {
-      setTableError(
-        err instanceof Error
-          ? err.message
-          : "An error occurred while updating miners",
-      );
-      throw err;
-    }
-  };
-
-  const handleBulkDelete = async () => {
-    setTableError(null);
-    const filteredMinerIds = getSortedFilteredMiners().map((m) => m.id);
-    try {
-      const response = await fetch("/api/franchise/miners/bulk-delete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ minerIds: filteredMinerIds }),
-      });
-      const data: ApiResponse = await response.json();
-      if (!response.ok) {
-        const errorMsg = data.error || "Failed to delete miners";
-        setTableError(errorMsg);
-        throw new Error(errorMsg);
-      }
-      await fetchData();
-    } catch (err) {
-      setTableError(
-        err instanceof Error
-          ? err.message
-          : "An error occurred while deleting miners",
-      );
-      throw err;
-    }
-  };
 
   const getUniqueModels = () => {
     const models = new Set<string>();
@@ -343,40 +243,9 @@ export default function FranchiseMinersContent() {
               All Miners
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-              Manage and monitor your customers&apos; mining machines
+              Monitor your customers&apos; mining machines. View only.
             </Typography>
           </Box>
-          <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>
-            <Button
-              variant="contained"
-              color="warning"
-              onClick={() => setShowBulkEditModal(true)}
-              disabled={
-                loading || formOpen || getSortedFilteredMiners().length === 0
-              }
-            >
-              Bulk Edit
-            </Button>
-            <Button
-              variant="contained"
-              color="error"
-              onClick={() => setShowBulkDeleteModal(true)}
-              disabled={
-                loading || formOpen || getSortedFilteredMiners().length === 0
-              }
-            >
-              Bulk Delete
-            </Button>
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={handleCreate}
-              disabled={loading || formOpen}
-              size="large"
-            >
-              Add Miner
-            </Button>
-          </Stack>
         </Stack>
 
         {error && (
@@ -608,49 +477,14 @@ export default function FranchiseMinersContent() {
 
             <MinersTable
               miners={getSortedFilteredMiners()}
-              onEdit={handleEdit}
-              onDelete={handleDelete}
               isLoading={loading}
-              error={tableError}
+              error={null}
               showDeleted={showDeleted}
               setShowDeleted={setShowDeleted}
+              readOnly
             />
           </>
         )}
-
-        <FranchiseMinerFormModal
-          open={formOpen}
-          onClose={handleFormClose}
-          onSuccess={handleFormSuccess}
-          miner={selectedMiner}
-          customers={customers}
-          spaces={spaces}
-          pools={pools}
-        />
-
-        <BulkEditModal
-          isOpen={showBulkEditModal}
-          onClose={() => setShowBulkEditModal(false)}
-          minerCount={getSortedFilteredMiners().length}
-          spaces={spaces}
-          pools={pools}
-          onSubmit={handleBulkEdit}
-        />
-
-        <BulkDeleteModal
-          isOpen={showBulkDeleteModal}
-          onClose={() => setShowBulkDeleteModal(false)}
-          minerCount={getSortedFilteredMiners().length}
-          minersPreview={getSortedFilteredMiners()
-            .slice(0, 10)
-            .map((m) => ({
-              id: m.id,
-              name: m.name,
-              hardwareName: m.hardware?.model,
-              spaceName: m.space?.name,
-            }))}
-          onSubmit={handleBulkDelete}
-        />
       </Container>
     </Box>
   );

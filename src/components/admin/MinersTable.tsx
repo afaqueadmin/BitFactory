@@ -153,12 +153,14 @@ interface Miner {
 
 interface MinersTableProps {
   miners: Miner[];
-  onEdit: (miner: Miner) => void;
-  onDelete: (minerId: string) => void;
+  onEdit?: (miner: Miner) => void;
+  onDelete?: (minerId: string) => void;
   isLoading?: boolean;
   error?: string | null;
   showDeleted: boolean;
   setShowDeleted: Dispatch<SetStateAction<boolean>>;
+  /** Hides Edit/Delete/Repair Notes actions, leaving history viewing only. */
+  readOnly?: boolean;
 }
 
 export default function MinersTable({
@@ -169,6 +171,7 @@ export default function MinersTable({
   error = null,
   showDeleted,
   setShowDeleted,
+  readOnly = false,
 }: MinersTableProps) {
   const [deleteConfirm, setDeleteConfirm] = React.useState<string | null>(null);
   const [deleting, setDeleting] = React.useState(false);
@@ -188,7 +191,7 @@ export default function MinersTable({
    * Handle delete confirmation
    */
   const handleDeleteConfirm = async () => {
-    if (!deleteConfirm) return;
+    if (!deleteConfirm || !onDelete) return;
 
     setDeleting(true);
     try {
@@ -241,7 +244,7 @@ export default function MinersTable({
    */
   const handleEdit = (miner: Miner) => {
     handleMenuClose();
-    onEdit(miner);
+    onEdit?.(miner);
   };
 
   /**
@@ -842,32 +845,38 @@ export default function MinersTable({
                       open={anchorEl !== null && selectedMinerId === miner.id}
                       onClose={handleMenuClose}
                     >
-                      <MenuItem onClick={() => handleEdit(miner)}>
-                        <EditIcon fontSize="small" sx={{ mr: 1 }} />
-                        Edit
-                      </MenuItem>
-                      <MenuItem
-                        onClick={() =>
-                          handleViewRepairNotes(miner.id, miner.name)
-                        }
-                      >
-                        <Typography fontSize="small">
-                          🛠️ Repair Notes
-                        </Typography>
-                      </MenuItem>
+                      {!readOnly && (
+                        <MenuItem onClick={() => handleEdit(miner)}>
+                          <EditIcon fontSize="small" sx={{ mr: 1 }} />
+                          Edit
+                        </MenuItem>
+                      )}
+                      {!readOnly && (
+                        <MenuItem
+                          onClick={() =>
+                            handleViewRepairNotes(miner.id, miner.name)
+                          }
+                        >
+                          <Typography fontSize="small">
+                            🛠️ Repair Notes
+                          </Typography>
+                        </MenuItem>
+                      )}
                       <MenuItem onClick={() => handleViewRateHistory(miner.id)}>
                         <Typography fontSize="small">
                           📈 See Miner History
                         </Typography>
                       </MenuItem>
-                      <MenuItem
-                        disabled={miner.isDeleted}
-                        onClick={() => handleDelete(miner.id)}
-                        sx={{ color: "error.main" }}
-                      >
-                        <DeleteIcon fontSize="small" sx={{ mr: 1 }} />
-                        Delete
-                      </MenuItem>
+                      {!readOnly && (
+                        <MenuItem
+                          disabled={miner.isDeleted}
+                          onClick={() => handleDelete(miner.id)}
+                          sx={{ color: "error.main" }}
+                        >
+                          <DeleteIcon fontSize="small" sx={{ mr: 1 }} />
+                          Delete
+                        </MenuItem>
+                      )}
                     </Menu>
                   </TableCell>
                 </TableRow>
