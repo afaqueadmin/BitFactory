@@ -595,18 +595,17 @@ export default function AdminSidebar() {
           display: { xs: "none", md: "block" },
           width: sideBarOpen || isHovered ? 280 : 72,
           flexShrink: 0,
+          height: "100%",
           borderRight: 1,
           borderColor: "divider",
           bgcolor: "background.paper",
-          overflow: "hidden",
+          overflowX: "hidden",
+          overflowY: "auto",
           transition: (theme) =>
             theme.transitions.create(["width"], {
               easing: theme.transitions.easing.sharp,
               duration: theme.transitions.duration.standard,
             }),
-          "&:hover": {
-            overflowY: "auto",
-          },
           "&::-webkit-scrollbar": {
             width: "4px",
           },
@@ -614,7 +613,7 @@ export default function AdminSidebar() {
             background: "transparent",
           },
           "&::-webkit-scrollbar-thumb": {
-            background: "rgba(0,0,0,0.2)",
+            background: "transparent",
             borderRadius: "2px",
           },
           "&:hover::-webkit-scrollbar-thumb": {
