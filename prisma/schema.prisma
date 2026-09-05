@@ -741,6 +741,11 @@ model Invoice {
   updatedBy              String?
   createdAt              DateTime              @default(now())
   updatedAt              DateTime              @updatedAt
+  btcpayInvoiceId        String?               @unique
+  btcpayStatus           BtcpayStatus?
+  btcpayCheckoutUrl      String?
+  btcpayCreatedAt        DateTime?
+  btcpaySettledAt        DateTime?
   notifications          InvoiceNotification[] @relation("invoiceNotifications")
   costPayments           CostPayment[]         @relation("invoiceCostPayments")
   tickets                SupportTicket[]
@@ -759,6 +764,7 @@ model Invoice {
   @@index([dueDate])
   @@index([createdAt])
   @@index([invoiceNumber])
+  @@index([btcpayInvoiceId])
   @@map("invoices")
 }
 
@@ -1079,6 +1085,14 @@ enum PaymentType {
   ELECTRICITY_CHARGES
   ADJUSTMENT
   HARDWARE_SALES
+}
+
+enum BtcpayStatus {
+  New
+  Processing
+  Settled
+  Expired
+  Invalid
 }
 
 enum InvoiceStatus {
