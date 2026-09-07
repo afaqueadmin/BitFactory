@@ -57,11 +57,18 @@ export default function TicketThreadView({
   const [message, setMessage] = useState("");
   const [isInternal, setIsInternal] = useState(false);
   const [replyError, setReplyError] = useState<string | null>(null);
+  const [statusError, setStatusError] = useState<string | null>(null);
 
+  // Priority + internal notes stay a "staff" concept (ADMIN/SUPER_ADMIN/
+  // FRANCHISEE). Status is narrower: FRANCHISEE can raise/reply but never
+  // manually changes status - only ADMIN/SUPER_ADMIN can, plus a CLIENT
+  // self-closing their own ticket (handled separately below).
   const isStaff =
     currentUserRole === "ADMIN" ||
     currentUserRole === "SUPER_ADMIN" ||
     currentUserRole === "FRANCHISEE";
+  const canManageStatus =
+    currentUserRole === "ADMIN" || currentUserRole === "SUPER_ADMIN";
 
   if (loading) {
     return (
@@ -93,7 +100,17 @@ export default function TicketThreadView({
   };
 
   const canClose = ticket.status !== "CLOSED";
-  const canReopenStatuses = isStaff ? TICKET_STATUSES : ["CLOSED"]; // CLIENT can only close their own ticket
+
+  const handleStatusChange = async (newStatus: string) => {
+    setStatusError(null);
+    try {
+      await updateStatus(newStatus);
+    } catch (err) {
+      setStatusError(
+        err instanceof Error ? err.message : "Failed to update status",
+      );
+    }
+  };
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
@@ -131,7 +148,7 @@ export default function TicketThreadView({
           </Stack>
         </Stack>
 
-        {isStaff && (
+        {(canManageStatus || isStaff) && (
           <Box
             sx={{
               mt: 2,
@@ -141,45 +158,54 @@ export default function TicketThreadView({
               flexWrap: "wrap",
             }}
           >
-            <TextField
-              select
-              size="small"
-              label="Status"
-              value={ticket.status}
-              onChange={(e) => updateStatus(e.target.value)}
-              disabled={updatingStatus}
-              sx={{ minWidth: 220 }}
-            >
-              {canReopenStatuses.map((s) => (
-                <MenuItem key={s} value={s}>
-                  {TICKET_STATUS_LABELS[s]}
-                </MenuItem>
-              ))}
-            </TextField>
-            <TextField
-              select
-              size="small"
-              label="Priority"
-              value={ticket.priority || "NORMAL"}
-              onChange={(e) => updatePriority(e.target.value)}
-              disabled={updatingPriority}
-              sx={{ minWidth: 160 }}
-            >
-              {TICKET_PRIORITIES.map((p) => (
-                <MenuItem key={p} value={p}>
-                  {TICKET_PRIORITY_LABELS[p]}
-                </MenuItem>
-              ))}
-            </TextField>
+            {canManageStatus && (
+              <TextField
+                select
+                size="small"
+                label="Status"
+                value={ticket.status}
+                onChange={(e) => handleStatusChange(e.target.value)}
+                disabled={updatingStatus}
+                sx={{ minWidth: 220 }}
+              >
+                {TICKET_STATUSES.map((s) => (
+                  <MenuItem key={s} value={s}>
+                    {TICKET_STATUS_LABELS[s]}
+                  </MenuItem>
+                ))}
+              </TextField>
+            )}
+            {isStaff && (
+              <TextField
+                select
+                size="small"
+                label="Priority"
+                value={ticket.priority || "NORMAL"}
+                onChange={(e) => updatePriority(e.target.value)}
+                disabled={updatingPriority}
+                sx={{ minWidth: 160 }}
+              >
+                {TICKET_PRIORITIES.map((p) => (
+                  <MenuItem key={p} value={p}>
+                    {TICKET_PRIORITY_LABELS[p]}
+                  </MenuItem>
+                ))}
+              </TextField>
+            )}
           </Box>
         )}
-        {!isStaff && canClose && (
+        {statusError && (
+          <Alert severity="error" sx={{ mt: 2 }}>
+            {statusError}
+          </Alert>
+        )}
+        {currentUserRole === "CLIENT" && canClose && (
           <Box sx={{ mt: 2 }}>
             <Button
               variant="outlined"
               size="small"
               disabled={updatingStatus}
-              onClick={() => updateStatus("CLOSED")}
+              onClick={() => handleStatusChange("CLOSED")}
             >
               Mark as resolved / close ticket
             </Button>

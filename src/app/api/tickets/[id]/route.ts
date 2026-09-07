@@ -8,19 +8,29 @@
  * flow in POST /api/tickets.
  *
  * PATCH: change status and/or priority (either or both, in one request).
- * CLIENT may only close their own ticket (self-service "I fixed it") and
- * can never touch priority; ADMIN/SUPER_ADMIN/FRANCHISEE (when it's their
- * franchise's ticket) may set any status and set priority.
+ * CLIENT may only close their own ticket (self-service "I fixed it").
+ * FRANCHISEE cannot change status at all (raise/reply only) or priority.
+ * ADMIN/SUPER_ADMIN may set any status and set priority.
+ *
+ * Resolving/closing a HARDWARE_MINER or POOL_HASHRATE ticket requires its
+ * linked miner (mandatory on these categories since creation - see
+ * POST /api/tickets) to be set to Miner.status "AUTO" - the admin-controlled
+ * deployment/maintenance flag, not the live pool ACTIVE/INACTIVE status.
+ * The idea: don't let a ticket about a broken machine get marked done while
+ * that machine is still flagged UNDER_MAINTENANCE/DEPLOYMENT_IN_PROGRESS.
+ * On a successful RESOLVED/CLOSED transition for these categories, a fresh
+ * live telemetry snapshot is attached the same way as at ticket creation.
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { AuditAction } from "@prisma/client";
+import { AuditAction, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
 import {
   assertCanAccessTicket,
   stripPriorityForClient,
 } from "@/lib/ticketScope";
+import { getLiveMinerTelemetry } from "@/lib/ticketTelemetry";
 
 const STATUSES = new Set([
   "OPEN",
@@ -130,7 +140,10 @@ export async function PATCH(
     }
 
     const { id } = await params;
-    const ticket = await prisma.supportTicket.findUnique({ where: { id } });
+    const ticket = await prisma.supportTicket.findUnique({
+      where: { id },
+      include: { miner: { select: { id: true, status: true } } },
+    });
     if (!ticket) {
       return NextResponse.json(
         { success: false, error: "Ticket not found" },
@@ -166,6 +179,15 @@ export async function PATCH(
       );
     }
 
+    // Franchisees can raise and reply to tickets, but never manually change
+    // status - that's a support/admin decision.
+    if (status !== undefined && auth.decoded.role === "FRANCHISEE") {
+      return NextResponse.json(
+        { success: false, error: "Franchisees cannot change ticket status" },
+        { status: 403 },
+      );
+    }
+
     if (
       status !== undefined &&
       auth.decoded.role === "CLIENT" &&
@@ -175,6 +197,36 @@ export async function PATCH(
         { success: false, error: "You can only close your own ticket" },
         { status: 403 },
       );
+    }
+
+    // A HARDWARE_MINER/POOL_HASHRATE ticket can't be resolved/closed while
+    // its miner is still flagged UNDER_MAINTENANCE/DEPLOYMENT_IN_PROGRESS -
+    // minerId is mandatory on these categories since creation, so a missing
+    // miner here would mean a pre-existing ticket from before that rule.
+    if (
+      (status === "RESOLVED" || status === "CLOSED") &&
+      (ticket.category === "HARDWARE_MINER" ||
+        ticket.category === "POOL_HASHRATE")
+    ) {
+      if (!ticket.miner) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "This ticket has no miner linked - one must be attached before it can be resolved or closed",
+          },
+          { status: 400 },
+        );
+      }
+      if (ticket.miner.status !== "AUTO") {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `The miner must be set to AUTO before this ticket can be resolved or closed (currently ${ticket.miner.status})`,
+          },
+          { status: 400 },
+        );
+      }
     }
 
     // Priority is a support/triage concept - a CLIENT never sets it, same
@@ -250,6 +302,41 @@ export async function PATCH(
 
       return result;
     });
+
+    // Best-effort live telemetry snapshot at resolution/closure - same
+    // treatment as the one attached at ticket creation, never blocks the
+    // status change if the pool fetch fails.
+    if (
+      (status === "RESOLVED" || status === "CLOSED") &&
+      (ticket.category === "HARDWARE_MINER" ||
+        ticket.category === "POOL_HASHRATE") &&
+      ticket.miner
+    ) {
+      try {
+        const snapshot = await getLiveMinerTelemetry(ticket.miner.id);
+        if (snapshot) {
+          await prisma.ticketMessage.create({
+            data: {
+              ticketId: id,
+              authorId: null,
+              isInternal: true,
+              isSystemGenerated: true,
+              body: `Live ${snapshot.poolName} telemetry at ticket ${status.toLowerCase()}: status ${snapshot.status}, ${snapshot.hashrateThs?.toFixed(2) ?? "?"} TH/s${
+                snapshot.efficiency !== null
+                  ? `, ${snapshot.efficiency.toFixed(2)}% efficiency`
+                  : ""
+              }.`,
+              metadata: snapshot as unknown as Prisma.InputJsonValue,
+            },
+          });
+        }
+      } catch (telemetryError) {
+        console.error(
+          "[Ticket Detail API] Live telemetry snapshot failed (non-fatal):",
+          telemetryError,
+        );
+      }
+    }
 
     return NextResponse.json({ success: true, data: updated });
   } catch (error) {

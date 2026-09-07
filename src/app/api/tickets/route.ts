@@ -10,10 +10,13 @@
  * POST: raise a new ticket. CLIENT/FRANCHISEE only. A FRANCHISEE can raise
  * either for their own personal mining account (the same way a CLIENT
  * does) or, via onBehalfOfUserId, for one of their own onboarded clients -
- * raisedById is always the actual submitter either way. If category is
- * HARDWARE_MINER or POOL_HASHRATE and a minerId is given, a live
- * Luxor/Braiins telemetry snapshot is fetched and attached as a
- * system-generated internal message - best-effort, never blocks creation.
+ * raisedById is always the actual submitter either way. category
+ * HARDWARE_MINER or POOL_HASHRATE requires a minerId (rejected with 400
+ * otherwise) - these are machine-specific categories and the ticket can't
+ * later be resolved/closed without one anyway (see PATCH /api/tickets/[id]).
+ * A live Luxor/Braiins telemetry snapshot is fetched for that miner and
+ * attached as a system-generated internal message - best-effort, never
+ * blocks creation.
  * If category is BILLING_INVOICE, an invoiceId can pin the ticket to the
  * specific invoice being disputed, the same way minerId pins a hardware
  * ticket to a specific machine.
@@ -232,6 +235,18 @@ export async function POST(request: NextRequest) {
     if (message.length > 5000) {
       return NextResponse.json(
         { success: false, error: "Message must not exceed 5000 characters" },
+        { status: 400 },
+      );
+    }
+    if (
+      (category === "HARDWARE_MINER" || category === "POOL_HASHRATE") &&
+      !minerId
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "A miner must be selected for this category",
+        },
         { status: 400 },
       );
     }

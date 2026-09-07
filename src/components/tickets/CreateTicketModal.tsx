@@ -127,6 +127,10 @@ export default function CreateTicketModal({
       setError("Subject, category and message are required");
       return;
     }
+    if (needsMiner && !minerId) {
+      setError("A miner must be selected for this category");
+      return;
+    }
     try {
       const result = await createTicket.mutateAsync({
         subject: subject.trim(),
@@ -212,13 +216,14 @@ export default function CreateTicketModal({
           {needsMiner && (
             <TextField
               select
-              label="Related Miner (optional)"
+              label="Related Miner"
               value={minerId}
               onChange={(e) => setMinerId(e.target.value)}
               fullWidth
-              helperText="Pin this ticket to a specific machine so support has instant context"
+              required
+              error={!minerId}
+              helperText="Required for this category so support has instant context on the machine"
             >
-              <MenuItem value="">None</MenuItem>
               {miners.map((m) => (
                 <MenuItem key={m.id} value={m.id}>
                   {m.name}
