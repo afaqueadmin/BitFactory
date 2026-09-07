@@ -52,6 +52,9 @@ export default function HashrateAlertsPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [sortField, setSortField] = useState<SortField>("date");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [minerFilter, setMinerFilter] = useState("");
+  const [customerFilter, setCustomerFilter] = useState("");
+  const [dateFilter, setDateFilter] = useState("");
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -67,7 +70,28 @@ export default function HashrateAlertsPage() {
       alert.benchmarkHashrate) *
     100;
 
-  const sortedAlerts = [...alerts].sort((a, b) => {
+  const filteredAlerts = alerts.filter((alert) => {
+    if (
+      minerFilter &&
+      !alert.miner.name.toLowerCase().includes(minerFilter.toLowerCase())
+    ) {
+      return false;
+    }
+    const customerName =
+      alert.miner.user.name || alert.miner.user.companyName || "";
+    if (
+      customerFilter &&
+      !customerName.toLowerCase().includes(customerFilter.toLowerCase())
+    ) {
+      return false;
+    }
+    if (dateFilter && alert.date.slice(0, 10) !== dateFilter) {
+      return false;
+    }
+    return true;
+  });
+
+  const sortedAlerts = [...filteredAlerts].sort((a, b) => {
     let compareA: string | number = "";
     let compareB: string | number = "";
 
@@ -137,7 +161,13 @@ export default function HashrateAlertsPage() {
         benchmark, as detected by cron_hashrate_benchmark_alert.
       </Typography>
 
-      <Stack direction="row" sx={{ mb: 3 }}>
+      <Stack
+        direction="row"
+        spacing={2}
+        flexWrap="wrap"
+        useFlexGap
+        sx={{ mb: 3 }}
+      >
         <TextField
           select
           size="small"
@@ -152,6 +182,29 @@ export default function HashrateAlertsPage() {
             </MenuItem>
           ))}
         </TextField>
+        <TextField
+          size="small"
+          label="Miner"
+          value={minerFilter}
+          onChange={(e) => setMinerFilter(e.target.value)}
+          sx={{ minWidth: 220 }}
+        />
+        <TextField
+          size="small"
+          label="Customer"
+          value={customerFilter}
+          onChange={(e) => setCustomerFilter(e.target.value)}
+          sx={{ minWidth: 220 }}
+        />
+        <TextField
+          size="small"
+          label="Date"
+          type="date"
+          value={dateFilter}
+          onChange={(e) => setDateFilter(e.target.value)}
+          InputLabelProps={{ shrink: true }}
+          sx={{ minWidth: 180 }}
+        />
       </Stack>
 
       {actionError && (
@@ -166,7 +219,7 @@ export default function HashrateAlertsPage() {
         </Box>
       ) : error ? (
         <Alert severity="error">{error}</Alert>
-      ) : alerts.length === 0 ? (
+      ) : sortedAlerts.length === 0 ? (
         <Typography variant="body2" color="text.secondary">
           No alerts found.
         </Typography>
