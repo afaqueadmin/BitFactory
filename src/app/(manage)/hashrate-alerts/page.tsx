@@ -18,10 +18,12 @@ import {
   Button,
   CircularProgress,
   Alert,
+  TableSortLabel,
 } from "@mui/material";
 import {
   useHashrateAlerts,
   useAcknowledgeHashrateAlert,
+  type HashrateAlertItem,
 } from "@/lib/hooks/useHashrateAlerts";
 
 const FILTERS = [
@@ -29,6 +31,15 @@ const FILTERS = [
   { value: "true", label: "Acknowledged" },
   { value: "", label: "All" },
 ];
+
+type SortField =
+  | "miner"
+  | "customer"
+  | "date"
+  | "actual"
+  | "benchmark"
+  | "shortfall"
+  | "status";
 
 export default function HashrateAlertsPage() {
   const [filter, setFilter] = useState("false");
@@ -39,6 +50,70 @@ export default function HashrateAlertsPage() {
     useAcknowledgeHashrateAlert();
 
   const [actionError, setActionError] = useState<string | null>(null);
+  const [sortField, setSortField] = useState<SortField>("date");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortOrder("asc");
+    }
+  };
+
+  const shortfallPctOf = (alert: HashrateAlertItem) =>
+    ((alert.benchmarkHashrate - alert.actualHashrate) /
+      alert.benchmarkHashrate) *
+    100;
+
+  const sortedAlerts = [...alerts].sort((a, b) => {
+    let compareA: string | number = "";
+    let compareB: string | number = "";
+
+    switch (sortField) {
+      case "miner":
+        compareA = a.miner.name || "";
+        compareB = b.miner.name || "";
+        break;
+      case "customer":
+        compareA = a.miner.user.name || a.miner.user.companyName || "";
+        compareB = b.miner.user.name || b.miner.user.companyName || "";
+        break;
+      case "date":
+        compareA = new Date(a.date).getTime();
+        compareB = new Date(b.date).getTime();
+        break;
+      case "actual":
+        compareA = a.actualHashrate || 0;
+        compareB = b.actualHashrate || 0;
+        break;
+      case "benchmark":
+        compareA = a.benchmarkHashrate || 0;
+        compareB = b.benchmarkHashrate || 0;
+        break;
+      case "shortfall":
+        compareA = shortfallPctOf(a);
+        compareB = shortfallPctOf(b);
+        break;
+      case "status":
+        compareA = a.acknowledgedAt ? 1 : 0;
+        compareB = b.acknowledgedAt ? 1 : 0;
+        break;
+    }
+
+    if (typeof compareA === "string" && typeof compareB === "string") {
+      return sortOrder === "asc"
+        ? compareA.localeCompare(compareB)
+        : compareB.localeCompare(compareA);
+    }
+
+    if (typeof compareA === "number" && typeof compareB === "number") {
+      return sortOrder === "asc" ? compareA - compareB : compareB - compareA;
+    }
+
+    return 0;
+  });
 
   const handleAcknowledge = async (id: string) => {
     setActionError(null);
@@ -100,22 +175,75 @@ export default function HashrateAlertsPage() {
           <Table size="small">
             <TableHead>
               <TableRow>
-                <TableCell>Miner</TableCell>
-                <TableCell>Customer</TableCell>
-                <TableCell>Date</TableCell>
-                <TableCell align="right">Actual</TableCell>
-                <TableCell align="right">Benchmark</TableCell>
-                <TableCell align="right">Shortfall</TableCell>
-                <TableCell>Status</TableCell>
+                <TableCell>
+                  <TableSortLabel
+                    active={sortField === "miner"}
+                    direction={sortField === "miner" ? sortOrder : "asc"}
+                    onClick={() => handleSort("miner")}
+                  >
+                    Miner
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell>
+                  <TableSortLabel
+                    active={sortField === "customer"}
+                    direction={sortField === "customer" ? sortOrder : "asc"}
+                    onClick={() => handleSort("customer")}
+                  >
+                    Customer
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell>
+                  <TableSortLabel
+                    active={sortField === "date"}
+                    direction={sortField === "date" ? sortOrder : "asc"}
+                    onClick={() => handleSort("date")}
+                  >
+                    Date
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell align="right">
+                  <TableSortLabel
+                    active={sortField === "actual"}
+                    direction={sortField === "actual" ? sortOrder : "asc"}
+                    onClick={() => handleSort("actual")}
+                  >
+                    Actual
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell align="right">
+                  <TableSortLabel
+                    active={sortField === "benchmark"}
+                    direction={sortField === "benchmark" ? sortOrder : "asc"}
+                    onClick={() => handleSort("benchmark")}
+                  >
+                    Benchmark
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell align="right">
+                  <TableSortLabel
+                    active={sortField === "shortfall"}
+                    direction={sortField === "shortfall" ? sortOrder : "asc"}
+                    onClick={() => handleSort("shortfall")}
+                  >
+                    Shortfall
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell>
+                  <TableSortLabel
+                    active={sortField === "status"}
+                    direction={sortField === "status" ? sortOrder : "asc"}
+                    onClick={() => handleSort("status")}
+                  >
+                    Status
+                  </TableSortLabel>
+                </TableCell>
                 <TableCell align="right">Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {alerts.map((alert) => {
-                const shortfallPct =
-                  ((alert.benchmarkHashrate - alert.actualHashrate) /
-                    alert.benchmarkHashrate) *
-                  100;
+              {sortedAlerts.map((alert) => {
+                const shortfallPct = shortfallPctOf(alert);
                 return (
                   <TableRow key={alert.id}>
                     <TableCell>{alert.miner.name}</TableCell>
