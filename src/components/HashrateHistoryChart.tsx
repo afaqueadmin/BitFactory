@@ -920,7 +920,7 @@ export default function HashrateHistoryChart({
                 display: "block",
               }}
             >
-              Latest Hashrate
+              Average Hashrate
             </Typography>
             <Typography
               variant="body2"
@@ -932,8 +932,25 @@ export default function HashrateHistoryChart({
               }}
             >
               {(() => {
-                const latest = chartData[chartData.length - 1];
-                const val = (latest?.luxor || 0) + (latest?.braiins || 0);
+                // Averaged per pool over its own non-null samples, then
+                // summed — a row missing one pool's tick (e.g. Braiins'
+                // daily point sharing rows with Luxor's 5-minute ticks)
+                // must not zero-fill and drag that pool's average down.
+                const mean = (values: number[]) =>
+                  values.length
+                    ? values.reduce((sum, v) => sum + v, 0) / values.length
+                    : 0;
+                const luxorAvg = mean(
+                  chartData
+                    .map((r) => r.luxor)
+                    .filter((v): v is number => v != null),
+                );
+                const braiinsAvg = mean(
+                  chartData
+                    .map((r) => r.braiins)
+                    .filter((v): v is number => v != null),
+                );
+                const val = luxorAvg + braiinsAvg;
                 return `${(val / unit.divisor).toFixed(2)} ${unit.label}`;
               })()}
             </Typography>
