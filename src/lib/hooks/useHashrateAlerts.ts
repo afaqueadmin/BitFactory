@@ -63,3 +63,26 @@ export function useAcknowledgeHashrateAlert() {
     },
   });
 }
+
+export function useBulkAcknowledgeHashrateAlerts() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      const res = await fetch(`/api/admin/hashrate-alerts/bulk-acknowledge`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || "Failed to acknowledge alerts");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["hashrate-alerts"] });
+    },
+  });
+}
