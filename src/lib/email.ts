@@ -154,6 +154,59 @@ export const sendPasswordResetEmail = async (
   }
 };
 
+/**
+ * Sent whenever a user changes their own password via the self-service flow
+ * (src/app/api/user/change-password/route.ts). Unlike sendPasswordResetEmail
+ * (admin/franchisee sets a new password for someone else, so the recipient
+ * needs to be told what it is), this is a pure notification - the user just
+ * typed the new password themselves, so it is deliberately left out of the
+ * email. Sending this successfully is a precondition for the password change
+ * being persisted - see the caller.
+ */
+export const sendPasswordChangedNotificationEmail = async (
+  email: string,
+  details: { ipAddress: string; userAgent: string; changedAt: Date },
+) => {
+  const { ipAddress, userAgent, changedAt } = details;
+  const mailOptions = {
+    from:
+      `BitFactory Admin <${process.env.SMTP_FROM}>` || "noreply@bitfactory.com",
+    to: email,
+    subject: "Your Password Was Changed - BitFactory",
+    html: `
+      <h1>Password Changed</h1>
+      <p>This is a confirmation that the password for your BitFactory account (${escapeHtml(email)}) was just changed.</p>
+      <table style="border-collapse: collapse;">
+        <tr>
+          <td style="padding: 4px 12px 4px 0;"><strong>Date &amp; Time:</strong></td>
+          <td style="padding: 4px 0;">${changedAt.toLocaleString("en-US", { dateStyle: "long", timeStyle: "short" })}</td>
+        </tr>
+        <tr>
+          <td style="padding: 4px 12px 4px 0;"><strong>IP Address:</strong></td>
+          <td style="padding: 4px 0;">${escapeHtml(ipAddress)}</td>
+        </tr>
+        <tr>
+          <td style="padding: 4px 12px 4px 0;"><strong>Device/Browser:</strong></td>
+          <td style="padding: 4px 0;">${escapeHtml(userAgent)}</td>
+        </tr>
+      </table>
+      <p>If you made this change, no further action is required.</p>
+      <p><strong>If you did not make this change, please contact our support team immediately</strong> - your account may be compromised.</p>
+      <br>
+      <p>Best regards,</p>
+      <p>The BitFactory Team</p>
+    `,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    return { success: true };
+  } catch (error) {
+    console.error("Error sending password changed notification email:", error);
+    return { success: false, error };
+  }
+};
+
 export const sendWalletChangeRequestSubmittedEmail = async (
   email: string,
   requestedAddress: string,

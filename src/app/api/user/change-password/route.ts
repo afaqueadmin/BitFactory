@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { hash, compare } from "bcrypt";
 import { NextRequest, NextResponse } from "next/server";
 import { verifyJwtToken } from "@/lib/jwt";
+import { sendPasswordChangedNotificationEmail } from "@/lib/email";
 
 export async function POST(request: NextRequest) {
   try {
@@ -61,7 +62,7 @@ export async function POST(request: NextRequest) {
     // Get user from database
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { password: true },
+      select: { email: true, password: true },
     });
 
     if (!user) {
@@ -80,6 +81,29 @@ export async function POST(request: NextRequest) {
     // Hash new password
     const hashedPassword = await hash(newPassword, 12);
 
+    const ipAddress = request.headers.get("x-forwarded-for") || "unknown";
+    const userAgent = request.headers.get("user-agent") || "unknown";
+
+    // Notifying the user is a precondition for the change, not an
+    // afterthought - if we can't reach them we don't silently swap their
+    // password out from under them.
+    const emailResult = await sendPasswordChangedNotificationEmail(user.email, {
+      ipAddress,
+      userAgent,
+      changedAt: new Date(),
+    });
+
+    if (!emailResult.success) {
+      console.error(
+        "Failed to send password change notification email:",
+        emailResult.error,
+      );
+      return NextResponse.json(
+        { error: "Password update failed. Please try again in a few minutes." },
+        { status: 500 },
+      );
+    }
+
     // Update password in database
     await prisma.user.update({
       where: { id: userId },
@@ -91,8 +115,8 @@ export async function POST(request: NextRequest) {
       data: {
         userId: userId,
         type: "PASSWORD_CHANGE",
-        ipAddress: request.headers.get("x-forwarded-for") || "unknown",
-        userAgent: request.headers.get("user-agent") || "unknown",
+        ipAddress,
+        userAgent,
       },
     });
 
