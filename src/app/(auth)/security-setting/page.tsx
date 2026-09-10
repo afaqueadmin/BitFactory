@@ -68,6 +68,16 @@ export default function SecuritySettingsPage() {
     fetchUserData();
   }, []);
 
+  // Keeps Recent Activity current without a manual page reload - polls in
+  // the background (no loading spinner) and is also triggered right after a
+  // password change so the new PASSWORD_CHANGE entry shows up immediately.
+  useEffect(() => {
+    const interval = setInterval(() => {
+      refreshActivities();
+    }, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
   const fetchUserData = async () => {
     try {
       setLoading(true);
@@ -102,6 +112,23 @@ export default function SecuritySettingsPage() {
       );
     } finally {
       setLoading(false);
+    }
+  };
+
+  const refreshActivities = async () => {
+    try {
+      const response = await fetch("/api/user/profile", {
+        method: "GET",
+        credentials: "include",
+        headers: {
+          "Cache-Control": "no-cache",
+        },
+      });
+      if (!response.ok) return;
+      const data = await response.json();
+      setActivities(data.recentActivities || []);
+    } catch (err) {
+      console.error("Error refreshing recent activity:", err);
     }
   };
 
@@ -160,6 +187,7 @@ export default function SecuritySettingsPage() {
         newPassword: "",
         confirmPassword: "",
       });
+      refreshActivities();
     } catch (error) {
       const errorMessage =
         error instanceof Error
