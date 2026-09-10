@@ -9,7 +9,7 @@ import {
   CircularProgress,
   Alert,
 } from "@mui/material";
-import ChangePasswordModal from "@/components/ChangePasswordModal";
+import AdminSelfChangePasswordModal from "@/components/AdminSelfChangePasswordModal";
 import TwoFactorSettings from "@/components/TwoFactorSettings";
 import PasskeySettings from "@/components/PasskeySettings";
 
@@ -193,11 +193,10 @@ export default function SecuritySettingsPage() {
       </Box>
 
       {/* Change Password Modal */}
-      <ChangePasswordModal
+      <AdminSelfChangePasswordModal
         open={changePasswordModalOpen}
         onClose={handleModalClose}
         onSuccess={handleSecurityUpdated}
-        customerId={userData.id || ""}
       />
     </Box>
   );

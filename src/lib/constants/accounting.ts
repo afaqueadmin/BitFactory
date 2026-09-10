@@ -220,6 +220,7 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   [AuditAction.WALLET_CHANGE_REQUESTED]: "Wallet Change Requested",
   [AuditAction.WALLET_CHANGE_APPROVED]: "Wallet Change Approved",
   [AuditAction.WALLET_CHANGE_REJECTED]: "Wallet Change Rejected",
+  [AuditAction.USER_PASSWORD_RESET]: "User Password Reset",
 };
 
 // ============================================================================

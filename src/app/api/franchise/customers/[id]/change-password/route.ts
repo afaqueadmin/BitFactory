@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { hash } from "bcrypt";
 import { verifyJwtToken } from "@/lib/jwt";
+import { AuditAction } from "@prisma/client";
 import { assertFranchiseeOwnsCustomer } from "@/lib/franchiseeScope";
 import { sendPasswordResetEmail } from "@/lib/email";
 
@@ -86,6 +87,24 @@ export async function PUT(
         );
       }
     }
+
+    // Audit trail - a single row records both who did this and to whom,
+    // regardless of whether the customer was also emailed.
+    const franchisee = await prisma.user.findUnique({
+      where: { id: decoded.userId },
+      select: { email: true },
+    });
+    await prisma.auditLog.create({
+      data: {
+        action: AuditAction.USER_PASSWORD_RESET,
+        entityType: "User",
+        entityId: id,
+        userId: decoded.userId,
+        description: `Password reset for ${customer.email} by franchisee ${franchisee?.email || decoded.userId}`,
+        ipAddress: request.headers.get("x-forwarded-for") || "unknown",
+        userAgent: request.headers.get("user-agent") || "unknown",
+      },
+    });
 
     return NextResponse.json({
       success: true,
