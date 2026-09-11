@@ -67,6 +67,7 @@ const securePaths = {
     "/machine",
     "/pools",
     "/security-settings",
+    "/audit-log",
     "/settings/payment",
     "/space",
     "/subaccounts",

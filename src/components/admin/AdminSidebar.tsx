@@ -31,6 +31,7 @@ import {
   RequestQuote as AdjustmentsIcon,
   Settings as SettingsIcon,
   History as ActivityLogIcon,
+  FactCheck as AuditLogIcon,
   ChevronLeft,
   ChevronRight,
   Lock as LockIcon,
@@ -84,6 +85,11 @@ const sidebarItems: SidebarItem[] = [
     title: "Activity Log",
     icon: <ActivityLogIcon />,
     path: "/activity-log",
+  },
+  {
+    title: "Audit Log",
+    icon: <AuditLogIcon />,
+    path: "/audit-log",
   },
   {
     title: "Franchisees",
