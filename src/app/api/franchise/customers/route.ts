@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
         phoneNumber: true,
         companyName: true,
         streetAddress: true,
-        twoFactorEnabled: true,
+        twoFactorAuth: { select: { enabled: true } },
         createdAt: true,
         isDeleted: true,
         franchiseeId: true,
@@ -103,7 +103,7 @@ export async function GET(request: NextRequest) {
           .map((pa) => pa.pool.name)
           .sort()
           .join(", "),
-        twoFactorEnabled: c.twoFactorEnabled,
+        twoFactorEnabled: c.twoFactorAuth?.enabled ?? false,
         joinDate: c.createdAt.toISOString().split("T")[0],
         miners: c.miners.length,
         status: hasActiveMiner ? "active" : "inactive",

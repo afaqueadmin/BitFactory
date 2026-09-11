@@ -20,19 +20,21 @@ export async function POST(req: NextRequest) {
       where: { email },
       select: {
         id: true,
-        twoFactorSecret: true,
-        twoFactorEnabled: true,
-        twoFactorBackupCodes: true,
         role: true,
+        twoFactorAuth: {
+          select: { secret: true, enabled: true, backupCodes: true },
+        },
       },
     });
 
-    if (!user?.twoFactorEnabled) {
+    if (!user?.twoFactorAuth?.enabled) {
       return NextResponse.json(
         { error: "2FA is not enabled for this user" },
         { status: 400 },
       );
     }
+
+    const twoFactorAuth = user.twoFactorAuth;
 
     // Generate tokens with role
     const { accessToken, refreshToken } = await generateTokens(
@@ -58,14 +60,15 @@ export async function POST(req: NextRequest) {
     const response = NextResponse.json({ success: true, redirectUrl });
 
     // First check if it's a backup code
-    if (user.twoFactorBackupCodes?.includes(token)) {
+    if (twoFactorAuth.backupCodes?.includes(token)) {
       // Remove the used backup code
-      await prisma.user.update({
-        where: { email },
+      await prisma.twoFactorAuth.update({
+        where: { userId: user.id },
         data: {
-          twoFactorBackupCodes: {
-            set: user.twoFactorBackupCodes.filter((code) => code !== token),
+          backupCodes: {
+            set: twoFactorAuth.backupCodes.filter((code) => code !== token),
           },
+          lastUsedAt: new Date(),
         },
       });
 
@@ -100,16 +103,23 @@ export async function POST(req: NextRequest) {
     }
 
     // Verify TOTP
-    const verified = speakeasy.totp.verify({
-      secret: user.twoFactorSecret!,
-      encoding: "base32",
-      token: token,
-      window: 1,
-    });
+    const verified =
+      !!twoFactorAuth.secret &&
+      speakeasy.totp.verify({
+        secret: twoFactorAuth.secret,
+        encoding: "base32",
+        token: token,
+        window: 1,
+      });
 
     if (!verified) {
       return NextResponse.json({ error: "Invalid token" }, { status: 400 });
     }
+
+    await prisma.twoFactorAuth.update({
+      where: { userId: user.id },
+      data: { lastUsedAt: new Date() },
+    });
 
     // Log successful 2FA verification
     await prisma.userActivity.create({

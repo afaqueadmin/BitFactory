@@ -152,9 +152,9 @@ export async function POST(request: NextRequest) {
       select: {
         email: true,
         password: true,
-        twoFactorEnabled: true,
-        twoFactorSecret: true,
-        twoFactorBackupCodes: true,
+        twoFactorAuth: {
+          select: { enabled: true, secret: true, backupCodes: true },
+        },
       },
     });
     if (!authUser) {
@@ -166,7 +166,8 @@ export async function POST(request: NextRequest) {
 
     let verifiedVia: "2FA" | "PASSWORD";
 
-    if (authUser.twoFactorEnabled) {
+    if (authUser.twoFactorAuth?.enabled) {
+      const twoFactorAuth = authUser.twoFactorAuth;
       if (!twoFactorToken || typeof twoFactorToken !== "string") {
         return NextResponse.json(
           {
@@ -178,24 +179,24 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const isBackupCode =
-        authUser.twoFactorBackupCodes?.includes(twoFactorToken);
+      const isBackupCode = twoFactorAuth.backupCodes?.includes(twoFactorToken);
       if (isBackupCode) {
-        await prisma.user.update({
-          where: { id: auth.decoded.userId },
+        await prisma.twoFactorAuth.update({
+          where: { userId: auth.decoded.userId },
           data: {
-            twoFactorBackupCodes: {
-              set: authUser.twoFactorBackupCodes.filter(
+            backupCodes: {
+              set: twoFactorAuth.backupCodes.filter(
                 (code) => code !== twoFactorToken,
               ),
             },
+            lastUsedAt: new Date(),
           },
         });
       } else {
         const verified =
-          !!authUser.twoFactorSecret &&
+          !!twoFactorAuth.secret &&
           speakeasy.totp.verify({
-            secret: authUser.twoFactorSecret,
+            secret: twoFactorAuth.secret,
             encoding: "base32",
             token: twoFactorToken,
             window: 1,
@@ -206,6 +207,10 @@ export async function POST(request: NextRequest) {
             { status: 400 },
           );
         }
+        await prisma.twoFactorAuth.update({
+          where: { userId: auth.decoded.userId },
+          data: { lastUsedAt: new Date() },
+        });
       }
       verifiedVia = "2FA";
     } else {

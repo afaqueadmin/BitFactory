@@ -77,7 +77,7 @@ export async function GET(request: NextRequest) {
         phoneNumber: true,
         companyName: true,
         luxorSubaccountName: true,
-        twoFactorEnabled: true,
+        twoFactorAuth: { select: { enabled: true } },
         streetAddress: true,
         createdAt: true,
         isDeleted: true,
@@ -140,7 +140,7 @@ export async function GET(request: NextRequest) {
           .map((pa) => pa.pool.name)
           .sort()
           .join(", "),
-        twoFactorEnabled: user.twoFactorEnabled,
+        twoFactorEnabled: user.twoFactorAuth?.enabled ?? false,
         joinDate: user.createdAt.toISOString().split("T")[0],
         miners: user.miners.length,
         status: user.isDeleted ? "deleted" : "active",

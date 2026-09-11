@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import speakeasy from "speakeasy";
+import { AuditAction } from "@prisma/client";
 import { getUserInfoFromToken } from "@/lib/helpers/getUserInfoFromToken";
 
 export async function POST(req: NextRequest) {
@@ -25,12 +26,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Token is required" }, { status: 400 });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { twoFactorSecret: true },
+    const twoFactorAuth = await prisma.twoFactorAuth.findUnique({
+      where: { userId },
+      select: { secret: true },
     });
 
-    if (!user?.twoFactorSecret) {
+    if (!twoFactorAuth?.secret) {
       return NextResponse.json(
         { error: "Two-factor authentication is not enabled" },
         { status: 400 },
@@ -38,7 +39,7 @@ export async function POST(req: NextRequest) {
     }
 
     const isValid = speakeasy.totp.verify({
-      secret: user.twoFactorSecret,
+      secret: twoFactorAuth.secret,
       encoding: "base32",
       token,
       window: 1, // Allow 1 time step before/after for clock drift
@@ -51,13 +52,27 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Disable 2FA by removing the secret and backup codes
-    await prisma.user.update({
-      where: { id: userId },
+    // Disable 2FA by clearing the secret and backup codes - the row itself
+    // is kept (not deleted), so enrolledAt/lastUsedAt history survives a
+    // disable/re-enable cycle.
+    await prisma.twoFactorAuth.update({
+      where: { userId },
       data: {
-        twoFactorSecret: null,
-        twoFactorEnabled: false,
-        twoFactorBackupCodes: [],
+        secret: null,
+        enabled: false,
+        backupCodes: [],
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        action: AuditAction.TWO_FACTOR_DISABLED,
+        entityType: "User",
+        entityId: userId,
+        userId,
+        description: "Two-factor authentication disabled",
+        ipAddress: req.headers.get("x-forwarded-for") || "unknown",
+        userAgent: req.headers.get("user-agent") || "unknown",
       },
     });
 

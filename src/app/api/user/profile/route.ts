@@ -88,7 +88,7 @@ export async function GET(request: NextRequest) {
         idNumber: true,
         companyUrl: true,
         role: true,
-        twoFactorEnabled: true,
+        twoFactorAuth: { select: { enabled: true } },
         isDeleted: true,
       },
     });
@@ -115,9 +115,16 @@ export async function GET(request: NextRequest) {
 
     console.log("Profile API [GET]: Successfully fetched data");
 
+    // Keep the response shape flat (twoFactorEnabled as a top-level boolean)
+    // for existing consumers, even though it now lives in its own table.
+    const { twoFactorAuth, ...userFields } = user;
+
     return Response.json(
       {
-        user,
+        user: {
+          ...userFields,
+          twoFactorEnabled: twoFactorAuth?.enabled ?? false,
+        },
         recentActivities,
       },
       {

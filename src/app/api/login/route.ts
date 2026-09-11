@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
         name: true,
         password: true,
         role: true,
-        twoFactorEnabled: true,
+        twoFactorAuth: { select: { enabled: true } },
       },
     });
 
@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Require 2FA only when this specific user has 2FA enabled.
-    if (user.twoFactorEnabled) {
+    if (user.twoFactorAuth?.enabled) {
       return NextResponse.json({
         requiresTwoFactor: true,
         message: "Please enter your 2FA code",

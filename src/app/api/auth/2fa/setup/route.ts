@@ -29,12 +29,18 @@ export async function POST(request: NextRequest) {
     // Generate QR code
     const qrCodeUrl = await QRCode.toDataURL(secret.otpauth_url!);
 
-    // Save the secret to the user's record
-    await prisma.user.update({
-      where: { id: userId },
-      data: {
-        twoFactorSecret: secret.base32,
-        twoFactorEnabled: false, // Will be enabled after verification
+    // Save the secret. Row may not exist yet for a user's first-ever setup -
+    // upsert covers both that and a re-run (e.g. scanning a fresh QR code).
+    await prisma.twoFactorAuth.upsert({
+      where: { userId },
+      create: {
+        userId,
+        secret: secret.base32,
+        enabled: false, // Will be enabled after verification
+      },
+      update: {
+        secret: secret.base32,
+        enabled: false,
       },
     });
 

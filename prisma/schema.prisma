@@ -67,6 +67,7 @@ model User {
   poolAuths                    PoolAuth[]
   poolSubaccounts              PoolSubaccount[]
   webauthnCredentials          WebAuthnCredential[]
+  twoFactorAuth                TwoFactorAuth?
   invoicedAmount               Decimal                      @db.Decimal(12, 2)
   createdRepairNotes           MinerRepairNote[]            @relation("CreatedRepairNotes")
   createdMinerPoolHistory      MinerPoolHistory[]           @relation("MinerPoolHistoryCreatedBy")
@@ -223,6 +224,25 @@ model WebAuthnCredential {
 
   @@index([userId])
   @@map("webauthn_credentials")
+}
+
+// One row per user who has ever engaged with 2FA (created lazily on first
+// /api/auth/2fa/setup call, or backfilled from the legacy users.twoFactor*
+// columns for pre-existing accounts). Those legacy columns on User are left
+// in place as a fallback and are not written to going forward.
+model TwoFactorAuth {
+  id          String    @id @default(cuid())
+  userId      String    @unique
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  enabled     Boolean   @default(false)
+  secret      String?
+  backupCodes String[]
+  enrolledAt  DateTime?
+  lastUsedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("two_factor_auth")
 }
 
 model UserActivity {
@@ -1186,6 +1206,8 @@ enum AuditAction {
   WALLET_CHANGE_APPROVED
   WALLET_CHANGE_REJECTED
   USER_PASSWORD_RESET
+  TWO_FACTOR_ENABLED
+  TWO_FACTOR_DISABLED
 }
 
 enum NotificationType {
