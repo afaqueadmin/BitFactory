@@ -67,6 +67,7 @@ export default function HashrateAlertsPage() {
   const [minerFilter, setMinerFilter] = useState("");
   const [customerFilter, setCustomerFilter] = useState("");
   const [dateFilter, setDateFilter] = useState("");
+  const [maxShortfallFilter, setMaxShortfallFilter] = useState("");
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -99,6 +100,12 @@ export default function HashrateAlertsPage() {
     }
     if (dateFilter && alert.date.slice(0, 10) !== dateFilter) {
       return false;
+    }
+    if (maxShortfallFilter !== "") {
+      const maxShortfall = Number(maxShortfallFilter);
+      if (!Number.isNaN(maxShortfall) && shortfallPctOf(alert) > maxShortfall) {
+        return false;
+      }
     }
     return true;
   });
@@ -228,6 +235,15 @@ export default function HashrateAlertsPage() {
             value={customerFilter}
             onChange={(e) => setCustomerFilter(e.target.value)}
             sx={{ minWidth: 220 }}
+          />
+          <TextField
+            size="small"
+            type="number"
+            label="Max Shortfall %"
+            value={maxShortfallFilter}
+            onChange={(e) => setMaxShortfallFilter(e.target.value)}
+            inputProps={{ min: 0, max: 100, step: 0.1 }}
+            sx={{ minWidth: 160 }}
           />
           <TextField
             size="small"
