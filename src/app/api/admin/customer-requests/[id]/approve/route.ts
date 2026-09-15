@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { hash } from "bcrypt";
 import { verifyJwtToken } from "@/lib/jwt";
+import { AuditAction } from "@prisma/client";
 import { sendWelcomeEmail } from "@/lib/email";
 import normalizeEmailUsername from "@/lib/helpers/normailizeEmailUsername";
 import { getOrCreatePaybackConfig } from "@/lib/paybackConfigHelpers";
@@ -205,6 +206,16 @@ export async function POST(
           reviewedById: decoded.userId,
           reviewedAt: new Date(),
           createdUserId: user.id,
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          action: AuditAction.CUSTOMER_REQUEST_APPROVED,
+          entityType: "FranchiseCustomerRequest",
+          entityId: id,
+          userId: decoded.userId,
+          description: `Customer request for ${name} (${email}) approved`,
         },
       });
 

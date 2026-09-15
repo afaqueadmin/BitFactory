@@ -14,6 +14,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
+import { AuditAction } from "@prisma/client";
 import { franchiseeMinerFilter } from "@/lib/franchiseeScope";
 import { WorkersResponse } from "@/lib/luxor";
 
@@ -677,6 +678,7 @@ export async function POST(
           ...(poolId && { poolId }),
           ...(serialNumber && { serialNumber: serialNumber.trim() }),
           ...(macAddress && { macAddress: macAddress.trim() }),
+          createdById: authenticatedUserId,
         },
         include: {
           user: {
@@ -719,6 +721,15 @@ export async function POST(
             createdById: authenticatedUserId,
           },
         });
+        await tx.auditLog.create({
+          data: {
+            action: AuditAction.MINER_HASHRATE_BENCHMARK_SET,
+            entityType: "Miner",
+            entityId: newMiner.id,
+            userId: authenticatedUserId,
+            description: `Hashrate benchmark set to ${benchmarkHashrateValue} TH/s`,
+          },
+        });
       }
 
       // Create miner ownership history entry
@@ -727,6 +738,15 @@ export async function POST(
           minerId: newMiner.id,
           ownerId: userId,
           createdById: authenticatedUserId,
+        },
+      });
+      await tx.auditLog.create({
+        data: {
+          action: AuditAction.MINER_OWNERSHIP_CHANGED,
+          entityType: "Miner",
+          entityId: newMiner.id,
+          userId: authenticatedUserId,
+          description: "Miner ownership assigned",
         },
       });
 
@@ -739,6 +759,15 @@ export async function POST(
             createdById: authenticatedUserId,
           },
         });
+        await tx.auditLog.create({
+          data: {
+            action: AuditAction.MINER_POOL_CHANGED,
+            entityType: "Miner",
+            entityId: newMiner.id,
+            userId: authenticatedUserId,
+            description: "Miner assigned to pool",
+          },
+        });
       }
 
       // Reduce hardware quantity
@@ -748,6 +777,16 @@ export async function POST(
           quantity: {
             decrement: 1,
           },
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          action: AuditAction.MINER_CREATED,
+          entityType: "Miner",
+          entityId: newMiner.id,
+          userId: authenticatedUserId,
+          description: `Miner ${newMiner.name} created`,
         },
       });
 

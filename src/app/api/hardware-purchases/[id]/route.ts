@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
 import { Decimal } from "@prisma/client/runtime/library";
+import { AuditAction } from "@prisma/client";
 import {
   VENDOR_NAME_OPTIONS,
   VendorNameValue,
@@ -227,6 +228,19 @@ export async function PUT(
       data: updateData,
     });
 
+    const changedFields: Partial<UpdateDataType> = { ...updateData };
+    delete changedFields.updatedBy;
+    await prisma.auditLog.create({
+      data: {
+        action: AuditAction.HARDWARE_PURCHASE_INVOICE_UPDATED,
+        entityType: "HardwarePurchaseInvoice",
+        entityId: updatedInvoice.id,
+        userId,
+        description: `Hardware purchase invoice ${updatedInvoice.invoiceNumber} updated`,
+        changes: JSON.stringify(changedFields),
+      },
+    });
+
     return NextResponse.json(
       {
         success: true,
@@ -283,6 +297,16 @@ export async function DELETE(
     }
 
     await prisma.hardwarePurchaseInvoice.delete({ where: { id: invoiceId } });
+
+    await prisma.auditLog.create({
+      data: {
+        action: AuditAction.HARDWARE_PURCHASE_INVOICE_DELETED,
+        entityType: "HardwarePurchaseInvoice",
+        entityId: invoiceId,
+        userId,
+        description: `Hardware purchase invoice ${existingInvoice.invoiceNumber} deleted`,
+      },
+    });
 
     return NextResponse.json(
       {

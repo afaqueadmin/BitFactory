@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
 import { Decimal } from "@prisma/client/runtime/library";
+import { AuditAction } from "@prisma/client";
 
 interface CreateVendorInvoiceRequest {
   invoiceNumber: string;
@@ -79,6 +80,16 @@ export async function POST(request: NextRequest) {
         paymentStatus: body.paymentStatus || "Pending",
         notes: body.notes || null,
         createdBy: userId,
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        action: AuditAction.VENDOR_INVOICE_CREATED,
+        entityType: "VendorInvoice",
+        entityId: vendorInvoice.id,
+        userId,
+        description: `Vendor invoice ${vendorInvoice.invoiceNumber} created`,
       },
     });
 

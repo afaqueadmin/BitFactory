@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
+import { AuditAction } from "@prisma/client";
 import { getOwnFranchise } from "@/lib/franchiseeScope";
 import normalizeEmailUsername from "@/lib/helpers/normailizeEmailUsername";
 
@@ -165,6 +166,16 @@ export async function POST(request: NextRequest) {
           initialDeposit !== ""
             ? initialDeposit
             : null,
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        action: AuditAction.CUSTOMER_REQUEST_SUBMITTED,
+        entityType: "FranchiseCustomerRequest",
+        entityId: created.id,
+        userId: auth.decoded.userId,
+        description: `Customer request for ${created.name} (${created.email}) submitted`,
       },
     });
 

@@ -223,6 +223,42 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   [AuditAction.USER_PASSWORD_RESET]: "User Password Reset",
   [AuditAction.TWO_FACTOR_ENABLED]: "Two-Factor Authentication Enabled",
   [AuditAction.TWO_FACTOR_DISABLED]: "Two-Factor Authentication Disabled",
+  [AuditAction.VENDOR_INVOICE_CREATED]: "Vendor Invoice Created",
+  [AuditAction.VENDOR_INVOICE_UPDATED]: "Vendor Invoice Updated",
+  [AuditAction.VENDOR_INVOICE_DELETED]: "Vendor Invoice Deleted",
+  [AuditAction.HARDWARE_PURCHASE_INVOICE_CREATED]:
+    "Hardware Purchase Invoice Created",
+  [AuditAction.HARDWARE_PURCHASE_INVOICE_UPDATED]:
+    "Hardware Purchase Invoice Updated",
+  [AuditAction.HARDWARE_PURCHASE_INVOICE_DELETED]:
+    "Hardware Purchase Invoice Deleted",
+  [AuditAction.FRANCHISE_CREATED]: "Franchise Created",
+  [AuditAction.FRANCHISE_UPDATED]: "Franchise Updated",
+  [AuditAction.FRANCHISE_DELETED]: "Franchise Deleted",
+  [AuditAction.CUSTOMER_REQUEST_SUBMITTED]: "Customer Request Submitted",
+  [AuditAction.CUSTOMER_REQUEST_APPROVED]: "Customer Request Approved",
+  [AuditAction.CUSTOMER_REQUEST_REJECTED]: "Customer Request Rejected",
+  [AuditAction.CUSTOMER_REQUEST_DELETED]: "Customer Request Deleted",
+  [AuditAction.GROUP_CREATED]: "Group Created",
+  [AuditAction.GROUP_UPDATED]: "Group Updated",
+  [AuditAction.GROUP_DELETED]: "Group Deleted",
+  [AuditAction.GROUP_SUBACCOUNT_ADDED]: "Group Member Added",
+  [AuditAction.GROUP_SUBACCOUNT_REMOVED]: "Group Member Removed",
+  [AuditAction.MINER_REPAIR_NOTE_ADDED]: "Repair Note Added",
+  [AuditAction.MINER_REPAIR_NOTE_UPDATED]: "Repair Note Updated",
+  [AuditAction.MINER_REPAIR_NOTE_DELETED]: "Repair Note Deleted",
+  [AuditAction.MINER_OWNERSHIP_CHANGED]: "Miner Ownership Changed",
+  [AuditAction.MINER_POOL_CHANGED]: "Miner Pool Reassigned",
+  [AuditAction.MINER_HASHRATE_BENCHMARK_SET]: "Miner Hashrate Benchmark Set",
+  [AuditAction.HARDWARE_PROCUREMENT_RECORDED]: "Hardware Procurement Recorded",
+  [AuditAction.MINER_HASHRATE_ALERT_ACKNOWLEDGED]:
+    "Hashrate Alert Acknowledged",
+  [AuditAction.MINER_CREATED]: "Miner Created",
+  [AuditAction.MINER_UPDATED]: "Miner Updated",
+  [AuditAction.MINER_DELETED]: "Miner Deleted",
+  [AuditAction.HARDWARE_CREATED]: "Hardware Created",
+  [AuditAction.HARDWARE_UPDATED]: "Hardware Updated",
+  [AuditAction.HARDWARE_DELETED]: "Hardware Deleted",
 };
 
 // ============================================================================

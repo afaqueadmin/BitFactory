@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { Decimal } from "@prisma/client/runtime/library";
 import { verifyJwtToken } from "@/lib/jwt";
+import { AuditAction } from "@prisma/client";
 
 interface BulkEditRequest {
   minerIds: string[];
@@ -216,10 +217,24 @@ export async function POST(
     }
 
     // Update all miners
+    const hasDirectFieldChanges = Object.keys(updateData).length > 0;
     await prisma.miner.updateMany({
       where: { id: { in: minerIds } },
-      data: updateData,
+      data: { ...updateData, updatedById: userId },
     });
+
+    if (hasDirectFieldChanges) {
+      await prisma.auditLog.createMany({
+        data: minerIds.map((minerId) => ({
+          action: AuditAction.MINER_UPDATED,
+          entityType: "Miner",
+          entityId: minerId,
+          userId,
+          description: "Miner updated (bulk edit)",
+          changes: JSON.stringify(updateData),
+        })),
+      });
+    }
 
     // Handle rate history updates
     if (updates.rate_per_kwh !== undefined) {
@@ -269,6 +284,15 @@ export async function POST(
               minerId,
               benchmarkHashrate: benchmarkDecimal,
               createdById: userId,
+            },
+          });
+          await prisma.auditLog.create({
+            data: {
+              action: AuditAction.MINER_HASHRATE_BENCHMARK_SET,
+              entityType: "Miner",
+              entityId: minerId,
+              userId,
+              description: `Hashrate benchmark set to ${benchmarkDecimal} TH/s (bulk edit)`,
             },
           });
         }

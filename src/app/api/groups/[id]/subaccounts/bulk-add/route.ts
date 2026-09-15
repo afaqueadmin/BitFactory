@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
+import { AuditAction } from "@prisma/client";
 
 /**
  * POST /api/groups/[id]/subaccounts/bulk-add
@@ -105,11 +106,24 @@ export async function POST(
         addedByUserId: userId,
       }));
 
-      const createdSubaccounts = await prisma.groupSubaccount.createMany({
-        data: toAdd,
-        skipDuplicates: true,
-      });
-      totalCount += createdSubaccounts.count;
+      const createdSubaccounts =
+        await prisma.groupSubaccount.createManyAndReturn({
+          data: toAdd,
+          skipDuplicates: true,
+        });
+      totalCount += createdSubaccounts.length;
+
+      if (createdSubaccounts.length > 0) {
+        await prisma.auditLog.createMany({
+          data: createdSubaccounts.map((created) => ({
+            action: AuditAction.GROUP_SUBACCOUNT_ADDED,
+            entityType: "Group",
+            entityId: groupId,
+            userId,
+            description: `${created.subaccountName || "Customer"} added to group ${group.name}`,
+          })),
+        });
+      }
     }
 
     if (hasUserIds) {
@@ -122,8 +136,9 @@ export async function POST(
 
       const members = await prisma.user.findMany({
         where: { id: { in: userIds }, role: "CLIENT", isDeleted: false },
-        select: { id: true },
+        select: { id: true, name: true, email: true },
       });
+      const memberById = new Map(members.map((m) => [m.id, m]));
 
       // Check which customers already belong to a group
       const existingSubaccounts = await prisma.groupSubaccount.findMany({
@@ -154,11 +169,28 @@ export async function POST(
         addedByUserId: userId,
       }));
 
-      const createdMembers = await prisma.groupSubaccount.createMany({
+      const createdMembers = await prisma.groupSubaccount.createManyAndReturn({
         data: toAdd,
         skipDuplicates: true,
       });
-      totalCount += createdMembers.count;
+      totalCount += createdMembers.length;
+
+      if (createdMembers.length > 0) {
+        await prisma.auditLog.createMany({
+          data: createdMembers.map((created) => {
+            const member = created.userId
+              ? memberById.get(created.userId)
+              : undefined;
+            return {
+              action: AuditAction.GROUP_SUBACCOUNT_ADDED,
+              entityType: "Group",
+              entityId: groupId,
+              userId,
+              description: `${member?.name || member?.email || "Customer"} added to group ${group.name}`,
+            };
+          }),
+        });
+      }
     }
 
     console.log(

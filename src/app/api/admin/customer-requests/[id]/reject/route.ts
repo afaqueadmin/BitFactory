@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
+import { AuditAction } from "@prisma/client";
 
 export async function POST(
   request: NextRequest,
@@ -70,6 +71,16 @@ export async function POST(
         reviewedById: decoded.userId,
         reviewedAt: new Date(),
         rejectionReason: reason || null,
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        action: AuditAction.CUSTOMER_REQUEST_REJECTED,
+        entityType: "FranchiseCustomerRequest",
+        entityId: id,
+        userId: decoded.userId,
+        description: `Customer request for ${customerRequest.name} (${customerRequest.email}) rejected${reason ? `: ${reason}` : ""}`,
       },
     });
 

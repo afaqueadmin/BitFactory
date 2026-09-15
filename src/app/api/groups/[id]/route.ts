@@ -13,6 +13,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
+import { AuditAction } from "@prisma/client";
 import { franchiseeUserFilter } from "@/lib/franchiseeScope";
 
 /**
@@ -472,6 +473,17 @@ export async function PUT(
 
     console.log("[Groups API] PUT[id] - Group updated successfully:", id);
 
+    await prisma.auditLog.create({
+      data: {
+        action: AuditAction.GROUP_UPDATED,
+        entityType: "Group",
+        entityId: updatedGroup.id,
+        userId: user.userId,
+        description: `Group ${updatedGroup.name} updated`,
+        changes: JSON.stringify(updateData),
+      },
+    });
+
     return NextResponse.json(
       {
         success: true,
@@ -572,6 +584,16 @@ export async function DELETE(
     });
 
     console.log("[Groups API] DELETE[id] - Group deleted successfully:", id);
+
+    await prisma.auditLog.create({
+      data: {
+        action: AuditAction.GROUP_DELETED,
+        entityType: "Group",
+        entityId: id,
+        userId: user.userId,
+        description: `Group ${existingGroup.name} deleted (${existingGroup._count.subaccounts} member(s) removed)`,
+      },
+    });
 
     return NextResponse.json(
       {

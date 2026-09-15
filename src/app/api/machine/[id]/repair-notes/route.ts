@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
+import { AuditAction } from "@prisma/client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -108,6 +109,16 @@ export async function POST(
             email: true,
           },
         },
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        action: AuditAction.MINER_REPAIR_NOTE_ADDED,
+        entityType: "Miner",
+        entityId: minerId,
+        userId: decoded.userId as string,
+        description: "Repair note added",
       },
     });
 

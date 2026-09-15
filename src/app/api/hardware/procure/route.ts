@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
+import { AuditAction } from "@prisma/client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -97,6 +98,16 @@ export async function POST(
           quantity: {
             increment: qty,
           },
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          action: AuditAction.HARDWARE_PROCUREMENT_RECORDED,
+          entityType: "Hardware",
+          entityId: hardwareId,
+          userId,
+          description: `Procured ${qty} unit${qty !== 1 ? "s" : ""} of hardware`,
         },
       });
     });

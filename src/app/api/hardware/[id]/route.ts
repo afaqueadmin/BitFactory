@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
+import { AuditAction } from "@prisma/client";
 
 interface ApiResponse<T = unknown> {
   success: boolean;
@@ -169,16 +170,34 @@ export async function PUT(
       }
     }
 
+    const directFieldChanges: Record<string, unknown> = {
+      ...(model !== undefined && { model }),
+      ...(powerUsage !== undefined && { powerUsage }),
+      ...(hashRate !== undefined && { hashRate }),
+      ...(quantity !== undefined && { quantity }),
+    };
+
     // Update hardware
     const updatedHardware = await prisma.hardware.update({
       where: { id },
       data: {
-        ...(model !== undefined && { model }),
-        ...(powerUsage !== undefined && { powerUsage }),
-        ...(hashRate !== undefined && { hashRate }),
-        ...(quantity !== undefined && { quantity }),
+        ...directFieldChanges,
+        updatedById: userId,
       },
     });
+
+    if (Object.keys(directFieldChanges).length > 0) {
+      await prisma.auditLog.create({
+        data: {
+          action: AuditAction.HARDWARE_UPDATED,
+          entityType: "Hardware",
+          entityId: updatedHardware.id,
+          userId,
+          description: `Hardware ${updatedHardware.model} updated`,
+          changes: JSON.stringify(directFieldChanges),
+        },
+      });
+    }
 
     return NextResponse.json<ApiResponse>({
       success: true,
@@ -275,6 +294,18 @@ export async function DELETE(
       where: { id },
       data: {
         isDeleted: true,
+        deletedById: userId,
+        deletedAt: new Date(),
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        action: AuditAction.HARDWARE_DELETED,
+        entityType: "Hardware",
+        entityId: id,
+        userId,
+        description: `Hardware ${existingHardware.model} deleted`,
       },
     });
 

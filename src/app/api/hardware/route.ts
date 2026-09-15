@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
+import { AuditAction } from "@prisma/client";
 
 interface ApiResponse<T = unknown> {
   success: boolean;
@@ -171,6 +172,17 @@ export async function POST(request: NextRequest) {
         powerUsage,
         hashRate,
         ...(quantity !== undefined && { quantity }),
+        createdById: userId,
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        action: AuditAction.HARDWARE_CREATED,
+        entityType: "Hardware",
+        entityId: hardware.id,
+        userId,
+        description: `Hardware ${hardware.model} created`,
       },
     });
 

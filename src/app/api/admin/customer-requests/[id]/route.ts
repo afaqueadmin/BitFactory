@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
+import { AuditAction } from "@prisma/client";
 
 export async function DELETE(
   request: NextRequest,
@@ -53,6 +54,16 @@ export async function DELETE(
     }
 
     await prisma.franchiseCustomerRequest.delete({ where: { id } });
+
+    await prisma.auditLog.create({
+      data: {
+        action: AuditAction.CUSTOMER_REQUEST_DELETED,
+        entityType: "FranchiseCustomerRequest",
+        entityId: id,
+        userId: decoded.userId,
+        description: `Customer request for ${customerRequest.name} (${customerRequest.email}) deleted`,
+      },
+    });
 
     return NextResponse.json({
       success: true,

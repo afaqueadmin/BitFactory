@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
+import { AuditAction } from "@prisma/client";
 
 /**
  * POST /api/groups/[id]/subaccounts/bulk-remove
@@ -54,6 +55,12 @@ export async function POST(
       );
     }
 
+    // Fetch the rows before deleting so each one can get its own audit entry
+    const toRemove = await prisma.groupSubaccount.findMany({
+      where: { id: { in: subaccountIds }, groupId },
+      select: { id: true, subaccountName: true },
+    });
+
     // Remove subaccounts from group
     const deleteResult = await prisma.groupSubaccount.deleteMany({
       where: {
@@ -67,6 +74,18 @@ export async function POST(
       deleteResult.count,
       "subaccounts from group",
     );
+
+    if (toRemove.length > 0) {
+      await prisma.auditLog.createMany({
+        data: toRemove.map((removed) => ({
+          action: AuditAction.GROUP_SUBACCOUNT_REMOVED,
+          entityType: "Group",
+          entityId: groupId,
+          userId: user.userId,
+          description: `${removed.subaccountName || "Customer"} removed from group ${group.name}`,
+        })),
+      });
+    }
 
     return NextResponse.json(
       {

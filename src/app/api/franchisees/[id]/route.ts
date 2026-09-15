@@ -12,6 +12,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
+import { AuditAction } from "@prisma/client";
 
 interface ApiResponse<T = Record<string, unknown>> {
   success: boolean;
@@ -334,6 +335,17 @@ export async function PUT(
       },
     });
 
+    await prisma.auditLog.create({
+      data: {
+        action: AuditAction.FRANCHISE_UPDATED,
+        entityType: "Franchise",
+        entityId: updatedFranchise.id,
+        userId: user.userId,
+        description: `Franchise ${updatedFranchise.businessName} updated`,
+        changes: JSON.stringify(updateData),
+      },
+    });
+
     return NextResponse.json(
       {
         success: true,
@@ -397,6 +409,16 @@ export async function DELETE(
     const deletedFranchise = await prisma.franchise.update({
       where: { id },
       data: { deletedAt: new Date(), isActive: false },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        action: AuditAction.FRANCHISE_DELETED,
+        entityType: "Franchise",
+        entityId: deletedFranchise.id,
+        userId: user.userId,
+        description: `Franchise ${deletedFranchise.businessName} deleted`,
+      },
     });
 
     return NextResponse.json(

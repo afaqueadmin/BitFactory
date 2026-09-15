@@ -12,6 +12,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
+import { AuditAction } from "@prisma/client";
 import { hash } from "bcrypt";
 import { sendWelcomeEmail } from "@/lib/email";
 import normalizeEmailUsername from "@/lib/helpers/normailizeEmailUsername";
@@ -260,6 +261,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           franchiseCode,
           createdById: authUser.userId,
           franchiseeId: franchisee.id,
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          action: AuditAction.FRANCHISE_CREATED,
+          entityType: "Franchise",
+          entityId: franchise.id,
+          userId: authUser.userId,
+          description: `Franchise ${franchise.businessName} (${franchise.franchiseCode}) created`,
         },
       });
 

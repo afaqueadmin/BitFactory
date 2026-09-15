@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
+import { AuditAction } from "@prisma/client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,8 +30,27 @@ export async function DELETE(
       );
     }
 
+    const existingNote = await prisma.minerRepairNote.findUnique({
+      where: { id: noteId },
+      select: { minerId: true },
+    });
+
+    if (!existingNote) {
+      return NextResponse.json({ error: "Note not found" }, { status: 404 });
+    }
+
     await prisma.minerRepairNote.delete({
       where: { id: noteId },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        action: AuditAction.MINER_REPAIR_NOTE_DELETED,
+        entityType: "Miner",
+        entityId: existingNote.minerId,
+        userId: decoded.userId as string,
+        description: "Repair note deleted",
+      },
     });
 
     return NextResponse.json({ success: true }, { status: 200 });
@@ -91,6 +111,16 @@ export async function PUT(
             email: true,
           },
         },
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        action: AuditAction.MINER_REPAIR_NOTE_UPDATED,
+        entityType: "Miner",
+        entityId: updatedNote.minerId,
+        userId: decoded.userId as string,
+        description: "Repair note updated",
       },
     });
 

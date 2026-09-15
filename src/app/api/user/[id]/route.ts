@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
+import { AuditAction } from "@prisma/client";
 
 export async function PUT(
   request: NextRequest,
@@ -238,6 +239,18 @@ export async function PUT(
     // the client has a Luxor credential, or directly by userId otherwise.
     if (body.groupId !== undefined && currentUser?.role === "CLIENT") {
       try {
+        // Look up the existing membership (if any) before removing it, so
+        // the removal can be attributed to the group it actually came from.
+        const existingMembership = await prisma.groupSubaccount.findFirst({
+          where: {
+            OR: [
+              { userId: id },
+              ...(luxorPoolAuthId ? [{ poolAuthId: luxorPoolAuthId }] : []),
+            ],
+          },
+          select: { groupId: true, subaccountName: true },
+        });
+
         // Remove any existing group membership for this user, whether keyed
         // by their Luxor credential or directly by userId (subaccount-less).
         await prisma.groupSubaccount.deleteMany({
@@ -248,6 +261,18 @@ export async function PUT(
             ],
           },
         });
+
+        if (existingMembership) {
+          await prisma.auditLog.create({
+            data: {
+              action: AuditAction.GROUP_SUBACCOUNT_REMOVED,
+              entityType: "Group",
+              entityId: existingMembership.groupId,
+              userId,
+              description: `${existingMembership.subaccountName || "Customer"} removed from group`,
+            },
+          });
+        }
 
         // Then add to the new group (only if groupId is not null/empty)
         if (body.groupId && body.groupId.trim().length > 0) {
@@ -277,6 +302,15 @@ export async function PUT(
               `[User Update API] Added user ${id} (no subaccount) to group "${body.groupId}"`,
             );
           }
+          await prisma.auditLog.create({
+            data: {
+              action: AuditAction.GROUP_SUBACCOUNT_ADDED,
+              entityType: "Group",
+              entityId: body.groupId,
+              userId,
+              description: `${subaccountName?.trim() || "Customer"} added to group`,
+            },
+          });
         } else {
           console.log(`[User Update API] Removed user ${id} from all groups`);
         }

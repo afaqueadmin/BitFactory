@@ -12,6 +12,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
+import { AuditAction } from "@prisma/client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -104,8 +105,9 @@ export async function PUT(
     console.log(`[Miners API] PUT: Starting for miner id ${id}`);
 
     // Verify admin authorization
+    let actorUserId: string;
     try {
-      await verifyAdminAuth(request);
+      ({ userId: actorUserId } = await verifyAdminAuth(request));
     } catch (authError) {
       const errorMsg =
         authError instanceof Error ? authError.message : "Authorization failed";
@@ -417,6 +419,9 @@ export async function PUT(
       );
     }
 
+    const directFieldChanges = { ...updateData };
+    updateData.updatedById = actorUserId;
+
     // Update miner with hardware quantity adjustments if hardware changed
     const updatedMiner = await prisma.$transaction(async (tx) => {
       // If hardware is being changed, adjust quantities
@@ -481,14 +486,20 @@ export async function PUT(
           latestBenchmark &&
           parseFloat(latestBenchmark.benchmarkHashrate.toString());
         if (!latestBenchmark || currentBenchmark !== benchmarkHashrateValue) {
-          const token = request.cookies.get("token")?.value;
-          const decoded = await verifyJwtToken(token!);
-
           await tx.minerHashrateBenchmark.create({
             data: {
               minerId: id,
               benchmarkHashrate: benchmarkHashrateValue,
-              createdById: decoded.userId,
+              createdById: actorUserId,
+            },
+          });
+          await tx.auditLog.create({
+            data: {
+              action: AuditAction.MINER_HASHRATE_BENCHMARK_SET,
+              entityType: "Miner",
+              entityId: id,
+              userId: actorUserId,
+              description: `Hashrate benchmark set to ${benchmarkHashrateValue} TH/s`,
             },
           });
         }
@@ -496,17 +507,21 @@ export async function PUT(
 
       // Handle miner reassignment (userId change)
       if (updateData.userId && updateData.userId !== existingMiner.userId) {
-        // Get authenticated user ID from token
-        const token = request.cookies.get("token")?.value;
-        const decoded = await verifyJwtToken(token!);
-        const authenticatedUserId = decoded.userId;
-
         // Create ownership history entry for reassignment
         await tx.minerOwnershipHistory.create({
           data: {
             minerId: id,
             ownerId: updateData.userId,
-            createdById: authenticatedUserId,
+            createdById: actorUserId,
+          },
+        });
+        await tx.auditLog.create({
+          data: {
+            action: AuditAction.MINER_OWNERSHIP_CHANGED,
+            entityType: "Miner",
+            entityId: id,
+            userId: actorUserId,
+            description: "Miner ownership reassigned",
           },
         });
       }
@@ -517,23 +532,27 @@ export async function PUT(
         updateData.poolId &&
         updateData.poolId !== existingMiner.poolId
       ) {
-        // Get authenticated user ID from token
-        const token = request.cookies.get("token")?.value;
-        const decoded = await verifyJwtToken(token!);
-        const authenticatedUserId = decoded.userId;
-
         // Create pool history entry for the new assignment
         await tx.minerPoolHistory.create({
           data: {
             minerId: id,
             poolId: updateData.poolId,
-            createdById: authenticatedUserId,
+            createdById: actorUserId,
+          },
+        });
+        await tx.auditLog.create({
+          data: {
+            action: AuditAction.MINER_POOL_CHANGED,
+            entityType: "Miner",
+            entityId: id,
+            userId: actorUserId,
+            description: "Miner reassigned to a different pool",
           },
         });
       }
 
       // Update the miner
-      return await tx.miner.update({
+      const result = await tx.miner.update({
         where: { id },
         data: updateData,
         include: {
@@ -577,6 +596,21 @@ export async function PUT(
           },
         },
       });
+
+      if (Object.keys(directFieldChanges).length > 0) {
+        await tx.auditLog.create({
+          data: {
+            action: AuditAction.MINER_UPDATED,
+            entityType: "Miner",
+            entityId: id,
+            userId: actorUserId,
+            description: `Miner ${result.name} updated`,
+            changes: JSON.stringify(directFieldChanges),
+          },
+        });
+      }
+
+      return result;
     });
 
     console.log(`[Miners API] PUT: Successfully updated miner ${id}`);
@@ -644,8 +678,9 @@ export async function DELETE(
     console.log(`[Miners API] DELETE: Starting for miner id ${id}`);
 
     // Verify admin authorization
+    let actorUserId: string;
     try {
-      await verifyAdminAuth(request);
+      ({ userId: actorUserId } = await verifyAdminAuth(request));
     } catch (authError) {
       const errorMsg =
         authError instanceof Error ? authError.message : "Authorization failed";
@@ -664,6 +699,7 @@ export async function DELETE(
       where: { id },
       select: {
         id: true,
+        name: true,
         hardwareId: true,
         user: { select: { franchiseeId: true } },
       },
@@ -698,10 +734,12 @@ export async function DELETE(
       // });
 
       // Soft delete hardware by setting isDeleted to true
-      await prisma.miner.update({
+      await tx.miner.update({
         where: { id },
         data: {
           isDeleted: true,
+          deletedById: actorUserId,
+          deletedAt: new Date(),
         },
       });
 
@@ -712,6 +750,16 @@ export async function DELETE(
           quantity: {
             increment: 1,
           },
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          action: AuditAction.MINER_DELETED,
+          entityType: "Miner",
+          entityId: id,
+          userId: actorUserId,
+          description: `Miner ${existingMiner.name} deleted`,
         },
       });
     });

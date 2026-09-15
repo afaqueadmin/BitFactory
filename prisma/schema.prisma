@@ -55,6 +55,12 @@ model User {
   createdMinerHistory          MinerOwnershipHistory[]      @relation("createdBy")
   ownedMinerHistory            MinerOwnershipHistory[]      @relation("owner")
   miners                       Miner[]
+  minersCreated                Miner[]                      @relation("MinerCreatedBy")
+  minersUpdated                Miner[]                      @relation("MinerUpdatedBy")
+  minersDeleted                Miner[]                      @relation("MinerDeletedBy")
+  hardwareCreated              Hardware[]                   @relation("HardwareCreatedBy")
+  hardwareUpdated              Hardware[]                   @relation("HardwareUpdatedBy")
+  hardwareDeleted              Hardware[]                   @relation("HardwareDeletedBy")
   emailSendRunsCreated         EmailSendRun[]               @relation("emailSendRunsCreated")
   emailSendResults             EmailSendResult[]            @relation("emailSendResults")
   recurringCreated             RecurringInvoice[]           @relation("recurringInvoicesCreated")
@@ -347,6 +353,13 @@ model Hardware {
   updatedAt          DateTime                     @updatedAt
   quantity           Int                          @default(1)
   isDeleted          Boolean                      @default(false)
+  createdById        String?
+  updatedById        String?
+  deletedById        String?
+  deletedAt          DateTime?
+  createdBy          User?                        @relation("HardwareCreatedBy", fields: [createdById], references: [id])
+  updatedBy          User?                        @relation("HardwareUpdatedBy", fields: [updatedById], references: [id])
+  deletedBy          User?                        @relation("HardwareDeletedBy", fields: [deletedById], references: [id])
   procurementHistory HardwareProcurementHistory[]
   miners             Miner[]
   invoices           Invoice[]
@@ -370,6 +383,13 @@ model Miner {
   poolAuth           String?
   serialNumber       String?
   macAddress         String?
+  createdById        String?
+  updatedById        String?
+  deletedById        String?
+  deletedAt          DateTime?
+  createdBy          User?                    @relation("MinerCreatedBy", fields: [createdById], references: [id])
+  updatedBy          User?                    @relation("MinerUpdatedBy", fields: [updatedById], references: [id])
+  deletedBy          User?                    @relation("MinerDeletedBy", fields: [deletedById], references: [id])
   ownershipHistory   MinerOwnershipHistory[]
   rateHistory        MinerRateHistory[]
   poolHistory        MinerPoolHistory[]
@@ -1208,6 +1228,38 @@ enum AuditAction {
   USER_PASSWORD_RESET
   TWO_FACTOR_ENABLED
   TWO_FACTOR_DISABLED
+  VENDOR_INVOICE_CREATED
+  VENDOR_INVOICE_UPDATED
+  VENDOR_INVOICE_DELETED
+  HARDWARE_PURCHASE_INVOICE_CREATED
+  HARDWARE_PURCHASE_INVOICE_UPDATED
+  HARDWARE_PURCHASE_INVOICE_DELETED
+  FRANCHISE_CREATED
+  FRANCHISE_UPDATED
+  FRANCHISE_DELETED
+  CUSTOMER_REQUEST_SUBMITTED
+  CUSTOMER_REQUEST_APPROVED
+  CUSTOMER_REQUEST_REJECTED
+  CUSTOMER_REQUEST_DELETED
+  GROUP_CREATED
+  GROUP_UPDATED
+  GROUP_DELETED
+  GROUP_SUBACCOUNT_ADDED
+  GROUP_SUBACCOUNT_REMOVED
+  MINER_REPAIR_NOTE_ADDED
+  MINER_REPAIR_NOTE_UPDATED
+  MINER_REPAIR_NOTE_DELETED
+  MINER_OWNERSHIP_CHANGED
+  MINER_POOL_CHANGED
+  MINER_HASHRATE_BENCHMARK_SET
+  HARDWARE_PROCUREMENT_RECORDED
+  MINER_HASHRATE_ALERT_ACKNOWLEDGED
+  MINER_CREATED
+  MINER_UPDATED
+  MINER_DELETED
+  HARDWARE_CREATED
+  HARDWARE_UPDATED
+  HARDWARE_DELETED
 }
 
 enum NotificationType {

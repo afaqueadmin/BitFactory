@@ -12,6 +12,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
+import { AuditAction } from "@prisma/client";
 
 /**
  * API Response Type
@@ -249,6 +250,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     });
 
     console.log("[Groups API] POST - Group created successfully:", newGroup.id);
+
+    await prisma.auditLog.create({
+      data: {
+        action: AuditAction.GROUP_CREATED,
+        entityType: "Group",
+        entityId: newGroup.id,
+        userId: user.userId,
+        description: `Group ${newGroup.name} created`,
+      },
+    });
 
     return NextResponse.json(
       {

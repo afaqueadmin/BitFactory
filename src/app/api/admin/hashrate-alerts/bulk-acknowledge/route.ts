@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
+import { AuditAction } from "@prisma/client";
 
 async function requireAdmin(request: NextRequest) {
   const token = request.cookies.get("token")?.value;
@@ -51,6 +52,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const toClaim = await prisma.minerHashrateAlertLog.findMany({
+      where: { id: { in: ids }, acknowledgedAt: null },
+      select: {
+        id: true,
+        minerId: true,
+        date: true,
+        miner: { select: { name: true } },
+      },
+    });
+
     const claim = await prisma.minerHashrateAlertLog.updateMany({
       where: { id: { in: ids }, acknowledgedAt: null },
       data: {
@@ -58,6 +69,18 @@ export async function POST(request: NextRequest) {
         acknowledgedById: auth.decoded.userId,
       },
     });
+
+    if (toClaim.length > 0) {
+      await prisma.auditLog.createMany({
+        data: toClaim.map((alert) => ({
+          action: AuditAction.MINER_HASHRATE_ALERT_ACKNOWLEDGED,
+          entityType: "Miner",
+          entityId: alert.minerId,
+          userId: auth.decoded.userId,
+          description: `Hashrate alert for ${alert.miner.name} on ${alert.date.toISOString().slice(0, 10)} acknowledged`,
+        })),
+      });
+    }
 
     return NextResponse.json({
       success: true,

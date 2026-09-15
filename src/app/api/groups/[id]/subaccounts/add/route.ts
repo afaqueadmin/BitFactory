@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
+import { AuditAction } from "@prisma/client";
 
 /**
  * POST /api/groups/[id]/subaccounts/add
@@ -150,6 +151,16 @@ export async function POST(
     }
 
     console.log("[Groups API] Subaccount added successfully:", groupSubaccount);
+
+    await prisma.auditLog.create({
+      data: {
+        action: AuditAction.GROUP_SUBACCOUNT_ADDED,
+        entityType: "Group",
+        entityId: groupId,
+        userId: authenticatedUserId,
+        description: `${groupSubaccount.subaccountName || "Customer"} added to group ${group.name}`,
+      },
+    });
 
     return NextResponse.json({
       success: true,

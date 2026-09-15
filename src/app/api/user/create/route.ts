@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { hash } from "bcrypt";
 import { NextRequest, NextResponse } from "next/server";
 import { verifyJwtToken } from "@/lib/jwt";
+import { AuditAction } from "@prisma/client";
 import { sendWelcomeEmail } from "@/lib/email";
 import normalizeEmailUsername from "@/lib/helpers/normailizeEmailUsername";
 import { getOrCreatePaybackConfig } from "@/lib/paybackConfigHelpers";
@@ -301,6 +302,16 @@ export async function POST(request: NextRequest) {
             `[User Create API] Added user ${newUser.id} (no subaccount) to group "${groupId}"`,
           );
         }
+
+        await prisma.auditLog.create({
+          data: {
+            action: AuditAction.GROUP_SUBACCOUNT_ADDED,
+            entityType: "Group",
+            entityId: groupId,
+            userId,
+            description: `${luxorPoolAuthId ? luxorSubaccountName?.trim() : newUser.name || newUser.email} added to group`,
+          },
+        });
       } catch (groupError) {
         console.error(
           "[User Create API] Failed to add user to group:",
