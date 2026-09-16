@@ -3,6 +3,7 @@ import { hash } from "bcrypt";
 import { NextRequest, NextResponse } from "next/server";
 import { verifyJwtToken } from "@/lib/jwt";
 import { AuditAction } from "@prisma/client";
+import { logPoolCredentialChange } from "@/lib/audit/logPoolCredentialChange";
 import { sendWelcomeEmail } from "@/lib/email";
 import normalizeEmailUsername from "@/lib/helpers/normailizeEmailUsername";
 import { getOrCreatePaybackConfig } from "@/lib/paybackConfigHelpers";
@@ -262,6 +263,12 @@ export async function POST(request: NextRequest) {
             select: { id: true },
           });
           luxorPoolAuthId = poolAuth.id;
+          await logPoolCredentialChange(prisma, {
+            action: AuditAction.POOL_CREDENTIAL_ADDED,
+            userId: newUser.id,
+            actorId: userId,
+            poolName: "Luxor",
+          });
         }
       } catch (updateError) {
         console.error(
@@ -343,6 +350,12 @@ export async function POST(request: NextRequest) {
           console.log(
             `[User Create API] Assigned Braiins credential to user ${newUser.id}`,
           );
+          await logPoolCredentialChange(prisma, {
+            action: AuditAction.POOL_CREDENTIAL_ADDED,
+            userId: newUser.id,
+            actorId: userId,
+            poolName: "Braiins",
+          });
         }
       } catch (braiinsError) {
         console.error(

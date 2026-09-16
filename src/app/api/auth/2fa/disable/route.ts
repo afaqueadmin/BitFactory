@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import speakeasy from "speakeasy";
-import { AuditAction } from "@prisma/client";
 import { getUserInfoFromToken } from "@/lib/helpers/getUserInfoFromToken";
 
 export async function POST(req: NextRequest) {
@@ -64,13 +63,10 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    await prisma.auditLog.create({
+    await prisma.userActivity.create({
       data: {
-        action: AuditAction.TWO_FACTOR_DISABLED,
-        entityType: "User",
-        entityId: userId,
         userId,
-        description: "Two-factor authentication disabled",
+        type: "2FA_DISABLED",
         ipAddress: req.headers.get("x-forwarded-for") || "unknown",
         userAgent: req.headers.get("user-agent") || "unknown",
       },

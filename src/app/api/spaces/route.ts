@@ -14,6 +14,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
+import { AuditAction } from "@prisma/client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -246,8 +247,9 @@ export async function POST(
     console.log("[Spaces API] POST: Starting");
 
     // Verify admin authorization
+    let actorUserId: string;
     try {
-      await verifyAdminAuth(request);
+      ({ userId: actorUserId } = await verifyAdminAuth(request));
     } catch (authError) {
       const errorMsg =
         authError instanceof Error ? authError.message : "Authorization failed";
@@ -355,6 +357,16 @@ export async function POST(
     });
 
     console.log(`[Spaces API] POST: Created space with id ${space.id}`);
+
+    await prisma.auditLog.create({
+      data: {
+        action: AuditAction.SPACE_CREATED,
+        entityType: "Space",
+        entityId: space.id,
+        userId: actorUserId,
+        description: `Space ${space.name} created`,
+      },
+    });
 
     return NextResponse.json<ApiResponse>(
       {

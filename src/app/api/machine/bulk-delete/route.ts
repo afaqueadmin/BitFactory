@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
+import { AuditAction } from "@prisma/client";
 
 interface BulkDeleteRequest {
   minerIds: string[];
@@ -43,8 +44,9 @@ export async function POST(
 ): Promise<NextResponse<ApiResponse>> {
   try {
     // Verify admin authorization
+    let actorUserId: string;
     try {
-      await verifyAdminAuth(req);
+      ({ userId: actorUserId } = await verifyAdminAuth(req));
     } catch (authError) {
       const errorMsg =
         authError instanceof Error ? authError.message : "Authorization failed";
@@ -141,6 +143,8 @@ export async function POST(
         where: { id: { in: minerIds } },
         data: {
           isDeleted: true,
+          deletedById: actorUserId,
+          deletedAt: new Date(),
         },
       });
 
@@ -151,6 +155,16 @@ export async function POST(
           data: { quantity: { increment: count } },
         });
       }
+
+      await tx.auditLog.createMany({
+        data: deletedMiners.map((miner) => ({
+          action: AuditAction.MINER_DELETED,
+          entityType: "Miner",
+          entityId: miner.id,
+          userId: actorUserId,
+          description: `Miner ${miner.name} deleted (bulk delete)`,
+        })),
+      });
 
       return {
         deletedCount: deletedMiners.length,

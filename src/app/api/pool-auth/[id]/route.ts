@@ -12,6 +12,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
+import { AuditAction } from "@prisma/client";
+import { logPoolCredentialChange } from "@/lib/audit/logPoolCredentialChange";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -63,8 +65,9 @@ export async function PUT(
   try {
     const { id } = await context.params;
 
+    let actorUserId: string;
     try {
-      await verifyAdminAuth(request);
+      ({ userId: actorUserId } = await verifyAdminAuth(request));
     } catch (authError) {
       const errorMsg =
         authError instanceof Error ? authError.message : "Authorization failed";
@@ -75,7 +78,10 @@ export async function PUT(
       );
     }
 
-    const existing = await prisma.poolAuth.findUnique({ where: { id } });
+    const existing = await prisma.poolAuth.findUnique({
+      where: { id },
+      include: { pool: { select: { name: true } } },
+    });
     if (!existing) {
       return NextResponse.json<ApiResponse>(
         { success: false, error: "PoolAuth not found" },
@@ -104,6 +110,13 @@ export async function PUT(
         createdAt: true,
         updatedAt: true,
       },
+    });
+
+    await logPoolCredentialChange(prisma, {
+      action: AuditAction.POOL_CREDENTIAL_UPDATED,
+      userId: existing.userId,
+      actorId: actorUserId,
+      poolName: existing.pool.name,
     });
 
     console.log(`[PoolAuth API] PUT: Updated PoolAuth (id: ${id})`);
@@ -136,8 +149,9 @@ export async function DELETE(
   try {
     const { id } = await context.params;
 
+    let actorUserId: string;
     try {
-      await verifyAdminAuth(request);
+      ({ userId: actorUserId } = await verifyAdminAuth(request));
     } catch (authError) {
       const errorMsg =
         authError instanceof Error ? authError.message : "Authorization failed";
@@ -148,7 +162,10 @@ export async function DELETE(
       );
     }
 
-    const existing = await prisma.poolAuth.findUnique({ where: { id } });
+    const existing = await prisma.poolAuth.findUnique({
+      where: { id },
+      include: { pool: { select: { name: true } } },
+    });
     if (!existing) {
       return NextResponse.json<ApiResponse>(
         { success: false, error: "PoolAuth not found" },
@@ -157,6 +174,13 @@ export async function DELETE(
     }
 
     await prisma.poolAuth.delete({ where: { id } });
+
+    await logPoolCredentialChange(prisma, {
+      action: AuditAction.POOL_CREDENTIAL_REMOVED,
+      userId: existing.userId,
+      actorId: actorUserId,
+      poolName: existing.pool.name,
+    });
 
     console.log(`[PoolAuth API] DELETE: Deleted PoolAuth (id: ${id})`);
 

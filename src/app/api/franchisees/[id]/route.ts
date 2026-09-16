@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
 import { AuditAction } from "@prisma/client";
+import { logPoolCredentialChange } from "@/lib/audit/logPoolCredentialChange";
 
 interface ApiResponse<T = Record<string, unknown>> {
   success: boolean;
@@ -244,6 +245,15 @@ export async function PUT(
         });
         if (luxorPool) {
           if (luxorSubaccountName && String(luxorSubaccountName).trim()) {
+            const existingLuxorAuth = await prisma.poolAuth.findUnique({
+              where: {
+                poolId_userId: {
+                  poolId: luxorPool.id,
+                  userId: existingFranchise.franchiseeId,
+                },
+              },
+              select: { id: true },
+            });
             await prisma.poolAuth.upsert({
               where: {
                 poolId_userId: {
@@ -258,13 +268,29 @@ export async function PUT(
               },
               update: { authKey: String(luxorSubaccountName).trim() },
             });
+            await logPoolCredentialChange(prisma, {
+              action: existingLuxorAuth
+                ? AuditAction.POOL_CREDENTIAL_UPDATED
+                : AuditAction.POOL_CREDENTIAL_ADDED,
+              userId: existingFranchise.franchiseeId,
+              actorId: user.userId,
+              poolName: "Luxor",
+            });
           } else {
-            await prisma.poolAuth.deleteMany({
+            const removed = await prisma.poolAuth.deleteMany({
               where: {
                 poolId: luxorPool.id,
                 userId: existingFranchise.franchiseeId,
               },
             });
+            if (removed.count > 0) {
+              await logPoolCredentialChange(prisma, {
+                action: AuditAction.POOL_CREDENTIAL_REMOVED,
+                userId: existingFranchise.franchiseeId,
+                actorId: user.userId,
+                poolName: "Luxor",
+              });
+            }
           }
         }
       } catch (poolAuthError) {
@@ -286,6 +312,15 @@ export async function PUT(
         });
         if (braiinsPool) {
           if (braiinsAuthKey && String(braiinsAuthKey).trim()) {
+            const existingBraiinsAuth = await prisma.poolAuth.findUnique({
+              where: {
+                poolId_userId: {
+                  poolId: braiinsPool.id,
+                  userId: existingFranchise.franchiseeId,
+                },
+              },
+              select: { id: true },
+            });
             await prisma.poolAuth.upsert({
               where: {
                 poolId_userId: {
@@ -300,13 +335,29 @@ export async function PUT(
               },
               update: { authKey: String(braiinsAuthKey).trim() },
             });
+            await logPoolCredentialChange(prisma, {
+              action: existingBraiinsAuth
+                ? AuditAction.POOL_CREDENTIAL_UPDATED
+                : AuditAction.POOL_CREDENTIAL_ADDED,
+              userId: existingFranchise.franchiseeId,
+              actorId: user.userId,
+              poolName: "Braiins",
+            });
           } else {
-            await prisma.poolAuth.deleteMany({
+            const removed = await prisma.poolAuth.deleteMany({
               where: {
                 poolId: braiinsPool.id,
                 userId: existingFranchise.franchiseeId,
               },
             });
+            if (removed.count > 0) {
+              await logPoolCredentialChange(prisma, {
+                action: AuditAction.POOL_CREDENTIAL_REMOVED,
+                userId: existingFranchise.franchiseeId,
+                actorId: user.userId,
+                poolName: "Braiins",
+              });
+            }
           }
         }
       } catch (braiinsError) {

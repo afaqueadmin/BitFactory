@@ -709,6 +709,16 @@ export async function POST(
         data: {
           minerId: newMiner.id,
           rate_per_kwh: ratePerKwh,
+          createdById: authenticatedUserId,
+        },
+      });
+      await tx.auditLog.create({
+        data: {
+          action: AuditAction.MINER_RATE_CHANGED,
+          entityType: "Miner",
+          entityId: newMiner.id,
+          userId: authenticatedUserId,
+          description: `Electricity rate set to ${ratePerKwh}/kWh`,
         },
       });
 

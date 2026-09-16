@@ -12,6 +12,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
+import { AuditAction } from "@prisma/client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -99,8 +100,9 @@ export async function PUT(
     console.log(`[Spaces API] PUT: Starting for space id ${id}`);
 
     // Verify admin authorization
+    let actorUserId: string;
     try {
-      await verifyAdminAuth(request);
+      ({ userId: actorUserId } = await verifyAdminAuth(request));
     } catch (authError) {
       const errorMsg =
         authError instanceof Error ? authError.message : "Authorization failed";
@@ -219,6 +221,17 @@ export async function PUT(
 
     console.log(`[Spaces API] PUT: Successfully updated space ${id}`);
 
+    await prisma.auditLog.create({
+      data: {
+        action: AuditAction.SPACE_UPDATED,
+        entityType: "Space",
+        entityId: id,
+        userId: actorUserId,
+        description: `Space ${updatedSpace.name} updated`,
+        changes: JSON.stringify(updateData),
+      },
+    });
+
     return NextResponse.json<ApiResponse>(
       {
         success: true,
@@ -279,8 +292,9 @@ export async function DELETE(
     console.log(`[Spaces API] DELETE: Starting for space id ${id}`);
 
     // Verify admin authorization
+    let actorUserId: string;
     try {
-      await verifyAdminAuth(request);
+      ({ userId: actorUserId } = await verifyAdminAuth(request));
     } catch (authError) {
       const errorMsg =
         authError instanceof Error ? authError.message : "Authorization failed";
@@ -331,6 +345,19 @@ export async function DELETE(
     // Delete space
     await prisma.space.delete({
       where: { id },
+    });
+
+    // Logged after the delete succeeds (existingSpace.name was captured
+    // above, before the row was gone) so a failed delete never produces a
+    // false "deleted" audit entry.
+    await prisma.auditLog.create({
+      data: {
+        action: AuditAction.SPACE_DELETED,
+        entityType: "Space",
+        entityId: id,
+        userId: actorUserId,
+        description: `Space ${existingSpace.name} deleted`,
+      },
     });
 
     console.log(`[Spaces API] DELETE: Successfully deleted space ${id}`);

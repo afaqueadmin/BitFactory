@@ -254,6 +254,16 @@ export async function POST(
             data: {
               minerId,
               rate_per_kwh: rateDecimal,
+              createdById: userId,
+            },
+          });
+          await prisma.auditLog.create({
+            data: {
+              action: AuditAction.MINER_RATE_CHANGED,
+              entityType: "Miner",
+              entityId: minerId,
+              userId,
+              description: `Electricity rate changed to ${rateDecimal}/kWh (bulk edit)`,
             },
           });
         }

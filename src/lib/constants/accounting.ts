@@ -259,6 +259,15 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   [AuditAction.HARDWARE_CREATED]: "Hardware Created",
   [AuditAction.HARDWARE_UPDATED]: "Hardware Updated",
   [AuditAction.HARDWARE_DELETED]: "Hardware Deleted",
+  [AuditAction.USER_UPDATED]: "User Updated",
+  [AuditAction.USER_DELETED]: "User Deleted",
+  [AuditAction.MINER_RATE_CHANGED]: "Miner Electricity Rate Changed",
+  [AuditAction.POOL_CREDENTIAL_ADDED]: "Pool Credential Added",
+  [AuditAction.POOL_CREDENTIAL_UPDATED]: "Pool Credential Updated",
+  [AuditAction.POOL_CREDENTIAL_REMOVED]: "Pool Credential Removed",
+  [AuditAction.SPACE_CREATED]: "Space Created",
+  [AuditAction.SPACE_UPDATED]: "Space Updated",
+  [AuditAction.SPACE_DELETED]: "Space Deleted",
 };
 
 // ============================================================================

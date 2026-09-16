@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
 import { AuditAction } from "@prisma/client";
+import { logPoolCredentialChange } from "@/lib/audit/logPoolCredentialChange";
 
 export async function PUT(
   request: NextRequest,
@@ -156,26 +157,43 @@ export async function PUT(
     }
 
     // Update user with provided fields
+    const updateData = {
+      name: body.name,
+      phoneNumber: body.phoneNumber,
+      companyName: body.companyName,
+      streetAddress: body.streetAddress,
+      city: body.city,
+      country: body.country,
+      companyUrl: body.companyUrl,
+      email: user.role === "SUPER_ADMIN" && body.email ? body.email : undefined,
+      luxorSubaccountName:
+        body.luxorSubaccountName !== undefined
+          ? body.luxorSubaccountName
+          : undefined,
+      franchiseeId: franchiseeIdUpdate,
+      segment: segmentUpdate,
+    };
+
     const updatedUser = await prisma.user.update({
       where: { id },
-      data: {
-        name: body.name,
-        phoneNumber: body.phoneNumber,
-        companyName: body.companyName,
-        streetAddress: body.streetAddress,
-        city: body.city,
-        country: body.country,
-        companyUrl: body.companyUrl,
-        email:
-          user.role === "SUPER_ADMIN" && body.email ? body.email : undefined,
-        luxorSubaccountName:
-          body.luxorSubaccountName !== undefined
-            ? body.luxorSubaccountName
-            : undefined,
-        franchiseeId: franchiseeIdUpdate,
-        segment: segmentUpdate,
-      },
+      data: updateData,
     });
+
+    const changedFields = Object.fromEntries(
+      Object.entries(updateData).filter(([, value]) => value !== undefined),
+    );
+    if (Object.keys(changedFields).length > 0) {
+      await prisma.auditLog.create({
+        data: {
+          action: AuditAction.USER_UPDATED,
+          entityType: "User",
+          entityId: id,
+          userId,
+          description: `User ${updatedUser.name || updatedUser.email} updated`,
+          changes: JSON.stringify(changedFields),
+        },
+      });
+    }
 
     // Dual-write: keep the Luxor PoolAuth row in sync with
     // User.luxorSubaccountName (legacy, still read by ~20 other files) any
@@ -193,6 +211,10 @@ export async function PUT(
           select: { id: true },
         });
         if (luxorPool) {
+          const existingLuxorAuth = await prisma.poolAuth.findUnique({
+            where: { poolId_userId: { poolId: luxorPool.id, userId: id } },
+            select: { id: true },
+          });
           const poolAuth = await prisma.poolAuth.upsert({
             where: { poolId_userId: { poolId: luxorPool.id, userId: id } },
             create: {
@@ -204,6 +226,14 @@ export async function PUT(
             select: { id: true },
           });
           luxorPoolAuthId = poolAuth.id;
+          await logPoolCredentialChange(prisma, {
+            action: existingLuxorAuth
+              ? AuditAction.POOL_CREDENTIAL_UPDATED
+              : AuditAction.POOL_CREDENTIAL_ADDED,
+            userId: id,
+            actorId: userId,
+            poolName: "Luxor",
+          });
         }
       } catch (poolAuthError) {
         console.error(
@@ -223,9 +253,17 @@ export async function PUT(
           select: { id: true },
         });
         if (luxorPool) {
-          await prisma.poolAuth.deleteMany({
+          const removed = await prisma.poolAuth.deleteMany({
             where: { poolId: luxorPool.id, userId: id },
           });
+          if (removed.count > 0) {
+            await logPoolCredentialChange(prisma, {
+              action: AuditAction.POOL_CREDENTIAL_REMOVED,
+              userId: id,
+              actorId: userId,
+              poolName: "Luxor",
+            });
+          }
         }
       } catch (poolAuthError) {
         console.error(
@@ -333,6 +371,12 @@ export async function PUT(
         });
         if (braiinsPool) {
           if (body.braiinsAuthKey && body.braiinsAuthKey.trim()) {
+            const existingBraiinsAuth = await prisma.poolAuth.findUnique({
+              where: {
+                poolId_userId: { poolId: braiinsPool.id, userId: id },
+              },
+              select: { id: true },
+            });
             await prisma.poolAuth.upsert({
               where: {
                 poolId_userId: { poolId: braiinsPool.id, userId: id },
@@ -347,13 +391,29 @@ export async function PUT(
             console.log(
               `[User Update API] Synced Braiins credential for user ${id}`,
             );
+            await logPoolCredentialChange(prisma, {
+              action: existingBraiinsAuth
+                ? AuditAction.POOL_CREDENTIAL_UPDATED
+                : AuditAction.POOL_CREDENTIAL_ADDED,
+              userId: id,
+              actorId: userId,
+              poolName: "Braiins",
+            });
           } else {
-            await prisma.poolAuth.deleteMany({
+            const removed = await prisma.poolAuth.deleteMany({
               where: { poolId: braiinsPool.id, userId: id },
             });
             console.log(
               `[User Update API] Removed Braiins credential for user ${id}`,
             );
+            if (removed.count > 0) {
+              await logPoolCredentialChange(prisma, {
+                action: AuditAction.POOL_CREDENTIAL_REMOVED,
+                userId: id,
+                actorId: userId,
+                poolName: "Braiins",
+              });
+            }
           }
         }
       } catch (braiinsError) {
@@ -439,7 +499,7 @@ export async function DELETE(
     // (set franchiseeId back to null / direct BitFactory customer) first.
     const targetUser = await prisma.user.findUnique({
       where: { id },
-      select: { franchiseeId: true },
+      select: { franchiseeId: true, name: true, email: true },
     });
 
     if (targetUser?.franchiseeId) {
@@ -483,6 +543,16 @@ export async function DELETE(
     await prisma.user.update({
       where: { id },
       data: { isDeleted: true },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        action: AuditAction.USER_DELETED,
+        entityType: "User",
+        entityId: id,
+        userId,
+        description: `User ${targetUser?.name || targetUser?.email || id} deleted`,
+      },
     });
 
     return NextResponse.json({

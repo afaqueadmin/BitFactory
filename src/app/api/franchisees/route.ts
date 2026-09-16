@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
 import { AuditAction } from "@prisma/client";
+import { logPoolCredentialChange } from "@/lib/audit/logPoolCredentialChange";
 import { hash } from "bcrypt";
 import { sendWelcomeEmail } from "@/lib/email";
 import normalizeEmailUsername from "@/lib/helpers/normailizeEmailUsername";
@@ -301,6 +302,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           console.log(
             `[Franchisees API] Synced Luxor PoolAuth for franchisee ${franchisee.id}`,
           );
+          await logPoolCredentialChange(prisma, {
+            action: AuditAction.POOL_CREDENTIAL_ADDED,
+            userId: franchisee.id,
+            actorId: authUser.userId,
+            poolName: "Luxor",
+          });
         }
       } catch (poolAuthError) {
         console.error(
@@ -333,6 +340,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           console.log(
             `[Franchisees API] Assigned Braiins credential to franchisee ${franchisee.id}`,
           );
+          await logPoolCredentialChange(prisma, {
+            action: AuditAction.POOL_CREDENTIAL_ADDED,
+            userId: franchisee.id,
+            actorId: authUser.userId,
+            poolName: "Braiins",
+          });
         }
       } catch (braiinsError) {
         console.error(

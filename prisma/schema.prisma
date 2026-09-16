@@ -61,6 +61,7 @@ model User {
   hardwareCreated              Hardware[]                   @relation("HardwareCreatedBy")
   hardwareUpdated              Hardware[]                   @relation("HardwareUpdatedBy")
   hardwareDeleted              Hardware[]                   @relation("HardwareDeletedBy")
+  minerRateHistoryCreated      MinerRateHistory[]           @relation("MinerRateHistoryCreatedBy")
   emailSendRunsCreated         EmailSendRun[]               @relation("emailSendRunsCreated")
   emailSendResults             EmailSendResult[]            @relation("emailSendResults")
   recurringCreated             RecurringInvoice[]           @relation("recurringInvoicesCreated")
@@ -414,10 +415,13 @@ model MinerRateHistory {
   minerId      String
   rate_per_kwh Decimal  @db.Decimal(10, 6)
   createdAt    DateTime @default(now())
+  createdById  String?
   miner        Miner    @relation(fields: [minerId], references: [id], onDelete: Cascade)
+  createdBy    User?    @relation("MinerRateHistoryCreatedBy", fields: [createdById], references: [id])
 
   @@index([minerId])
   @@index([minerId, createdAt(sort: Desc)])
+  @@index([createdById])
   @@map("miner_rate_history")
 }
 
@@ -1260,6 +1264,15 @@ enum AuditAction {
   HARDWARE_CREATED
   HARDWARE_UPDATED
   HARDWARE_DELETED
+  USER_UPDATED
+  USER_DELETED
+  MINER_RATE_CHANGED
+  POOL_CREDENTIAL_ADDED
+  POOL_CREDENTIAL_UPDATED
+  POOL_CREDENTIAL_REMOVED
+  SPACE_CREATED
+  SPACE_UPDATED
+  SPACE_DELETED
 }
 
 enum NotificationType {

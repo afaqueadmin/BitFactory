@@ -12,6 +12,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
+import { AuditAction } from "@prisma/client";
+import { logPoolCredentialChange } from "@/lib/audit/logPoolCredentialChange";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -126,8 +128,9 @@ export async function POST(
   request: NextRequest,
 ): Promise<NextResponse<ApiResponse>> {
   try {
+    let actorUserId: string;
     try {
-      await verifyAdminAuth(request);
+      ({ userId: actorUserId } = await verifyAdminAuth(request));
     } catch (authError) {
       const errorMsg =
         authError instanceof Error ? authError.message : "Authorization failed";
@@ -163,7 +166,10 @@ export async function POST(
     }
 
     const [pool, user] = await Promise.all([
-      prisma.pool.findUnique({ where: { id: poolId }, select: { id: true } }),
+      prisma.pool.findUnique({
+        where: { id: poolId },
+        select: { id: true, name: true },
+      }),
       prisma.user.findUnique({ where: { id: userId }, select: { id: true } }),
     ]);
 
@@ -181,6 +187,11 @@ export async function POST(
       );
     }
 
+    const existingPoolAuth = await prisma.poolAuth.findUnique({
+      where: { poolId_userId: { poolId, userId } },
+      select: { id: true },
+    });
+
     const poolAuth = await prisma.poolAuth.upsert({
       where: { poolId_userId: { poolId, userId } },
       create: { poolId, userId, authKey: authKey.trim() },
@@ -193,6 +204,15 @@ export async function POST(
         createdAt: true,
         updatedAt: true,
       },
+    });
+
+    await logPoolCredentialChange(prisma, {
+      action: existingPoolAuth
+        ? AuditAction.POOL_CREDENTIAL_UPDATED
+        : AuditAction.POOL_CREDENTIAL_ADDED,
+      userId,
+      actorId: actorUserId,
+      poolName: pool.name,
     });
 
     console.log(
