@@ -48,9 +48,10 @@ export async function GET(request: NextRequest) {
       try {
         const decoded = await verifyJwtToken(refreshToken);
         if (decoded && decoded.type === "refresh") {
-          // Get user data
-          const user = await prisma.user.findUnique({
-            where: { id: decoded.userId },
+          // Get user data - excludes soft-deleted accounts so a deleted
+          // user can't keep refreshing into new token pairs indefinitely.
+          const user = await prisma.user.findFirst({
+            where: { id: decoded.userId, isDeleted: false },
             select: {
               id: true,
               email: true,
