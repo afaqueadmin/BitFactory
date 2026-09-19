@@ -29,6 +29,7 @@ import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay"
 import { DateDisplay } from "@/components/accounting/common/DateDisplay";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import DownloadIcon from "@mui/icons-material/Download";
+import PayWithBitcoinButton from "@/components/PayWithBitcoinButton";
 
 export default function CustomerInvoiceDetailPage() {
   const params = useParams();
@@ -150,20 +151,35 @@ export default function CustomerInvoiceDetailPage() {
           >
             Back to Invoices
           </Button>
-          <Button
-            variant="contained"
-            startIcon={<DownloadIcon />}
-            onClick={handleDownload}
-            disabled={downloadLoading}
+          <Box
             sx={{
-              bgcolor: "primary.main",
-              "&:hover": {
-                bgcolor: "primary.dark",
-              },
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "flex-end",
+              gap: 1,
             }}
           >
-            {downloadLoading ? "Downloading..." : "Download Invoice"}
-          </Button>
+            <Button
+              variant="contained"
+              startIcon={<DownloadIcon />}
+              onClick={handleDownload}
+              disabled={downloadLoading}
+              sx={{
+                bgcolor: "primary.main",
+                "&:hover": {
+                  bgcolor: "primary.dark",
+                },
+              }}
+            >
+              {downloadLoading ? "Downloading..." : "Download Invoice"}
+            </Button>
+            {process.env.NEXT_PUBLIC_BTCPAY_ENABLED === "true" && (
+              <PayWithBitcoinButton
+                invoiceId={invoice.id}
+                disabled={invoice.status === "PAID"}
+              />
+            )}
+          </Box>
         </Box>
         <Typography variant="h4" sx={{ fontWeight: 700 }}>
           {invoice.invoiceNumber}
