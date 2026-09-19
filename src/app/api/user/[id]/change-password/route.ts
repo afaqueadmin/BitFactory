@@ -67,15 +67,15 @@ export async function PUT(
 
     const { newPassword, emailPassword } = await request.json();
 
-    if (!newPassword || newPassword.length < 6) {
+    if (!newPassword || newPassword.length < 8) {
       return NextResponse.json(
-        { error: "Password must be at least 6 characters long" },
+        { error: "Password must be at least 8 characters long" },
         { status: 400 },
       );
     }
 
     // Hash the new password
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
 
     // Update user password
     const updatedUser = await prisma.user.update({
