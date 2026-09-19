@@ -57,9 +57,15 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    // Same generic message as the other "can't proceed" cases below - the
+    // paired /authenticate/options route already avoids revealing whether an
+    // email is registered, so this route shouldn't undo that here.
     if (!user) {
       console.warn("WebAuthn authenticate verify: User not found", { email });
-      return NextResponse.json({ error: "User not found" }, { status: 401 });
+      return NextResponse.json(
+        { error: "Authentication failed" },
+        { status: 401 },
+      );
     }
 
     // Check if user has any credentials
@@ -68,7 +74,7 @@ export async function POST(request: NextRequest) {
         userId: user.id,
       });
       return NextResponse.json(
-        { error: "User has no passkeys registered" },
+        { error: "Authentication failed" },
         { status: 401 },
       );
     }
@@ -111,8 +117,10 @@ export async function POST(request: NextRequest) {
         userId: user.id,
         error: errorMsg,
       });
+      // Generic message to the client - the underlying library error is
+      // logged above for debugging but shouldn't reach the response.
       const errorResponse = NextResponse.json(
-        { error: errorMsg || "Assertion verification failed" },
+        { error: "Authentication failed" },
         { status: 401 },
       );
       errorResponse.cookies.set("webauthn_auth_challenge", "", {
@@ -131,7 +139,7 @@ export async function POST(request: NextRequest) {
         { userId: user.id },
       );
       return NextResponse.json(
-        { error: "Assertion verification failed" },
+        { error: "Authentication failed" },
         { status: 401 },
       );
     }
