@@ -88,7 +88,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (user && user.role !== "SUPER_ADMIN" && role === "ADMIN") {
+    if (
+      user &&
+      user.role !== "SUPER_ADMIN" &&
+      ["ADMIN", "SUPER_ADMIN"].includes(role)
+    ) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
