@@ -207,6 +207,133 @@ export const sendPasswordChangedNotificationEmail = async (
   }
 };
 
+export interface SecurityEventDetails {
+  ipAddress: string;
+  userAgent: string;
+  occurredAt: Date;
+}
+
+/**
+ * Shared shell for the account-security notifications below (2FA, passkey and
+ * email changes). Like sendPasswordChangedNotificationEmail these are pure
+ * notifications - never put a credential or secret in them. `message` is an
+ * HTML fragment, so callers must escapeHtml() any dynamic value they put in it.
+ */
+const sendSecurityNotificationEmail = async (params: {
+  to: string;
+  subject: string;
+  heading: string;
+  message: string;
+  details: SecurityEventDetails;
+  logLabel: string;
+}) => {
+  const { to, subject, heading, message, details, logLabel } = params;
+  const mailOptions = {
+    from: `BitFactory Admin <${process.env.SMTP_FROM}>`,
+    to,
+    subject,
+    html: `
+      <h1>${heading}</h1>
+      <p>${message}</p>
+      <table style="border-collapse: collapse;">
+        <tr>
+          <td style="padding: 4px 12px 4px 0;"><strong>Date &amp; Time:</strong></td>
+          <td style="padding: 4px 0;">${details.occurredAt.toLocaleString("en-US", { dateStyle: "long", timeStyle: "short" })}</td>
+        </tr>
+        <tr>
+          <td style="padding: 4px 12px 4px 0;"><strong>IP Address:</strong></td>
+          <td style="padding: 4px 0;">${escapeHtml(details.ipAddress)}</td>
+        </tr>
+        <tr>
+          <td style="padding: 4px 12px 4px 0;"><strong>Device/Browser:</strong></td>
+          <td style="padding: 4px 0;">${escapeHtml(details.userAgent)}</td>
+        </tr>
+      </table>
+      <p>If you made this change, no further action is required.</p>
+      <p><strong>If you did not make this change, please contact our support team immediately</strong> - your account may be compromised.</p>
+      <br>
+      <p>Best regards,</p>
+      <p>The BitFactory Team</p>
+    `,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    return { success: true };
+  } catch (error) {
+    console.error(`Error sending ${logLabel} notification email:`, error);
+    return { success: false, error };
+  }
+};
+
+export const sendTwoFactorEnabledEmail = (
+  email: string,
+  details: SecurityEventDetails,
+) =>
+  sendSecurityNotificationEmail({
+    to: email,
+    subject: "Two-Factor Authentication Enabled - BitFactory",
+    heading: "Two-Factor Authentication Enabled",
+    message: `Two-factor authentication was just turned on for your BitFactory account (${escapeHtml(email)}).`,
+    details,
+    logLabel: "2FA enabled",
+  });
+
+export const sendTwoFactorDisabledEmail = (
+  email: string,
+  details: SecurityEventDetails,
+) =>
+  sendSecurityNotificationEmail({
+    to: email,
+    subject: "Two-Factor Authentication Disabled - BitFactory",
+    heading: "Two-Factor Authentication Disabled",
+    message: `Two-factor authentication was just turned off for your BitFactory account (${escapeHtml(email)}). Your account is now protected by your password alone.`,
+    details,
+    logLabel: "2FA disabled",
+  });
+
+export const sendPasskeyRegisteredEmail = (
+  email: string,
+  details: SecurityEventDetails,
+) =>
+  sendSecurityNotificationEmail({
+    to: email,
+    subject: "New Passkey Added - BitFactory",
+    heading: "New Passkey Added",
+    message: `A new passkey was just added to your BitFactory account (${escapeHtml(email)}). A passkey can be used to sign in to your account.`,
+    details,
+    logLabel: "passkey registered",
+  });
+
+export const sendPasskeyRemovedEmail = (
+  email: string,
+  details: SecurityEventDetails,
+) =>
+  sendSecurityNotificationEmail({
+    to: email,
+    subject: "Passkey Removed - BitFactory",
+    heading: "Passkey Removed",
+    message: `A passkey was just removed from your BitFactory account (${escapeHtml(email)}).`,
+    details,
+    logLabel: "passkey removed",
+  });
+
+// Goes to the OLD address on purpose: the person who owns the account before
+// the change is the one who needs to spot an unauthorised one.
+export const sendEmailChangeNotificationEmail = (
+  oldEmail: string,
+  newEmail: string,
+  details: SecurityEventDetails,
+) =>
+  sendSecurityNotificationEmail({
+    to: oldEmail,
+    subject: "Your Account Email Was Changed - BitFactory",
+    heading: "Account Email Changed",
+    message: `The email address on your BitFactory account was just changed from ${escapeHtml(oldEmail)} to ${escapeHtml(newEmail)}.`,
+    details,
+    logLabel: "email change",
+  });
+
 export const sendWalletChangeRequestSubmittedEmail = async (
   email: string,
   requestedAddress: string,

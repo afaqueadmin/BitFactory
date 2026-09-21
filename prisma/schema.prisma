@@ -213,6 +213,19 @@ model TokenBlacklist {
   @@map("token_blacklist")
 }
 
+// One row per recorded attempt against a rate-limited auth action. `key` is
+// "<scope>:<axis>:<identifier>" (see src/lib/rateLimit.ts). Standalone on
+// purpose - no relation to users, so it can never affect user rows.
+model AuthAttempt {
+  id        String   @id @default(cuid())
+  key       String
+  createdAt DateTime @default(now())
+
+  @@index([key, createdAt])
+  @@index([createdAt])
+  @@map("auth_attempts")
+}
+
 model WebAuthnCredential {
   id     String @id @default(cuid())
   userId String
