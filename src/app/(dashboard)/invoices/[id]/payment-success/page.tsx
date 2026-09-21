@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
-import jwt from "jsonwebtoken";
+import { verifyJwtToken } from "@/lib/jwt";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 
@@ -19,10 +19,7 @@ export default async function PaymentSuccessPage({ params }: PageProps) {
   let userId!: string;
   let userRole!: string;
   try {
-    const decoded = jwt.verify(
-      token,
-      process.env.JWT_SECRET || "your-secret-key",
-    ) as { userId: string };
+    const decoded = await verifyJwtToken(token);
     userId = decoded.userId;
 
     // Get user role

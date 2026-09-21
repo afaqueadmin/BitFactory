@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
+import { verifyJwtToken } from "@/lib/jwt";
 import { ConfirmoPaymentService } from "@/services/confirmoPaymentService";
 
 /**
@@ -28,10 +28,7 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const decoded = jwt.verify(
-      token,
-      process.env.JWT_SECRET || "your-secret-key",
-    ) as { userId: string };
+    const decoded = await verifyJwtToken(token);
     if (!decoded?.userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -73,7 +70,7 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    jwt.verify(token, process.env.JWT_SECRET || "your-secret-key");
+    await verifyJwtToken(token);
 
     const { prisma } = await import("@/lib/prisma");
 

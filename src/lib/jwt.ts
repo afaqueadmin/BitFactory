@@ -6,8 +6,14 @@ export interface JwtPayload extends JWTPayload {
   type?: string;
 }
 
+// Read lazily (not at import time) so builds and public pages still load when
+// the variable is missing; auth operations fail closed instead of falling back
+// to a guessable secret.
 const getJwtSecretKey = () => {
-  const secret = process.env.JWT_SECRET || "your-secret-key";
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error("JWT_SECRET environment variable is not set");
+  }
   return new TextEncoder().encode(secret);
 };
 

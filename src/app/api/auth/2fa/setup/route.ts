@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { userId } = getUserInfoFromToken(token);
+    const { userId } = await getUserInfoFromToken(token);
     if (!userId) {
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
