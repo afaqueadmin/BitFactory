@@ -558,8 +558,10 @@ model PoolWorkerDailyMetric {
 
   hashrate       Decimal?
   efficiency     Decimal?
-  staleShares    Int?
-  rejectedShares Int?
+  // Luxor's GET /pool/workers reports these as fractions (e.g. 0.0102), not
+  // whole counts, so they must not be Int.
+  staleShares    Decimal?
+  rejectedShares Decimal?
   estRevenue     Decimal? @db.Decimal(20, 8)
   firmware       String?
   status         String? // normalized ACTIVE/INACTIVE
