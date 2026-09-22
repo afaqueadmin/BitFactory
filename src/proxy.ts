@@ -1,6 +1,21 @@
-import { NextResponse, URLPattern } from "next/server";
+import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { JwtPayload, verifyJwtToken } from "@/lib/jwt";
+
+// Lightweight stand-ins for URLPattern's `{base}` / `{base}/...` matching.
+// URLPattern isn't reliably available as a global in Vercel's deployed Edge
+// Runtime (it's only a passthrough in next/server, and silently becomes
+// undefined there), which crashes middleware at module load for every
+// request - so route matching here uses plain string/regex checks instead.
+type PathMatcher = { test: (pathname: string) => boolean };
+
+const prefixPattern = (base: string): PathMatcher => ({
+  test: (pathname) => pathname === base || pathname.startsWith(`${base}/`),
+});
+
+const singleSegmentPattern = (base: string): PathMatcher => ({
+  test: (pathname) => new RegExp(`^${base}/[^/]+$`).test(pathname),
+});
 
 // Publicly accessible paths (no authentication required)
 const publicPaths = new Set([
@@ -41,8 +56,8 @@ const clientPaths = [
   // Add client-specific public paths if any
 ];
 const clientDynamicPatterns = [
-  new URLPattern({ pathname: "/invoices/:id*" }),
-  new URLPattern({ pathname: "/support/:id*" }),
+  prefixPattern("/invoices"),
+  prefixPattern("/support"),
 ];
 
 const securePaths = {
@@ -100,18 +115,18 @@ const securePaths = {
 const dynamicPatternsPaths = {
   CLIENT: clientDynamicPatterns,
   ADMIN: [
-    new URLPattern({ pathname: "/accounting/:path*" }),
-    new URLPattern({ pathname: "/db-data-management/:path*" }),
-    new URLPattern({ pathname: "/customers/:id*" }),
-    new URLPattern({ pathname: "/groups/:id*" }),
-    new URLPattern({ pathname: "/franchisees/:id" }),
-    new URLPattern({ pathname: "/franchisees/:id/incentives" }),
-    new URLPattern({ pathname: "/tickets/:id*" }),
+    prefixPattern("/accounting"),
+    prefixPattern("/db-data-management"),
+    prefixPattern("/customers"),
+    prefixPattern("/groups"),
+    singleSegmentPattern("/franchisees"),
+    {
+      test: (pathname: string) =>
+        /^\/franchisees\/[^/]+\/incentives$/.test(pathname),
+    },
+    prefixPattern("/tickets"),
   ],
-  FRANCHISEE: [
-    ...clientDynamicPatterns,
-    new URLPattern({ pathname: "/franchise/support/:id*" }),
-  ],
+  FRANCHISEE: [...clientDynamicPatterns, prefixPattern("/franchise/support")],
 };
 
 // Role-based default redirects
@@ -136,7 +151,7 @@ const isInRouteGroup = (
 ) => {
   return (
     securePaths[role].has(pathname) ||
-    dynamicPatternsPaths[role].some((p) => p.test({ pathname }))
+    dynamicPatternsPaths[role].some((p) => p.test(pathname))
   );
 };
 
