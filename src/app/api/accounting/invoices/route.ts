@@ -90,7 +90,11 @@ export async function GET(request: NextRequest) {
         case "status":
           return [{ status: sortDirection }, { createdAt: defaultSort }];
         case "issuedDate":
-          return [{ issuedDate: sortDirection }, { createdAt: defaultSort }];
+          return [
+            { issuedDate: { sort: sortDirection, nulls: "last" } },
+            { invoiceGeneratedDate: sortDirection },
+            { createdAt: defaultSort },
+          ];
         case "paidDate":
           return [{ paidDate: sortDirection }, { createdAt: defaultSort }];
         case "dueDate":

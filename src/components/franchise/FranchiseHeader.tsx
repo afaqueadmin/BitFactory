@@ -72,7 +72,7 @@ export default function FranchiseHeader() {
             src="/BitfactoryLogo.webp"
             alt="BitFactory Logo"
             width={162}
-            height={46}
+            height={81}
             priority
             style={{ cursor: "pointer", height: "auto" }}
             onClick={handleLogoClick}

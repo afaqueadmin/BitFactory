@@ -40,9 +40,10 @@ export default function Home() {
               src="/BitfactoryLogo.webp"
               alt="Bitfactory logo"
               width={250}
-              height={0}
+              height={125}
               priority
               style={{
+                height: "auto",
                 borderRadius: 16,
                 display: "block",
                 objectFit: "contain",

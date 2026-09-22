@@ -55,7 +55,7 @@ export default function InvoicesPage() {
         throw new Error("User ID is required");
       }
       const response = await fetch(
-        `/api/accounting/invoices?customerId=${user.id}`,
+        `/api/accounting/invoices?customerId=${user.id}&sortBy=issuedDate&sortDirection=desc`,
       );
       if (!response.ok) {
         throw new Error("Failed to fetch invoices");

@@ -2,26 +2,22 @@
 "use client";
 
 /**
- * Dashboard page (authenticated)
+ * Dashboard page (authenticated) - BitFactory Daylight theme (v1.3)
  *
  * Composes:
- * - DashboardHeader
- * - HostedMinersCard
- * - MarketplaceCard
- * - Four GradientStatCard instances
+ * - DashboardHeader (Daylight variant)
+ * - Four Daylight KPI StatCards (balance, daily cost, days left, monthly cost)
+ * - Mining Performance chart card (MiningEarningsChart, Daylight variant)
+ * - FactoryStatusCard (worker health + per-pool breakdown)
  *
- * Notes:
- * - This page provides demo/hardcoded values for now.
- * - Individual components are fully data-driven via props.
- *
- * Layout:
- * - Container maxWidth="lg"
- * - Grid breakpoints used to meet responsive requirements
+ * Layout (guide §6 / §7):
+ * - Max content width 1600px (page padding is set by the (auth) layout)
+ * - KPI row: 4 columns, 2 columns below 960px
+ * - Chart + status side by side, stacked below 960px
  */
 
 import React from "react";
 import {
-  Container,
   Box,
   Typography,
   CircularProgress,
@@ -29,20 +25,142 @@ import {
   useTheme,
   useMediaQuery,
 } from "@mui/material";
+import AccountBalanceWalletOutlinedIcon from "@mui/icons-material/AccountBalanceWalletOutlined";
+import PaidOutlinedIcon from "@mui/icons-material/PaidOutlined";
+import HourglassBottomOutlinedIcon from "@mui/icons-material/HourglassBottomOutlined";
+import CalendarMonthOutlinedIcon from "@mui/icons-material/CalendarMonthOutlined";
 import DashboardHeader from "@/components/DashboardHeader";
-import HostedMinersCard from "@/components/HostedMinersCard";
+import FactoryStatusCard from "@/components/daylight/FactoryStatusCard";
+import StatCard from "@/components/daylight/StatCard";
 import MiningEarningsChart from "@/components/MiningEarningsChart";
 import { useUser } from "@/lib/hooks/useUser";
-import BalanceCard from "@/components/dashboardCards/BalanceCard";
-import CostsCard from "@/components/dashboardCards/CostsCard";
-import EstimatedMonthlyCostCard from "@/components/dashboardCards/EstimatedMonthlyCostCard";
-import EstimatedMiningDaysLeftCard from "@/components/dashboardCards/EstimatedMiningDaysLeftCard";
 import { formatValue } from "@/lib/helpers/formatValue";
 import { getDaysInCurrentMonth } from "@/lib/helpers/getDaysInCurrentMonth";
+import { MQ, RADIUS_CARD, focusRing, useDaylight } from "@/lib/daylight";
+
+type ChartMode = "total" | "luxor" | "braiins" | "sideBySide";
+type Granularity = "daily" | "monthly";
+
+/** Daylight segmented control (Daily / Monthly). */
+function Segmented({
+  value,
+  onChange,
+}: {
+  value: Granularity;
+  onChange: (next: Granularity) => void;
+}) {
+  const { d, fonts } = useDaylight();
+  const options: { id: Granularity; label: string; title: string }[] = [
+    { id: "daily", label: "Daily", title: "Show the last 31 days" },
+    { id: "monthly", label: "Monthly", title: "Show every fully-closed month" },
+  ];
+
+  return (
+    <Box
+      role="group"
+      aria-label="Chart granularity"
+      sx={{
+        display: "inline-flex",
+        gap: "3px",
+        p: "3px",
+        border: `1px solid ${d.border}`,
+        borderRadius: "8px",
+        bgcolor: d.canvas,
+      }}
+    >
+      {options.map((o) => {
+        const selected = value === o.id;
+        return (
+          <Box
+            component="button"
+            type="button"
+            key={o.id}
+            title={o.title}
+            aria-pressed={selected}
+            onClick={() => onChange(o.id)}
+            sx={{
+              border: 0,
+              borderRadius: "5px",
+              cursor: "pointer",
+              px: "12px",
+              minHeight: 32,
+              fontFamily: fonts.body,
+              fontSize: 11,
+              fontWeight: selected ? 650 : 500,
+              bgcolor: selected ? d.surface : "transparent",
+              color: selected ? d.action : d.muted,
+              boxShadow: selected ? `0 1px 4px ${d.border}` : "none",
+              "&:hover": { color: d.action },
+              "&:focus-visible": focusRing(d.action),
+              [MQ.mobile]: { minHeight: 44, px: "14px" },
+            }}
+          >
+            {o.label}
+          </Box>
+        );
+      })}
+    </Box>
+  );
+}
+
+/** Daylight tab (pool selector): soft-blue when active. */
+function PoolTab({
+  active,
+  onClick,
+  title,
+  dot,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  title: string;
+  dot?: string;
+  children: React.ReactNode;
+}) {
+  const { d, fonts } = useDaylight();
+  return (
+    <Box
+      component="button"
+      type="button"
+      title={title}
+      aria-pressed={active}
+      onClick={onClick}
+      sx={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: "7px",
+        border: 0,
+        borderRadius: "7px",
+        cursor: "pointer",
+        whiteSpace: "nowrap",
+        px: "12px",
+        minHeight: 40,
+        fontFamily: fonts.body,
+        fontSize: 11,
+        fontWeight: active ? 600 : 500,
+        bgcolor: active ? d.skySoft : "transparent",
+        color: active ? d.action : d.muted,
+        "&:hover": { bgcolor: active ? d.skySoft : d.hover },
+        "&:focus-visible": focusRing(d.action),
+        [MQ.mobile]: { minHeight: 44, px: "10px", fontSize: 10 },
+      }}
+    >
+      {dot && (
+        <Box
+          component="span"
+          aria-hidden
+          sx={{ width: 7, height: 7, borderRadius: "2px", bgcolor: dot }}
+        />
+      )}
+      {children}
+    </Box>
+  );
+}
 
 export default function DashboardPage() {
   const { loading, error } = useUser();
   const theme = useTheme();
+  const { d, fonts } = useDaylight();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const [balance, setBalance] = React.useState<number>(0);
   const [balanceLoading, setBalanceLoading] = React.useState(true);
@@ -81,15 +199,11 @@ export default function DashboardPage() {
   const [workersError, setWorkersError] = React.useState<string | null>(null);
 
   // Chart view mode state
-  const [chartMode, setChartMode] = React.useState<
-    "total" | "luxor" | "braiins" | "sideBySide"
-  >("total");
+  const [chartMode, setChartMode] = React.useState<ChartMode>("total");
 
   // Mining Performance chart granularity: daily (last 31 days) or monthly
   // (every fully-closed calendar month since data began).
-  const [granularity, setGranularity] = React.useState<"daily" | "monthly">(
-    "daily",
-  );
+  const [granularity, setGranularity] = React.useState<Granularity>("daily");
 
   const estimatedMonthlyCost = React.useMemo(() => {
     if (dailyCostLoading) return 0;
@@ -274,10 +388,8 @@ export default function DashboardPage() {
     fetchMinersSummary();
   }, []);
 
-  // ...existing code...
   const hosted = {
     runningCount: workersStats.activeWorkers,
-    progress: 66,
     errorCount: workersStats.inactiveWorkers,
   };
 
@@ -369,318 +481,202 @@ export default function DashboardPage() {
     );
   }
 
+  const statsLoading = balanceLoading || dailyCostLoading;
+
   return (
-    <Box component="main" sx={{ pt: { xs: 1, md: 2 }, pb: { xs: 3, md: 4 } }}>
-      <Container maxWidth="xl">
-        {/* Header */}
-        <DashboardHeader />
+    <Box
+      sx={{
+        maxWidth: 1600,
+        mx: "auto",
+        fontFamily: fonts.body,
+        color: d.text,
+      }}
+    >
+      {/* Page heading */}
+      <DashboardHeader daylight />
 
-        {/* Top two horizontal cards - 50/50 split */}
+      {/* KPI cards - 4 columns, 2 below 960px */}
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+          [MQ.stack]: { gridTemplateColumns: "repeat(2, minmax(0, 1fr))" },
+          gap: { xs: "10px", sm: "16px" },
+          mb: { xs: "18px", sm: "22px" },
+        }}
+      >
+        <StatCard
+          title="Balance"
+          value={formatValue(balance, "currency")}
+          caption="Available balance"
+          tone="sky"
+          icon={<AccountBalanceWalletOutlinedIcon />}
+          isLoading={balanceLoading}
+        />
+        <StatCard
+          title="Daily cost"
+          value={formatValue(dailyCost, "currency")}
+          caption="Charged per day"
+          tone="amber"
+          icon={<PaidOutlinedIcon />}
+          isLoading={dailyCostLoading}
+        />
+        <StatCard
+          title="Estimated mining days left"
+          value={daysLeft}
+          unit={daysLeft === 1 ? "day" : "days"}
+          caption="At your current daily cost"
+          tone="mint"
+          icon={<HourglassBottomOutlinedIcon />}
+          isLoading={statsLoading}
+        />
+        <StatCard
+          title="Estimated monthly cost"
+          value={formatValue(estimatedMonthlyCost, "currency")}
+          caption={`Based on ${getDaysInCurrentMonth()} days this month`}
+          tone="amber"
+          icon={<CalendarMonthOutlinedIcon />}
+          isLoading={dailyCostLoading}
+        />
+      </Box>
+
+      {/* Main grid: Mining Performance + Factory Status */}
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: "minmax(0, 1fr) 300px",
+          [MQ.compact]: { gridTemplateColumns: "minmax(0, 1fr) 260px" },
+          [MQ.stack]: { gridTemplateColumns: "minmax(0, 1fr)" },
+          gap: { xs: "18px", md: "20px" },
+        }}
+      >
+        {/* Chart card */}
         <Box
+          component="section"
+          aria-labelledby="mining-performance-title"
           sx={{
-            display: "flex",
-            gap: 4,
-            mb: 2,
-            flexDirection: { xs: "column", md: "row" },
+            minWidth: 0,
+            bgcolor: d.surface,
+            border: `1px solid ${d.border}`,
+            borderRadius: RADIUS_CARD,
+            boxShadow: d.shadow,
+            pb: { xs: "6px", sm: "10px" },
           }}
         >
-          <Box sx={{ flex: 1 }}>
-            {/* Hosted miners: 50% width on desktop */}
-            <HostedMinersCard
-              runningCount={hosted.runningCount}
-              progress={hosted.progress}
-              errorCount={hosted.errorCount}
-              activePoolNames={workersStats.activePoolNames}
-              poolBreakdown={workersStats.poolBreakdown}
-              totalMinerCount={
-                showTotalMinersHeading ? combinedMinerCount : undefined
-              }
-              loading={workersLoading}
-              error={workersError}
-              onRefresh={handleRefreshWorkers}
-              onAddMiner={() => {
-                // stub for now, later wire to modal / route
-                console.log("ADD MINER clicked from DashboardPage");
-              }}
-            />
-          </Box>
-          {/* Marketplace card: 50% width on desktop
-              commented out, considering removal */}
-          {/* <Box sx={{ flex: 1 }}>
-            
-            <MarketplaceCard
-              runningCount={marketplace.runningCount}
-              comingSoon={marketplace.comingSoon}
-            />
-          </Box> */}
-        </Box>
-
-        {/* 4 gradient stat cards - 2-col on mobile, 4-col on desktop */}
-        <Box
-          sx={{
-            display: "grid",
-            gridTemplateColumns: { xs: "1fr 1fr", md: "1fr 1fr 1fr 1fr" },
-            gap: { xs: 1.5, sm: 2, md: 3 },
-            mb: 2,
-          }}
-        >
-          <BalanceCard value={balanceLoading ? 0 : balance} />
-          <CostsCard value={dailyCostLoading ? 0 : dailyCost} />
-          <EstimatedMiningDaysLeftCard days={daysLeft} />
-          <EstimatedMonthlyCostCard value={estimatedMonthlyCost} />
-        </Box>
-
-        {/* Chart Section with Main Heading */}
-        <Box sx={{ mt: { xs: 2.5, md: 4 } }}>
           <Box
             sx={{
               display: "flex",
               justifyContent: "space-between",
-              alignItems: { xs: "stretch", sm: "center" },
-              mb: { xs: 1.5, sm: 2, md: 2.5 },
-              gap: 1.5,
-              flexDirection: { xs: "column", sm: "row" },
+              alignItems: "flex-start",
+              flexWrap: "wrap",
+              gap: "12px",
+              p: { xs: "19px 18px 0", sm: "23px 24px 0" },
             }}
           >
-            {/* Top row / Left on desktop: Title + Granularity Toggle */}
-            <Box
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                flexWrap: "wrap",
-                gap: 1.5,
-              }}
-            >
+            <Box>
               <Typography
-                variant="h5"
-                fontWeight="bold"
+                id="mining-performance-title"
+                component="h2"
                 sx={{
-                  color: theme.palette.text.primary,
-                  fontSize: { xs: "1.2rem", sm: "1.45rem", md: "1.75rem" },
-                  letterSpacing: "-0.02em",
+                  fontFamily: fonts.heading,
+                  fontWeight: 750,
+                  fontSize: { xs: 16, sm: 18 },
+                  letterSpacing: "-.035em",
+                  color: d.text,
                 }}
               >
                 Mining Performance
               </Typography>
-
-              {/* Granularity toggle: Daily / Monthly */}
-              <Box
+              <Typography
                 sx={{
-                  display: "inline-flex",
-                  p: 0.5,
-                  borderRadius: 3,
-                  backgroundColor:
-                    theme.palette.mode === "dark"
-                      ? "rgba(255, 255, 255, 0.06)"
-                      : "rgba(0, 0, 0, 0.05)",
-                  border: `1px solid ${
-                    theme.palette.mode === "dark"
-                      ? "rgba(255, 255, 255, 0.08)"
-                      : "rgba(0, 0, 0, 0.06)"
-                  }`,
+                  fontSize: { xs: 10, sm: 11 },
+                  color: d.muted,
+                  mt: "4px",
                 }}
               >
-                {(["daily", "monthly"] as const).map((g) => {
-                  const active = granularity === g;
-                  return (
-                    <Box
-                      component="button"
-                      key={g}
-                      onClick={() => setGranularity(g)}
-                      sx={{
-                        px: { xs: 1.5, sm: 2 },
-                        py: { xs: 0.6, sm: 0.75 },
-                        borderRadius: 2.5,
-                        border: "none",
-                        cursor: "pointer",
-                        fontSize: { xs: "0.75rem", sm: "0.8rem" },
-                        fontWeight: active ? 700 : 500,
-                        backgroundColor: active
-                          ? "primary.main"
-                          : "transparent",
-                        color: active
-                          ? "primary.contrastText"
-                          : "text.secondary",
-                        boxShadow: active
-                          ? "0 2px 8px rgba(0, 198, 255, 0.35)"
-                          : "none",
-                        transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
-                        "&:hover": {
-                          color: active
-                            ? "primary.contrastText"
-                            : "text.primary",
-                        },
-                      }}
-                      title={
-                        g === "daily"
-                          ? "Show the last 31 days"
-                          : "Show every fully-closed month"
-                      }
-                    >
-                      {g === "daily" ? "Daily" : "Monthly"}
-                    </Box>
-                  );
-                })}
-              </Box>
+                Revenue in BTC
+              </Typography>
             </Box>
 
-            {/* Pool Selector Pills - Horizontal scrollable on mobile if needed */}
-            {workersStats.activePoolNames.length > 1 && (
-              <Box
-                sx={{
-                  display: "flex",
-                  gap: 0.75,
-                  overflowX: "auto",
-                  pb: { xs: 0.5, sm: 0 },
-                  scrollbarWidth: "none",
-                  "&::-webkit-scrollbar": { display: "none" },
-                  justifyContent: { xs: "flex-start", sm: "flex-end" },
-                }}
-              >
-                <Box
-                  component="button"
-                  onClick={() => setChartMode("total")}
-                  sx={{
-                    px: { xs: 1.25, sm: 1.75 },
-                    py: { xs: 0.6, sm: 0.75 },
-                    borderRadius: 2.5,
-                    border: "none",
-                    cursor: "pointer",
-                    fontSize: { xs: "0.75rem", sm: "0.8rem" },
-                    fontWeight: chartMode === "total" ? 700 : 500,
-                    whiteSpace: "nowrap",
-                    backgroundColor:
-                      chartMode === "total"
-                        ? "primary.main"
-                        : theme.palette.mode === "dark"
-                          ? "rgba(255, 255, 255, 0.06)"
-                          : "rgba(0, 0, 0, 0.05)",
-                    color:
-                      chartMode === "total"
-                        ? "primary.contrastText"
-                        : "text.secondary",
-                    boxShadow:
-                      chartMode === "total"
-                        ? "0 2px 8px rgba(0, 198, 255, 0.35)"
-                        : "none",
-                    transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
-                  }}
-                  title="Show total earnings from all pools"
-                >
-                  All Pools
-                </Box>
-
-                {workersStats.activePoolNames.includes("Luxor") && (
-                  <Box
-                    component="button"
-                    onClick={() => setChartMode("luxor")}
-                    sx={{
-                      px: { xs: 1.25, sm: 1.75 },
-                      py: { xs: 0.6, sm: 0.75 },
-                      borderRadius: 2.5,
-                      border: "none",
-                      cursor: "pointer",
-                      fontSize: { xs: "0.75rem", sm: "0.8rem" },
-                      fontWeight: chartMode === "luxor" ? 700 : 500,
-                      whiteSpace: "nowrap",
-                      backgroundColor:
-                        chartMode === "luxor"
-                          ? "#1565C0"
-                          : theme.palette.mode === "dark"
-                            ? "rgba(255, 255, 255, 0.06)"
-                            : "rgba(0, 0, 0, 0.05)",
-                      color:
-                        chartMode === "luxor" ? "#FFFFFF" : "text.secondary",
-                      boxShadow:
-                        chartMode === "luxor"
-                          ? "0 2px 8px rgba(21, 101, 192, 0.4)"
-                          : "none",
-                      transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
-                    }}
-                    title="Show Luxor pool earnings only"
-                  >
-                    🔷 Luxor
-                  </Box>
-                )}
-
-                {workersStats.activePoolNames.includes("Braiins") && (
-                  <Box
-                    component="button"
-                    onClick={() => setChartMode("braiins")}
-                    sx={{
-                      px: { xs: 1.25, sm: 1.75 },
-                      py: { xs: 0.6, sm: 0.75 },
-                      borderRadius: 2.5,
-                      border: "none",
-                      cursor: "pointer",
-                      fontSize: { xs: "0.75rem", sm: "0.8rem" },
-                      fontWeight: chartMode === "braiins" ? 700 : 500,
-                      whiteSpace: "nowrap",
-                      backgroundColor:
-                        chartMode === "braiins"
-                          ? "#FB8C00"
-                          : theme.palette.mode === "dark"
-                            ? "rgba(255, 255, 255, 0.06)"
-                            : "rgba(0, 0, 0, 0.05)",
-                      color:
-                        chartMode === "braiins" ? "#FFFFFF" : "text.secondary",
-                      boxShadow:
-                        chartMode === "braiins"
-                          ? "0 2px 8px rgba(251, 140, 0, 0.4)"
-                          : "none",
-                      transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
-                    }}
-                    title="Show Braiins pool earnings only"
-                  >
-                    🔶 Braiins
-                  </Box>
-                )}
-
-                <Box
-                  component="button"
-                  onClick={() => setChartMode("sideBySide")}
-                  sx={{
-                    px: { xs: 1.25, sm: 1.75 },
-                    py: { xs: 0.6, sm: 0.75 },
-                    borderRadius: 2.5,
-                    border: "none",
-                    cursor: "pointer",
-                    fontSize: { xs: "0.75rem", sm: "0.8rem" },
-                    fontWeight: chartMode === "sideBySide" ? 700 : 500,
-                    whiteSpace: "nowrap",
-                    backgroundColor:
-                      chartMode === "sideBySide"
-                        ? "success.main"
-                        : theme.palette.mode === "dark"
-                          ? "rgba(255, 255, 255, 0.06)"
-                          : "rgba(0, 0, 0, 0.05)",
-                    color:
-                      chartMode === "sideBySide"
-                        ? "success.contrastText"
-                        : "text.secondary",
-                    boxShadow:
-                      chartMode === "sideBySide"
-                        ? "0 2px 8px rgba(0, 200, 83, 0.35)"
-                        : "none",
-                    transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
-                  }}
-                  title="Show side-by-side comparison of both pools"
-                >
-                  Side by Side
-                </Box>
-              </Box>
-            )}
+            <Segmented value={granularity} onChange={setGranularity} />
           </Box>
 
+          {/* Pool selector - only when the customer has more than one pool */}
+          {workersStats.activePoolNames.length > 1 && (
+            <Box
+              role="group"
+              aria-label="Pool filter"
+              sx={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: "4px",
+                px: { xs: "12px", sm: "18px" },
+                pt: "14px",
+              }}
+            >
+              <PoolTab
+                active={chartMode === "total"}
+                onClick={() => setChartMode("total")}
+                title="Show total earnings from all pools"
+              >
+                All Pools
+              </PoolTab>
+
+              {workersStats.activePoolNames.includes("Luxor") && (
+                <PoolTab
+                  active={chartMode === "luxor"}
+                  onClick={() => setChartMode("luxor")}
+                  title="Show Luxor pool earnings only"
+                  dot={d.poolLuxor}
+                >
+                  Luxor
+                </PoolTab>
+              )}
+
+              {workersStats.activePoolNames.includes("Braiins") && (
+                <PoolTab
+                  active={chartMode === "braiins"}
+                  onClick={() => setChartMode("braiins")}
+                  title="Show Braiins pool earnings only"
+                  dot={d.poolBraiins}
+                >
+                  Braiins
+                </PoolTab>
+              )}
+
+              <PoolTab
+                active={chartMode === "sideBySide"}
+                onClick={() => setChartMode("sideBySide")}
+                title="Show side-by-side comparison of both pools"
+              >
+                Side by Side
+              </PoolTab>
+            </Box>
+          )}
+
           <MiningEarningsChart
-            height={isMobile ? 320 : 440}
+            daylight
+            height={isMobile ? 300 : 340}
             days={31}
             viewMode={chartMode}
             granularity={granularity}
           />
         </Box>
-      </Container>
+
+        {/* Factory status */}
+        <FactoryStatusCard
+          runningCount={hosted.runningCount}
+          errorCount={hosted.errorCount}
+          activePoolNames={workersStats.activePoolNames}
+          poolBreakdown={workersStats.poolBreakdown}
+          totalMinerCount={
+            showTotalMinersHeading ? combinedMinerCount : undefined
+          }
+          loading={workersLoading}
+          error={workersError}
+          onRefresh={handleRefreshWorkers}
+        />
+      </Box>
     </Box>
   );
 }

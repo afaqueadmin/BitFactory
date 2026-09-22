@@ -24,6 +24,7 @@ import {
 } from "@mui/material";
 import TrendingUpIcon from "@mui/icons-material/TrendingUp";
 import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
+import { useDaylight } from "@/lib/daylight";
 
 interface DailyPerformanceData {
   date: string;
@@ -43,6 +44,12 @@ interface MiningEarningsChartProps {
   viewMode?: "total" | "luxor" | "braiins" | "sideBySide";
   /** "daily" (default) shows `days` days; "monthly" shows every fully-closed month. */
   granularity?: "daily" | "monthly";
+  /**
+   * Daylight styling: renders chrome-less (the parent supplies the card),
+   * with flat brand-blue bars, a Manrope period total above the chart and the
+   * average / data-point stats in a footer strip below it.
+   */
+  daylight?: boolean;
 }
 
 export default function MiningEarningsChart({
@@ -50,8 +57,10 @@ export default function MiningEarningsChart({
   days = 10,
   viewMode = "total",
   granularity = "daily",
+  daylight = false,
 }: MiningEarningsChartProps) {
   const theme = useTheme();
+  const { d, fonts } = useDaylight();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const isTablet = useMediaQuery(theme.breakpoints.down("md"));
   const [miningData, setMiningData] = useState<DailyPerformanceData[]>([]);
@@ -220,6 +229,14 @@ export default function MiningEarningsChart({
 
   const chartHeight = isMobile ? Math.max(260, height - 60) : height;
 
+  // Bar fills: the original gradients, or flat Daylight colours.
+  const fillTotal = daylight ? d.brand : "url(#earningsGradient)";
+  const fillLuxor = daylight ? d.poolLuxor : "url(#luxorGradient)";
+  const fillBraiins = daylight ? d.poolBraiins : "url(#braiinsGradient)";
+  const fillRebate = daylight ? d.danger : "url(#rebateGradient)";
+  const axisTextColor = daylight ? d.muted : theme.palette.text.secondary;
+  const axisFont = daylight ? { fontFamily: fonts.body } : {};
+
   return (
     <Paper
       elevation={0}
@@ -228,6 +245,11 @@ export default function MiningEarningsChart({
         width: "100%",
         display: "flex",
         flexDirection: "column",
+        ...(daylight && {
+          p: { xs: "0 12px 4px", sm: "0 20px 4px" },
+          fontFamily: fonts.body,
+          "& .MuiTypography-root": { fontFamily: "inherit" },
+        }),
         background:
           theme.palette.mode === "dark"
             ? "linear-gradient(145deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.8) 100%)"
@@ -244,10 +266,52 @@ export default function MiningEarningsChart({
             ? "0 8px 32px rgba(0, 0, 0, 0.3)"
             : "0 8px 24px rgba(0, 114, 255, 0.06)",
         overflow: "hidden",
+        ...(daylight && {
+          background: "none",
+          backdropFilter: "none",
+          border: "none",
+          borderRadius: 0,
+          boxShadow: "none",
+        }),
       }}
     >
+      {/* Daylight: big period total above the chart */}
+      {daylight && !loading && !error && miningData.length > 0 && (
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "baseline",
+            flexWrap: "wrap",
+            gap: "10px",
+            px: { xs: "6px", sm: "4px" },
+            pt: "15px",
+            pb: "6px",
+          }}
+        >
+          <Box
+            component="strong"
+            sx={{
+              fontFamily: fonts.heading,
+              fontWeight: 750,
+              fontSize: { xs: 22, sm: 25 },
+              letterSpacing: "-1px",
+              color: d.text,
+              fontVariantNumeric: "tabular-nums",
+            }}
+          >
+            ₿{summaryMetrics.total.toFixed(8)}
+          </Box>
+          <Box
+            component="span"
+            sx={{ fontSize: { xs: 10, sm: 11 }, color: d.muted }}
+          >
+            {granularity === "monthly" ? "all closed months" : "period total"}
+          </Box>
+        </Box>
+      )}
+
       {/* Quick Summary KPIs on mobile & desktop */}
-      {!loading && !error && miningData.length > 0 && (
+      {!daylight && !loading && !error && miningData.length > 0 && (
         <Box
           sx={{
             display: "grid",
@@ -363,7 +427,11 @@ export default function MiningEarningsChart({
             gap: 1.5,
           }}
         >
-          <CircularProgress size={36} thickness={4} />
+          <CircularProgress
+            size={36}
+            thickness={4}
+            sx={daylight ? { color: d.action } : undefined}
+          />
           <Typography variant="caption" color="text.secondary">
             Loading mining performance...
           </Typography>
@@ -406,14 +474,18 @@ export default function MiningEarningsChart({
             touchAction: "pan-y", // Allow smooth vertical scroll on mobile while touching chart
           }}
         >
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer
+            width="100%"
+            height="100%"
+            initialDimension={{ width: 320, height: chartHeight }}
+          >
             <BarChart
               data={miningData}
               barCategoryGap={isMobile ? "15%" : "22%"}
               margin={{
                 top: 10,
                 right: isMobile ? 4 : 20,
-                left: isMobile ? -14 : 20,
+                left: isMobile ? (daylight ? 0 : -14) : 20,
                 bottom: isMobile ? 10 : 20,
               }}
             >
@@ -449,12 +521,16 @@ export default function MiningEarningsChart({
               </defs>
 
               <CartesianGrid
-                strokeDasharray="3 3"
+                strokeDasharray={daylight ? undefined : "3 3"}
                 vertical={false}
                 stroke={
-                  theme.palette.mode === "dark"
-                    ? "rgba(255, 255, 255, 0.07)"
-                    : "rgba(0, 0, 0, 0.05)"
+                  daylight
+                    ? theme.palette.mode === "dark"
+                      ? "rgba(255, 255, 255, 0.07)"
+                      : "#EAF0F4"
+                    : theme.palette.mode === "dark"
+                      ? "rgba(255, 255, 255, 0.07)"
+                      : "rgba(0, 0, 0, 0.05)"
                 }
               />
 
@@ -463,7 +539,8 @@ export default function MiningEarningsChart({
                 interval={xAxisInterval}
                 tick={{
                   fontSize: isMobile ? 10 : 11,
-                  fill: theme.palette.text.secondary,
+                  fill: axisTextColor,
+                  ...axisFont,
                 }}
                 tickFormatter={(value: string | number) => {
                   try {
@@ -497,8 +574,9 @@ export default function MiningEarningsChart({
                 height={isMobile ? 40 : 50}
                 tickLine={false}
                 axisLine={{
-                  stroke:
-                    theme.palette.mode === "dark"
+                  stroke: daylight
+                    ? d.border
+                    : theme.palette.mode === "dark"
                       ? "rgba(255,255,255,0.1)"
                       : "rgba(0,0,0,0.1)",
                 }}
@@ -507,7 +585,8 @@ export default function MiningEarningsChart({
               <YAxis
                 tick={{
                   fontSize: isMobile ? 9 : 11,
-                  fill: theme.palette.text.secondary,
+                  fill: axisTextColor,
+                  ...axisFont,
                 }}
                 domain={[yMin, yMax]}
                 tickCount={isMobile ? 5 : 8}
@@ -515,7 +594,7 @@ export default function MiningEarningsChart({
                 tickLine={false}
                 axisLine={false}
                 label={
-                  isMobile
+                  isMobile || daylight
                     ? undefined
                     : {
                         value: "Revenue (BTC)",
@@ -524,9 +603,10 @@ export default function MiningEarningsChart({
                         offset: 10,
                         style: {
                           textAnchor: "middle",
-                          fill: theme.palette.text.secondary,
+                          fill: axisTextColor,
                           fontSize: 12,
                           fontWeight: 500,
+                          ...axisFont,
                         },
                       }
                 }
@@ -605,6 +685,14 @@ export default function MiningEarningsChart({
                         px: 1.75,
                         py: 1.25,
                         minWidth: 150,
+                        ...(daylight && {
+                          backgroundColor: d.surface,
+                          backdropFilter: "none",
+                          border: `1px solid ${d.border}`,
+                          boxShadow: "0 8px 30px rgba(100,114,124,.13)",
+                          fontFamily: fonts.body,
+                          "& .MuiTypography-root": { fontFamily: "inherit" },
+                        }),
                       }}
                     >
                       <Typography
@@ -692,7 +780,7 @@ export default function MiningEarningsChart({
                               variant="caption"
                               sx={{
                                 fontWeight: 800,
-                                color: "primary.main",
+                                color: daylight ? d.action : "primary.main",
                                 fontFamily: "monospace",
                               }}
                             >
@@ -705,8 +793,9 @@ export default function MiningEarningsChart({
                   );
                 }}
                 cursor={{
-                  fill:
-                    theme.palette.mode === "dark"
+                  fill: daylight
+                    ? d.skySoft
+                    : theme.palette.mode === "dark"
                       ? "rgba(255, 255, 255, 0.05)"
                       : "rgba(0, 198, 255, 0.08)",
                 }}
@@ -716,6 +805,7 @@ export default function MiningEarningsChart({
                 wrapperStyle={{
                   fontSize: isMobile ? "0.75rem" : "0.85rem",
                   paddingTop: isMobile ? "4px" : "12px",
+                  ...(daylight && { color: d.muted, fontFamily: fonts.body }),
                 }}
               />
 
@@ -737,7 +827,7 @@ export default function MiningEarningsChart({
                     stackId="revenue"
                     maxBarSize={maxBarWidth}
                     radius={[0, 0, 4, 4]}
-                    fill="url(#earningsGradient)"
+                    fill={fillTotal}
                   />
                   <Bar
                     dataKey="breakdown.luxorRebate"
@@ -745,7 +835,7 @@ export default function MiningEarningsChart({
                     stackId="revenue"
                     maxBarSize={maxBarWidth}
                     radius={[4, 4, 0, 0]}
-                    fill="url(#rebateGradient)"
+                    fill={fillRebate}
                   />
                 </>
               )}
@@ -759,7 +849,7 @@ export default function MiningEarningsChart({
                     stackId="luxor"
                     maxBarSize={maxBarWidth}
                     radius={[0, 0, 4, 4]}
-                    fill="url(#luxorGradient)"
+                    fill={fillLuxor}
                   />
                   <Bar
                     dataKey="breakdown.luxorRebate"
@@ -767,7 +857,7 @@ export default function MiningEarningsChart({
                     stackId="luxor"
                     maxBarSize={maxBarWidth}
                     radius={[4, 4, 0, 0]}
-                    fill="url(#rebateGradient)"
+                    fill={fillRebate}
                   />
                 </>
               )}
@@ -779,7 +869,7 @@ export default function MiningEarningsChart({
                   name="Braiins Revenue"
                   maxBarSize={maxBarWidth}
                   radius={[4, 4, 0, 0]}
-                  fill="url(#braiinsGradient)"
+                  fill={fillBraiins}
                 />
               )}
 
@@ -792,7 +882,7 @@ export default function MiningEarningsChart({
                     stackId="luxor"
                     maxBarSize={maxBarWidth}
                     radius={[0, 0, 4, 4]}
-                    fill="url(#luxorGradient)"
+                    fill={fillLuxor}
                   />
                   <Bar
                     dataKey="breakdown.luxorRebate"
@@ -800,19 +890,55 @@ export default function MiningEarningsChart({
                     stackId="luxor"
                     maxBarSize={maxBarWidth}
                     radius={[4, 4, 0, 0]}
-                    fill="url(#rebateGradient)"
+                    fill={fillRebate}
                   />
                   <Bar
                     dataKey="breakdown.braiins"
                     name="Braiins"
                     maxBarSize={maxBarWidth}
                     radius={[4, 4, 0, 0]}
-                    fill="url(#braiinsGradient)"
+                    fill={fillBraiins}
                   />
                 </>
               )}
             </BarChart>
           </ResponsiveContainer>
+        </Box>
+      )}
+
+      {/* Daylight: average / data-point strip under the chart */}
+      {daylight && !loading && !error && miningData.length > 0 && (
+        <Box
+          sx={{
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "center",
+            gap: { xs: "4px 10px", sm: "4px 18px" },
+            borderTop: `1px solid ${d.border}`,
+            mt: 1,
+            px: { xs: "6px", sm: "4px" },
+            py: "13px",
+            fontSize: 10,
+            color: d.muted,
+          }}
+        >
+          <span>
+            {granularity === "monthly" ? "Monthly avg" : "Daily avg"}{" "}
+            <Box
+              component="b"
+              sx={{
+                color: d.text,
+                fontWeight: 650,
+                fontVariantNumeric: "tabular-nums",
+              }}
+            >
+              ₿{summaryMetrics.avg.toFixed(8)}
+            </Box>
+          </span>
+          <span>
+            {summaryMetrics.count}{" "}
+            {granularity === "monthly" ? "months" : "days"}
+          </span>
         </Box>
       )}
     </Paper>
