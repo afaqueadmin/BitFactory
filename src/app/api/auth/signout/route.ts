@@ -24,12 +24,20 @@ export async function POST(request: NextRequest) {
           });
 
           if (!existingEntry) {
-            // Token not blacklisted yet, add it now
+            // Token not blacklisted yet, add it now. expiresAt only controls
+            // when this row is safe to purge - it must be at least the
+            // token's own remaining lifetime, or the blacklist entry could
+            // expire (and the check in verifyJwtToken stop rejecting it)
+            // before the token itself does. Falls back to the longest token
+            // lifetime issued (refresh, 7d) if exp is somehow missing.
+            const expiresAt = decoded.exp
+              ? new Date(decoded.exp * 1000)
+              : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
             await prisma.tokenBlacklist.create({
               data: {
                 token,
                 userId: decoded.userId,
-                expiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15 minutes from now
+                expiresAt,
               },
             });
             console.log(`[Auth Signout] Token blacklisted for user: ${userId}`);

@@ -17,6 +17,7 @@ import { logPoolCredentialChange } from "@/lib/audit/logPoolCredentialChange";
 import { hash } from "bcrypt";
 import { sendWelcomeEmail } from "@/lib/email";
 import normalizeEmailUsername from "@/lib/helpers/normailizeEmailUsername";
+import { generateTempPassword } from "@/lib/helpers/generateTempPassword";
 import { getOrCreatePaybackConfig } from "@/lib/paybackConfigHelpers";
 
 interface ApiResponse<T = Record<string, unknown>> {
@@ -230,8 +231,32 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     const franchiseCode = await generateFranchiseCode(businessName);
 
-    const tempPassword = Math.random().toString(36).slice(-8);
+    // Per H-5, tempPassword is never returned in the response - only sent by
+    // email - so a requested send has to succeed before the account exists,
+    // matching /api/user/create.
+    const tempPassword = generateTempPassword();
     const hashedPassword = await hash(tempPassword, 12);
+
+    let emailSent = false;
+    if (sendEmail) {
+      const emailResult = await sendWelcomeEmail(email, tempPassword);
+      if (!emailResult.success) {
+        console.error(
+          "[Franchisees API] Failed to send welcome email:",
+          emailResult.error,
+        );
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "Failed to send the welcome email, so the franchisee was not created. Please check the email address and try again.",
+          } as ApiResponse,
+          { status: 502 },
+        );
+      }
+      emailSent = true;
+    }
+
     const { defaultInvoicedAmount } = await getOrCreatePaybackConfig("CLIENT");
 
     const { franchisee, franchise } = await prisma.$transaction(async (tx) => {
@@ -365,19 +390,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       },
     });
 
-    let emailSent = false;
-    if (sendEmail) {
-      const emailResult = await sendWelcomeEmail(email, tempPassword);
-      if (!emailResult.success) {
-        console.error(
-          "[Franchisees API] Failed to send welcome email:",
-          emailResult.error,
-        );
-      } else {
-        emailSent = true;
-      }
-    }
-
     return NextResponse.json(
       {
         success: true,
@@ -389,7 +401,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             email: franchisee.email,
             role: franchisee.role,
           },
-          tempPassword,
           emailSent,
         },
         message: "Franchisee created successfully",

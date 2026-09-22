@@ -102,8 +102,8 @@ export const sendWelcomeEmail = async (email: string, tempPassword: string) => {
     html: `
       <h1>Welcome to BitFactory!</h1>
       <p>Your account has been created successfully. Here are your login credentials:</p>
-      <p><strong>URL:</strong><a href="my.bitfactory.ae" target="_blank"> my.bitfactory.ae</a></p>
-      <p><strong>Username:</strong> ${email}</p>
+      <p><strong>URL:</strong><a href="https://my.bitfactory.ae" target="_blank"> my.bitfactory.ae</a></p>
+      <p><strong>Username:</strong> ${escapeHtml(email)}</p>
       <p><strong>Temporary Password:</strong> ${tempPassword}</p>
       <p>For security reasons, please change your password immediately after logging in.</p>
       <p>If you have any questions, please don't hesitate to contact our support team.</p>

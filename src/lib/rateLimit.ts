@@ -116,6 +116,58 @@ export async function clearRateLimit(key: string): Promise<void> {
   await prisma.authAttempt.deleteMany({ where: { key } });
 }
 
+export const DEFAULT_AUTH_RATE_LIMITS = {
+  perEmail: { max: 10, windowSeconds: 15 * 60 } satisfies RateLimitOptions,
+  perIp: { max: 30, windowSeconds: 15 * 60 } satisfies RateLimitOptions,
+};
+
+export interface AuthRateLimitOutcome {
+  email: RateLimitResult | null;
+  ip: RateLimitResult | null;
+  /** True if either axis (present and checked) was over its limit. */
+  blocked: boolean;
+}
+
+/**
+ * Checks the per-email and per-IP axes for an auth action together, so
+ * neither alone is a workaround (an attacker spreading guesses across IPs is
+ * still caught by email; one behind a shared/NAT IP is still caught by IP).
+ * An axis is skipped, not counted as blocked, when its identifier is absent
+ * (e.g. `getClientIp` returned null) - see its docstring for why.
+ *
+ * Callers decide what "blocked" means: during the observe-only rollout they
+ * only log it, an enforcing caller returns 429.
+ */
+export async function checkAuthRateLimit(
+  scope: string,
+  identifiers: { email?: string | null; ip?: string | null },
+  limits: {
+    perEmail?: RateLimitOptions;
+    perIp?: RateLimitOptions;
+  } = {},
+): Promise<AuthRateLimitOutcome> {
+  const perEmail = limits.perEmail ?? DEFAULT_AUTH_RATE_LIMITS.perEmail;
+  const perIp = limits.perIp ?? DEFAULT_AUTH_RATE_LIMITS.perIp;
+
+  const [email, ip] = await Promise.all([
+    identifiers.email
+      ? checkRateLimit(
+          buildRateLimitKey(scope, "email", identifiers.email),
+          perEmail,
+        )
+      : Promise.resolve(null),
+    identifiers.ip
+      ? checkRateLimit(buildRateLimitKey(scope, "ip", identifiers.ip), perIp)
+      : Promise.resolve(null),
+  ]);
+
+  return {
+    email,
+    ip,
+    blocked: Boolean((email && !email.allowed) || (ip && !ip.allowed)),
+  };
+}
+
 // Keeps the table bounded without needing a cron job. Never fails the caller.
 async function purgeExpiredSometimes(): Promise<void> {
   if (Math.random() >= PURGE_PROBABILITY) return;

@@ -4,6 +4,7 @@ import { verifyWebAuthnAuthentication } from "@/lib/webauthn/server";
 import { WebAuthnAssertionResponse } from "@/types/webauthn";
 import { generateTokens } from "@/lib/jwt";
 import type { AuthenticationResponseJSON } from "@simplewebauthn/types";
+import { checkAuthRateLimit, getClientIp } from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
 
@@ -30,6 +31,31 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: "Email and assertion required" },
         { status: 400 },
+      );
+    }
+
+    // Observe-only for now - see H-1 in the plan. This is a full,
+    // independent login entry point (see C-3/Chain B), so it needs the same
+    // protection as password login.
+    try {
+      const rl = await checkAuthRateLimit("webauthn_authenticate", {
+        email,
+        ip: getClientIp(request.headers),
+      });
+      if (rl.blocked) {
+        console.warn(
+          "[rateLimit:observe] webauthn authenticate/verify would be blocked",
+          {
+            email,
+            emailRemaining: rl.email?.remaining,
+            ipRemaining: rl.ip?.remaining,
+          },
+        );
+      }
+    } catch (rlError) {
+      console.error(
+        "[rateLimit:observe] webauthn authenticate/verify check failed:",
+        rlError,
       );
     }
 

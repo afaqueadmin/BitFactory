@@ -34,6 +34,19 @@ export async function verifyJwtToken(token: string): Promise<JwtPayload> {
       throw new Error("Invalid token payload structure");
     }
 
+    // Blacklist check is skipped on Edge (middleware) - Prisma can't run
+    // there. Sensitive server actions all go through Node-runtime API
+    // routes, which do reach this check, so a token revoked at logout is
+    // still rejected before it can do anything; only page-routing decisions
+    // made by middleware itself don't see the revocation until the token's
+    // own (short) expiry.
+    if (process.env.NEXT_RUNTIME !== "edge") {
+      const { isTokenBlacklisted } = await import("@/lib/auth/tokenBlacklist");
+      if (await isTokenBlacklisted(token)) {
+        throw new Error("Token has been revoked");
+      }
+    }
+
     return payload as JwtPayload;
   } catch (error) {
     console.error("verifyJwtToken error:", error);

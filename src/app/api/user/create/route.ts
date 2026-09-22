@@ -6,6 +6,7 @@ import { AuditAction } from "@prisma/client";
 import { logPoolCredentialChange } from "@/lib/audit/logPoolCredentialChange";
 import { sendWelcomeEmail } from "@/lib/email";
 import normalizeEmailUsername from "@/lib/helpers/normailizeEmailUsername";
+import { generateTempPassword } from "@/lib/helpers/generateTempPassword";
 import { getOrCreatePaybackConfig } from "@/lib/paybackConfigHelpers";
 
 /**
@@ -181,9 +182,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate a random temporary password
-    const tempPassword = Math.random().toString(36).slice(-8);
+    // Generate a temporary password. Per H-5, this is never returned in the
+    // API response - only sent by email - so if sendEmail is requested, that
+    // send has to succeed BEFORE the account exists, or the new user would be
+    // created with a password nobody (including the admin) can ever see.
+    const tempPassword = generateTempPassword();
     const hashedPassword = await hash(tempPassword, 12);
+
+    let emailSent = false;
+    if (sendEmail) {
+      const emailResult = await sendWelcomeEmail(email, tempPassword);
+      if (!emailResult.success) {
+        console.error("Failed to send welcome email:", emailResult.error);
+        return NextResponse.json(
+          {
+            error:
+              "Failed to send the welcome email, so the account was not created. Please check the email address and try again.",
+          },
+          { status: 502 },
+        );
+      }
+      emailSent = true;
+    }
 
     // Create the user in database
     const { defaultInvoicedAmount } = await getOrCreatePaybackConfig("CLIENT");
@@ -380,17 +400,6 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    const sendEmailByEnvironment = process.env.NODE_ENV === "production";
-    let emailSent = sendEmailByEnvironment;
-    if (sendEmailByEnvironment && sendEmail) {
-      // Send welcome email with credentials
-      const emailResult = await sendWelcomeEmail(email, tempPassword);
-      if (!emailResult.success) {
-        console.error("Failed to send welcome email:", emailResult.error);
-        emailSent = false;
-      }
-    }
-
     return NextResponse.json(
       {
         message: "User created successfully",
@@ -401,7 +410,6 @@ export async function POST(request: NextRequest) {
           role: newUser.role,
           luxorSubaccountName: role === "CLIENT" ? luxorSubaccountName : null,
         },
-        tempPassword, //@TODO: In production, this should be sent via email instead
         emailSent,
       },
       { status: 201 },

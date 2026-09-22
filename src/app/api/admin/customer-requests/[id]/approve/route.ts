@@ -13,6 +13,7 @@ import { verifyJwtToken } from "@/lib/jwt";
 import { AuditAction } from "@prisma/client";
 import { sendWelcomeEmail } from "@/lib/email";
 import normalizeEmailUsername from "@/lib/helpers/normailizeEmailUsername";
+import { generateTempPassword } from "@/lib/helpers/generateTempPassword";
 import { getOrCreatePaybackConfig } from "@/lib/paybackConfigHelpers";
 
 export async function POST(
@@ -164,8 +165,30 @@ export async function POST(
       );
     }
 
-    const tempPassword = Math.random().toString(36).slice(-8);
+    // Per H-5, tempPassword is never returned in the response - only sent by
+    // email - so, unlike /api/user/create and /api/franchisees, there's no
+    // opt-out here: this route has no "skip email" toggle, so the send must
+    // succeed before the account exists or the admin has no way to give the
+    // new customer their password.
+    const tempPassword = generateTempPassword();
     const hashedPassword = await hash(tempPassword, 12);
+
+    const emailResult = await sendWelcomeEmail(email, tempPassword);
+    if (!emailResult.success) {
+      console.error(
+        "[Admin Customer Requests API] Failed to send welcome email:",
+        emailResult.error,
+      );
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Failed to send the welcome email, so the customer was not created. Please check the email address and try again.",
+        },
+        { status: 502 },
+      );
+    }
+
     const { defaultInvoicedAmount } = await getOrCreatePaybackConfig("CLIENT");
 
     const newUser = await prisma.$transaction(async (tx) => {
@@ -222,25 +245,12 @@ export async function POST(
       return user;
     });
 
-    let emailSent = false;
-    if (process.env.NODE_ENV === "production") {
-      const emailResult = await sendWelcomeEmail(newUser.email, tempPassword);
-      emailSent = emailResult.success;
-      if (!emailResult.success) {
-        console.error(
-          "[Admin Customer Requests API] Failed to send welcome email:",
-          emailResult.error,
-        );
-      }
-    }
-
     return NextResponse.json({
       success: true,
       message: "Request approved and customer created",
       data: {
         user: { id: newUser.id, name: newUser.name, email: newUser.email },
-        tempPassword,
-        emailSent,
+        emailSent: true,
       },
     });
   } catch (error) {

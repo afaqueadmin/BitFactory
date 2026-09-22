@@ -1,5 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SignJWT } from "jose";
+
+// verifyJwtToken dynamically imports this module (see jwt.ts for why: it must
+// stay out of the Edge bundle middleware loads). Mocked so these stay fast,
+// deterministic unit tests instead of silently depending on a live database -
+// the flaky Neon connection seen all session would otherwise make this suite
+// fail intermittently for reasons unrelated to what it's testing.
+const isTokenBlacklisted = vi.fn().mockResolvedValue(false);
+vi.mock("@/lib/auth/tokenBlacklist", () => ({
+  isTokenBlacklisted: (...args: unknown[]) => isTokenBlacklisted(...args),
+}));
+
 import { generateTokens, signJwtToken, verifyJwtToken } from "@/lib/jwt";
 import { getUserInfoFromToken } from "@/lib/helpers/getUserInfoFromToken";
 
@@ -21,6 +32,7 @@ describe("JWT secret handling", () => {
   afterEach(() => {
     vi.unstubAllEnvs();
     vi.restoreAllMocks();
+    isTokenBlacklisted.mockReset().mockResolvedValue(false);
   });
 
   describe("with JWT_SECRET set", () => {
@@ -63,6 +75,29 @@ describe("JWT secret handling", () => {
       expect(await getUserInfoFromToken("not-a-jwt")).toEqual({
         userId: null,
       });
+    });
+
+    it("rejects a signature-valid token that has been blacklisted (logged out)", async () => {
+      const { accessToken } = await generateTokens("user-3", "CLIENT");
+      isTokenBlacklisted.mockResolvedValue(true);
+
+      await expect(verifyJwtToken(accessToken)).rejects.toThrow(
+        "Invalid or expired token",
+      );
+      expect(isTokenBlacklisted).toHaveBeenCalledWith(accessToken);
+    });
+
+    it("skips the blacklist check on the Edge runtime (middleware) instead of failing to bundle it", async () => {
+      vi.stubEnv("NEXT_RUNTIME", "edge");
+      const { accessToken } = await generateTokens("user-4", "CLIENT");
+      // If this ran, the token would be rejected - proving the skip, not
+      // just that the check happened to return false.
+      isTokenBlacklisted.mockResolvedValue(true);
+
+      const payload = await verifyJwtToken(accessToken);
+
+      expect(payload.userId).toBe("user-4");
+      expect(isTokenBlacklisted).not.toHaveBeenCalled();
     });
   });
 

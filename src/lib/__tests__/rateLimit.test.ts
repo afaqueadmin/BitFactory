@@ -14,6 +14,7 @@ vi.mock("@/lib/prisma", () => ({
 import { prisma } from "@/lib/prisma";
 import {
   buildRateLimitKey,
+  checkAuthRateLimit,
   checkRateLimit,
   clearRateLimit,
   getClientIp,
@@ -190,5 +191,112 @@ describe("clearRateLimit", () => {
     expect(db.deleteMany).toHaveBeenCalledWith({
       where: { key: "login:email:a@b.com" },
     });
+  });
+});
+
+describe("checkAuthRateLimit", () => {
+  it("checks both axes under the scoped, normalized keys", async () => {
+    db.count.mockResolvedValue(1);
+
+    await checkAuthRateLimit("login", {
+      email: "User@Example.com",
+      ip: "203.0.113.9",
+    });
+
+    expect(db.create).toHaveBeenCalledWith({
+      data: { key: "login:email:user@example.com" },
+    });
+    expect(db.create).toHaveBeenCalledWith({
+      data: { key: "login:ip:203.0.113.9" },
+    });
+  });
+
+  it("skips the ip axis entirely when ip is null, rather than sharing a placeholder key", async () => {
+    db.count.mockResolvedValue(1);
+
+    const result = await checkAuthRateLimit("login", {
+      email: "a@b.com",
+      ip: null,
+    });
+
+    expect(result.ip).toBeNull();
+    expect(db.create).toHaveBeenCalledTimes(1);
+    expect(db.create).toHaveBeenCalledWith({
+      data: { key: "login:email:a@b.com" },
+    });
+  });
+
+  it("is not blocked when both axes are within limits", async () => {
+    db.count.mockResolvedValue(1);
+
+    const result = await checkAuthRateLimit("login", {
+      email: "a@b.com",
+      ip: "203.0.113.9",
+    });
+
+    expect(result.blocked).toBe(false);
+    expect(result.email?.allowed).toBe(true);
+    expect(result.ip?.allowed).toBe(true);
+  });
+
+  it("is blocked when only the email axis is over, even if ip is fine", async () => {
+    db.count.mockImplementation((async (args?: { where?: { key: string } }) =>
+      args?.where?.key.startsWith("login:email:") ? 999 : 1) as never);
+    db.findFirst.mockResolvedValue({ createdAt: NOW } as never);
+
+    const result = await checkAuthRateLimit("login", {
+      email: "a@b.com",
+      ip: "203.0.113.9",
+    });
+
+    expect(result.blocked).toBe(true);
+    expect(result.email?.allowed).toBe(false);
+    expect(result.ip?.allowed).toBe(true);
+  });
+
+  it("is blocked when only the ip axis is over, even if email is fine", async () => {
+    db.count.mockImplementation((async (args?: { where?: { key: string } }) =>
+      args?.where?.key.startsWith("login:ip:") ? 999 : 1) as never);
+    db.findFirst.mockResolvedValue({ createdAt: NOW } as never);
+
+    const result = await checkAuthRateLimit("login", {
+      email: "a@b.com",
+      ip: "203.0.113.9",
+    });
+
+    expect(result.blocked).toBe(true);
+    expect(result.email?.allowed).toBe(true);
+    expect(result.ip?.allowed).toBe(false);
+  });
+
+  it("uses tighter default limits for email (10/15min) than ip (30/15min)", async () => {
+    db.count.mockResolvedValue(1);
+
+    await checkAuthRateLimit("login", { email: "a@b.com", ip: "203.0.113.9" });
+
+    // 11th attempt: over on email (max 10), still fine on ip (max 30).
+    db.count.mockResolvedValue(11);
+    db.findFirst.mockResolvedValue({ createdAt: NOW } as never);
+    const result = await checkAuthRateLimit("login", {
+      email: "a@b.com",
+      ip: "203.0.113.9",
+    });
+
+    expect(result.blocked).toBe(true);
+  });
+
+  it("accepts overridden limits instead of the defaults", async () => {
+    db.count.mockResolvedValue(2);
+    db.findFirst.mockResolvedValue({ createdAt: NOW } as never);
+
+    // 2 attempts already used: within the default max of 10, but over an
+    // overridden max of 1 - proves the override, not the default, was used.
+    const result = await checkAuthRateLimit(
+      "forgot_password",
+      { email: "a@b.com", ip: null },
+      { perEmail: { max: 1, windowSeconds: 900 } },
+    );
+
+    expect(result.blocked).toBe(true);
   });
 });

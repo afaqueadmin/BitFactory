@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { hash } from "bcrypt";
 import { sendPasswordResetEmail } from "@/lib/email";
 import normalizeEmailUsername from "@/lib/helpers/normailizeEmailUsername";
+import { checkAuthRateLimit, getClientIp } from "@/lib/rateLimit";
 
 export async function POST(request: NextRequest) {
   try {
@@ -11,6 +12,28 @@ export async function POST(request: NextRequest) {
     // Validate input
     if (!email || typeof email !== "string") {
       return NextResponse.json({ error: "Email is required" }, { status: 400 });
+    }
+
+    // Observe-only for now - see H-1 in the plan. This route currently
+    // overwrites the password on every call (C-1), so it's the highest
+    // priority one to watch before enforcing.
+    try {
+      const rl = await checkAuthRateLimit("forgot_password", {
+        email,
+        ip: getClientIp(request.headers),
+      });
+      if (rl.blocked) {
+        console.warn("[rateLimit:observe] forgot-password would be blocked", {
+          email,
+          emailRemaining: rl.email?.remaining,
+          ipRemaining: rl.ip?.remaining,
+        });
+      }
+    } catch (rlError) {
+      console.error(
+        "[rateLimit:observe] forgot-password check failed:",
+        rlError,
+      );
     }
 
     console.log(

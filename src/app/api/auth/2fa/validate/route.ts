@@ -3,6 +3,7 @@ import speakeasy from "speakeasy";
 import { prisma } from "@/lib/prisma";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import { generateTokens } from "@/lib/jwt";
+import { checkAuthRateLimit, getClientIp } from "@/lib/rateLimit";
 
 export async function POST(req: NextRequest) {
   try {
@@ -14,6 +15,24 @@ export async function POST(req: NextRequest) {
         { error: "Email and token are required" },
         { status: 400 },
       );
+    }
+
+    // Observe-only for now - see H-1 in the plan. This is the endpoint that
+    // actually gates a 2FA login, so it matters most once enforcing starts.
+    try {
+      const rl = await checkAuthRateLimit("2fa_validate", {
+        email,
+        ip: getClientIp(req.headers),
+      });
+      if (rl.blocked) {
+        console.warn("[rateLimit:observe] 2fa/validate would be blocked", {
+          email,
+          emailRemaining: rl.email?.remaining,
+          ipRemaining: rl.ip?.remaining,
+        });
+      }
+    } catch (rlError) {
+      console.error("[rateLimit:observe] 2fa/validate check failed:", rlError);
     }
 
     const user = await prisma.user.findUnique({

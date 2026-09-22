@@ -191,7 +191,7 @@ export default function CustomerRequestReviewModal({
         throw new Error(data.error || "Failed to approve request");
       }
       onSuccess(
-        `Customer created. Temporary password: ${data.data?.tempPassword}`,
+        `Customer created. Welcome email with login details sent to ${data.data?.user?.email ?? "the customer"}.`,
       );
       onClose();
     } catch (err) {
