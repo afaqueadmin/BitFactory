@@ -125,6 +125,35 @@ const toApiDate = (date: Date): string => date.toISOString().slice(0, 10);
  * no padding is needed there.
  */
 /**
+ * Combines same-day rows from more than one PoolSubaccount into one point:
+ * hashrate sums (it's a rate, additive across subaccounts); efficiency and
+ * uptime are hashrate-weighted averages for that day, since a plain average
+ * would let a near-idle subaccount's efficiency skew the combined number as
+ * much as the subaccount doing all the work. A day with zero total hashrate
+ * (all rows null/zero) falls back to a plain average so it doesn't divide by
+ * zero.
+ */
+function weightedAverage(
+  rows: Array<{ value: number | null; weight: number }>,
+): number | null {
+  const withValue = rows.filter((r) => r.value !== null);
+  if (withValue.length === 0) return null;
+
+  const totalWeight = withValue.reduce((sum, r) => sum + r.weight, 0);
+  if (totalWeight <= 0) {
+    return (
+      withValue.reduce((sum, r) => sum + (r.value as number), 0) /
+      withValue.length
+    );
+  }
+
+  return (
+    withValue.reduce((sum, r) => sum + (r.value as number) * r.weight, 0) /
+    totalWeight
+  );
+}
+
+/**
  * Fetch a Luxor subaccount's hashrate + efficiency series, DB-first.
  *
  * Only tick="1d" requests can be served from PoolSubaccountDailySnapshot —
@@ -133,14 +162,19 @@ const toApiDate = (date: Date): string => date.toISOString().slice(0, 10);
  * unchanged. For 1d requests, every fully-closed prior day comes from the
  * DB (written by cron_pool_daily_snapshot) and only "today" (if the window
  * reaches that far) is fetched live.
+ *
+ * `poolSubaccountIds` covers every subaccount currently in view - a client
+ * with more than one Luxor subaccount selected gets same-day rows from each
+ * one combined (hashrate summed, efficiency hashrate-weighted) rather than
+ * only ever reading a single arbitrary one.
  */
 export async function fetchLuxorSeries(
   subaccountName: string,
   window: Window,
   tick: TickSize,
-  poolSubaccountId: string | null,
+  poolSubaccountIds: string[],
 ): Promise<HashratePoint[]> {
-  if (tick !== "1d" || !poolSubaccountId) {
+  if (tick !== "1d" || poolSubaccountIds.length === 0) {
     return fetchLuxorSeriesLive(subaccountName, window, tick);
   }
 
@@ -148,18 +182,33 @@ export async function fetchLuxorSeries(
 
   const dbRows = await prisma.poolSubaccountDailySnapshot.findMany({
     where: {
-      poolSubaccountId,
+      poolSubaccountId: { in: poolSubaccountIds },
       date: { gte: dbRangeStart(window), lt: today },
       hashrate: { not: null },
     },
     orderBy: { date: "asc" },
   });
 
-  const points: HashratePoint[] = dbRows.map((r) => ({
-    t: r.date.getTime(),
-    hashrate: Number(r.hashrate),
-    efficiency: r.efficiency !== null ? Number(r.efficiency) : null,
-  }));
+  const byDate = new Map<number, typeof dbRows>();
+  for (const row of dbRows) {
+    const t = row.date.getTime();
+    const existing = byDate.get(t);
+    if (existing) existing.push(row);
+    else byDate.set(t, [row]);
+  }
+
+  const points: HashratePoint[] = Array.from(byDate.entries())
+    .sort(([a], [b]) => a - b)
+    .map(([t, rows]) => ({
+      t,
+      hashrate: rows.reduce((sum, r) => sum + Number(r.hashrate), 0),
+      efficiency: weightedAverage(
+        rows.map((r) => ({
+          value: r.efficiency !== null ? Number(r.efficiency) : null,
+          weight: Number(r.hashrate),
+        })),
+      ),
+    }));
 
   if (window.end.getTime() >= today.getTime()) {
     try {
@@ -260,9 +309,9 @@ async function fetchLuxorSeriesLive(
 export async function fetchLuxorUptime(
   subaccountName: string,
   window: Window,
-  poolSubaccountId: string | null,
+  poolSubaccountIds: string[],
 ): Promise<UptimePoint[]> {
-  if (!poolSubaccountId) {
+  if (poolSubaccountIds.length === 0) {
     return fetchLuxorUptimeLive(subaccountName, window);
   }
 
@@ -270,17 +319,33 @@ export async function fetchLuxorUptime(
 
   const dbRows = await prisma.poolSubaccountDailySnapshot.findMany({
     where: {
-      poolSubaccountId,
+      poolSubaccountId: { in: poolSubaccountIds },
       date: { gte: dbRangeStart(window), lt: today },
       uptime: { not: null },
     },
     orderBy: { date: "asc" },
   });
 
-  const points: UptimePoint[] = dbRows.map((r) => ({
-    t: r.date.getTime(),
-    uptime: Number(r.uptime),
-  }));
+  const byDate = new Map<number, typeof dbRows>();
+  for (const row of dbRows) {
+    const t = row.date.getTime();
+    const existing = byDate.get(t);
+    if (existing) existing.push(row);
+    else byDate.set(t, [row]);
+  }
+
+  const points: UptimePoint[] = Array.from(byDate.entries())
+    .sort(([a], [b]) => a - b)
+    .map(([t, rows]) => ({
+      t,
+      uptime: weightedAverage(
+        rows.map((r) => ({
+          value: r.uptime !== null ? Number(r.uptime) : null,
+          weight: Number(r.hashrate ?? 0),
+        })),
+      ),
+    }))
+    .filter((p): p is UptimePoint => p.uptime !== null);
 
   if (window.end.getTime() >= today.getTime()) {
     try {
