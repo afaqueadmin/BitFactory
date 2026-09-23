@@ -187,15 +187,28 @@ export async function POST(
       );
     }
 
+    // A user can now hold more than one PoolAuth row per pool (multiple
+    // Luxor subaccounts), so this is a plain create rather than an upsert -
+    // only reject the exact same subaccount being added twice.
     const existingPoolAuth = await prisma.poolAuth.findUnique({
-      where: { poolId_userId: { poolId, userId } },
+      where: {
+        poolId_userId_authKey: { poolId, userId, authKey: authKey.trim() },
+      },
       select: { id: true },
     });
 
-    const poolAuth = await prisma.poolAuth.upsert({
-      where: { poolId_userId: { poolId, userId } },
-      create: { poolId, userId, authKey: authKey.trim() },
-      update: { authKey: authKey.trim() },
+    if (existingPoolAuth) {
+      return NextResponse.json<ApiResponse>(
+        {
+          success: false,
+          error: "This subaccount is already assigned to this user",
+        },
+        { status: 409 },
+      );
+    }
+
+    const poolAuth = await prisma.poolAuth.create({
+      data: { poolId, userId, authKey: authKey.trim() },
       select: {
         id: true,
         poolId: true,
@@ -207,16 +220,14 @@ export async function POST(
     });
 
     await logPoolCredentialChange(prisma, {
-      action: existingPoolAuth
-        ? AuditAction.POOL_CREDENTIAL_UPDATED
-        : AuditAction.POOL_CREDENTIAL_ADDED,
+      action: AuditAction.POOL_CREDENTIAL_ADDED,
       userId,
       actorId: actorUserId,
       poolName: pool.name,
     });
 
     console.log(
-      `[PoolAuth API] POST: Upserted PoolAuth (pool: ${poolId}, user: ${userId})`,
+      `[PoolAuth API] POST: Created PoolAuth (pool: ${poolId}, user: ${userId})`,
     );
 
     return NextResponse.json<ApiResponse>(

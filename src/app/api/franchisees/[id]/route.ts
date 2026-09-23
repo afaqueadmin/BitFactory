@@ -245,29 +245,27 @@ export async function PUT(
         });
         if (luxorPool) {
           if (luxorSubaccountName && String(luxorSubaccountName).trim()) {
-            const existingLuxorAuth = await prisma.poolAuth.findUnique({
+            const existingLuxorAuth = await prisma.poolAuth.findFirst({
               where: {
-                poolId_userId: {
-                  poolId: luxorPool.id,
-                  userId: existingFranchise.franchiseeId,
-                },
+                poolId: luxorPool.id,
+                userId: existingFranchise.franchiseeId,
               },
               select: { id: true },
             });
-            await prisma.poolAuth.upsert({
-              where: {
-                poolId_userId: {
+            if (existingLuxorAuth) {
+              await prisma.poolAuth.update({
+                where: { id: existingLuxorAuth.id },
+                data: { authKey: String(luxorSubaccountName).trim() },
+              });
+            } else {
+              await prisma.poolAuth.create({
+                data: {
                   poolId: luxorPool.id,
                   userId: existingFranchise.franchiseeId,
+                  authKey: String(luxorSubaccountName).trim(),
                 },
-              },
-              create: {
-                poolId: luxorPool.id,
-                userId: existingFranchise.franchiseeId,
-                authKey: String(luxorSubaccountName).trim(),
-              },
-              update: { authKey: String(luxorSubaccountName).trim() },
-            });
+              });
+            }
             await logPoolCredentialChange(prisma, {
               action: existingLuxorAuth
                 ? AuditAction.POOL_CREDENTIAL_UPDATED
@@ -312,29 +310,27 @@ export async function PUT(
         });
         if (braiinsPool) {
           if (braiinsAuthKey && String(braiinsAuthKey).trim()) {
-            const existingBraiinsAuth = await prisma.poolAuth.findUnique({
+            const existingBraiinsAuth = await prisma.poolAuth.findFirst({
               where: {
-                poolId_userId: {
-                  poolId: braiinsPool.id,
-                  userId: existingFranchise.franchiseeId,
-                },
+                poolId: braiinsPool.id,
+                userId: existingFranchise.franchiseeId,
               },
               select: { id: true },
             });
-            await prisma.poolAuth.upsert({
-              where: {
-                poolId_userId: {
+            if (existingBraiinsAuth) {
+              await prisma.poolAuth.update({
+                where: { id: existingBraiinsAuth.id },
+                data: { authKey: String(braiinsAuthKey).trim() },
+              });
+            } else {
+              await prisma.poolAuth.create({
+                data: {
                   poolId: braiinsPool.id,
                   userId: existingFranchise.franchiseeId,
+                  authKey: String(braiinsAuthKey).trim(),
                 },
-              },
-              create: {
-                poolId: braiinsPool.id,
-                userId: existingFranchise.franchiseeId,
-                authKey: String(braiinsAuthKey).trim(),
-              },
-              update: { authKey: String(braiinsAuthKey).trim() },
-            });
+              });
+            }
             await logPoolCredentialChange(prisma, {
               action: existingBraiinsAuth
                 ? AuditAction.POOL_CREDENTIAL_UPDATED

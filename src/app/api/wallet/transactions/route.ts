@@ -3,6 +3,11 @@ import { verifyJwtToken } from "@/lib/jwt";
 import { createLuxorClient } from "@/lib/luxor";
 import { createBraiinsClient } from "@/lib/braiins";
 import { prisma } from "@/lib/prisma";
+import {
+  resolveLuxorSubaccounts,
+  selectRequestedSubaccounts,
+  joinSubaccountNames,
+} from "@/lib/luxorSubaccounts";
 
 /**
  * Transaction object from unified transaction history
@@ -272,11 +277,19 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const luxorAuth = poolAuths.find((auth) =>
-      auth.pool.name.toLowerCase().includes("luxor"),
-    );
     const braiinsAuth = poolAuths.find((auth) =>
       auth.pool.name.toLowerCase().includes("braiins"),
+    );
+
+    // Every Luxor subaccount for this user, narrowed to whatever was
+    // requested via ?subaccounts= (defaults to all).
+    const allLuxorSubaccounts = await resolveLuxorSubaccounts(userId);
+    const selectedLuxorSubaccounts = selectRequestedSubaccounts(
+      allLuxorSubaccounts,
+      searchParams.get("subaccounts"),
+    );
+    const selectedLuxorAuthKeys = new Set(
+      selectedLuxorSubaccounts.map((s) => s.authKey),
     );
 
     // Calculate date range.
@@ -323,8 +336,16 @@ export async function GET(request: NextRequest) {
     const subaccountNameById = new Map(
       subaccounts.map((s) => [s.id, s.subaccountName]),
     );
+    // Scoped to the selected subaccounts - if the user has more Luxor
+    // PoolSubaccount rows than are currently selected, the extras are
+    // excluded from DB-backed history the same way the live path excludes
+    // them from the Luxor API call below.
     const luxorSubaccountIds = subaccounts
-      .filter((s) => s.pool.name === "Luxor")
+      .filter(
+        (s) =>
+          s.pool.name === "Luxor" &&
+          selectedLuxorAuthKeys.has(s.subaccountName),
+      )
       .map((s) => s.id);
     const braiinsSubaccountIds = subaccounts
       .filter((s) => s.pool.name === "Braiins")
@@ -428,11 +449,13 @@ export async function GET(request: NextRequest) {
     const braiinsStats = emptyStats();
 
     // Fetch from Luxor
-    if (luxorAuth && wantLuxor) {
+    if (selectedLuxorSubaccounts.length > 0 && wantLuxor) {
       try {
-        const authKey = luxorAuth.authKey;
+        const authKey = joinSubaccountNames(
+          selectedLuxorSubaccounts.map((s) => s.authKey),
+        );
         console.log(
-          `[Transactions API] Fetching Luxor transactions for auth key: ${authKey}`,
+          `[Transactions API] Fetching Luxor transactions for auth key(s): ${authKey}`,
         );
         const client = createLuxorClient(authKey);
         const params: Record<string, string | number> = {

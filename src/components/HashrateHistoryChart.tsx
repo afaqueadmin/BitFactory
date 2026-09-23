@@ -109,6 +109,8 @@ interface HashrateHistoryChartProps {
    */
   minerId?: string;
   height?: number;
+  /** Comma-separated Luxor subaccounts to scope to, or "all" (default). */
+  subaccountsParam?: string;
 }
 
 interface ChartRow {
@@ -150,6 +152,7 @@ export default function HashrateHistoryChart({
   userId,
   minerId,
   height = 380,
+  subaccountsParam = "all",
 }: HashrateHistoryChartProps) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
@@ -197,6 +200,7 @@ export default function HashrateHistoryChart({
       isLive,
       userId,
       minerId,
+      subaccountsParam,
     },
   );
 

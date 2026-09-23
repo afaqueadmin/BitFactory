@@ -4,6 +4,10 @@ import { verifyJwtToken } from "@/lib/jwt";
 import { createLuxorClient, LuxorError } from "@/lib/luxor";
 import { walletCache } from "@/lib/cache";
 import { WalletFetchResponse, WalletErrorResponse } from "@/lib/types/wallet";
+import {
+  resolveLuxorSubaccounts,
+  selectRequestedSubaccounts,
+} from "@/lib/luxorSubaccounts";
 
 // Route segment config
 export const runtime = "nodejs";
@@ -146,19 +150,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     // 3. Get user from database
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: {
-        id: true,
-        email: true,
-        luxorSubaccountName: true,
-        poolAuths: {
-          where: { pool: { name: "Luxor" } },
-          select: { authKey: true },
-        },
-      },
+      select: { id: true, email: true },
     });
-
-    const luxorIdentifier =
-      user?.poolAuths[0]?.authKey || user?.luxorSubaccountName;
 
     if (!user) {
       console.error("[Wallet API] User not found:", userId);
@@ -177,6 +170,16 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         },
       );
     }
+
+    // 3b. Resolve which subaccount(s) to fetch - the customer's full list
+    // (admin/franchisee via customerId, or a CLIENT with no filter applied),
+    // or the subset requested via ?subaccounts= (CLIENT's own filter).
+    const allSubaccounts = await resolveLuxorSubaccounts(userId);
+    const selectedSubaccounts = selectRequestedSubaccounts(
+      allSubaccounts,
+      request.nextUrl.searchParams.get("subaccounts"),
+    );
+    const luxorIdentifier = selectedSubaccounts[0]?.authKey;
 
     // 4. Check if user has Luxor subaccount configured
     if (!luxorIdentifier) {
@@ -200,8 +203,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    // 5. Check server-side cache
-    const cacheKey = `wallet_${userId}_${currency}`;
+    // 5. Check server-side cache (keyed by the exact set of subaccounts in view)
+    const cacheKey = `wallet_${userId}_${currency}_${selectedSubaccounts.map((s) => s.authKey).join(",")}`;
     const cachedData = walletCache.get(cacheKey);
 
     if (cachedData) {
@@ -211,7 +214,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json(
         {
           success: true,
-          data: cachedData,
+          ...(cachedData as object),
           timestamp: new Date().toISOString(),
         } as WalletFetchResponse,
         {
@@ -223,7 +226,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    // 6. Fetch from Luxor API
+    // 6. Fetch from Luxor API - the primary (first selected) subaccount uses
+    // the full error-handling below; any additional selected subaccounts are
+    // fetched best-effort alongside it.
     console.log(`[Wallet API] Cache miss, fetching from Luxor for ${cacheKey}`);
     const luxorClient = createLuxorClient(luxorIdentifier);
 
@@ -356,14 +361,40 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       );
     }
 
+    // 6b. Fetch any additional selected subaccounts alongside the primary
+    // one, best-effort - one failing shouldn't fail the whole response.
+    const extraResults = await Promise.allSettled(
+      selectedSubaccounts
+        .slice(1)
+        .map((s) =>
+          luxorClient.getSubaccountPaymentSettings(currency, s.authKey),
+        ),
+    );
+    const extraSettled = extraResults
+      .filter((r) => r.status === "fulfilled")
+      .map((r) => (r as PromiseFulfilledResult<typeof paymentSettings>).value);
+    extraResults
+      .filter((r) => r.status === "rejected")
+      .forEach((r) =>
+        console.error(
+          `[Wallet API] Failed to fetch payment settings for a selected subaccount:`,
+          (r as PromiseRejectedResult).reason,
+        ),
+      );
+
+    const responseBody = {
+      data: paymentSettings,
+      subaccounts: [paymentSettings, ...extraSettled],
+    };
+
     // 7. Cache the result
-    walletCache.set(cacheKey, paymentSettings);
+    walletCache.set(cacheKey, responseBody);
 
     // 8. Return success response with cache headers
     return NextResponse.json(
       {
         success: true,
-        data: paymentSettings,
+        ...responseBody,
         timestamp: new Date().toISOString(),
       } as WalletFetchResponse,
       {

@@ -3,6 +3,10 @@ import { verifyJwtToken } from "@/lib/jwt";
 import { createLuxorClient } from "@/lib/luxor";
 import { createBraiinsClient } from "@/lib/braiins";
 import { prisma } from "@/lib/prisma";
+import {
+  selectRequestedSubaccounts,
+  joinSubaccountNames,
+} from "@/lib/luxorSubaccounts";
 
 /**
  * GET /api/wallet/earnings-24h
@@ -65,8 +69,12 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const luxorAuth = poolAuths.find((auth) =>
+    const luxorAuths = poolAuths.filter((auth) =>
       auth.pool.name.toLowerCase().includes("luxor"),
+    );
+    const selectedLuxorAuths = selectRequestedSubaccounts(
+      luxorAuths.map((a) => ({ id: a.id, authKey: a.authKey })),
+      request.nextUrl.searchParams.get("subaccounts"),
     );
     const braiinsAuth = poolAuths.find((auth) =>
       auth.pool.name.toLowerCase().includes("braiins"),
@@ -84,11 +92,13 @@ export async function GET(request: NextRequest) {
     let braiinsRevenueBtc = 0;
 
     // Fetch from Luxor
-    if (luxorAuth) {
+    if (selectedLuxorAuths.length > 0) {
       try {
-        const authKey = luxorAuth.authKey;
+        const authKey = joinSubaccountNames(
+          selectedLuxorAuths.map((a) => a.authKey),
+        );
         console.log(
-          `[24h Revenue API] Fetching Luxor transactions for auth key: ${authKey}`,
+          `[24h Revenue API] Fetching Luxor transactions for auth key(s): ${authKey}`,
         );
         const client = createLuxorClient(authKey);
         const transactions = await client.getTransactions("BTC", {
@@ -144,7 +154,7 @@ export async function GET(request: NextRequest) {
 
     // Determine which pools have a configured account
     const activePoolNames = [];
-    if (luxorAuth) activePoolNames.push("Luxor");
+    if (selectedLuxorAuths.length > 0) activePoolNames.push("Luxor");
     if (braiinsAuth) activePoolNames.push("Braiins");
 
     return NextResponse.json({
@@ -155,7 +165,11 @@ export async function GET(request: NextRequest) {
       currency: "BTC",
       timestamp: new Date().toISOString(),
       dataSource:
-        luxorAuth && braiinsAuth ? "both" : luxorAuth ? "luxor" : "braiins",
+        selectedLuxorAuths.length > 0 && braiinsAuth
+          ? "both"
+          : selectedLuxorAuths.length > 0
+            ? "luxor"
+            : "braiins",
       activePoolNames,
       poolBreakdown: {
         luxor: {

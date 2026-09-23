@@ -490,7 +490,7 @@ model PoolAuth {
   groupSubaccounts GroupSubaccount[]
   poolSubaccounts  PoolSubaccount[]
 
-  @@unique([poolId, userId])
+  @@unique([poolId, userId, authKey])
   @@index([userId])
   @@index([poolId])
   @@map("pool_auths")

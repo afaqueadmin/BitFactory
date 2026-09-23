@@ -70,6 +70,8 @@ interface UseHashrateHistoryArgs {
    * itself.
    */
   minerId?: string;
+  /** Comma-separated Luxor subaccounts to scope to, or "all" (default). */
+  subaccountsParam?: string;
 }
 
 /**
@@ -85,6 +87,7 @@ export const useHashrateHistory = ({
   isLive,
   userId,
   minerId,
+  subaccountsParam = "all",
 }: UseHashrateHistoryArgs) => {
   const startIso = start.toISOString();
   // A live window's end moves every render; round it to the minute so the
@@ -101,11 +104,13 @@ export const useHashrateHistory = ({
         endIso,
         period,
         minerId ?? userId ?? "self",
+        subaccountsParam,
       ],
       queryFn: async () => {
         const params = new URLSearchParams({ start: startIso, end: endIso });
         if (period) params.append("period", period);
         if (!minerId && userId) params.append("userId", userId);
+        if (!minerId) params.append("subaccounts", subaccountsParam);
 
         const endpoint = minerId
           ? `/api/miners/${minerId}/hashrate-history`

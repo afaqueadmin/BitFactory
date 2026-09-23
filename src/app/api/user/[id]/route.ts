@@ -211,20 +211,28 @@ export async function PUT(
           select: { id: true },
         });
         if (luxorPool) {
-          const existingLuxorAuth = await prisma.poolAuth.findUnique({
-            where: { poolId_userId: { poolId: luxorPool.id, userId: id } },
+          // A user can have more than one Luxor PoolAuth row now (added via
+          // the subaccounts UI); this legacy field only ever owns one -
+          // the oldest - and never touches any others.
+          const existingLuxorAuth = await prisma.poolAuth.findFirst({
+            where: { poolId: luxorPool.id, userId: id },
+            orderBy: { createdAt: "asc" },
             select: { id: true },
           });
-          const poolAuth = await prisma.poolAuth.upsert({
-            where: { poolId_userId: { poolId: luxorPool.id, userId: id } },
-            create: {
-              poolId: luxorPool.id,
-              userId: id,
-              authKey: subaccountName.trim(),
-            },
-            update: { authKey: subaccountName.trim() },
-            select: { id: true },
-          });
+          const poolAuth = existingLuxorAuth
+            ? await prisma.poolAuth.update({
+                where: { id: existingLuxorAuth.id },
+                data: { authKey: subaccountName.trim() },
+                select: { id: true },
+              })
+            : await prisma.poolAuth.create({
+                data: {
+                  poolId: luxorPool.id,
+                  userId: id,
+                  authKey: subaccountName.trim(),
+                },
+                select: { id: true },
+              });
           luxorPoolAuthId = poolAuth.id;
           await logPoolCredentialChange(prisma, {
             action: existingLuxorAuth
@@ -371,23 +379,24 @@ export async function PUT(
         });
         if (braiinsPool) {
           if (body.braiinsAuthKey && body.braiinsAuthKey.trim()) {
-            const existingBraiinsAuth = await prisma.poolAuth.findUnique({
-              where: {
-                poolId_userId: { poolId: braiinsPool.id, userId: id },
-              },
+            const existingBraiinsAuth = await prisma.poolAuth.findFirst({
+              where: { poolId: braiinsPool.id, userId: id },
               select: { id: true },
             });
-            await prisma.poolAuth.upsert({
-              where: {
-                poolId_userId: { poolId: braiinsPool.id, userId: id },
-              },
-              create: {
-                poolId: braiinsPool.id,
-                userId: id,
-                authKey: body.braiinsAuthKey.trim(),
-              },
-              update: { authKey: body.braiinsAuthKey.trim() },
-            });
+            if (existingBraiinsAuth) {
+              await prisma.poolAuth.update({
+                where: { id: existingBraiinsAuth.id },
+                data: { authKey: body.braiinsAuthKey.trim() },
+              });
+            } else {
+              await prisma.poolAuth.create({
+                data: {
+                  poolId: braiinsPool.id,
+                  userId: id,
+                  authKey: body.braiinsAuthKey.trim(),
+                },
+              });
+            }
             console.log(
               `[User Update API] Synced Braiins credential for user ${id}`,
             );

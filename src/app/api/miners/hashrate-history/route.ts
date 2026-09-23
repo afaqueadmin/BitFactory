@@ -13,6 +13,10 @@ import {
   fetchLuxorSeries,
   fetchLuxorUptime,
 } from "@/lib/hashrateHistory";
+import {
+  selectRequestedSubaccounts,
+  joinSubaccountNames,
+} from "@/lib/luxorSubaccounts";
 
 /**
  * GET /api/miners/hashrate-history
@@ -153,8 +157,22 @@ export async function GET(request: NextRequest) {
       include: { pool: { select: { id: true, name: true } } },
     });
 
-    const luxorAuth = poolAuths.find((auth) =>
+    const luxorAuths = poolAuths.filter((auth) =>
       auth.pool.name.toLowerCase().includes("luxor"),
+    );
+    const selectedLuxorAuths = selectRequestedSubaccounts(
+      luxorAuths.map((a) => ({ id: a.id, authKey: a.authKey })),
+      searchParams.get("subaccounts"),
+    );
+    const luxorAuth =
+      selectedLuxorAuths.length > 0 ? selectedLuxorAuths[0] : null;
+    // Live fetches below query every selected subaccount at once (Luxor's
+    // subaccount_names accepts a comma list); the DB-backed portion still
+    // reads a single PoolSubaccount id (see luxorPoolSubaccountId below), so
+    // for now it reflects only the first selected subaccount when more than
+    // one is in view.
+    const luxorAuthKeys = joinSubaccountNames(
+      selectedLuxorAuths.map((a) => a.authKey),
     );
     const braiinsAuth = poolAuths.find((auth) =>
       auth.pool.name.toLowerCase().includes("braiins"),
@@ -222,7 +240,7 @@ export async function GET(request: NextRequest) {
       await Promise.all([
         luxorAuth
           ? fetchLuxorSeries(
-              luxorAuth.authKey,
+              luxorAuthKeys,
               window,
               tick,
               luxorPoolSubaccountId,
@@ -253,11 +271,11 @@ export async function GET(request: NextRequest) {
             })
           : Promise.resolve(null),
         luxorAuth
-          ? fetchLuxorEarliestData(luxorAuth.authKey)
+          ? fetchLuxorEarliestData(luxorAuthKeys)
           : Promise.resolve(null),
         wantUptime && luxorAuth
           ? fetchLuxorUptime(
-              luxorAuth.authKey,
+              luxorAuthKeys,
               window,
               luxorPoolSubaccountId,
             ).catch((error) => {

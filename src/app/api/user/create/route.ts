@@ -274,16 +274,13 @@ export async function POST(request: NextRequest) {
           select: { id: true },
         });
         if (luxorPool) {
-          const poolAuth = await prisma.poolAuth.upsert({
-            where: {
-              poolId_userId: { poolId: luxorPool.id, userId: newUser.id },
-            },
-            create: {
+          // Brand-new user, so there is no existing PoolAuth row to collide with.
+          const poolAuth = await prisma.poolAuth.create({
+            data: {
               poolId: luxorPool.id,
               userId: newUser.id,
               authKey: luxorSubaccountName.trim(),
             },
-            update: { authKey: luxorSubaccountName.trim() },
             select: { id: true },
           });
           luxorPoolAuthId = poolAuth.id;
@@ -360,16 +357,13 @@ export async function POST(request: NextRequest) {
           select: { id: true },
         });
         if (braiinsPool) {
-          await prisma.poolAuth.upsert({
-            where: {
-              poolId_userId: { poolId: braiinsPool.id, userId: newUser.id },
-            },
-            create: {
+          // Brand-new user, so there is no existing PoolAuth row to collide with.
+          await prisma.poolAuth.create({
+            data: {
               poolId: braiinsPool.id,
               userId: newUser.id,
               authKey: braiinsAuthKey.trim(),
             },
-            update: { authKey: braiinsAuthKey.trim() },
           });
           console.log(
             `[User Create API] Assigned Braiins credential to user ${newUser.id}`,

@@ -69,12 +69,20 @@ interface HostedMinersListProps {
   customerId?: string;
   poolFilter?: "all" | "luxor" | "braiins";
   repairButtonLabel?: string;
+  /**
+   * Comma-separated Luxor subaccounts to scope worker status to, or "all".
+   * Only meaningful for the CLIENT's own /miners page (which has a
+   * SubaccountFilterProvider above it) - the admin customer-detail view
+   * doesn't pass this and gets every subaccount, same as before.
+   */
+  subaccountsParam?: string;
 }
 
 export default function HostedMinersList({
   customerId,
   poolFilter = "all",
   repairButtonLabel = "🛠️ Previous Repair Notes",
+  subaccountsParam = "all",
 }: HostedMinersListProps) {
   const theme = useTheme();
   // Pool history is an admin-only view; this component is also rendered on
@@ -113,7 +121,7 @@ export default function HostedMinersList({
 
   // TanStack Query hook to fetch and transform miners
   const { data: miners = [], isLoading: loading } = useQuery({
-    queryKey: ["miners", customerId],
+    queryKey: ["miners", customerId, subaccountsParam],
     queryFn: async () => {
       try {
         // Step 1: Fetch miners from database with pool and space relations
@@ -186,8 +194,7 @@ export default function HostedMinersList({
           { status: string; hashrate: number; firmware: string }
         > = new Map();
         try {
-          const luxorUrl =
-            "/api/luxor?endpoint=workers&currency=BTC&page_size=1000";
+          const luxorUrl = `/api/luxor?endpoint=workers&currency=BTC&page_size=1000&subaccounts=${subaccountsParam}`;
 
           const luxorResponse = await fetch(luxorUrl, {
             method: "GET",

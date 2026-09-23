@@ -106,12 +106,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const poolAuth = await prisma.poolAuth.findUnique({
+    const poolAuth = await prisma.poolAuth.findFirst({
       where: {
-        poolId_userId: {
-          poolId: luxorPool.id,
-          userId,
-        },
+        poolId: luxorPool.id,
+        userId,
       },
     });
 

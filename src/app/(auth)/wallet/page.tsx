@@ -25,6 +25,7 @@ import { useWalletChangeRequests } from "@/lib/hooks/useWalletChangeRequests";
 import RequestWalletChangeModal from "@/components/wallet/RequestWalletChangeModal";
 import WalletChangeRequestHistory from "@/components/wallet/WalletChangeRequestHistory";
 import { useFreezeRemaining } from "@/components/wallet/FreezeCountdown";
+import { useSubaccountFilter } from "@/lib/contexts/subaccountFilter-context";
 
 interface PoolBreakdown {
   totalEarnings: number;
@@ -101,6 +102,7 @@ export default function WalletPage() {
   const hasPendingWalletChange = !!activeWalletChangeRequest || isPayoutFrozen;
 
   const { user } = useUser();
+  const { queryParam: subaccountsParam } = useSubaccountFilter();
   // const theme = useTheme();
 
   // // Fetch BTC price using TanStack Query
@@ -126,7 +128,9 @@ export default function WalletPage() {
         setIsLoading(true);
         setError(null);
 
-        const response = await fetch("/api/wallet/earnings-summary");
+        const response = await fetch(
+          `/api/wallet/earnings-summary?subaccounts=${subaccountsParam}`,
+        );
 
         if (!response.ok) {
           throw new Error(
@@ -150,7 +154,7 @@ export default function WalletPage() {
 
     // Call the API immediately on component mount
     fetchEarningsSummary();
-  }, []);
+  }, [subaccountsParam]);
 
   // Fetch 24-hour revenue from API
   useEffect(() => {
@@ -159,7 +163,9 @@ export default function WalletPage() {
         setRevenue24hLoading(true);
         setRevenue24hError(null);
 
-        const response = await fetch("/api/wallet/earnings-24h");
+        const response = await fetch(
+          `/api/wallet/earnings-24h?subaccounts=${subaccountsParam}`,
+        );
 
         if (!response.ok) {
           throw new Error(
@@ -183,7 +189,7 @@ export default function WalletPage() {
 
     // Call the API immediately on component mount
     fetchRevenue24h();
-  }, []);
+  }, [subaccountsParam]);
 
   // Fetch wallet settings from Luxor API
   useEffect(() => {
@@ -192,12 +198,15 @@ export default function WalletPage() {
         setWalletLoading(true);
         setWalletError(null);
 
-        const response = await fetch("/api/wallet/settings?currency=BTC", {
-          credentials: "include",
-          headers: {
-            "Cache-Control": "no-cache",
+        const response = await fetch(
+          `/api/wallet/settings?currency=BTC&subaccounts=${subaccountsParam}`,
+          {
+            credentials: "include",
+            headers: {
+              "Cache-Control": "no-cache",
+            },
           },
-        });
+        );
 
         if (!response.ok) {
           const errorData = await response.json();
@@ -229,7 +238,7 @@ export default function WalletPage() {
     if (user?.id) {
       fetchWalletSettings();
     }
-  }, [user?.id]);
+  }, [user?.id, subaccountsParam]);
 
   // Auto-reset poolMode if selected pool is not in activePoolNames
   useEffect(() => {

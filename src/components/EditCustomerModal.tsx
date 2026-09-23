@@ -16,6 +16,9 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  Chip,
+  Stack,
+  Typography,
 } from "@mui/material";
 import { Close as CloseIcon } from "@mui/icons-material";
 import { useUser } from "@/lib/hooks/useUser";
@@ -70,6 +73,19 @@ export default function EditCustomerModal({
   const [subaccounts, setSubaccounts] = useState<
     Array<{ name: string; id: number }>
   >([]);
+  // Every Luxor PoolAuth row this customer currently has (including the
+  // "primary" one reflected in formData.luxorSubaccountName above) - lets an
+  // admin attach more than one Luxor subaccount to a client.
+  const [luxorPoolAuths, setLuxorPoolAuths] = useState<
+    Array<{ id: string; authKey: string }>
+  >([]);
+  const [newSubaccountToAdd, setNewSubaccountToAdd] = useState("");
+  const [subaccountActionError, setSubaccountActionError] = useState("");
+  const [addingSubaccount, setAddingSubaccount] = useState(false);
+  const [removingSubaccountId, setRemovingSubaccountId] = useState<
+    string | null
+  >(null);
+  const [luxorPoolId, setLuxorPoolId] = useState<string | null>(null);
   const [groups, setGroups] = useState<Group[]>([]);
   const [franchises, setFranchises] = useState<Franchise[]>([]);
   const [fetchingFranchises, setFetchingFranchises] = useState(false);
@@ -111,8 +127,80 @@ export default function EditCustomerModal({
         loadCurrentBraiinsAuth(customerId);
       }
       fetchFranchises();
+      fetchLuxorPoolId();
     }
   }, [initialData, open]);
+
+  const fetchLuxorPoolId = async () => {
+    try {
+      const response = await fetch("/api/pools");
+      if (!response.ok) return;
+      const data = await response.json();
+      const pools: Array<{ id: string; name: string }> = Array.isArray(
+        data.data,
+      )
+        ? data.data
+        : Array.isArray(data)
+          ? data
+          : [];
+      setLuxorPoolId(pools.find((p) => p.name === "Luxor")?.id || null);
+    } catch (err) {
+      console.error("[EditCustomerModal] Error fetching Luxor pool id:", err);
+    }
+  };
+
+  const handleAddSubaccount = async () => {
+    if (!customerId || !luxorPoolId || !newSubaccountToAdd) return;
+    setSubaccountActionError("");
+    setAddingSubaccount(true);
+    try {
+      const response = await fetch("/api/pool-auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          poolId: luxorPoolId,
+          userId: customerId,
+          authKey: newSubaccountToAdd,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || "Failed to add subaccount");
+      }
+      setLuxorPoolAuths((prev) => [
+        ...prev,
+        { id: data.data.id, authKey: data.data.authKey },
+      ]);
+      setNewSubaccountToAdd("");
+    } catch (err) {
+      setSubaccountActionError(
+        err instanceof Error ? err.message : "Failed to add subaccount",
+      );
+    } finally {
+      setAddingSubaccount(false);
+    }
+  };
+
+  const handleRemoveSubaccount = async (id: string) => {
+    setSubaccountActionError("");
+    setRemovingSubaccountId(id);
+    try {
+      const response = await fetch(`/api/pool-auth/${id}`, {
+        method: "DELETE",
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || "Failed to remove subaccount");
+      }
+      setLuxorPoolAuths((prev) => prev.filter((sub) => sub.id !== id));
+    } catch (err) {
+      setSubaccountActionError(
+        err instanceof Error ? err.message : "Failed to remove subaccount",
+      );
+    } finally {
+      setRemovingSubaccountId(null);
+    }
+  };
 
   const fetchFranchises = async () => {
     try {
@@ -301,14 +389,26 @@ export default function EditCustomerModal({
       const data = await response.json();
       if (!data.success || !Array.isArray(data.data)) return;
 
-      const braiinsEntry = (
-        data.data as Array<{ authKey: string; pool: { name: string } }>
-      ).find((entry) => entry.pool.name === "Braiins");
+      const entries = data.data as Array<{
+        id: string;
+        authKey: string;
+        pool: { name: string };
+      }>;
+
+      const braiinsEntry = entries.find(
+        (entry) => entry.pool.name === "Braiins",
+      );
 
       setFormData((prev) => ({
         ...prev,
         braiinsAuthKey: braiinsEntry?.authKey || "",
       }));
+
+      setLuxorPoolAuths(
+        entries
+          .filter((entry) => entry.pool.name === "Luxor")
+          .map((entry) => ({ id: entry.id, authKey: entry.authKey })),
+      );
     } catch (err) {
       console.error(
         "[EditCustomerModal] Error loading current Braiins credential:",
@@ -570,6 +670,71 @@ export default function EditCustomerModal({
                 ))}
               </Select>
             </FormControl>
+
+            {/* Additional Luxor subaccounts - lets one client have more than
+                one Luxor subaccount, beyond the single one above. */}
+            {customerId && (
+              <Box>
+                <Typography variant="body2" sx={{ mb: 1, fontWeight: 500 }}>
+                  Additional Luxor Subaccounts
+                </Typography>
+                <Stack
+                  direction="row"
+                  spacing={1}
+                  flexWrap="wrap"
+                  useFlexGap
+                  sx={{ mb: 1 }}
+                >
+                  {luxorPoolAuths.length === 0 && (
+                    <Typography variant="body2" color="text.secondary">
+                      None assigned
+                    </Typography>
+                  )}
+                  {luxorPoolAuths.map((sub) => (
+                    <Chip
+                      key={sub.id}
+                      label={sub.authKey}
+                      onDelete={() => handleRemoveSubaccount(sub.id)}
+                      disabled={removingSubaccountId === sub.id}
+                    />
+                  ))}
+                </Stack>
+                <Stack direction="row" spacing={1}>
+                  <FormControl fullWidth size="small" disabled={!luxorPoolId}>
+                    <InputLabel>Add subaccount</InputLabel>
+                    <Select
+                      value={newSubaccountToAdd}
+                      label="Add subaccount"
+                      onChange={(e) => setNewSubaccountToAdd(e.target.value)}
+                    >
+                      {subaccounts
+                        .filter(
+                          (sub) =>
+                            !luxorPoolAuths.some((a) => a.authKey === sub.name),
+                        )
+                        .map((sub) => (
+                          <MenuItem key={sub.id} value={sub.name}>
+                            {sub.name}
+                          </MenuItem>
+                        ))}
+                    </Select>
+                  </FormControl>
+                  <Button
+                    variant="outlined"
+                    disabled={!newSubaccountToAdd || addingSubaccount}
+                    onClick={handleAddSubaccount}
+                  >
+                    Add
+                  </Button>
+                </Stack>
+                {subaccountActionError && (
+                  <Alert severity="error" sx={{ mt: 1 }}>
+                    {subaccountActionError}
+                  </Alert>
+                )}
+              </Box>
+            )}
+
             <TextField
               fullWidth
               label="Braiins Auth Key (Optional)"

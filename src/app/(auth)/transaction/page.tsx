@@ -27,6 +27,7 @@ import {
 import DownloadIcon from "@mui/icons-material/Download";
 import { useUser } from "@/lib/hooks/useUser";
 import { formatValue } from "@/lib/helpers/formatValue";
+import { useSubaccountFilter } from "@/lib/contexts/subaccountFilter-context";
 
 interface Transaction {
   pool: "Luxor" | "Braiins";
@@ -84,6 +85,7 @@ interface TransactionResponse {
 export default function TransactionPage() {
   const theme = useTheme();
   const { user } = useUser();
+  const { queryParam: subaccountsParam } = useSubaccountFilter();
   const [poolMode, setPoolMode] = useState<"total" | "luxor" | "braiins">(
     "total",
   );
@@ -134,6 +136,7 @@ export default function TransactionPage() {
         limit: pageSize.toString(),
         type,
         pool: poolMode,
+        subaccounts: subaccountsParam,
         ...dateParams,
       });
 
@@ -171,6 +174,7 @@ export default function TransactionPage() {
         type: typeFilter,
         pool: poolMode,
         export: "true",
+        subaccounts: subaccountsParam,
         ...dateParams,
       });
 
@@ -237,7 +241,15 @@ export default function TransactionPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [poolMode, typeFilter, dateMode, presetRange, startDate, endDate]);
+  }, [
+    poolMode,
+    typeFilter,
+    dateMode,
+    presetRange,
+    startDate,
+    endDate,
+    subaccountsParam,
+  ]);
 
   useEffect(() => {
     fetchTransactions(currentPage, typeFilter);
@@ -250,6 +262,7 @@ export default function TransactionPage() {
     presetRange,
     startDate,
     endDate,
+    subaccountsParam,
   ]);
 
   // The API now filters by pool server-side, before pagination, so what

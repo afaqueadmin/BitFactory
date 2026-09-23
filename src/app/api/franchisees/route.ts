@@ -313,16 +313,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           select: { id: true },
         });
         if (luxorPool) {
-          await prisma.poolAuth.upsert({
-            where: {
-              poolId_userId: { poolId: luxorPool.id, userId: franchisee.id },
-            },
-            create: {
+          // Brand-new franchisee, so there is no existing PoolAuth row to collide with.
+          await prisma.poolAuth.create({
+            data: {
               poolId: luxorPool.id,
               userId: franchisee.id,
               authKey: luxorSubaccountName.trim(),
             },
-            update: { authKey: luxorSubaccountName.trim() },
           });
           console.log(
             `[Franchisees API] Synced Luxor PoolAuth for franchisee ${franchisee.id}`,
@@ -351,16 +348,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           select: { id: true },
         });
         if (braiinsPool) {
-          await prisma.poolAuth.upsert({
-            where: {
-              poolId_userId: { poolId: braiinsPool.id, userId: franchisee.id },
-            },
-            create: {
+          // Brand-new franchisee, so there is no existing PoolAuth row to collide with.
+          await prisma.poolAuth.create({
+            data: {
               poolId: braiinsPool.id,
               userId: franchisee.id,
               authKey: braiinsAuthKey.trim(),
             },
-            update: { authKey: braiinsAuthKey.trim() },
           });
           console.log(
             `[Franchisees API] Assigned Braiins credential to franchisee ${franchisee.id}`,

@@ -7,6 +7,7 @@ import AppBarComponent from "@/components/AppBar";
 import UserFooter from "@/components/UserFooter";
 import PasskeySetupPrompt from "@/components/PasskeySetupPrompt";
 import { useAuth } from "@/lib/contexts/auth-context";
+import { SubaccountFilterProvider } from "@/lib/contexts/subaccountFilter-context";
 import { useTheme } from "@/app/theme-provider";
 import { HEADER_HEIGHT, MQ, useDaylight } from "@/lib/daylight";
 
@@ -27,32 +28,34 @@ export default function AuthLayout({
   const isDaylightPage = pathname === "/dashboard";
 
   return (
-    <Box
-      sx={{
-        display: "flex",
-        flexDirection: "column",
-        minHeight: "100vh",
-        ...(isDaylightPage && { backgroundColor: d.canvas }),
-      }}
-    >
-      <AppBarComponent />
-      <PasskeySetupPrompt />
+    <SubaccountFilterProvider>
       <Box
-        component="main"
         sx={{
-          flexGrow: 1,
-          // Clear the fixed header: 76px top bar, 72px mobile top bar.
-          marginTop: `${HEADER_HEIGHT.desktop}px`,
-          [MQ.mobile]: { marginTop: `${HEADER_HEIGHT.mobile}px` },
-          overflow: "auto",
-          padding: isDaylightPage
-            ? { xs: "24px 18px", md: "32px 36px" }
-            : "clamp(12px, 5vw, 24px)",
+          display: "flex",
+          flexDirection: "column",
+          minHeight: "100vh",
+          ...(isDaylightPage && { backgroundColor: d.canvas }),
         }}
       >
-        {children}
+        <AppBarComponent />
+        <PasskeySetupPrompt />
+        <Box
+          component="main"
+          sx={{
+            flexGrow: 1,
+            // Clear the fixed header: 76px top bar, 72px mobile top bar.
+            marginTop: `${HEADER_HEIGHT.desktop}px`,
+            [MQ.mobile]: { marginTop: `${HEADER_HEIGHT.mobile}px` },
+            overflow: "auto",
+            padding: isDaylightPage
+              ? { xs: "24px 18px", md: "32px 36px" }
+              : "clamp(12px, 5vw, 24px)",
+          }}
+        >
+          {children}
+        </Box>
+        <UserFooter />
       </Box>
-      <UserFooter />
-    </Box>
+    </SubaccountFilterProvider>
   );
 }

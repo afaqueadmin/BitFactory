@@ -20,6 +20,9 @@ import {
   IconButton,
   Menu,
   MenuItem,
+  ListItemIcon,
+  ListItemText,
+  Checkbox,
   Box,
   CircularProgress,
   GlobalStyles,
@@ -27,6 +30,8 @@ import {
 import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import AccountCircle from "@mui/icons-material/AccountCircle";
+import CheckIcon from "@mui/icons-material/Check";
+import AccountTreeOutlinedIcon from "@mui/icons-material/AccountTreeOutlined";
 import DarkModeIcon from "@mui/icons-material/DarkModeOutlined";
 import LightModeIcon from "@mui/icons-material/LightModeOutlined";
 import SpaceDashboardOutlinedIcon from "@mui/icons-material/SpaceDashboardOutlined";
@@ -39,6 +44,7 @@ import InsightsOutlinedIcon from "@mui/icons-material/InsightsOutlined";
 import ShowChartOutlinedIcon from "@mui/icons-material/ShowChartOutlined";
 import SavingsOutlinedIcon from "@mui/icons-material/SavingsOutlined";
 import { useAuth } from "@/lib/contexts/auth-context";
+import { useSubaccountFilter } from "@/lib/contexts/subaccountFilter-context";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
@@ -129,9 +135,16 @@ export default function AppBarComponent() {
   const { darkMode, toggleDarkMode } = useTheme();
   const { d, fonts } = useDaylight();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [subaccountAnchorEl, setSubaccountAnchorEl] =
+    useState<null | HTMLElement>(null);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const { logout } = useAuth();
+  const {
+    available: availableSubaccounts,
+    selected: selectedSubaccounts,
+    setSelected: setSelectedSubaccounts,
+  } = useSubaccountFilter();
   const pathname = usePathname(); // Get current path
 
   const { user } = useUser();
@@ -164,6 +177,29 @@ export default function AppBarComponent() {
 
   const handleClose = () => {
     setAnchorEl(null);
+  };
+
+  const handleSubaccountMenu = (event: React.MouseEvent<HTMLElement>) => {
+    setSubaccountAnchorEl(event.currentTarget);
+  };
+
+  const handleSubaccountMenuClose = () => {
+    setSubaccountAnchorEl(null);
+  };
+
+  const toggleSubaccount = (authKey: string) => {
+    if (selectedSubaccounts === "all") {
+      setSelectedSubaccounts([authKey]);
+      return;
+    }
+    const isSelected = selectedSubaccounts.includes(authKey);
+    if (isSelected && selectedSubaccounts.length === 1) return; // keep at least one selected
+    const next = isSelected
+      ? selectedSubaccounts.filter((k) => k !== authKey)
+      : [...selectedSubaccounts, authKey];
+    setSelectedSubaccounts(
+      next.length === availableSubaccounts.length ? "all" : next,
+    );
   };
 
   const handleOpenMobileNav = () => {
@@ -594,6 +630,58 @@ export default function AppBarComponent() {
           </Box>
 
           <Box sx={{ flexGrow: 1 }} />
+
+          {/* Subaccount filter - only shown for CLIENT users with more than
+              one Luxor subaccount to pick from. */}
+          {user?.role === "CLIENT" && availableSubaccounts.length > 1 && (
+            <>
+              <IconButton
+                onClick={handleSubaccountMenu}
+                aria-label="Filter by subaccount"
+                aria-haspopup="menu"
+                aria-expanded={Boolean(subaccountAnchorEl)}
+                sx={iconBtnSx}
+              >
+                <AccountTreeOutlinedIcon />
+              </IconButton>
+              <Menu
+                anchorEl={subaccountAnchorEl}
+                open={Boolean(subaccountAnchorEl)}
+                onClose={handleSubaccountMenuClose}
+                slotProps={{ paper: { sx: menuPaperSx } }}
+              >
+                <MenuItem onClick={() => setSelectedSubaccounts("all")} dense>
+                  <ListItemIcon>
+                    {selectedSubaccounts === "all" && (
+                      <CheckIcon fontSize="small" />
+                    )}
+                  </ListItemIcon>
+                  <ListItemText>All subaccounts</ListItemText>
+                </MenuItem>
+                {availableSubaccounts.map((sub) => (
+                  <MenuItem
+                    key={sub.authKey}
+                    onClick={() => toggleSubaccount(sub.authKey)}
+                    dense
+                  >
+                    <ListItemIcon>
+                      <Checkbox
+                        edge="start"
+                        size="small"
+                        checked={
+                          selectedSubaccounts === "all" ||
+                          selectedSubaccounts.includes(sub.authKey)
+                        }
+                        tabIndex={-1}
+                        disableRipple
+                      />
+                    </ListItemIcon>
+                    <ListItemText>{sub.authKey}</ListItemText>
+                  </MenuItem>
+                ))}
+              </Menu>
+            </>
+          )}
 
           {/* Dark Mode Toggle */}
           <IconButton

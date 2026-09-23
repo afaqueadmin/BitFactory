@@ -36,6 +36,7 @@ import MiningEarningsChart from "@/components/MiningEarningsChart";
 import { useUser } from "@/lib/hooks/useUser";
 import { formatValue } from "@/lib/helpers/formatValue";
 import { getDaysInCurrentMonth } from "@/lib/helpers/getDaysInCurrentMonth";
+import { useSubaccountFilter } from "@/lib/contexts/subaccountFilter-context";
 import { MQ, RADIUS_CARD, focusRing, useDaylight } from "@/lib/daylight";
 
 type ChartMode = "total" | "luxor" | "braiins" | "sideBySide";
@@ -159,6 +160,7 @@ function PoolTab({
 
 export default function DashboardPage() {
   const { loading, error } = useUser();
+  const { queryParam: subaccountsParam } = useSubaccountFilter();
   const theme = useTheme();
   const { d, fonts } = useDaylight();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
@@ -287,12 +289,15 @@ export default function DashboardPage() {
         setWorkersLoading(true);
         setWorkersError(null);
 
-        const response = await fetch("/api/workers/stats", {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
+        const response = await fetch(
+          `/api/workers/stats?subaccounts=${subaccountsParam}`,
+          {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+            },
           },
-        });
+        );
 
         const data = await response.json();
 
@@ -341,7 +346,7 @@ export default function DashboardPage() {
     };
 
     fetchWorkersStats();
-  }, []);
+  }, [subaccountsParam]);
 
   // Fetch miner summary counts on component mount
   React.useEffect(() => {
@@ -349,12 +354,15 @@ export default function DashboardPage() {
       try {
         setMinersSummaryLoading(true);
 
-        const response = await fetch("/api/miners/summary", {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
+        const response = await fetch(
+          `/api/miners/summary?subaccounts=${subaccountsParam}`,
+          {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+            },
           },
-        });
+        );
 
         const data = await response.json();
 
@@ -386,7 +394,7 @@ export default function DashboardPage() {
     };
 
     fetchMinersSummary();
-  }, []);
+  }, [subaccountsParam]);
 
   const hosted = {
     runningCount: workersStats.activeWorkers,
@@ -410,12 +418,15 @@ export default function DashboardPage() {
       setWorkersLoading(true);
       setWorkersError(null);
 
-      const response = await fetch("/api/workers/stats", {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
+      const response = await fetch(
+        `/api/workers/stats?subaccounts=${subaccountsParam}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
         },
-      });
+      );
 
       if (!response.ok) {
         throw new Error("Failed to fetch workers stats");

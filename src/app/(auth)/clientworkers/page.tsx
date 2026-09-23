@@ -43,6 +43,7 @@ import SpeedIcon from "@mui/icons-material/Speed";
 import ElectricBoltIcon from "@mui/icons-material/ElectricBolt";
 import GradientStatCard from "@/components/GradientStatCard";
 import { WorkersResponse } from "@/lib/luxor";
+import { useSubaccountFilter } from "@/lib/contexts/subaccountFilter-context";
 
 /**
  * Response structure from the /api/luxor proxy route
@@ -65,6 +66,7 @@ interface WorkersState {
 
 export default function WorkersPage() {
   const theme = useTheme();
+  const { queryParam: subaccountsParam } = useSubaccountFilter();
   const [state, setState] = useState<WorkersState>({
     workers: null,
     loading: true,
@@ -96,6 +98,7 @@ export default function WorkersPage() {
         status: filters.status,
         page_number: filters.page_number,
         page_size: filters.page_size,
+        subaccounts: subaccountsParam,
       });
 
       const queryString = params.toString();
@@ -131,14 +134,14 @@ export default function WorkersPage() {
         error: errorMsg,
       }));
     }
-  }, [filters]);
+  }, [filters, subaccountsParam]);
 
   /**
    * Fetch data on component mount and when filters change
    */
   useEffect(() => {
     fetchWorkersData();
-  }, [filters, fetchWorkersData]);
+  }, [filters, subaccountsParam, fetchWorkersData]);
 
   /**
    * Handle filter change

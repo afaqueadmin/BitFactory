@@ -10,6 +10,7 @@ import HashRate24HoursCard from "@/components/dashboardCards/HashRate24HoursCard
 import HashpriceCard from "@/components/dashboardCards/HashpriceCard";
 import HashrateHistoryChart from "@/components/HashrateHistoryChart";
 import { formatHashrate } from "@/lib/workerNormalization";
+import { useSubaccountFilter } from "@/lib/contexts/subaccountFilter-context";
 
 interface MinersSummary {
   totalHashrate: number;
@@ -41,6 +42,7 @@ interface MinersSummary {
 
 export default function Miners() {
   const theme = useTheme();
+  const { queryParam: subaccountsParam } = useSubaccountFilter();
   const [poolMode, setPoolMode] = useState<"total" | "luxor" | "braiins">(
     "total",
   );
@@ -81,14 +83,17 @@ export default function Miners() {
     },
     isLoading: summaryLoading,
   } = useQuery({
-    queryKey: ["miners-summary"],
+    queryKey: ["miners-summary", subaccountsParam],
     queryFn: async () => {
-      const response = await fetch("/api/miners/summary", {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
+      const response = await fetch(
+        `/api/miners/summary?subaccounts=${subaccountsParam}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
         },
-      });
+      );
 
       if (!response.ok) {
         console.error("Failed to fetch miners summary");
@@ -359,7 +364,10 @@ export default function Miners() {
       </Box>
 
       {/* Hashrate & Shares Efficiency history — follows the pool toggle above */}
-      <HashrateHistoryChart poolMode={poolMode} />
+      <HashrateHistoryChart
+        poolMode={poolMode}
+        subaccountsParam={subaccountsParam}
+      />
 
       {/* Pool Comparison Cards - Only show if multiple pools and in total mode */}
       {poolMode === "total" &&
@@ -650,6 +658,7 @@ export default function Miners() {
       <HostedMinersList
         poolFilter={minerFilter}
         repairButtonLabel="Repair history"
+        subaccountsParam={subaccountsParam}
       />
     </Box>
   );

@@ -26,6 +26,11 @@ import { verifyJwtToken } from "@/lib/jwt";
 import { createLuxorClient, LuxorError } from "@/lib/luxor";
 import { prisma } from "@/lib/prisma";
 import { franchiseeUserFilter } from "@/lib/franchiseeScope";
+import {
+  joinSubaccountNames,
+  selectRequestedSubaccounts,
+  type LuxorSubaccount,
+} from "@/lib/luxorSubaccounts";
 
 // ✅ Ensure this runs on Node.js runtime (required for async operations)
 export const runtime = "nodejs";
@@ -180,7 +185,7 @@ async function extractUserFromToken(request: NextRequest) {
         role: true,
         poolAuths: {
           where: { pool: { name: "Luxor" } },
-          select: { authKey: true },
+          select: { id: true, authKey: true },
         },
       },
     });
@@ -189,11 +194,23 @@ async function extractUserFromToken(request: NextRequest) {
       throw new Error("User not found in database");
     }
 
+    // All of this user's Luxor subaccounts, falling back to the legacy
+    // column when they have no PoolAuth rows yet. luxorSubaccountName /
+    // luxorPoolAuthKey below are kept only for endpoint branches that
+    // haven't been migrated to the multi-subaccount list yet.
+    const luxorSubaccounts: LuxorSubaccount[] =
+      user.poolAuths.length > 0
+        ? user.poolAuths
+        : user.luxorSubaccountName
+          ? [{ id: null, authKey: user.luxorSubaccountName }]
+          : [];
+
     return {
       userId: decoded.userId,
       role: decoded.role,
       luxorSubaccountName: user.luxorSubaccountName,
       luxorPoolAuthKey: user.poolAuths[0]?.authKey || null,
+      luxorSubaccounts,
     };
   } catch (error) {
     if (error instanceof Error) {
@@ -361,6 +378,7 @@ export async function GET(
       role: string;
       luxorSubaccountName: string | null;
       luxorPoolAuthKey: string | null;
+      luxorSubaccounts: LuxorSubaccount[];
     };
     try {
       user = await extractUserFromToken(request);
@@ -640,12 +658,16 @@ export async function GET(
             );
           }
           console.log(`[Luxor Proxy V2] GET: Getting workers for ${currency}`);
-          const clientLuxorIdentifier =
-            user.luxorPoolAuthKey || user.luxorSubaccountName || undefined;
+          const clientSelectedSubaccounts = joinSubaccountNames(
+            selectRequestedSubaccounts(
+              user.luxorSubaccounts,
+              searchParams.get("subaccounts"),
+            ).map((s) => s.authKey),
+          );
           data = await luxorClient.getWorkers(currency, {
             subaccount_names:
-              user.role === "CLIENT" && clientLuxorIdentifier
-                ? clientLuxorIdentifier
+              user.role === "CLIENT" && clientSelectedSubaccounts
+                ? clientSelectedSubaccounts
                 : user.role === "FRANCHISEE"
                   ? (await getFranchiseeSubaccountNames(user.userId)) ||
                     undefined
@@ -853,12 +875,16 @@ export async function GET(
           // NOTE: Luxor API requires exactly ONE of subaccount_names or site_id, not both
           // Prefer subaccount_names if provided, otherwise use site_id
 
-          const summaryLuxorIdentifier =
-            user.luxorPoolAuthKey || user.luxorSubaccountName || undefined;
+          const summarySelectedSubaccounts = joinSubaccountNames(
+            selectRequestedSubaccounts(
+              user.luxorSubaccounts,
+              searchParams.get("subaccounts"),
+            ).map((s) => s.authKey),
+          );
           data = await luxorClient.getSummary(currency, {
             subaccount_names:
-              user.role === "CLIENT" && summaryLuxorIdentifier
-                ? summaryLuxorIdentifier
+              user.role === "CLIENT" && summarySelectedSubaccounts
+                ? summarySelectedSubaccounts
                 : undefined,
             // FRANCHISEE intentionally gets the same site-wide summary as
             // ADMIN/SUPER_ADMIN (uptime/hashrate are not per-customer scoped).
