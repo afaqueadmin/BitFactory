@@ -16,6 +16,7 @@ import {
   Button,
   Chip,
   Tooltip,
+  TablePagination,
 } from "@mui/material";
 import { useQuery } from "@tanstack/react-query";
 import { useUser } from "@/lib/hooks/useUser";
@@ -42,6 +43,8 @@ export default function InvoicesPage() {
   const { user } = useUser();
   const router = useRouter();
   const [statementDownloading, setStatementDownloading] = useState(false);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
 
   // Fetch invoices using TanStack Query
   const {
@@ -49,13 +52,13 @@ export default function InvoicesPage() {
     isLoading: invoicesLoading,
     error: invoicesError,
   } = useQuery<InvoicesResponse>({
-    queryKey: ["invoices", user?.id],
+    queryKey: ["invoices", user?.id, page, rowsPerPage],
     queryFn: async () => {
       if (!user?.id) {
         throw new Error("User ID is required");
       }
       const response = await fetch(
-        `/api/accounting/invoices?customerId=${user.id}&sortBy=issuedDate&sortDirection=desc`,
+        `/api/accounting/invoices?customerId=${user.id}&sortBy=issuedDate&sortDirection=desc&page=${page + 1}&limit=${rowsPerPage}`,
       );
       if (!response.ok) {
         throw new Error("Failed to fetch invoices");
@@ -64,6 +67,17 @@ export default function InvoicesPage() {
     },
     enabled: !!user?.id,
   });
+
+  const handleChangePage = (_event: unknown, newPage: number) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
 
   // Fetch this customer's own issued memos once, to badge invoice rows that
   // have one - the API force-scopes CLIENT requests to their own
@@ -445,6 +459,15 @@ export default function InvoicesPage() {
             </TableBody>
           </Table>
         </TableContainer>
+        <TablePagination
+          component="div"
+          count={invoicesResponse?.pagination.total ?? 0}
+          page={page}
+          onPageChange={handleChangePage}
+          rowsPerPage={rowsPerPage}
+          onRowsPerPageChange={handleChangeRowsPerPage}
+          rowsPerPageOptions={[10, 25, 50]}
+        />
       </Paper>
     </Box>
   );
