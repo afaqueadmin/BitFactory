@@ -3,8 +3,14 @@
  *
  * GET: list wallet change requests visible to the caller.
  *   - CLIENT/FRANCHISEE: only requests they submitted (their own account -
- *     the wallet page never lets them view/request for someone else).
- *   - ADMIN/SUPER_ADMIN: every request, optionally filtered by ?status=.
+ *     the wallet page never lets them view/request for someone else). The
+ *     admin-only review trail (confirmedById/confirmedAt/confirmationMethod/
+ *     confirmationContact/confirmationNote/confirmedBy) is stripped from the
+ *     response for these callers - it can contain the client's own phone
+ *     number/email plus internal notes, none of which the client needs to
+ *     see back.
+ *   - ADMIN/SUPER_ADMIN: every request, optionally filtered by ?status=,
+ *     including the full review trail.
  *
  * POST: submit a new wallet change request. CLIENT/FRANCHISEE only. Requires
  * step-up re-authentication (current password, or a 2FA code/backup code for
@@ -15,7 +21,10 @@
  * the step-up already required by /api/user/change-password. Snapshots the
  * user's live primary Luxor address into currentAddress at submission time,
  * so the request row is itself a permanent before/after record. Only one
- * PENDING request per user at a time.
+ * request in flight per user at a time: blocks a new submission while a
+ * previous one is PENDING, CONFIRMED, or APPROVED-and-still-within-its-24h
+ * payout freeze (reviewedAt + 24h) - approval no longer pushes to Luxor
+ * immediately, so the freeze window is the real "still settling" period.
  *
  * Braiins is out of scope - see src/lib/wallet.ts.
  */
@@ -30,7 +39,7 @@ import { verifyJwtToken } from "@/lib/jwt";
 import { fetchCurrentPrimaryAddress } from "@/lib/wallet";
 import { sendWalletChangeRequestSubmittedEmail } from "@/lib/email";
 
-const STATUSES = new Set(["PENDING", "APPROVED", "REJECTED"]);
+const STATUSES = new Set(["PENDING", "CONFIRMED", "APPROVED", "REJECTED"]);
 
 async function requireUser(request: NextRequest) {
   const token = request.cookies.get("token")?.value;
@@ -60,7 +69,13 @@ export async function GET(request: NextRequest) {
     const where: Prisma.WalletChangeRequestWhereInput = {
       ...(isAdmin ? {} : { userId: auth.decoded.userId }),
       ...(statusParam && STATUSES.has(statusParam)
-        ? { status: statusParam as "PENDING" | "APPROVED" | "REJECTED" }
+        ? {
+            status: statusParam as
+              | "PENDING"
+              | "CONFIRMED"
+              | "APPROVED"
+              | "REJECTED",
+          }
         : {}),
     };
 
@@ -70,10 +85,30 @@ export async function GET(request: NextRequest) {
       include: {
         user: { select: { id: true, name: true, email: true } },
         reviewedBy: { select: { id: true, name: true, email: true } },
+        confirmedBy: { select: { id: true, name: true, email: true } },
       },
     });
 
-    return NextResponse.json({ success: true, data: requests });
+    const data = isAdmin
+      ? requests
+      : requests.map((req) => ({
+          id: req.id,
+          userId: req.userId,
+          currency: req.currency,
+          currentAddress: req.currentAddress,
+          requestedAddress: req.requestedAddress,
+          reason: req.reason,
+          status: req.status,
+          rejectionReason: req.rejectionReason,
+          reviewedById: req.reviewedById,
+          reviewedAt: req.reviewedAt,
+          createdAt: req.createdAt,
+          updatedAt: req.updatedAt,
+          user: req.user,
+          reviewedBy: req.reviewedBy,
+        }));
+
+    return NextResponse.json({ success: true, data });
   } catch (error) {
     console.error("[Wallet Change Requests API] GET error:", error);
     return NextResponse.json(
@@ -235,16 +270,25 @@ export async function POST(request: NextRequest) {
       verifiedVia = "PASSWORD";
     }
 
-    const existingPending = await prisma.walletChangeRequest.findFirst({
-      where: { userId: auth.decoded.userId, status: "PENDING" },
-      select: { id: true },
+    const freezeWindowStart = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const existingActive = await prisma.walletChangeRequest.findFirst({
+      where: {
+        userId: auth.decoded.userId,
+        OR: [
+          { status: { in: ["PENDING", "CONFIRMED"] } },
+          { status: "APPROVED", reviewedAt: { gt: freezeWindowStart } },
+        ],
+      },
+      select: { id: true, status: true },
     });
-    if (existingPending) {
+    if (existingActive) {
       return NextResponse.json(
         {
           success: false,
           error:
-            "You already have a pending wallet change request. Wait for it to be reviewed before submitting another.",
+            existingActive.status === "APPROVED"
+              ? "Your last wallet change is still in its 24-hour security freeze. Wait for it to clear before submitting another."
+              : "You already have a wallet change request in review. Wait for it to be resolved before submitting another.",
         },
         { status: 400 },
       );

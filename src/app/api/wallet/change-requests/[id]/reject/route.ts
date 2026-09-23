@@ -1,19 +1,24 @@
 /**
  * POST /api/wallet/change-requests/[id]/reject
  *
- * Rejects a PENDING wallet change request. Nothing is pushed to Luxor - the
- * live address is left exactly as it was. The status update is guarded by a
- * status-conditioned updateMany (not a separate check-then-write), so two
- * concurrent reject/approve calls on the same request can't both succeed.
- * ADMIN/SUPER_ADMIN only.
+ * Rejects a request that's still PENDING or CONFIRMED (not yet APPROVED).
+ * Nothing is pushed to Luxor - the live address is left exactly as it was.
+ * Requires the admin's own step-up re-authentication (password or 2FA),
+ * same as confirm/approve, for consistency across every admin action on a
+ * wallet change request.
  *
- * Body: { rejectionReason: string }
+ * The status update is guarded by a status-conditioned updateMany (not a
+ * separate check-then-write), so two concurrent reject/approve calls on the
+ * same request can't both succeed.
+ *
+ * Body: { rejectionReason: string, currentPassword?: string, twoFactorToken?: string }
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { AuditAction } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
+import { verifyStepUp } from "@/lib/auth/stepUp";
 import { sendWalletChangeRequestRejectedEmail } from "@/lib/email";
 
 async function requireAdmin(request: NextRequest) {
@@ -45,7 +50,11 @@ export async function POST(
 
     const { id } = await params;
     const body = await request.json().catch(() => ({}));
-    const { rejectionReason } = body as { rejectionReason?: string };
+    const { rejectionReason, currentPassword, twoFactorToken } = body as {
+      rejectionReason?: string;
+      currentPassword?: string;
+      twoFactorToken?: string;
+    };
 
     if (
       !rejectionReason ||
@@ -68,12 +77,36 @@ export async function POST(
         { status: 404 },
       );
     }
+    if (
+      walletChangeRequest.status !== "PENDING" &&
+      walletChangeRequest.status !== "CONFIRMED"
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Request has already been ${walletChangeRequest.status.toLowerCase()}`,
+        },
+        { status: 400 },
+      );
+    }
+
+    const stepUp = await verifyStepUp(
+      auth.decoded.userId,
+      { currentPassword, twoFactorToken },
+      "reject a wallet change request",
+    );
+    if (!stepUp.ok) {
+      return NextResponse.json(
+        { success: false, error: stepUp.error, code: stepUp.code },
+        { status: stepUp.status },
+      );
+    }
 
     const trimmedReason = rejectionReason.trim();
     const now = new Date();
 
     const claim = await prisma.walletChangeRequest.updateMany({
-      where: { id, status: "PENDING" },
+      where: { id, status: { in: ["PENDING", "CONFIRMED"] } },
       data: {
         status: "REJECTED",
         rejectionReason: trimmedReason,

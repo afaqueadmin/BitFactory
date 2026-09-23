@@ -22,9 +22,11 @@ import {
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import CheckIcon from "@mui/icons-material/Check";
 import { useWalletChangeRequests } from "@/lib/hooks/useWalletChangeRequests";
+import FreezeCountdown from "@/components/wallet/FreezeCountdown";
 
-const STATUS_COLOR: Record<string, "warning" | "success" | "error"> = {
+const STATUS_COLOR: Record<string, "warning" | "info" | "success" | "error"> = {
   PENDING: "warning",
+  CONFIRMED: "info",
   APPROVED: "success",
   REJECTED: "error",
 };
@@ -232,6 +234,10 @@ export default function WalletChangeRequestHistory() {
                 </Typography>
               </Box>
             )}
+
+            {req.status === "APPROVED" && (
+              <FreezeCountdown reviewedAt={req.reviewedAt} />
+            )}
           </Paper>
         ))}
       </Box>
@@ -290,6 +296,11 @@ export default function WalletChangeRequestHistory() {
                   >
                     {req.rejectionReason}
                   </Typography>
+                )}
+                {req.status === "APPROVED" && (
+                  <Box sx={{ mt: 0.5 }}>
+                    <FreezeCountdown reviewedAt={req.reviewedAt} dense />
+                  </Box>
                 )}
               </TableCell>
               <TableCell>

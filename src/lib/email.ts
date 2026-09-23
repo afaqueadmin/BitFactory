@@ -368,18 +368,20 @@ export const sendWalletChangeRequestApprovedEmail = async (
   email: string,
   oldAddress: string | null,
   newAddress: string,
+  approvedAt: Date = new Date(),
 ) => {
+  const freezeEnds = new Date(approvedAt.getTime() + 24 * 60 * 60 * 1000);
   const mailOptions = {
     from:
       `BitFactory Admin <${process.env.SMTP_FROM}>` || "noreply@bitfactory.com",
     to: email,
-    subject: "Wallet Address Updated - BitFactory",
+    subject: "Wallet Change Approved - BitFactory",
     html: `
-      <h1>Wallet Address Updated</h1>
-      <p>Your payout wallet address has been changed:</p>
+      <h1>Wallet Change Approved</h1>
+      <p>Your wallet change request has been approved by an administrator:</p>
       <p><strong>Previous:</strong> ${oldAddress || "Not configured"}</p>
       <p><strong>New:</strong> ${newAddress}</p>
-      <p>This change is now live and future payouts will be sent to the new address.</p>
+      <p>For your security, payouts are frozen for 24 hours from approval, until ${freezeEnds.toUTCString()}. Our team updates the payout address on your behalf during this window.</p>
       <p><strong>If you did not request this, please contact our support team immediately.</strong></p>
       <br>
       <p>Best regards,</p>

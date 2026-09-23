@@ -90,6 +90,11 @@ export default function RequestWalletChangeModal({
             Luxor only changes once an admin approves it.
           </Alert>
 
+          <Alert severity="warning">
+            For your security, once this request is approved your payouts will
+            be frozen for 24 hours while we finish updating your payout address.
+          </Alert>
+
           <Typography variant="body2" color="text.secondary">
             Current address: <strong>{currentAddress}</strong>
           </Typography>

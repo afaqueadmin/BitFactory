@@ -24,6 +24,7 @@ import { useBitcoinLivePrice } from "@/components/useBitcoinLivePrice";
 import { useWalletChangeRequests } from "@/lib/hooks/useWalletChangeRequests";
 import RequestWalletChangeModal from "@/components/wallet/RequestWalletChangeModal";
 import WalletChangeRequestHistory from "@/components/wallet/WalletChangeRequestHistory";
+import { useFreezeRemaining } from "@/components/wallet/FreezeCountdown";
 
 interface PoolBreakdown {
   totalEarnings: number;
@@ -83,10 +84,21 @@ export default function WalletPage() {
 
   // Wallet change request state
   const [requestChangeOpen, setRequestChangeOpen] = useState(false);
-  const { requests: walletChangeRequests } = useWalletChangeRequests({
-    status: "PENDING",
-  });
-  const hasPendingWalletChange = walletChangeRequests.length > 0;
+  const { requests: walletChangeRequests } = useWalletChangeRequests();
+  const activeWalletChangeRequest = walletChangeRequests.find(
+    (req) => req.status === "PENDING" || req.status === "CONFIRMED",
+  );
+  const latestApprovedRequest = walletChangeRequests
+    .filter((req) => req.status === "APPROVED")
+    .sort(
+      (a, b) =>
+        new Date(b.reviewedAt ?? 0).getTime() -
+        new Date(a.reviewedAt ?? 0).getTime(),
+    )[0];
+  const { isFrozen: isPayoutFrozen, label: freezeLabel } = useFreezeRemaining(
+    latestApprovedRequest?.reviewedAt,
+  );
+  const hasPendingWalletChange = !!activeWalletChangeRequest || isPayoutFrozen;
 
   const { user } = useUser();
   // const theme = useTheme();
@@ -695,7 +707,11 @@ export default function WalletPage() {
                     fontWeight: 600,
                   }}
                 >
-                  ⏳ Change pending review
+                  {isPayoutFrozen && freezeLabel
+                    ? `🔒 ${freezeLabel}`
+                    : activeWalletChangeRequest?.status === "CONFIRMED"
+                      ? "✅ Confirmed — awaiting final approval"
+                      : "⏳ Change pending review"}
                 </Typography>
               ) : (
                 <Button
