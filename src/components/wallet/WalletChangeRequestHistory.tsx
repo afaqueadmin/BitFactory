@@ -126,6 +126,16 @@ export default function WalletChangeRequestHistory() {
               />
             </Box>
 
+            {req.subaccountName && (
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ display: "block", fontSize: "0.7rem", mb: 1 }}
+              >
+                Subaccount: <strong>{req.subaccountName}</strong>
+              </Typography>
+            )}
+
             <Box sx={{ mb: 1 }}>
               <Typography
                 variant="caption"
@@ -258,6 +268,7 @@ export default function WalletChangeRequestHistory() {
         <TableHead>
           <TableRow sx={{ backgroundColor: theme.palette.action.hover }}>
             <TableCell sx={{ fontWeight: 700 }}>Requested</TableCell>
+            <TableCell sx={{ fontWeight: 700 }}>Subaccount</TableCell>
             <TableCell sx={{ fontWeight: 700 }}>Previous Address</TableCell>
             <TableCell sx={{ fontWeight: 700 }}>New Address</TableCell>
             <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
@@ -273,6 +284,9 @@ export default function WalletChangeRequestHistory() {
                   month: "short",
                   day: "numeric",
                 })}
+              </TableCell>
+              <TableCell sx={{ fontSize: "0.8rem" }}>
+                {req.subaccountName || "—"}
               </TableCell>
               <TableCell sx={{ fontFamily: "monospace", fontSize: "0.8rem" }}>
                 {req.currentAddress || "Not configured"}

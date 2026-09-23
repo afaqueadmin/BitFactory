@@ -9,12 +9,8 @@ import {
   Button,
   TextField,
   Alert,
-  IconButton,
-  Tooltip,
   useTheme,
 } from "@mui/material";
-import ContentCopyIcon from "@mui/icons-material/ContentCopy";
-import CheckIcon from "@mui/icons-material/Check";
 import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
 import ElectricityCostTable from "@/components/ElectricityCostTable";
 import ProfitLossChart from "@/components/ProfitLossChart";
@@ -24,6 +20,7 @@ import { useBitcoinLivePrice } from "@/components/useBitcoinLivePrice";
 import { useWalletChangeRequests } from "@/lib/hooks/useWalletChangeRequests";
 import RequestWalletChangeModal from "@/components/wallet/RequestWalletChangeModal";
 import WalletChangeRequestHistory from "@/components/wallet/WalletChangeRequestHistory";
+import WalletSubaccountCards from "@/components/wallet/WalletSubaccountCards";
 import { useFreezeRemaining } from "@/components/wallet/FreezeCountdown";
 import { useSubaccountFilter } from "@/lib/contexts/subaccountFilter-context";
 
@@ -63,8 +60,9 @@ export default function WalletPage() {
   const isDark = theme.palette.mode === "dark";
   const [summary, setSummary] = useState<EarningsSummary | null>(null);
   const [revenue24h, setRevenue24h] = useState<Revenue24h | null>(null);
-  const [walletSettings, setWalletSettings] =
-    useState<LuxorPaymentSettings | null>(null);
+  const [walletSubaccounts, setWalletSubaccounts] = useState<
+    LuxorPaymentSettings[]
+  >([]);
   const [poolMode, setPoolMode] = useState<"total" | "luxor" | "braiins">(
     "total",
   );
@@ -75,7 +73,6 @@ export default function WalletPage() {
   const [error, setError] = useState<string | null>(null);
   const [revenue24hError, setRevenue24hError] = useState<string | null>(null);
   const [walletError, setWalletError] = useState<string | null>(null);
-  const [copiedAddress, setCopiedAddress] = useState(false);
 
   // Statement download state
   const [statementStartDate, setStatementStartDate] = useState<string>("");
@@ -83,8 +80,9 @@ export default function WalletPage() {
   const [statementError, setStatementError] = useState<string | null>(null);
   const [statementDownloading, setStatementDownloading] = useState(false);
 
-  // Wallet change request state
-  const [requestChangeOpen, setRequestChangeOpen] = useState(false);
+  // Wallet change request state - which subaccount's card opened the modal
+  const [requestChangeSubaccount, setRequestChangeSubaccount] =
+    useState<LuxorPaymentSettings | null>(null);
   const { requests: walletChangeRequests } = useWalletChangeRequests();
   const activeWalletChangeRequest = walletChangeRequests.find(
     (req) => req.status === "PENDING" || req.status === "CONFIRMED",
@@ -217,9 +215,9 @@ export default function WalletPage() {
         }
 
         const data = await response.json();
-        if (data.success && data.data) {
-          setWalletSettings(data.data);
-          console.log("[Wallet] Settings loaded from Luxor:", data.data);
+        if (data.success && (data.subaccounts || data.data)) {
+          setWalletSubaccounts(data.subaccounts || [data.data]);
+          console.log("[Wallet] Settings loaded from Luxor:", data.subaccounts);
         } else {
           throw new Error(
             data.error || "Invalid response from wallet settings endpoint",
@@ -251,28 +249,6 @@ export default function WalletPage() {
     }
   }, [activePoolNames]);
 
-  const getPrimaryWalletAddress = (): string => {
-    if (!walletSettings?.addresses || walletSettings.addresses.length === 0) {
-      return "Not configured";
-    }
-
-    // Find primary address (highest revenue allocation or first one)
-    const primary = walletSettings.addresses.reduce((prev, current) =>
-      current.revenue_allocation > prev.revenue_allocation ? current : prev,
-    );
-
-    return primary.external_address;
-  };
-
-  const toProperCase = (text: string): string => {
-    if (!text) return "";
-    return text
-      .toLowerCase()
-      .split("_")
-      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(" ");
-  };
-
   // Helper functions to get values based on pool mode
   const getTotalEarnings = (): number => {
     if (!summary) return 0;
@@ -302,15 +278,6 @@ export default function WalletPage() {
       return revenue24h.poolBreakdown?.braiins.btc ?? 0;
     return 0;
   };
-
-  let payoutDate = new Date();
-  let twoHoursLaterPayoutDate = new Date();
-  if (walletSettings?.next_payout_at !== undefined) {
-    payoutDate = new Date(walletSettings.next_payout_at);
-    twoHoursLaterPayoutDate = new Date(
-      payoutDate.getTime() + 2 * 60 * 60 * 1000,
-    );
-  }
 
   const { btcLiveData, BtcLivePriceComponent } = useBitcoinLivePrice();
   const btcPriceUsd = btcLiveData?.price
@@ -383,15 +350,6 @@ export default function WalletPage() {
       console.error("Statement download error:", error);
     } finally {
       setStatementDownloading(false);
-    }
-  };
-
-  const handleCopyAddress = () => {
-    const address = getPrimaryWalletAddress();
-    if (address && address !== "Not configured") {
-      navigator.clipboard.writeText(address);
-      setCopiedAddress(true);
-      setTimeout(() => setCopiedAddress(false), 2000);
     }
   };
 
@@ -607,148 +565,6 @@ export default function WalletPage() {
           )}
         </Paper>
 
-        {/* Card 2: Primary Wallet Address */}
-        <Paper
-          sx={{
-            p: { xs: 2, sm: 2.5 },
-            borderRadius: 3,
-            background: isDark
-              ? "linear-gradient(135deg, rgba(120, 53, 15, 0.85) 0%, rgba(15, 23, 42, 0.95) 100%)"
-              : "linear-gradient(135deg, #d97706 0%, #f59e0b 100%)",
-            color: "white",
-            border: `1px solid ${
-              isDark ? "rgba(245, 158, 11, 0.3)" : "rgba(255,255,255,0.2)"
-            }`,
-            boxShadow: "0 4px 20px rgba(217, 119, 6, 0.15)",
-            opacity: poolMode === "braiins" ? 0.65 : 1,
-            position: "relative",
-            overflow: "hidden",
-          }}
-        >
-          <Box
-            sx={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-            }}
-          >
-            <Typography
-              variant="caption"
-              sx={{
-                opacity: 0.85,
-                fontWeight: 600,
-                fontSize: { xs: "0.75rem", sm: "0.82rem" },
-                letterSpacing: "0.03em",
-                textTransform: "uppercase",
-              }}
-            >
-              Primary Wallet Address
-            </Typography>
-            {getPrimaryWalletAddress() !== "Not configured" &&
-              poolMode !== "braiins" && (
-                <Tooltip title={copiedAddress ? "Copied!" : "Copy Address"}>
-                  <IconButton
-                    size="small"
-                    onClick={handleCopyAddress}
-                    sx={{
-                      color: "white",
-                      p: 0.5,
-                      backgroundColor: "rgba(255,255,255,0.15)",
-                      "&:hover": { backgroundColor: "rgba(255,255,255,0.25)" },
-                    }}
-                  >
-                    {copiedAddress ? (
-                      <CheckIcon sx={{ fontSize: 16 }} />
-                    ) : (
-                      <ContentCopyIcon sx={{ fontSize: 16 }} />
-                    )}
-                  </IconButton>
-                </Tooltip>
-              )}
-          </Box>
-
-          {poolMode === "braiins" ? (
-            <Typography
-              variant="body2"
-              sx={{ mt: 1.5, fontFamily: "monospace", opacity: 0.9 }}
-            >
-              Not available for Braiins
-            </Typography>
-          ) : walletLoading ? (
-            <Box
-              sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1.5 }}
-            >
-              <CircularProgress size={18} sx={{ color: "white" }} />
-              <Typography variant="body2">Loading...</Typography>
-            </Box>
-          ) : walletError ? (
-            <Typography variant="body2" sx={{ mt: 1.5 }}>
-              {walletError}
-            </Typography>
-          ) : (
-            <>
-              <Typography
-                variant="body2"
-                sx={{
-                  wordBreak: "break-all",
-                  mt: 1,
-                  fontFamily: "monospace",
-                  fontSize: { xs: "0.78rem", sm: "0.85rem" },
-                  lineHeight: 1.4,
-                  backgroundColor: "rgba(0,0,0,0.15)",
-                  p: 0.75,
-                  borderRadius: 1.5,
-                }}
-              >
-                {getPrimaryWalletAddress()}
-              </Typography>
-
-              {hasPendingWalletChange ? (
-                <Typography
-                  variant="caption"
-                  sx={{
-                    mt: 1,
-                    display: "inline-block",
-                    backgroundColor: "rgba(255,255,255,0.2)",
-                    px: 1,
-                    py: 0.25,
-                    borderRadius: 1,
-                    fontWeight: 600,
-                  }}
-                >
-                  {isPayoutFrozen && freezeLabel
-                    ? `🔒 ${freezeLabel}`
-                    : activeWalletChangeRequest?.status === "CONFIRMED"
-                      ? "✅ Confirmed — awaiting final approval"
-                      : "⏳ Change pending review"}
-                </Typography>
-              ) : (
-                <Button
-                  size="small"
-                  variant="outlined"
-                  onClick={() => setRequestChangeOpen(true)}
-                  sx={{
-                    mt: 1,
-                    color: "white",
-                    borderColor: "rgba(255,255,255,0.5)",
-                    borderRadius: 2,
-                    fontSize: "0.72rem",
-                    py: 0.3,
-                    textTransform: "none",
-                    fontWeight: 600,
-                    "&:hover": {
-                      borderColor: "white",
-                      backgroundColor: "rgba(255,255,255,0.15)",
-                    },
-                  }}
-                >
-                  Request Change
-                </Button>
-              )}
-            </>
-          )}
-        </Paper>
-
         {/* Card 3: Revenue (24 Hours) */}
         <Paper
           sx={{
@@ -888,178 +704,59 @@ export default function WalletPage() {
             </Box>
           )}
         </Paper>
+      </Box>
 
-        {/* Card 5: Payment Frequency */}
-        <Paper
+      {/* Wallet address / payment frequency / next payout - one group per
+          Luxor subaccount currently in view, since each can have its own
+          payout address. */}
+      {poolMode !== "braiins" && (
+        <Box
           sx={{
-            p: { xs: 2, sm: 2.5 },
-            borderRadius: 3,
-            background: isDark
-              ? "linear-gradient(135deg, rgba(124, 45, 18, 0.85) 0%, rgba(15, 23, 42, 0.95) 100%)"
-              : "linear-gradient(135deg, #ea580c 0%, #f97316 100%)",
-            color: "white",
-            border: `1px solid ${
-              isDark ? "rgba(249, 115, 22, 0.3)" : "rgba(255,255,255,0.2)"
-            }`,
-            boxShadow: "0 4px 20px rgba(234, 88, 12, 0.15)",
-            opacity: poolMode === "braiins" ? 0.65 : 1,
+            display: "grid",
+            gridTemplateColumns: {
+              xs: "1fr",
+              sm: "repeat(2, 1fr)",
+              lg: "repeat(3, 1fr)",
+            },
+            gap: { xs: 1.5, sm: 2 },
+            mt: 2,
           }}
         >
-          <Typography
-            variant="caption"
-            sx={{
-              opacity: 0.85,
-              fontWeight: 600,
-              fontSize: { xs: "0.75rem", sm: "0.82rem" },
-              letterSpacing: "0.03em",
-              textTransform: "uppercase",
-              display: "block",
-            }}
-          >
-            Payment Frequency
-          </Typography>
-
-          {poolMode === "braiins" ? (
-            <Typography
-              variant="body2"
-              sx={{ mt: 1.5, fontFamily: "monospace", opacity: 0.9 }}
-            >
-              Not available for Braiins
-            </Typography>
-          ) : walletLoading ? (
+          {walletLoading ? (
             <Box
-              sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1.5 }}
-            >
-              <CircularProgress size={18} sx={{ color: "white" }} />
-              <Typography variant="body2">Loading...</Typography>
-            </Box>
-          ) : walletError ? (
-            <Typography variant="body2" sx={{ mt: 1.5 }}>
-              Unable to load
-            </Typography>
-          ) : (
-            <Box sx={{ mt: 1 }}>
-              <Typography
-                sx={{
-                  fontWeight: 800,
-                  fontSize: { xs: "1.25rem", sm: "1.45rem" },
-                }}
-              >
-                {walletSettings?.payment_frequency
-                  ? toProperCase(walletSettings.payment_frequency)
-                  : "Not set"}
-              </Typography>
-              {walletSettings?.payment_frequency === "WEEKLY" &&
-                walletSettings?.day_of_week && (
-                  <Typography
-                    variant="caption"
-                    sx={{ mt: 0.5, opacity: 0.9, display: "block" }}
-                  >
-                    Every {toProperCase(walletSettings.day_of_week)}
-                  </Typography>
-                )}
-            </Box>
-          )}
-        </Paper>
-
-        {/* Card 6: Next Payout */}
-        <Paper
-          sx={{
-            p: { xs: 2, sm: 2.5 },
-            borderRadius: 3,
-            background: isDark
-              ? "linear-gradient(135deg, rgba(19, 78, 74, 0.85) 0%, rgba(15, 23, 42, 0.95) 100%)"
-              : "linear-gradient(135deg, #0d9488 0%, #14b8a6 100%)",
-            color: "white",
-            border: `1px solid ${
-              isDark ? "rgba(20, 184, 166, 0.3)" : "rgba(255,255,255,0.2)"
-            }`,
-            boxShadow: "0 4px 20px rgba(13, 148, 136, 0.15)",
-            opacity: poolMode === "braiins" ? 0.65 : 1,
-          }}
-        >
-          <Typography
-            variant="caption"
-            sx={{
-              opacity: 0.85,
-              fontWeight: 600,
-              fontSize: { xs: "0.75rem", sm: "0.82rem" },
-              letterSpacing: "0.03em",
-              textTransform: "uppercase",
-              display: "block",
-            }}
-          >
-            Next Payout
-          </Typography>
-
-          {poolMode === "braiins" ? (
-            <Typography
-              variant="body2"
-              sx={{ mt: 1.5, fontFamily: "monospace", opacity: 0.9 }}
-            >
-              Not available for Braiins
-            </Typography>
-          ) : walletLoading ? (
-            <Box
-              sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1.5 }}
-            >
-              <CircularProgress size={18} sx={{ color: "white" }} />
-              <Typography variant="body2">Loading...</Typography>
-            </Box>
-          ) : walletError ? (
-            <Typography variant="body2" sx={{ mt: 1.5 }}>
-              Unable to load
-            </Typography>
-          ) : walletSettings?.next_payout_at ? (
-            <Box sx={{ mt: 1 }}>
-              <Typography
-                sx={{
-                  fontWeight: 800,
-                  fontSize: { xs: "1.1rem", sm: "1.3rem" },
-                }}
-              >
-                {payoutDate.toLocaleDateString("en-US", {
-                  weekday: "short",
-                  month: "short",
-                  day: "numeric",
-                  year: "numeric",
-                })}
-              </Typography>
-              <Typography
-                variant="caption"
-                sx={{ mt: 0.5, opacity: 0.9, display: "block" }}
-              >
-                {payoutDate.toLocaleTimeString("en-US", {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}{" "}
-                -{" "}
-                {twoHoursLaterPayoutDate.toLocaleTimeString("en-US", {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}{" "}
-                (
-                {new Intl.DateTimeFormat("en-US", {
-                  timeZoneName: "shortOffset",
-                })
-                  .formatToParts(payoutDate)
-                  .find((part) => part.type === "timeZoneName")?.value || "GMT"}
-                )
-              </Typography>
-            </Box>
-          ) : (
-            <Typography
               sx={{
-                fontWeight: 700,
-                fontSize: { xs: "1.1rem", sm: "1.25rem" },
-                mt: 1,
+                gridColumn: "1 / -1",
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
               }}
             >
-              Not scheduled
-            </Typography>
+              <CircularProgress size={18} />
+              <Typography variant="body2">
+                Loading wallet settings...
+              </Typography>
+            </Box>
+          ) : walletError ? (
+            <Alert severity="error" sx={{ gridColumn: "1 / -1" }}>
+              {walletError}
+            </Alert>
+          ) : (
+            walletSubaccounts.map((settings) => (
+              <WalletSubaccountCards
+                key={settings.subaccount?.id ?? settings.subaccount?.name}
+                settings={settings}
+                isDark={isDark}
+                dimmed={false}
+                hasPendingWalletChange={hasPendingWalletChange}
+                isPayoutFrozen={isPayoutFrozen}
+                freezeLabel={freezeLabel}
+                activeWalletChangeRequest={activeWalletChangeRequest}
+                onRequestChange={() => setRequestChangeSubaccount(settings)}
+              />
+            ))
           )}
-        </Paper>
-      </Box>
+        </Box>
+      )}
 
       {/* Profit & Loss Overview */}
       <ProfitLossChart
@@ -1187,11 +884,26 @@ export default function WalletPage() {
         <WalletChangeRequestHistory />
       </Box>
 
-      <RequestWalletChangeModal
-        open={requestChangeOpen}
-        onClose={() => setRequestChangeOpen(false)}
-        currentAddress={getPrimaryWalletAddress()}
-      />
+      {requestChangeSubaccount && (
+        <RequestWalletChangeModal
+          open={!!requestChangeSubaccount}
+          onClose={() => setRequestChangeSubaccount(null)}
+          subaccountName={
+            requestChangeSubaccount.subaccount?.name ||
+            String(requestChangeSubaccount.subaccount?.id ?? "")
+          }
+          currentAddress={
+            requestChangeSubaccount.addresses &&
+            requestChangeSubaccount.addresses.length > 0
+              ? requestChangeSubaccount.addresses.reduce((prev, current) =>
+                  current.revenue_allocation > prev.revenue_allocation
+                    ? current
+                    : prev,
+                ).external_address
+              : "Not configured"
+          }
+        />
+      )}
 
       {/* Electricity Cost Table */}
       <ElectricityCostTable />

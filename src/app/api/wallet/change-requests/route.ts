@@ -18,13 +18,18 @@
  * twoFactorEnabled flag, never the client) and a checksum-valid mainnet
  * Bitcoin address, on top of the session cookie - this redirects a client's
  * real payout destination, so a live session alone isn't enough, matching
- * the step-up already required by /api/user/change-password. Snapshots the
- * user's live primary Luxor address into currentAddress at submission time,
- * so the request row is itself a permanent before/after record. Only one
- * request in flight per user at a time: blocks a new submission while a
- * previous one is PENDING, CONFIRMED, or APPROVED-and-still-within-its-24h
- * payout freeze (reviewedAt + 24h) - approval no longer pushes to Luxor
- * immediately, so the freeze window is the real "still settling" period.
+ * the step-up already required by /api/user/change-password. Requires
+ * subaccountName when the caller has more than one Luxor subaccount
+ * (payment settings, including payout address, are configured per
+ * subaccount in Luxor, not account-wide) - validated against the caller's
+ * own PoolAuth rows, never trusted blindly. Snapshots that subaccount's
+ * live address into currentAddress at submission time, so the request row
+ * is itself a permanent before/after record. Only one request in flight per
+ * user at a time (across all of that user's subaccounts): blocks a new
+ * submission while a previous one is PENDING, CONFIRMED, or
+ * APPROVED-and-still-within-its-24h payout freeze (reviewedAt + 24h) -
+ * approval no longer pushes to Luxor immediately, so the freeze window is
+ * the real "still settling" period.
  *
  * Braiins is out of scope - see src/lib/wallet.ts.
  */
@@ -36,7 +41,8 @@ import speakeasy from "speakeasy";
 import { validate, Network } from "bitcoin-address-validation";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
-import { fetchCurrentPrimaryAddress } from "@/lib/wallet";
+import { fetchAddressForSubaccount } from "@/lib/wallet";
+import { resolveLuxorSubaccounts } from "@/lib/luxorSubaccounts";
 import { sendWalletChangeRequestSubmittedEmail } from "@/lib/email";
 
 const STATUSES = new Set(["PENDING", "CONFIRMED", "APPROVED", "REJECTED"]);
@@ -139,13 +145,19 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json().catch(() => ({}));
-    const { requestedAddress, reason, currentPassword, twoFactorToken } =
-      body as {
-        requestedAddress?: string;
-        reason?: string;
-        currentPassword?: string;
-        twoFactorToken?: string;
-      };
+    const {
+      requestedAddress,
+      reason,
+      currentPassword,
+      twoFactorToken,
+      subaccountName: requestedSubaccountName,
+    } = body as {
+      requestedAddress?: string;
+      reason?: string;
+      currentPassword?: string;
+      twoFactorToken?: string;
+      subaccountName?: string;
+    };
 
     if (
       !requestedAddress ||
@@ -176,6 +188,35 @@ export async function POST(request: NextRequest) {
         { success: false, error: "reason must not exceed 1000 characters" },
         { status: 400 },
       );
+    }
+
+    // Which Luxor subaccount this request is for - validated against the
+    // caller's own subaccounts (never trust the submitted value blindly). A
+    // caller with exactly one subaccount can omit it.
+    const callerSubaccounts = await resolveLuxorSubaccounts(
+      auth.decoded.userId,
+    );
+    let subaccountName: string | null = null;
+    if (callerSubaccounts.length > 0) {
+      if (requestedSubaccountName) {
+        const match = callerSubaccounts.find(
+          (s) => s.authKey === requestedSubaccountName,
+        );
+        if (!match) {
+          return NextResponse.json(
+            { success: false, error: "Unknown subaccount" },
+            { status: 400 },
+          );
+        }
+        subaccountName = match.authKey;
+      } else if (callerSubaccounts.length === 1) {
+        subaccountName = callerSubaccounts[0].authKey;
+      } else {
+        return NextResponse.json(
+          { success: false, error: "subaccountName is required" },
+          { status: 400 },
+        );
+      }
     }
 
     // ── Step-up re-authentication ──────────────────────────────────────
@@ -294,14 +335,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const currentAddress = await fetchCurrentPrimaryAddress(
-      auth.decoded.userId,
-    );
+    const currentAddress = subaccountName
+      ? await fetchAddressForSubaccount(subaccountName)
+      : null;
 
     const created = await prisma.$transaction(async (tx) => {
       const walletChangeRequest = await tx.walletChangeRequest.create({
         data: {
           userId: auth.decoded.userId,
+          subaccountName,
           currentAddress,
           requestedAddress: trimmedAddress,
           reason:
@@ -315,8 +357,9 @@ export async function POST(request: NextRequest) {
           entityType: "WalletChangeRequest",
           entityId: walletChangeRequest.id,
           userId: auth.decoded.userId,
-          description: `Wallet change requested: ${currentAddress ?? "(not configured)"} -> ${trimmedAddress}`,
+          description: `Wallet change requested for subaccount ${subaccountName ?? "(unknown)"}: ${currentAddress ?? "(not configured)"} -> ${trimmedAddress}`,
           changes: JSON.stringify({
+            subaccountName,
             requestedAddress: { from: currentAddress, to: trimmedAddress },
             verifiedVia,
           }),

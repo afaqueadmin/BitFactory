@@ -4,6 +4,7 @@ export interface WalletChangeRequestItem {
   id: string;
   userId: string;
   currency: string;
+  subaccountName: string | null;
   currentAddress: string | null;
   requestedAddress: string;
   reason: string | null;
@@ -55,6 +56,7 @@ export function useCreateWalletChangeRequest() {
   return useMutation({
     mutationFn: async (input: {
       requestedAddress: string;
+      subaccountName?: string;
       reason?: string;
       currentPassword?: string;
       twoFactorToken?: string;

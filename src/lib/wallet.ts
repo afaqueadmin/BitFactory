@@ -56,6 +56,10 @@ export async function resolveLuxorIdentifier(
  * no Luxor identifier configured or Luxor has no addresses on file -
  * best-effort snapshot, never throws (a missing snapshot shouldn't block a
  * client from submitting a request).
+ *
+ * Resolves to the caller's first/oldest PoolAuth row - for a user with more
+ * than one Luxor subaccount, use fetchAddressForSubaccount with the specific
+ * subaccount instead.
  */
 export async function fetchCurrentPrimaryAddress(
   userId: string,
@@ -64,14 +68,28 @@ export async function fetchCurrentPrimaryAddress(
   const luxorIdentifier = await resolveLuxorIdentifier(userId);
   if (!luxorIdentifier) return null;
 
+  return fetchAddressForSubaccount(luxorIdentifier, currency);
+}
+
+/**
+ * Fetches the live primary Luxor address for one specific subaccount -
+ * payment settings (including payout addresses) are configured per
+ * subaccount in Luxor, not account-wide, so a user with multiple Luxor
+ * subaccounts can have a genuinely different address on each one. Same
+ * best-effort semantics as fetchCurrentPrimaryAddress: never throws.
+ */
+export async function fetchAddressForSubaccount(
+  subaccountName: string,
+  currency: string = "BTC",
+): Promise<string | null> {
   try {
     const settings = await createLuxorClient(
-      luxorIdentifier,
-    ).getSubaccountPaymentSettings(currency, luxorIdentifier);
+      subaccountName,
+    ).getSubaccountPaymentSettings(currency, subaccountName);
     return selectPrimaryAddress(settings.addresses)?.external_address ?? null;
   } catch (error) {
     console.error(
-      `[Wallet] Could not fetch current Luxor address for user ${userId}:`,
+      `[Wallet] Could not fetch current Luxor address for subaccount ${subaccountName}:`,
       error instanceof LuxorError ? error.message : error,
     );
     return null;

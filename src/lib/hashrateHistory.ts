@@ -133,7 +133,7 @@ const toApiDate = (date: Date): string => date.toISOString().slice(0, 10);
  * (all rows null/zero) falls back to a plain average so it doesn't divide by
  * zero.
  */
-function weightedAverage(
+export function weightedAverage(
   rows: Array<{ value: number | null; weight: number }>,
 ): number | null {
   const withValue = rows.filter((r) => r.value !== null);

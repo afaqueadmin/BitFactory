@@ -258,6 +258,7 @@ export default function WalletRequestsPage() {
               <TableRow>
                 <TableCell>Client</TableCell>
                 <TableCell>Requested</TableCell>
+                <TableCell>Subaccount</TableCell>
                 <TableCell>Current Address</TableCell>
                 <TableCell>Requested Address</TableCell>
                 <TableCell>Reason</TableCell>
@@ -280,6 +281,9 @@ export default function WalletRequestsPage() {
                   </TableCell>
                   <TableCell>
                     {new Date(req.createdAt).toLocaleString()}
+                  </TableCell>
+                  <TableCell sx={{ fontSize: "0.75rem" }}>
+                    {req.subaccountName || "—"}
                   </TableCell>
                   <TableCell
                     sx={{ fontFamily: "monospace", fontSize: "0.75rem" }}

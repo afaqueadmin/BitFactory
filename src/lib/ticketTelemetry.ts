@@ -20,6 +20,7 @@
 import { prisma } from "@/lib/prisma";
 import { createLuxorClient } from "@/lib/luxor";
 import { createBraiinsClient } from "@/lib/braiins";
+import { joinSubaccountNames } from "@/lib/luxorSubaccounts";
 
 export interface MinerTelemetrySnapshot {
   poolName: "Luxor" | "Braiins";
@@ -38,15 +39,21 @@ async function fetchLiveLuxorSnapshot(
   userId: string,
   minerName: string,
 ): Promise<MinerTelemetrySnapshot | null> {
-  const poolSubaccount = await prisma.poolSubaccount.findFirst({
+  // A client can have more than one Luxor subaccount now, and the miner in
+  // question could be on any of them, so every one is searched at once
+  // rather than only the first PoolSubaccount row found.
+  const poolSubaccounts = await prisma.poolSubaccount.findMany({
     where: { userId, pool: { name: "Luxor" } },
     include: { poolAuth: true },
   });
-  if (!poolSubaccount?.poolAuth) return null;
+  const authKeys = poolSubaccounts
+    .map((s) => s.poolAuth?.authKey)
+    .filter((k): k is string => !!k);
+  if (authKeys.length === 0) return null;
 
   const client = createLuxorClient("ticket-telemetry");
   const response = await client.getWorkers("BTC", {
-    subaccount_names: poolSubaccount.poolAuth.authKey,
+    subaccount_names: joinSubaccountNames(authKeys),
   });
 
   const worker = response.workers.find((w) => w.name === minerName);

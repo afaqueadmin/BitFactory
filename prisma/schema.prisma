@@ -186,6 +186,11 @@ model WalletChangeRequest {
   userId              String
   user                User          @relation("walletChangeRequests", fields: [userId], references: [id])
   currency            String        @default("BTC")
+  // Which Luxor subaccount this request is for - a snapshot (like
+  // currentAddress), not a live FK, since that's all the admin needs to
+  // know which one to update manually on Luxor. Null on rows submitted
+  // before multi-subaccount support existed.
+  subaccountName      String?
   currentAddress      String?
   requestedAddress    String
   reason              String?       @db.Text
