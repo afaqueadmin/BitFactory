@@ -327,17 +327,22 @@ export async function GET(
 
     // Fetch live Luxor worker statuses for AUTO miners, keyed by
     // "subaccountName::workerName", so an AUTO miner with no active Luxor
-    // session (INACTIVE) can be surfaced as UNDER_MAINTENANCE below.
+    // session (INACTIVE) can be surfaced as UNDER_MAINTENANCE below. A
+    // customer can have more than one Luxor subaccount now, and a given
+    // miner could live on any of them, so every one of theirs is queried -
+    // not just the first PoolAuth row.
     const autoMinerSubaccountNames = Array.from(
       new Set(
         miners
           .filter((miner) => miner.status === "AUTO")
-          .map(
-            (miner) =>
-              miner.user.poolAuths[0]?.authKey ||
-              miner.user.luxorSubaccountName,
-          )
-          .filter((name): name is string => !!name),
+          .flatMap((miner) => {
+            const authKeys = miner.user.poolAuths.map((pa) => pa.authKey);
+            return authKeys.length > 0
+              ? authKeys
+              : miner.user.luxorSubaccountName
+                ? [miner.user.luxorSubaccountName]
+                : [];
+          }),
       ),
     );
     const luxorWorkerStatusByKey = await fetchLuxorWorkerStatuses(
@@ -353,11 +358,23 @@ export async function GET(
       const luxorSubaccountName =
         poolAuths[0]?.authKey || miner.user.luxorSubaccountName;
 
+      // Live status is looked up across every one of the customer's Luxor
+      // subaccounts (not just the first/displayed one) - the miner could be
+      // reporting under any of them.
+      const luxorAuthKeys =
+        poolAuths.length > 0
+          ? poolAuths.map((pa) => pa.authKey)
+          : miner.user.luxorSubaccountName
+            ? [miner.user.luxorSubaccountName]
+            : [];
+
       let status = miner.status;
-      if (status === "AUTO" && luxorSubaccountName) {
-        const liveStatus = luxorWorkerStatusByKey.get(
-          `${luxorSubaccountName}::${miner.name}`,
-        );
+      if (status === "AUTO" && luxorAuthKeys.length > 0) {
+        const liveStatus = luxorAuthKeys
+          .map((authKey) =>
+            luxorWorkerStatusByKey.get(`${authKey}::${miner.name}`),
+          )
+          .find((s) => s !== undefined);
         if (liveStatus === "INACTIVE") {
           status = "UNDER_MAINTENANCE";
         }
