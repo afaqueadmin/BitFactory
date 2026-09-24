@@ -89,12 +89,6 @@ export async function GET(request: NextRequest) {
           return [{ totalAmount: sortDirection }, { createdAt: defaultSort }];
         case "status":
           return [{ status: sortDirection }, { createdAt: defaultSort }];
-        case "issuedDate":
-          return [
-            { issuedDate: { sort: sortDirection, nulls: "last" } },
-            { invoiceGeneratedDate: sortDirection },
-            { createdAt: defaultSort },
-          ];
         case "paidDate":
           return [{ paidDate: sortDirection }, { createdAt: defaultSort }];
         case "dueDate":
@@ -154,7 +148,11 @@ export async function GET(request: NextRequest) {
     let invoices;
     let total;
 
-    if (sortBy === "paidPastDue" || sortBy === "daysUntilDue") {
+    if (
+      sortBy === "paidPastDue" ||
+      sortBy === "daysUntilDue" ||
+      sortBy === "issuedDate"
+    ) {
       const allMatchingInvoices = await prisma.invoice.findMany({
         where,
         include,
@@ -169,6 +167,21 @@ export async function GET(request: NextRequest) {
           if (aIssuedPriority !== bIssuedPriority) {
             return aIssuedPriority - bIssuedPriority;
           }
+        }
+
+        if (sortBy === "issuedDate") {
+          // issuedDate can be null on invoices created before it was
+          // tracked (or backfilled without it) - fall back to
+          // invoiceGeneratedDate, matching what the UI displays for those
+          // rows, so a row's position always matches the date shown.
+          const aDate = new Date(
+            a.issuedDate || a.invoiceGeneratedDate,
+          ).getTime();
+          const bDate = new Date(
+            b.issuedDate || b.invoiceGeneratedDate,
+          ).getTime();
+          const cmp = aDate - bDate;
+          return sortDirection === "asc" ? cmp : -cmp;
         }
 
         const aValue =
