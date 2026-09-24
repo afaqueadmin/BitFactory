@@ -625,16 +625,18 @@ export async function PUT(
 
     console.log(`[Miners API] PUT: Successfully updated miner ${id}`);
 
-    // Resolve the customer's Luxor subaccount from PoolAuth (falling back to
-    // the legacy field) so the response shape stays unchanged for consumers.
+    // Resolve the customer's Luxor subaccount(s) from PoolAuth (falling back
+    // to the legacy field), joining every one rather than just the first.
     const { poolAuths, ...updatedMinerUser } = updatedMiner.user;
     const { hashrateBenchmarks, ...updatedMinerRest } = updatedMiner;
+    const poolAuthNames = poolAuths.map((pa) => pa.authKey);
     const transformedMiner = {
       ...updatedMinerRest,
       user: {
         ...updatedMinerUser,
         luxorSubaccountName:
-          poolAuths[0]?.authKey || updatedMiner.user.luxorSubaccountName,
+          (poolAuthNames.length > 0 ? poolAuthNames.join(", ") : null) ||
+          updatedMiner.user.luxorSubaccountName,
       },
       benchmarkHashrate:
         hashrateBenchmarks.length > 0

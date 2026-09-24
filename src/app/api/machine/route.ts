@@ -355,18 +355,19 @@ export async function GET(
     // field) so the response shape stays unchanged for existing consumers.
     const transformedMiners = miners.map((miner) => {
       const { poolAuths, ...user } = miner.user;
-      const luxorSubaccountName =
-        poolAuths[0]?.authKey || miner.user.luxorSubaccountName;
 
-      // Live status is looked up across every one of the customer's Luxor
-      // subaccounts (not just the first/displayed one) - the miner could be
-      // reporting under any of them.
+      // Every one of the customer's Luxor subaccounts - used both for the
+      // displayed name (joined) and the live-status lookup below (the miner
+      // could be reporting under any of them).
       const luxorAuthKeys =
         poolAuths.length > 0
           ? poolAuths.map((pa) => pa.authKey)
           : miner.user.luxorSubaccountName
             ? [miner.user.luxorSubaccountName]
             : [];
+      const luxorSubaccountName =
+        (luxorAuthKeys.length > 0 ? luxorAuthKeys.join(", ") : null) ||
+        miner.user.luxorSubaccountName;
 
       let status = miner.status;
       if (status === "AUTO" && luxorAuthKeys.length > 0) {
@@ -822,15 +823,17 @@ export async function POST(
 
     console.log(`[Miners API] POST: Created miner with id ${miner.id}`);
 
-    // Resolve the customer's Luxor subaccount from PoolAuth (falling back to
-    // the legacy field) so the response shape stays unchanged for consumers.
+    // Resolve the customer's Luxor subaccount(s) from PoolAuth (falling back
+    // to the legacy field), joining every one rather than just the first.
     const { poolAuths, ...minerUser } = miner.user;
+    const poolAuthNames = poolAuths.map((pa) => pa.authKey);
     const transformedMiner = {
       ...miner,
       user: {
         ...minerUser,
         luxorSubaccountName:
-          poolAuths[0]?.authKey || miner.user.luxorSubaccountName,
+          (poolAuthNames.length > 0 ? poolAuthNames.join(", ") : null) ||
+          miner.user.luxorSubaccountName,
       },
     };
 

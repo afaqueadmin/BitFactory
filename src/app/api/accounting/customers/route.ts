@@ -49,9 +49,13 @@ export async function GET(request: NextRequest) {
       orderBy: { name: "asc" },
     });
 
-    // Format response: "John Doe (Mining-Account-1)" or "John Doe (No subaccount assigned)"
+    // Format response: "John Doe (Mining-Account-1, Mining-Account-2)" or
+    // "John Doe (No subaccount assigned)" - every Luxor subaccount joined,
+    // not just the first.
     const formattedCustomers = customers.map((c) => {
-      const luxorIdentifier = c.poolAuths[0]?.authKey || c.luxorSubaccountName;
+      const names = c.poolAuths.map((pa) => pa.authKey);
+      const luxorIdentifier =
+        (names.length > 0 ? names.join(", ") : null) || c.luxorSubaccountName;
       return {
         id: c.id,
         displayName: `${c.name || "Unnamed Customer"} (${luxorIdentifier || "No subaccount assigned"})`,
