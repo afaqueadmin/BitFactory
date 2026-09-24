@@ -81,6 +81,10 @@ export async function GET(
             email: true,
             luxorSubaccountName: true,
             segment: true,
+            poolAuths: {
+              where: { pool: { name: "Luxor" } },
+              select: { authKey: true },
+            },
           },
         },
         space: { select: { id: true, name: true, location: true } },
@@ -103,17 +107,30 @@ export async function GET(
       orderBy: { createdAt: "desc" },
     });
 
-    const transformed = miners.map((miner) => ({
-      ...miner,
-      rate_per_kwh:
-        miner.rateHistory && miner.rateHistory.length > 0
-          ? miner.rateHistory[0].rate_per_kwh
-          : undefined,
-      benchmarkHashrate:
-        miner.hashrateBenchmarks && miner.hashrateBenchmarks.length > 0
-          ? miner.hashrateBenchmarks[0].benchmarkHashrate
-          : undefined,
-    }));
+    // Resolve the customer's Luxor subaccount(s) from PoolAuth (falling back
+    // to the legacy field), joining every one rather than just showing the
+    // old single-value field.
+    const transformed = miners.map((miner) => {
+      const { poolAuths, ...user } = miner.user;
+      const poolAuthNames = poolAuths.map((pa) => pa.authKey);
+      return {
+        ...miner,
+        user: {
+          ...user,
+          luxorSubaccountName:
+            (poolAuthNames.length > 0 ? poolAuthNames.join(", ") : null) ||
+            miner.user.luxorSubaccountName,
+        },
+        rate_per_kwh:
+          miner.rateHistory && miner.rateHistory.length > 0
+            ? miner.rateHistory[0].rate_per_kwh
+            : undefined,
+        benchmarkHashrate:
+          miner.hashrateBenchmarks && miner.hashrateBenchmarks.length > 0
+            ? miner.hashrateBenchmarks[0].benchmarkHashrate
+            : undefined,
+      };
+    });
 
     return NextResponse.json({
       success: true,

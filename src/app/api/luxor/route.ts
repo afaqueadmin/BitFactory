@@ -303,17 +303,35 @@ async function getFranchiseeSubaccountNames(
     where: {
       role: "CLIENT",
       isDeleted: false,
-      luxorSubaccountName: { not: null },
-      NOT: { luxorSubaccountName: { contains: "_test" } },
       ...franchiseeUserFilter({ id: franchiseeUserId, role: "FRANCHISEE" }),
     },
-    select: { luxorSubaccountName: true },
+    select: {
+      luxorSubaccountName: true,
+      poolAuths: {
+        where: { pool: { name: "Luxor" } },
+        select: { authKey: true },
+      },
+    },
   });
 
-  return customers
-    .map((c) => c.luxorSubaccountName)
-    .filter((name): name is string => !!name)
-    .join(",");
+  // Every one of each customer's Luxor subaccounts (PoolAuth), falling back
+  // to the legacy single-value field only when a customer has no PoolAuth
+  // rows yet - matches resolveLuxorSubaccounts' semantics elsewhere.
+  const names = new Set<string>();
+  for (const customer of customers) {
+    const poolAuthNames = customer.poolAuths.map((pa) => pa.authKey);
+    const effectiveNames =
+      poolAuthNames.length > 0
+        ? poolAuthNames
+        : customer.luxorSubaccountName
+          ? [customer.luxorSubaccountName]
+          : [];
+    for (const name of effectiveNames) {
+      if (!name.includes("_test")) names.add(name);
+    }
+  }
+
+  return Array.from(names).join(",");
 }
 
 /**
@@ -885,17 +903,14 @@ export async function GET(
             subaccount_names:
               user.role === "CLIENT" && summarySelectedSubaccounts
                 ? summarySelectedSubaccounts
-                : ["ADMIN", "SUPER_ADMIN"].includes(user.role)
+                : ["ADMIN", "SUPER_ADMIN", "FRANCHISEE"].includes(user.role)
                   ? subaccountNamesParam
                   : undefined,
-            // FRANCHISEE intentionally keeps the same site-wide summary as
-            // before (uptime/hashrate are not per-customer scoped there) -
-            // untouched. ADMIN/SUPER_ADMIN fall back to site_id only when no
+            // ADMIN/SUPER_ADMIN/FRANCHISEE fall back to site_id only when no
             // subaccount_names was supplied by the caller.
             site_id:
-              user.role === "FRANCHISEE" ||
-              (["ADMIN", "SUPER_ADMIN"].includes(user.role) &&
-                !subaccountNamesParam)
+              ["ADMIN", "SUPER_ADMIN", "FRANCHISEE"].includes(user.role) &&
+              !subaccountNamesParam
                 ? siteId
                 : undefined,
           });
