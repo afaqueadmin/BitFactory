@@ -885,12 +885,19 @@ export async function GET(
             subaccount_names:
               user.role === "CLIENT" && summarySelectedSubaccounts
                 ? summarySelectedSubaccounts
+                : ["ADMIN", "SUPER_ADMIN"].includes(user.role)
+                  ? subaccountNamesParam
+                  : undefined,
+            // FRANCHISEE intentionally keeps the same site-wide summary as
+            // before (uptime/hashrate are not per-customer scoped there) -
+            // untouched. ADMIN/SUPER_ADMIN fall back to site_id only when no
+            // subaccount_names was supplied by the caller.
+            site_id:
+              user.role === "FRANCHISEE" ||
+              (["ADMIN", "SUPER_ADMIN"].includes(user.role) &&
+                !subaccountNamesParam)
+                ? siteId
                 : undefined,
-            // FRANCHISEE intentionally gets the same site-wide summary as
-            // ADMIN/SUPER_ADMIN (uptime/hashrate are not per-customer scoped).
-            site_id: ["ADMIN", "SUPER_ADMIN", "FRANCHISEE"].includes(user.role)
-              ? siteId
-              : undefined,
           });
           break;
 

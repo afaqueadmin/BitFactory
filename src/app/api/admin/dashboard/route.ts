@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
-import { WorkersResponse, SummaryResponse } from "@/lib/luxor";
+import {
+  WorkersResponse,
+  SummaryResponse,
+  Worker,
+  Subaccount,
+} from "@/lib/luxor";
 import { BraiinsClient } from "@/lib/braiins";
 import { franchiseeUserFilter } from "@/lib/franchiseeScope";
 import { fetchLiveBtcPrice } from "@/lib/services/btcPriceService";
@@ -102,126 +107,59 @@ interface DashboardStats {
 }
 
 /**
- * Helper: Fetch all ACCESSIBLE subaccount names from Luxor API
- * This ensures we only use subaccounts the current user has permission to access
+ * Helper: Fetch the tracked-customer Luxor subaccount names, cross-checked
+ * against Luxor's own live subaccount list.
  *
- * Previously: Fetched from database (luxor_subaccount_name field)
- * Problem: Database might have stale/inaccessible subaccounts
- * Solution: Fetch from Luxor API which returns only accessible ones
+ * Two sources, intersected:
+ * - Our database (User.luxorSubaccountName + PoolAuth for pool "Luxor") -
+ *   the authoritative record of which subaccounts belong to which tracked
+ *   customer.
+ * - Luxor's own /pool/subaccounts listing - guards against stale DB entries
+ *   (a renamed/removed subaccount that no longer exists in Luxor) rather
+ *   than trusting either source alone.
  *
- * NOTE: This function must be called from within the GET handler to pass the request
- * context properly. Server-side internal fetches with manually set cookies don't work
- * reliably on production.
+ * NOTE: This function must be called from within the GET handler to pass the
+ * request context properly. Server-side internal fetches with manually set
+ * cookies don't work reliably on production.
  */
-async function getAllSubaccountNames(
+async function getTrackedLuxorSubaccounts(
   request: NextRequest,
   currentUser: { id: string; role: string },
 ): Promise<string[]> {
-  try {
-    console.log(
-      "[Admin Dashboard] Fetching accessible subaccounts from Luxor API...",
-    );
+  const usersWithSubaccounts = await prisma.user.findMany({
+    where: {
+      luxorSubaccountName: { not: null },
+      ...franchiseeUserFilter(currentUser),
+    },
+    select: { luxorSubaccountName: true },
+  });
 
-    // Create a new request to /api/luxor that preserves the original request's cookies
-    const url = new URL("/api/luxor?endpoint=subaccounts", request.url);
-    const luxorRequest = new NextRequest(url, {
-      method: "GET",
-      headers: request.headers, // Pass original headers including cookies
-    });
+  const usersWithLuxorPoolAuth = await prisma.poolAuth.findMany({
+    where: {
+      pool: { name: "Luxor" },
+      user: { ...franchiseeUserFilter(currentUser) },
+    },
+    select: { authKey: true },
+  });
 
-    const response = await fetch(luxorRequest);
+  const dbSubaccountNames = Array.from(
+    new Set([
+      ...usersWithSubaccounts
+        .map((u) => u.luxorSubaccountName)
+        .filter((name): name is string => name !== null),
+      ...usersWithLuxorPoolAuth.map((pa) => pa.authKey),
+    ]),
+  );
 
-    if (!response.ok) {
-      console.error(
-        "[Admin Dashboard] Subaccounts fetch failed:",
-        response.status,
-      );
-      return [];
-    }
+  console.log(
+    `[Admin Dashboard] Tracked-customer subaccounts in our DB (${dbSubaccountNames.length}):`,
+    dbSubaccountNames,
+  );
 
-    const result = await response.json();
-    console.log(
-      "[Admin Dashboard] Luxor subaccounts response:",
-      JSON.stringify(result, null, 2),
-    );
-
-    if (result.success && result.data?.subaccounts) {
-      const subaccounts = result.data.subaccounts as Array<{
-        id: number;
-        name: string;
-      }>;
-      const subaccountNames = subaccounts.map((s) => s.name);
-      console.log(
-        `[Admin Dashboard] Accessible subaccounts from Luxor (${subaccountNames.length} total):`,
-        subaccountNames,
-      );
-      return subaccountNames;
-    }
-
-    console.log(
-      "[Admin Dashboard] No subaccounts found in Luxor API response, falling back to database",
-    );
-
-    // FALLBACK: Get subaccounts from database if Luxor API returns empty
-    try {
-      const usersWithSubaccounts = await prisma.user.findMany({
-        where: {
-          luxorSubaccountName: {
-            not: null,
-          },
-          ...franchiseeUserFilter(currentUser),
-        },
-        select: {
-          luxorSubaccountName: true,
-        },
-      });
-
-      const usersWithLuxorPoolAuth = await prisma.poolAuth.findMany({
-        where: {
-          pool: { name: "Luxor" },
-          user: { ...franchiseeUserFilter(currentUser) },
-        },
-        select: { authKey: true },
-      });
-
-      const dbSubaccountNames = Array.from(
-        new Set([
-          ...usersWithSubaccounts
-            .map((u) => u.luxorSubaccountName)
-            .filter((name): name is string => name !== null),
-          ...usersWithLuxorPoolAuth.map((pa) => pa.authKey),
-        ]),
-      );
-
-      console.log(
-        `[Admin Dashboard] Fallback: Found ${dbSubaccountNames.length} subaccounts in database:`,
-        dbSubaccountNames,
-      );
-      return dbSubaccountNames;
-    } catch (dbError) {
-      console.error(
-        "[Admin Dashboard] Error fetching subaccounts from database:",
-        dbError,
-      );
-      return [];
-    }
-  } catch (error) {
-    console.error(
-      "[Admin Dashboard] Error fetching subaccounts from Luxor API:",
-      error,
-    );
+  if (dbSubaccountNames.length === 0) {
     return [];
   }
-}
 
-/**
- * Helper: Fetch all subaccounts from Luxor (V2 API)
- * V2 API: GET /pool/subaccounts?page_number=1&page_size=10
- * Returns all subaccounts across all sites
- */
-async function fetchSubaccountStats(
-  request: NextRequest,
-): Promise<{ total: number; active: number; inactive: number } | null> {
   try {
     const url = new URL("/api/luxor?endpoint=subaccounts", request.url);
     const luxorRequest = new NextRequest(url, {
@@ -236,33 +174,55 @@ async function fetchSubaccountStats(
         "[Admin Dashboard] Subaccounts fetch failed:",
         response.status,
       );
-      return null;
+      // Live check unavailable - fall back to the DB list unfiltered rather
+      // than reporting zero tracked subaccounts.
+      return dbSubaccountNames;
     }
 
     const result = await response.json();
-    if (result.success && result.data?.subaccounts) {
-      const subaccounts = result.data.subaccounts as Array<{
-        id: number;
-        name: string;
-      }>;
-      const totalSubaccounts = subaccounts.length;
-      const activeSubaccounts = subaccounts.filter(
-        ({ name }) => !name.includes("_test"),
-      ).length;
-      return {
-        total: totalSubaccounts,
-        active: activeSubaccounts, // Will be refined by workers fetch
-        inactive: totalSubaccounts - activeSubaccounts,
-      };
-    }
+    const luxorSubaccounts: Subaccount[] = result.success
+      ? (result.data?.subaccounts ?? [])
+      : [];
+
+    const liveNames = new Set(luxorSubaccounts.map((s) => s.name));
+    const names = dbSubaccountNames.filter((name) => liveNames.has(name));
+
+    console.log(
+      `[Admin Dashboard] Tracked subaccounts confirmed live in Luxor (${names.length} of ${dbSubaccountNames.length}):`,
+      names,
+    );
+
+    return names;
   } catch (error) {
-    console.error("[Admin Dashboard] Error fetching subaccounts:", error);
+    console.error(
+      "[Admin Dashboard] Error fetching subaccounts from Luxor API:",
+      error,
+    );
+    return dbSubaccountNames;
   }
-  return null;
 }
 
 /**
- * Helper: Fetch all workers from Luxor across all subaccounts
+ * Helper: Derive tracked-customer pool-account stats from data already
+ * fetched elsewhere - no separate Luxor call. "Active" means the subaccount
+ * has at least one worker Luxor currently reports as ACTIVE; there's no
+ * other liveness signal for a subaccount as a whole.
+ */
+function derivePoolAccountStats(
+  subaccountNames: string[],
+  workers: Worker[],
+): { total: number; active: number; inactive: number } {
+  const activeNames = new Set(
+    workers.filter((w) => w.status === "ACTIVE").map((w) => w.subaccount_name),
+  );
+  const total = subaccountNames.length;
+  const active = subaccountNames.filter((name) => activeNames.has(name)).length;
+  return { total, active, inactive: total - active };
+}
+
+/**
+ * Helper: Fetch all workers from Luxor for the given (tracked-customer)
+ * subaccounts.
  */
 async function fetchAllWorkers(
   request: NextRequest,
@@ -273,6 +233,7 @@ async function fetchAllWorkers(
   total: number;
   activeHashrate: number;
   inactiveHashrate: number;
+  workers: Worker[];
 } | null> {
   if (subaccountNames.length === 0) {
     return {
@@ -281,6 +242,7 @@ async function fetchAllWorkers(
       total: 0,
       activeHashrate: 0,
       inactiveHashrate: 0,
+      workers: [],
     };
   }
 
@@ -291,7 +253,7 @@ async function fetchAllWorkers(
     url.searchParams.set("currency", "BTC");
     url.searchParams.set("page_number", "1");
     url.searchParams.set("page_size", "1000");
-    url.searchParams.set("site_id", process.env.LUXOR_FIXED_SITE_ID || "");
+    url.searchParams.set("subaccount_names", subaccountNames.join(","));
 
     const luxorRequest = new NextRequest(url, {
       method: "GET",
@@ -330,6 +292,7 @@ async function fetchAllWorkers(
         total: (data.total_active || 0) + (data.total_inactive || 0),
         activeHashrate,
         inactiveHashrate,
+        workers: data.workers || [],
       };
     }
   } catch (error) {
@@ -339,7 +302,8 @@ async function fetchAllWorkers(
 }
 
 /**
- * Helper: Fetch total revenue from Luxor across all subaccounts
+ * Helper: Fetch total revenue from Luxor for the given (tracked-customer)
+ * subaccounts.
  */
 async function fetchTotalRevenue(
   request: NextRequest,
@@ -365,7 +329,9 @@ async function fetchTotalRevenue(
     url.searchParams.set("currency", "BTC");
     url.searchParams.set("start_date", "2025-01-01");
     url.searchParams.set("end_date", endDate);
-    url.searchParams.set("site_id", process.env.LUXOR_FIXED_SITE_ID || "");
+    // The "revenue" proxy case reads the singular "subaccount_name" key
+    // (see fetchRevenueForSubaccountNames below, which established this).
+    url.searchParams.set("subaccount_name", subaccountNames.join(","));
 
     const luxorRequest = new NextRequest(url, {
       method: "GET",
@@ -820,7 +786,7 @@ export async function GET(request: NextRequest) {
     // Fetch subaccount names once to reuse for all Luxor queries
     let subaccountNames: string[] = [];
     try {
-      subaccountNames = await getAllSubaccountNames(request, user);
+      subaccountNames = await getTrackedLuxorSubaccounts(request, user);
     } catch (error) {
       console.error(
         "[Admin Dashboard] Error fetching subaccount names:",
@@ -973,12 +939,6 @@ export async function GET(request: NextRequest) {
     try {
       // Use the subaccount names already fetched above
       if (subaccountNames.length > 0) {
-        // Fetch subaccount statistics from V2 API
-        const subaccountStats = await fetchSubaccountStats(request);
-        if (subaccountStats) {
-          luxorStats.poolAccounts = subaccountStats;
-        }
-
         // Fetch all workers statistics
         const workersStats = await fetchAllWorkers(request, subaccountNames);
         if (workersStats) {
@@ -987,6 +947,12 @@ export async function GET(request: NextRequest) {
             inactiveWorkers: workersStats.inactive,
             totalWorkers: workersStats.total,
           };
+          // Pool-account stats derived from the same workers response -
+          // no separate Luxor call needed.
+          luxorStats.poolAccounts = derivePoolAccountStats(
+            subaccountNames,
+            workersStats.workers,
+          );
         }
 
         // Fetch summary data (includes hashrate, uptime)
