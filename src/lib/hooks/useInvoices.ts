@@ -180,7 +180,7 @@ export function useCreateInvoice() {
       billingMonth?: string;
       invoiceGeneratedDate?: string;
       lineItems?: InvoiceLineItemInput[];
-      machineHostingLocation?: string;
+      machineHostingLocation?: string[];
     }) => {
       const res = await fetch("/api/accounting/invoices", {
         method: "POST",

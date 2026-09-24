@@ -271,13 +271,26 @@ export async function POST(request: NextRequest) {
     if (
       machineHostingLocation !== undefined &&
       machineHostingLocation !== null &&
-      typeof machineHostingLocation !== "string"
+      (!Array.isArray(machineHostingLocation) ||
+        machineHostingLocation.some((loc) => typeof loc !== "string"))
     ) {
       return NextResponse.json(
-        { error: "machineHostingLocation must be a string" },
+        { error: "machineHostingLocation must be an array of strings" },
         { status: 400 },
       );
     }
+
+    const normalizedMachineHostingLocation: string[] = Array.isArray(
+      machineHostingLocation,
+    )
+      ? Array.from(
+          new Set(
+            machineHostingLocation
+              .map((loc: string) => loc.trim())
+              .filter((loc: string) => loc.length > 0),
+          ),
+        )
+      : [];
 
     // Status is always DRAFT when creating new invoices
     // Admins can change to ISSUED after creation via the status change endpoint
@@ -484,11 +497,7 @@ export async function POST(request: NextRequest) {
         billingMonth: billingMonth
           ? normalizeBillingMonth(billingMonth)
           : undefined,
-        machineHostingLocation:
-          typeof machineHostingLocation === "string" &&
-          machineHostingLocation.trim()
-            ? machineHostingLocation.trim()
-            : undefined,
+        machineHostingLocation: normalizedMachineHostingLocation,
         createdBy: userId,
         lineItems: hasLineItems ? { create: validatedLineItems } : undefined,
       },

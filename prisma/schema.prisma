@@ -806,7 +806,7 @@ model Invoice {
   issuedDate             DateTime?
   dueDate                DateTime
   billingMonth           DateTime? // Format: First day of month (e.g., 2026-04-01 for April 2026)
-  machineHostingLocation String?
+  machineHostingLocation String[]              @default([])
   paidDate               DateTime?
   createdBy              String
   updatedBy              String?

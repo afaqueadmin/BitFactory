@@ -25,11 +25,12 @@ import {
   Customer,
 } from "@/lib/hooks/useInvoices";
 import { useSpaceLocations } from "@/lib/hooks/useSpaceLocations";
-import { getMostCommonMinerLocation } from "@/lib/utils/minerLocation";
+import { getMinerLocations } from "@/lib/utils/minerLocation";
 import {
   LineItemsEditor,
   LineItem,
 } from "@/components/accounting/invoices/LineItemsEditor";
+import { LocationsMultiSelect } from "@/components/accounting/invoices/LocationsMultiSelect";
 
 export default function CreateHardwareSalesInvoicePage() {
   const router = useRouter();
@@ -44,7 +45,7 @@ export default function CreateHardwareSalesInvoicePage() {
       .split("T")[0],
     status: InvoiceStatus.DRAFT,
     invoiceType: "HARDWARE_SALES",
-    machineHostingLocation: "",
+    machineHostingLocation: [] as string[],
   });
 
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
@@ -58,10 +59,13 @@ export default function CreateHardwareSalesInvoicePage() {
 
   useEffect(() => {
     if (!formData.customerId || customerMinersLoading) return;
-    const derivedLocation = getMostCommonMinerLocation(customerMiners);
+    const derivedLocations = getMinerLocations(customerMiners);
     setFormData((prev) => ({
       ...prev,
-      machineHostingLocation: derivedLocation || prev.machineHostingLocation,
+      machineHostingLocation:
+        derivedLocations.length > 0
+          ? derivedLocations
+          : prev.machineHostingLocation,
     }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.customerId, customerMinersLoading]);
@@ -179,7 +183,7 @@ export default function CreateHardwareSalesInvoicePage() {
         hardwareId: undefined,
         invoiceGeneratedDate: formData.issueDate || undefined,
         lineItems,
-        machineHostingLocation: formData.machineHostingLocation || undefined,
+        machineHostingLocation: formData.machineHostingLocation,
       });
 
       // Redirect to hardware-sales dashboard
@@ -349,23 +353,17 @@ export default function CreateHardwareSalesInvoicePage() {
                   helperText="When payment is due (defaults to 30 days from today)"
                   required
                 />
-                <TextField
-                  select
-                  label="Machine Hosting Location"
-                  name="machineHostingLocation"
+                <LocationsMultiSelect
                   value={formData.machineHostingLocation}
-                  onChange={handleInputChange}
-                  fullWidth
+                  onChange={(locations) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      machineHostingLocation: locations,
+                    }))
+                  }
+                  options={spaceLocations}
                   disabled={spaceLocationsLoading}
-                  helperText="Shown on the invoice PDF as the Machine Hosting Location. Leave blank to use the default location."
-                >
-                  <MenuItem value="">-- Use Default Location --</MenuItem>
-                  {spaceLocations.map((location) => (
-                    <MenuItem key={location} value={location}>
-                      {location}
-                    </MenuItem>
-                  ))}
-                </TextField>
+                />
                 {/* Status is automatically set to DRAFT when creating invoices */}
               </Stack>
             </Box>
