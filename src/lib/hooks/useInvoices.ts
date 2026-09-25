@@ -212,7 +212,7 @@ export interface Customer {
   id: string;
   displayName: string; // "John Doe (Mining-Account-1)"
   name: string | null;
-  luxorSubaccountName: string | null;
+  luxorSubaccounts: string[];
 }
 
 export function useCustomers() {

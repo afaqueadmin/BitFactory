@@ -581,7 +581,7 @@ export class LuxorClient {
  * @throws Error if LUXOR_API_KEY is not set in environment
  *
  * @example
- * const client = createLuxorClient(user.luxorSubaccountName);
+ * const client = createLuxorClient(subaccountName);
  * const data = await client.request('/pool/active-workers/BTC');
  */
 export function createLuxorClient(subaccountName: string): LuxorClient {

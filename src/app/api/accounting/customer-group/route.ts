@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
 import { getGroupByUserId } from "@/lib/groupUtils";
+import { getClientGroupIds } from "@/lib/luxorSubaccounts";
 
 export async function GET(request: NextRequest) {
   try {
@@ -48,9 +49,14 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const group = await getGroupByUserId(customer.id);
+    const [group, groupIds] = await Promise.all([
+      getGroupByUserId(customer.id),
+      // Every group the client is in - more than one when their Luxor
+      // subaccounts are split across groups.
+      getClientGroupIds(customer.id),
+    ]);
 
-    return NextResponse.json({ group: group || null });
+    return NextResponse.json({ group: group || null, groupIds });
   } catch (error) {
     console.error("Get customer group error:", error);
     return NextResponse.json(

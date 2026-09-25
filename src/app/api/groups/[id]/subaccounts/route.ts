@@ -26,7 +26,11 @@ export async function GET(
                 name: true,
                 email: true,
                 role: true,
-                luxorSubaccountName: true,
+                poolAuths: {
+                  where: { pool: { name: "Luxor" } },
+                  orderBy: { createdAt: "asc" },
+                  select: { authKey: true },
+                },
                 miners: {
                   where: { isDeleted: false },
                   select: { id: true },
@@ -41,7 +45,11 @@ export async function GET(
             name: true,
             email: true,
             role: true,
-            luxorSubaccountName: true,
+            poolAuths: {
+              where: { pool: { name: "Luxor" } },
+              orderBy: { createdAt: "asc" },
+              select: { authKey: true },
+            },
             miners: {
               where: { isDeleted: false },
               select: { id: true },
@@ -67,7 +75,7 @@ export async function GET(
               name: user.name,
               email: user.email,
               role: user.role,
-              luxorSubaccountName: user.luxorSubaccountName,
+              luxorSubaccounts: user.poolAuths.map((p) => p.authKey),
               minerCount: user.miners.length,
             }
           : null,

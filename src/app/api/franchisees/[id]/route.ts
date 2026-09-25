@@ -12,14 +12,51 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
-import { AuditAction } from "@prisma/client";
+import { AuditAction, Prisma } from "@prisma/client";
 import { logPoolCredentialChange } from "@/lib/audit/logPoolCredentialChange";
+import {
+  LuxorSubaccountConflictError,
+  SUBACCOUNT_TX_OPTIONS,
+  normalizeSubaccountNames,
+  setLuxorSubaccounts,
+} from "@/lib/luxorSubaccounts";
 
 interface ApiResponse<T = Record<string, unknown>> {
   success: boolean;
   data?: T;
   error?: string;
   message?: string;
+}
+
+const franchiseInclude = {
+  franchisee: {
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      poolAuths: {
+        where: { pool: { name: "Luxor" } },
+        orderBy: { createdAt: "asc" },
+        select: { authKey: true },
+      },
+    },
+  },
+  createdBy: { select: { id: true, name: true, email: true } },
+  _count: { select: { users: true } },
+} satisfies Prisma.FranchiseInclude;
+
+/** Flattens the franchisee's Luxor PoolAuth rows into luxorSubaccounts. */
+function withLuxorSubaccounts(
+  franchise: Prisma.FranchiseGetPayload<{ include: typeof franchiseInclude }>,
+) {
+  const { poolAuths, ...franchisee } = franchise.franchisee;
+  return {
+    ...franchise,
+    franchisee: {
+      ...franchisee,
+      luxorSubaccounts: poolAuths.map((pa) => pa.authKey),
+    },
+  };
 }
 
 async function getAuthenticatedUser(request: NextRequest) {
@@ -68,18 +105,7 @@ export async function GET(
 
     const franchise = await prisma.franchise.findUnique({
       where: { id },
-      include: {
-        franchisee: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            luxorSubaccountName: true,
-          },
-        },
-        createdBy: { select: { id: true, name: true, email: true } },
-        _count: { select: { users: true } },
-      },
+      include: franchiseInclude,
     });
 
     if (!franchise || franchise.deletedAt) {
@@ -90,7 +116,7 @@ export async function GET(
     }
 
     return NextResponse.json(
-      { success: true, data: franchise } as ApiResponse,
+      { success: true, data: withLuxorSubaccounts(franchise) } as ApiResponse,
       { status: 200 },
     );
   } catch (error) {
@@ -119,7 +145,7 @@ export async function GET(
  *   state?: string
  *   postalCode?: string
  *   isActive?: boolean
- *   luxorSubaccountName?: string | null
+ *   luxorSubaccountNames?: string[]   - the franchisee's full set of Luxor subaccounts
  * }
  */
 export async function PUT(
@@ -170,9 +196,12 @@ export async function PUT(
       state,
       postalCode,
       isActive,
-      luxorSubaccountName,
+      luxorSubaccountNames: rawLuxorSubaccountNames,
       braiinsAuthKey,
     } = body;
+    const luxorSubaccountNames = normalizeSubaccountNames(
+      rawLuxorSubaccountNames,
+    );
 
     const stringFields: Record<string, unknown> = {
       businessName,
@@ -225,78 +254,25 @@ export async function PUT(
       updateData.isActive = isActive;
     }
 
-    if (luxorSubaccountName !== undefined) {
-      await prisma.user.update({
-        where: { id: existingFranchise.franchiseeId },
-        data: {
-          luxorSubaccountName: luxorSubaccountName
-            ? String(luxorSubaccountName).trim()
-            : null,
-        },
-      });
-
-      // Dual-write: keep the Luxor PoolAuth row in sync with
-      // User.luxorSubaccountName (legacy, still read by ~20 other files) —
-      // same pattern as /api/user/[id] for CLIENT.
+    if (luxorSubaccountNames !== null) {
       try {
-        const luxorPool = await prisma.pool.findUnique({
-          where: { name: "Luxor" },
-          select: { id: true },
-        });
-        if (luxorPool) {
-          if (luxorSubaccountName && String(luxorSubaccountName).trim()) {
-            const existingLuxorAuth = await prisma.poolAuth.findFirst({
-              where: {
-                poolId: luxorPool.id,
-                userId: existingFranchise.franchiseeId,
-              },
-              select: { id: true },
-            });
-            if (existingLuxorAuth) {
-              await prisma.poolAuth.update({
-                where: { id: existingLuxorAuth.id },
-                data: { authKey: String(luxorSubaccountName).trim() },
-              });
-            } else {
-              await prisma.poolAuth.create({
-                data: {
-                  poolId: luxorPool.id,
-                  userId: existingFranchise.franchiseeId,
-                  authKey: String(luxorSubaccountName).trim(),
-                },
-              });
-            }
-            await logPoolCredentialChange(prisma, {
-              action: existingLuxorAuth
-                ? AuditAction.POOL_CREDENTIAL_UPDATED
-                : AuditAction.POOL_CREDENTIAL_ADDED,
+        await prisma.$transaction(
+          (tx) =>
+            setLuxorSubaccounts(tx, {
               userId: existingFranchise.franchiseeId,
+              names: luxorSubaccountNames,
               actorId: user.userId,
-              poolName: "Luxor",
-            });
-          } else {
-            const removed = await prisma.poolAuth.deleteMany({
-              where: {
-                poolId: luxorPool.id,
-                userId: existingFranchise.franchiseeId,
-              },
-            });
-            if (removed.count > 0) {
-              await logPoolCredentialChange(prisma, {
-                action: AuditAction.POOL_CREDENTIAL_REMOVED,
-                userId: existingFranchise.franchiseeId,
-                actorId: user.userId,
-                poolName: "Luxor",
-              });
-            }
-          }
-        }
-      } catch (poolAuthError) {
-        console.error(
-          "[Franchisees API] Failed to sync Luxor PoolAuth:",
-          poolAuthError,
+            }),
+          SUBACCOUNT_TX_OPTIONS,
         );
-        // Don't fail the franchise update if this fails
+      } catch (poolAuthError) {
+        if (poolAuthError instanceof LuxorSubaccountConflictError) {
+          return NextResponse.json(
+            { success: false, error: poolAuthError.message } as ApiResponse,
+            { status: 409 },
+          );
+        }
+        throw poolAuthError;
       }
     }
 
@@ -368,18 +344,7 @@ export async function PUT(
     const updatedFranchise = await prisma.franchise.update({
       where: { id },
       data: updateData,
-      include: {
-        franchisee: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            luxorSubaccountName: true,
-          },
-        },
-        createdBy: { select: { id: true, name: true, email: true } },
-        _count: { select: { users: true } },
-      },
+      include: franchiseInclude,
     });
 
     await prisma.auditLog.create({
@@ -396,7 +361,7 @@ export async function PUT(
     return NextResponse.json(
       {
         success: true,
-        data: updatedFranchise,
+        data: withLuxorSubaccounts(updatedFranchise),
         message: "Franchise updated successfully",
       } as ApiResponse,
       { status: 200 },

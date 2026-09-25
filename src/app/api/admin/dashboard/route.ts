@@ -111,9 +111,8 @@ interface DashboardStats {
  * against Luxor's own live subaccount list.
  *
  * Two sources, intersected:
- * - Our database (User.luxorSubaccountName + PoolAuth for pool "Luxor") -
- *   the authoritative record of which subaccounts belong to which tracked
- *   customer.
+ * - Our database (PoolAuth rows for pool "Luxor") - the authoritative record
+ *   of which subaccounts belong to which tracked customer.
  * - Luxor's own /pool/subaccounts listing - guards against stale DB entries
  *   (a renamed/removed subaccount that no longer exists in Luxor) rather
  *   than trusting either source alone.
@@ -126,14 +125,6 @@ async function getTrackedLuxorSubaccounts(
   request: NextRequest,
   currentUser: { id: string; role: string },
 ): Promise<string[]> {
-  const usersWithSubaccounts = await prisma.user.findMany({
-    where: {
-      luxorSubaccountName: { not: null },
-      ...franchiseeUserFilter(currentUser),
-    },
-    select: { luxorSubaccountName: true },
-  });
-
   const usersWithLuxorPoolAuth = await prisma.poolAuth.findMany({
     where: {
       pool: { name: "Luxor" },
@@ -143,12 +134,7 @@ async function getTrackedLuxorSubaccounts(
   });
 
   const dbSubaccountNames = Array.from(
-    new Set([
-      ...usersWithSubaccounts
-        .map((u) => u.luxorSubaccountName)
-        .filter((name): name is string => name !== null),
-      ...usersWithLuxorPoolAuth.map((pa) => pa.authKey),
-    ]),
+    new Set(usersWithLuxorPoolAuth.map((pa) => pa.authKey)),
   );
 
   console.log(
@@ -879,11 +865,6 @@ export async function GET(request: NextRequest) {
       where: {
         role: "CLIENT",
         isDeleted: false,
-        NOT: {
-          luxorSubaccountName: {
-            contains: "_test",
-          },
-        },
         poolAuths: { none: { authKey: { contains: "_test" } } },
         ...franchiseeUserFilter(user),
       },
@@ -1001,19 +982,7 @@ export async function GET(request: NextRequest) {
     let selfMiningHostingCost = 0;
     let selfMiningProfitUsd = 0;
     try {
-      const [
-        selfMiningLuxorUsers,
-        selfMiningLuxorAuths,
-        selfMiningBraiinsAuths,
-      ] = await Promise.all([
-        prisma.user.findMany({
-          where: {
-            segment: "SELF_MINING",
-            isDeleted: false,
-            luxorSubaccountName: { not: null },
-          },
-          select: { luxorSubaccountName: true },
-        }),
+      const [selfMiningLuxorAuths, selfMiningBraiinsAuths] = await Promise.all([
         prisma.poolAuth.findMany({
           where: {
             pool: { name: "Luxor" },
@@ -1031,12 +1000,7 @@ export async function GET(request: NextRequest) {
       ]);
 
       const selfMiningSubaccountNames = Array.from(
-        new Set([
-          ...selfMiningLuxorUsers
-            .map((u) => u.luxorSubaccountName)
-            .filter((name): name is string => !!name),
-          ...selfMiningLuxorAuths.map((pa) => pa.authKey),
-        ]),
+        new Set(selfMiningLuxorAuths.map((pa) => pa.authKey)),
       );
 
       const [

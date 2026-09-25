@@ -81,7 +81,7 @@ interface GroupSubaccount {
     name: string;
     email: string;
     role: "ADMIN" | "CLIENT" | "SUPER_ADMIN";
-    luxorSubaccountName: string;
+    luxorSubaccounts: string[];
   };
   minerCount: number;
 }
@@ -469,7 +469,8 @@ export default function GroupDetailPage() {
       (sub.subaccountName || "")
         .toLowerCase()
         .includes(searchTerm.toLowerCase()) ||
-      sub.user.luxorSubaccountName
+      sub.user.luxorSubaccounts
+        .join(", ")
         .toLowerCase()
         .includes(searchTerm.toLowerCase()),
   );
@@ -699,7 +700,7 @@ export default function GroupDetailPage() {
                           </TableCell>
                           <TableCell>
                             <Typography variant="body2">
-                              {subaccount.user.luxorSubaccountName || "-"}
+                              {subaccount.subaccountName || "-"}
                             </Typography>
                           </TableCell>
                           <TableCell align="right">
@@ -939,7 +940,7 @@ export default function GroupDetailPage() {
                     Luxor Subaccount
                   </Typography>
                   <Typography variant="body2">
-                    {dialog.selectedSubaccount?.user.luxorSubaccountName || "-"}
+                    {dialog.selectedSubaccount?.subaccountName || "-"}
                   </Typography>
                 </Paper>
               </Box>

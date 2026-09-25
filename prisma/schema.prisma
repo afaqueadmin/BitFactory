@@ -495,7 +495,9 @@ model PoolAuth {
   groupSubaccounts GroupSubaccount[]
   poolSubaccounts  PoolSubaccount[]
 
-  @@unique([poolId, userId, authKey])
+  // One subaccount/token belongs to exactly one user per pool. A user can
+  // still hold several rows per pool (multiple Luxor subaccounts).
+  @@unique([poolId, authKey])
   @@index([userId])
   @@index([poolId])
   @@map("pool_auths")

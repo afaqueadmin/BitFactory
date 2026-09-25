@@ -47,7 +47,6 @@ export async function GET(request: NextRequest) {
       where: {
         id: { in: userIds },
         isDeleted: false,
-        luxorSubaccountName: { not: { contains: "higgs_test" } },
         poolAuths: { none: { authKey: { contains: "higgs_test" } } },
         ...franchiseeUserFilter({ id: userId, role: userRole }),
       },

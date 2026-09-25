@@ -78,7 +78,6 @@ interface CustomerRequest {
   name: string;
   email: string;
   phoneNumber: string | null;
-  luxorSubaccountName: string | null;
   initialDeposit: string | null;
   status: "PENDING" | "APPROVED" | "REJECTED";
   rejectionReason: string | null;

@@ -65,9 +65,8 @@ interface FranchiseeDashboardStats {
 /**
  * Fetch this franchisee's own customers' Luxor subaccount names, cross-
  * checked against Luxor's own live subaccount list - same approach as the
- * admin dashboard's getTrackedLuxorSubaccounts. Every PoolAuth row per
- * customer, falling back to the legacy luxorSubaccountName field only when a
- * customer has none, deduped and excluding test accounts.
+ * admin dashboard's getTrackedLuxorSubaccounts. Every Luxor PoolAuth row per
+ * customer, deduped and excluding test accounts.
  */
 async function getFranchiseeTrackedLuxorSubaccounts(
   request: NextRequest,
@@ -80,7 +79,6 @@ async function getFranchiseeTrackedLuxorSubaccounts(
       ...franchiseeUserFilter(currentUser),
     },
     select: {
-      luxorSubaccountName: true,
       poolAuths: {
         where: { pool: { name: "Luxor" } },
         select: { authKey: true },
@@ -90,14 +88,7 @@ async function getFranchiseeTrackedLuxorSubaccounts(
 
   const dbNames = new Set<string>();
   for (const customer of customers) {
-    const poolAuthNames = customer.poolAuths.map((pa) => pa.authKey);
-    const effectiveNames =
-      poolAuthNames.length > 0
-        ? poolAuthNames
-        : customer.luxorSubaccountName
-          ? [customer.luxorSubaccountName]
-          : [];
-    for (const name of effectiveNames) {
+    for (const { authKey: name } of customer.poolAuths) {
       if (!name.includes("_test")) dbNames.add(name);
     }
   }
@@ -359,10 +350,10 @@ export async function GET(request: NextRequest) {
       where: {
         role: "CLIENT",
         isDeleted: false,
-        NOT: { luxorSubaccountName: { contains: "_test" } },
+        poolAuths: { none: { authKey: { contains: "_test" } } },
         ...franchiseeUserFilter(currentUser),
       },
-      include: { miners: true },
+      select: { id: true, miners: true },
     });
 
     const activeCustomerCount = totalCustomers.filter(

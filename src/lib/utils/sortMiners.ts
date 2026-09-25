@@ -41,7 +41,7 @@ interface User {
   id: string;
   name: string | null;
   email: string;
-  luxorSubaccountName?: string | null;
+  luxorSubaccounts?: string[];
   segment?: string | null;
 }
 
@@ -128,7 +128,7 @@ function getSortValue(miner: Miner, field: MinerSortField): string | number {
       return (miner.user?.name || miner.user?.email || "").toLowerCase();
 
     case "subaccount":
-      return (miner.user?.luxorSubaccountName || "").toLowerCase();
+      return (miner.user?.luxorSubaccounts ?? []).join(", ").toLowerCase();
 
     case "segment":
       return (miner.user?.segment || "").toLowerCase();

@@ -115,7 +115,7 @@ interface Subaccount {
     name: string;
     email: string;
     role: string;
-    luxorSubaccountName: string;
+    luxorSubaccounts: string[];
   };
   minerCount: number;
 }

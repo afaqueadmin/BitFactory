@@ -68,7 +68,6 @@ export async function POST(
                 id: true,
                 email: true,
                 name: true,
-                luxorSubaccountName: true,
               },
             },
             hardware: {
@@ -102,8 +101,6 @@ export async function POST(
         dueDate: result.invoice!.dueDate,
         totalMiners: result.invoice!.totalMiners,
         unitPrice: Number(result.invoice!.unitPrice),
-        luxorSubaccountName:
-          result.invoice!.user?.luxorSubaccountName || undefined,
         customerId: result.invoice!.user?.id || undefined,
         hardwareModel: result.invoice!.hardware?.model || undefined,
         billingMonth: result.invoice!.billingMonth || undefined,

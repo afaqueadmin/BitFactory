@@ -11,9 +11,16 @@ import {
   Button,
   ToggleButton,
   ToggleButtonGroup,
+  Chip,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Checkbox,
+  ListItemText,
 } from "@mui/material";
 import { ArrowBack as ArrowBackIcon } from "@mui/icons-material";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import ElectricityCostTable from "@/components/ElectricityCostTable";
 import HostedMinersList from "@/components/HostedMinersList";
 import PoolAuthSection from "@/components/PoolAuthSection";
@@ -28,6 +35,9 @@ import { getDaysInCurrentMonth } from "@/lib/helpers/getDaysInCurrentMonth";
 import { formatValue } from "@/lib/helpers/formatValue";
 import { LuxorPaymentSettings } from "@/lib/types/wallet";
 import { useBitcoinLivePrice } from "@/components/useBitcoinLivePrice";
+
+// "All subaccounts" option value in the subaccount filter.
+const ALL_SUBACCOUNTS = "__all__";
 
 interface CustomerDetails {
   id: string;
@@ -44,6 +54,8 @@ interface CustomerDetails {
   isDeleted: boolean;
   miners: number;
   status: "active" | "inactive";
+  /** The customer's Luxor subaccount names, oldest first. */
+  luxorSubaccounts: string[];
 }
 
 interface EarningsSummary {
@@ -136,9 +148,12 @@ export default function CustomerDetailPage() {
           throw new Error("Failed to fetch customer details");
         }
 
-        const { user } = await response.json();
+        const { user, subaccounts } = await response.json();
         console.log(user);
         return {
+          luxorSubaccounts: Array.isArray(subaccounts)
+            ? subaccounts.map((s: { authKey: string }) => s.authKey)
+            : [],
           id: user.id,
           name: user.name,
           email: user.email,
@@ -161,6 +176,39 @@ export default function CustomerDetailPage() {
     staleTime: 1000 * 60 * 5, // 5 minutes
     enabled: !!customerId,
   });
+
+  // Which of the customer's Luxor subaccounts the pool data below is scoped
+  // to - same "all or a subset" model as the client's own subaccount filter.
+  // Balance, costs, statement and invoices are per customer, not per
+  // subaccount, so they ignore it.
+  const allSubaccounts = React.useMemo(
+    () => customer?.luxorSubaccounts ?? [],
+    [customer?.luxorSubaccounts],
+  );
+  const [selectedSubaccounts, setSelectedSubaccounts] = React.useState<
+    string[] | "all"
+  >("all");
+  // Drop names that no longer belong to the customer (e.g. removed in the
+  // Pool Authentication section below); fall back to all if none are left.
+  const subaccountsInView = React.useMemo(() => {
+    if (selectedSubaccounts === "all") return allSubaccounts;
+    const kept = selectedSubaccounts.filter((s) => allSubaccounts.includes(s));
+    return kept.length > 0 ? kept : allSubaccounts;
+  }, [selectedSubaccounts, allSubaccounts]);
+  const isFilteringSubaccounts =
+    subaccountsInView.length < allSubaccounts.length;
+  const subaccountsParam = isFilteringSubaccounts
+    ? subaccountsInView.join(",")
+    : "all";
+
+  const queryClient = useQueryClient();
+  const refreshSubaccountData = () => {
+    queryClient.invalidateQueries({ queryKey: ["customer", customerId] });
+    queryClient.invalidateQueries({ queryKey: ["walletSettings", customerId] });
+    queryClient.invalidateQueries({
+      queryKey: ["earningsSummary", customerId],
+    });
+  };
 
   // Fetch balance
   const { data: balanceData, isLoading: balanceLoading } = useQuery<{
@@ -232,11 +280,11 @@ export default function CustomerDetailPage() {
     isLoading,
     error,
   } = useQuery<EarningsSummary>({
-    queryKey: ["earningsSummary", customerId],
+    queryKey: ["earningsSummary", customerId, subaccountsParam],
     queryFn: async () => {
       try {
         const response = await fetch(
-          `/api/wallet/earnings-summary?customerId=${customerId}`,
+          `/api/wallet/earnings-summary?customerId=${customerId}&subaccounts=${encodeURIComponent(subaccountsParam)}`,
         );
 
         if (!response.ok) {
@@ -256,17 +304,18 @@ export default function CustomerDetailPage() {
     enabled: !!customerId,
   });
 
-  // Fetch wallet settings
+  // Fetch wallet settings - one entry per Luxor subaccount in view, since
+  // payout frequency/schedule is configured per subaccount in Luxor.
   const {
     data: walletSettings,
     isLoading: walletLoading,
     error: walletError,
-  } = useQuery<LuxorPaymentSettings>({
-    queryKey: ["walletSettings", customerId],
+  } = useQuery<LuxorPaymentSettings[]>({
+    queryKey: ["walletSettings", customerId, subaccountsParam],
     queryFn: async () => {
       try {
         const response = await fetch(
-          `/api/wallet/settings?currency=BTC&customerId=${customerId}`,
+          `/api/wallet/settings?currency=BTC&customerId=${customerId}&subaccounts=${encodeURIComponent(subaccountsParam)}`,
           {
             credentials: "include",
             headers: {
@@ -284,9 +333,9 @@ export default function CustomerDetailPage() {
         }
 
         const data = await response.json();
-        if (data.success && data.data) {
-          console.log("[Wallet] Settings loaded from Luxor:", data.data);
-          return data.data;
+        if (data.success && (data.subaccounts || data.data)) {
+          console.log("[Wallet] Settings loaded from Luxor:", data.subaccounts);
+          return data.subaccounts || [data.data];
         } else {
           throw new Error(
             data.error || "Invalid response from wallet settings endpoint",
@@ -325,14 +374,10 @@ export default function CustomerDetailPage() {
       .join(" ");
   };
 
-  let payoutDate = new Date();
-  let twoHoursLaterPayoutDate = new Date();
-  if (walletSettings?.next_payout_at !== undefined) {
-    payoutDate = new Date(walletSettings.next_payout_at);
-    twoHoursLaterPayoutDate = new Date(
-      payoutDate.getTime() + 2 * 60 * 60 * 1000,
-    );
-  }
+  const payoutSettings = walletSettings ?? [];
+  const showSubaccountNames = payoutSettings.length > 1;
+  const settingsLabel = (settings: LuxorPaymentSettings) =>
+    settings.subaccount?.name || String(settings.subaccount?.id ?? "");
 
   const { btcLiveData, BtcLivePriceComponent } = useBitcoinLivePrice();
   const minCardHeight = 140;
@@ -398,6 +443,90 @@ export default function CustomerDetailPage() {
                 <Typography variant="body2" color="text.secondary">
                   Company: {customer.companyName}
                 </Typography>
+              )}
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  flexWrap: "wrap",
+                  gap: 1,
+                  mt: 1,
+                }}
+              >
+                <Typography variant="body2" color="text.secondary">
+                  Luxor subaccounts:
+                </Typography>
+                {allSubaccounts.length === 0 ? (
+                  <Typography variant="body2" color="text.secondary">
+                    None assigned
+                  </Typography>
+                ) : (
+                  allSubaccounts.map((name) => (
+                    <Chip key={name} label={name} size="small" />
+                  ))
+                )}
+              </Box>
+              {allSubaccounts.length > 1 && (
+                <Box sx={{ mt: 2 }}>
+                  <FormControl size="small" sx={{ minWidth: 260 }}>
+                    <InputLabel id="customer-subaccount-filter-label">
+                      Viewing subaccounts
+                    </InputLabel>
+                    <Select
+                      labelId="customer-subaccount-filter-label"
+                      label="Viewing subaccounts"
+                      multiple
+                      value={subaccountsInView}
+                      renderValue={(selected) =>
+                        isFilteringSubaccounts
+                          ? selected.join(", ")
+                          : "All subaccounts"
+                      }
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        const next =
+                          typeof value === "string" ? value.split(",") : value;
+                        if (next.includes(ALL_SUBACCOUNTS)) {
+                          setSelectedSubaccounts("all");
+                          return;
+                        }
+                        // Keep at least one selected
+                        if (next.length === 0) return;
+                        setSelectedSubaccounts(
+                          next.length === allSubaccounts.length ? "all" : next,
+                        );
+                      }}
+                    >
+                      <MenuItem value={ALL_SUBACCOUNTS}>
+                        <Checkbox
+                          size="small"
+                          checked={!isFilteringSubaccounts}
+                        />
+                        <ListItemText primary="All subaccounts" />
+                      </MenuItem>
+                      {allSubaccounts.map((name) => (
+                        <MenuItem key={name} value={name}>
+                          <Checkbox
+                            size="small"
+                            checked={subaccountsInView.includes(name)}
+                          />
+                          <ListItemText primary={name} />
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                  {isFilteringSubaccounts && (
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{ display: "block", mt: 0.5 }}
+                    >
+                      Earnings, payouts, transactions, hashrate and miner status
+                      show the selected subaccounts only. Balance, costs,
+                      statement and invoices are per customer.
+                    </Typography>
+                  )}
+                </Box>
               )}
             </Box>
             {BtcLivePriceComponent}
@@ -587,23 +716,40 @@ export default function CustomerDetailPage() {
                   <Typography variant="body2" sx={{ mt: 1 }}>
                     Unable to load
                   </Typography>
+                ) : payoutSettings.length === 0 ? (
+                  <Typography variant="h5" fontWeight="bold" sx={{ mt: 1 }}>
+                    Not set
+                  </Typography>
                 ) : (
-                  <Box sx={{ mt: 1 }}>
-                    <Typography variant="h5" fontWeight="bold">
-                      {walletSettings?.payment_frequency
-                        ? toProperCase(walletSettings.payment_frequency)
-                        : "Not set"}
-                    </Typography>
-                    {walletSettings?.payment_frequency === "WEEKLY" &&
-                      walletSettings?.day_of_week && (
-                        <Typography
-                          variant="body2"
-                          sx={{ mt: 1, opacity: 0.9 }}
-                        >
-                          Every {toProperCase(walletSettings.day_of_week)}
+                  payoutSettings.map((settings) => (
+                    <Box key={settingsLabel(settings)} sx={{ mt: 1 }}>
+                      {showSubaccountNames && (
+                        <Typography variant="caption" sx={{ opacity: 0.85 }}>
+                          {settingsLabel(settings)}
                         </Typography>
                       )}
-                  </Box>
+                      <Typography
+                        variant={showSubaccountNames ? "h6" : "h5"}
+                        fontWeight="bold"
+                      >
+                        {settings.payment_frequency
+                          ? toProperCase(settings.payment_frequency)
+                          : "Not set"}
+                      </Typography>
+                      {settings.payment_frequency === "WEEKLY" &&
+                        settings.day_of_week && (
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              mt: showSubaccountNames ? 0 : 1,
+                              opacity: 0.9,
+                            }}
+                          >
+                            Every {toProperCase(settings.day_of_week)}
+                          </Typography>
+                        )}
+                    </Box>
+                  ))
                 )}
               </Paper>
             </Box>
@@ -640,40 +786,69 @@ export default function CustomerDetailPage() {
                   <Typography variant="body2" sx={{ mt: 1 }}>
                     Unable to load
                   </Typography>
-                ) : walletSettings?.next_payout_at ? (
-                  <Box sx={{ mt: 1 }}>
-                    <Typography variant="h6" fontWeight="bold">
-                      {payoutDate.toLocaleDateString("en-US", {
-                        weekday: "short",
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                      })}
-                    </Typography>
-                    <Typography variant="body2" sx={{ mt: 0.5, opacity: 0.9 }}>
-                      {payoutDate.toLocaleTimeString("en-US", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}{" "}
-                      -{" "}
-                      {twoHoursLaterPayoutDate.toLocaleTimeString("en-US", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}{" "}
-                      (
-                      {new Intl.DateTimeFormat("en-US", {
-                        timeZoneName: "shortOffset",
-                      })
-                        .formatToParts(payoutDate)
-                        .find((part) => part.type === "timeZoneName")?.value ||
-                        "GMT"}
-                      )
-                    </Typography>
-                  </Box>
-                ) : (
+                ) : payoutSettings.length === 0 ? (
                   <Typography variant="h6" fontWeight="bold" sx={{ mt: 1 }}>
                     Not scheduled
                   </Typography>
+                ) : (
+                  payoutSettings.map((settings) => {
+                    const payoutDate = settings.next_payout_at
+                      ? new Date(settings.next_payout_at)
+                      : null;
+                    const twoHoursLaterPayoutDate = payoutDate
+                      ? new Date(payoutDate.getTime() + 2 * 60 * 60 * 1000)
+                      : null;
+                    return (
+                      <Box key={settingsLabel(settings)} sx={{ mt: 1 }}>
+                        {showSubaccountNames && (
+                          <Typography variant="caption" sx={{ opacity: 0.85 }}>
+                            {settingsLabel(settings)}
+                          </Typography>
+                        )}
+                        {payoutDate && twoHoursLaterPayoutDate ? (
+                          <>
+                            <Typography variant="h6" fontWeight="bold">
+                              {payoutDate.toLocaleDateString("en-US", {
+                                weekday: "short",
+                                month: "short",
+                                day: "numeric",
+                                year: "numeric",
+                              })}
+                            </Typography>
+                            <Typography
+                              variant="body2"
+                              sx={{ mt: 0.5, opacity: 0.9 }}
+                            >
+                              {payoutDate.toLocaleTimeString("en-US", {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}{" "}
+                              -{" "}
+                              {twoHoursLaterPayoutDate.toLocaleTimeString(
+                                "en-US",
+                                {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                },
+                              )}{" "}
+                              (
+                              {new Intl.DateTimeFormat("en-US", {
+                                timeZoneName: "shortOffset",
+                              })
+                                .formatToParts(payoutDate)
+                                .find((part) => part.type === "timeZoneName")
+                                ?.value || "GMT"}
+                              )
+                            </Typography>
+                          </>
+                        ) : (
+                          <Typography variant="h6" fontWeight="bold">
+                            Not scheduled
+                          </Typography>
+                        )}
+                      </Box>
+                    );
+                  })
                 )}
               </Paper>
             </Box>
@@ -694,12 +869,18 @@ export default function CustomerDetailPage() {
               border: (theme) => `1px solid ${theme.palette.divider}`,
             }}
           >
-            <PoolAuthSection customerId={customerId} />
+            <PoolAuthSection
+              customerId={customerId}
+              onChange={refreshSubaccountData}
+            />
           </Paper>
 
           {/* Hashrate & Shares Efficiency history for this customer. The API
               authorises the userId param for ADMIN/SUPER_ADMIN. */}
-          <HashrateHistoryChart userId={customerId} />
+          <HashrateHistoryChart
+            userId={customerId}
+            subaccountsParam={subaccountsParam}
+          />
 
           {/* Miners Section */}
           <Paper
@@ -716,7 +897,13 @@ export default function CustomerDetailPage() {
               border: (theme) => `1px solid ${theme.palette.divider}`,
             }}
           >
-            <HostedMinersList customerId={customerId} />
+            {/* Live status follows the subaccount filter - miners reporting
+                under an unselected subaccount show as offline. The list itself
+                isn't filtered: miners aren't linked to a subaccount yet. */}
+            <HostedMinersList
+              customerId={customerId}
+              subaccountsParam={subaccountsInView.join(",")}
+            />
           </Paper>
 
           {/* Account Statement / Transaction History / Invoices Section */}
@@ -756,7 +943,10 @@ export default function CustomerDetailPage() {
               <ElectricityCostTable customerId={customerId} />
             )}
             {activeView === "transactions" && (
-              <TransactionHistorySection customerId={customerId} />
+              <TransactionHistorySection
+                customerId={customerId}
+                subaccountsParam={subaccountsParam}
+              />
             )}
             {activeView === "invoices" && (
               <CustomerInvoicesTable customerId={customerId} />

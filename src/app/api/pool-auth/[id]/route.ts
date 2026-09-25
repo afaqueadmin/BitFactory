@@ -14,6 +14,10 @@ import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
 import { AuditAction } from "@prisma/client";
 import { logPoolCredentialChange } from "@/lib/audit/logPoolCredentialChange";
+import {
+  SUBACCOUNT_TX_OPTIONS,
+  setLuxorSubaccounts,
+} from "@/lib/luxorSubaccounts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -99,24 +103,54 @@ export async function PUT(
       );
     }
 
-    const poolAuth = await prisma.poolAuth.update({
-      where: { id },
-      data: { authKey: authKey.trim() },
-      select: {
-        id: true,
-        poolId: true,
-        userId: true,
-        authKey: true,
-        createdAt: true,
-        updatedAt: true,
+    // A subaccount/token belongs to one user per pool (@@unique([poolId, authKey])).
+    const taken = await prisma.poolAuth.findUnique({
+      where: {
+        poolId_authKey: { poolId: existing.poolId, authKey: authKey.trim() },
       },
+      select: { id: true, userId: true },
     });
+    if (taken && taken.id !== id) {
+      return NextResponse.json<ApiResponse>(
+        {
+          success: false,
+          error:
+            taken.userId === existing.userId
+              ? "This subaccount is already assigned to this user"
+              : "This subaccount is already assigned to another user",
+        },
+        { status: 409 },
+      );
+    }
 
-    await logPoolCredentialChange(prisma, {
-      action: AuditAction.POOL_CREDENTIAL_UPDATED,
-      userId: existing.userId,
-      actorId: actorUserId,
-      poolName: existing.pool.name,
+    const poolAuth = await prisma.$transaction(async (tx) => {
+      const updated = await tx.poolAuth.update({
+        where: { id },
+        data: { authKey: authKey.trim() },
+        select: {
+          id: true,
+          poolId: true,
+          userId: true,
+          authKey: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+      // GroupSubaccount keeps a copy of the name - keep it in step.
+      await tx.groupSubaccount.updateMany({
+        where: { poolAuthId: id },
+        data: { subaccountName: updated.authKey },
+      });
+      await logPoolCredentialChange(tx, {
+        action: AuditAction.POOL_CREDENTIAL_UPDATED,
+        userId: existing.userId,
+        actorId: actorUserId,
+        poolName: existing.pool.name,
+        ...(existing.pool.name === "Luxor"
+          ? { credentialName: `${existing.authKey} -> ${updated.authKey}` }
+          : {}),
+      });
+      return updated;
     });
 
     console.log(`[PoolAuth API] PUT: Updated PoolAuth (id: ${id})`);
@@ -173,14 +207,51 @@ export async function DELETE(
       );
     }
 
-    await prisma.poolAuth.delete({ where: { id } });
-
-    await logPoolCredentialChange(prisma, {
-      action: AuditAction.POOL_CREDENTIAL_REMOVED,
-      userId: existing.userId,
-      actorId: actorUserId,
-      poolName: existing.pool.name,
-    });
+    if (existing.pool.name === "Luxor") {
+      // Same path as the customer edit form, so group membership follows
+      // the same rules wherever a Luxor subaccount is removed from.
+      await prisma.$transaction(async (tx) => {
+        const current = await tx.poolAuth.findMany({
+          where: { poolId: existing.poolId, userId: existing.userId },
+          select: { authKey: true },
+        });
+        await setLuxorSubaccounts(tx, {
+          userId: existing.userId,
+          names: current
+            .map((c) => c.authKey)
+            .filter((k) => k !== existing.authKey),
+          actorId: actorUserId,
+        });
+      }, SUBACCOUNT_TX_OPTIONS);
+    } else {
+      await prisma.$transaction(async (tx) => {
+        // Drop its group membership rows too - the FK is ON DELETE SET NULL,
+        // which would otherwise leave an orphaned membership behind.
+        const memberships = await tx.groupSubaccount.findMany({
+          where: { poolAuthId: id },
+          select: { groupId: true },
+        });
+        await tx.groupSubaccount.deleteMany({ where: { poolAuthId: id } });
+        for (const m of memberships) {
+          await tx.auditLog.create({
+            data: {
+              action: AuditAction.GROUP_SUBACCOUNT_REMOVED,
+              entityType: "Group",
+              entityId: m.groupId,
+              userId: actorUserId,
+              description: `${existing.pool.name} credential removed from group`,
+            },
+          });
+        }
+        await tx.poolAuth.delete({ where: { id } });
+        await logPoolCredentialChange(tx, {
+          action: AuditAction.POOL_CREDENTIAL_REMOVED,
+          userId: existing.userId,
+          actorId: actorUserId,
+          poolName: existing.pool.name,
+        });
+      });
+    }
 
     console.log(`[PoolAuth API] DELETE: Deleted PoolAuth (id: ${id})`);
 

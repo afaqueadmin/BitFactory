@@ -41,7 +41,6 @@ export async function GET(
             id: true,
             email: true,
             name: true,
-            luxorSubaccountName: true,
           },
         },
         createdByUser: { select: { id: true, email: true, name: true } },

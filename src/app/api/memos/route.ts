@@ -339,9 +339,11 @@ export async function POST(request: NextRequest) {
         id: true,
         name: true,
         email: true,
-        luxorSubaccountName: true,
+        // Memo prefix uses the customer's oldest Luxor subaccount.
         poolAuths: {
           where: { pool: { name: "Luxor" } },
+          orderBy: { createdAt: "asc" },
+          take: 1,
           select: { authKey: true },
         },
       },
@@ -354,8 +356,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const luxorIdentifier =
-      customer.poolAuths[0]?.authKey || customer.luxorSubaccountName;
+    const luxorIdentifier = customer.poolAuths[0]?.authKey;
 
     if (!luxorIdentifier) {
       return NextResponse.json(

@@ -175,7 +175,11 @@ export default function CustomerRequestsPanel() {
                     </Typography>
                   </TableCell>
                   <TableCell>{r.phoneNumber || "-"}</TableCell>
-                  <TableCell>{r.luxorSubaccountName || "-"}</TableCell>
+                  <TableCell>
+                    {r.luxorSubaccounts.length > 0
+                      ? r.luxorSubaccounts.join(", ")
+                      : "-"}
+                  </TableCell>
                   <TableCell>
                     {r.initialDeposit ? `$${r.initialDeposit}` : "-"}
                   </TableCell>

@@ -230,10 +230,10 @@ export async function GET(
             id: true,
             name: true,
             email: true,
-            luxorSubaccountName: true,
             segment: true,
             poolAuths: {
               where: { pool: { name: "Luxor" } },
+              orderBy: { createdAt: "asc" },
               select: { authKey: true },
             },
           },
@@ -335,14 +335,7 @@ export async function GET(
       new Set(
         miners
           .filter((miner) => miner.status === "AUTO")
-          .flatMap((miner) => {
-            const authKeys = miner.user.poolAuths.map((pa) => pa.authKey);
-            return authKeys.length > 0
-              ? authKeys
-              : miner.user.luxorSubaccountName
-                ? [miner.user.luxorSubaccountName]
-                : [];
-          }),
+          .flatMap((miner) => miner.user.poolAuths.map((pa) => pa.authKey)),
       ),
     );
     const luxorWorkerStatusByKey = await fetchLuxorWorkerStatuses(
@@ -350,24 +343,15 @@ export async function GET(
       autoMinerSubaccountNames,
     );
 
-    // Transform miners to include latest rate_per_kwh, and resolve the
-    // customer's Luxor subaccount from PoolAuth (falling back to the legacy
-    // field) so the response shape stays unchanged for existing consumers.
+    // Transform miners to include latest rate_per_kwh, and flatten the
+    // customer's Luxor subaccounts (PoolAuth) into user.luxorSubaccounts.
     const transformedMiners = miners.map((miner) => {
       const { poolAuths, ...user } = miner.user;
 
       // Every one of the customer's Luxor subaccounts - used both for the
-      // displayed name (joined) and the live-status lookup below (the miner
-      // could be reporting under any of them).
-      const luxorAuthKeys =
-        poolAuths.length > 0
-          ? poolAuths.map((pa) => pa.authKey)
-          : miner.user.luxorSubaccountName
-            ? [miner.user.luxorSubaccountName]
-            : [];
-      const luxorSubaccountName =
-        (luxorAuthKeys.length > 0 ? luxorAuthKeys.join(", ") : null) ||
-        miner.user.luxorSubaccountName;
+      // displayed names and the live-status lookup below (the miner could be
+      // reporting under any of them).
+      const luxorAuthKeys = poolAuths.map((pa) => pa.authKey);
 
       let status = miner.status;
       if (status === "AUTO" && luxorAuthKeys.length > 0) {
@@ -386,7 +370,7 @@ export async function GET(
         status,
         user: {
           ...user,
-          luxorSubaccountName,
+          luxorSubaccounts: luxorAuthKeys,
         },
         rate_per_kwh:
           miner.rateHistory && miner.rateHistory.length > 0
@@ -704,10 +688,10 @@ export async function POST(
               id: true,
               name: true,
               email: true,
-              luxorSubaccountName: true,
               segment: true,
               poolAuths: {
                 where: { pool: { name: "Luxor" } },
+                orderBy: { createdAt: "asc" },
                 select: { authKey: true },
               },
             },
@@ -823,17 +807,14 @@ export async function POST(
 
     console.log(`[Miners API] POST: Created miner with id ${miner.id}`);
 
-    // Resolve the customer's Luxor subaccount(s) from PoolAuth (falling back
-    // to the legacy field), joining every one rather than just the first.
+    // Flatten the customer's Luxor subaccounts (PoolAuth) into
+    // user.luxorSubaccounts.
     const { poolAuths, ...minerUser } = miner.user;
-    const poolAuthNames = poolAuths.map((pa) => pa.authKey);
     const transformedMiner = {
       ...miner,
       user: {
         ...minerUser,
-        luxorSubaccountName:
-          (poolAuthNames.length > 0 ? poolAuthNames.join(", ") : null) ||
-          miner.user.luxorSubaccountName,
+        luxorSubaccounts: poolAuths.map((pa) => pa.authKey),
       },
     };
 

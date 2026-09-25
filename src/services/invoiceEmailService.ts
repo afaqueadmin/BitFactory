@@ -14,7 +14,6 @@ export interface InvoiceEmailPayload {
   dueDate: Date;
   totalMiners: number;
   unitPrice: number;
-  luxorSubaccountName?: string | null;
   customerId?: string | null;
   hardwareModel?: string | null;
   billingMonth?: Date | null;

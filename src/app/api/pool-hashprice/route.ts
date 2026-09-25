@@ -61,17 +61,17 @@ export async function GET(request: NextRequest) {
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: {
-        luxorSubaccountName: true,
         role: true,
         poolAuths: {
           where: { pool: { name: "Luxor" } },
+          orderBy: { createdAt: "asc" },
+          take: 1,
           select: { authKey: true },
         },
       },
     });
 
-    const luxorIdentifier =
-      user?.poolAuths[0]?.authKey || user?.luxorSubaccountName;
+    const luxorIdentifier = user?.poolAuths[0]?.authKey;
 
     let subaccountForAuth: string;
     if (user?.role === "ADMIN") {

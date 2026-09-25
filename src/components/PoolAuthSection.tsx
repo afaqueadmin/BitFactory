@@ -43,9 +43,14 @@ interface PoolAuthEntry {
 
 interface PoolAuthSectionProps {
   customerId: string;
+  /** Called after a credential is added, edited or removed. */
+  onChange?: () => void;
 }
 
-export default function PoolAuthSection({ customerId }: PoolAuthSectionProps) {
+export default function PoolAuthSection({
+  customerId,
+  onChange,
+}: PoolAuthSectionProps) {
   const [poolAuths, setPoolAuths] = useState<PoolAuthEntry[]>([]);
   const [pools, setPools] = useState<PoolOption[]>([]);
   const [loading, setLoading] = useState(true);
@@ -94,8 +99,10 @@ export default function PoolAuthSection({ customerId }: PoolAuthSectionProps) {
     fetchData();
   }, [fetchData]);
 
+  // A client can hold several Luxor subaccounts; other pools stay at one
+  // credential per client.
   const poolsWithoutCredential = pools.filter(
-    (p) => !poolAuths.some((pa) => pa.poolId === p.id),
+    (p) => p.name === "Luxor" || !poolAuths.some((pa) => pa.poolId === p.id),
   );
 
   const openAddForm = () => {
@@ -150,6 +157,7 @@ export default function PoolAuthSection({ customerId }: PoolAuthSectionProps) {
       }
 
       await fetchData();
+      onChange?.();
       setFormOpen(false);
       setEditing(null);
     } catch (err) {
@@ -172,6 +180,7 @@ export default function PoolAuthSection({ customerId }: PoolAuthSectionProps) {
         throw new Error(data.error || "Failed to remove credential");
       }
       await fetchData();
+      onChange?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error occurred");
     } finally {

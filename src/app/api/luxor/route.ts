@@ -163,7 +163,7 @@ const endpointMap: Record<
  * to get the subaccount name.
  *
  * @param request - NextRequest object
- * @returns Object with userId, role, and luxorSubaccountName if valid
+ * @returns Object with userId, role, and the user's Luxor subaccounts if valid
  * @throws Error if token is invalid or user not found
  */
 async function extractUserFromToken(request: NextRequest) {
@@ -176,15 +176,15 @@ async function extractUserFromToken(request: NextRequest) {
   try {
     const decoded = await verifyJwtToken(token);
 
-    // Fetch user from database to get the luxorSubaccountName
+    // Fetch user from database to get their Luxor subaccounts (PoolAuth)
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },
       select: {
         id: true,
-        luxorSubaccountName: true,
         role: true,
         poolAuths: {
           where: { pool: { name: "Luxor" } },
+          orderBy: { createdAt: "asc" },
           select: { id: true, authKey: true },
         },
       },
@@ -194,22 +194,11 @@ async function extractUserFromToken(request: NextRequest) {
       throw new Error("User not found in database");
     }
 
-    // All of this user's Luxor subaccounts, falling back to the legacy
-    // column when they have no PoolAuth rows yet. luxorSubaccountName /
-    // luxorPoolAuthKey below are kept only for endpoint branches that
-    // haven't been migrated to the multi-subaccount list yet.
-    const luxorSubaccounts: LuxorSubaccount[] =
-      user.poolAuths.length > 0
-        ? user.poolAuths
-        : user.luxorSubaccountName
-          ? [{ id: null, authKey: user.luxorSubaccountName }]
-          : [];
+    const luxorSubaccounts: LuxorSubaccount[] = user.poolAuths;
 
     return {
       userId: decoded.userId,
       role: decoded.role,
-      luxorSubaccountName: user.luxorSubaccountName,
-      luxorPoolAuthKey: user.poolAuths[0]?.authKey || null,
       luxorSubaccounts,
     };
   } catch (error) {
@@ -290,7 +279,7 @@ function checkAdminAccess(
  *
  * Server-side derived only — never trusts a client-supplied subaccount list,
  * matching the same security posture as the existing CLIENT branch (which
- * only ever uses the caller's own DB-stored `luxorSubaccountName`, never a
+ * only ever uses the caller's own DB-stored PoolAuth subaccounts, never a
  * client-supplied value).
  *
  * @param franchiseeUserId - the authenticated FRANCHISEE user's id
@@ -306,7 +295,6 @@ async function getFranchiseeSubaccountNames(
       ...franchiseeUserFilter({ id: franchiseeUserId, role: "FRANCHISEE" }),
     },
     select: {
-      luxorSubaccountName: true,
       poolAuths: {
         where: { pool: { name: "Luxor" } },
         select: { authKey: true },
@@ -314,19 +302,10 @@ async function getFranchiseeSubaccountNames(
     },
   });
 
-  // Every one of each customer's Luxor subaccounts (PoolAuth), falling back
-  // to the legacy single-value field only when a customer has no PoolAuth
-  // rows yet - matches resolveLuxorSubaccounts' semantics elsewhere.
+  // Every one of each customer's Luxor subaccounts (PoolAuth).
   const names = new Set<string>();
   for (const customer of customers) {
-    const poolAuthNames = customer.poolAuths.map((pa) => pa.authKey);
-    const effectiveNames =
-      poolAuthNames.length > 0
-        ? poolAuthNames
-        : customer.luxorSubaccountName
-          ? [customer.luxorSubaccountName]
-          : [];
-    for (const name of effectiveNames) {
+    for (const { authKey: name } of customer.poolAuths) {
       if (!name.includes("_test")) names.add(name);
     }
   }
@@ -394,8 +373,6 @@ export async function GET(
     let user: {
       userId: string;
       role: string;
-      luxorSubaccountName: string | null;
-      luxorPoolAuthKey: string | null;
       luxorSubaccounts: LuxorSubaccount[];
     };
     try {
@@ -453,7 +430,9 @@ export async function GET(
     let luxorClient;
     try {
       luxorClient = createLuxorClient(
-        user.luxorPoolAuthKey || user.luxorSubaccountName || user.userId,
+        // Only labels the client's log lines.
+        joinSubaccountNames(user.luxorSubaccounts.map((s) => s.authKey)) ||
+          user.userId,
       );
     } catch (clientError) {
       const errorMsg =

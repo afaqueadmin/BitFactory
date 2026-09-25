@@ -9,10 +9,6 @@ import {
   TextField,
   Button,
   Box,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
   IconButton,
   CircularProgress,
   Alert,
@@ -20,24 +16,15 @@ import {
   Chip,
 } from "@mui/material";
 import { Close as CloseIcon } from "@mui/icons-material";
-
-interface ProxyResponse<T = Record<string, unknown>> {
-  success: boolean;
-  data?: T;
-  error?: string;
-}
-
-interface Subaccount {
-  id: number;
-  name: string;
-}
+import LuxorSubaccountMultiSelect from "@/components/LuxorSubaccountMultiSelect";
 
 export interface CustomerRequestRow {
   id: string;
   name: string;
   email: string;
   phoneNumber: string | null;
-  luxorSubaccountName: string | null;
+  /** The created customer's Luxor subaccounts (empty until approved). */
+  luxorSubaccounts: string[];
   initialDeposit: string | null;
   status: "PENDING" | "APPROVED" | "REJECTED";
   rejectionReason: string | null;
@@ -64,12 +51,9 @@ export default function CustomerRequestReviewModal({
     email: "",
     phoneNumber: "",
     initialDeposit: "",
-    luxorSubaccountName: "",
+    luxorSubaccountNames: [] as string[],
   });
   const [rejectionReason, setRejectionReason] = useState("");
-  const [fetchingSubaccounts, setFetchingSubaccounts] = useState(true);
-  const [subaccounts, setSubaccounts] = useState<Subaccount[]>([]);
-  const [subaccountsError, setSubaccountsError] = useState<string | null>(null);
   const [approving, setApproving] = useState(false);
   const [rejecting, setRejecting] = useState(false);
   const [error, setError] = useState("");
@@ -83,73 +67,12 @@ export default function CustomerRequestReviewModal({
         email: request.email,
         phoneNumber: request.phoneNumber || "",
         initialDeposit: request.initialDeposit || "",
-        luxorSubaccountName: request.luxorSubaccountName || "",
+        luxorSubaccountNames: request.luxorSubaccounts ?? [],
       });
       setRejectionReason("");
       setError("");
-      if (request.status === "PENDING") {
-        fetchSubaccounts();
-      }
     }
   }, [open, request]);
-
-  const fetchSubaccounts = async () => {
-    try {
-      setFetchingSubaccounts(true);
-      setSubaccountsError(null);
-      setSubaccounts([]);
-
-      const luxorResponse = await fetch("/api/luxor?endpoint=subaccounts");
-      if (!luxorResponse.ok) {
-        throw new Error(`Luxor API returned status ${luxorResponse.status}`);
-      }
-      const luxorData: ProxyResponse<Record<string, unknown>> =
-        await luxorResponse.json();
-      if (!luxorData.success) {
-        throw new Error(luxorData.error || "Failed to fetch subaccounts");
-      }
-
-      const responseData = luxorData.data as Record<string, unknown>;
-      let luxorSubaccountsList: Subaccount[] = [];
-      if (responseData && Array.isArray(responseData.subaccounts)) {
-        luxorSubaccountsList = (
-          responseData.subaccounts as Array<Record<string, unknown>>
-        ).map(
-          (sub) =>
-            ({
-              id: Number(sub.id || 0),
-              name: String(sub.name || ""),
-            }) as Subaccount,
-        );
-      }
-
-      const dbResponse = await fetch("/api/user/subaccounts/existing");
-      let assignedNames: string[] = [];
-      if (dbResponse.ok) {
-        const dbData = await dbResponse.json();
-        if (dbData.success && Array.isArray(dbData.data)) {
-          assignedNames = dbData.data.map(
-            (item: { luxorSubaccountName: string }) => item.luxorSubaccountName,
-          );
-        }
-      }
-
-      setSubaccounts(
-        luxorSubaccountsList.filter(
-          (sub) =>
-            !assignedNames.includes(sub.name) ||
-            sub.name === request?.luxorSubaccountName,
-        ),
-      );
-    } catch (err) {
-      setSubaccountsError(
-        err instanceof Error ? err.message : "Failed to fetch subaccounts",
-      );
-      setSubaccounts([]);
-    } finally {
-      setFetchingSubaccounts(false);
-    }
-  };
 
   const handleApprove = async () => {
     if (!request) return;
@@ -163,7 +86,7 @@ export default function CustomerRequestReviewModal({
       setError("Email is required");
       return;
     }
-    if (!formData.luxorSubaccountName) {
+    if (formData.luxorSubaccountNames.length === 0) {
       setError("Please select a Luxor subaccount");
       return;
     }
@@ -179,7 +102,7 @@ export default function CustomerRequestReviewModal({
             name: formData.name.trim(),
             email: formData.email.trim(),
             phoneNumber: formData.phoneNumber.trim() || null,
-            luxorSubaccountName: formData.luxorSubaccountName,
+            luxorSubaccountNames: formData.luxorSubaccountNames,
             initialDeposit: formData.initialDeposit
               ? parseFloat(formData.initialDeposit)
               : null,
@@ -325,42 +248,18 @@ export default function CustomerRequestReviewModal({
             disabled={!isPending}
           />
 
-          <FormControl fullWidth required disabled={!isPending}>
-            <InputLabel id="review-subaccount-label">
-              Luxor Subaccount
-            </InputLabel>
-            <Select
-              labelId="review-subaccount-label"
-              label="Luxor Subaccount"
-              value={formData.luxorSubaccountName}
-              onChange={(e) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  luxorSubaccountName: e.target.value,
-                }))
-              }
-              disabled={!isPending || fetchingSubaccounts}
-            >
-              {formData.luxorSubaccountName &&
-                !subaccounts.some(
-                  (sub) => sub.name === formData.luxorSubaccountName,
-                ) && (
-                  <MenuItem value={formData.luxorSubaccountName}>
-                    {formData.luxorSubaccountName}
-                  </MenuItem>
-                )}
-              {subaccounts.map((sub) => (
-                <MenuItem key={sub.id} value={sub.name}>
-                  {sub.name}
-                </MenuItem>
-              ))}
-            </Select>
-            {subaccountsError && (
-              <Alert severity="warning" sx={{ mt: 1 }}>
-                {subaccountsError}
-              </Alert>
-            )}
-          </FormControl>
+          <LuxorSubaccountMultiSelect
+            open={open && isPending}
+            value={formData.luxorSubaccountNames}
+            onChange={(names) =>
+              setFormData((prev) => ({
+                ...prev,
+                luxorSubaccountNames: names,
+              }))
+            }
+            required
+            disabled={!isPending}
+          />
 
           <TextField
             fullWidth
@@ -408,11 +307,7 @@ export default function CustomerRequestReviewModal({
                 "Reject Request"
               )}
             </Button>
-            <Button
-              onClick={handleApprove}
-              variant="contained"
-              disabled={busy || fetchingSubaccounts}
-            >
+            <Button onClick={handleApprove} variant="contained" disabled={busy}>
               {approving ? (
                 <CircularProgress size={20} color="inherit" />
               ) : (

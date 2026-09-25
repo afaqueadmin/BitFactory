@@ -62,7 +62,7 @@ interface User {
   id: string;
   name: string | null;
   email: string;
-  luxorSubaccountName?: string | null;
+  luxorSubaccounts?: string[];
   segment?: string | null;
 }
 
@@ -766,7 +766,9 @@ export default function MinersTable({
                     {miner.user?.name || miner.user?.email || "—"}
                   </TableCell>
                   <TableCell>
-                    {miner.user?.luxorSubaccountName || "—"}
+                    {miner.user?.luxorSubaccounts?.length
+                      ? miner.user.luxorSubaccounts.join(", ")
+                      : "—"}
                   </TableCell>
                   <TableCell>{miner.user?.segment || "—"}</TableCell>
                   <TableCell>

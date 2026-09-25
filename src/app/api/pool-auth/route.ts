@@ -14,6 +14,10 @@ import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
 import { AuditAction } from "@prisma/client";
 import { logPoolCredentialChange } from "@/lib/audit/logPoolCredentialChange";
+import {
+  SUBACCOUNT_TX_OPTIONS,
+  setLuxorSubaccounts,
+} from "@/lib/luxorSubaccounts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -120,7 +124,8 @@ export async function GET(
 /**
  * POST /api/pool-auth
  *
- * Create or update (upsert) a client's authentication credential for a pool.
+ * Add an authentication credential for a client on a pool. A client can hold
+ * several per pool (multiple Luxor subaccounts); each belongs to one client.
  *
  * Request body: { poolId: string, userId: string, authKey: string }
  */
@@ -187,44 +192,67 @@ export async function POST(
       );
     }
 
-    // A user can now hold more than one PoolAuth row per pool (multiple
-    // Luxor subaccounts), so this is a plain create rather than an upsert -
-    // only reject the exact same subaccount being added twice.
+    // A user can hold more than one PoolAuth row per pool (multiple Luxor
+    // subaccounts), but each subaccount/token belongs to exactly one user
+    // (@@unique([poolId, authKey])).
     const existingPoolAuth = await prisma.poolAuth.findUnique({
-      where: {
-        poolId_userId_authKey: { poolId, userId, authKey: authKey.trim() },
-      },
-      select: { id: true },
+      where: { poolId_authKey: { poolId, authKey: authKey.trim() } },
+      select: { userId: true },
     });
 
     if (existingPoolAuth) {
       return NextResponse.json<ApiResponse>(
         {
           success: false,
-          error: "This subaccount is already assigned to this user",
+          error:
+            existingPoolAuth.userId === userId
+              ? "This subaccount is already assigned to this user"
+              : "This subaccount is already assigned to another user",
         },
         { status: 409 },
       );
     }
 
-    const poolAuth = await prisma.poolAuth.create({
-      data: { poolId, userId, authKey: authKey.trim() },
-      select: {
-        id: true,
-        poolId: true,
-        userId: true,
-        authKey: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
-
-    await logPoolCredentialChange(prisma, {
-      action: AuditAction.POOL_CREDENTIAL_ADDED,
-      userId,
-      actorId: actorUserId,
-      poolName: pool.name,
-    });
+    const select = {
+      id: true,
+      poolId: true,
+      userId: true,
+      authKey: true,
+      createdAt: true,
+      updatedAt: true,
+    };
+    const poolAuth =
+      pool.name === "Luxor"
+        ? // Same path as the customer edit form, so the new subaccount joins
+          // the client's group under the same rules.
+          await prisma.$transaction(async (tx) => {
+            const current = await tx.poolAuth.findMany({
+              where: { poolId, userId },
+              select: { authKey: true },
+            });
+            await setLuxorSubaccounts(tx, {
+              userId,
+              names: [...current.map((c) => c.authKey), authKey.trim()],
+              actorId: actorUserId,
+            });
+            return tx.poolAuth.findUniqueOrThrow({
+              where: { poolId_authKey: { poolId, authKey: authKey.trim() } },
+              select,
+            });
+          }, SUBACCOUNT_TX_OPTIONS)
+        : await prisma.$transaction(async (tx) => {
+            const created = await tx.poolAuth.create({
+              data: { poolId, userId, authKey: authKey.trim() },
+              select,
+            });
+            await logPoolCredentialChange(tx, {
+              action: AuditAction.POOL_CREDENTIAL_ADDED,
+              userId,
+              actorId: actorUserId,
+              poolName: pool.name,
+            });
+            return created;
+          });
 
     console.log(
       `[PoolAuth API] POST: Created PoolAuth (pool: ${poolId}, user: ${userId})`,

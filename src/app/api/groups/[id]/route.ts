@@ -99,7 +99,11 @@ export async function GET(
                     name: true,
                     email: true,
                     role: true,
-                    luxorSubaccountName: true,
+                    poolAuths: {
+                      where: { pool: { name: "Luxor" } },
+                      orderBy: { createdAt: "asc" },
+                      select: { authKey: true },
+                    },
                     miners: {
                       where: { isDeleted: false },
                       select: { id: true },
@@ -114,7 +118,11 @@ export async function GET(
                 name: true,
                 email: true,
                 role: true,
-                luxorSubaccountName: true,
+                poolAuths: {
+                  where: { pool: { name: "Luxor" } },
+                  orderBy: { createdAt: "asc" },
+                  select: { authKey: true },
+                },
                 miners: {
                   where: { isDeleted: false },
                   select: { id: true },
@@ -164,8 +172,7 @@ export async function GET(
           name: member?.name || "Unknown",
           email: member?.email || "unknown@example.com",
           role: member?.role || "CLIENT",
-          luxorSubaccountName:
-            member?.luxorSubaccountName || groupSub.subaccountName || "",
+          luxorSubaccounts: member?.poolAuths.map((pa) => pa.authKey) ?? [],
         },
         minerCount: member?.miners.length || 0,
       };
@@ -203,7 +210,11 @@ export async function GET(
             name: true,
             email: true,
             role: true,
-            luxorSubaccountName: true,
+            poolAuths: {
+              where: { pool: { name: "Luxor" } },
+              orderBy: { createdAt: "asc" },
+              select: { authKey: true },
+            },
             miners: {
               where: { isDeleted: false },
               select: { id: true },
@@ -225,7 +236,7 @@ export async function GET(
           name: pa.user.name || "Unknown",
           email: pa.user.email || "unknown@example.com",
           role: pa.user.role,
-          luxorSubaccountName: pa.user.luxorSubaccountName || "",
+          luxorSubaccounts: pa.user.poolAuths.map((p) => p.authKey),
         },
         minerCount: pa.user.miners.length,
       }));
@@ -245,7 +256,11 @@ export async function GET(
         name: true,
         email: true,
         role: true,
-        luxorSubaccountName: true,
+        poolAuths: {
+          where: { pool: { name: "Luxor" } },
+          orderBy: { createdAt: "asc" },
+          select: { authKey: true },
+        },
         miners: { where: { isDeleted: false }, select: { id: true } },
       },
     });
@@ -260,7 +275,7 @@ export async function GET(
         name: u.name || "Unknown",
         email: u.email || "unknown@example.com",
         role: u.role,
-        luxorSubaccountName: u.luxorSubaccountName || "",
+        luxorSubaccounts: u.poolAuths.map((p) => p.authKey),
       },
       minerCount: u.miners.length,
     }));

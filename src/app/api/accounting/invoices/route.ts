@@ -418,15 +418,16 @@ export async function POST(request: NextRequest) {
     }
 
     // Fetch customer to get their Luxor identifier for the invoice number
-    // prefix. PoolAuth is the source of truth; luxorSubaccountName is a
-    // fallback for any row the dual-write hasn't caught up on.
+    // prefix - their oldest Luxor subaccount (PoolAuth), so it stays the same
+    // no matter how many more they're given later.
     const customer = await prisma.user.findUnique({
       where: { id: customerId },
       select: {
         name: true,
-        luxorSubaccountName: true,
         poolAuths: {
           where: { pool: { name: "Luxor" } },
+          orderBy: { createdAt: "asc" },
+          take: 1,
           select: { authKey: true },
         },
       },
@@ -444,7 +445,6 @@ export async function POST(request: NextRequest) {
     // human-readable instead of blocking invoice creation.
     const luxorIdentifier =
       customer.poolAuths[0]?.authKey ||
-      customer.luxorSubaccountName ||
       customer.name?.trim().split(/\s+/)[0] ||
       "Customer";
 

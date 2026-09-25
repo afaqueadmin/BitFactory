@@ -29,7 +29,7 @@ export const preferredRegion = "iad1";
  * - 200: Payment settings with addresses array
  * - 401: Unauthorized (no/invalid token)
  * - 404: User not found
- * - 422: User has no luxorSubaccountName configured
+ * - 422: User has no Luxor subaccount configured
  * - 429: Luxor rate limit (include Retry-After header)
  * - 503: Luxor service unavailable or network error
  *
@@ -184,7 +184,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     // 4. Check if user has Luxor subaccount configured
     if (!luxorIdentifier) {
       console.warn(
-        "[Wallet API] User has no luxorSubaccountName configured:",
+        "[Wallet API] User has no Luxor subaccount configured:",
         userId,
       );
       return NextResponse.json(

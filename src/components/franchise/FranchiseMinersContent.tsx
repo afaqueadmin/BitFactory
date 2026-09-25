@@ -27,7 +27,7 @@ interface MinerUser {
   id: string;
   name: string | null;
   email: string;
-  luxorSubaccountName?: string | null;
+  luxorSubaccounts?: string[];
   segment?: string | null;
 }
 

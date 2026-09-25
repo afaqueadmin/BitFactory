@@ -71,9 +71,11 @@ interface HostedMinersListProps {
   repairButtonLabel?: string;
   /**
    * Comma-separated Luxor subaccounts to scope worker status to, or "all".
-   * Only meaningful for the CLIENT's own /miners page (which has a
-   * SubaccountFilterProvider above it) - the admin customer-detail view
-   * doesn't pass this and gets every subaccount, same as before.
+   * On the CLIENT's own /miners page it's resolved server-side against the
+   * caller's own subaccounts. In the admin view (customerId set) the admin
+   * has no subaccounts of their own, so it must be the customer's explicit
+   * names - it's sent as subaccount_names, and an empty value skips the
+   * Luxor lookup rather than falling back to every worker on the site.
    */
   subaccountsParam?: string;
 }
@@ -194,16 +196,26 @@ export default function HostedMinersList({
           { status: string; hashrate: number; firmware: string }
         > = new Map();
         try {
-          const luxorUrl = `/api/luxor?endpoint=workers&currency=BTC&page_size=1000&subaccounts=${subaccountsParam}`;
+          const skipLuxor =
+            isAdminView && (!subaccountsParam || subaccountsParam === "all");
+          const luxorUrl = isAdminView
+            ? `/api/luxor?endpoint=workers&currency=BTC&page_size=1000&subaccount_names=${encodeURIComponent(subaccountsParam)}`
+            : `/api/luxor?endpoint=workers&currency=BTC&page_size=1000&subaccounts=${subaccountsParam}`;
 
-          const luxorResponse = await fetch(luxorUrl, {
-            method: "GET",
-            headers: {
-              "Content-Type": "application/json",
-            },
-          });
+          const luxorResponse = skipLuxor
+            ? null
+            : await fetch(luxorUrl, {
+                method: "GET",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+              });
 
-          if (luxorResponse.ok) {
+          if (!luxorResponse) {
+            console.log(
+              "[HostedMinersList] Customer has no Luxor subaccounts in view - skipping Luxor worker lookup",
+            );
+          } else if (luxorResponse.ok) {
             const luxorData = await luxorResponse.json();
             console.log(
               "[HostedMinersList] Luxor raw API response:",

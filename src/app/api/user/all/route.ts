@@ -76,7 +76,6 @@ export async function GET(request: NextRequest) {
         country: true,
         phoneNumber: true,
         companyName: true,
-        luxorSubaccountName: true,
         twoFactorAuth: { select: { enabled: true } },
         streetAddress: true,
         createdAt: true,
@@ -92,7 +91,9 @@ export async function GET(request: NextRequest) {
           },
         },
         poolAuths: {
+          orderBy: { createdAt: "asc" },
           select: {
+            authKey: true,
             pool: { select: { name: true } },
           },
         },
@@ -129,15 +130,12 @@ export async function GET(request: NextRequest) {
         country: user.country || "N/A",
         phoneNumber: user.phoneNumber || "N/A",
         companyName: user.companyName || "N/A",
-        // Not defaulted to "N/A" like the other display fields below: this
-        // value round-trips into EditCustomerModal's Luxor Subaccount select,
-        // which has a real "N/A (Unassigned)" option — feeding it a fake
-        // "N/A" here made that option look pre-selected, so saving the form
-        // without touching the field silently wrote "N/A" as a real
-        // subaccount and created a bogus Luxor PoolAuth.
-        luxorSubaccountName: user.luxorSubaccountName || "",
-        pools: user.poolAuths
-          .map((pa) => pa.pool.name)
+        // Luxor subaccount names only - never Braiins auth keys (tokens).
+        luxorSubaccounts: user.poolAuths
+          .filter((pa) => pa.pool.name === "Luxor")
+          .map((pa) => pa.authKey),
+        // Distinct pool names - a client can hold several Luxor subaccounts.
+        pools: Array.from(new Set(user.poolAuths.map((pa) => pa.pool.name)))
           .sort()
           .join(", "),
         twoFactorEnabled: user.twoFactorAuth?.enabled ?? false,
