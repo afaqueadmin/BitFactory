@@ -32,131 +32,26 @@ import CalendarMonthOutlinedIcon from "@mui/icons-material/CalendarMonthOutlined
 import DashboardHeader from "@/components/DashboardHeader";
 import FactoryStatusCard from "@/components/daylight/FactoryStatusCard";
 import StatCard from "@/components/daylight/StatCard";
+import Segmented from "@/components/daylight/Segmented";
+import PillTab from "@/components/daylight/PillTab";
 import MiningEarningsChart from "@/components/MiningEarningsChart";
 import { useUser } from "@/lib/hooks/useUser";
 import { formatValue } from "@/lib/helpers/formatValue";
 import { getDaysInCurrentMonth } from "@/lib/helpers/getDaysInCurrentMonth";
 import { useSubaccountFilter } from "@/lib/contexts/subaccountFilter-context";
-import { MQ, RADIUS_CARD, focusRing, useDaylight } from "@/lib/daylight";
+import { MQ, RADIUS_CARD, useDaylight } from "@/lib/daylight";
 
 type ChartMode = "total" | "luxor" | "braiins" | "sideBySide";
 type Granularity = "daily" | "monthly";
 
-/** Daylight segmented control (Daily / Monthly). */
-function Segmented({
-  value,
-  onChange,
-}: {
-  value: Granularity;
-  onChange: (next: Granularity) => void;
-}) {
-  const { d, fonts } = useDaylight();
-  const options: { id: Granularity; label: string; title: string }[] = [
-    { id: "daily", label: "Daily", title: "Show the last 31 days" },
-    { id: "monthly", label: "Monthly", title: "Show every fully-closed month" },
-  ];
-
-  return (
-    <Box
-      role="group"
-      aria-label="Chart granularity"
-      sx={{
-        display: "inline-flex",
-        gap: "3px",
-        p: "3px",
-        border: `1px solid ${d.border}`,
-        borderRadius: "8px",
-        bgcolor: d.canvas,
-      }}
-    >
-      {options.map((o) => {
-        const selected = value === o.id;
-        return (
-          <Box
-            component="button"
-            type="button"
-            key={o.id}
-            title={o.title}
-            aria-pressed={selected}
-            onClick={() => onChange(o.id)}
-            sx={{
-              border: 0,
-              borderRadius: "5px",
-              cursor: "pointer",
-              px: "12px",
-              minHeight: 32,
-              fontFamily: fonts.body,
-              fontSize: 11,
-              fontWeight: selected ? 650 : 500,
-              bgcolor: selected ? d.surface : "transparent",
-              color: selected ? d.action : d.muted,
-              boxShadow: selected ? `0 1px 4px ${d.border}` : "none",
-              "&:hover": { color: d.action },
-              "&:focus-visible": focusRing(d.action),
-              [MQ.mobile]: { minHeight: 44, px: "14px" },
-            }}
-          >
-            {o.label}
-          </Box>
-        );
-      })}
-    </Box>
-  );
-}
-
-/** Daylight tab (pool selector): soft-blue when active. */
-function PoolTab({
-  active,
-  onClick,
-  title,
-  dot,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  title: string;
-  dot?: string;
-  children: React.ReactNode;
-}) {
-  const { d, fonts } = useDaylight();
-  return (
-    <Box
-      component="button"
-      type="button"
-      title={title}
-      aria-pressed={active}
-      onClick={onClick}
-      sx={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: "7px",
-        border: 0,
-        borderRadius: "7px",
-        cursor: "pointer",
-        whiteSpace: "nowrap",
-        px: "12px",
-        minHeight: 40,
-        fontFamily: fonts.body,
-        fontSize: 11,
-        fontWeight: active ? 600 : 500,
-        bgcolor: active ? d.skySoft : "transparent",
-        color: active ? d.action : d.muted,
-        "&:hover": { bgcolor: active ? d.skySoft : d.hover },
-        "&:focus-visible": focusRing(d.action),
-        [MQ.mobile]: { minHeight: 44, px: "10px", fontSize: 10 },
-      }}
-    >
-      {dot && (
-        <Box
-          component="span"
-          aria-hidden
-          sx={{ width: 7, height: 7, borderRadius: "2px", bgcolor: dot }}
-        />
-      )}
-      {children}
-    </Box>
-  );
-}
+const GRANULARITY_OPTIONS = [
+  { id: "daily" as const, label: "Daily", title: "Show the last 31 days" },
+  {
+    id: "monthly" as const,
+    label: "Monthly",
+    title: "Show every fully-closed month",
+  },
+];
 
 export default function DashboardPage() {
   const { loading, error } = useUser();
@@ -609,7 +504,12 @@ export default function DashboardPage() {
               </Typography>
             </Box>
 
-            <Segmented value={granularity} onChange={setGranularity} />
+            <Segmented
+              value={granularity}
+              onChange={setGranularity}
+              options={GRANULARITY_OPTIONS}
+              ariaLabel="Chart granularity"
+            />
           </Box>
 
           {/* Pool selector - only when the customer has more than one pool */}
@@ -625,43 +525,43 @@ export default function DashboardPage() {
                 pt: "14px",
               }}
             >
-              <PoolTab
+              <PillTab
                 active={chartMode === "total"}
                 onClick={() => setChartMode("total")}
                 title="Show total earnings from all pools"
               >
                 All Pools
-              </PoolTab>
+              </PillTab>
 
               {workersStats.activePoolNames.includes("Luxor") && (
-                <PoolTab
+                <PillTab
                   active={chartMode === "luxor"}
                   onClick={() => setChartMode("luxor")}
                   title="Show Luxor pool earnings only"
                   dot={d.poolLuxor}
                 >
                   Luxor
-                </PoolTab>
+                </PillTab>
               )}
 
               {workersStats.activePoolNames.includes("Braiins") && (
-                <PoolTab
+                <PillTab
                   active={chartMode === "braiins"}
                   onClick={() => setChartMode("braiins")}
                   title="Show Braiins pool earnings only"
                   dot={d.poolBraiins}
                 >
                   Braiins
-                </PoolTab>
+                </PillTab>
               )}
 
-              <PoolTab
+              <PillTab
                 active={chartMode === "sideBySide"}
                 onClick={() => setChartMode("sideBySide")}
                 title="Show side-by-side comparison of both pools"
               >
                 Side by Side
-              </PoolTab>
+              </PillTab>
             </Box>
           )}
 

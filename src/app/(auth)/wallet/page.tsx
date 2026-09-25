@@ -1,15 +1,27 @@
 "use client";
 
+/**
+ * Wallet page (authenticated) - BitFactory Daylight theme (v1.3)
+ *
+ * Composes:
+ * - Page heading + pool mode Segmented control (Total / Luxor / Braiins)
+ * - Balance hero (Total Earnings, guide §5 gradient area) + Revenue (24h) /
+ *   Pending Payouts meta
+ * - Per-subaccount wallet address / payment frequency / next payout cards
+ * - ProfitLossChart (Daylight variant)
+ * - Statement download card
+ * - Wallet Change Requests (Daylight WalletChangeRequestHistory)
+ * - ElectricityCostTable (Daylight variant)
+ */
+
 import React, { useEffect, useState } from "react";
 import {
   Box,
   Typography,
-  Paper,
   CircularProgress,
   Button,
   TextField,
   Alert,
-  useTheme,
 } from "@mui/material";
 import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
 import ElectricityCostTable from "@/components/ElectricityCostTable";
@@ -17,12 +29,15 @@ import ProfitLossChart from "@/components/ProfitLossChart";
 import { useUser } from "@/lib/hooks/useUser";
 import { LuxorPaymentSettings } from "@/lib/types/wallet";
 import { useBitcoinLivePrice } from "@/components/useBitcoinLivePrice";
+import BtcPriceLabel from "@/components/BtcPriceLabel";
 import { useWalletChangeRequests } from "@/lib/hooks/useWalletChangeRequests";
 import RequestWalletChangeModal from "@/components/wallet/RequestWalletChangeModal";
 import WalletChangeRequestHistory from "@/components/wallet/WalletChangeRequestHistory";
 import WalletSubaccountCards from "@/components/wallet/WalletSubaccountCards";
 import { useFreezeRemaining } from "@/components/wallet/FreezeCountdown";
 import { useSubaccountFilter } from "@/lib/contexts/subaccountFilter-context";
+import Segmented, { SegmentedOption } from "@/components/daylight/Segmented";
+import { MQ, RADIUS_CARD, useDaylight } from "@/lib/daylight";
 
 interface PoolBreakdown {
   totalEarnings: number;
@@ -55,17 +70,22 @@ interface Revenue24h {
   };
 }
 
+type PoolMode = "total" | "luxor" | "braiins";
+
+const POOL_MODE_OPTIONS: SegmentedOption<PoolMode>[] = [
+  { id: "total", label: "Total" },
+  { id: "luxor", label: "Luxor" },
+  { id: "braiins", label: "Braiins" },
+];
+
 export default function WalletPage() {
-  const theme = useTheme();
-  const isDark = theme.palette.mode === "dark";
+  const { d, fonts } = useDaylight();
   const [summary, setSummary] = useState<EarningsSummary | null>(null);
   const [revenue24h, setRevenue24h] = useState<Revenue24h | null>(null);
   const [walletSubaccounts, setWalletSubaccounts] = useState<
     LuxorPaymentSettings[]
   >([]);
-  const [poolMode, setPoolMode] = useState<"total" | "luxor" | "braiins">(
-    "total",
-  );
+  const [poolMode, setPoolMode] = useState<PoolMode>("total");
   const [activePoolNames, setActivePoolNames] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [revenue24hLoading, setRevenue24hLoading] = useState(false);
@@ -101,26 +121,8 @@ export default function WalletPage() {
 
   const { user } = useUser();
   const { queryParam: subaccountsParam } = useSubaccountFilter();
-  // const theme = useTheme();
 
-  // // Fetch BTC price using TanStack Query
-  // const { data: btcLiveData, isLoading: btcPriceLoading, error: btcPriceError } = useQuery<BtcPrice>({
-  //   queryKey: ["btcprice"],
-  //   queryFn: async () => {
-  //     // const response = await fetch("/api/btcprice");
-  //     const response = await fetch(
-  //   "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT"
-  //     );
-  //     if (!response.ok) {
-  //       throw new Error("Failed to fetch BTC price");
-  //     }
-  //     return response.json();
-  //   },
-  //   staleTime: 1000 * 60 * 5, // 5 minutes
-  //   refetchInterval: 1000 * 60 * 5, // Refetch every 5 minutes. Enable this to fetch live data periodically
-  // });
   useEffect(() => {
-    // Fetch earnings summary from API
     const fetchEarningsSummary = async () => {
       try {
         setIsLoading(true);
@@ -139,7 +141,6 @@ export default function WalletPage() {
         const data: EarningsSummary = await response.json();
         setSummary(data);
         setActivePoolNames(data.activePoolNames || []);
-        console.log("[Wallet] Earnings summary loaded:", data);
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : "Unknown error";
@@ -150,11 +151,9 @@ export default function WalletPage() {
       }
     };
 
-    // Call the API immediately on component mount
     fetchEarningsSummary();
   }, [subaccountsParam]);
 
-  // Fetch 24-hour revenue from API
   useEffect(() => {
     const fetchRevenue24h = async () => {
       try {
@@ -174,7 +173,6 @@ export default function WalletPage() {
         const data: Revenue24h = await response.json();
         setRevenue24h(data);
         setActivePoolNames(data.activePoolNames || []);
-        console.log("[Wallet] 24h revenue loaded:", data);
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : "Unknown error";
@@ -185,11 +183,9 @@ export default function WalletPage() {
       }
     };
 
-    // Call the API immediately on component mount
     fetchRevenue24h();
   }, [subaccountsParam]);
 
-  // Fetch wallet settings from Luxor API
   useEffect(() => {
     const fetchWalletSettings = async () => {
       try {
@@ -217,7 +213,6 @@ export default function WalletPage() {
         const data = await response.json();
         if (data.success && (data.subaccounts || data.data)) {
           setWalletSubaccounts(data.subaccounts || [data.data]);
-          console.log("[Wallet] Settings loaded from Luxor:", data.subaccounts);
         } else {
           throw new Error(
             data.error || "Invalid response from wallet settings endpoint",
@@ -243,11 +238,11 @@ export default function WalletPage() {
     if (
       activePoolNames.length > 0 &&
       poolMode !== "total" &&
-      !activePoolNames.includes(poolMode)
+      !activePoolNames.includes(poolMode === "luxor" ? "Luxor" : "Braiins")
     ) {
       setPoolMode("total");
     }
-  }, [activePoolNames]);
+  }, [activePoolNames, poolMode]);
 
   // Helper functions to get values based on pool mode
   const getTotalEarnings = (): number => {
@@ -279,19 +274,28 @@ export default function WalletPage() {
     return 0;
   };
 
-  const { btcLiveData, BtcLivePriceComponent } = useBitcoinLivePrice();
+  const { btcLiveData } = useBitcoinLivePrice();
   const btcPriceUsd = btcLiveData?.price
     ? typeof btcLiveData.price === "string"
       ? parseFloat(btcLiveData.price)
       : btcLiveData.price
     : null;
 
+  const usdEquivalent = (btc: number) =>
+    btc && btcPriceUsd
+      ? (btc * btcPriceUsd).toLocaleString(undefined, {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        })
+      : "0.00";
+
+  const poolSuffix = poolMode !== "total" ? ` (${poolMode.toUpperCase()})` : "";
+
   // Handle statement download
   const handleDownloadStatement = async () => {
     try {
       setStatementError(null);
 
-      // Validate dates
       if (!statementStartDate || !statementEndDate) {
         setStatementError("Both start and end dates are required");
         return;
@@ -305,7 +309,6 @@ export default function WalletPage() {
         return;
       }
 
-      // Check 12-month limit
       const monthsDiff =
         (endDate.getFullYear() - startDate.getFullYear()) * 12 +
         (endDate.getMonth() - startDate.getMonth());
@@ -353,46 +356,58 @@ export default function WalletPage() {
     }
   };
 
-  return (
-    <Box
-      component="main"
+  const sectionHeading = (text: string) => (
+    <Typography
+      component="h2"
       sx={{
-        flexGrow: 1,
-        p: { xs: 1.5, sm: 2, md: 3 },
-        mt: { xs: 1, md: 2 },
-        backgroundColor: (theme) =>
-          theme.palette.mode === "light"
-            ? "#f8fafc"
-            : theme.palette.background.default,
-        minHeight: "100vh",
+        fontFamily: fonts.heading,
+        fontWeight: 750,
+        fontSize: 18,
+        letterSpacing: "-.035em",
+        color: d.text,
+        mb: "14px",
       }}
     >
-      {/* ── Page Header ────────────────────────────────────────────── */}
+      {text}
+    </Typography>
+  );
+
+  return (
+    <Box
+      sx={{ maxWidth: 1600, mx: "auto", fontFamily: fonts.body, color: d.text }}
+    >
+      {/* Page heading */}
       <Box
         sx={{
           display: "flex",
           justifyContent: "space-between",
-          alignItems: { xs: "stretch", sm: "flex-start" },
-          flexDirection: { xs: "column", sm: "row" },
-          gap: { xs: 1.5, sm: 2 },
-          mb: { xs: 2, md: 3 },
+          alignItems: "center",
+          flexWrap: "wrap",
+          gap: 2,
+          mb: { xs: "20px", md: "26px" },
         }}
       >
-        <Box>
+        <Box sx={{ minWidth: 0 }}>
           <Typography
-            variant="h4"
-            fontWeight="bold"
+            component="h1"
             sx={{
-              fontSize: { xs: "1.45rem", sm: "1.85rem", md: "2.125rem" },
-              letterSpacing: "-0.02em",
+              fontFamily: fonts.heading,
+              fontWeight: 750,
+              fontSize: { xs: 27, md: 32 },
+              lineHeight: 1.3,
+              letterSpacing: "-.035em",
+              color: d.text,
             }}
           >
             Wallet
           </Typography>
           <Typography
-            variant="body2"
-            color="text.secondary"
-            sx={{ fontSize: { xs: "0.8rem", sm: "0.875rem" } }}
+            sx={{
+              fontSize: { xs: 12, md: 13 },
+              lineHeight: { xs: 1.7, md: 1.5 },
+              color: d.muted,
+              mt: "7px",
+            }}
           >
             Overview of your mining earnings, payouts, and financial records.
           </Typography>
@@ -401,78 +416,26 @@ export default function WalletPage() {
         <Box
           sx={{
             display: "flex",
-            gap: 1.25,
+            gap: "10px",
             alignItems: "center",
             flexWrap: "wrap",
           }}
         >
           {activePoolNames.length > 1 && (
-            <Box
-              sx={{
-                display: "inline-flex",
-                p: 0.5,
-                borderRadius: 3,
-                backgroundColor: isDark
-                  ? "rgba(255, 255, 255, 0.05)"
-                  : "rgba(0, 0, 0, 0.04)",
-                border: `1px solid ${
-                  isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)"
-                }`,
-                gap: 0.5,
-              }}
-            >
-              {[
-                { key: "total", label: "Total" },
-                ...(activePoolNames.includes("Luxor")
-                  ? [{ key: "luxor", label: "🔷 Luxor" }]
-                  : []),
-                ...(activePoolNames.includes("Braiins")
-                  ? [{ key: "braiins", label: "🔶 Braiins" }]
-                  : []),
-              ].map((item) => {
-                const active = poolMode === item.key;
-                return (
-                  <Button
-                    key={item.key}
-                    size="small"
-                    onClick={() =>
-                      setPoolMode(item.key as "total" | "luxor" | "braiins")
-                    }
-                    sx={{
-                      px: { xs: 1.25, sm: 1.75 },
-                      py: { xs: 0.4, sm: 0.6 },
-                      borderRadius: 2.5,
-                      fontSize: { xs: "0.72rem", sm: "0.8rem" },
-                      fontWeight: active ? 700 : 500,
-                      textTransform: "none",
-                      color: active
-                        ? theme.palette.primary.contrastText
-                        : theme.palette.text.secondary,
-                      backgroundColor: active
-                        ? theme.palette.primary.main
-                        : "transparent",
-                      boxShadow: active
-                        ? "0 2px 8px rgba(0, 198, 255, 0.35)"
-                        : "none",
-                      "&:hover": {
-                        backgroundColor: active
-                          ? theme.palette.primary.dark
-                          : isDark
-                            ? "rgba(255,255,255,0.06)"
-                            : "rgba(0,0,0,0.04)",
-                      },
-                    }}
-                  >
-                    {item.label}
-                  </Button>
-                );
-              })}
-            </Box>
+            <Segmented
+              value={poolMode}
+              onChange={setPoolMode}
+              ariaLabel="Pool mode"
+              options={POOL_MODE_OPTIONS.filter(
+                (o) =>
+                  o.id === "total" ||
+                  activePoolNames.includes(
+                    o.id === "luxor" ? "Luxor" : "Braiins",
+                  ),
+              )}
+            />
           )}
-
-          <Box sx={{ width: { xs: "100%", sm: "auto" } }}>
-            {BtcLivePriceComponent}
-          </Box>
+          <BtcPriceLabel daylight />
         </Box>
       </Box>
 
@@ -482,233 +445,136 @@ export default function WalletPage() {
         </Alert>
       )}
 
-      {/* ── KPI Summary Cards ───────────────────────────────────────── */}
+      {/* Balance hero (guide §5): Total Earnings, with Revenue (24h) and
+          Pending Payouts as meta figures alongside it. */}
       <Box
         sx={{
-          display: "grid",
-          gridTemplateColumns: {
-            xs: "1fr",
-            sm: "repeat(2, 1fr)",
-            lg: "repeat(3, 1fr)",
-          },
-          gap: { xs: 1.5, sm: 2 },
-          mt: 2,
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "24px",
+          p: { xs: "22px", sm: "26px 30px" },
+          mb: { xs: "18px", sm: "22px" },
+          borderRadius: RADIUS_CARD,
+          background: "linear-gradient(110deg, #EDF8FF, #F0FAF6)",
+          border: "1px solid #D7EAF3",
         }}
       >
-        {/* Card 1: Total Earnings */}
-        <Paper
-          sx={{
-            p: { xs: 2, sm: 2.5 },
-            borderRadius: 3,
-            background: isDark
-              ? "linear-gradient(135deg, rgba(30, 58, 138, 0.85) 0%, rgba(15, 23, 42, 0.95) 100%)"
-              : "linear-gradient(135deg, #1e40af 0%, #3b82f6 100%)",
-            color: "white",
-            border: `1px solid ${
-              isDark ? "rgba(59, 130, 246, 0.3)" : "rgba(255,255,255,0.2)"
-            }`,
-            boxShadow: "0 4px 20px rgba(30, 64, 175, 0.15)",
-            position: "relative",
-            overflow: "hidden",
-          }}
-        >
-          <Typography
-            variant="caption"
-            sx={{
-              opacity: 0.85,
-              fontWeight: 600,
-              fontSize: { xs: "0.75rem", sm: "0.82rem" },
-              letterSpacing: "0.03em",
-              textTransform: "uppercase",
-              display: "block",
-            }}
-          >
-            Total Earnings{" "}
-            {poolMode !== "total" && `(${poolMode.toUpperCase()})`}
+        <Box>
+          <Typography sx={{ fontSize: 12, color: d.muted }}>
+            Total Earnings{poolSuffix}
           </Typography>
-
           {isLoading ? (
             <Box
-              sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1.5 }}
+              sx={{ display: "flex", alignItems: "center", gap: 1, mt: "8px" }}
             >
-              <CircularProgress size={18} sx={{ color: "white" }} />
-              <Typography variant="body2">Loading...</Typography>
+              <CircularProgress size={20} sx={{ color: d.action }} />
+              <Typography sx={{ fontSize: 13, color: d.muted }}>
+                Loading...
+              </Typography>
             </Box>
           ) : (
-            <Box sx={{ mt: 1 }}>
+            <>
               <Typography
                 sx={{
-                  fontWeight: 800,
-                  fontSize: { xs: "1.35rem", sm: "1.65rem" },
-                  letterSpacing: "-0.01em",
+                  fontFamily: fonts.heading,
+                  fontWeight: 750,
+                  fontSize: { xs: 32, sm: 40 },
+                  letterSpacing: "-1.5px",
+                  color: d.text,
+                  mt: "4px",
+                  fontVariantNumeric: "tabular-nums",
                 }}
               >
                 ₿ {getTotalEarnings().toFixed(8)}
               </Typography>
-              <Typography
-                sx={{
-                  fontWeight: 600,
-                  fontSize: { xs: "0.95rem", sm: "1.05rem" },
-                  opacity: 0.9,
-                  mt: 0.25,
-                }}
-              >
-                ≈ $
-                {getTotalEarnings() && btcLiveData?.price
-                  ? (getTotalEarnings() * btcLiveData.price).toLocaleString(
-                      undefined,
-                      { minimumFractionDigits: 2, maximumFractionDigits: 2 },
-                    )
-                  : "0.00"}
+              <Typography sx={{ fontSize: 12, color: d.muted, mt: "6px" }}>
+                ≈ ${usdEquivalent(getTotalEarnings())} USD
               </Typography>
-            </Box>
+            </>
           )}
-        </Paper>
+        </Box>
 
-        {/* Card 3: Revenue (24 Hours) */}
-        <Paper
+        <Box
           sx={{
-            p: { xs: 2, sm: 2.5 },
-            borderRadius: 3,
-            background: isDark
-              ? "linear-gradient(135deg, rgba(88, 28, 135, 0.85) 0%, rgba(15, 23, 42, 0.95) 100%)"
-              : "linear-gradient(135deg, #7c3aed 0%, #a855f7 100%)",
-            color: "white",
-            border: `1px solid ${
-              isDark ? "rgba(168, 85, 247, 0.3)" : "rgba(255,255,255,0.2)"
-            }`,
-            boxShadow: "0 4px 20px rgba(124, 58, 237, 0.15)",
+            display: "flex",
+            gap: { xs: "24px", sm: "40px" },
+            flexWrap: "wrap",
           }}
         >
-          <Typography
-            variant="caption"
-            sx={{
-              opacity: 0.85,
-              fontWeight: 600,
-              fontSize: { xs: "0.75rem", sm: "0.82rem" },
-              letterSpacing: "0.03em",
-              textTransform: "uppercase",
-              display: "block",
-            }}
-          >
-            Revenue (24 Hours){" "}
-            {poolMode !== "total" && `(${poolMode.toUpperCase()})`}
-          </Typography>
-
-          {revenue24hLoading ? (
-            <Box
-              sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1.5 }}
-            >
-              <CircularProgress size={18} sx={{ color: "white" }} />
-              <Typography variant="body2">Loading...</Typography>
-            </Box>
-          ) : revenue24hError ? (
-            <Typography variant="body2" sx={{ mt: 1.5 }}>
-              {revenue24hError}
+          <Box>
+            <Typography sx={{ fontSize: 11, color: d.muted }}>
+              Revenue (24h){poolSuffix}
             </Typography>
-          ) : (
-            <Box sx={{ mt: 1 }}>
-              <Typography
-                sx={{
-                  fontWeight: 800,
-                  fontSize: { xs: "1.35rem", sm: "1.65rem" },
-                  letterSpacing: "-0.01em",
-                }}
-              >
-                ₿ {getRevenue24h().toFixed(8)}
+            {revenue24hLoading ? (
+              <CircularProgress size={16} sx={{ color: d.action, mt: "8px" }} />
+            ) : revenue24hError ? (
+              <Typography sx={{ fontSize: 11, color: d.danger, mt: "8px" }}>
+                {revenue24hError}
               </Typography>
-              <Typography
-                sx={{
-                  fontWeight: 600,
-                  fontSize: { xs: "0.95rem", sm: "1.05rem" },
-                  opacity: 0.9,
-                  mt: 0.25,
-                }}
-              >
-                ≈ $
-                {getRevenue24h() && btcLiveData?.price
-                  ? (getRevenue24h() * btcLiveData.price).toLocaleString(
-                      undefined,
-                      { minimumFractionDigits: 2, maximumFractionDigits: 2 },
-                    )
-                  : "0.00"}
-              </Typography>
-            </Box>
-          )}
-        </Paper>
+            ) : (
+              <>
+                <Typography
+                  component="strong"
+                  sx={{
+                    display: "block",
+                    fontFamily: fonts.heading,
+                    fontWeight: 700,
+                    fontSize: 23,
+                    color: d.text,
+                    mt: "8px",
+                    fontVariantNumeric: "tabular-nums",
+                  }}
+                >
+                  ₿ {getRevenue24h().toFixed(8)}
+                </Typography>
+                <Typography
+                  component="small"
+                  sx={{ fontSize: 11, color: d.muted }}
+                >
+                  ≈ ${usdEquivalent(getRevenue24h())}
+                </Typography>
+              </>
+            )}
+          </Box>
 
-        {/* Card 4: Pending Payouts */}
-        <Paper
-          sx={{
-            p: { xs: 2, sm: 2.5 },
-            borderRadius: 3,
-            background: isDark
-              ? "linear-gradient(135deg, rgba(6, 78, 59, 0.85) 0%, rgba(15, 23, 42, 0.95) 100%)"
-              : "linear-gradient(135deg, #059669 0%, #10b981 100%)",
-            color: "white",
-            border: `1px solid ${
-              isDark ? "rgba(16, 185, 129, 0.3)" : "rgba(255,255,255,0.2)"
-            }`,
-            boxShadow: "0 4px 20px rgba(5, 150, 105, 0.15)",
-          }}
-        >
-          <Typography
-            variant="caption"
-            sx={{
-              opacity: 0.85,
-              fontWeight: 600,
-              fontSize: { xs: "0.75rem", sm: "0.82rem" },
-              letterSpacing: "0.03em",
-              textTransform: "uppercase",
-              display: "block",
-            }}
-          >
-            Pending Payouts{" "}
-            {poolMode !== "total" && `(${poolMode.toUpperCase()})`}
-          </Typography>
-
-          {isLoading ? (
-            <Box
-              sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1.5 }}
-            >
-              <CircularProgress size={18} sx={{ color: "white" }} />
-              <Typography variant="body2">Loading...</Typography>
-            </Box>
-          ) : (
-            <Box sx={{ mt: 1 }}>
-              <Typography
-                sx={{
-                  fontWeight: 800,
-                  fontSize: { xs: "1.35rem", sm: "1.65rem" },
-                  letterSpacing: "-0.01em",
-                }}
-              >
-                ₿ {getPendingPayouts().toFixed(8)}
-              </Typography>
-              <Typography
-                sx={{
-                  fontWeight: 600,
-                  fontSize: { xs: "0.95rem", sm: "1.05rem" },
-                  opacity: 0.9,
-                  mt: 0.25,
-                }}
-              >
-                ≈ $
-                {getPendingPayouts() && btcLiveData?.price
-                  ? (getPendingPayouts() * btcLiveData.price).toLocaleString(
-                      undefined,
-                      { minimumFractionDigits: 2, maximumFractionDigits: 2 },
-                    )
-                  : "0.00"}
-              </Typography>
-            </Box>
-          )}
-        </Paper>
+          <Box>
+            <Typography sx={{ fontSize: 11, color: d.muted }}>
+              Pending Payouts{poolSuffix}
+            </Typography>
+            {isLoading ? (
+              <CircularProgress size={16} sx={{ color: d.action, mt: "8px" }} />
+            ) : (
+              <>
+                <Typography
+                  component="strong"
+                  sx={{
+                    display: "block",
+                    fontFamily: fonts.heading,
+                    fontWeight: 700,
+                    fontSize: 23,
+                    color: d.text,
+                    mt: "8px",
+                    fontVariantNumeric: "tabular-nums",
+                  }}
+                >
+                  ₿ {getPendingPayouts().toFixed(8)}
+                </Typography>
+                <Typography
+                  component="small"
+                  sx={{ fontSize: 11, color: d.muted }}
+                >
+                  ≈ ${usdEquivalent(getPendingPayouts())}
+                </Typography>
+              </>
+            )}
+          </Box>
+        </Box>
       </Box>
 
       {/* Wallet address / payment frequency / next payout - one group per
-          Luxor subaccount currently in view, since each can have its own
-          payout address. */}
+          Luxor subaccount currently in view. */}
       {poolMode !== "braiins" && (
         <Box
           sx={{
@@ -718,8 +584,8 @@ export default function WalletPage() {
               sm: "repeat(2, 1fr)",
               lg: "repeat(3, 1fr)",
             },
-            gap: { xs: 1.5, sm: 2 },
-            mt: 2,
+            gap: { xs: "12px", sm: "16px" },
+            mb: { xs: "18px", sm: "22px" },
           }}
         >
           {walletLoading ? (
@@ -731,8 +597,8 @@ export default function WalletPage() {
                 gap: 1,
               }}
             >
-              <CircularProgress size={18} />
-              <Typography variant="body2">
+              <CircularProgress size={18} sx={{ color: d.action }} />
+              <Typography sx={{ fontSize: 13, color: d.muted }}>
                 Loading wallet settings...
               </Typography>
             </Box>
@@ -744,8 +610,9 @@ export default function WalletPage() {
             walletSubaccounts.map((settings) => (
               <WalletSubaccountCards
                 key={settings.subaccount?.id ?? settings.subaccount?.name}
+                daylight
                 settings={settings}
-                isDark={isDark}
+                isDark={false}
                 dimmed={false}
                 hasPendingWalletChange={hasPendingWalletChange}
                 isPayoutFrozen={isPayoutFrozen}
@@ -760,40 +627,57 @@ export default function WalletPage() {
 
       {/* Profit & Loss Overview */}
       <ProfitLossChart
+        daylight
         totalEarningsBtc={getTotalEarnings()}
         btcPriceUsd={btcPriceUsd}
       />
 
       {/* Statement Download Section */}
-      <Box sx={{ width: "100%", mt: { xs: 2.5, md: 4 } }}>
-        <Paper
+      <Box sx={{ width: "100%", mt: { xs: "20px", md: "26px" } }}>
+        <Box
           sx={{
-            p: { xs: 2, sm: 3 },
-            borderRadius: 3,
-            backgroundColor: isDark
-              ? "rgba(33, 150, 243, 0.06)"
-              : "rgba(33, 150, 243, 0.04)",
-            border: `1px solid ${
-              isDark ? "rgba(33, 150, 243, 0.2)" : "rgba(33, 150, 243, 0.15)"
-            }`,
-            borderLeft: "4px solid #2196f3",
+            p: { xs: "20px", sm: "24px" },
+            borderRadius: RADIUS_CARD,
+            bgcolor: d.surface,
+            border: `1px solid ${d.border}`,
+            boxShadow: d.shadow,
           }}
         >
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, mb: 1 }}>
-            <PictureAsPdfIcon sx={{ color: "primary.main", fontSize: 24 }} />
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: "12px",
+              mb: "6px",
+            }}
+          >
+            <Box
+              aria-hidden
+              sx={{
+                display: "grid",
+                placeItems: "center",
+                width: 33,
+                height: 33,
+                borderRadius: "8px",
+                bgcolor: d.skySoft,
+                color: d.action,
+                flexShrink: 0,
+              }}
+            >
+              <PictureAsPdfIcon sx={{ fontSize: 18 }} />
+            </Box>
             <Typography
-              variant="h6"
-              fontWeight="700"
-              sx={{ fontSize: { xs: "1rem", sm: "1.15rem" } }}
+              sx={{
+                fontFamily: fonts.heading,
+                fontWeight: 750,
+                fontSize: 16,
+                color: d.text,
+              }}
             >
               Download Account Statement
             </Typography>
           </Box>
-          <Typography
-            variant="body2"
-            color="text.secondary"
-            sx={{ mb: 2, fontSize: { xs: "0.8rem", sm: "0.875rem" } }}
-          >
+          <Typography sx={{ fontSize: 12, color: d.muted, mb: "18px" }}>
             Select a date range (max 12 months) to generate and download your
             account statement as PDF.
           </Typography>
@@ -808,7 +692,7 @@ export default function WalletPage() {
             sx={{
               display: "grid",
               gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr auto" },
-              gap: 1.5,
+              gap: "12px",
               alignItems: "flex-end",
             }}
           >
@@ -821,11 +705,20 @@ export default function WalletPage() {
                 setStatementError(null);
               }}
               slotProps={{ inputLabel: { shrink: true } }}
-              inputProps={{
-                max: new Date().toISOString().split("T")[0],
-              }}
+              inputProps={{ max: new Date().toISOString().split("T")[0] }}
               fullWidth
               size="small"
+              sx={{
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: "8px",
+                  bgcolor: d.surface,
+                  "& fieldset": { borderColor: d.inputBorder },
+                  "&:hover fieldset": { borderColor: d.action },
+                },
+                "& .MuiOutlinedInput-root.Mui-focused fieldset": {
+                  borderColor: d.action,
+                },
+              }}
             />
             <TextField
               label="End Date"
@@ -836,15 +729,23 @@ export default function WalletPage() {
                 setStatementError(null);
               }}
               slotProps={{ inputLabel: { shrink: true } }}
-              inputProps={{
-                max: new Date().toISOString().split("T")[0],
-              }}
+              inputProps={{ max: new Date().toISOString().split("T")[0] }}
               fullWidth
               size="small"
+              sx={{
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: "8px",
+                  bgcolor: d.surface,
+                  "& fieldset": { borderColor: d.inputBorder },
+                  "&:hover fieldset": { borderColor: d.action },
+                },
+                "& .MuiOutlinedInput-root.Mui-focused fieldset": {
+                  borderColor: d.action,
+                },
+              }}
             />
             <Button
               variant="contained"
-              color="primary"
               onClick={handleDownloadStatement}
               disabled={
                 statementDownloading || !statementStartDate || !statementEndDate
@@ -852,11 +753,15 @@ export default function WalletPage() {
               fullWidth
               sx={{
                 whiteSpace: "nowrap",
-                borderRadius: 2,
+                borderRadius: "8px",
                 py: { xs: 1, sm: 0.9 },
                 fontWeight: 600,
                 textTransform: "none",
-                boxShadow: "0 2px 8px rgba(0,198,255,0.3)",
+                fontFamily: fonts.body,
+                bgcolor: d.action,
+                boxShadow: "none",
+                "&:hover": { bgcolor: d.actionHover, boxShadow: "none" },
+                [MQ.mobile]: { minHeight: 44 },
               }}
             >
               {statementDownloading ? (
@@ -869,19 +774,13 @@ export default function WalletPage() {
               )}
             </Button>
           </Box>
-        </Paper>
+        </Box>
       </Box>
 
       {/* Wallet Change Requests */}
-      <Box sx={{ width: "100%", mt: { xs: 2.5, md: 4 } }}>
-        <Typography
-          variant="h6"
-          fontWeight="700"
-          sx={{ mb: 1.5, fontSize: { xs: "1rem", sm: "1.2rem" } }}
-        >
-          Wallet Change Requests
-        </Typography>
-        <WalletChangeRequestHistory />
+      <Box sx={{ width: "100%", mt: { xs: "20px", md: "26px" } }}>
+        {sectionHeading("Wallet Change Requests")}
+        <WalletChangeRequestHistory daylight />
       </Box>
 
       {requestChangeSubaccount && (
@@ -905,8 +804,8 @@ export default function WalletPage() {
         />
       )}
 
-      {/* Electricity Cost Table */}
-      <ElectricityCostTable />
+      {/* Electricity Cost Table - the component sets its own top margin */}
+      <ElectricityCostTable daylight />
     </Box>
   );
 }

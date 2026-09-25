@@ -23,6 +23,7 @@ import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import CheckIcon from "@mui/icons-material/Check";
 import { useWalletChangeRequests } from "@/lib/hooks/useWalletChangeRequests";
 import FreezeCountdown from "@/components/wallet/FreezeCountdown";
+import { RADIUS_CARD, useDaylight } from "@/lib/daylight";
 
 const STATUS_COLOR: Record<string, "warning" | "info" | "success" | "error"> = {
   PENDING: "warning",
@@ -31,8 +32,31 @@ const STATUS_COLOR: Record<string, "warning" | "info" | "success" | "error"> = {
   REJECTED: "error",
 };
 
-export default function WalletChangeRequestHistory() {
+/** Daylight soft-tone pill colours for a wallet change request's status. */
+function daylightStatusTone(
+  d: ReturnType<typeof useDaylight>["d"],
+  status: string,
+) {
+  switch (status) {
+    case "APPROVED":
+      return { bg: d.mint, text: d.success };
+    case "REJECTED":
+      return { bg: d.dangerSoft, text: d.danger };
+    case "CONFIRMED":
+      return { bg: d.skySoft, text: d.action };
+    default:
+      return { bg: d.amber, text: d.warning };
+  }
+}
+
+export default function WalletChangeRequestHistory({
+  daylight = false,
+}: {
+  /** Daylight styling: white card chrome, soft-tone status pills. */
+  daylight?: boolean;
+} = {}) {
   const theme = useTheme();
+  const { d, fonts } = useDaylight();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const isDark = theme.palette.mode === "dark";
   const { requests, loading, error } = useWalletChangeRequests();
@@ -47,7 +71,10 @@ export default function WalletChangeRequestHistory() {
   if (loading) {
     return (
       <Box sx={{ display: "flex", justifyContent: "center", p: 4 }}>
-        <CircularProgress size={24} />
+        <CircularProgress
+          size={24}
+          sx={daylight ? { color: d.action } : undefined}
+        />
       </Box>
     );
   }
@@ -67,13 +94,20 @@ export default function WalletChangeRequestHistory() {
         sx={{
           p: 3,
           textAlign: "center",
-          borderRadius: 2,
-          backgroundColor: isDark
-            ? "rgba(255, 255, 255, 0.02)"
-            : "rgba(0, 0, 0, 0.01)",
+          borderRadius: daylight ? RADIUS_CARD : 2,
+          backgroundColor: daylight
+            ? d.canvas
+            : isDark
+              ? "rgba(255, 255, 255, 0.02)"
+              : "rgba(0, 0, 0, 0.01)",
+          borderColor: daylight ? d.border : undefined,
         }}
       >
-        <Typography variant="body2" color="text.secondary">
+        <Typography
+          variant="body2"
+          color="text.secondary"
+          sx={daylight ? { fontFamily: fonts.body, color: d.muted } : undefined}
+        >
           No wallet change requests yet.
         </Typography>
       </Paper>
@@ -90,13 +124,21 @@ export default function WalletChangeRequestHistory() {
             variant="outlined"
             sx={{
               p: 2,
-              borderRadius: 2.5,
-              backgroundColor: isDark
-                ? "rgba(255, 255, 255, 0.03)"
-                : "rgba(0, 0, 0, 0.015)",
+              borderRadius: daylight ? RADIUS_CARD : 2.5,
+              backgroundColor: daylight
+                ? d.surface
+                : isDark
+                  ? "rgba(255, 255, 255, 0.03)"
+                  : "rgba(0, 0, 0, 0.015)",
               border: `1px solid ${
-                isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)"
+                daylight
+                  ? d.border
+                  : isDark
+                    ? "rgba(255,255,255,0.08)"
+                    : "rgba(0,0,0,0.08)"
               }`,
+              boxShadow: daylight ? d.shadow : undefined,
+              fontFamily: daylight ? fonts.body : undefined,
             }}
           >
             <Box
@@ -121,8 +163,19 @@ export default function WalletChangeRequestHistory() {
               <Chip
                 label={req.status}
                 size="small"
-                color={STATUS_COLOR[req.status] || "default"}
-                sx={{ fontWeight: 700, fontSize: "0.7rem", height: 22 }}
+                color={
+                  daylight ? undefined : STATUS_COLOR[req.status] || "default"
+                }
+                sx={{
+                  fontWeight: 700,
+                  fontSize: "0.7rem",
+                  height: 22,
+                  ...(daylight && {
+                    fontFamily: fonts.body,
+                    backgroundColor: daylightStatusTone(d, req.status).bg,
+                    color: daylightStatusTone(d, req.status).text,
+                  }),
+                }}
               />
             </Box>
 
@@ -149,12 +202,15 @@ export default function WalletChangeRequestHistory() {
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "space-between",
-                  backgroundColor: isDark
-                    ? "rgba(0,0,0,0.3)"
-                    : "rgba(0,0,0,0.04)",
+                  backgroundColor: daylight
+                    ? d.canvas
+                    : isDark
+                      ? "rgba(0,0,0,0.3)"
+                      : "rgba(0,0,0,0.04)",
                   p: 0.75,
-                  borderRadius: 1.5,
+                  borderRadius: daylight ? "8px" : 1.5,
                   mt: 0.25,
+                  ...(daylight && { border: `1px solid ${d.border}` }),
                 }}
               >
                 <Typography
@@ -231,14 +287,23 @@ export default function WalletChangeRequestHistory() {
                   mt: 1,
                   p: 1,
                   borderRadius: 1.5,
-                  backgroundColor: alpha(theme.palette.error.main, 0.1),
-                  border: `1px solid ${alpha(theme.palette.error.main, 0.2)}`,
+                  backgroundColor: daylight
+                    ? d.dangerSoft
+                    : alpha(theme.palette.error.main, 0.1),
+                  border: `1px solid ${daylight ? d.borderDanger : alpha(theme.palette.error.main, 0.2)}`,
                 }}
               >
                 <Typography
                   variant="caption"
-                  color="error.main"
-                  sx={{ fontWeight: 600, display: "block" }}
+                  color={daylight ? undefined : "error.main"}
+                  sx={{
+                    fontWeight: 600,
+                    display: "block",
+                    ...(daylight && {
+                      fontFamily: fonts.body,
+                      color: d.danger,
+                    }),
+                  }}
                 >
                   Reason: {req.rejectionReason}
                 </Typography>
@@ -260,24 +325,70 @@ export default function WalletChangeRequestHistory() {
       component={Paper}
       variant="outlined"
       sx={{
-        borderRadius: 2.5,
+        borderRadius: daylight ? RADIUS_CARD : 2.5,
         overflow: "hidden",
+        ...(daylight && {
+          backgroundColor: d.surface,
+          borderColor: d.border,
+          boxShadow: d.shadow,
+          fontFamily: fonts.body,
+        }),
       }}
     >
       <Table size="small">
         <TableHead>
-          <TableRow sx={{ backgroundColor: theme.palette.action.hover }}>
-            <TableCell sx={{ fontWeight: 700 }}>Requested</TableCell>
-            <TableCell sx={{ fontWeight: 700 }}>Subaccount</TableCell>
-            <TableCell sx={{ fontWeight: 700 }}>Previous Address</TableCell>
-            <TableCell sx={{ fontWeight: 700 }}>New Address</TableCell>
-            <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
-            <TableCell sx={{ fontWeight: 700 }}>Reviewed</TableCell>
+          <TableRow
+            sx={{
+              backgroundColor: daylight
+                ? "#FBFCFD"
+                : theme.palette.action.hover,
+            }}
+          >
+            {[
+              "Requested",
+              "Subaccount",
+              "Previous Address",
+              "New Address",
+              "Status",
+              "Reviewed",
+            ].map((label) => (
+              <TableCell
+                key={label}
+                sx={{
+                  fontWeight: 700,
+                  ...(daylight && {
+                    fontFamily: fonts.body,
+                    color: d.muted,
+                    fontSize: 10,
+                    letterSpacing: ".015em",
+                    textTransform: "uppercase",
+                    borderBottomColor: d.border,
+                  }),
+                }}
+              >
+                {label}
+              </TableCell>
+            ))}
           </TableRow>
         </TableHead>
         <TableBody>
           {requests.map((req) => (
-            <TableRow key={req.id} hover>
+            <TableRow
+              key={req.id}
+              hover
+              sx={
+                daylight
+                  ? {
+                      fontFamily: fonts.body,
+                      "&:hover": { backgroundColor: d.hover },
+                      "& .MuiTableCell-root": {
+                        borderBottomColor: d.border,
+                        color: d.text,
+                      },
+                    }
+                  : undefined
+              }
+            >
               <TableCell>
                 {new Date(req.createdAt).toLocaleDateString("en-US", {
                   year: "numeric",
@@ -298,8 +409,17 @@ export default function WalletChangeRequestHistory() {
                 <Chip
                   label={req.status}
                   size="small"
-                  color={STATUS_COLOR[req.status] || "default"}
-                  sx={{ fontWeight: 600 }}
+                  color={
+                    daylight ? undefined : STATUS_COLOR[req.status] || "default"
+                  }
+                  sx={{
+                    fontWeight: 600,
+                    ...(daylight && {
+                      fontFamily: fonts.body,
+                      backgroundColor: daylightStatusTone(d, req.status).bg,
+                      color: daylightStatusTone(d, req.status).text,
+                    }),
+                  }}
                 />
                 {req.status === "REJECTED" && req.rejectionReason && (
                   <Typography

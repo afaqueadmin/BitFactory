@@ -20,6 +20,7 @@ import {
   Alert,
 } from "@mui/material";
 import { formatValue } from "@/lib/helpers/formatValue";
+import { RADIUS_CARD, useDaylight } from "@/lib/daylight";
 
 interface ProfitLossTotals {
   electricityCostTotal: number;
@@ -34,6 +35,10 @@ interface ProfitLossResponse {
 interface ProfitLossChartProps {
   totalEarningsBtc: number;
   btcPriceUsd: number | null | undefined;
+  /** Daylight styling: white card chrome, Manrope/Inter fonts. Bar colours
+   * (electricity/hardware/revenue) are left as-is - they're a semantic
+   * category key, not a brand accent. */
+  daylight?: boolean;
 }
 
 const COLOR_ELECTRICITY = "#ffb300";
@@ -45,10 +50,12 @@ const COLOR_LOSS = "#f44336";
 export default function ProfitLossChart({
   totalEarningsBtc,
   btcPriceUsd,
+  daylight = false,
 }: ProfitLossChartProps) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const isDark = theme.palette.mode === "dark";
+  const { d, fonts } = useDaylight();
   const [data, setData] = useState<ProfitLossResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -132,23 +139,42 @@ export default function ProfitLossChart({
         p: { xs: 1.75, sm: 3 },
         width: "100%",
         mt: { xs: 2, md: 3 },
-        borderRadius: 3,
+        borderRadius: daylight ? RADIUS_CARD : 3,
+        backgroundColor: daylight ? d.surface : undefined,
+        backgroundImage: daylight ? "none" : undefined,
         border: `1px solid ${
-          isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)"
+          daylight
+            ? d.border
+            : isDark
+              ? "rgba(255, 255, 255, 0.08)"
+              : "rgba(0, 0, 0, 0.06)"
         }`,
+        boxShadow: daylight ? d.shadow : undefined,
+        fontFamily: daylight ? fonts.body : undefined,
       }}
     >
       <Typography
         variant="h6"
         fontWeight="700"
-        sx={{ mb: 2, fontSize: { xs: "1rem", sm: "1.2rem" } }}
+        sx={{
+          mb: 2,
+          fontSize: { xs: "1rem", sm: "1.2rem" },
+          ...(daylight && {
+            fontFamily: fonts.heading,
+            fontWeight: 750,
+            color: d.text,
+          }),
+        }}
       >
         Profit &amp; Loss
       </Typography>
 
       {loading ? (
         <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
-          <CircularProgress size={28} />
+          <CircularProgress
+            size={28}
+            sx={daylight ? { color: d.action } : undefined}
+          />
         </Box>
       ) : error ? (
         <Alert severity="error">{error}</Alert>
@@ -173,11 +199,17 @@ export default function ProfitLossChart({
                 sx={{
                   p: { xs: 1, sm: 1.25 },
                   borderRadius: 2,
-                  backgroundColor: isDark
-                    ? "rgba(255, 255, 255, 0.03)"
-                    : "rgba(0, 0, 0, 0.02)",
+                  backgroundColor: daylight
+                    ? d.canvas
+                    : isDark
+                      ? "rgba(255, 255, 255, 0.03)"
+                      : "rgba(0, 0, 0, 0.02)",
                   border: `1px solid ${
-                    isDark ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.04)"
+                    daylight
+                      ? d.border
+                      : isDark
+                        ? "rgba(255, 255, 255, 0.06)"
+                        : "rgba(0, 0, 0, 0.04)"
                   }`,
                   borderLeft: card.color
                     ? `3px solid ${card.color}`
@@ -194,6 +226,7 @@ export default function ProfitLossChart({
                     fontSize: { xs: "0.68rem", sm: "0.75rem" },
                     display: "block",
                     fontWeight: 500,
+                    ...(daylight && { fontFamily: fonts.body, color: d.muted }),
                   }}
                 >
                   {card.label}
@@ -205,6 +238,7 @@ export default function ProfitLossChart({
                     color: card.color,
                     fontSize: { xs: "0.9rem", sm: "1.05rem" },
                     mt: 0.25,
+                    ...(daylight && { fontFamily: fonts.body }),
                   }}
                 >
                   {formatValue(card.value, "currency")}
@@ -235,7 +269,13 @@ export default function ProfitLossChart({
               >
                 <CartesianGrid
                   horizontal={false}
-                  stroke={isDark ? "rgba(255,255,255,0.08)" : "#e8e8e8"}
+                  stroke={
+                    daylight
+                      ? d.border
+                      : isDark
+                        ? "rgba(255,255,255,0.08)"
+                        : "#e8e8e8"
+                  }
                 />
                 <XAxis
                   type="number"
@@ -245,38 +285,51 @@ export default function ProfitLossChart({
                   }
                   tick={{
                     fontSize: isMobile ? 10 : 12,
-                    fill: theme.palette.text.secondary,
+                    fill: daylight ? d.muted : theme.palette.text.secondary,
+                    ...(daylight && { fontFamily: fonts.body }),
                   }}
-                  axisLine={{ stroke: theme.palette.divider }}
+                  axisLine={{
+                    stroke: daylight ? d.border : theme.palette.divider,
+                  }}
                   tickLine={false}
                   label={{
                     value: "USD",
                     position: "insideBottomRight",
                     offset: -5,
                     fontSize: 10,
-                    fill: theme.palette.text.secondary,
+                    fill: daylight ? d.muted : theme.palette.text.secondary,
                   }}
                 />
                 <YAxis
                   dataKey="name"
                   type="category"
-                  axisLine={{ stroke: theme.palette.divider }}
+                  axisLine={{
+                    stroke: daylight ? d.border : theme.palette.divider,
+                  }}
                   tickLine={false}
                   width={isMobile ? 76 : 90}
                   tick={{
                     fontSize: isMobile ? 11 : 13,
-                    fill: theme.palette.text.primary,
+                    fill: daylight ? d.text : theme.palette.text.primary,
                     fontWeight: 600,
+                    ...(daylight && { fontFamily: fonts.body }),
                   }}
                 />
                 <Tooltip
                   formatter={(value) => formatValue(Number(value), "currency")}
                   contentStyle={{
-                    backgroundColor: isDark ? "rgba(15, 23, 42, 0.95)" : "#fff",
-                    border: `1px solid ${theme.palette.divider}`,
+                    backgroundColor: daylight
+                      ? d.surface
+                      : isDark
+                        ? "rgba(15, 23, 42, 0.95)"
+                        : "#fff",
+                    border: `1px solid ${daylight ? d.border : theme.palette.divider}`,
                     borderRadius: 8,
                     fontSize: "0.8rem",
-                    boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
+                    boxShadow: daylight
+                      ? "0 8px 30px rgba(100,114,124,.13)"
+                      : "0 8px 24px rgba(0,0,0,0.15)",
+                    ...(daylight && { fontFamily: fonts.body }),
                   }}
                 />
                 <Bar
@@ -336,7 +389,11 @@ export default function ProfitLossChart({
                 <Typography
                   variant="caption"
                   color="text.secondary"
-                  sx={{ fontSize: "0.75rem", fontWeight: 500 }}
+                  sx={{
+                    fontSize: "0.75rem",
+                    fontWeight: 500,
+                    ...(daylight && { fontFamily: fonts.body, color: d.muted }),
+                  }}
                 >
                   {item.label}
                 </Typography>

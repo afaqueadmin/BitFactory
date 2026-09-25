@@ -67,6 +67,7 @@ import {
   Close as CloseIcon,
 } from "@mui/icons-material";
 import { useHashrateHistory } from "@/hooks/useHashrateHistory";
+import { RADIUS_CARD, useDaylight } from "@/lib/daylight";
 import {
   PERIODS,
   Period,
@@ -111,6 +112,10 @@ interface HashrateHistoryChartProps {
   height?: number;
   /** Comma-separated Luxor subaccounts to scope to, or "all" (default). */
   subaccountsParam?: string;
+  /** Daylight styling: white card chrome, Inter/Manrope fonts and neutral
+   * tokens. The pool/efficiency/uptime line colours are left untouched -
+   * they deliberately mirror Luxor's own watcher (see file header). */
+  daylight?: boolean;
 }
 
 interface ChartRow {
@@ -153,10 +158,12 @@ export default function HashrateHistoryChart({
   minerId,
   height = 380,
   subaccountsParam = "all",
+  daylight = false,
 }: HashrateHistoryChartProps) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const isDark = theme.palette.mode === "dark";
+  const { d, fonts } = useDaylight();
 
   const [period, setPeriod] = useState<Period | null>("1W");
   const [offset, setOffset] = useState(0);
@@ -589,10 +596,22 @@ export default function HashrateHistoryChart({
       sx={{
         p: { xs: 1.5, sm: 2.5 },
         mb: { xs: 2, md: 4 },
-        borderRadius: 2,
-        backgroundColor: isDark ? theme.palette.grey[900] : "#ffffff",
-        border: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)"}`,
+        borderRadius: daylight ? RADIUS_CARD : 2,
+        backgroundColor: daylight
+          ? d.surface
+          : isDark
+            ? theme.palette.grey[900]
+            : "#ffffff",
+        border: `1px solid ${
+          daylight
+            ? d.border
+            : isDark
+              ? "rgba(255,255,255,0.08)"
+              : "rgba(0,0,0,0.08)"
+        }`,
+        boxShadow: daylight ? d.shadow : "none",
         overflow: "auto",
+        fontFamily: daylight ? fonts.body : undefined,
       }}
     >
       {/* ── Toolbar ───────────────────────────────────────────────────── */}
@@ -616,9 +635,13 @@ export default function HashrateHistoryChart({
           <Typography
             variant="h6"
             sx={{
-              fontWeight: 700,
+              fontWeight: daylight ? 750 : 700,
               fontSize: { xs: "0.95rem", sm: "1.15rem" },
               letterSpacing: "-0.01em",
+              ...(daylight && {
+                fontFamily: fonts.heading,
+                color: d.text,
+              }),
             }}
           >
             {/* "A", "A & B", "A, B & C" — not "A & B & C". */}
@@ -641,7 +664,7 @@ export default function HashrateHistoryChart({
               sx={{
                 display: "flex",
                 borderRadius: 1.5,
-                border: `1px solid ${theme.palette.divider}`,
+                border: `1px solid ${daylight ? d.border : theme.palette.divider}`,
               }}
             >
               <MuiTooltip title="Chart view">
@@ -726,11 +749,30 @@ export default function HashrateHistoryChart({
                   minWidth: { xs: 32, sm: 42 },
                   px: { xs: 0.6, sm: 1.25 },
                   py: { xs: 0.4, sm: 0.6 },
-                  borderRadius: 2,
+                  borderRadius: daylight ? "7px" : 2,
                   fontSize: { xs: "0.68rem", sm: "0.75rem" },
                   fontWeight: period === p ? 700 : 500,
                   boxShadow:
                     period === p ? "0 2px 6px rgba(0,198,255,0.3)" : "none",
+                  ...(daylight && {
+                    fontFamily: fonts.body,
+                    textTransform: "none",
+                    ...(period === p
+                      ? {
+                          backgroundColor: d.action,
+                          borderColor: d.action,
+                          boxShadow: "none",
+                          "&:hover": { backgroundColor: d.actionHover },
+                        }
+                      : {
+                          color: d.muted,
+                          borderColor: d.border,
+                          "&:hover": {
+                            borderColor: d.action,
+                            backgroundColor: d.hover,
+                          },
+                        }),
+                  }),
                 }}
               >
                 {p}
@@ -748,8 +790,17 @@ export default function HashrateHistoryChart({
                 color={customRange ? "primary" : "default"}
                 sx={{
                   p: { xs: 0.4, sm: 0.6 },
-                  border: `1px solid ${customRange ? theme.palette.primary.main : theme.palette.divider}`,
-                  borderRadius: 2,
+                  border: `1px solid ${
+                    daylight
+                      ? customRange
+                        ? d.action
+                        : d.border
+                      : customRange
+                        ? theme.palette.primary.main
+                        : theme.palette.divider
+                  }`,
+                  borderRadius: daylight ? "7px" : 2,
+                  ...(daylight && { color: customRange ? d.action : d.muted }),
                 }}
               >
                 <DateRangeIcon sx={{ fontSize: { xs: 16, sm: 18 } }} />
@@ -762,11 +813,13 @@ export default function HashrateHistoryChart({
             sx={{
               display: "flex",
               alignItems: "center",
-              borderRadius: 2,
-              border: `1px solid ${theme.palette.divider}`,
-              backgroundColor: isDark
-                ? "rgba(255,255,255,0.03)"
-                : "rgba(0,0,0,0.02)",
+              borderRadius: daylight ? "7px" : 2,
+              border: `1px solid ${daylight ? d.border : theme.palette.divider}`,
+              backgroundColor: daylight
+                ? d.canvas
+                : isDark
+                  ? "rgba(255,255,255,0.03)"
+                  : "rgba(0,0,0,0.02)",
             }}
           >
             <IconButton
@@ -787,6 +840,7 @@ export default function HashrateHistoryChart({
                 whiteSpace: "nowrap",
                 fontSize: { xs: "0.72rem", sm: "0.82rem" },
                 fontWeight: 600,
+                ...(daylight && { fontFamily: fonts.body, color: d.text }),
               }}
             >
               {rangeLabel || "—"}
@@ -814,10 +868,13 @@ export default function HashrateHistoryChart({
             flexWrap: "wrap",
             mb: 2,
             p: 1.5,
-            borderRadius: 1.5,
-            backgroundColor: isDark
-              ? "rgba(255,255,255,0.04)"
-              : "rgba(0,0,0,0.03)",
+            borderRadius: daylight ? "8px" : 1.5,
+            backgroundColor: daylight
+              ? d.canvas
+              : isDark
+                ? "rgba(255,255,255,0.04)"
+                : "rgba(0,0,0,0.03)",
+            ...(daylight && { border: `1px solid ${d.border}` }),
           }}
         >
           <TextField
@@ -843,6 +900,21 @@ export default function HashrateHistoryChart({
             variant="contained"
             onClick={applyCustomRange}
             disabled={!draftFrom || !draftTo || draftFrom > draftTo}
+            sx={
+              daylight
+                ? {
+                    textTransform: "none",
+                    borderRadius: "8px",
+                    fontFamily: fonts.body,
+                    backgroundColor: d.action,
+                    boxShadow: "none",
+                    "&:hover": {
+                      backgroundColor: d.actionHover,
+                      boxShadow: "none",
+                    },
+                  }
+                : undefined
+            }
           >
             Apply
           </Button>
@@ -852,11 +924,32 @@ export default function HashrateHistoryChart({
               variant="outlined"
               startIcon={<CloseIcon fontSize="small" />}
               onClick={clearCustomRange}
+              sx={
+                daylight
+                  ? {
+                      textTransform: "none",
+                      borderRadius: "8px",
+                      fontFamily: fonts.body,
+                      color: d.muted,
+                      borderColor: d.border,
+                      "&:hover": {
+                        borderColor: d.action,
+                        backgroundColor: d.hover,
+                      },
+                    }
+                  : undefined
+              }
             >
               Clear
             </Button>
           )}
-          <Typography variant="caption" color="text.secondary">
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={
+              daylight ? { fontFamily: fonts.body, color: d.muted } : undefined
+            }
+          >
             Resolution is picked from the span: 5-minute within the last week,
             hourly within the last month, daily beyond.
           </Typography>
@@ -875,13 +968,20 @@ export default function HashrateHistoryChart({
             gap: { xs: 1, sm: 1.5 },
             mb: { xs: 1.75, sm: 2 },
             p: { xs: 1.25, sm: 1.5 },
-            borderRadius: 2,
-            backgroundColor: isDark
-              ? "rgba(255, 255, 255, 0.03)"
-              : "rgba(0, 0, 0, 0.02)",
+            borderRadius: daylight ? "8px" : 2,
+            backgroundColor: daylight
+              ? d.canvas
+              : isDark
+                ? "rgba(255, 255, 255, 0.03)"
+                : "rgba(0, 0, 0, 0.02)",
             border: `1px solid ${
-              isDark ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.05)"
+              daylight
+                ? d.border
+                : isDark
+                  ? "rgba(255, 255, 255, 0.06)"
+                  : "rgba(0, 0, 0, 0.05)"
             }`,
+            ...(daylight && { fontFamily: fonts.body }),
           }}
         >
           <Box>
@@ -901,8 +1001,9 @@ export default function HashrateHistoryChart({
               sx={{
                 fontWeight: 700,
                 fontSize: { xs: "0.85rem", sm: "0.95rem" },
-                color: theme.palette.text.primary,
+                color: daylight ? d.text : theme.palette.text.primary,
                 mt: 0.25,
+                ...(daylight && { fontFamily: fonts.body }),
               }}
             >
               {(() => {
@@ -931,8 +1032,9 @@ export default function HashrateHistoryChart({
               sx={{
                 fontWeight: 700,
                 fontSize: { xs: "0.85rem", sm: "0.95rem" },
-                color: "primary.main",
+                color: daylight ? d.action : "primary.main",
                 mt: 0.25,
+                ...(daylight && { fontFamily: fonts.body }),
               }}
             >
               {(() => {
@@ -1007,8 +1109,18 @@ export default function HashrateHistoryChart({
             gap: 1.5,
           }}
         >
-          <CircularProgress size={32} thickness={4} />
-          <Typography variant="caption" color="text.secondary">
+          <CircularProgress
+            size={32}
+            thickness={4}
+            sx={daylight ? { color: d.action } : undefined}
+          />
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={
+              daylight ? { fontFamily: fonts.body, color: d.muted } : undefined
+            }
+          >
             Loading hashrate history...
           </Typography>
         </Box>
@@ -1023,7 +1135,12 @@ export default function HashrateHistoryChart({
             height: chartHeight,
           }}
         >
-          <Typography color="text.secondary">
+          <Typography
+            color="text.secondary"
+            sx={
+              daylight ? { fontFamily: fonts.body, color: d.muted } : undefined
+            }
+          >
             No hashrate data for this period.
           </Typography>
         </Box>
@@ -1153,20 +1270,29 @@ export default function HashrateHistoryChart({
                   return (
                     <Box
                       sx={{
-                        backgroundColor: isDark
-                          ? "rgba(15, 23, 42, 0.95)"
-                          : "rgba(255, 255, 255, 0.98)",
-                        backdropFilter: "blur(10px)",
+                        backgroundColor: daylight
+                          ? d.surface
+                          : isDark
+                            ? "rgba(15, 23, 42, 0.95)"
+                            : "rgba(255, 255, 255, 0.98)",
+                        backdropFilter: daylight ? "none" : "blur(10px)",
                         border: `1px solid ${
-                          isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.1)"
+                          daylight
+                            ? d.border
+                            : isDark
+                              ? "rgba(255,255,255,0.12)"
+                              : "rgba(0,0,0,0.1)"
                         }`,
-                        borderRadius: 2,
-                        boxShadow: isDark
-                          ? "0 8px 32px rgba(0,0,0,0.6)"
-                          : "0 8px 24px rgba(0,0,0,0.1)",
+                        borderRadius: daylight ? "10px" : 2,
+                        boxShadow: daylight
+                          ? "0 8px 30px rgba(100,114,124,.13)"
+                          : isDark
+                            ? "0 8px 32px rgba(0,0,0,0.6)"
+                            : "0 8px 24px rgba(0,0,0,0.1)",
                         px: 1.5,
                         py: 1,
                         minWidth: 140,
+                        ...(daylight && { fontFamily: fonts.body }),
                       }}
                     >
                       <Typography
@@ -1362,12 +1488,23 @@ export default function HashrateHistoryChart({
                     fontWeight: 500,
                     lineHeight: 1.5,
                     border: "1px solid",
-                    borderColor: off ? "divider" : item.color,
+                    borderColor: off
+                      ? daylight
+                        ? d.border
+                        : "divider"
+                      : item.color,
                     backgroundColor: off
                       ? "transparent"
                       : alpha(item.color, isDark ? 0.22 : 0.1),
-                    color: off ? "text.secondary" : "text.primary",
+                    color: off
+                      ? daylight
+                        ? d.muted
+                        : "text.secondary"
+                      : daylight
+                        ? d.text
+                        : "text.primary",
                     transition: "background-color .15s, border-color .15s",
+                    ...(daylight && { fontFamily: fonts.body }),
                     "&:hover": {
                       backgroundColor: alpha(item.color, isDark ? 0.3 : 0.18),
                       borderColor: item.color,
@@ -1381,7 +1518,9 @@ export default function HashrateHistoryChart({
                       borderTop: "3px",
                       borderTopStyle: item.dashed ? "dashed" : "solid",
                       borderTopColor: off
-                        ? theme.palette.action.disabled
+                        ? daylight
+                          ? d.border
+                          : theme.palette.action.disabled
                         : item.color,
                     }}
                   />
@@ -1467,7 +1606,10 @@ export default function HashrateHistoryChart({
               key={note}
               variant="caption"
               color="text.secondary"
-              sx={{ display: "block" }}
+              sx={{
+                display: "block",
+                ...(daylight && { fontFamily: fonts.body, color: d.muted }),
+              }}
             >
               {note}
             </Typography>

@@ -21,6 +21,7 @@ import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import CheckIcon from "@mui/icons-material/Check";
 import { LuxorPaymentSettings } from "@/lib/types/wallet";
 import { WalletChangeRequestItem } from "@/lib/hooks/useWalletChangeRequests";
+import { RADIUS_CARD, focusRing, useDaylight } from "@/lib/daylight";
 
 const toProperCase = (text: string): string => {
   if (!text) return "";
@@ -40,6 +41,9 @@ interface WalletSubaccountCardsProps {
   freezeLabel: string | null;
   activeWalletChangeRequest: WalletChangeRequestItem | undefined;
   onRequestChange: () => void;
+  /** Daylight styling: flat soft-tone cards instead of the saturated
+   * gradients (guide §4: "do not use gradients on KPI cards"). */
+  daylight?: boolean;
 }
 
 export default function WalletSubaccountCards({
@@ -51,8 +55,10 @@ export default function WalletSubaccountCards({
   freezeLabel,
   activeWalletChangeRequest,
   onRequestChange,
+  daylight = false,
 }: WalletSubaccountCardsProps) {
   const [copiedAddress, setCopiedAddress] = useState(false);
+  const { d, fonts } = useDaylight();
 
   const primaryAddress = (): string => {
     if (!settings.addresses || settings.addresses.length === 0) {
@@ -89,8 +95,9 @@ export default function WalletSubaccountCards({
         sx={{
           gridColumn: "1 / -1",
           fontWeight: 700,
-          opacity: 0.7,
+          opacity: daylight ? 1 : 0.7,
           mt: 1,
+          ...(daylight && { fontFamily: fonts.heading, color: d.text }),
         }}
       >
         {settings.subaccount?.name || "Subaccount"}
@@ -100,18 +107,25 @@ export default function WalletSubaccountCards({
       <Paper
         sx={{
           p: { xs: 2, sm: 2.5 },
-          borderRadius: 3,
-          background: isDark
-            ? "linear-gradient(135deg, rgba(120, 53, 15, 0.85) 0%, rgba(15, 23, 42, 0.95) 100%)"
-            : "linear-gradient(135deg, #d97706 0%, #f59e0b 100%)",
-          color: "white",
+          borderRadius: daylight ? RADIUS_CARD : 3,
+          background: daylight
+            ? d.skySoft
+            : isDark
+              ? "linear-gradient(135deg, rgba(120, 53, 15, 0.85) 0%, rgba(15, 23, 42, 0.95) 100%)"
+              : "linear-gradient(135deg, #d97706 0%, #f59e0b 100%)",
+          color: daylight ? d.text : "white",
           border: `1px solid ${
-            isDark ? "rgba(245, 158, 11, 0.3)" : "rgba(255,255,255,0.2)"
+            daylight
+              ? d.borderSky
+              : isDark
+                ? "rgba(245, 158, 11, 0.3)"
+                : "rgba(255,255,255,0.2)"
           }`,
-          boxShadow: "0 4px 20px rgba(217, 119, 6, 0.15)",
+          boxShadow: daylight ? d.shadow : "0 4px 20px rgba(217, 119, 6, 0.15)",
           opacity: dimmed ? 0.65 : 1,
           position: "relative",
           overflow: "hidden",
+          fontFamily: daylight ? fonts.body : undefined,
         }}
       >
         <Box
@@ -124,11 +138,12 @@ export default function WalletSubaccountCards({
           <Typography
             variant="caption"
             sx={{
-              opacity: 0.85,
+              opacity: daylight ? 1 : 0.85,
               fontWeight: 600,
               fontSize: { xs: "0.75rem", sm: "0.82rem" },
               letterSpacing: "0.03em",
               textTransform: "uppercase",
+              ...(daylight && { color: d.action }),
             }}
           >
             Wallet Address
@@ -138,15 +153,33 @@ export default function WalletSubaccountCards({
               <IconButton
                 size="small"
                 onClick={handleCopyAddress}
-                sx={{
-                  color: "white",
-                  p: 0.5,
-                  backgroundColor: "rgba(255,255,255,0.15)",
-                  "&:hover": { backgroundColor: "rgba(255,255,255,0.25)" },
-                }}
+                sx={
+                  daylight
+                    ? {
+                        color: d.action,
+                        p: 0.5,
+                        backgroundColor: d.surface,
+                        border: `1px solid ${d.borderSky}`,
+                        "&:hover": { backgroundColor: d.hover },
+                        "&:focus-visible": focusRing(d.action),
+                      }
+                    : {
+                        color: "white",
+                        p: 0.5,
+                        backgroundColor: "rgba(255,255,255,0.15)",
+                        "&:hover": {
+                          backgroundColor: "rgba(255,255,255,0.25)",
+                        },
+                      }
+                }
               >
                 {copiedAddress ? (
-                  <CheckIcon sx={{ fontSize: 16 }} />
+                  <CheckIcon
+                    sx={{
+                      fontSize: 16,
+                      color: daylight ? d.success : undefined,
+                    }}
+                  />
                 ) : (
                   <ContentCopyIcon sx={{ fontSize: 16 }} />
                 )}
@@ -163,9 +196,10 @@ export default function WalletSubaccountCards({
             fontFamily: "monospace",
             fontSize: { xs: "0.78rem", sm: "0.85rem" },
             lineHeight: 1.4,
-            backgroundColor: "rgba(0,0,0,0.15)",
+            backgroundColor: daylight ? d.surface : "rgba(0,0,0,0.15)",
             p: 0.75,
-            borderRadius: 1.5,
+            borderRadius: daylight ? "8px" : 1.5,
+            ...(daylight && { border: `1px solid ${d.border}`, color: d.text }),
           }}
         >
           {primaryAddress()}
@@ -177,10 +211,11 @@ export default function WalletSubaccountCards({
             sx={{
               mt: 1,
               display: "inline-block",
-              backgroundColor: "rgba(255,255,255,0.2)",
+              backgroundColor: daylight ? d.amber : "rgba(255,255,255,0.2)",
+              color: daylight ? d.warning : undefined,
               px: 1,
               py: 0.25,
-              borderRadius: 1,
+              borderRadius: daylight ? "999px" : 1,
               fontWeight: 600,
             }}
           >
@@ -197,17 +232,29 @@ export default function WalletSubaccountCards({
             onClick={onRequestChange}
             sx={{
               mt: 1,
-              color: "white",
-              borderColor: "rgba(255,255,255,0.5)",
-              borderRadius: 2,
+              borderRadius: daylight ? "8px" : 2,
               fontSize: "0.72rem",
               py: 0.3,
               textTransform: "none",
               fontWeight: 600,
-              "&:hover": {
-                borderColor: "white",
-                backgroundColor: "rgba(255,255,255,0.15)",
-              },
+              ...(daylight
+                ? {
+                    fontFamily: fonts.body,
+                    color: d.action,
+                    borderColor: d.action,
+                    "&:hover": {
+                      borderColor: d.actionHover,
+                      backgroundColor: d.hover,
+                    },
+                  }
+                : {
+                    color: "white",
+                    borderColor: "rgba(255,255,255,0.5)",
+                    "&:hover": {
+                      borderColor: "white",
+                      backgroundColor: "rgba(255,255,255,0.15)",
+                    },
+                  }),
             }}
           >
             Request Change
@@ -219,27 +266,35 @@ export default function WalletSubaccountCards({
       <Paper
         sx={{
           p: { xs: 2, sm: 2.5 },
-          borderRadius: 3,
-          background: isDark
-            ? "linear-gradient(135deg, rgba(124, 45, 18, 0.85) 0%, rgba(15, 23, 42, 0.95) 100%)"
-            : "linear-gradient(135deg, #ea580c 0%, #f97316 100%)",
-          color: "white",
+          borderRadius: daylight ? RADIUS_CARD : 3,
+          background: daylight
+            ? d.mint
+            : isDark
+              ? "linear-gradient(135deg, rgba(124, 45, 18, 0.85) 0%, rgba(15, 23, 42, 0.95) 100%)"
+              : "linear-gradient(135deg, #ea580c 0%, #f97316 100%)",
+          color: daylight ? d.text : "white",
           border: `1px solid ${
-            isDark ? "rgba(249, 115, 22, 0.3)" : "rgba(255,255,255,0.2)"
+            daylight
+              ? d.borderMint
+              : isDark
+                ? "rgba(249, 115, 22, 0.3)"
+                : "rgba(255,255,255,0.2)"
           }`,
-          boxShadow: "0 4px 20px rgba(234, 88, 12, 0.15)",
+          boxShadow: daylight ? d.shadow : "0 4px 20px rgba(234, 88, 12, 0.15)",
           opacity: dimmed ? 0.65 : 1,
+          fontFamily: daylight ? fonts.body : undefined,
         }}
       >
         <Typography
           variant="caption"
           sx={{
-            opacity: 0.85,
+            opacity: daylight ? 1 : 0.85,
             fontWeight: 600,
             fontSize: { xs: "0.75rem", sm: "0.82rem" },
             letterSpacing: "0.03em",
             textTransform: "uppercase",
             display: "block",
+            ...(daylight && { color: d.success }),
           }}
         >
           Payment Frequency
@@ -247,7 +302,11 @@ export default function WalletSubaccountCards({
 
         <Box sx={{ mt: 1 }}>
           <Typography
-            sx={{ fontWeight: 800, fontSize: { xs: "1.25rem", sm: "1.45rem" } }}
+            sx={{
+              fontWeight: 800,
+              fontSize: { xs: "1.25rem", sm: "1.45rem" },
+              ...(daylight && { fontFamily: fonts.heading, color: d.text }),
+            }}
           >
             {settings.payment_frequency
               ? toProperCase(settings.payment_frequency)
@@ -256,7 +315,12 @@ export default function WalletSubaccountCards({
           {settings.payment_frequency === "WEEKLY" && settings.day_of_week && (
             <Typography
               variant="caption"
-              sx={{ mt: 0.5, opacity: 0.9, display: "block" }}
+              sx={{
+                mt: 0.5,
+                opacity: daylight ? 1 : 0.9,
+                display: "block",
+                ...(daylight && { color: d.cardMuted }),
+              }}
             >
               Every {toProperCase(settings.day_of_week)}
             </Typography>
@@ -268,27 +332,37 @@ export default function WalletSubaccountCards({
       <Paper
         sx={{
           p: { xs: 2, sm: 2.5 },
-          borderRadius: 3,
-          background: isDark
-            ? "linear-gradient(135deg, rgba(19, 78, 74, 0.85) 0%, rgba(15, 23, 42, 0.95) 100%)"
-            : "linear-gradient(135deg, #0d9488 0%, #14b8a6 100%)",
-          color: "white",
+          borderRadius: daylight ? RADIUS_CARD : 3,
+          background: daylight
+            ? d.amber
+            : isDark
+              ? "linear-gradient(135deg, rgba(19, 78, 74, 0.85) 0%, rgba(15, 23, 42, 0.95) 100%)"
+              : "linear-gradient(135deg, #0d9488 0%, #14b8a6 100%)",
+          color: daylight ? d.text : "white",
           border: `1px solid ${
-            isDark ? "rgba(20, 184, 166, 0.3)" : "rgba(255,255,255,0.2)"
+            daylight
+              ? d.borderAmber
+              : isDark
+                ? "rgba(20, 184, 166, 0.3)"
+                : "rgba(255,255,255,0.2)"
           }`,
-          boxShadow: "0 4px 20px rgba(13, 148, 136, 0.15)",
+          boxShadow: daylight
+            ? d.shadow
+            : "0 4px 20px rgba(13, 148, 136, 0.15)",
           opacity: dimmed ? 0.65 : 1,
+          fontFamily: daylight ? fonts.body : undefined,
         }}
       >
         <Typography
           variant="caption"
           sx={{
-            opacity: 0.85,
+            opacity: daylight ? 1 : 0.85,
             fontWeight: 600,
             fontSize: { xs: "0.75rem", sm: "0.82rem" },
             letterSpacing: "0.03em",
             textTransform: "uppercase",
             display: "block",
+            ...(daylight && { color: d.warning }),
           }}
         >
           Next Payout
@@ -297,7 +371,11 @@ export default function WalletSubaccountCards({
         {payoutDate && twoHoursLaterPayoutDate ? (
           <Box sx={{ mt: 1 }}>
             <Typography
-              sx={{ fontWeight: 800, fontSize: { xs: "1.1rem", sm: "1.3rem" } }}
+              sx={{
+                fontWeight: 800,
+                fontSize: { xs: "1.1rem", sm: "1.3rem" },
+                ...(daylight && { fontFamily: fonts.heading, color: d.text }),
+              }}
             >
               {payoutDate.toLocaleDateString("en-US", {
                 weekday: "short",
@@ -308,7 +386,12 @@ export default function WalletSubaccountCards({
             </Typography>
             <Typography
               variant="caption"
-              sx={{ mt: 0.5, opacity: 0.9, display: "block" }}
+              sx={{
+                mt: 0.5,
+                opacity: daylight ? 1 : 0.9,
+                display: "block",
+                ...(daylight && { color: d.cardMuted }),
+              }}
             >
               {payoutDate.toLocaleTimeString("en-US", {
                 hour: "2-digit",
@@ -334,6 +417,7 @@ export default function WalletSubaccountCards({
               fontWeight: 700,
               fontSize: { xs: "1.1rem", sm: "1.25rem" },
               mt: 1,
+              ...(daylight && { fontFamily: fonts.heading, color: d.text }),
             }}
           >
             Not scheduled

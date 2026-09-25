@@ -22,6 +22,7 @@ import {
 import RepairNotesModal from "./admin/RepairNotesModal";
 import MinerPoolHistoryModal from "./admin/MinerPoolHistoryModal";
 import HashrateHistoryChart from "./HashrateHistoryChart";
+import { RADIUS_CARD, useDaylight } from "@/lib/daylight";
 
 // Types
 interface Hardware {
@@ -78,6 +79,9 @@ interface HostedMinersListProps {
    * Luxor lookup rather than falling back to every worker on the site.
    */
   subaccountsParam?: string;
+  /** Daylight styling: white cards, soft-tone status pills, Inter/Manrope
+   * fonts. Doesn't touch data-fetching or the repair/pool-history modals. */
+  daylight?: boolean;
 }
 
 export default function HostedMinersList({
@@ -85,8 +89,10 @@ export default function HostedMinersList({
   poolFilter = "all",
   repairButtonLabel = "🛠️ Previous Repair Notes",
   subaccountsParam = "all",
+  daylight = false,
 }: HostedMinersListProps) {
   const theme = useTheme();
+  const { d, fonts } = useDaylight();
   // Pool history is an admin-only view; this component is also rendered on
   // the client's own /miners page without a customerId, so gate on that.
   const isAdminView = !!customerId;
@@ -578,6 +584,35 @@ export default function HostedMinersList({
       textColor = theme.palette.secondary.main;
     }
 
+    if (daylight) {
+      // Guide §4: status badges are soft-tone pills - mint/success for
+      // healthy, red/danger for errors, amber/warning for in-progress,
+      // soft-blue/info for maintenance.
+      const tone =
+        status === "Active"
+          ? { bg: d.mint, text: d.success }
+          : status === "Deployment in Progress"
+            ? { bg: d.amber, text: d.warning }
+            : status === "Under Maintenance"
+              ? { bg: d.skySoft, text: d.action }
+              : { bg: d.dangerSoft, text: d.danger };
+
+      return (
+        <Chip
+          label={status}
+          size="small"
+          sx={{
+            backgroundColor: tone.bg,
+            color: tone.text,
+            fontFamily: fonts.body,
+            fontWeight: 550,
+            minWidth: "70px",
+            borderRadius: "20px",
+          }}
+        />
+      );
+    }
+
     return (
       <Chip
         label={status}
@@ -620,22 +655,46 @@ export default function HostedMinersList({
                 fontSize: { xs: "0.72rem", sm: "0.78rem" },
                 px: { xs: 1.25, sm: 1.75 },
                 py: { xs: 0.5, sm: 0.65 },
-                borderRadius: 2.5,
+                borderRadius: daylight ? "7px" : 2.5,
                 whiteSpace: "nowrap",
                 flexShrink: 0,
                 backgroundColor: active
-                  ? theme.palette.primary.main
-                  : theme.palette.mode === "dark"
-                    ? "rgba(255, 255, 255, 0.04)"
-                    : "rgba(0, 0, 0, 0.03)",
+                  ? daylight
+                    ? d.action
+                    : theme.palette.primary.main
+                  : daylight
+                    ? "transparent"
+                    : theme.palette.mode === "dark"
+                      ? "rgba(255, 255, 255, 0.04)"
+                      : "rgba(0, 0, 0, 0.03)",
                 color: active
-                  ? theme.palette.primary.contrastText
-                  : theme.palette.text.secondary,
+                  ? daylight
+                    ? "#fff"
+                    : theme.palette.primary.contrastText
+                  : daylight
+                    ? d.muted
+                    : theme.palette.text.secondary,
                 borderColor: active
-                  ? theme.palette.primary.main
-                  : theme.palette.divider,
-                boxShadow: active ? "0 2px 8px rgba(0, 198, 255, 0.3)" : "none",
+                  ? daylight
+                    ? d.action
+                    : theme.palette.primary.main
+                  : daylight
+                    ? d.border
+                    : theme.palette.divider,
+                boxShadow: active
+                  ? daylight
+                    ? "none"
+                    : "0 2px 8px rgba(0, 198, 255, 0.3)"
+                  : "none",
                 transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+                ...(daylight && {
+                  fontFamily: fonts.body,
+                  minHeight: 40,
+                  "&:hover": {
+                    backgroundColor: active ? d.actionHover : d.hover,
+                    borderColor: d.action,
+                  },
+                }),
               }}
             >
               {value} ({count})
@@ -655,11 +714,19 @@ export default function HostedMinersList({
               p: 6,
             }}
           >
-            <CircularProgress />
+            <CircularProgress sx={daylight ? { color: d.action } : undefined} />
           </Box>
         ) : filteredMiners.length === 0 ? (
           <Box sx={{ p: 4, textAlign: "center" }}>
-            <Typography variant="h6" color="text.secondary">
+            <Typography
+              variant="h6"
+              color="text.secondary"
+              sx={
+                daylight
+                  ? { fontFamily: fonts.body, color: d.muted }
+                  : undefined
+              }
+            >
               No miners found for the selected filter.
             </Typography>
           </Box>
@@ -671,10 +738,15 @@ export default function HostedMinersList({
               onChange={(_, isExpanded) => toggleExpanded(miner.id, isExpanded)}
               sx={{
                 mb: 1.5,
-                border: `1px solid ${alpha(theme.palette.divider, 0.12)}`,
-                borderRadius: "12px !important",
+                border: `1px solid ${daylight ? d.border : alpha(theme.palette.divider, 0.12)}`,
+                borderRadius: daylight
+                  ? `${RADIUS_CARD} !important`
+                  : "12px !important",
                 overflow: "hidden",
-                boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+                backgroundColor: daylight ? d.surface : undefined,
+                backgroundImage: daylight ? "none" : undefined,
+                boxShadow: daylight ? d.shadow : "0 2px 8px rgba(0,0,0,0.04)",
+                fontFamily: daylight ? fonts.body : undefined,
                 "&:before": {
                   display: "none",
                 },
@@ -712,6 +784,10 @@ export default function HostedMinersList({
                       sx={{
                         fontSize: { xs: "0.92rem", sm: "1.05rem" },
                         lineHeight: 1.3,
+                        ...(daylight && {
+                          fontFamily: fonts.heading,
+                          color: d.text,
+                        }),
                       }}
                     >
                       {miner.model}
@@ -731,21 +807,39 @@ export default function HostedMinersList({
                     <Typography
                       variant="caption"
                       color="text.secondary"
-                      sx={{ fontSize: { xs: "0.75rem", sm: "0.82rem" } }}
+                      sx={{
+                        fontSize: { xs: "0.75rem", sm: "0.82rem" },
+                        ...(daylight && {
+                          fontFamily: fonts.body,
+                          color: d.muted,
+                        }),
+                      }}
                     >
                       <strong>Worker:</strong> {miner.workerName}
                     </Typography>
                     <Typography
                       variant="caption"
                       color="text.secondary"
-                      sx={{ fontSize: { xs: "0.75rem", sm: "0.82rem" } }}
+                      sx={{
+                        fontSize: { xs: "0.75rem", sm: "0.82rem" },
+                        ...(daylight && {
+                          fontFamily: fonts.body,
+                          color: d.muted,
+                        }),
+                      }}
                     >
                       <strong>Location:</strong> {miner.location}
                     </Typography>
                     <Typography
                       variant="caption"
                       color="text.secondary"
-                      sx={{ fontSize: { xs: "0.75rem", sm: "0.82rem" } }}
+                      sx={{
+                        fontSize: { xs: "0.75rem", sm: "0.82rem" },
+                        ...(daylight && {
+                          fontFamily: fonts.body,
+                          color: d.muted,
+                        }),
+                      }}
                     >
                       <strong>Pool:</strong> {miner.connectedPool}
                     </Typography>
@@ -768,16 +862,25 @@ export default function HostedMinersList({
               >
                 <Box
                   sx={{
-                    backgroundColor: alpha(theme.palette.background.paper, 0.6),
-                    borderRadius: 2,
+                    backgroundColor: daylight
+                      ? d.canvas
+                      : alpha(theme.palette.background.paper, 0.6),
+                    borderRadius: daylight ? "10px" : 2,
                     p: { xs: 1.5, sm: 2.5 },
-                    border: `1px solid ${alpha(theme.palette.divider, 0.08)}`,
+                    border: `1px solid ${daylight ? d.border : alpha(theme.palette.divider, 0.08)}`,
                   }}
                 >
                   <Typography
                     variant="subtitle2"
                     fontWeight="700"
-                    sx={{ mb: 1.5, fontSize: { xs: "0.85rem", sm: "0.95rem" } }}
+                    sx={{
+                      mb: 1.5,
+                      fontSize: { xs: "0.85rem", sm: "0.95rem" },
+                      ...(daylight && {
+                        fontFamily: fonts.heading,
+                        color: d.text,
+                      }),
+                    }}
                   >
                     Miner Details
                   </Typography>
@@ -797,14 +900,28 @@ export default function HostedMinersList({
                       <Typography
                         variant="caption"
                         color="text.secondary"
-                        sx={{ mb: 0.25, display: "block", fontSize: "0.72rem" }}
+                        sx={{
+                          mb: 0.25,
+                          display: "block",
+                          fontSize: "0.72rem",
+                          ...(daylight && {
+                            fontFamily: fonts.body,
+                            color: d.muted,
+                          }),
+                        }}
                       >
                         Firmware
                       </Typography>
                       <Typography
                         variant="body2"
                         fontWeight="600"
-                        sx={{ fontSize: { xs: "0.8rem", sm: "0.875rem" } }}
+                        sx={{
+                          fontSize: { xs: "0.8rem", sm: "0.875rem" },
+                          ...(daylight && {
+                            fontFamily: fonts.body,
+                            color: d.text,
+                          }),
+                        }}
                       >
                         {miner.firmware || "N/A"}
                       </Typography>
@@ -814,7 +931,15 @@ export default function HostedMinersList({
                       <Typography
                         variant="caption"
                         color="text.secondary"
-                        sx={{ mb: 0.25, display: "block", fontSize: "0.72rem" }}
+                        sx={{
+                          mb: 0.25,
+                          display: "block",
+                          fontSize: "0.72rem",
+                          ...(daylight && {
+                            fontFamily: fonts.body,
+                            color: d.muted,
+                          }),
+                        }}
                       >
                         Serial No.
                       </Typography>
@@ -825,6 +950,7 @@ export default function HostedMinersList({
                           fontFamily: "monospace",
                           wordBreak: "break-all",
                           fontSize: { xs: "0.75rem", sm: "0.85rem" },
+                          ...(daylight && { color: d.text }),
                         }}
                       >
                         {miner.serialNumber || "—"}
@@ -835,7 +961,15 @@ export default function HostedMinersList({
                       <Typography
                         variant="caption"
                         color="text.secondary"
-                        sx={{ mb: 0.25, display: "block", fontSize: "0.72rem" }}
+                        sx={{
+                          mb: 0.25,
+                          display: "block",
+                          fontSize: "0.72rem",
+                          ...(daylight && {
+                            fontFamily: fonts.body,
+                            color: d.muted,
+                          }),
+                        }}
                       >
                         MAC Address
                       </Typography>
@@ -846,6 +980,7 @@ export default function HostedMinersList({
                           fontFamily: "monospace",
                           wordBreak: "break-all",
                           fontSize: { xs: "0.75rem", sm: "0.85rem" },
+                          ...(daylight && { color: d.text }),
                         }}
                       >
                         {miner.macAddress || "—"}
@@ -856,15 +991,29 @@ export default function HostedMinersList({
                       <Typography
                         variant="caption"
                         color="text.secondary"
-                        sx={{ mb: 0.25, display: "block", fontSize: "0.72rem" }}
+                        sx={{
+                          mb: 0.25,
+                          display: "block",
+                          fontSize: "0.72rem",
+                          ...(daylight && {
+                            fontFamily: fonts.body,
+                            color: d.muted,
+                          }),
+                        }}
                       >
                         Hash Rate
                       </Typography>
                       <Typography
                         variant="body2"
                         fontWeight="700"
-                        color="primary.main"
-                        sx={{ fontSize: { xs: "0.8rem", sm: "0.875rem" } }}
+                        color={daylight ? undefined : "primary.main"}
+                        sx={{
+                          fontSize: { xs: "0.8rem", sm: "0.875rem" },
+                          ...(daylight && {
+                            fontFamily: fonts.body,
+                            color: d.action,
+                          }),
+                        }}
                       >
                         {miner.hashRate || "N/A"}
                       </Typography>
@@ -874,7 +1023,15 @@ export default function HostedMinersList({
                       <Typography
                         variant="caption"
                         color="text.secondary"
-                        sx={{ mb: 0.25, display: "block", fontSize: "0.72rem" }}
+                        sx={{
+                          mb: 0.25,
+                          display: "block",
+                          fontSize: "0.72rem",
+                          ...(daylight && {
+                            fontFamily: fonts.body,
+                            color: d.muted,
+                          }),
+                        }}
                       >
                         Status
                       </Typography>
@@ -883,8 +1040,12 @@ export default function HostedMinersList({
                         fontWeight="700"
                         sx={{
                           fontSize: { xs: "0.8rem", sm: "0.875rem" },
-                          color:
-                            miner.status === "Active"
+                          ...(daylight && { fontFamily: fonts.body }),
+                          color: daylight
+                            ? miner.status === "Active"
+                              ? d.success
+                              : d.danger
+                            : miner.status === "Active"
                               ? theme.palette.success.main
                               : theme.palette.error.main,
                         }}
@@ -897,7 +1058,15 @@ export default function HostedMinersList({
                       <Typography
                         variant="caption"
                         color="text.secondary"
-                        sx={{ mb: 0.5, display: "block", fontSize: "0.72rem" }}
+                        sx={{
+                          mb: 0.5,
+                          display: "block",
+                          fontSize: "0.72rem",
+                          ...(daylight && {
+                            fontFamily: fonts.body,
+                            color: d.muted,
+                          }),
+                        }}
                       >
                         Actions
                       </Typography>
@@ -917,10 +1086,19 @@ export default function HostedMinersList({
                           }
                           sx={{
                             textTransform: "none",
-                            borderRadius: 2,
+                            borderRadius: daylight ? "8px" : 2,
                             py: 0.6,
                             fontSize: { xs: "0.72rem", sm: "0.78rem" },
                             fontWeight: 600,
+                            ...(daylight && {
+                              fontFamily: fonts.body,
+                              color: d.text,
+                              borderColor: d.inputBorder,
+                              "&:hover": {
+                                borderColor: d.action,
+                                backgroundColor: d.hover,
+                              },
+                            }),
                           }}
                         >
                           {repairButtonLabel}
@@ -935,10 +1113,19 @@ export default function HostedMinersList({
                             }
                             sx={{
                               textTransform: "none",
-                              borderRadius: 2,
+                              borderRadius: daylight ? "8px" : 2,
                               py: 0.6,
                               fontSize: { xs: "0.72rem", sm: "0.78rem" },
                               fontWeight: 600,
+                              ...(daylight && {
+                                fontFamily: fonts.body,
+                                color: d.text,
+                                borderColor: d.inputBorder,
+                                "&:hover": {
+                                  borderColor: d.action,
+                                  backgroundColor: d.hover,
+                                },
+                              }),
                             }}
                           >
                             Pool History
@@ -954,7 +1141,11 @@ export default function HostedMinersList({
                     fetches once this miner's accordion is actually open. */}
                 {!isAdminView && expandedMinerIds.has(miner.id) && (
                   <Box sx={{ mt: 2 }}>
-                    <HashrateHistoryChart minerId={miner.id} height={300} />
+                    <HashrateHistoryChart
+                      minerId={miner.id}
+                      height={300}
+                      daylight={daylight}
+                    />
                   </Box>
                 )}
               </AccordionDetails>
