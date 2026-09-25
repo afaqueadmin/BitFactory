@@ -79,7 +79,7 @@ const POOL_MODE_OPTIONS: SegmentedOption<PoolMode>[] = [
 ];
 
 export default function WalletPage() {
-  const { d, fonts } = useDaylight();
+  const { d, darkMode, fonts } = useDaylight();
   const [summary, setSummary] = useState<EarningsSummary | null>(null);
   const [revenue24h, setRevenue24h] = useState<Revenue24h | null>(null);
   const [walletSubaccounts, setWalletSubaccounts] = useState<
@@ -457,8 +457,10 @@ export default function WalletPage() {
           p: { xs: "22px", sm: "26px 30px" },
           mb: { xs: "18px", sm: "22px" },
           borderRadius: RADIUS_CARD,
-          background: "linear-gradient(110deg, #EDF8FF, #F0FAF6)",
-          border: "1px solid #D7EAF3",
+          background: darkMode
+            ? d.skySoft
+            : "linear-gradient(110deg, #EDF8FF, #F0FAF6)",
+          border: `1px solid ${darkMode ? d.borderSky : "#D7EAF3"}`,
         }}
       >
         <Box>

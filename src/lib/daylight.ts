@@ -49,6 +49,8 @@ export interface DaylightPalette {
   borderDanger: string;
   /** Hover fill for neutral controls / nav links. */
   hover: string;
+  /** Data-table header row background (guide: "#FBFCFD" in light mode). */
+  tableHead: string;
   shadow: string;
   /** Series colours for the two mining pools. */
   poolLuxor: string;
@@ -79,6 +81,7 @@ const light: DaylightPalette = {
   borderAmber: "#EEDDBB",
   borderDanger: "#E5B0AB",
   hover: "#F0F6F9",
+  tableHead: "#FBFCFD",
   shadow: "0 4px 20px rgba(70,100,120,.035)",
   poolLuxor: "#1675A9",
   poolBraiins: "#E0A030",
@@ -108,6 +111,7 @@ const dark: DaylightPalette = {
   borderAmber: "rgba(255,190,80,0.25)",
   borderDanger: "rgba(240,138,130,0.35)",
   hover: "rgba(255,255,255,0.06)",
+  tableHead: "#242424",
   shadow: "0 4px 20px rgba(0,0,0,0.35)",
   poolLuxor: "#5CB8E8",
   poolBraiins: "#F0B34A",

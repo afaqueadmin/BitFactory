@@ -340,7 +340,7 @@ export default function WalletChangeRequestHistory({
           <TableRow
             sx={{
               backgroundColor: daylight
-                ? "#FBFCFD"
+                ? d.tableHead
                 : theme.palette.action.hover,
             }}
           >

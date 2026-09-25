@@ -1,19 +1,25 @@
 "use client";
 
+/**
+ * Transaction page (authenticated) - BitFactory Daylight theme (v1.3)
+ *
+ * Composes:
+ * - Page heading + pool mode Segmented control (Total / Luxor / Braiins)
+ * - Three Daylight KPI StatCards (total credits, total debits, net amount) -
+ *   the summary/poolBreakdown data the API already returns, not previously
+ *   rendered anywhere on this page
+ * - Filter card: Type PillTabs (All / Credits / Debits, also previously
+ *   computed but with no UI control) + CSV download, and a date range
+ *   (Preset pills or a Custom range) below it
+ * - Daylight data table with pagination
+ */
+
 import React, { useEffect, useState } from "react";
 import {
   Box,
   Typography,
-  Paper,
   Button,
   CircularProgress,
-  useTheme,
-  ToggleButton,
-  ToggleButtonGroup,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   Table,
   TableBody,
   TableCell,
@@ -24,10 +30,17 @@ import {
   Alert,
   Chip,
 } from "@mui/material";
-import DownloadIcon from "@mui/icons-material/Download";
+import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
+import TrendingUpOutlinedIcon from "@mui/icons-material/TrendingUpOutlined";
+import TrendingDownOutlinedIcon from "@mui/icons-material/TrendingDownOutlined";
+import AccountBalanceOutlinedIcon from "@mui/icons-material/AccountBalanceOutlined";
 import { useUser } from "@/lib/hooks/useUser";
 import { formatValue } from "@/lib/helpers/formatValue";
 import { useSubaccountFilter } from "@/lib/contexts/subaccountFilter-context";
+import StatCard from "@/components/daylight/StatCard";
+import Segmented, { SegmentedOption } from "@/components/daylight/Segmented";
+import PillTab from "@/components/daylight/PillTab";
+import { MQ, RADIUS_CARD, useDaylight } from "@/lib/daylight";
 
 interface Transaction {
   pool: "Luxor" | "Braiins";
@@ -82,16 +95,33 @@ interface TransactionResponse {
   };
 }
 
+type PoolMode = "total" | "luxor" | "braiins";
+type TypeFilter = "all" | "credit" | "debit";
+
+const POOL_MODE_OPTIONS: SegmentedOption<PoolMode>[] = [
+  { id: "total", label: "Total" },
+  { id: "luxor", label: "Luxor" },
+  { id: "braiins", label: "Braiins" },
+];
+
+const DATE_MODE_OPTIONS: SegmentedOption<"preset" | "custom">[] = [
+  { id: "preset", label: "Preset" },
+  { id: "custom", label: "Custom" },
+];
+
+const PRESET_RANGES: { id: "10d" | "20d" | "30d" | "all"; label: string }[] = [
+  { id: "10d", label: "Last 10 days" },
+  { id: "20d", label: "Last 20 days" },
+  { id: "30d", label: "Last 30 days" },
+  { id: "all", label: "All time" },
+];
+
 export default function TransactionPage() {
-  const theme = useTheme();
+  const { d, fonts } = useDaylight();
   const { user } = useUser();
   const { queryParam: subaccountsParam } = useSubaccountFilter();
-  const [poolMode, setPoolMode] = useState<"total" | "luxor" | "braiins">(
-    "total",
-  );
-  const [typeFilter, setTypeFilter] = useState<"all" | "credit" | "debit">(
-    "all",
-  );
+  const [poolMode, setPoolMode] = useState<PoolMode>("total");
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(25);
 
@@ -151,7 +181,6 @@ export default function TransactionPage() {
 
       const txData: TransactionResponse = await response.json();
       setData(txData);
-      console.log("[Transaction Page] Data loaded:", txData);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Unknown error";
       console.error("[Transaction Page] Error fetching transactions:", err);
@@ -312,164 +341,253 @@ export default function TransactionPage() {
     }
   };
 
-  const getTransactionColor = (type: "credit" | "debit") => {
-    return type === "credit" ? "success" : "error";
-  };
-
-  const getTransactionLabel = (type: "credit" | "debit") => {
-    return type === "credit" ? "+ (Credit)" : "- (Debit)";
-  };
-
-  const getPoolColor = (pool: "Luxor" | "Braiins") => {
-    return pool === "Luxor" ? "primary" : "info";
+  const dateInputSx = {
+    padding: "10px 12px",
+    borderRadius: "8px",
+    border: `1px solid ${d.inputBorder}`,
+    backgroundColor: d.surface,
+    color: d.text,
+    fontFamily: fonts.body,
+    fontSize: "0.875rem",
+    width: "100%",
+    minHeight: "44px",
+    boxSizing: "border-box" as const,
   };
 
   if (!user) {
     return (
       <Box sx={{ p: 3 }}>
-        <Alert severity="error">User not authenticated</Alert>
+        <Alert
+          severity="error"
+          sx={{
+            borderRadius: "8px",
+            bgcolor: d.dangerSoft,
+            color: d.danger,
+            fontFamily: fonts.body,
+          }}
+        >
+          User not authenticated
+        </Alert>
       </Box>
     );
   }
 
   return (
-    <Box sx={{ p: { xs: 1.5, sm: 2, md: 3 }, maxWidth: "1400px", mx: "auto" }}>
-      {/* Header Section */}
-      <Box sx={{ mb: { xs: 2, md: 4 } }}>
-        <Typography
-          variant="h3"
-          component="h1"
-          sx={{
-            fontWeight: "bold",
-            mb: { xs: 1.5, md: 2 },
-            fontSize: { xs: "1.6rem", sm: "2rem", md: "3rem" },
-          }}
-        >
-          Transaction History
-        </Typography>
-
-        {/* Pool Mode Toggle */}
-        <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-          {(["total", "luxor", "braiins"] as const).map((mode) => (
-            <button
-              key={mode}
-              onClick={() => {
-                setPoolMode(mode);
-                setCurrentPage(1);
-              }}
-              style={{
-                padding: "6px 12px",
-                borderRadius: "6px",
-                border: "none",
-                cursor: "pointer",
-                fontSize: "0.8rem",
-                fontWeight: poolMode === mode ? 600 : 400,
-                backgroundColor:
-                  poolMode === mode
-                    ? mode === "luxor"
-                      ? "#1565C0"
-                      : mode === "braiins"
-                        ? "#FFA500"
-                        : theme.palette.primary.main
-                    : theme.palette.mode === "dark"
-                      ? "rgba(255,255,255,0.1)"
-                      : "rgba(0,0,0,0.05)",
-                color:
-                  poolMode === mode
-                    ? mode === "total"
-                      ? theme.palette.primary.contrastText
-                      : "#FFFFFF"
-                    : theme.palette.text.primary,
-                transition: "all 0.2s",
-              }}
-            >
-              {mode === "total"
-                ? "Total"
-                : mode === "luxor"
-                  ? "🔷 Luxor"
-                  : "🟧 Braiins"}
-            </button>
-          ))}
+    <Box
+      sx={{ maxWidth: 1600, mx: "auto", fontFamily: fonts.body, color: d.text }}
+    >
+      {/* Page heading */}
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexWrap: "wrap",
+          gap: 2,
+          mb: { xs: "20px", md: "26px" },
+        }}
+      >
+        <Box sx={{ minWidth: 0 }}>
+          <Typography
+            component="h1"
+            sx={{
+              fontFamily: fonts.heading,
+              fontWeight: 750,
+              fontSize: { xs: 27, md: 32 },
+              lineHeight: 1.3,
+              letterSpacing: "-.035em",
+              color: d.text,
+            }}
+          >
+            Transactions
+          </Typography>
+          <Typography
+            sx={{
+              fontSize: { xs: 12, md: 13 },
+              lineHeight: { xs: 1.7, md: 1.5 },
+              color: d.muted,
+              mt: "7px",
+            }}
+          >
+            Every credit and debit recorded across your pools.
+          </Typography>
         </Box>
+
+        <Segmented
+          value={poolMode}
+          onChange={setPoolMode}
+          ariaLabel="Pool mode"
+          options={POOL_MODE_OPTIONS}
+        />
       </Box>
 
-      {/* Date Range Filter */}
-      <Paper sx={{ p: { xs: 2, sm: 3 }, mb: { xs: 2, md: 3 } }}>
+      {error && (
+        <Alert
+          severity="error"
+          sx={{
+            mb: 2,
+            borderRadius: "8px",
+            bgcolor: d.dangerSoft,
+            color: d.danger,
+            fontFamily: fonts.body,
+          }}
+        >
+          {error}
+        </Alert>
+      )}
+
+      {/* KPI cards - the summary the API already returns */}
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+          gap: { xs: "10px", sm: "16px" },
+          mb: { xs: "18px", sm: "22px" },
+          [MQ.stack]: { gridTemplateColumns: "1fr" },
+        }}
+      >
+        <StatCard
+          title={`Total Credits${poolMode !== "total" ? ` (${poolMode.toUpperCase()})` : ""}`}
+          value={formatValue(displaySummary?.totalCredits ?? 0, "BTC")}
+          caption={`≈ $${formatValue(displaySummary?.totalCreditsUsd ?? 0, "number")}`}
+          tone="mint"
+          icon={<TrendingUpOutlinedIcon />}
+          isLoading={isLoading}
+        />
+        <StatCard
+          title={`Total Debits${poolMode !== "total" ? ` (${poolMode.toUpperCase()})` : ""}`}
+          value={formatValue(displaySummary?.totalDebits ?? 0, "BTC")}
+          caption={`≈ $${formatValue(displaySummary?.totalDebitsUsd ?? 0, "number")}`}
+          tone="amber"
+          icon={<TrendingDownOutlinedIcon />}
+          isLoading={isLoading}
+        />
+        <StatCard
+          title={`Net Amount${poolMode !== "total" ? ` (${poolMode.toUpperCase()})` : ""}`}
+          value={formatValue(displaySummary?.netAmount ?? 0, "BTC")}
+          caption={`≈ $${formatValue(displaySummary?.netAmountUsd ?? 0, "number")}`}
+          tone="sky"
+          icon={<AccountBalanceOutlinedIcon />}
+          isLoading={isLoading}
+        />
+      </Box>
+
+      {/* Filters card */}
+      <Box
+        sx={{
+          bgcolor: d.surface,
+          border: `1px solid ${d.border}`,
+          borderRadius: RADIUS_CARD,
+          boxShadow: d.shadow,
+          p: { xs: "16px 18px", sm: "20px 24px" },
+          mb: { xs: "18px", sm: "22px" },
+        }}
+      >
+        {/* Type filter + CSV export */}
         <Box
           sx={{
             display: "flex",
             alignItems: "center",
-            gap: { xs: 1, sm: 2 },
-            mb: 2,
+            justifyContent: "space-between",
             flexWrap: "wrap",
+            gap: "10px",
+            mb: "16px",
           }}
         >
-          <Typography
-            variant="subtitle2"
-            sx={{ fontWeight: 600, minWidth: "fit-content" }}
-          >
-            Date Range:
-          </Typography>
-          <ToggleButtonGroup
-            value={dateMode}
-            exclusive
-            onChange={(e, newMode) => {
-              if (newMode !== null) {
-                setDateMode(newMode);
-              }
-            }}
-            size="small"
-          >
-            <ToggleButton value="preset">Preset</ToggleButton>
-            <ToggleButton value="custom">Custom</ToggleButton>
-          </ToggleButtonGroup>
+          <Box sx={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
+            <PillTab
+              active={typeFilter === "all"}
+              onClick={() => setTypeFilter("all")}
+            >
+              All
+            </PillTab>
+            <PillTab
+              active={typeFilter === "credit"}
+              onClick={() => setTypeFilter("credit")}
+              dot={d.success}
+            >
+              Credits
+            </PillTab>
+            <PillTab
+              active={typeFilter === "debit"}
+              onClick={() => setTypeFilter("debit")}
+              dot={d.danger}
+            >
+              Debits
+            </PillTab>
+          </Box>
 
           <Button
-            variant="outlined"
-            size="small"
-            startIcon={
-              isExporting ? (
-                <CircularProgress size={14} />
-              ) : (
-                <DownloadIcon fontSize="small" />
-              )
-            }
             onClick={handleDownloadCsv}
             disabled={isExporting || isLoading}
-            sx={{ ml: { sm: "auto" }, textTransform: "none" }}
+            startIcon={
+              isExporting ? (
+                <CircularProgress size={14} sx={{ color: d.action }} />
+              ) : (
+                <DownloadOutlinedIcon sx={{ fontSize: 16 }} />
+              )
+            }
+            sx={{
+              textTransform: "none",
+              fontFamily: fonts.body,
+              fontSize: 12,
+              fontWeight: 600,
+              minHeight: 40,
+              borderRadius: "8px",
+              border: `1px solid ${d.inputBorder}`,
+              color: d.text,
+              px: "15px",
+              "&:hover": { bgcolor: d.hover },
+              [MQ.mobile]: { minHeight: 44 },
+            }}
           >
             Download CSV
           </Button>
         </Box>
 
-        {/* Preset Options - Same Row */}
-        {dateMode === "preset" && (
-          <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-            <ToggleButtonGroup
-              value={presetRange}
-              exclusive
-              onChange={(e, newRange) => {
-                if (newRange !== null) {
-                  setPresetRange(newRange);
-                }
-              }}
-              size="small"
-            >
-              <ToggleButton value="10d">Last 10 Days</ToggleButton>
-              <ToggleButton value="20d">Last 20 Days</ToggleButton>
-              <ToggleButton value="30d">Last 30 Days</ToggleButton>
-              <ToggleButton value="all">All Time</ToggleButton>
-            </ToggleButtonGroup>
-          </Box>
-        )}
+        {/* Date range */}
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: "12px",
+            flexWrap: "wrap",
+            pt: "14px",
+            borderTop: `1px solid ${d.border}`,
+          }}
+        >
+          <Typography sx={{ fontSize: 11, fontWeight: 650, color: d.muted }}>
+            Date range
+          </Typography>
+          <Segmented
+            value={dateMode}
+            onChange={setDateMode}
+            ariaLabel="Date range mode"
+            options={DATE_MODE_OPTIONS}
+          />
+        </Box>
 
-        {/* Custom Date Range */}
-        {dateMode === "custom" && (
+        {dateMode === "preset" ? (
+          <Box
+            sx={{ display: "flex", gap: "4px", flexWrap: "wrap", mt: "12px" }}
+          >
+            {PRESET_RANGES.map((r) => (
+              <PillTab
+                key={r.id}
+                active={presetRange === r.id}
+                onClick={() => setPresetRange(r.id)}
+              >
+                {r.label}
+              </PillTab>
+            ))}
+          </Box>
+        ) : (
           <Box
             sx={{
               display: "grid",
               gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
-              gap: { xs: 1.5, sm: 2 },
+              gap: { xs: "12px", sm: "16px" },
+              mt: "14px",
             }}
           >
             {[
@@ -478,12 +596,10 @@ export default function TransactionPage() {
             ].map(({ label, value, setter }) => (
               <Box
                 key={label}
-                sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}
+                sx={{ display: "flex", flexDirection: "column", gap: "6px" }}
               >
                 <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  sx={{ fontWeight: 600 }}
+                  sx={{ fontSize: 11, fontWeight: 650, color: d.muted }}
                 >
                   {label}
                 </Typography>
@@ -491,122 +607,94 @@ export default function TransactionPage() {
                   type="date"
                   value={value}
                   onChange={(e) => setter(e.target.value)}
-                  style={{
-                    padding: "8px 10px",
-                    borderRadius: "4px",
-                    border:
-                      theme.palette.mode === "dark"
-                        ? "1px solid #444"
-                        : "1px solid #ccc",
-                    backgroundColor:
-                      theme.palette.mode === "dark" ? "#333" : "#fff",
-                    color: theme.palette.mode === "dark" ? "#fff" : "#000",
-                    fontFamily: "inherit",
-                    fontSize: "0.875rem",
-                    width: "100%",
-                    boxSizing: "border-box",
-                  }}
+                  style={dateInputSx}
                 />
               </Box>
             ))}
           </Box>
         )}
-      </Paper>
+      </Box>
 
-      {/* Error Alert */}
-      {error && (
-        <Alert severity="error" sx={{ mb: 3 }}>
-          {error}
-        </Alert>
-      )}
-
-      {/* Transactions Table */}
-      <Paper sx={{ overflow: "hidden" }}>
+      {/* Transactions table */}
+      <Box
+        sx={{
+          bgcolor: d.surface,
+          border: `1px solid ${d.border}`,
+          borderRadius: RADIUS_CARD,
+          boxShadow: d.shadow,
+          overflow: "hidden",
+        }}
+      >
         <TableContainer>
           {isLoading ? (
-            <Box sx={{ p: 3, textAlign: "center" }}>
-              <CircularProgress />
-              <Typography sx={{ mt: 2 }}>Loading transactions...</Typography>
+            <Box sx={{ p: 4, textAlign: "center" }}>
+              <CircularProgress sx={{ color: d.action }} />
+              <Typography sx={{ mt: 2, fontSize: 13, color: d.muted }}>
+                Loading transactions...
+              </Typography>
             </Box>
           ) : filteredTransactions.length === 0 ? (
-            <Box sx={{ p: 3, textAlign: "center" }}>
-              <Typography color="text.secondary">
+            <Box sx={{ p: 4, textAlign: "center" }}>
+              <Typography sx={{ fontSize: 13, color: d.muted }}>
                 No transactions found
               </Typography>
             </Box>
           ) : (
             <Table size="small">
-              <TableHead
-                sx={{
-                  backgroundColor:
-                    theme.palette.mode === "dark"
-                      ? theme.palette.grey[800]
-                      : theme.palette.grey[100],
-                }}
-              >
+              <TableHead sx={{ backgroundColor: d.tableHead }}>
                 <TableRow>
-                  <TableCell
-                    sx={{
-                      fontWeight: 600,
-                      fontSize: { xs: "0.75rem", sm: "0.875rem" },
-                    }}
-                  >
-                    Date
-                  </TableCell>
-                  <TableCell
-                    sx={{
-                      fontWeight: 600,
-                      fontSize: { xs: "0.75rem", sm: "0.875rem" },
-                      display: { xs: "none", sm: "table-cell" },
-                    }}
-                  >
-                    Pool
-                  </TableCell>
-                  <TableCell
-                    sx={{
-                      fontWeight: 600,
-                      fontSize: { xs: "0.75rem", sm: "0.875rem" },
-                      display: { xs: "none", md: "table-cell" },
-                    }}
-                  >
-                    Category
-                  </TableCell>
-                  <TableCell
-                    sx={{
-                      fontWeight: 600,
-                      fontSize: { xs: "0.75rem", sm: "0.875rem" },
-                    }}
-                  >
-                    Type
-                  </TableCell>
-                  <TableCell
-                    align="right"
-                    sx={{
-                      fontWeight: 600,
-                      fontSize: { xs: "0.75rem", sm: "0.875rem" },
-                    }}
-                  >
-                    Amount (BTC)
-                  </TableCell>
-                  <TableCell
-                    align="right"
-                    sx={{
-                      fontWeight: 600,
-                      fontSize: { xs: "0.75rem", sm: "0.875rem" },
-                      display: { xs: "none", sm: "table-cell" },
-                    }}
-                  >
-                    USD
-                  </TableCell>
-                  <TableCell
-                    sx={{
-                      fontWeight: 600,
-                      fontSize: { xs: "0.75rem", sm: "0.875rem" },
-                      display: { xs: "none", md: "table-cell" },
-                    }}
-                  >
-                    TX ID
-                  </TableCell>
+                  {[
+                    { label: "Date", show: true, align: "left" as const },
+                    {
+                      label: "Pool",
+                      show: true,
+                      align: "left" as const,
+                      hideBelow: "sm",
+                    },
+                    {
+                      label: "Category",
+                      show: true,
+                      align: "left" as const,
+                      hideBelow: "md",
+                    },
+                    { label: "Type", show: true, align: "left" as const },
+                    {
+                      label: "Amount (BTC)",
+                      show: true,
+                      align: "right" as const,
+                    },
+                    {
+                      label: "USD",
+                      show: true,
+                      align: "right" as const,
+                      hideBelow: "sm",
+                    },
+                    {
+                      label: "TX ID",
+                      show: true,
+                      align: "left" as const,
+                      hideBelow: "md",
+                    },
+                  ].map((col) => (
+                    <TableCell
+                      key={col.label}
+                      align={col.align}
+                      sx={{
+                        fontFamily: fonts.body,
+                        fontWeight: 600,
+                        fontSize: 10,
+                        letterSpacing: ".015em",
+                        textTransform: "uppercase",
+                        color: d.muted,
+                        borderBottomColor: d.border,
+                        display: col.hideBelow
+                          ? { xs: "none", [col.hideBelow]: "table-cell" }
+                          : "table-cell",
+                      }}
+                    >
+                      {col.label}
+                    </TableCell>
+                  ))}
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -614,11 +702,19 @@ export default function TransactionPage() {
                   <TableRow
                     key={`${tx.transaction_id}-${idx}`}
                     hover
-                    sx={{ "&:last-child td, &:last-child th": { border: 0 } }}
+                    sx={{
+                      "&:hover": { backgroundColor: d.hover },
+                      "& .MuiTableCell-root": {
+                        borderBottomColor: d.border,
+                        fontFamily: fonts.body,
+                      },
+                      "&:last-child td, &:last-child th": { border: 0 },
+                    }}
                   >
                     <TableCell
                       sx={{
-                        fontSize: { xs: "0.75rem", sm: "0.875rem" },
+                        fontSize: 12,
+                        color: d.text,
                         py: { xs: 1, sm: 1.5 },
                       }}
                     >
@@ -633,13 +729,19 @@ export default function TransactionPage() {
                       <Chip
                         label={tx.pool}
                         size="small"
-                        color={getPoolColor(tx.pool)}
-                        variant="outlined"
+                        sx={{
+                          fontFamily: fonts.body,
+                          fontWeight: 600,
+                          fontSize: 10,
+                          bgcolor: tx.pool === "Luxor" ? d.skySoft : d.amber,
+                          color: tx.pool === "Luxor" ? d.action : d.warning,
+                        }}
                       />
                     </TableCell>
                     <TableCell
                       sx={{
-                        fontSize: "0.875rem",
+                        fontSize: 12,
+                        color: d.text,
                         display: { xs: "none", md: "table-cell" },
                         py: { xs: 1, sm: 1.5 },
                       }}
@@ -654,20 +756,31 @@ export default function TransactionPage() {
                             : "- Debit"
                         }
                         size="small"
-                        color={getTransactionColor(tx.transaction_type)}
-                        variant="outlined"
-                        sx={{ fontSize: { xs: "0.65rem", sm: "0.75rem" } }}
+                        sx={{
+                          fontFamily: fonts.body,
+                          fontWeight: 600,
+                          fontSize: { xs: 9, sm: 10 },
+                          bgcolor:
+                            tx.transaction_type === "credit"
+                              ? d.mint
+                              : d.dangerSoft,
+                          color:
+                            tx.transaction_type === "credit"
+                              ? d.success
+                              : d.danger,
+                        }}
                       />
                     </TableCell>
                     <TableCell
                       align="right"
                       sx={{
-                        fontSize: { xs: "0.75rem", sm: "0.875rem" },
-                        fontWeight: 500,
+                        fontSize: 12,
+                        fontWeight: 650,
+                        fontVariantNumeric: "tabular-nums",
                         color:
                           tx.transaction_type === "credit"
-                            ? "success.main"
-                            : "error.main",
+                            ? d.success
+                            : d.danger,
                         py: { xs: 1, sm: 1.5 },
                       }}
                     >
@@ -676,7 +789,8 @@ export default function TransactionPage() {
                     <TableCell
                       align="right"
                       sx={{
-                        fontSize: "0.875rem",
+                        fontSize: 12,
+                        color: d.text,
                         display: { xs: "none", sm: "table-cell" },
                         py: { xs: 1, sm: 1.5 },
                       }}
@@ -685,7 +799,7 @@ export default function TransactionPage() {
                     </TableCell>
                     <TableCell
                       sx={{
-                        fontSize: "0.75rem",
+                        fontSize: 11,
                         fontFamily: "monospace",
                         display: { xs: "none", md: "table-cell" },
                         py: { xs: 1, sm: 1.5 },
@@ -699,7 +813,7 @@ export default function TransactionPage() {
                           title={`View on mempool.space: ${tx.transaction_id}`}
                           style={{
                             textDecoration: "underline",
-                            color: "inherit",
+                            color: d.action,
                           }}
                         >
                           {tx.transaction_id.length > 8
@@ -707,7 +821,7 @@ export default function TransactionPage() {
                             : tx.transaction_id}
                         </a>
                       ) : (
-                        <span>N/A</span>
+                        <span style={{ color: d.muted }}>N/A</span>
                       )}
                     </TableCell>
                   </TableRow>
@@ -721,7 +835,8 @@ export default function TransactionPage() {
         {!isLoading && data && data.pagination.totalPages > 1 && (
           <Box
             sx={{
-              p: { xs: 1.5, sm: 2 },
+              p: { xs: "14px", sm: "16px" },
+              borderTop: `1px solid ${d.border}`,
               display: "flex",
               justifyContent: "center",
             }}
@@ -730,20 +845,31 @@ export default function TransactionPage() {
               count={data.pagination.totalPages}
               page={currentPage}
               onChange={(e, page) => setCurrentPage(page)}
-              color="primary"
               size="small"
               siblingCount={0}
               boundaryCount={1}
+              sx={{
+                "& .MuiPaginationItem-root": {
+                  fontFamily: fonts.body,
+                  fontSize: 12,
+                  color: d.muted,
+                  borderRadius: "8px",
+                },
+                "& .MuiPaginationItem-root.Mui-selected": {
+                  bgcolor: d.action,
+                  color: "#fff",
+                  "&:hover": { bgcolor: d.actionHover },
+                },
+              }}
             />
           </Box>
         )}
-      </Paper>
+      </Box>
 
-      {/* Footer Info */}
+      {/* Footer info */}
       {data && (
         <Typography
-          variant="caption"
-          sx={{ display: "block", mt: 1.5, color: "text.secondary" }}
+          sx={{ display: "block", mt: "12px", fontSize: 11, color: d.muted }}
         >
           Showing {(currentPage - 1) * pageSize + 1}-
           {Math.min(currentPage * pageSize, data.pagination.totalItems)} of{" "}

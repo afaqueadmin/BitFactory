@@ -181,7 +181,7 @@ function EnhancedTableHead(props: EnhancedTableHeadProps) {
                   : "table-cell",
               ...(daylight && {
                 borderBottomColor: d.border,
-                backgroundColor: "#FBFCFD",
+                backgroundColor: d.tableHead,
                 fontFamily: fonts.body,
                 color: d.muted,
                 fontSize: 10,
