@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
 import { franchiseeUserFilter } from "@/lib/franchiseeScope";
+import { hostingEligibleUserFilter } from "@/lib/hostingEligibility";
 
 export async function GET(request: NextRequest) {
   try {
@@ -30,12 +31,18 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // ?scope=hosting limits the list to customers who can be billed for
+    // hosting (excludes potential customers and customers with no segment).
+    const hostingOnly =
+      new URL(request.url).searchParams.get("scope") === "hosting";
+
     // Fetch all customers (users with role CLIENT)
     const customers = await prisma.user.findMany({
       where: {
         role: "CLIENT",
         isDeleted: false,
         ...franchiseeUserFilter(user),
+        ...(hostingOnly ? hostingEligibleUserFilter() : {}),
       },
       select: {
         id: true,

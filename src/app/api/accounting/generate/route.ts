@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
+import {
+  HOSTING_INELIGIBLE_ERROR,
+  isHostingEligibleSegment,
+} from "@/lib/hostingEligibility";
 import { AuditAction, InvoiceStatus } from "@prisma/client";
 import { accrueIncentivesForInvoice } from "@/lib/incentives/accrue";
 
@@ -34,6 +38,27 @@ export async function POST(request: NextRequest) {
     if (!customerId || !month || !year) {
       return NextResponse.json(
         { error: "Missing required fields: customerId, month, year" },
+        { status: 400 },
+      );
+    }
+
+    // Generated invoices default to ELECTRICITY_CHARGES (hosting), so the
+    // customer must be hosting-eligible.
+    const customer = await prisma.user.findUnique({
+      where: { id: customerId },
+      select: { segment: true },
+    });
+
+    if (!customer) {
+      return NextResponse.json(
+        { error: "Customer not found" },
+        { status: 404 },
+      );
+    }
+
+    if (!isHostingEligibleSegment(customer.segment)) {
+      return NextResponse.json(
+        { error: HOSTING_INELIGIBLE_ERROR },
         { status: 400 },
       );
     }

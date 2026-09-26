@@ -77,7 +77,9 @@ const MONTH_NAMES = [
 
 export default function BulkInvoicesPage() {
   const router = useRouter();
-  const { customers, loading: customersLoading } = useCustomers();
+  const { customers, loading: customersLoading } = useCustomers({
+    hostingOnly: true,
+  });
   const { balances } = useCustomerBalances();
   const { monthlyBills } = useCustomerMonthlyBills();
   const {

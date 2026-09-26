@@ -215,11 +215,17 @@ export interface Customer {
   luxorSubaccounts: string[];
 }
 
-export function useCustomers() {
+// hostingOnly excludes potential customers and customers with no segment -
+// use it on hosting (ELECTRICITY_CHARGES) screens, not hardware sales.
+export function useCustomers(options: { hostingOnly?: boolean } = {}) {
+  const hostingOnly = !!options.hostingOnly;
   const { data, isLoading, error } = useQuery({
-    queryKey: ["customers"],
+    queryKey: ["customers", { hostingOnly }],
     queryFn: async () => {
-      const res = await fetch("/api/accounting/customers", {
+      const url = hostingOnly
+        ? "/api/accounting/customers?scope=hosting"
+        : "/api/accounting/customers";
+      const res = await fetch(url, {
         method: "GET",
         credentials: "include",
       });

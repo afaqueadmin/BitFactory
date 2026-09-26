@@ -35,7 +35,9 @@ export default function RecurringInvoicesPage() {
   const [page, setPage] = useState(1);
   const { recurringInvoices, loading, error } = useRecurringInvoices(page);
   // Fetch customers for dropdown
-  const { customers, loading: customersLoading } = useCustomers();
+  const { customers, loading: customersLoading } = useCustomers({
+    hostingOnly: true,
+  });
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [openDialog, setOpenDialog] = useState(false);
