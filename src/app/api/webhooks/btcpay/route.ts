@@ -26,6 +26,7 @@ export async function POST(req: NextRequest) {
   const rawBody = await req.text();
   const signature = req.headers.get("btcpay-sig");
 
+  console.log("rawBody", rawBody);
   console.log("btcpay-sig", signature);
 
   // @TODO: uncomment the following if-block and make it work
