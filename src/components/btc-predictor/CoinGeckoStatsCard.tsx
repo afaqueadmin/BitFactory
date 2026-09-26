@@ -1,15 +1,9 @@
 "use client";
 
 import React from "react";
-import {
-  Box,
-  Typography,
-  Chip,
-  CircularProgress,
-  Alert,
-  useTheme,
-} from "@mui/material";
+import { Box, Typography, Chip, CircularProgress, Alert } from "@mui/material";
 import { CoinGeckoData } from "@/hooks/useBtcMarketInsights";
+import { useDaylight } from "@/lib/daylight";
 
 interface CoinGeckoStatsCardProps {
   data: CoinGeckoData | null | undefined;
@@ -27,9 +21,11 @@ const formatCurrency = (value: number): string =>
 const ChangeChip = ({
   label,
   value,
+  fontFamily,
 }: {
   label: string;
   value: number | null;
+  fontFamily: string;
 }) => {
   if (value == null) return null;
   const isUp = value >= 0;
@@ -38,8 +34,9 @@ const ChangeChip = ({
       size="small"
       label={`${label}: ${isUp ? "+" : ""}${value.toFixed(2)}%`}
       sx={{
+        fontFamily,
         fontWeight: 700,
-        fontSize: { xs: "0.7rem", sm: "0.75rem" },
+        fontSize: { xs: 10, sm: 11 },
         color: "#fff",
         backgroundColor: isUp ? "#4caf50" : "#f44336",
         height: 24,
@@ -52,20 +49,28 @@ export default function CoinGeckoStatsCard({
   data,
   isLoading,
 }: CoinGeckoStatsCardProps) {
-  const theme = useTheme();
-  const isDark = theme.palette.mode === "dark";
+  const { d, fonts } = useDaylight();
 
   if (isLoading) {
     return (
       <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
-        <CircularProgress size={28} />
+        <CircularProgress size={28} sx={{ color: d.action }} />
       </Box>
     );
   }
 
   if (!data) {
     return (
-      <Alert severity="warning" sx={{ borderRadius: 2 }}>
+      <Alert
+        severity="warning"
+        sx={{
+          borderRadius: "8px",
+          bgcolor: d.amber,
+          color: d.warning,
+          fontFamily: fonts.body,
+          "& .MuiAlert-icon": { color: d.warning },
+        }}
+      >
         CoinGecko market data unavailable right now.
       </Alert>
     );
@@ -75,122 +80,138 @@ export default function CoinGeckoStatsCard({
   const downVotes = data.sentimentVotesDownPercentage;
 
   return (
-    <Box>
+    <Box sx={{ fontFamily: fonts.body }}>
       <Box
         sx={{
           display: "flex",
-          gap: 0.75,
+          gap: "6px",
           overflowX: "auto",
-          pb: 0.5,
-          mb: 2,
+          pb: "4px",
+          mb: "16px",
           scrollbarWidth: "none",
           "&::-webkit-scrollbar": { display: "none" },
         }}
       >
-        <ChangeChip label="1h" value={data.priceChangePercentage1h} />
-        <ChangeChip label="24h" value={data.priceChangePercentage24h} />
-        <ChangeChip label="7d" value={data.priceChangePercentage7d} />
-        <ChangeChip label="30d" value={data.priceChangePercentage30d} />
+        <ChangeChip
+          label="1h"
+          value={data.priceChangePercentage1h}
+          fontFamily={fonts.body}
+        />
+        <ChangeChip
+          label="24h"
+          value={data.priceChangePercentage24h}
+          fontFamily={fonts.body}
+        />
+        <ChangeChip
+          label="7d"
+          value={data.priceChangePercentage7d}
+          fontFamily={fonts.body}
+        />
+        <ChangeChip
+          label="30d"
+          value={data.priceChangePercentage30d}
+          fontFamily={fonts.body}
+        />
       </Box>
 
       <Box
         sx={{
           display: "grid",
           gridTemplateColumns: "1fr 1fr",
-          gap: 1.5,
-          mb: 2,
-          backgroundColor: isDark
-            ? "rgba(255, 255, 255, 0.02)"
-            : "rgba(0, 0, 0, 0.02)",
-          p: 1.5,
-          borderRadius: 2,
-          border: `1px solid ${
-            isDark ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.04)"
-          }`,
+          gap: "12px",
+          mb: "16px",
+          bgcolor: d.canvas,
+          p: "12px",
+          borderRadius: "10px",
+          border: `1px solid ${d.border}`,
         }}
       >
         <Box>
           <Typography
-            variant="caption"
-            color="text.secondary"
             sx={{
-              fontSize: { xs: "0.68rem", sm: "0.75rem" },
+              fontSize: { xs: 10, sm: 11 },
+              color: d.muted,
               display: "block",
             }}
           >
             Market Cap Rank
           </Typography>
           <Typography
-            variant="body1"
-            fontWeight="800"
-            color="primary.main"
-            sx={{ fontSize: { xs: "0.95rem", sm: "1.1rem" }, mt: 0.25 }}
+            sx={{
+              fontFamily: fonts.heading,
+              fontWeight: 750,
+              color: d.action,
+              fontSize: { xs: 15, sm: 17 },
+              mt: "2px",
+            }}
           >
             {data.marketCapRank ? `#${data.marketCapRank}` : "—"}
           </Typography>
         </Box>
         <Box>
           <Typography
-            variant="caption"
-            color="text.secondary"
             sx={{
-              fontSize: { xs: "0.68rem", sm: "0.75rem" },
+              fontSize: { xs: 10, sm: 11 },
+              color: d.muted,
               display: "block",
             }}
           >
             All-Time High
           </Typography>
           <Typography
-            variant="body1"
-            fontWeight="700"
-            sx={{ fontSize: { xs: "0.85rem", sm: "0.95rem" }, mt: 0.25 }}
+            sx={{
+              fontWeight: 700,
+              color: d.text,
+              fontSize: { xs: 13, sm: 14 },
+              mt: "2px",
+            }}
           >
             {formatCurrency(data.ath)}{" "}
-            <Typography
+            <Box
               component="span"
-              variant="caption"
-              color="#f44336"
-              sx={{ fontSize: "0.7rem", fontWeight: 700 }}
+              sx={{ color: d.danger, fontSize: 11, fontWeight: 700 }}
             >
               ({data.athChangePercentage.toFixed(1)}%)
-            </Typography>
+            </Box>
           </Typography>
         </Box>
         <Box sx={{ gridColumn: "1 / -1" }}>
           <Typography
-            variant="caption"
-            color="text.secondary"
             sx={{
-              fontSize: { xs: "0.68rem", sm: "0.75rem" },
+              fontSize: { xs: 10, sm: 11 },
+              color: d.muted,
               display: "block",
             }}
           >
             All-Time Low
           </Typography>
           <Typography
-            variant="body1"
-            fontWeight="700"
-            sx={{ fontSize: { xs: "0.85rem", sm: "0.95rem" }, mt: 0.25 }}
+            sx={{
+              fontWeight: 700,
+              color: d.text,
+              fontSize: { xs: 13, sm: 14 },
+              mt: "2px",
+            }}
           >
             {formatCurrency(data.atl)}{" "}
-            <Typography
+            <Box
               component="span"
-              variant="caption"
-              color="#4caf50"
-              sx={{ fontSize: "0.7rem", fontWeight: 700 }}
+              sx={{ color: d.success, fontSize: 11, fontWeight: 700 }}
             >
               (+{data.atlChangePercentage.toFixed(0)}%)
-            </Typography>
+            </Box>
           </Typography>
         </Box>
       </Box>
 
       {upVotes != null && downVotes != null && (
-        <Box sx={{ mt: 1 }}>
+        <Box sx={{ mt: "8px" }}>
           <Typography
-            variant="caption"
-            color="text.secondary"
-            sx={{ fontWeight: 600, fontSize: { xs: "0.7rem", sm: "0.75rem" } }}
+            sx={{
+              fontWeight: 650,
+              fontSize: { xs: 11, sm: 12 },
+              color: d.muted,
+            }}
           >
             Community Sentiment
           </Typography>
@@ -200,28 +221,22 @@ export default function CoinGeckoStatsCard({
               height: 8,
               borderRadius: 4,
               overflow: "hidden",
-              mt: 0.75,
-              backgroundColor: isDark
-                ? theme.palette.grey[700]
-                : theme.palette.grey[300],
+              mt: "6px",
+              backgroundColor: d.border,
             }}
           >
             <Box sx={{ width: `${upVotes}%`, backgroundColor: "#4caf50" }} />
             <Box sx={{ width: `${downVotes}%`, backgroundColor: "#f44336" }} />
           </Box>
           <Box
-            sx={{ display: "flex", justifyContent: "space-between", mt: 0.5 }}
+            sx={{ display: "flex", justifyContent: "space-between", mt: "4px" }}
           >
             <Typography
-              variant="caption"
-              sx={{ color: "#4caf50", fontWeight: 700, fontSize: "0.72rem" }}
+              sx={{ color: "#257451", fontWeight: 700, fontSize: 11 }}
             >
               {upVotes.toFixed(0)}% Bullish
             </Typography>
-            <Typography
-              variant="caption"
-              sx={{ color: "#f44336", fontWeight: 700, fontSize: "0.72rem" }}
-            >
+            <Typography sx={{ color: d.danger, fontWeight: 700, fontSize: 11 }}>
               {downVotes.toFixed(0)}% Bearish
             </Typography>
           </Box>
@@ -229,9 +244,7 @@ export default function CoinGeckoStatsCard({
       )}
 
       <Typography
-        variant="caption"
-        color="text.secondary"
-        sx={{ display: "block", mt: 2, fontSize: "0.7rem", opacity: 0.8 }}
+        sx={{ display: "block", mt: "16px", fontSize: 10, color: d.muted }}
       >
         Source: CoinGecko
       </Typography>

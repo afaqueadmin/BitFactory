@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Hashprice History Page
+ * Hashprice History Page - BitFactory Daylight theme (v1.3)
  *
  * FEATURES:
  *
@@ -9,10 +9,12 @@
  * - Current Hashprice Card: Shows LIVE real-time hashprice from Luxor summary API (today's value, refreshes every 5 min)
  * - High/Low Card: Displays highest and lowest hashprice in selected period
  * - Hashprice Change Card: Shows price change from first to last day
- *   as both percentage and absolute value. Color-coded: green if up, red if down
+ *   as both percentage and absolute value. Colour-coded via the success/danger tokens.
+ * - Plus network-wide context cards (price, market cap, difficulty, halving, ...)
  *
  * Chart (Main Visualization):
- * - Hashprice Line: Main line showing actual pool hashprice movement (historical data)
+ * - Hashprice Line: Main line showing actual pool hashprice movement (historical data) -
+ *   kept Luxor/Binance-style gold, same reasoning as the BTC Price History chart.
  * - Area fill: Subtle gradient underneath for visual appeal
  *
  * Timeframe Selector:
@@ -36,15 +38,10 @@
 import React, { useState, useMemo } from "react";
 import {
   Box,
-  Paper,
   Typography,
   CircularProgress,
   Alert,
-  Button,
-  useTheme,
   useMediaQuery,
-  SxProps,
-  Theme,
 } from "@mui/material";
 import {
   AreaChart,
@@ -62,6 +59,8 @@ import {
 } from "@/hooks/useHashpriceHistory";
 import { useQuery } from "@tanstack/react-query";
 import { useSubaccountFilter } from "@/lib/contexts/subaccountFilter-context";
+import PillTab from "@/components/daylight/PillTab";
+import { RADIUS_CARD, useDaylight } from "@/lib/daylight";
 
 interface ChartData {
   date: string;
@@ -120,16 +119,17 @@ const formatBlockTime = (ms: number): string => {
 /**
  * Shared card for every statistic on this page. A null value renders
  * "Unavailable"; `source` names the upstream API the figure came from, so the
- * provenance of each number is visible without consulting the footer.
+ * provenance of each number is visible without consulting the footer. Kept
+ * as a neutral canvas-tone card (rather than the dashboard's soft-colour
+ * StatCard) since 13 of these at once would otherwise be a wall of pastel.
  */
-function StatCard({
+function HashpriceStatCard({
   label,
   value,
   isLoading,
   source,
   color,
   caption,
-  sx,
 }: {
   label: string;
   value: string | null;
@@ -137,76 +137,75 @@ function StatCard({
   source: string;
   color?: string;
   caption?: string;
-  sx?: SxProps<Theme>;
 }) {
-  const theme = useTheme();
-  const isDark = theme.palette.mode === "dark";
+  const { d, fonts } = useDaylight();
 
   return (
-    <Paper
+    <Box
       sx={{
-        p: { xs: 1.25, sm: 1.5 },
-        backgroundColor: isDark ? theme.palette.grey[800] : "#f5f5f5",
-        borderRadius: 1.5,
+        p: { xs: "10px", sm: "12px" },
+        bgcolor: d.canvas,
+        border: `1px solid ${d.border}`,
+        borderRadius: "10px",
         display: "flex",
         flexDirection: "column",
-        ...sx,
+        fontFamily: fonts.body,
       }}
     >
       <Typography
-        variant="caption"
-        color="textSecondary"
-        sx={{ fontSize: { xs: "0.68rem", sm: "0.78rem" }, lineHeight: 1.3 }}
+        sx={{ fontSize: { xs: 10, sm: 11 }, color: d.muted, lineHeight: 1.3 }}
       >
         {label}
       </Typography>
       <Typography
         sx={{
-          fontWeight: "bold",
-          mt: 0.4,
-          fontSize: { xs: "0.9rem", sm: "1.1rem" },
+          fontWeight: 700,
+          mt: "3px",
+          fontSize: { xs: 13, sm: 15 },
           lineHeight: 1.3,
           // Five columns leaves each card narrow at the md breakpoint; wrapping
           // keeps longer values (High / Low, Period Change) inside the card.
           overflowWrap: "break-word",
-          color: value == null ? "inherit" : (color ?? "inherit"),
+          color: value == null ? d.muted : (color ?? d.text),
         }}
       >
-        {isLoading ? <CircularProgress size={16} /> : (value ?? "Unavailable")}
+        {isLoading ? (
+          <CircularProgress size={16} sx={{ color: d.action }} />
+        ) : (
+          (value ?? "Unavailable")
+        )}
       </Typography>
       {!isLoading && value != null && caption ? (
         <Typography
-          variant="caption"
-          color="textSecondary"
           sx={{
             display: "block",
-            fontSize: { xs: "0.62rem", sm: "0.68rem" },
+            fontSize: { xs: 9, sm: 10 },
             lineHeight: 1.3,
+            color: d.muted,
           }}
         >
           {caption}
         </Typography>
       ) : null}
       <Typography
-        variant="caption"
-        color="textSecondary"
         sx={{
           display: "block",
           mt: "auto",
-          pt: 0.6,
-          fontSize: { xs: "0.58rem", sm: "0.63rem" },
+          pt: "5px",
+          fontSize: { xs: 9, sm: 10 },
           lineHeight: 1.3,
-          opacity: 0.75,
+          color: d.muted,
+          opacity: 0.85,
         }}
       >
         {source}
       </Typography>
-    </Paper>
+    </Box>
   );
 }
 
 export default function HashpriceHistoryPage() {
-  const theme = useTheme();
+  const { d, fonts } = useDaylight();
   const [selectedTimeframe, setSelectedTimeframe] = useState("30D");
 
   // Get days from selected timeframe
@@ -317,35 +316,38 @@ export default function HashpriceHistoryPage() {
     return { current, high, low, change, changePercent };
   }, [hashpriceData, statistics, liveHashprice]);
 
-  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
-  const isDark = theme.palette.mode === "dark";
-  const chartColor = "#f7b923"; // Binance-style gold
-  const gridColor = isDark ? "#444" : "#e0e0e0";
-  const textColor = isDark ? "#fff" : "#000";
+  const isMobile = useMediaQuery("(max-width:599.95px)");
+  const chartColor = "#f7b923"; // Binance/Luxor-style gold - kept as-is (see file header)
 
   return (
-    <Box sx={{ p: { xs: 1.5, sm: 2, md: 3 }, mt: { xs: 1, md: 2 } }}>
-      {/* Header */}
-      <Box sx={{ mb: { xs: 2, md: 4 } }}>
+    <Box
+      sx={{ maxWidth: 1600, mx: "auto", fontFamily: fonts.body, color: d.text }}
+    >
+      {/* Page heading */}
+      <Box sx={{ mb: { xs: "20px", md: "26px" } }}>
         <Typography
-          variant="h4"
           component="h1"
           sx={{
-            fontWeight: "bold",
-            mb: 0.5,
-            fontSize: { xs: "1.6rem", sm: "2rem", md: "2.125rem" },
+            fontFamily: fonts.heading,
+            fontWeight: 750,
+            fontSize: { xs: 27, md: 32 },
+            lineHeight: 1.3,
+            letterSpacing: "-.035em",
+            color: d.text,
           }}
         >
           Hashprice History
         </Typography>
-        <Typography variant="body2" color="textSecondary">
+        <Typography
+          sx={{ fontSize: { xs: 12, md: 13 }, color: d.muted, mt: "7px" }}
+        >
           {isMobile
             ? "Your BTC hashprice from Luxor Mining"
             : "Your subaccount hashprice from Luxor Mining (BTC per PH/s per day) • Current: LIVE real-time • Chart: Historical"}
         </Typography>
       </Box>
 
-      {/* Statistics Cards */}
+      {/* Statistics cards */}
       <Box
         sx={{
           display: "grid",
@@ -354,11 +356,11 @@ export default function HashpriceHistoryPage() {
             sm: "repeat(3, 1fr)",
             md: "repeat(5, 1fr)",
           },
-          gap: { xs: 1, sm: 1.25 },
-          mb: { xs: 2, md: 4 },
+          gap: { xs: "8px", sm: "10px" },
+          mb: { xs: "18px", sm: "22px" },
         }}
       >
-        <StatCard
+        <HashpriceStatCard
           label="BTC Price"
           isLoading={isNetworkLoading}
           value={
@@ -367,7 +369,7 @@ export default function HashpriceHistoryPage() {
           source={`${network?.priceSource ?? "mempool.space"} · prices`}
         />
 
-        <StatCard
+        <HashpriceStatCard
           label="Market Capitalization"
           isLoading={isNetworkLoading}
           value={
@@ -379,7 +381,7 @@ export default function HashpriceHistoryPage() {
           source={`${network?.priceSource ?? "mempool.space"} · mempool.space`}
         />
 
-        <StatCard
+        <HashpriceStatCard
           label="Block Reward"
           isLoading={isNetworkLoading}
           value={
@@ -393,7 +395,7 @@ export default function HashpriceHistoryPage() {
           source="Derived · mempool.space height"
         />
 
-        <StatCard
+        <HashpriceStatCard
           label="Network Difficulty"
           isLoading={isNetworkLoading}
           value={
@@ -404,7 +406,7 @@ export default function HashpriceHistoryPage() {
           source="mempool.space · mining/hashrate"
         />
 
-        <StatCard
+        <HashpriceStatCard
           label="Avg Block Time"
           isLoading={isNetworkLoading}
           value={
@@ -416,7 +418,7 @@ export default function HashpriceHistoryPage() {
           source="mempool.space · difficulty-adjustment"
         />
 
-        <StatCard
+        <HashpriceStatCard
           label="Halving Estimate"
           isLoading={isNetworkLoading}
           value={
@@ -432,7 +434,7 @@ export default function HashpriceHistoryPage() {
           source="Derived · mempool.space height"
         />
 
-        <StatCard
+        <HashpriceStatCard
           label="Previous Difficulty Adjustment"
           isLoading={isNetworkLoading}
           value={
@@ -441,24 +443,24 @@ export default function HashpriceHistoryPage() {
               : null
           }
           // Rising difficulty cuts miner revenue, so it reads red — matching the
-          // estimated adjustment card above.
+          // estimated adjustment card below.
           color={
             network?.previousRetargetPercent != null &&
             network.previousRetargetPercent > 0
-              ? "#f44336"
-              : "#4caf50"
+              ? d.danger
+              : d.success
           }
           source="mempool.space · difficulty-adjustment"
         />
 
-        <StatCard
+        <HashpriceStatCard
           label="Current Hashprice"
           isLoading={isLiveLoading}
           value={formatHashprice(cardStatistics.current)}
           source="Luxor · pool-hashprice-live"
         />
 
-        <StatCard
+        <HashpriceStatCard
           label="Period Change"
           isLoading={false}
           value={`${cardStatistics.change >= 0 ? "+" : ""}${
@@ -466,18 +468,18 @@ export default function HashpriceHistoryPage() {
               ? `${cardStatistics.changePercent.toFixed(2)}%`
               : `${formatHashprice(cardStatistics.change)} (${cardStatistics.changePercent.toFixed(2)}%)`
           }`}
-          color={cardStatistics.change >= 0 ? "#4caf50" : "#f44336"}
+          color={cardStatistics.change >= 0 ? d.success : d.danger}
           source="Luxor · hashprice-history"
         />
 
-        <StatCard
+        <HashpriceStatCard
           label="High / Low"
           isLoading={false}
           value={`${formatHashprice(cardStatistics.high)} / ${formatHashprice(cardStatistics.low)}`}
           source="Luxor · hashprice-history"
         />
 
-        <StatCard
+        <HashpriceStatCard
           label="Est. Difficulty Adjustment"
           isLoading={isDifficultyLoading}
           value={
@@ -487,13 +489,13 @@ export default function HashpriceHistoryPage() {
           }
           color={
             estimatedChangePercent != null && estimatedChangePercent > 0
-              ? "#f44336"
-              : "#4caf50"
+              ? d.danger
+              : d.success
           }
           source="mempool.space · difficulty-adjustment"
         />
 
-        <StatCard
+        <HashpriceStatCard
           label="Difficulty Adjustment Date Estimate"
           isLoading={isDifficultyLoading}
           value={
@@ -505,65 +507,61 @@ export default function HashpriceHistoryPage() {
         />
       </Box>
 
-      {/* Chart Section */}
-      {/*
-        Main visualization showing hashprice movement:
-        - Golden line: Close price (primary indicator)
-        - Area fill: Gradient underneath for visual appeal
-      */}
-      <Paper
+      {/* Chart card */}
+      <Box
         sx={{
-          p: { xs: 1.5, sm: 3 },
-          borderRadius: 2,
-          backgroundColor: isDark ? theme.palette.grey[900] : "#ffffff",
+          p: { xs: "16px 12px", sm: "20px 24px" },
+          bgcolor: d.surface,
+          border: `1px solid ${d.border}`,
+          borderRadius: RADIUS_CARD,
+          boxShadow: d.shadow,
+          mb: { xs: "18px", sm: "22px" },
         }}
       >
-        {/* Timeframe Selector Buttons */}
+        {/* Timeframe selector */}
         <Box
           sx={{
-            mb: { xs: 2, sm: 3 },
+            mb: { xs: "16px", sm: "20px" },
             display: "flex",
-            gap: 0.75,
+            gap: "4px",
             flexWrap: "wrap",
           }}
         >
           {TIMEFRAMES.map((timeframe) => (
-            <Button
+            <PillTab
               key={timeframe.label}
+              active={selectedTimeframe === timeframe.label}
               onClick={() => setSelectedTimeframe(timeframe.label)}
-              variant={
-                selectedTimeframe === timeframe.label ? "contained" : "outlined"
-              }
-              size="small"
-              sx={{
-                minWidth: { xs: "40px", sm: "60px" },
-                px: { xs: 1, sm: 1.5 },
-                fontSize: { xs: "0.7rem", sm: "0.8rem" },
-                textTransform: "uppercase",
-              }}
             >
               {timeframe.label}
-            </Button>
+            </PillTab>
           ))}
         </Box>
 
-        {/* Debug Info - Shows actual data returned */}
+        {/* Data coverage note */}
         {!isLoading && hashpriceData.length > 0 && (
-          <Box sx={{ mb: 2, p: 1.5, bgcolor: "info.lighter", borderRadius: 1 }}>
+          <Box
+            sx={{
+              mb: "16px",
+              p: "10px 12px",
+              bgcolor: d.skySoft,
+              border: `1px solid ${d.borderSky}`,
+              borderRadius: "8px",
+            }}
+          >
             <Typography
-              variant="caption"
-              sx={{ fontSize: "0.7rem", color: "info.main" }}
+              sx={{ fontSize: 11, color: d.action, fontFamily: fonts.body }}
             >
               📊 Data: {hashpriceData.length} days returned | Requested:{" "}
               {queryDays} days |
               {hashpriceData.length < queryDays
-                ? ` ⚠️ Limited history`
-                : ` ✓ Full period`}
+                ? " ⚠️ Limited history"
+                : " ✓ Full period"}
             </Typography>
           </Box>
         )}
 
-        {/* Loading State */}
+        {/* Loading state */}
         {isLoading && (
           <Box
             sx={{
@@ -573,33 +571,45 @@ export default function HashpriceHistoryPage() {
               minHeight: "400px",
             }}
           >
-            <CircularProgress />
+            <CircularProgress sx={{ color: d.action }} />
           </Box>
         )}
 
-        {/* Error State */}
+        {/* Error state */}
         {isError && (
-          <Alert severity="error" sx={{ mb: 2 }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: "bold" }}>
+          <Alert
+            severity="error"
+            sx={{
+              mb: 2,
+              borderRadius: "8px",
+              bgcolor: d.dangerSoft,
+              color: d.danger,
+              fontFamily: fonts.body,
+              "& .MuiAlert-icon": { color: d.danger },
+            }}
+          >
+            <Typography
+              sx={{ fontWeight: 700, fontSize: 13, fontFamily: fonts.body }}
+            >
               Failed to load hashprice data
             </Typography>
-            <Typography variant="body2">{error}</Typography>
-            <Typography variant="caption" sx={{ mt: 1, display: "block" }}>
+            <Typography sx={{ fontSize: 12, fontFamily: fonts.body }}>
+              {error}
+            </Typography>
+            <Typography
+              sx={{
+                mt: 1,
+                display: "block",
+                fontSize: 11,
+                fontFamily: fonts.body,
+              }}
+            >
               Please try again or refresh the page.
             </Typography>
           </Alert>
         )}
 
-        {/* Chart Visualization */}
-        {/*
-          Real historical hashprice chart showing:
-          - Golden line: Calculated hashprice from Luxor API data
-          - Area fill: Gradient underneath for visual appeal
-          - Grid: Gridlines for reference
-
-          Data is calculated from: Daily Revenue ÷ Daily Hashrate
-          Updates automatically every 5 minutes
-        */}
+        {/* Chart */}
         {!isLoading && !isError && hasChartValues && (
           <ResponsiveContainer width="100%" height={isMobile ? 260 : 400}>
             <AreaChart
@@ -617,16 +627,24 @@ export default function HashpriceHistoryPage() {
                   <stop offset="95%" stopColor={chartColor} stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
+              <CartesianGrid strokeDasharray="3 3" stroke={d.border} />
               <XAxis
                 dataKey="date"
-                stroke={textColor}
-                tick={{ fontSize: isMobile ? 9 : 12 }}
+                stroke={d.border}
+                tick={{
+                  fontSize: isMobile ? 9 : 12,
+                  fill: d.muted,
+                  fontFamily: fonts.body,
+                }}
                 interval="preserveStartEnd"
               />
               <YAxis
-                stroke={textColor}
-                tick={{ fontSize: isMobile ? 8 : 11 }}
+                stroke={d.border}
+                tick={{
+                  fontSize: isMobile ? 8 : 11,
+                  fill: d.muted,
+                  fontFamily: fonts.body,
+                }}
                 tickFormatter={(value) => {
                   if (value === 0) return "0";
                   if (isMobile) return value.toExponential(1);
@@ -638,13 +656,14 @@ export default function HashpriceHistoryPage() {
               />
               <Tooltip
                 contentStyle={{
-                  backgroundColor: isDark ? "#333" : "#fff",
+                  backgroundColor: d.surface,
                   border: `2px solid ${chartColor}`,
-                  borderRadius: "8px",
-                  color: textColor,
+                  borderRadius: "10px",
+                  color: d.text,
                   padding: "12px",
-                  boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+                  boxShadow: "0 8px 30px rgba(100,114,124,.13)",
                   fontSize: "0.85rem",
+                  fontFamily: fonts.body,
                 }}
                 formatter={(value) => {
                   const numValue =
@@ -662,7 +681,11 @@ export default function HashpriceHistoryPage() {
                 separator=" = "
               />
               <Legend
-                wrapperStyle={{ color: textColor }}
+                wrapperStyle={{
+                  color: d.muted,
+                  fontFamily: fonts.body,
+                  fontSize: 12,
+                }}
                 iconType="line"
                 height={20}
               />
@@ -688,7 +711,7 @@ export default function HashpriceHistoryPage() {
           </ResponsiveContainer>
         )}
 
-        {/* Empty State */}
+        {/* Empty state */}
         {!isLoading && !isError && !hasChartValues && (
           <Box
             sx={{
@@ -698,33 +721,32 @@ export default function HashpriceHistoryPage() {
               minHeight: "400px",
             }}
           >
-            <Typography color="textSecondary">
+            <Typography
+              sx={{ fontSize: 13, color: d.muted, fontFamily: fonts.body }}
+            >
               {rawResponse?.message ||
                 "No data available. Please check your connection and try again."}
             </Typography>
           </Box>
         )}
-      </Paper>
+      </Box>
 
-      {/* Info Section */}
-      {/* Footer disclaimer: daily DB snapshots sourced from Luxor, per subaccount, may lag live. */}
-      <Paper
+      {/* Info footer */}
+      <Box
         sx={{
-          p: { xs: 1, sm: 1.25 },
-          mt: { xs: 2, md: 3 },
-          borderRadius: 2,
-          backgroundColor: isDark ? theme.palette.grey[800] : "#f5f5f5",
+          p: { xs: "12px 14px", sm: "14px 16px" },
+          borderRadius: RADIUS_CARD,
+          bgcolor: d.skySoft,
+          border: `1px solid ${d.borderSky}`,
         }}
       >
         <Typography
-          variant="caption"
-          color="textSecondary"
-          sx={{ display: "block", opacity: 0.8 }}
+          sx={{ display: "block", fontSize: 11, color: d.text, opacity: 0.9 }}
         >
           Daily snapshots stored in our database, sourced from Luxor for your
           subaccount — may lag the live hashprice above.
         </Typography>
-      </Paper>
+      </Box>
     </Box>
   );
 }
