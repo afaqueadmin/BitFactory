@@ -84,7 +84,15 @@ export default function CreateMemoModal({
   const isCategoryLocked = Boolean(presetCategory);
   const needsCustomerPicker = !customerId;
 
-  const { customers, loading: customersLoading } = useCustomers();
+  // Hosting memos only list customers who can be billed for hosting;
+  // hardware memos list everyone (potential customers can buy hardware).
+  const { customers: allCustomers, loading: allCustomersLoading } =
+    useCustomers();
+  const { customers: hostingCustomers, loading: hostingCustomersLoading } =
+    useCustomers({ hostingOnly: true });
+  const customers = category === "HOSTING" ? hostingCustomers : allCustomers;
+  const customersLoading =
+    category === "HOSTING" ? hostingCustomersLoading : allCustomersLoading;
 
   // Optional invoice picker, scoped to the selected customer + category.
   // Only relevant when the memo wasn't opened directly from an invoice.
@@ -289,8 +297,19 @@ export default function CreateMemoModal({
               label="Category"
               value={category}
               onChange={(e) => {
-                setCategory(e.target.value as "HOSTING" | "HARDWARE");
+                const nextCategory = e.target.value as "HOSTING" | "HARDWARE";
+                setCategory(nextCategory);
                 setSelectedInvoiceId("");
+                // Switching to hosting drops a customer the hosting list hides.
+                if (
+                  needsCustomerPicker &&
+                  nextCategory === "HOSTING" &&
+                  !hostingCustomers.some(
+                    (c: Customer) => c.id === selectedCustomerId,
+                  )
+                ) {
+                  setSelectedCustomerId("");
+                }
               }}
               disabled={isCategoryLocked}
               required

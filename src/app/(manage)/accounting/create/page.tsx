@@ -40,7 +40,9 @@ import { LocationsMultiSelect } from "@/components/accounting/invoices/Locations
 export default function CreateInvoicePage() {
   const router = useRouter();
   const { create: createInvoice, error: createError } = useCreateInvoice();
-  const { customers, loading: customersLoading } = useCustomers();
+  const { customers, loading: customersLoading } = useCustomers({
+    hostingOnly: true,
+  });
 
   const now = new Date();
 

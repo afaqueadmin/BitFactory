@@ -41,7 +41,9 @@ export default function CustomerBalanceDetailPage() {
   const [startDateFilter, setStartDateFilter] = useState("");
   const [endDateFilter, setEndDateFilter] = useState("");
 
-  const { customers, loading: customersLoading } = useCustomers();
+  const { customers, loading: customersLoading } = useCustomers({
+    hostingOnly: true,
+  });
 
   const isFiltered = Boolean(
     typeFilter || customerId || startDateFilter || endDateFilter,

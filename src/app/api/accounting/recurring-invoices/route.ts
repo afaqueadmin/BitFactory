@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
+import {
+  HOSTING_INELIGIBLE_ERROR,
+  isHostingEligibleSegment,
+} from "@/lib/hostingEligibility";
 import { AuditAction } from "@prisma/client";
 
 export async function GET(request: NextRequest) {
@@ -98,7 +102,10 @@ export async function POST(request: NextRequest) {
 
     if (!customerId || !dayOfMonth || !unitPrice || !startDate) {
       return NextResponse.json(
-        { error: "Missing required fields: customerId, dayOfMonth, unitPrice, startDate" },
+        {
+          error:
+            "Missing required fields: customerId, dayOfMonth, unitPrice, startDate",
+        },
         { status: 400 },
       );
     }
@@ -106,6 +113,27 @@ export async function POST(request: NextRequest) {
     if (dayOfMonth < 1 || dayOfMonth > 31) {
       return NextResponse.json(
         { error: "dayOfMonth must be between 1 and 31" },
+        { status: 400 },
+      );
+    }
+
+    // Recurring templates generate hosting invoices, so the customer must be
+    // hosting-eligible (not a potential customer, and has a segment).
+    const customer = await prisma.user.findUnique({
+      where: { id: customerId },
+      select: { segment: true },
+    });
+
+    if (!customer) {
+      return NextResponse.json(
+        { error: "Customer not found" },
+        { status: 404 },
+      );
+    }
+
+    if (!isHostingEligibleSegment(customer.segment)) {
+      return NextResponse.json(
+        { error: HOSTING_INELIGIBLE_ERROR },
         { status: 400 },
       );
     }

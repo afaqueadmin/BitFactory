@@ -75,7 +75,9 @@ function CreditAdjustmentsContent() {
     null,
   );
 
-  const { customers, loading: customersLoading } = useCustomers();
+  const { customers, loading: customersLoading } = useCustomers({
+    hostingOnly: true,
+  });
 
   const filters = {
     customerId: customerId || undefined,
