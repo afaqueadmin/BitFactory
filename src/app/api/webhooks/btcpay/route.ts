@@ -36,6 +36,8 @@ export async function POST(req: NextRequest) {
 
   const event = JSON.parse(rawBody);
   const { invoiceId, type } = event;
+  console.log("invoiceId", invoiceId);
+  console.log("type", type);
 
   const invoice = await prisma.invoice.findUnique({
     where: { btcpayInvoiceId: invoiceId },
