@@ -1,10 +1,22 @@
 "use client";
 
+/**
+ * Invoices page (authenticated) - BitFactory Daylight theme (v1.3)
+ *
+ * Composes:
+ * - Page heading + Download Statement button
+ * - Daylight data table (guide-style header row, soft-tone status pills)
+ *   with the same pagination/memo-badging logic as before
+ *
+ * Status pills are rendered with a local Daylight tone map rather than the
+ * shared <StatusBadge>, which is reused across admin/accounting pages and
+ * stays on its MUI Chip colours there.
+ */
+
 import React from "react";
 import {
   Box,
   Typography,
-  Paper,
   CircularProgress,
   Table,
   TableBody,
@@ -12,7 +24,6 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  useTheme,
   Button,
   Chip,
   Tooltip,
@@ -20,13 +31,14 @@ import {
 } from "@mui/material";
 import { useQuery } from "@tanstack/react-query";
 import { useUser } from "@/lib/hooks/useUser";
-import { StatusBadge } from "@/components/accounting/common/StatusBadge";
-import { Invoice } from "@prisma/client";
+import { InvoiceStatus, Invoice } from "@prisma/client";
+import { INVOICE_STATUS_LABELS } from "@/lib/constants/accounting";
 import { useRouter } from "next/navigation";
 import { calculateDaysUntilDue } from "@/lib/mocks/invoiceMocks";
-import DownloadIcon from "@mui/icons-material/Download";
+import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
 import { useState } from "react";
 import { useMemos } from "@/lib/hooks/admin/useMemos";
+import { RADIUS_CARD, useDaylight, DaylightPalette } from "@/lib/daylight";
 
 interface InvoicesResponse {
   pagination: {
@@ -38,8 +50,25 @@ interface InvoicesResponse {
   invoices: Invoice[];
 }
 
+/** Daylight soft-tone pill for an invoice status. */
+function invoiceStatusTone(d: DaylightPalette, status: InvoiceStatus) {
+  switch (status) {
+    case "PAID":
+      return { bg: d.mint, text: d.success };
+    case "ISSUED":
+      return { bg: d.skySoft, text: d.action };
+    case "OVERDUE":
+      return { bg: d.dangerSoft, text: d.danger };
+    case "CANCELLED":
+      return { bg: d.amber, text: d.warning };
+    default:
+      // DRAFT, REFUNDED
+      return { bg: d.border, text: d.muted };
+  }
+}
+
 export default function InvoicesPage() {
-  const theme = useTheme();
+  const { d, fonts } = useDaylight();
   const { user } = useUser();
   const router = useRouter();
   const [statementDownloading, setStatementDownloading] = useState(false);
@@ -87,14 +116,6 @@ export default function InvoicesPage() {
     customerMemos.filter((m) => m.invoice).map((m) => m.invoice!.id),
   );
 
-  const headerCellSx = {
-    fontWeight: "bold",
-    borderBottom: "2px solid",
-    borderBottomColor: "divider",
-    py: { xs: 1.5, sm: 2 },
-    px: { xs: 1.5, sm: 2 },
-  };
-
   const handleDownloadStatement = async () => {
     try {
       setStatementDownloading(true);
@@ -135,130 +156,154 @@ export default function InvoicesPage() {
     }
   };
 
+  const formatDate = (value: string | Date | null | undefined) =>
+    value
+      ? new Date(value).toLocaleDateString("en-US", {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+        })
+      : "";
+
+  const headerCellSx = {
+    fontFamily: fonts.body,
+    fontWeight: 600,
+    fontSize: 10,
+    letterSpacing: ".015em",
+    textTransform: "uppercase" as const,
+    color: d.muted,
+    borderBottomColor: d.border,
+    py: { xs: 1.5, sm: 2 },
+    px: { xs: 1.5, sm: 2 },
+  };
+
+  const columns = [
+    { label: "Invoice", hideBelow: undefined },
+    { label: "Amount", hideBelow: undefined, align: "right" as const },
+    { label: "Status", hideBelow: undefined },
+    { label: "Issued Date", hideBelow: "sm" as const },
+    { label: "Due Date", hideBelow: "sm" as const },
+    { label: "Paid Date", hideBelow: "md" as const },
+    { label: "Paid Past Due", hideBelow: "md" as const },
+    { label: "Days Until Due", hideBelow: "md" as const },
+  ];
+
   return (
-    <Box sx={{ p: { xs: 1.5, sm: 2, md: 3 }, mt: { xs: 1, md: 2 } }}>
-      {/* Header */}
-      <Box sx={{ mb: { xs: 2, md: 4 } }}>
-        <Box
-          sx={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: { xs: "flex-start", sm: "center" },
-            gap: 2,
-            flexDirection: { xs: "column", sm: "row" },
-            mb: 1,
-          }}
-        >
+    <Box
+      sx={{ maxWidth: 1600, mx: "auto", fontFamily: fonts.body, color: d.text }}
+    >
+      {/* Page heading */}
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexWrap: "wrap",
+          gap: 2,
+          mb: { xs: "20px", md: "26px" },
+        }}
+      >
+        <Box sx={{ minWidth: 0 }}>
           <Typography
-            variant="h4"
             component="h1"
             sx={{
-              fontWeight: "bold",
-              mb: 0.5,
-              fontSize: { xs: "1.6rem", sm: "2rem", md: "2.125rem" },
+              fontFamily: fonts.heading,
+              fontWeight: 750,
+              fontSize: { xs: 27, md: 32 },
+              lineHeight: 1.3,
+              letterSpacing: "-.035em",
+              color: d.text,
             }}
           >
             Invoices
           </Typography>
-          <Button
-            variant="outlined"
-            startIcon={<DownloadIcon />}
-            onClick={handleDownloadStatement}
-            disabled={statementDownloading || !user?.id || invoicesLoading}
+          <Typography
             sx={{
-              whiteSpace: "nowrap",
-              minWidth: { xs: "100%", sm: "auto" },
+              fontSize: { xs: 12, md: 13 },
+              lineHeight: { xs: 1.7, md: 1.5 },
+              color: d.muted,
+              mt: "7px",
             }}
           >
-            {statementDownloading ? "Downloading..." : "Download Statement"}
-          </Button>
+            View and manage your invoices.
+          </Typography>
         </Box>
-        <Typography variant="body2" color="textSecondary">
-          View and manage your invoices
-        </Typography>
+
+        <Button
+          onClick={handleDownloadStatement}
+          disabled={statementDownloading || !user?.id || invoicesLoading}
+          startIcon={
+            statementDownloading ? (
+              <CircularProgress size={14} sx={{ color: d.action }} />
+            ) : (
+              <DownloadOutlinedIcon sx={{ fontSize: 16 }} />
+            )
+          }
+          sx={{
+            textTransform: "none",
+            fontFamily: fonts.body,
+            fontSize: 12,
+            fontWeight: 600,
+            minHeight: 42,
+            borderRadius: "8px",
+            border: `1px solid ${d.inputBorder}`,
+            color: d.text,
+            px: "16px",
+            width: { xs: "100%", sm: "auto" },
+            "&:hover": { bgcolor: d.hover },
+          }}
+        >
+          {statementDownloading ? "Downloading..." : "Download Statement"}
+        </Button>
       </Box>
 
-      {/* Invoices Table */}
-      <Paper
+      {/* Invoices table */}
+      <Box
         sx={{
-          width: "100%",
-          borderRadius: 2,
+          bgcolor: d.surface,
+          border: `1px solid ${d.border}`,
+          borderRadius: RADIUS_CARD,
+          boxShadow: d.shadow,
           overflow: "hidden",
-          boxShadow: theme.shadows[2],
         }}
       >
         <TableContainer>
           <Table sx={{ minWidth: { xs: 320, sm: 600 } }} size="small">
-            <TableHead
-              sx={{
-                backgroundColor:
-                  theme.palette.mode === "dark"
-                    ? "rgba(255,255,255,0.05)"
-                    : "rgba(0,0,0,0.03)",
-              }}
-            >
+            <TableHead sx={{ backgroundColor: d.tableHead }}>
               <TableRow>
-                <TableCell sx={headerCellSx}>Invoice</TableCell>
-                <TableCell align="right" sx={headerCellSx}>
-                  Amount
-                </TableCell>
-                <TableCell sx={headerCellSx}>Status</TableCell>
-                <TableCell
-                  sx={{
-                    ...headerCellSx,
-                    display: { xs: "none", sm: "table-cell" },
-                  }}
-                >
-                  Issued Date
-                </TableCell>
-                <TableCell
-                  sx={{
-                    ...headerCellSx,
-                    display: { xs: "none", sm: "table-cell" },
-                  }}
-                >
-                  Due Date
-                </TableCell>
-                <TableCell
-                  sx={{
-                    ...headerCellSx,
-                    display: { xs: "none", md: "table-cell" },
-                  }}
-                >
-                  Paid Date
-                </TableCell>
-                <TableCell
-                  sx={{
-                    ...headerCellSx,
-                    display: { xs: "none", md: "table-cell" },
-                  }}
-                >
-                  Paid Past Due
-                </TableCell>
-                <TableCell
-                  sx={{
-                    ...headerCellSx,
-                    display: { xs: "none", md: "table-cell" },
-                  }}
-                >
-                  Days Until Due
-                </TableCell>
+                {columns.map((col) => (
+                  <TableCell
+                    key={col.label}
+                    align={col.align}
+                    sx={{
+                      ...headerCellSx,
+                      display: col.hideBelow
+                        ? { xs: "none", [col.hideBelow]: "table-cell" }
+                        : "table-cell",
+                    }}
+                  >
+                    {col.label}
+                  </TableCell>
+                ))}
               </TableRow>
             </TableHead>
             <TableBody>
               {invoicesLoading ? (
                 <TableRow>
-                  <TableCell colSpan={8} sx={{ textAlign: "center", py: 3 }}>
-                    <CircularProgress size={24} />
+                  <TableCell colSpan={8} sx={{ textAlign: "center", py: 4 }}>
+                    <CircularProgress size={24} sx={{ color: d.action }} />
                   </TableCell>
                 </TableRow>
               ) : invoicesError ? (
                 <TableRow>
-                  <TableCell
-                    colSpan={8}
-                    sx={{ textAlign: "center", py: 3, color: "error.main" }}
-                  >
-                    <Typography variant="body2">
+                  <TableCell colSpan={8} sx={{ textAlign: "center", py: 4 }}>
+                    <Typography
+                      sx={{
+                        fontSize: 13,
+                        color: d.danger,
+                        fontFamily: fonts.body,
+                      }}
+                    >
                       Failed to load invoices
                     </Typography>
                   </TableCell>
@@ -269,28 +314,32 @@ export default function InvoicesPage() {
                   const daysUntilDue = calculateDaysUntilDue(
                     new Date(invoice.dueDate),
                   );
+                  const tone = invoiceStatusTone(d, invoice.status);
 
                   return (
                     <TableRow
                       hover
                       key={invoice.id}
+                      onClick={() => router.push(`/invoices/${invoice.id}`)}
                       sx={{
                         cursor: "pointer",
-                        "&:nth-of-type(odd)": {
-                          backgroundColor: theme.palette.action.hover,
+                        "&:hover": { backgroundColor: d.hover },
+                        "& .MuiTableCell-root": {
+                          borderBottomColor: d.border,
+                          fontFamily: fonts.body,
                         },
+                        "&:last-child td, &:last-child th": { border: 0 },
                       }}
-                      onClick={() => router.push(`/invoices/${invoice.id}`)}
                     >
                       <TableCell
                         sx={{ py: { xs: 1, sm: 1.5 }, px: { xs: 1.5, sm: 2 } }}
                       >
                         <Box sx={{ display: "flex", alignItems: "center" }}>
                           <Typography
-                            variant="body2"
-                            fontWeight="medium"
                             sx={{
-                              color: "primary.main",
+                              fontSize: 13,
+                              fontWeight: 600,
+                              color: d.action,
                               "&:hover": { textDecoration: "underline" },
                             }}
                           >
@@ -301,9 +350,15 @@ export default function InvoicesPage() {
                               <Chip
                                 label="Memo"
                                 size="small"
-                                variant="outlined"
-                                color="primary"
-                                sx={{ ml: 1, height: 18, fontSize: "0.65rem" }}
+                                sx={{
+                                  ml: 1,
+                                  height: 18,
+                                  fontSize: "0.62rem",
+                                  fontFamily: fonts.body,
+                                  fontWeight: 600,
+                                  bgcolor: d.skySoft,
+                                  color: d.action,
+                                }}
                               />
                             </Tooltip>
                           ) : null}
@@ -313,67 +368,66 @@ export default function InvoicesPage() {
                         align="right"
                         sx={{ py: { xs: 1, sm: 1.5 }, px: { xs: 1.5, sm: 2 } }}
                       >
-                        <Typography variant="body2" fontWeight="medium">
+                        <Typography
+                          sx={{
+                            fontSize: 13,
+                            fontWeight: 600,
+                            color: d.text,
+                            fontVariantNumeric: "tabular-nums",
+                          }}
+                        >
                           ${Number(invoice.totalAmount).toFixed(2)}
                         </Typography>
                       </TableCell>
                       <TableCell
                         sx={{ py: { xs: 1, sm: 1.5 }, px: { xs: 1.5, sm: 2 } }}
                       >
-                        <StatusBadge status={invoice.status} />
+                        <Chip
+                          label={INVOICE_STATUS_LABELS[invoice.status]}
+                          size="small"
+                          sx={{
+                            fontFamily: fonts.body,
+                            fontWeight: 600,
+                            fontSize: 11,
+                            bgcolor: tone.bg,
+                            color: tone.text,
+                          }}
+                        />
                       </TableCell>
                       <TableCell
                         sx={{
                           py: { xs: 1, sm: 1.5 },
                           px: { xs: 1.5, sm: 2 },
                           display: { xs: "none", sm: "table-cell" },
+                          fontSize: 12,
+                          color: d.text,
                         }}
                       >
-                        <Typography variant="body2">
-                          {(invoice.issuedDate ||
-                            invoice.invoiceGeneratedDate) &&
-                            new Date(
-                              invoice.issuedDate ||
-                                invoice.invoiceGeneratedDate,
-                            ).toLocaleDateString("en-US", {
-                              year: "numeric",
-                              month: "short",
-                              day: "numeric",
-                            })}
-                        </Typography>
+                        {formatDate(
+                          invoice.issuedDate || invoice.invoiceGeneratedDate,
+                        )}
                       </TableCell>
                       <TableCell
                         sx={{
                           py: { xs: 1, sm: 1.5 },
                           px: { xs: 1.5, sm: 2 },
                           display: { xs: "none", sm: "table-cell" },
+                          fontSize: 12,
+                          color: d.text,
                         }}
                       >
-                        <Typography variant="body2">
-                          {new Date(invoice.dueDate).toLocaleDateString(
-                            "en-US",
-                            { year: "numeric", month: "short", day: "numeric" },
-                          )}
-                        </Typography>
+                        {formatDate(invoice.dueDate)}
                       </TableCell>
                       <TableCell
                         sx={{
                           py: { xs: 1, sm: 1.5 },
                           px: { xs: 1.5, sm: 2 },
                           display: { xs: "none", md: "table-cell" },
+                          fontSize: 12,
+                          color: d.text,
                         }}
                       >
-                        <Typography variant="body2">
-                          {invoice.paidDate &&
-                            new Date(invoice.paidDate).toLocaleDateString(
-                              "en-US",
-                              {
-                                year: "numeric",
-                                month: "short",
-                                day: "numeric",
-                              },
-                            )}
-                        </Typography>
+                        {formatDate(invoice.paidDate)}
                       </TableCell>
                       <TableCell
                         sx={{
@@ -389,13 +443,12 @@ export default function InvoicesPage() {
                             sx={{
                               display: "inline-flex",
                               alignItems: "center",
-                              px: 1,
-                              py: 0.25,
+                              px: "9px",
+                              py: "3px",
                               borderRadius: "999px",
-                              backgroundColor: "#fdecea",
-                              border: "1px solid #f44336",
-                              color: "#c62828",
-                              fontSize: "0.75rem",
+                              backgroundColor: d.dangerSoft,
+                              color: d.danger,
+                              fontSize: 11,
                               fontWeight: 700,
                               whiteSpace: "nowrap",
                             }}
@@ -411,7 +464,7 @@ export default function InvoicesPage() {
                             days
                           </Box>
                         ) : (
-                          "-"
+                          <span style={{ color: d.muted }}>-</span>
                         )}
                       </TableCell>
                       <TableCell
@@ -422,18 +475,19 @@ export default function InvoicesPage() {
                         }}
                       >
                         {invoice.status === "PAID" ? (
-                          "-"
+                          <span style={{ color: d.muted }}>-</span>
                         ) : (
                           <Typography
-                            variant="body2"
                             sx={{
+                              fontSize: 12,
+                              fontFamily: fonts.body,
+                              fontWeight: 600,
                               color:
                                 daysUntilDue < 0
-                                  ? "error.main"
+                                  ? d.danger
                                   : daysUntilDue < 7
-                                    ? "warning.main"
-                                    : "success.main",
-                              fontWeight: "500",
+                                    ? d.warning
+                                    : d.success,
                             }}
                           >
                             {daysUntilDue === 0
@@ -451,8 +505,16 @@ export default function InvoicesPage() {
                 })
               ) : (
                 <TableRow>
-                  <TableCell colSpan={8} sx={{ textAlign: "center", py: 3 }}>
-                    <Typography variant="body2">No invoices found</Typography>
+                  <TableCell colSpan={8} sx={{ textAlign: "center", py: 4 }}>
+                    <Typography
+                      sx={{
+                        fontSize: 13,
+                        color: d.muted,
+                        fontFamily: fonts.body,
+                      }}
+                    >
+                      No invoices found
+                    </Typography>
                   </TableCell>
                 </TableRow>
               )}
@@ -467,8 +529,20 @@ export default function InvoicesPage() {
           rowsPerPage={rowsPerPage}
           onRowsPerPageChange={handleChangeRowsPerPage}
           rowsPerPageOptions={[10, 25, 50]}
+          sx={{
+            borderTop: `1px solid ${d.border}`,
+            fontFamily: fonts.body,
+            color: d.muted,
+            "& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows":
+              {
+                fontFamily: fonts.body,
+                fontSize: 12,
+              },
+            "& .MuiSelect-select": { fontFamily: fonts.body, color: d.text },
+            "& .MuiTablePagination-actions button": { color: d.text },
+          }}
         />
-      </Paper>
+      </Box>
     </Box>
   );
 }

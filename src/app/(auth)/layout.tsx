@@ -23,14 +23,15 @@ export default function AuthLayout({
   const pathname = usePathname();
 
   // The Daylight page treatment (pale canvas, guide padding) is currently
-  // rolled out on the client dashboard, miners, wallet and transaction
-  // pages; other client pages keep their existing look and only pick up the
-  // new header.
+  // rolled out on the client dashboard, miners, wallet, transaction and
+  // invoices pages; other client pages keep their existing look and only
+  // pick up the new header.
   const isDaylightPage =
     pathname === "/dashboard" ||
     pathname === "/miners" ||
     pathname === "/wallet" ||
-    pathname === "/transaction";
+    pathname === "/transaction" ||
+    pathname === "/invoices";
 
   return (
     <SubaccountFilterProvider>
