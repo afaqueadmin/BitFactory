@@ -8,13 +8,10 @@ import {
   Button,
   TextField,
   Typography,
-  Paper,
   InputAdornment,
   IconButton,
   CircularProgress,
   Alert,
-  Card,
-  CardContent,
 } from "@mui/material";
 import Visibility from "@mui/icons-material/Visibility";
 import VisibilityOff from "@mui/icons-material/VisibilityOff";
@@ -27,6 +24,7 @@ import PwaInstallPrompt, {
   PwaQuickInstallButton,
 } from "@/components/pwa/PwaInstallPrompt";
 import { PwaInstallProvider } from "@/components/pwa/PwaInstallContext";
+import { RADIUS_CARD, focusRing, useDaylight } from "@/lib/daylight";
 
 const PASSKEY_OFFER_FLAG = "bf_offer_passkey_setup";
 
@@ -36,6 +34,7 @@ function setPasskeyOfferFlag() {
 }
 
 export default function Login() {
+  const { d, fonts } = useDaylight();
   const router = useRouter();
   const [formData, setFormData] = useState({
     email: "",
@@ -150,6 +149,20 @@ export default function Login() {
     window.location.href = redirectUrl;
   };
 
+  const inputSx = {
+    "& .MuiOutlinedInput-root": {
+      borderRadius: "8px",
+      fontFamily: fonts.body,
+      "& fieldset": { borderColor: d.inputBorder },
+      "&:hover fieldset": { borderColor: d.action },
+    },
+    "& .MuiOutlinedInput-root.Mui-focused fieldset": {
+      borderColor: d.action,
+      borderWidth: "2px",
+    },
+    "& .MuiInputLabel-root": { fontFamily: fonts.body },
+  };
+
   return (
     <PwaInstallProvider>
       <Box
@@ -159,6 +172,8 @@ export default function Login() {
           alignItems: "center",
           justifyContent: "center",
           p: 2,
+          bgcolor: d.canvas,
+          fontFamily: fonts.body,
         }}
       >
         {/* Forgot Password Modal */}
@@ -173,8 +188,7 @@ export default function Login() {
             onVerified={handleTwoFactorVerified}
           />
         ) : (
-          <Paper
-            elevation={3}
+          <Box
             sx={{
               p: 4,
               width: "100%",
@@ -182,6 +196,10 @@ export default function Login() {
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
+              bgcolor: d.surface,
+              border: `1px solid ${d.border}`,
+              borderRadius: RADIUS_CARD,
+              boxShadow: d.shadow,
             }}
           >
             {/* Logo */}
@@ -195,18 +213,37 @@ export default function Login() {
               />
             </Box>
 
-            <Typography variant="body2" color="text.main" mb={3} fontSize={16}>
+            <Typography
+              mb={3}
+              sx={{ fontSize: 15, color: d.muted, fontFamily: fonts.body }}
+            >
               Login To Your Bitcoin Mining Factory.
             </Typography>
 
             {/* Error Message */}
             {error && (
-              <Alert severity="error" sx={{ mb: 2 }}>
+              <Alert
+                severity="error"
+                sx={{
+                  mb: 2,
+                  width: "100%",
+                  borderRadius: "8px",
+                  bgcolor: d.dangerSoft,
+                  color: d.danger,
+                  fontFamily: fonts.body,
+                  "& .MuiAlert-icon": { color: d.danger },
+                }}
+              >
                 {error}
               </Alert>
             )}
 
-            <Box component="form" onSubmit={handleSubmit} noValidate>
+            <Box
+              component="form"
+              onSubmit={handleSubmit}
+              noValidate
+              sx={{ width: "100%" }}
+            >
               <TextField
                 fullWidth
                 required
@@ -216,6 +253,7 @@ export default function Login() {
                 value={formData.email}
                 onChange={handleChange}
                 margin="normal"
+                sx={inputSx}
               />
 
               <TextField
@@ -227,12 +265,14 @@ export default function Login() {
                 value={formData.password}
                 onChange={handleChange}
                 margin="normal"
+                sx={inputSx}
                 InputProps={{
                   endAdornment: (
                     <InputAdornment position="end">
                       <IconButton
                         onClick={() => setShowPassword(!showPassword)}
                         edge="end"
+                        sx={{ color: d.muted }}
                       >
                         {showPassword ? <VisibilityOff /> : <Visibility />}
                       </IconButton>
@@ -243,10 +283,14 @@ export default function Login() {
 
               <Box display="flex" mt={1}>
                 <Button
-                  variant="text"
                   size="small"
                   onClick={handleForgotPassword}
-                  sx={{ textTransform: "none" }}
+                  sx={{
+                    textTransform: "none",
+                    fontFamily: fonts.body,
+                    color: d.action,
+                    "&:hover": { bgcolor: d.hover },
+                  }}
                 >
                   Forgot password?
                 </Button>
@@ -255,27 +299,29 @@ export default function Login() {
               {webAuthnSupported && (
                 <Button
                   fullWidth
-                  variant="contained"
-                  sx={{
-                    mt: 3,
-                    mb: 1,
-                    bgcolor: "#0f766e",
-                    color: "#ffffff",
-                    boxShadow: "0 8px 24px rgba(15, 118, 110, 0.28)",
-                    "&:hover": {
-                      bgcolor: "#115e59",
-                      boxShadow: "0 10px 28px rgba(15, 118, 110, 0.34)",
-                    },
-                  }}
                   onClick={handlePasskeyLogin}
                   disabled={passKeyLoading || !formData.email}
                   startIcon={
                     passKeyLoading ? (
-                      <CircularProgress size={20} />
+                      <CircularProgress size={20} sx={{ color: d.action }} />
                     ) : (
                       <FingerprintIcon />
                     )
                   }
+                  sx={{
+                    mt: 3,
+                    mb: 1,
+                    minHeight: 42,
+                    borderRadius: "8px",
+                    textTransform: "none",
+                    fontWeight: 600,
+                    fontFamily: fonts.body,
+                    color: d.action,
+                    border: `1px solid ${d.action}`,
+                    "&:hover": { bgcolor: d.hover },
+                    "&:focus-visible": focusRing(d.action),
+                    "&.Mui-disabled": { color: d.muted, borderColor: d.border },
+                  }}
                 >
                   {passKeyLoading ? "Authenticating..." : "Login with Passkey"}
                 </Button>
@@ -284,11 +330,26 @@ export default function Login() {
               <Button
                 type="submit"
                 fullWidth
-                variant="contained"
-                color="primary"
-                sx={{ mt: 1, mb: 1 }}
+                sx={{
+                  mt: 1,
+                  mb: 1,
+                  minHeight: 42,
+                  borderRadius: "8px",
+                  textTransform: "none",
+                  fontWeight: 650,
+                  fontFamily: fonts.body,
+                  color: "#fff",
+                  bgcolor: d.action,
+                  boxShadow: "none",
+                  "&:hover": { bgcolor: d.actionHover, boxShadow: "none" },
+                  "&.Mui-disabled": { bgcolor: d.border, color: d.muted },
+                }}
                 disabled={isLoading || !formData.password}
-                startIcon={isLoading ? <CircularProgress size={20} /> : null}
+                startIcon={
+                  isLoading ? (
+                    <CircularProgress size={20} sx={{ color: "#fff" }} />
+                  ) : null
+                }
               >
                 {isLoading ? "Loading..." : "Login with Password"}
               </Button>
@@ -301,10 +362,8 @@ export default function Login() {
                 alignItems="center"
               >
                 <Typography
-                  variant="body2"
-                  color="text.secondary"
                   component="span"
-                  sx={{ mr: 0 }}
+                  sx={{ fontSize: 13, color: d.muted, fontFamily: fonts.body }}
                 >
                   Don&apos;t have an account?
                 </Typography>
@@ -313,9 +372,14 @@ export default function Login() {
                   href="https://www.bitfactory.ae"
                   target="_blank"
                   rel="noopener noreferrer"
-                  variant="text"
                   size="medium"
-                  sx={{ textTransform: "none", ml: 0 }}
+                  sx={{
+                    textTransform: "none",
+                    ml: 0,
+                    fontFamily: fonts.body,
+                    color: d.action,
+                    "&:hover": { bgcolor: d.hover },
+                  }}
                 >
                   Sign up
                 </Button>
@@ -329,16 +393,25 @@ export default function Login() {
 
             {/* Passkey unavailable notice */}
             {!webAuthnSupported && (
-              <Card sx={{ mt: 2, bgcolor: "info.lighter" }}>
-                <CardContent>
-                  <Typography variant="caption" color="info.main">
-                    ℹ️ Passkey authentication is not available in your browser.
-                    Please update your browser or use the password login method.
-                  </Typography>
-                </CardContent>
-              </Card>
+              <Box
+                sx={{
+                  mt: 2,
+                  p: "12px 14px",
+                  width: "100%",
+                  borderRadius: "8px",
+                  bgcolor: d.skySoft,
+                  border: `1px solid ${d.borderSky}`,
+                }}
+              >
+                <Typography
+                  sx={{ fontSize: 11, color: d.action, fontFamily: fonts.body }}
+                >
+                  ℹ️ Passkey authentication is not available in your browser.
+                  Please update your browser or use the password login method.
+                </Typography>
+              </Box>
             )}
-          </Paper>
+          </Box>
         )}
 
         {/* PWA Mobile/Tablet Install Modal Popup */}

@@ -1,12 +1,20 @@
 "use client";
 
+/**
+ * Welcome / landing page - BitFactory Daylight theme (v1.3)
+ *
+ * Public, unauthenticated entry point: pale canvas background, a single
+ * centred Daylight card with the brand mark and a Login call to action.
+ */
+
 import React from "react";
-import { Box, Typography, Button, useTheme, Stack, Paper } from "@mui/material";
+import { Box, Typography, Button, Stack } from "@mui/material";
 import Link from "next/link";
 import Image from "next/image";
+import { RADIUS_CARD, useDaylight } from "@/lib/daylight";
 
 export default function Home() {
-  const theme = useTheme();
+  const { d, fonts } = useDaylight();
 
   return (
     <Box
@@ -18,20 +26,20 @@ export default function Home() {
         textAlign: "center",
         px: 2,
         py: { xs: 6, md: 10 },
-        bgcolor: "background.default",
+        bgcolor: d.canvas,
+        fontFamily: fonts.body,
       }}
     >
-      <Paper
-        elevation={3}
+      <Box
         sx={{
           maxWidth: 600,
           width: "100%",
           mx: "auto",
           p: { xs: 5, md: 7 },
-          bgcolor: "background.paper",
-          borderRadius: 5,
-          border: `1px solid ${theme.palette.divider}`,
-          boxShadow: "0px 4px 20px rgba(0,0,0,0.1)",
+          bgcolor: d.surface,
+          borderRadius: RADIUS_CARD,
+          border: `1px solid ${d.border}`,
+          boxShadow: d.shadow,
         }}
       >
         <Stack spacing={0} alignItems="center">
@@ -52,36 +60,43 @@ export default function Home() {
           </Box>
 
           <Typography
-            variant="body1"
             mb={4}
-            fontSize={25}
-            sx={{ color: "text.main", maxWidth: 500 }}
+            sx={{
+              fontSize: { xs: 18, sm: 20 },
+              color: d.muted,
+              maxWidth: 500,
+              mt: 2,
+            }}
           >
             Login to your Bitcoin mining Factory
           </Typography>
 
           <Button
-            variant="contained"
-            color="primary"
-            size="large"
             component={Link}
             href="/login"
+            size="large"
             sx={{
               px: 6,
               py: 1.5,
               fontSize: 16,
-              borderRadius: 3,
-              transition: "0.3s",
+              fontWeight: 650,
+              textTransform: "none",
+              borderRadius: "8px",
+              color: "#fff",
+              bgcolor: d.action,
+              boxShadow: "none",
+              transition: "0.2s",
               "&:hover": {
-                transform: "scale(1.05)",
-                boxShadow: "0px 4px 15px rgba(0,0,0,0.2)",
+                bgcolor: d.actionHover,
+                boxShadow: "none",
+                transform: "scale(1.03)",
               },
             }}
           >
             Login
           </Button>
         </Stack>
-      </Paper>
+      </Box>
     </Box>
   );
 }
