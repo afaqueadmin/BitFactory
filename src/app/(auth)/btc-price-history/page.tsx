@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * BTC Price History Page
+ * BTC Price History Page - BitFactory Daylight theme (v1.3)
  *
  * FEATURES:
  *
@@ -9,12 +9,14 @@
  * - Current Price Card: Shows the live BTC/USDT price from Binance (independent of timeframe)
  *   (always the latest market price, not affected by which timeframe you select)
  * - 24h Change Card: Displays how much the price has changed in the last 24 hours
- *   as both percentage and absolute value. Color-coded: green if up, red if down
+ *   as both percentage and absolute value. Colour-coded via a mint/danger StatCard tone.
  * - High/Low Cards: Show the highest and lowest prices during the selected timeframe
  *   (for the entire timeframe you picked like 1W, 1M, etc., not just 24 hours)
  *
  * Chart (Main Visualization):
- * - Close Price (Golden Line): The main line showing how price moved throughout the period
+ * - Close Price (Golden Line): The main line showing how price moved throughout the period -
+ *   deliberately kept Binance's own gold, not restyled to a Daylight brand colour, along with
+ *   its green/red high-low range lines, since the point is to read like Binance's own chart.
  * - High/Low (Subtle Range): Dashed lines showing per-candle highs (green) and lows (red)
  *   creating a range band
  * - Volume Bars (Semi-transparent): Gray bars showing trading volume at the bottom
@@ -42,12 +44,9 @@
 import React, { useState, useMemo } from "react";
 import {
   Box,
-  Paper,
   Typography,
   CircularProgress,
   Alert,
-  Button,
-  useTheme,
   useMediaQuery,
 } from "@mui/material";
 import {
@@ -61,8 +60,15 @@ import {
   Area,
   AreaChart,
 } from "recharts";
+import CurrencyBitcoinOutlinedIcon from "@mui/icons-material/CurrencyBitcoinOutlined";
+import TrendingUpOutlinedIcon from "@mui/icons-material/TrendingUpOutlined";
+import TrendingDownOutlinedIcon from "@mui/icons-material/TrendingDownOutlined";
+import SwapVertOutlinedIcon from "@mui/icons-material/SwapVertOutlined";
 import { useBinanceKlines, KlineData } from "@/hooks/useBinanceKlines";
 import { fetchLiveBtc24hStats } from "@/lib/services/btcPriceService";
+import StatCard from "@/components/daylight/StatCard";
+import PillTab from "@/components/daylight/PillTab";
+import { RADIUS_CARD, useDaylight } from "@/lib/daylight";
 
 interface ChartData {
   timestamp: number;
@@ -128,7 +134,7 @@ const formatDate = (timestamp: number, timeframe: string): string => {
 };
 
 export default function BtcPriceHistoryPage() {
-  const theme = useTheme();
+  const { d, fonts } = useDaylight();
   const [selectedTimeframe, setSelectedTimeframe] = useState("24H");
   const [currentPrice, setCurrentPrice] = useState(0);
   const [change24h, setChange24h] = useState(0);
@@ -184,8 +190,8 @@ export default function BtcPriceHistoryPage() {
       };
     }
 
-    const high = Math.max(...chartData.map((d) => d.high));
-    const low = Math.min(...chartData.map((d) => d.low));
+    const high = Math.max(...chartData.map((point) => point.high));
+    const low = Math.min(...chartData.map((point) => point.low));
 
     // Current price comes from live Binance ticker (independent of timeframe)
     // 24h change comes from Binance 24hr stats (consistent across all timeframes)
@@ -199,168 +205,136 @@ export default function BtcPriceHistoryPage() {
     };
   }, [chartData, currentPrice, change24h, changePercent24h]);
 
-  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
-  const isDark = theme.palette.mode === "dark";
-  // Binance-style golden/yellow color for close price
+  const isMobile = useMediaQuery("(max-width:599.95px)");
+  const isUp = statistics.change >= 0;
+  // Binance-style golden/yellow color for close price - kept as-is (see file header).
   const chartColor = "#f7b923";
-  const gridColor = isDark ? "#444" : "#e0e0e0";
-  const textColor = isDark ? "#fff" : "#000";
 
   return (
-    <Box sx={{ p: { xs: 1.5, sm: 2, md: 3 }, mt: { xs: 1, md: 2 } }}>
-      {/* Header */}
-      <Box sx={{ mb: { xs: 2, md: 4 } }}>
+    <Box
+      sx={{ maxWidth: 1600, mx: "auto", fontFamily: fonts.body, color: d.text }}
+    >
+      {/* Page heading */}
+      <Box sx={{ mb: { xs: "20px", md: "26px" } }}>
         <Typography
-          variant="h4"
           component="h1"
           sx={{
-            fontWeight: "bold",
-            mb: 0.5,
-            fontSize: { xs: "1.6rem", sm: "2rem", md: "2.125rem" },
+            fontFamily: fonts.heading,
+            fontWeight: 750,
+            fontSize: { xs: 27, md: 32 },
+            lineHeight: 1.3,
+            letterSpacing: "-.035em",
+            color: d.text,
           }}
         >
           Bitcoin Price History
         </Typography>
-        <Typography variant="body2" color="textSecondary">
-          Real-time BTC/USDT price data from Binance
+        <Typography
+          sx={{
+            fontSize: { xs: 12, md: 13 },
+            lineHeight: { xs: 1.7, md: 1.5 },
+            color: d.muted,
+            mt: "7px",
+          }}
+        >
+          Real-time BTC/USDT price data from Binance.
         </Typography>
       </Box>
 
-      {/* Statistics Cards */}
+      {/* KPI cards */}
       <Box
         sx={{
           display: "grid",
-          gridTemplateColumns: { xs: "1fr 1fr", sm: "1fr 1fr 1fr" },
-          gap: { xs: 1.5, sm: 2 },
-          mb: { xs: 2, md: 4 },
+          gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+          gap: { xs: "10px", sm: "16px" },
+          mb: { xs: "18px", sm: "22px" },
+          "@media (max-width:699.95px)": { gridTemplateColumns: "1fr 1fr" },
         }}
       >
-        <Paper
-          sx={{
-            p: { xs: 1.5, sm: 2 },
-            backgroundColor: isDark ? theme.palette.grey[800] : "#f5f5f5",
-            borderRadius: 2,
-          }}
-        >
-          <Typography variant="caption" color="textSecondary">
-            Current Price
-          </Typography>
-          <Typography
-            variant="h6"
-            sx={{
-              fontWeight: "bold",
-              mt: 0.5,
-              fontSize: { xs: "1rem", sm: "1.25rem" },
-            }}
-          >
-            {formatCurrency(statistics.current)}
-          </Typography>
-        </Paper>
-
-        <Paper
-          sx={{
-            p: { xs: 1.5, sm: 2 },
-            backgroundColor: isDark ? theme.palette.grey[800] : "#f5f5f5",
-            borderRadius: 2,
-          }}
-        >
-          <Typography variant="caption" color="textSecondary">
-            24h Change
-          </Typography>
-          <Typography
-            variant="h6"
-            sx={{
-              fontWeight: "bold",
-              mt: 0.5,
-              fontSize: { xs: "0.85rem", sm: "1.25rem" },
-              color: statistics.change >= 0 ? "#4caf50" : "#f44336",
-            }}
-          >
-            {statistics.change >= 0 ? "+" : ""}
-            {isMobile
-              ? `${statistics.changePercent.toFixed(2)}%`
-              : `${formatCurrency(statistics.change)} (${statistics.changePercent.toFixed(2)}%)`}
-          </Typography>
-        </Paper>
-
-        <Paper
-          sx={{
-            p: { xs: 1.5, sm: 2 },
-            gridColumn: { xs: "1 / -1", sm: "auto" },
-            backgroundColor: isDark ? theme.palette.grey[800] : "#f5f5f5",
-            borderRadius: 2,
-          }}
-        >
-          <Typography variant="caption" color="textSecondary">
-            {isMobile ? `High / Low (${selectedTimeframe})` : "High / Low"}
-          </Typography>
-          <Typography
-            variant="body2"
-            sx={{
-              fontWeight: "bold",
-              mt: 0.5,
-              fontSize: { xs: "0.85rem", sm: "0.875rem" },
-            }}
-          >
-            {formatCurrency(statistics.high)} / {formatCurrency(statistics.low)}
-          </Typography>
-        </Paper>
+        <StatCard
+          title="Current Price"
+          value={formatCurrency(statistics.current)}
+          caption="Live BTC/USDT"
+          tone="sky"
+          icon={<CurrencyBitcoinOutlinedIcon />}
+          isLoading={!statistics.current}
+        />
+        <StatCard
+          title="24h Change"
+          value={`${isUp ? "+" : ""}${formatCurrency(statistics.change)}`}
+          caption={`${isUp ? "+" : ""}${statistics.changePercent.toFixed(2)}%`}
+          tone={isUp ? "mint" : "danger"}
+          valueColor={isUp ? d.success : d.danger}
+          icon={
+            isUp ? <TrendingUpOutlinedIcon /> : <TrendingDownOutlinedIcon />
+          }
+          isLoading={!statistics.current}
+        />
+        <StatCard
+          title={`High / Low (${selectedTimeframe})`}
+          value={formatCurrency(statistics.high)}
+          caption={`Low ${formatCurrency(statistics.low)}`}
+          tone="amber"
+          icon={<SwapVertOutlinedIcon />}
+          isLoading={isLoading && chartData.length === 0}
+        />
       </Box>
 
-      {/* Chart Section */}
-      {/* 
-        Main visualization showing price movement:
-        - Golden line: Close price (primary indicator)
-        - Dashed lines: High (green) and Low (red) prices creating a range band
-        - Area fill: Subtle gradient under the close price for visual appeal
-      */}
-      <Paper
+      {/* Chart card */}
+      <Box
         sx={{
-          p: { xs: 1.5, sm: 3 },
-          borderRadius: 2,
-          backgroundColor: isDark ? theme.palette.grey[900] : "#ffffff",
+          bgcolor: d.surface,
+          border: `1px solid ${d.border}`,
+          borderRadius: RADIUS_CARD,
+          boxShadow: d.shadow,
+          p: { xs: "16px 12px", sm: "20px 24px" },
+          mb: { xs: "18px", sm: "22px" },
         }}
       >
-        {/* Timeframe Selector Buttons */}
+        {/* Timeframe selector */}
         <Box
           sx={{
-            mb: 2,
+            mb: "16px",
             display: "flex",
-            gap: { xs: 1, sm: 2 },
+            gap: "12px",
             alignItems: "center",
             flexWrap: "wrap",
           }}
         >
           <Typography
-            variant="caption"
-            color="textSecondary"
-            sx={{ fontWeight: 600, display: { xs: "none", sm: "block" } }}
+            sx={{
+              fontSize: 11,
+              fontWeight: 650,
+              color: d.muted,
+              display: { xs: "none", sm: "block" },
+              whiteSpace: "nowrap",
+            }}
           >
-            ⏰ All times in UTC
+            All times in UTC
           </Typography>
-          <Box sx={{ display: "flex", gap: 0.75, flexWrap: "wrap" }}>
+          <Box
+            sx={{
+              display: "flex",
+              gap: "4px",
+              flexWrap: "wrap",
+              overflowX: "auto",
+              pb: { xs: "2px", sm: 0 },
+              "&::-webkit-scrollbar": { display: "none" },
+            }}
+          >
             {TIMEFRAMES.map((timeframe) => (
-              <Button
+              <PillTab
                 key={timeframe}
+                active={selectedTimeframe === timeframe}
                 onClick={() => setSelectedTimeframe(timeframe)}
-                variant={
-                  selectedTimeframe === timeframe ? "contained" : "outlined"
-                }
-                size="small"
-                sx={{
-                  minWidth: { xs: "40px", sm: "60px" },
-                  px: { xs: 1, sm: 1.5 },
-                  fontSize: { xs: "0.7rem", sm: "0.8rem" },
-                  textTransform: "uppercase",
-                }}
               >
                 {timeframe}
-              </Button>
+              </PillTab>
             ))}
           </Box>
         </Box>
 
-        {/* Loading State */}
+        {/* Loading state */}
         {isLoading && (
           <Box
             sx={{
@@ -370,34 +344,44 @@ export default function BtcPriceHistoryPage() {
               minHeight: "400px",
             }}
           >
-            <CircularProgress />
+            <CircularProgress sx={{ color: d.action }} />
           </Box>
         )}
 
-        {/* Error State */}
+        {/* Error state */}
         {isError && (
-          <Alert severity="error" sx={{ mb: 2 }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: "bold" }}>
+          <Alert
+            severity="error"
+            sx={{
+              mb: 2,
+              borderRadius: "8px",
+              bgcolor: d.dangerSoft,
+              color: d.danger,
+              fontFamily: fonts.body,
+            }}
+          >
+            <Typography
+              sx={{ fontWeight: 700, fontSize: 13, fontFamily: fonts.body }}
+            >
               Failed to load price data
             </Typography>
-            <Typography variant="body2">{error}</Typography>
-            <Typography variant="caption" sx={{ mt: 1, display: "block" }}>
+            <Typography sx={{ fontSize: 12, fontFamily: fonts.body }}>
+              {error}
+            </Typography>
+            <Typography
+              sx={{
+                mt: 1,
+                display: "block",
+                fontSize: 11,
+                fontFamily: fonts.body,
+              }}
+            >
               Please try again or refresh the page.
             </Typography>
           </Alert>
         )}
 
-        {/* Chart Visualization */}
-        {/* 
-          Binance-style chart showing:
-          - Golden line: Main close price indicator
-          - Area fill: Gradient underneath for visual appeal
-          - High/Low dashed lines: Range band showing daily extremes
-          - Grid: Subtle gridlines for reference
-          
-          Data updates automatically every 5 minutes from Binance API
-          without requiring manual page refresh
-        */}
+        {/* Chart */}
         {!isLoading && !isError && chartData.length > 0 && (
           <ResponsiveContainer width="100%" height={isMobile ? 260 : 400}>
             <AreaChart
@@ -410,27 +394,37 @@ export default function BtcPriceHistoryPage() {
                   <stop offset="95%" stopColor={chartColor} stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
+              <CartesianGrid strokeDasharray="3 3" stroke={d.border} />
               <XAxis
                 dataKey="date"
-                stroke={textColor}
-                tick={{ fontSize: isMobile ? 9 : 12 }}
-                interval={isMobile ? "preserveStartEnd" : "preserveStartEnd"}
+                stroke={d.border}
+                tick={{
+                  fontSize: isMobile ? 9 : 12,
+                  fill: d.muted,
+                  fontFamily: fonts.body,
+                }}
+                interval="preserveStartEnd"
               />
               <YAxis
                 yAxisId="left"
-                stroke={textColor}
-                tick={{ fontSize: isMobile ? 9 : 12 }}
+                stroke={d.border}
+                tick={{
+                  fontSize: isMobile ? 9 : 12,
+                  fill: d.muted,
+                  fontFamily: fonts.body,
+                }}
                 width={isMobile ? 52 : 70}
                 tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
                 domain={["dataMin", "dataMax"]}
               />
               <Tooltip
                 contentStyle={{
-                  backgroundColor: isDark ? "#333" : "#fff",
-                  border: `1px solid ${theme.palette.divider}`,
-                  borderRadius: "8px",
-                  color: textColor,
+                  backgroundColor: d.surface,
+                  border: `1px solid ${d.border}`,
+                  borderRadius: "10px",
+                  boxShadow: "0 8px 30px rgba(100,114,124,.13)",
+                  color: d.text,
+                  fontFamily: fonts.body,
                 }}
                 formatter={(value, name) => {
                   if (value == null || !name) {
@@ -453,7 +447,11 @@ export default function BtcPriceHistoryPage() {
                 }}
               />
               <Legend
-                wrapperStyle={{ color: textColor }}
+                wrapperStyle={{
+                  color: d.muted,
+                  fontFamily: fonts.body,
+                  fontSize: 12,
+                }}
                 iconType="line"
                 height={20}
               />
@@ -498,7 +496,7 @@ export default function BtcPriceHistoryPage() {
           </ResponsiveContainer>
         )}
 
-        {/* Empty State */}
+        {/* Empty state */}
         {!isLoading && !isError && chartData.length === 0 && (
           <Box
             sx={{
@@ -508,31 +506,31 @@ export default function BtcPriceHistoryPage() {
               minHeight: "400px",
             }}
           >
-            <Typography color="textSecondary">No data available</Typography>
+            <Typography
+              sx={{ fontSize: 13, color: d.muted, fontFamily: fonts.body }}
+            >
+              No data available
+            </Typography>
           </Box>
         )}
-      </Paper>
+      </Box>
 
-      {/* Info Section */}
-      {/* 
-        Footer with data source information:
-        - Binance Public API for real-time BTCUSDT data
-        - Automatic updates every 5 minutes without manual refresh
-        - All prices displayed in USDT
-      */}
-      <Paper
+      {/* Info footer */}
+      <Box
         sx={{
-          p: { xs: 1.5, sm: 2 },
-          mt: { xs: 2, md: 3 },
-          borderRadius: 2,
-          backgroundColor: isDark ? theme.palette.grey[800] : "#f5f5f5",
+          p: { xs: "14px 16px", sm: "16px 20px" },
+          borderRadius: RADIUS_CARD,
+          bgcolor: d.skySoft,
+          border: `1px solid ${d.borderSky}`,
         }}
       >
-        <Typography variant="body2" color="textSecondary">
-          <strong>Data Source:</strong> Binance Public API (BTCUSDT) • All
-          prices in USDT
+        <Typography sx={{ fontSize: 12, color: d.text }}>
+          <Box component="strong" sx={{ fontWeight: 700 }}>
+            Data Source:
+          </Box>{" "}
+          Binance Public API (BTCUSDT) • All prices in USDT
         </Typography>
-      </Paper>
+      </Box>
     </Box>
   );
 }
