@@ -37,10 +37,13 @@ export async function POST(req: NextRequest) {
   const event = JSON.parse(rawBody);
   const { invoiceId, type } = event;
   console.log("invoiceId", invoiceId);
+  console.log("event.metadata.orderId", event.metadata.orderId);
   console.log("type", type);
 
+  const invId = event.metadata.orderId; // Contains the original Bitfactory invoiceId
+
   const invoice = await prisma.invoice.findUnique({
-    where: { btcpayInvoiceId: invoiceId },
+    where: { btcpayInvoiceId: invId },
   });
 
   if (!invoice) {
