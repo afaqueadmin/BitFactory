@@ -42,7 +42,9 @@ export default function AddAdjustmentModal({
   // When no customerId is preset (e.g. opened from the Credit Adjustments
   // page rather than a customer's row menu), let the admin pick one.
   const needsCustomerPicker = !customerId;
-  const { customers, loading: customersLoading } = useCustomers();
+  const { customers, loading: customersLoading } = useCustomers({
+    hostingOnly: true,
+  });
 
   const handleClose = () => {
     onClose();

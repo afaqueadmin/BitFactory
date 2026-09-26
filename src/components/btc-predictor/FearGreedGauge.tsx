@@ -1,20 +1,16 @@
 "use client";
 
 import React from "react";
-import {
-  Box,
-  Typography,
-  CircularProgress,
-  Alert,
-  useTheme,
-} from "@mui/material";
+import { Box, Typography, CircularProgress, Alert } from "@mui/material";
 import { FearGreedData } from "@/hooks/useBtcMarketInsights";
+import { useDaylight } from "@/lib/daylight";
 
 interface FearGreedGaugeProps {
   data: FearGreedData | null | undefined;
   isLoading: boolean;
 }
 
+// Semantic (not brand) colours - matches alternative.me's own scale.
 const classificationColor = (value: number): string => {
   if (value <= 24) return "#f44336"; // Extreme Fear
   if (value <= 44) return "#ff9800"; // Fear
@@ -27,20 +23,28 @@ export default function FearGreedGauge({
   data,
   isLoading,
 }: FearGreedGaugeProps) {
-  const theme = useTheme();
-  const isDark = theme.palette.mode === "dark";
+  const { d, fonts } = useDaylight();
 
   if (isLoading) {
     return (
       <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
-        <CircularProgress size={28} />
+        <CircularProgress size={28} sx={{ color: d.action }} />
       </Box>
     );
   }
 
   if (!data) {
     return (
-      <Alert severity="warning" sx={{ borderRadius: 2 }}>
+      <Alert
+        severity="warning"
+        sx={{
+          borderRadius: "8px",
+          bgcolor: d.amber,
+          color: d.warning,
+          fontFamily: fonts.body,
+          "& .MuiAlert-icon": { color: d.warning },
+        }}
+      >
         Fear &amp; Greed data unavailable right now.
       </Alert>
     );
@@ -55,15 +59,15 @@ export default function FearGreedGauge({
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          mb: 2,
+          mb: "16px",
         }}
       >
         <Typography
-          variant="h3"
-          fontWeight="800"
           sx={{
+            fontFamily: fonts.heading,
+            fontWeight: 750,
             color: markerColor,
-            fontSize: { xs: "2rem", sm: "2.5rem" },
+            fontSize: { xs: 32, sm: 40 },
             lineHeight: 1,
           }}
         >
@@ -71,19 +75,19 @@ export default function FearGreedGauge({
         </Typography>
         <Box
           sx={{
-            px: 1.5,
-            py: 0.5,
-            borderRadius: 999,
+            px: "12px",
+            py: "5px",
+            borderRadius: "999px",
             backgroundColor: `${markerColor}22`,
             border: `1px solid ${markerColor}44`,
           }}
         >
           <Typography
-            variant="subtitle2"
-            fontWeight="700"
             sx={{
+              fontFamily: fonts.body,
+              fontWeight: 700,
               color: markerColor,
-              fontSize: { xs: "0.8rem", sm: "0.9rem" },
+              fontSize: { xs: 12, sm: 13 },
             }}
           >
             {data.classification}
@@ -91,7 +95,7 @@ export default function FearGreedGauge({
         </Box>
       </Box>
 
-      <Box sx={{ position: "relative", pt: 2, pb: 1 }}>
+      <Box sx={{ position: "relative", pt: "16px", pb: "8px" }}>
         <Box
           sx={{
             height: 12,
@@ -110,33 +114,23 @@ export default function FearGreedGauge({
             height: 0,
             borderLeft: "6px solid transparent",
             borderRight: "6px solid transparent",
-            borderTop: `10px solid ${isDark ? "#fff" : "#1e293b"}`,
+            borderTop: `10px solid ${d.text}`,
             filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.3))",
           }}
         />
       </Box>
 
-      <Box sx={{ display: "flex", justifyContent: "space-between", mt: 0.5 }}>
-        <Typography
-          variant="caption"
-          color="text.secondary"
-          sx={{ fontSize: { xs: "0.68rem", sm: "0.75rem" } }}
-        >
+      <Box sx={{ display: "flex", justifyContent: "space-between", mt: "4px" }}>
+        <Typography sx={{ fontSize: { xs: 10, sm: 11 }, color: d.muted }}>
           0 • Extreme Fear
         </Typography>
-        <Typography
-          variant="caption"
-          color="text.secondary"
-          sx={{ fontSize: { xs: "0.68rem", sm: "0.75rem" } }}
-        >
+        <Typography sx={{ fontSize: { xs: 10, sm: 11 }, color: d.muted }}>
           100 • Extreme Greed
         </Typography>
       </Box>
 
       <Typography
-        variant="caption"
-        color="text.secondary"
-        sx={{ display: "block", mt: 2, fontSize: "0.7rem", opacity: 0.8 }}
+        sx={{ display: "block", mt: "16px", fontSize: 10, color: d.muted }}
       >
         Source: alternative.me Crypto Fear &amp; Greed Index
       </Typography>

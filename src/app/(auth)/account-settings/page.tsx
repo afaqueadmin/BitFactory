@@ -1,25 +1,35 @@
 "use client";
 
+/**
+ * Account Settings page (authenticated) - BitFactory Daylight theme (v1.3)
+ *
+ * Composes:
+ * - Page heading
+ * - Daylight profile card (avatar upload, editable fields, save button)
+ * - Lightweight Daylight-toned error/success dialogs (page-local, not the
+ *   shared generic modal pattern, so restyled in place rather than deferred)
+ *
+ * All fetch/upload/patch logic is unchanged from the previous implementation.
+ */
+
 import React, { useEffect, useState } from "react";
 import {
   Box,
-  Paper,
   Typography,
   TextField,
   Button,
   Grid as MuiGrid,
   Avatar,
   CircularProgress,
-  useTheme,
   Dialog,
   DialogContent,
-  DialogTitle,
   Fade,
   IconButton,
 } from "@mui/material";
 
 import { CheckCircleOutline, Close, ErrorOutline } from "@mui/icons-material";
 import { PhotoCamera } from "@mui/icons-material";
+import { RADIUS_CARD, useDaylight } from "@/lib/daylight";
 
 // Create a Grid component that includes the 'item' prop
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -40,7 +50,7 @@ interface UserProfile {
 }
 
 export default function AccountSettings() {
-  const theme = useTheme();
+  const { d, fonts } = useDaylight();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -172,6 +182,21 @@ export default function AccountSettings() {
     }
   };
 
+  const inputSx = {
+    "& .MuiOutlinedInput-root": {
+      borderRadius: "8px",
+      fontFamily: fonts.body,
+      "& fieldset": { borderColor: d.inputBorder },
+      "&:hover fieldset": { borderColor: d.action },
+    },
+    "& .MuiOutlinedInput-root.Mui-focused fieldset": {
+      borderColor: d.action,
+      borderWidth: "2px",
+    },
+    "& .MuiInputLabel-root": { fontFamily: fonts.body, color: d.muted },
+    "& .MuiInputBase-input": { fontFamily: fonts.body, color: d.text },
+  };
+
   if (loading) {
     return (
       <Box
@@ -182,65 +207,55 @@ export default function AccountSettings() {
           minHeight: "60vh",
         }}
       >
-        <CircularProgress />
+        <CircularProgress sx={{ color: d.action }} />
       </Box>
     );
   }
 
   return (
     <Box
-      sx={{
-        p: { xs: 2, sm: 3 },
-        mt: { xs: 1, sm: 2 },
-        maxWidth: 1200,
-        mx: "auto",
-        minHeight: "100vh",
-        bgcolor: (theme) =>
-          theme.palette.mode === "dark" ? "background.default" : "grey.50",
-      }}
+      sx={{ maxWidth: 1200, mx: "auto", fontFamily: fonts.body, color: d.text }}
     >
-      <Typography
-        variant="h4"
-        fontWeight="bold"
-        gutterBottom
-        sx={{
-          color: (theme) =>
-            theme.palette.mode === "dark" ? "primary.light" : "primary.dark",
-          mb: 3,
-          borderBottom: (theme) => `2px solid ${theme.palette.primary.main}`,
-          pb: 1,
-        }}
-      >
-        Account Settings
-      </Typography>
+      <Box sx={{ mb: { xs: "20px", md: "26px" } }}>
+        <Typography
+          component="h1"
+          sx={{
+            fontFamily: fonts.heading,
+            fontWeight: 750,
+            fontSize: { xs: 27, md: 32 },
+            lineHeight: 1.3,
+            letterSpacing: "-.035em",
+            color: d.text,
+          }}
+        >
+          Account Settings
+        </Typography>
+        <Typography
+          sx={{
+            fontSize: { xs: 12, md: 13 },
+            lineHeight: { xs: 1.7, md: 1.5 },
+            color: d.muted,
+            mt: "7px",
+          }}
+        >
+          Manage your profile information.
+        </Typography>
+      </Box>
 
       {/* Profile Section */}
-      <Paper
-        elevation={3}
+      <Box
         sx={{
-          p: { xs: 2, sm: 4 },
-          mb: 4,
-          borderRadius: 2,
-          background: (theme) =>
-            theme.palette.mode === "dark"
-              ? "linear-gradient(145deg, rgba(40,40,40,0.9), rgba(30,30,30,0.9))"
-              : "linear-gradient(145deg, rgba(255,255,255,0.9), rgba(250,250,250,0.9))",
-          backdropFilter: "blur(10px)",
-          border: (theme) => `1px solid ${theme.palette.divider}`,
+          p: { xs: 2.5, sm: 4 },
+          bgcolor: d.surface,
+          border: `1px solid ${d.border}`,
+          borderRadius: RADIUS_CARD,
+          boxShadow: d.shadow,
         }}
       >
         <Grid container spacing={4}>
           {/* Profile Photo Section */}
           <Grid item xs={12} md={3}>
-            <Box
-              sx={{
-                textAlign: "center",
-                position: "relative",
-                "&:hover .upload-overlay": {
-                  opacity: 1,
-                },
-              }}
-            >
+            <Box sx={{ textAlign: "center" }}>
               <Avatar
                 src={formData.profileImage || undefined}
                 sx={{
@@ -248,32 +263,28 @@ export default function AccountSettings() {
                   height: { xs: 100, sm: 120, md: 140 },
                   mx: "auto",
                   mb: 2,
-                  bgcolor: theme.palette.primary.main,
+                  bgcolor: d.action,
                   fontSize: { xs: "2.5rem", sm: "3rem", md: "3.5rem" },
-                  border: (theme) => `4px solid ${theme.palette.primary.main}`,
-                  boxShadow: (theme) =>
-                    `0 0 20px ${theme.palette.primary.main}40`,
+                  fontFamily: fonts.heading,
+                  border: `4px solid ${d.surface}`,
+                  boxShadow: d.shadow,
                 }}
               >
                 {formData.name?.charAt(0) || "U"}
               </Avatar>
               <Button
                 component="label"
-                variant="contained"
-                startIcon={<PhotoCamera />}
+                startIcon={<PhotoCamera sx={{ fontSize: 18 }} />}
                 sx={{
-                  mt: 1,
-                  background: (theme) =>
-                    theme.palette.mode === "dark"
-                      ? "rgba(255,255,255,0.1)"
-                      : "rgba(0,0,0,0.1)",
-                  backdropFilter: "blur(5px)",
-                  "&:hover": {
-                    background: (theme) =>
-                      theme.palette.mode === "dark"
-                        ? "rgba(255,255,255,0.2)"
-                        : "rgba(0,0,0,0.2)",
-                  },
+                  textTransform: "none",
+                  fontFamily: fonts.body,
+                  fontWeight: 600,
+                  fontSize: 12.5,
+                  borderRadius: "8px",
+                  border: `1px solid ${d.inputBorder}`,
+                  color: d.text,
+                  px: "16px",
+                  "&:hover": { bgcolor: d.hover },
                 }}
               >
                 Upload Photo
@@ -380,22 +391,7 @@ export default function AccountSettings() {
 
           {/* Form Fields */}
           <Grid item xs={12} md={9}>
-            <Box
-              component="form"
-              onSubmit={handleSubmit}
-              sx={{
-                "& .MuiTextField-root": {
-                  "& .MuiOutlinedInput-root": {
-                    "&:hover fieldset": {
-                      borderColor: (theme) => theme.palette.primary.main,
-                    },
-                    "&.Mui-focused fieldset": {
-                      borderWidth: "2px",
-                    },
-                  },
-                },
-              }}
-            >
+            <Box component="form" onSubmit={handleSubmit}>
               <Grid container spacing={3}>
                 {/* Error Dialog */}
                 <Dialog
@@ -405,25 +401,20 @@ export default function AccountSettings() {
                   TransitionProps={{ timeout: 500 }}
                   PaperProps={{
                     sx: {
-                      borderRadius: 3,
+                      borderRadius: "16px",
                       minWidth: "300px",
-                      background: (theme) =>
-                        theme.palette.mode === "dark"
-                          ? "linear-gradient(145deg, rgba(40,40,40,0.95), rgba(30,30,30,0.95))"
-                          : "linear-gradient(145deg, rgba(255,255,255,0.95), rgba(250,250,250,0.95))",
-                      backdropFilter: "blur(10px)",
-                      border: (theme) =>
-                        `1px solid ${theme.palette.error.main}40`,
-                      boxShadow: (theme) =>
-                        `0 8px 32px ${theme.palette.error.main}30`,
+                      bgcolor: d.surface,
+                      border: `1px solid ${d.border}`,
+                      boxShadow: d.shadow,
                     },
                   }}
                 >
-                  <DialogTitle
+                  <Box
                     sx={{
                       textAlign: "center",
                       pt: 3,
                       pb: 0,
+                      position: "relative",
                     }}
                   >
                     <IconButton
@@ -432,30 +423,24 @@ export default function AccountSettings() {
                         position: "absolute",
                         right: 8,
                         top: 8,
-                        color: (theme) => theme.palette.grey[500],
+                        color: d.muted,
                       }}
                     >
                       <Close />
                     </IconButton>
                     <ErrorOutline
-                      sx={{
-                        fontSize: "4rem",
-                        color: "error.main",
-                        mb: 1,
-                      }}
+                      sx={{ fontSize: "3.5rem", color: d.danger, mb: 1 }}
                     />
-                  </DialogTitle>
+                  </Box>
                   <DialogContent>
                     <Typography
-                      variant="h6"
                       align="center"
                       sx={{
                         mb: 2,
-                        color: (theme) =>
-                          theme.palette.mode === "dark"
-                            ? theme.palette.error.light
-                            : theme.palette.error.dark,
-                        fontWeight: "bold",
+                        fontFamily: fonts.heading,
+                        fontWeight: 700,
+                        fontSize: 18,
+                        color: d.text,
                       }}
                     >
                       Error
@@ -464,7 +449,9 @@ export default function AccountSettings() {
                       align="center"
                       sx={{
                         mb: 3,
-                        color: (theme) => theme.palette.text.secondary,
+                        fontFamily: fonts.body,
+                        fontSize: 13,
+                        color: d.muted,
                       }}
                     >
                       {error}
@@ -475,15 +462,16 @@ export default function AccountSettings() {
                         variant="contained"
                         sx={{
                           px: 4,
-                          background: (theme) =>
-                            `linear-gradient(45deg, ${theme.palette.error.main}, ${theme.palette.error.dark})`,
-                          boxShadow: (theme) =>
-                            `0 4px 20px ${theme.palette.error.main}40`,
+                          textTransform: "none",
+                          fontFamily: fonts.body,
+                          fontWeight: 650,
+                          borderRadius: "8px",
+                          bgcolor: d.danger,
+                          boxShadow: "none",
                           "&:hover": {
-                            background: (theme) =>
-                              `linear-gradient(45deg, ${theme.palette.error.dark}, ${theme.palette.error.main})`,
-                            boxShadow: (theme) =>
-                              `0 6px 25px ${theme.palette.error.main}60`,
+                            bgcolor: d.danger,
+                            opacity: 0.9,
+                            boxShadow: "none",
                           },
                         }}
                       >
@@ -501,25 +489,20 @@ export default function AccountSettings() {
                   TransitionProps={{ timeout: 500 }}
                   PaperProps={{
                     sx: {
-                      borderRadius: 3,
+                      borderRadius: "16px",
                       minWidth: "300px",
-                      background: (theme) =>
-                        theme.palette.mode === "dark"
-                          ? "linear-gradient(145deg, rgba(40,40,40,0.95), rgba(30,30,30,0.95))"
-                          : "linear-gradient(145deg, rgba(255,255,255,0.95), rgba(250,250,250,0.95))",
-                      backdropFilter: "blur(10px)",
-                      border: (theme) =>
-                        `1px solid ${theme.palette.primary.main}40`,
-                      boxShadow: (theme) =>
-                        `0 8px 32px ${theme.palette.primary.main}30`,
+                      bgcolor: d.surface,
+                      border: `1px solid ${d.border}`,
+                      boxShadow: d.shadow,
                     },
                   }}
                 >
-                  <DialogTitle
+                  <Box
                     sx={{
                       textAlign: "center",
                       pt: 3,
                       pb: 0,
+                      position: "relative",
                     }}
                   >
                     <IconButton
@@ -528,30 +511,24 @@ export default function AccountSettings() {
                         position: "absolute",
                         right: 8,
                         top: 8,
-                        color: (theme) => theme.palette.grey[500],
+                        color: d.muted,
                       }}
                     >
                       <Close />
                     </IconButton>
                     <CheckCircleOutline
-                      sx={{
-                        fontSize: "4rem",
-                        color: "success.main",
-                        mb: 1,
-                      }}
+                      sx={{ fontSize: "3.5rem", color: d.success, mb: 1 }}
                     />
-                  </DialogTitle>
+                  </Box>
                   <DialogContent>
                     <Typography
-                      variant="h6"
                       align="center"
                       sx={{
                         mb: 2,
-                        color: (theme) =>
-                          theme.palette.mode === "dark"
-                            ? theme.palette.primary.light
-                            : theme.palette.primary.dark,
-                        fontWeight: "bold",
+                        fontFamily: fonts.heading,
+                        fontWeight: 700,
+                        fontSize: 18,
+                        color: d.text,
                       }}
                     >
                       {success}
@@ -562,15 +539,15 @@ export default function AccountSettings() {
                         variant="contained"
                         sx={{
                           px: 4,
-                          background: (theme) =>
-                            `linear-gradient(45deg, ${theme.palette.success.main}, ${theme.palette.success.dark})`,
-                          boxShadow: (theme) =>
-                            `0 4px 20px ${theme.palette.success.main}40`,
+                          textTransform: "none",
+                          fontFamily: fonts.body,
+                          fontWeight: 650,
+                          borderRadius: "8px",
+                          bgcolor: d.action,
+                          boxShadow: "none",
                           "&:hover": {
-                            background: (theme) =>
-                              `linear-gradient(45deg, ${theme.palette.success.dark}, ${theme.palette.success.main})`,
-                            boxShadow: (theme) =>
-                              `0 6px 25px ${theme.palette.success.main}60`,
+                            bgcolor: d.actionHover,
+                            boxShadow: "none",
                           },
                         }}
                       >
@@ -588,11 +565,7 @@ export default function AccountSettings() {
                     value={getFormValue(formData.name)}
                     onChange={handleInputChange}
                     variant="outlined"
-                    sx={{
-                      "& label.Mui-focused": {
-                        color: (theme) => theme.palette.primary.main,
-                      },
-                    }}
+                    sx={inputSx}
                   />
                 </Grid>
                 <Grid item xs={12} sm={6}>
@@ -608,13 +581,10 @@ export default function AccountSettings() {
                     }}
                     variant="outlined"
                     sx={{
-                      "& label.Mui-focused": {
-                        color: (theme) => theme.palette.primary.main,
-                      },
+                      ...inputSx,
                       "& .MuiInputBase-input.Mui-readOnly": {
                         cursor: "not-allowed",
-                        bgcolor: (theme) =>
-                          theme.palette.action.disabledBackground,
+                        bgcolor: d.hover,
                       },
                     }}
                   />
@@ -627,11 +597,7 @@ export default function AccountSettings() {
                     value={getFormValue(formData.phoneNumber)}
                     onChange={handleInputChange}
                     variant="outlined"
-                    sx={{
-                      "& label.Mui-focused": {
-                        color: (theme) => theme.palette.primary.main,
-                      },
-                    }}
+                    sx={inputSx}
                   />
                 </Grid>
                 <Grid item xs={12} sm={6}>
@@ -649,11 +615,9 @@ export default function AccountSettings() {
                     variant="outlined"
                     sx={{
                       width: "100%",
-                      "& label.Mui-focused": {
-                        color: (theme) => theme.palette.primary.main,
-                      },
-                      // ensure the input root fills the grid column like other fields
+                      ...inputSx,
                       "& .MuiOutlinedInput-root": {
+                        ...inputSx["& .MuiOutlinedInput-root"],
                         width: "100%",
                       },
                     }}
@@ -667,11 +631,7 @@ export default function AccountSettings() {
                     value={getFormValue(formData.country)}
                     onChange={handleInputChange}
                     variant="outlined"
-                    sx={{
-                      "& label.Mui-focused": {
-                        color: (theme) => theme.palette.primary.main,
-                      },
-                    }}
+                    sx={inputSx}
                   />
                 </Grid>
                 <Grid item xs={12} sm={6}>
@@ -682,11 +642,7 @@ export default function AccountSettings() {
                     value={getFormValue(formData.city)}
                     onChange={handleInputChange}
                     variant="outlined"
-                    sx={{
-                      "& label.Mui-focused": {
-                        color: (theme) => theme.palette.primary.main,
-                      },
-                    }}
+                    sx={inputSx}
                   />
                 </Grid>
                 <Grid item xs={12} sm={6}>
@@ -697,11 +653,7 @@ export default function AccountSettings() {
                     value={getFormValue(formData.companyName)}
                     onChange={handleInputChange}
                     variant="outlined"
-                    sx={{
-                      "& label.Mui-focused": {
-                        color: (theme) => theme.palette.primary.main,
-                      },
-                    }}
+                    sx={inputSx}
                   />
                 </Grid>
                 <Grid item xs={12} sm={6}>
@@ -712,11 +664,7 @@ export default function AccountSettings() {
                     value={getFormValue(formData.idNumber)}
                     onChange={handleInputChange}
                     variant="outlined"
-                    sx={{
-                      "& label.Mui-focused": {
-                        color: (theme) => theme.palette.primary.main,
-                      },
-                    }}
+                    sx={inputSx}
                   />
                 </Grid>
                 <Grid item xs={12} sm={12} md={12} lg={12}>
@@ -729,12 +677,8 @@ export default function AccountSettings() {
                     variant="outlined"
                     sx={{
                       width: "100%",
-                      "& label.Mui-focused": {
-                        color: (theme) => theme.palette.primary.main,
-                      },
-                      "& .MuiInputBase-root": {
-                        width: "100%",
-                      },
+                      ...inputSx,
+                      "& .MuiInputBase-root": { width: "100%" },
                     }}
                   />
                 </Grid>
@@ -745,17 +689,16 @@ export default function AccountSettings() {
                     disabled={saving}
                     sx={{
                       px: 4,
-                      py: 2,
-                      background: (theme) =>
-                        `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.primary.dark})`,
-                      boxShadow: (theme) =>
-                        `0 4px 20px ${theme.palette.primary.main}40`,
-                      "&:hover": {
-                        background: (theme) =>
-                          `linear-gradient(45deg, ${theme.palette.primary.dark}, ${theme.palette.primary.main})`,
-                        boxShadow: (theme) =>
-                          `0 6px 25px ${theme.palette.primary.main}60`,
-                      },
+                      py: 1.4,
+                      textTransform: "none",
+                      fontFamily: fonts.body,
+                      fontWeight: 650,
+                      borderRadius: "8px",
+                      bgcolor: d.action,
+                      color: "#fff",
+                      boxShadow: "none",
+                      "&:hover": { bgcolor: d.actionHover, boxShadow: "none" },
+                      "&.Mui-disabled": { bgcolor: d.border, color: d.muted },
                     }}
                   >
                     {saving ? "Saving..." : "Save Changes"}
@@ -765,7 +708,7 @@ export default function AccountSettings() {
             </Box>
           </Grid>
         </Grid>
-      </Paper>
+      </Box>
     </Box>
   );
 }

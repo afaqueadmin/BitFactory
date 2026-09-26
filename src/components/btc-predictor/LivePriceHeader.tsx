@@ -1,19 +1,18 @@
 "use client";
 
 import React from "react";
-import {
-  Box,
-  Paper,
-  Typography,
-  CircularProgress,
-  useTheme,
-} from "@mui/material";
 import { useQuery } from "@tanstack/react-query";
 import { useBitcoinLivePrice } from "@/components/useBitcoinLivePrice";
 import {
   fetchLiveBtc24hStats,
   Btc24hStats,
 } from "@/lib/services/btcPriceService";
+import StatCard from "@/components/daylight/StatCard";
+import CurrencyBitcoinOutlinedIcon from "@mui/icons-material/CurrencyBitcoinOutlined";
+import TrendingUpOutlinedIcon from "@mui/icons-material/TrendingUpOutlined";
+import TrendingDownOutlinedIcon from "@mui/icons-material/TrendingDownOutlined";
+import { MQ, useDaylight } from "@/lib/daylight";
+import { Box } from "@mui/material";
 
 const formatCurrency = (value: number): string =>
   new Intl.NumberFormat("en-US", {
@@ -24,8 +23,7 @@ const formatCurrency = (value: number): string =>
   }).format(value);
 
 export default function LivePriceHeader() {
-  const theme = useTheme();
-  const isDark = theme.palette.mode === "dark";
+  const { d } = useDaylight();
   const { btcLiveData } = useBitcoinLivePrice();
 
   const { data: ticker24h } = useQuery<Btc24hStats>({
@@ -46,127 +44,55 @@ export default function LivePriceHeader() {
   const changePercent = ticker24h ? ticker24h.priceChangePercent : null;
   const isUp = (change ?? 0) >= 0;
 
-  const cardSx = {
-    p: { xs: 1.5, sm: 2 },
-    borderRadius: 2.5,
-    backgroundColor: isDark
-      ? "rgba(255, 255, 255, 0.03)"
-      : "rgba(0, 0, 0, 0.02)",
-    border: `1px solid ${
-      isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)"
-    }`,
-    boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
-  };
-
   return (
     <Box
       sx={{
         display: "grid",
-        gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(4, 1fr)" },
-        gap: { xs: 1.25, sm: 2 },
-        mb: { xs: 2, md: 3 },
+        gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+        gap: { xs: "10px", sm: "16px" },
+        mb: { xs: "18px", sm: "22px" },
+        [MQ.stack]: { gridTemplateColumns: "repeat(2, minmax(0, 1fr))" },
       }}
     >
-      <Paper sx={cardSx}>
-        <Typography
-          variant="caption"
-          color="text.secondary"
-          sx={{ fontWeight: 600, fontSize: { xs: "0.7rem", sm: "0.75rem" } }}
-        >
-          Bitcoin Price
-        </Typography>
-        {currentPrice != null ? (
-          <Typography
-            variant="h6"
-            fontWeight="800"
-            sx={{
-              mt: 0.5,
-              fontSize: { xs: "1rem", sm: "1.2rem" },
-              letterSpacing: "-0.01em",
-            }}
-          >
-            {formatCurrency(currentPrice)}
-          </Typography>
-        ) : (
-          <CircularProgress size={18} sx={{ mt: 1 }} />
-        )}
-      </Paper>
-
-      <Paper sx={cardSx}>
-        <Typography
-          variant="caption"
-          color="text.secondary"
-          sx={{ fontWeight: 600, fontSize: { xs: "0.7rem", sm: "0.75rem" } }}
-        >
-          24h Change
-        </Typography>
-        {change != null && changePercent != null ? (
-          <Typography
-            variant="h6"
-            fontWeight="800"
-            sx={{
-              mt: 0.5,
-              color: isUp ? "#4caf50" : "#f44336",
-              fontSize: { xs: "0.95rem", sm: "1.15rem" },
-            }}
-          >
-            {isUp ? "+" : ""}
-            {changePercent.toFixed(2)}%
-          </Typography>
-        ) : (
-          <CircularProgress size={18} sx={{ mt: 1 }} />
-        )}
-      </Paper>
-
-      <Paper sx={cardSx}>
-        <Typography
-          variant="caption"
-          color="text.secondary"
-          sx={{ fontWeight: 600, fontSize: { xs: "0.7rem", sm: "0.75rem" } }}
-        >
-          24h High
-        </Typography>
-        {ticker24h ? (
-          <Typography
-            variant="h6"
-            fontWeight="700"
-            sx={{
-              mt: 0.5,
-              color: "#4caf50",
-              fontSize: { xs: "0.95rem", sm: "1.15rem" },
-            }}
-          >
-            {formatCurrency(ticker24h.highPrice)}
-          </Typography>
-        ) : (
-          <CircularProgress size={18} sx={{ mt: 1 }} />
-        )}
-      </Paper>
-
-      <Paper sx={cardSx}>
-        <Typography
-          variant="caption"
-          color="text.secondary"
-          sx={{ fontWeight: 600, fontSize: { xs: "0.7rem", sm: "0.75rem" } }}
-        >
-          24h Low
-        </Typography>
-        {ticker24h ? (
-          <Typography
-            variant="h6"
-            fontWeight="700"
-            sx={{
-              mt: 0.5,
-              color: "#f44336",
-              fontSize: { xs: "0.95rem", sm: "1.15rem" },
-            }}
-          >
-            {formatCurrency(ticker24h.lowPrice)}
-          </Typography>
-        ) : (
-          <CircularProgress size={18} sx={{ mt: 1 }} />
-        )}
-      </Paper>
+      <StatCard
+        title="Bitcoin Price"
+        value={currentPrice != null ? formatCurrency(currentPrice) : "—"}
+        caption="Live BTC/USD"
+        tone="sky"
+        icon={<CurrencyBitcoinOutlinedIcon />}
+        isLoading={currentPrice == null}
+      />
+      <StatCard
+        title="24h Change"
+        value={
+          change != null && changePercent != null
+            ? `${isUp ? "+" : ""}${changePercent.toFixed(2)}%`
+            : "—"
+        }
+        caption={
+          change != null ? `${isUp ? "+" : ""}${formatCurrency(change)}` : ""
+        }
+        tone={isUp ? "mint" : "danger"}
+        valueColor={isUp ? d.success : d.danger}
+        icon={isUp ? <TrendingUpOutlinedIcon /> : <TrendingDownOutlinedIcon />}
+        isLoading={change == null}
+      />
+      <StatCard
+        title="24h High"
+        value={ticker24h ? formatCurrency(ticker24h.highPrice) : "—"}
+        tone="mint"
+        valueColor={d.success}
+        icon={<TrendingUpOutlinedIcon />}
+        isLoading={!ticker24h}
+      />
+      <StatCard
+        title="24h Low"
+        value={ticker24h ? formatCurrency(ticker24h.lowPrice) : "—"}
+        tone="danger"
+        valueColor={d.danger}
+        icon={<TrendingDownOutlinedIcon />}
+        isLoading={!ticker24h}
+      />
     </Box>
   );
 }

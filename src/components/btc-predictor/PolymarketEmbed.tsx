@@ -2,6 +2,7 @@
 
 import React from "react";
 import { Box } from "@mui/material";
+import { RADIUS_CONTROL } from "@/lib/daylight";
 
 export default function PolymarketEmbed() {
   return (
@@ -9,7 +10,10 @@ export default function PolymarketEmbed() {
       sx={{
         width: "100%",
         overflow: "hidden",
-        borderRadius: 2,
+        borderRadius: RADIUS_CONTROL,
+        // The embed itself is pinned to a dark theme regardless of ours
+        // (see the iframe src below); keep a dark backdrop so there's no
+        // white flash while it loads.
         backgroundColor: "rgba(0,0,0,0.2)",
       }}
     >

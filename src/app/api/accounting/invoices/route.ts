@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
+import {
+  HOSTING_INELIGIBLE_ERROR,
+  isHostingEligibleSegment,
+} from "@/lib/hostingEligibility";
 import { InvoiceStatus, AuditAction, Prisma } from "@prisma/client";
 import { assertFranchiseeOwnsCustomer } from "@/lib/franchiseeScope";
 
@@ -424,6 +428,7 @@ export async function POST(request: NextRequest) {
       where: { id: customerId },
       select: {
         name: true,
+        segment: true,
         poolAuths: {
           where: { pool: { name: "Luxor" } },
           orderBy: { createdAt: "asc" },
@@ -437,6 +442,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: "Customer not found" },
         { status: 404 },
+      );
+    }
+
+    // Hosting invoices (the default type) are blocked for potential customers
+    // and customers with no segment; hardware sales invoices are allowed.
+    if (
+      (invoiceType || "ELECTRICITY_CHARGES") === "ELECTRICITY_CHARGES" &&
+      !isHostingEligibleSegment(customer.segment)
+    ) {
+      return NextResponse.json(
+        { error: HOSTING_INELIGIBLE_ERROR },
+        { status: 400 },
       );
     }
 

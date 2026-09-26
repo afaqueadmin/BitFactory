@@ -57,6 +57,7 @@ import {
   HEADER_HEIGHT,
   MQ,
   focusRing,
+  logoFilter,
   sidebarWidthStyles,
   useDaylight,
 } from "@/lib/daylight";
@@ -307,7 +308,7 @@ export default function AppBarComponent() {
         fill
         priority
         sizes={`${width}px`}
-        style={{ objectFit: "cover" }}
+        style={{ objectFit: "cover", filter: logoFilter(darkMode) }}
       />
     </Box>
   );
@@ -444,7 +445,7 @@ export default function AppBarComponent() {
               fill
               priority
               sizes="168px"
-              style={{ objectFit: "cover" }}
+              style={{ objectFit: "cover", filter: logoFilter(darkMode) }}
             />
           </Box>
         </Link>

@@ -154,6 +154,15 @@ export const focusRing = (color: string) => ({
   outlineOffset: "3px",
 });
 
+/**
+ * Dark-mode filter for the BitFactory wordmark, whose navy diamond and "Bit"
+ * text nearly vanish on the dark canvas. A brightness lift keeps the fine
+ * interwoven lines crisp; a drop-shadow glow was tried and blurred into the
+ * gaps between them. No-op in light mode.
+ */
+export const logoFilter = (darkMode: boolean) =>
+  darkMode ? "brightness(1.7)" : "none";
+
 export function useDaylight() {
   const { darkMode } = useTheme();
   const d = darkMode ? dark : light;

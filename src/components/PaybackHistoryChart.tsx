@@ -38,6 +38,7 @@ import {
   buildPaybackChartHeading,
   PaybackOsFilter,
 } from "@/lib/helpers/paybackChartHeading";
+import { RADIUS_CARD, useDaylight } from "@/lib/daylight";
 
 const RANGE_LABELS: Record<PaybackHistoryRange, string> = {
   "30D": "30D",
@@ -57,6 +58,10 @@ interface PaybackHistoryChartProps {
   miner: MinerModel;
   os: PaybackOsFilter;
   height?: number;
+  /** Daylight styling: white card chrome, Inter/Manrope fonts, neutral
+   * tokens. The Stock OS / Custom OS / BTC price line colours are left
+   * untouched - they're matched 1:1 to PaybackGraphicalView's legend. */
+  daylight?: boolean;
 }
 
 interface TooltipEntry {
@@ -71,9 +76,11 @@ export default function PaybackHistoryChart({
   miner,
   os,
   height = 320,
+  daylight = false,
 }: PaybackHistoryChartProps) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const { d, fonts } = useDaylight();
   const [range, setRange] = useState<PaybackHistoryRange>("30D");
 
   const heading = useMemo(
@@ -119,10 +126,13 @@ export default function PaybackHistoryChart({
         p: { xs: 2, sm: 3 },
         width: "100%",
         mb: 3,
-        borderRadius: 3,
+        borderRadius: daylight ? RADIUS_CARD : 3,
         border: "1px solid",
-        borderColor: (theme) => theme.palette.divider,
-        boxShadow: "0 4px 20px rgba(0, 0, 0, 0.05)",
+        borderColor: daylight ? d.border : (theme) => theme.palette.divider,
+        boxShadow: daylight ? d.shadow : "0 4px 20px rgba(0, 0, 0, 0.05)",
+        backgroundColor: daylight ? d.surface : undefined,
+        backgroundImage: daylight ? "none" : undefined,
+        fontFamily: daylight ? fonts.body : undefined,
       }}
     >
       <Box
@@ -139,15 +149,21 @@ export default function PaybackHistoryChart({
           <Typography
             variant="h6"
             sx={{
-              fontWeight: 700,
+              fontWeight: daylight ? 750 : 700,
               fontSize: { xs: "1.05rem", sm: "1.25rem" },
+              ...(daylight && { fontFamily: fonts.heading, color: d.text }),
             }}
           >
             {heading}
           </Typography>
           <Typography
             variant="caption"
-            sx={{ color: "text.secondary", display: "block", mt: 0.25 }}
+            sx={{
+              color: daylight ? d.muted : "text.secondary",
+              display: "block",
+              mt: 0.25,
+              ...(daylight && { fontFamily: fonts.body }),
+            }}
           >
             Comparing Breakeven Production Cost vs. Live BTC Spot Price
           </Typography>
@@ -168,14 +184,21 @@ export default function PaybackHistoryChart({
               py: 0.4,
               fontSize: "0.75rem",
               fontWeight: 600,
-              borderRadius: "6px !important",
+              borderRadius: daylight ? "7px !important" : "6px !important",
               mx: 0.25,
               border: "1px solid transparent",
+              ...(daylight && {
+                fontFamily: fonts.body,
+                color: d.muted,
+                textTransform: "none",
+                border: `1px solid ${d.border}`,
+              }),
               "&.Mui-selected": {
-                bgcolor: "primary.main",
+                bgcolor: daylight ? d.action : "primary.main",
                 color: "#fff",
+                borderColor: daylight ? d.action : undefined,
                 "&:hover": {
-                  bgcolor: "primary.dark",
+                  bgcolor: daylight ? d.actionHover : "primary.dark",
                 },
               },
             },
@@ -198,13 +221,30 @@ export default function PaybackHistoryChart({
             height,
           }}
         >
-          <CircularProgress size={36} />
+          <CircularProgress
+            size={36}
+            sx={daylight ? { color: d.action } : undefined}
+          />
         </Box>
       )}
 
       {!isLoading && isError && (
         <Box sx={{ height, display: "flex", alignItems: "center" }}>
-          <Alert severity="error" sx={{ width: "100%" }}>
+          <Alert
+            severity="error"
+            sx={
+              daylight
+                ? {
+                    width: "100%",
+                    borderRadius: "8px",
+                    bgcolor: d.dangerSoft,
+                    color: d.danger,
+                    fontFamily: fonts.body,
+                    "& .MuiAlert-icon": { color: d.danger },
+                  }
+                : { width: "100%" }
+            }
+          >
             {error || "Failed to load historical payback data"}
           </Alert>
         </Box>
@@ -219,7 +259,21 @@ export default function PaybackHistoryChart({
             height,
           }}
         >
-          <Alert severity="info" sx={{ width: "100%" }}>
+          <Alert
+            severity="info"
+            sx={
+              daylight
+                ? {
+                    width: "100%",
+                    borderRadius: "8px",
+                    bgcolor: d.skySoft,
+                    color: d.action,
+                    fontFamily: fonts.body,
+                    "& .MuiAlert-icon": { color: d.action },
+                  }
+                : { width: "100%" }
+            }
+          >
             No historical data yet. Daily snapshots will appear here once
             collected.
           </Alert>
@@ -242,9 +296,11 @@ export default function PaybackHistoryChart({
                 vertical={false}
                 strokeDasharray="3 3"
                 stroke={
-                  theme.palette.mode === "dark"
-                    ? "rgba(255,255,255,0.08)"
-                    : "rgba(0,0,0,0.06)"
+                  daylight
+                    ? d.border
+                    : theme.palette.mode === "dark"
+                      ? "rgba(255,255,255,0.08)"
+                      : "rgba(0,0,0,0.06)"
                 }
               />
               <XAxis
@@ -253,7 +309,8 @@ export default function PaybackHistoryChart({
                 tickLine={false}
                 tick={{
                   fontSize: isMobile ? 10 : 11,
-                  fill: theme.palette.text.secondary,
+                  fill: daylight ? d.muted : theme.palette.text.secondary,
+                  ...(daylight && { fontFamily: fonts.body }),
                 }}
                 interval={isMobile ? "preserveStartEnd" : "preserveStartEnd"}
                 minTickGap={24}
@@ -263,7 +320,8 @@ export default function PaybackHistoryChart({
                 tickLine={false}
                 tick={{
                   fontSize: isMobile ? 10 : 11,
-                  fill: theme.palette.text.secondary,
+                  fill: daylight ? d.muted : theme.palette.text.secondary,
+                  ...(daylight && { fontFamily: fonts.body }),
                 }}
                 width={isMobile ? 54 : 64}
                 domain={[yMin, yMax]}
@@ -304,23 +362,27 @@ export default function PaybackHistoryChart({
                   return (
                     <Box
                       sx={{
-                        backgroundColor:
-                          theme.palette.mode === "dark"
+                        backgroundColor: daylight
+                          ? d.surface
+                          : theme.palette.mode === "dark"
                             ? "rgba(30, 30, 35, 0.95)"
                             : "rgba(255, 255, 255, 0.96)",
-                        backdropFilter: "blur(8px)",
-                        border: `1px solid ${theme.palette.divider}`,
+                        backdropFilter: daylight ? "none" : "blur(8px)",
+                        border: `1px solid ${daylight ? d.border : theme.palette.divider}`,
                         borderRadius: "10px",
-                        boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
+                        boxShadow: daylight
+                          ? "0 8px 30px rgba(100,114,124,.13)"
+                          : "0 8px 24px rgba(0,0,0,0.15)",
                         p: 1.5,
                         minWidth: 190,
+                        ...(daylight && { fontFamily: fonts.body }),
                       }}
                     >
                       <Typography
                         variant="caption"
                         sx={{
                           fontWeight: 700,
-                          color: "text.secondary",
+                          color: daylight ? d.muted : "text.secondary",
                           display: "block",
                           mb: 0.75,
                           textTransform: "uppercase",
@@ -365,7 +427,7 @@ export default function PaybackHistoryChart({
                               <Typography
                                 variant="body2"
                                 sx={{
-                                  color: "text.primary",
+                                  color: daylight ? d.text : "text.primary",
                                   fontSize: "0.82rem",
                                   fontWeight: 500,
                                 }}
@@ -392,7 +454,7 @@ export default function PaybackHistoryChart({
                           sx={{
                             mt: 1,
                             pt: 0.75,
-                            borderTop: `1px solid ${theme.palette.divider}`,
+                            borderTop: `1px solid ${daylight ? d.border : theme.palette.divider}`,
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "space-between",
@@ -402,7 +464,7 @@ export default function PaybackHistoryChart({
                           <Typography
                             variant="caption"
                             sx={{
-                              color: "text.secondary",
+                              color: daylight ? d.muted : "text.secondary",
                               fontWeight: 600,
                             }}
                           >
@@ -436,6 +498,7 @@ export default function PaybackHistoryChart({
                   paddingBottom: 14,
                   fontSize: isMobile ? 11 : 12.5,
                   fontWeight: 600,
+                  ...(daylight && { color: d.muted, fontFamily: fonts.body }),
                 }}
               />
 

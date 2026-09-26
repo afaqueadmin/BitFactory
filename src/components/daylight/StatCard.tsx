@@ -12,7 +12,7 @@ import React from "react";
 import { Box, Skeleton, Typography } from "@mui/material";
 import { RADIUS_CARD, useDaylight } from "@/lib/daylight";
 
-export type StatCardTone = "sky" | "mint" | "amber";
+export type StatCardTone = "sky" | "mint" | "amber" | "danger";
 
 export interface StatCardProps {
   title: string;
@@ -24,6 +24,9 @@ export interface StatCardProps {
   tone: StatCardTone;
   icon: React.ReactNode;
   isLoading?: boolean;
+  /** Overrides the value's default text colour, e.g. success/danger for a
+   * signed delta (24h change) where the number itself carries meaning. */
+  valueColor?: string;
 }
 
 export default function StatCard({
@@ -34,6 +37,7 @@ export default function StatCard({
   tone,
   icon,
   isLoading = false,
+  valueColor,
 }: StatCardProps) {
   const { d, fonts } = useDaylight();
 
@@ -41,6 +45,7 @@ export default function StatCard({
     sky: { bg: d.skySoft, border: d.borderSky, icon: d.action },
     mint: { bg: d.mint, border: d.borderMint, icon: d.success },
     amber: { bg: d.amber, border: d.borderAmber, icon: d.warning },
+    danger: { bg: d.dangerSoft, border: d.borderDanger, icon: d.danger },
   }[tone];
 
   return (
@@ -101,7 +106,7 @@ export default function StatCard({
             fontSize: { xs: 24, sm: 28 },
             lineHeight: 1.4,
             letterSpacing: { xs: "-.8px", sm: "-1px" },
-            color: d.text,
+            color: valueColor || d.text,
             m: "9px 0 5px",
             fontVariantNumeric: "tabular-nums",
             overflowWrap: "anywhere",

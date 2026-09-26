@@ -1,16 +1,10 @@
 "use client";
 
 import React from "react";
-import {
-  Box,
-  Typography,
-  CircularProgress,
-  Alert,
-  Link,
-  useTheme,
-} from "@mui/material";
+import { Box, Typography, CircularProgress, Alert, Link } from "@mui/material";
 import { formatDistanceToNow } from "date-fns";
 import { NewsArticle } from "@/hooks/useBtcNews";
+import { useDaylight } from "@/lib/daylight";
 
 interface NewsFeedProps {
   articles: NewsArticle[];
@@ -23,27 +17,35 @@ export default function NewsFeed({
   isLoading,
   isError,
 }: NewsFeedProps) {
-  const theme = useTheme();
-  const isDark = theme.palette.mode === "dark";
+  const { d, fonts } = useDaylight();
 
   if (isLoading) {
     return (
       <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
-        <CircularProgress size={28} />
+        <CircularProgress size={28} sx={{ color: d.action }} />
       </Box>
     );
   }
 
   if (isError || articles.length === 0) {
     return (
-      <Alert severity="warning" sx={{ borderRadius: 2 }}>
+      <Alert
+        severity="warning"
+        sx={{
+          borderRadius: "8px",
+          bgcolor: d.amber,
+          color: d.warning,
+          fontFamily: fonts.body,
+          "& .MuiAlert-icon": { color: d.warning },
+        }}
+      >
         BTC news feed unavailable right now.
       </Alert>
     );
   }
 
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", gap: 1.25 }}>
+    <Box sx={{ display: "flex", flexDirection: "column", gap: "10px" }}>
       {articles.map((article) => (
         <Link
           key={article.id}
@@ -56,22 +58,16 @@ export default function NewsFeed({
           <Box
             sx={{
               display: "flex",
-              gap: 1.5,
-              p: { xs: 1.25, sm: 1.5 },
-              borderRadius: 2,
+              gap: "12px",
+              p: { xs: "10px", sm: "12px" },
+              borderRadius: "10px",
               alignItems: "center",
-              backgroundColor: isDark
-                ? "rgba(255, 255, 255, 0.03)"
-                : "rgba(0, 0, 0, 0.02)",
-              border: `1px solid ${
-                isDark ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.05)"
-              }`,
+              bgcolor: d.canvas,
+              border: `1px solid ${d.border}`,
               transition: "all 0.2s ease-in-out",
               "&:hover": {
-                backgroundColor: isDark
-                  ? "rgba(255, 255, 255, 0.07)"
-                  : "rgba(0, 0, 0, 0.05)",
-                borderColor: theme.palette.primary.main,
+                bgcolor: d.hover,
+                borderColor: d.action,
                 transform: "translateY(-1px)",
               },
             }}
@@ -92,29 +88,30 @@ export default function NewsFeed({
             )}
             <Box sx={{ minWidth: 0, flex: 1 }}>
               <Typography
-                variant="body2"
-                fontWeight={600}
                 sx={{
+                  fontFamily: fonts.body,
+                  fontWeight: 600,
+                  color: d.text,
                   overflow: "hidden",
                   textOverflow: "ellipsis",
                   display: "-webkit-box",
                   WebkitLineClamp: 2,
                   WebkitBoxOrient: "vertical",
                   lineHeight: 1.35,
-                  fontSize: { xs: "0.82rem", sm: "0.875rem" },
+                  fontSize: { xs: 12, sm: 13 },
                 }}
               >
                 {article.title}
               </Typography>
               <Typography
-                variant="caption"
-                color="text.secondary"
-                sx={{ mt: 0.5, display: "block", fontSize: "0.72rem" }}
+                sx={{
+                  mt: "4px",
+                  display: "block",
+                  fontSize: 11,
+                  color: d.muted,
+                }}
               >
-                <Box
-                  component="span"
-                  sx={{ color: "primary.main", fontWeight: 700 }}
-                >
+                <Box component="span" sx={{ color: d.action, fontWeight: 700 }}>
                   {article.source}
                 </Box>
                 {" • "}

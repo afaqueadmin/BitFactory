@@ -23,14 +23,23 @@ export default function AuthLayout({
   const pathname = usePathname();
 
   // The Daylight page treatment (pale canvas, guide padding) is currently
-  // rolled out on the client dashboard, miners, wallet and transaction
-  // pages; other client pages keep their existing look and only pick up the
-  // new header.
+  // rolled out on the client dashboard, miners, wallet, transaction,
+  // invoices, BTC price history, hashprice history, payback analysis,
+  // account settings, security settings and support pages; other client
+  // pages keep their existing look and only pick up the new header.
   const isDaylightPage =
     pathname === "/dashboard" ||
     pathname === "/miners" ||
     pathname === "/wallet" ||
-    pathname === "/transaction";
+    pathname === "/transaction" ||
+    pathname === "/invoices" ||
+    pathname === "/btc-price-history" ||
+    pathname === "/hashprice-history" ||
+    pathname === "/payback-analysis" ||
+    pathname === "/account-settings" ||
+    pathname === "/security-setting" ||
+    pathname === "/support" ||
+    (pathname?.startsWith("/support/") ?? false);
 
   return (
     <SubaccountFilterProvider>

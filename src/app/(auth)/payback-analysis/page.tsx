@@ -1,8 +1,17 @@
 "use client";
 
+/**
+ * Payback Analysis page - BitFactory Daylight theme (v1.3)
+ *
+ * The default "Scenario Table" view is fully re-themed (heading, view/strategy
+ * switchers, controls, config summary, data table). The "Graphical Analysis"
+ * alternate view (PaybackGraphicalView and its chart primitives, shared with
+ * the admin payback-analysis-company page) keeps its current MUI-theme-based
+ * look for now - see the PR/commit notes for scope.
+ */
+
 import {
   Box,
-  Paper,
   Typography,
   Button,
   Table,
@@ -15,18 +24,8 @@ import {
   Alert,
   TextField,
   InputAdornment,
-  ToggleButtonGroup,
-  ToggleButton,
-  Tabs,
-  Tab,
-  Chip,
-  useTheme,
   useMediaQuery,
 } from "@mui/material";
-import {
-  TableChart as TableChartIcon,
-  InsightsOutlined as InsightsIcon,
-} from "@mui/icons-material";
 import { useCallback, useEffect, useState } from "react";
 import { formatValue } from "@/lib/helpers/formatValue";
 import PaybackHistoryChart from "@/components/PaybackHistoryChart";
@@ -53,13 +52,38 @@ import {
   calculateStrategy2Values,
   calculateStrategy3Values,
 } from "@/lib/helpers/paybackCalculations";
+import Segmented, { SegmentedOption } from "@/components/daylight/Segmented";
+import { RADIUS_CARD, useDaylight } from "@/lib/daylight";
 
 type PaybackStrategy = PaybackStrategyKey;
+type ViewMode = "TABLE" | "GRAPHS";
+type OsSelection = "STOCK" | "CUSTOM";
 
-const OS_LABELS: Record<"STOCK" | "CUSTOM", string> = {
+const OS_LABELS: Record<OsSelection, string> = {
   STOCK: "Stock OS",
   CUSTOM: "Custom OS",
 };
+
+const VIEW_OPTIONS: SegmentedOption<ViewMode>[] = [
+  { id: "TABLE", label: "Scenario Table" },
+  { id: "GRAPHS", label: "Graphical Analysis" },
+];
+
+const STRATEGY_OPTIONS: SegmentedOption<PaybackStrategy>[] = [
+  { id: "STRATEGY_1", label: "Strategy 1" },
+  { id: "STRATEGY_2", label: "Strategy 2" },
+  { id: "STRATEGY_3", label: "Strategy 3" },
+];
+
+const MINER_OPTIONS: SegmentedOption<MinerModel>[] = [
+  { id: "S21PRO", label: "S21 Pro" },
+  { id: "S21XP", label: "S21 XP" },
+];
+
+const OS_OPTIONS: SegmentedOption<OsSelection>[] = [
+  { id: "STOCK", label: "Stock OS" },
+  { id: "CUSTOM", label: "Custom OS" },
+];
 
 const columns = [
   "CURRENT",
@@ -99,9 +123,32 @@ interface PaybackConfigData {
   invoicedAmount: number;
 }
 
+/** A label/value pair in the config summary fact sheet. */
+function Fact({ label, value }: { label: string; value: string }) {
+  const { d, fonts } = useDaylight();
+  return (
+    <Box>
+      <Typography sx={{ fontSize: 11, color: d.muted, fontFamily: fonts.body }}>
+        {label}
+      </Typography>
+      <Typography
+        sx={{
+          fontSize: 13,
+          fontWeight: 600,
+          color: d.text,
+          mt: "2px",
+          fontFamily: fonts.body,
+        }}
+      >
+        {value}
+      </Typography>
+    </Box>
+  );
+}
+
 export default function PaybackAnalysisPage() {
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const { d, fonts } = useDaylight();
+  const isMobile = useMediaQuery("(max-width:599.95px)");
 
   // Config state
   const [config, setConfig] = useState<PaybackConfigData | null>(null);
@@ -150,13 +197,13 @@ export default function PaybackAnalysisPage() {
     useState<PaybackStrategy>("STRATEGY_1");
 
   // OS selector state
-  const [selectedOS, setSelectedOS] = useState<"STOCK" | "CUSTOM">("STOCK");
+  const [selectedOS, setSelectedOS] = useState<OsSelection>("STOCK");
 
   // Miner selector state
   const [selectedMiner, setSelectedMiner] = useState<MinerModel>("S21PRO");
 
   // Which half of the analysis is on screen: the scenario grid, or the charts.
-  const [viewMode, setViewMode] = useState<"TABLE" | "GRAPHS">("TABLE");
+  const [viewMode, setViewMode] = useState<ViewMode>("TABLE");
 
   // Calculated values for all scenarios
   const [calculatedValues, setCalculatedValues] = useState<Strategy2Values[]>(
@@ -854,20 +901,65 @@ export default function PaybackAnalysisPage() {
 
   const tableRows = [btcPriceRow, rewardRow, ...staticRows, ...dynamicRows];
 
+  const alertSx = (tone: "success" | "error") => ({
+    mb: 2,
+    borderRadius: "8px",
+    bgcolor: tone === "success" ? d.mint : d.dangerSoft,
+    color: tone === "success" ? d.success : d.danger,
+    fontFamily: fonts.body,
+    "& .MuiAlert-icon": { color: tone === "success" ? d.success : d.danger },
+  });
+
+  const inputSx = {
+    "& .MuiOutlinedInput-root": {
+      borderRadius: "8px",
+      fontFamily: fonts.body,
+      "& fieldset": { borderColor: d.inputBorder },
+      "&:hover fieldset": { borderColor: d.action },
+    },
+    "& .MuiOutlinedInput-root.Mui-focused fieldset": {
+      borderColor: d.action,
+      borderWidth: "2px",
+    },
+    "& .MuiInputLabel-root": { fontFamily: fonts.body },
+  };
+
+  const primaryBtnSx = {
+    textTransform: "none",
+    fontFamily: fonts.body,
+    fontWeight: 650,
+    borderRadius: "8px",
+    minHeight: 40,
+    bgcolor: d.action,
+    color: "#fff",
+    boxShadow: "none",
+    "&:hover": { bgcolor: d.actionHover, boxShadow: "none" },
+    "&.Mui-disabled": { bgcolor: d.border, color: d.muted },
+  } as const;
+
+  const outlineBtnSx = {
+    textTransform: "none",
+    fontFamily: fonts.body,
+    fontWeight: 600,
+    borderRadius: "8px",
+    minHeight: 40,
+    color: d.text,
+    borderColor: d.inputBorder,
+    "&:hover": { bgcolor: d.hover, borderColor: d.action },
+  } as const;
+
   // Show loading state
   if (configLoading) {
     return (
-      <Box sx={{ p: { xs: 1.5, sm: 2, md: 3 }, mt: { xs: 1, md: 2 } }}>
-        <Box
-          sx={{
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            minHeight: "400px",
-          }}
-        >
-          <CircularProgress />
-        </Box>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          minHeight: "400px",
+        }}
+      >
+        <CircularProgress sx={{ color: d.action }} />
       </Box>
     );
   }
@@ -875,11 +967,11 @@ export default function PaybackAnalysisPage() {
   // Show error state
   if (configError || !config) {
     return (
-      <Box sx={{ p: { xs: 1.5, sm: 2, md: 3 }, mt: { xs: 1, md: 2 } }}>
-        <Alert severity="error" sx={{ mb: 3 }}>
+      <Box>
+        <Alert severity="error" sx={alertSx("error")}>
           {configError || "Failed to load configuration"}
         </Alert>
-        <Button variant="contained" onClick={fetchConfig}>
+        <Button onClick={fetchConfig} sx={primaryBtnSx}>
           Retry
         </Button>
       </Box>
@@ -887,12 +979,14 @@ export default function PaybackAnalysisPage() {
   }
 
   return (
-    <Box sx={{ p: { xs: 1.5, sm: 2, md: 3 }, mt: { xs: 1, md: 2 } }}>
+    <Box
+      sx={{ maxWidth: 1600, mx: "auto", fontFamily: fonts.body, color: d.text }}
+    >
       {/* Success/Error messages for invoiced amount update */}
       {invoicedUpdateSuccess && (
         <Alert
           severity="success"
-          sx={{ mb: 2 }}
+          sx={alertSx("success")}
           onClose={() => setInvoicedUpdateSuccess(null)}
         >
           {invoicedUpdateSuccess}
@@ -901,7 +995,7 @@ export default function PaybackAnalysisPage() {
       {invoicedUpdateError && (
         <Alert
           severity="error"
-          sx={{ mb: 2 }}
+          sx={alertSx("error")}
           onClose={() => setInvoicedUpdateError(null)}
         >
           {invoicedUpdateError}
@@ -912,7 +1006,7 @@ export default function PaybackAnalysisPage() {
       {machineCostSuccess && (
         <Alert
           severity="success"
-          sx={{ mb: 2 }}
+          sx={alertSx("success")}
           onClose={() => setMachineCostSuccess(null)}
         >
           {machineCostSuccess}
@@ -921,14 +1015,14 @@ export default function PaybackAnalysisPage() {
       {machineCostError && (
         <Alert
           severity="error"
-          sx={{ mb: 2 }}
+          sx={alertSx("error")}
           onClose={() => setMachineCostError(null)}
         >
           {machineCostError}
         </Alert>
       )}
 
-      <Box sx={{ mb: { xs: 2, md: 3 } }}>
+      <Box sx={{ mb: { xs: "18px", md: "22px" } }}>
         {/* Title + view switcher */}
         <Box
           sx={{
@@ -936,107 +1030,73 @@ export default function PaybackAnalysisPage() {
             alignItems: { xs: "flex-start", sm: "center" },
             flexDirection: { xs: "column", sm: "row" },
             justifyContent: "space-between",
-            gap: { xs: 1.5, sm: 2 },
-            mb: { xs: 2, md: 3 },
+            gap: "14px",
+            mb: "16px",
           }}
         >
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: "12px" }}>
             <Typography
-              variant="h4"
+              component="h1"
               sx={{
-                fontWeight: 700,
-                fontSize: { xs: "1.6rem", sm: "2rem", md: "2.125rem" },
+                fontFamily: fonts.heading,
+                fontWeight: 750,
+                fontSize: { xs: 27, md: 32 },
+                letterSpacing: "-.035em",
+                color: d.text,
               }}
             >
               Payback Analysis
             </Typography>
             {isSelfMining && (
-              <Chip label="Self-Mining Account" color="primary" size="small" />
+              <Box
+                sx={{
+                  px: "10px",
+                  py: "4px",
+                  borderRadius: "999px",
+                  bgcolor: d.skySoft,
+                  color: d.action,
+                  fontSize: 11,
+                  fontWeight: 650,
+                }}
+              >
+                Self-Mining Account
+              </Box>
             )}
           </Box>
 
-          <ToggleButtonGroup
+          <Segmented
             value={viewMode}
-            exclusive
-            onChange={(e, newValue) => {
-              if (newValue !== null) setViewMode(newValue);
-            }}
-            aria-label="Analysis view"
-            size="small"
-            sx={{
-              "& .MuiToggleButton-root": {
-                px: { xs: 1.5, sm: 2 },
-                py: 0.75,
-                fontSize: { xs: "0.75rem", sm: "0.8125rem" },
-                lineHeight: 1.5,
-                gap: 0.75,
-              },
-            }}
-          >
-            <ToggleButton value="TABLE" aria-label="Scenario table">
-              <TableChartIcon sx={{ fontSize: "1.05rem" }} />
-              {isMobile ? "Table" : "Scenario Table"}
-            </ToggleButton>
-            <ToggleButton value="GRAPHS" aria-label="Graphical analysis">
-              <InsightsIcon sx={{ fontSize: "1.05rem" }} />
-              {isMobile ? "Graphs" : "Graphical Analysis"}
-            </ToggleButton>
-          </ToggleButtonGroup>
+            onChange={setViewMode}
+            ariaLabel="Analysis view"
+            options={VIEW_OPTIONS}
+          />
         </Box>
 
         {/* Strategy tabs */}
-        <Tabs
-          value={selectedStrategy}
-          onChange={(e, newValue) => setSelectedStrategy(newValue)}
-          aria-label="Strategy selector"
-          sx={{ mb: { xs: 1.5, sm: 2 }, minHeight: 36 }}
-        >
-          <Tab
-            value="STRATEGY_1"
-            label="Strategy 1"
-            sx={{ minHeight: 36, py: 0.5 }}
+        <Box sx={{ mb: "14px" }}>
+          <Segmented
+            value={selectedStrategy}
+            onChange={setSelectedStrategy}
+            ariaLabel="Strategy selector"
+            options={STRATEGY_OPTIONS}
           />
-          <Tab
-            value="STRATEGY_2"
-            label="Strategy 2"
-            sx={{ minHeight: 36, py: 0.5 }}
-          />
-          <Tab
-            value="STRATEGY_3"
-            label="Strategy 3"
-            sx={{ minHeight: 36, py: 0.5 }}
-          />
-        </Tabs>
+        </Box>
 
         <Box
           sx={{
-            borderLeft: `4px solid ${theme.palette.primary.main}`,
-            backgroundColor:
-              theme.palette.mode === "dark"
-                ? "rgba(255,255,255,0.05)"
-                : "rgba(0,0,0,0.03)",
-            borderRadius: 1,
-            px: { xs: 1.5, sm: 2 },
-            py: { xs: 1, sm: 1.25 },
-            mb: { xs: 1.5, sm: 2 },
+            borderLeft: `3px solid ${d.action}`,
+            bgcolor: d.skySoft,
+            borderRadius: "8px",
+            px: "16px",
+            py: "12px",
+            mb: "16px",
           }}
         >
-          <Typography
-            sx={{
-              fontWeight: 650,
-              fontSize: { xs: "0.95rem", sm: "1.05rem" },
-            }}
-          >
+          <Typography sx={{ fontWeight: 650, fontSize: 14, color: d.text }}>
             {STRATEGY_COPY[selectedStrategy].headline}
           </Typography>
           <Typography
-            variant="body2"
-            sx={{
-              color: "text.secondary",
-              maxWidth: "72ch",
-              mt: 0.25,
-              fontSize: { xs: "0.8rem", sm: "0.875rem" },
-            }}
+            sx={{ color: d.muted, maxWidth: "72ch", mt: "2px", fontSize: 12 }}
           >
             {STRATEGY_COPY[selectedStrategy].detail}
           </Typography>
@@ -1048,48 +1108,22 @@ export default function PaybackAnalysisPage() {
             display: "flex",
             flexWrap: "wrap",
             alignItems: "center",
-            gap: { xs: 1.5, sm: 2 },
-            "& .MuiToggleButton-root": {
-              px: { xs: 1.5, sm: 2 },
-              py: 0.75,
-              fontSize: { xs: "0.75rem", sm: "0.8125rem" },
-              lineHeight: 1.5,
-            },
+            gap: "14px",
           }}
         >
-          <ToggleButtonGroup
+          <Segmented
             value={selectedMiner}
-            exclusive
-            onChange={(e, newValue) => {
-              if (newValue !== null) setSelectedMiner(newValue);
-            }}
-            aria-label="Miner model selector"
-            size="small"
-          >
-            <ToggleButton value="S21PRO" aria-label="S21 Pro Analysis">
-              S21 Pro Analysis
-            </ToggleButton>
-            <ToggleButton value="S21XP" aria-label="S21 XP Analysis">
-              S21 XP Analysis
-            </ToggleButton>
-          </ToggleButtonGroup>
+            onChange={setSelectedMiner}
+            ariaLabel="Miner model selector"
+            options={MINER_OPTIONS}
+          />
 
-          <ToggleButtonGroup
+          <Segmented
             value={selectedOS}
-            exclusive
-            onChange={(e, newValue) => {
-              if (newValue !== null) setSelectedOS(newValue);
-            }}
-            aria-label="OS selector"
-            size="small"
-          >
-            <ToggleButton value="STOCK" aria-label="Stock OS">
-              {isMobile ? "Stock" : "Stock OS"}
-            </ToggleButton>
-            <ToggleButton value="CUSTOM" aria-label="Custom OS">
-              {isMobile ? "Custom" : "Custom OS"}
-            </ToggleButton>
-          </ToggleButtonGroup>
+            onChange={setSelectedOS}
+            ariaLabel="OS selector"
+            options={OS_OPTIONS}
+          />
 
           {!isSelfMining && (
             <TextField
@@ -1104,7 +1138,7 @@ export default function PaybackAnalysisPage() {
                 ),
               }}
               inputProps={{ step: "0.01", min: "0" }}
-              sx={{ width: { xs: "100%", sm: "180px" } }}
+              sx={{ width: { xs: "100%", sm: "180px" }, ...inputSx }}
             />
           )}
 
@@ -1121,24 +1155,23 @@ export default function PaybackAnalysisPage() {
                 ),
               }}
               inputProps={{ step: "0.01", min: "0" }}
-              sx={{ width: { xs: "100%", sm: "200px" } }}
+              sx={{ width: { xs: "100%", sm: "200px" }, ...inputSx }}
             />
           )}
 
           <Box
             sx={{
               display: "flex",
-              gap: 1.5,
+              gap: "10px",
               width: { xs: "100%", sm: "auto" },
             }}
           >
             {!isSelfMining && (
               <Button
-                variant="contained"
                 onClick={handleUpdateInvoicedAmount}
                 disabled={isUpdatingInvoiced}
-                size="small"
                 fullWidth={isMobile}
+                sx={primaryBtnSx}
               >
                 {isUpdatingInvoiced ? "Updating..." : "Update"}
               </Button>
@@ -1146,29 +1179,27 @@ export default function PaybackAnalysisPage() {
 
             {isSelfMining && (
               <Button
-                variant="contained"
                 onClick={handleSaveMachineCost}
                 disabled={isSavingMachineCost}
-                size="small"
                 fullWidth={isMobile}
+                sx={primaryBtnSx}
               >
                 {isSavingMachineCost ? "Saving..." : "Save Machine Cost"}
               </Button>
             )}
 
             <Button
-              variant="outlined"
               onClick={handleRefresh}
               disabled={isRefreshing}
-              size="small"
               fullWidth={isMobile}
+              sx={outlineBtnSx}
             >
               {isRefreshing ? "Refreshing..." : "Refresh"}
             </Button>
           </Box>
         </Box>
 
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+        <Typography sx={{ mt: "10px", fontSize: 11, color: d.muted }}>
           Updated:{" "}
           {lastUpdated
             ? lastUpdated.toLocaleString(undefined, {
@@ -1183,110 +1214,75 @@ export default function PaybackAnalysisPage() {
       </Box>
 
       {/* Config summary card — the spec both views are built on */}
-      <Paper sx={{ p: { xs: 2, sm: 3 }, mb: { xs: 2, md: 3 } }}>
+      <Box
+        sx={{
+          p: { xs: "16px", sm: "20px 24px" },
+          mb: { xs: "18px", md: "22px" },
+          bgcolor: d.surface,
+          border: `1px solid ${d.border}`,
+          borderRadius: RADIUS_CARD,
+          boxShadow: d.shadow,
+        }}
+      >
         <Box
           sx={{
             display: "grid",
             gridTemplateColumns: { xs: "1fr 1fr", md: "1fr 1fr 1fr" },
-            gap: { xs: 2, sm: 2 },
+            gap: "16px",
           }}
         >
-          <Box>
-            <Typography variant="subtitle2" color="text.secondary">
-              Document
-            </Typography>
-            <Typography variant="body2">Payback Analysis</Typography>
-          </Box>
-          <Box>
-            <Typography variant="subtitle2" color="text.secondary">
-              Hosting Charges
-            </Typography>
-            <Typography variant="body2">
-              {formatValue(activeHostingCharges, "currency", {
-                minimumFractionDigits: 5,
-                maximumFractionDigits: 5,
-              })}
-            </Typography>
-          </Box>
-          <Box>
-            <Typography variant="subtitle2" color="text.secondary">
-              {isSelfMining ? "Monthly Operating Cost" : "Monthly Invoicing"}
-            </Typography>
-            <Typography variant="body2">
-              {formatValue(monthlyElectricityHosting, "currency")}
-            </Typography>
-          </Box>
-          <Box>
-            <Typography variant="subtitle2" color="text.secondary">
-              Power Consumption
-            </Typography>
-            <Typography variant="body2">
-              {`${formatValue(activePowerConsumption, "number", {
-                minimumFractionDigits: 4,
-                maximumFractionDigits: 4,
-              })} KWH`}
-            </Typography>
-          </Box>
+          <Fact label="Document" value="Payback Analysis" />
+          <Fact
+            label="Hosting Charges"
+            value={formatValue(activeHostingCharges, "currency", {
+              minimumFractionDigits: 5,
+              maximumFractionDigits: 5,
+            })}
+          />
+          <Fact
+            label={
+              isSelfMining ? "Monthly Operating Cost" : "Monthly Invoicing"
+            }
+            value={formatValue(monthlyElectricityHosting, "currency")}
+          />
+          <Fact
+            label="Power Consumption"
+            value={`${formatValue(activePowerConsumption, "number", {
+              minimumFractionDigits: 4,
+              maximumFractionDigits: 4,
+            })} KWH`}
+          />
           {!isSelfMining && (
-            <Box>
-              <Typography variant="subtitle2" color="text.secondary">
-                Invoiced Amount
-              </Typography>
-              <Typography variant="body2">
-                {formatValue(
-                  parseFloat(editableInvoicedAmount || "0"),
-                  "currency",
-                )}
-              </Typography>
-            </Box>
+            <Fact
+              label="Invoiced Amount"
+              value={formatValue(
+                parseFloat(editableInvoicedAmount || "0"),
+                "currency",
+              )}
+            />
           )}
-          <Box>
-            <Typography variant="subtitle2" color="text.secondary">
-              Machine Cost
-            </Typography>
-            <Typography variant="body2">
-              {formatValue(machineCost, "currency")}
-            </Typography>
-          </Box>
-          <Box>
-            <Typography variant="subtitle2" color="text.secondary">
-              Current Miner
-            </Typography>
-            <Typography variant="body2">
-              {MINER_LABELS[selectedMiner]}
-            </Typography>
-          </Box>
-          <Box>
-            <Typography variant="subtitle2" color="text.secondary">
-              Current OS
-            </Typography>
-            <Typography variant="body2">{OS_LABELS[selectedOS]}</Typography>
-          </Box>
-          <Box>
-            <Typography variant="subtitle2" color="text.secondary">
-              {`${MINER_LABELS[selectedMiner]} Hashrate`}
-            </Typography>
-            <Typography variant="body2">{activeHashrateSummary}</Typography>
-          </Box>
+          <Fact
+            label="Machine Cost"
+            value={formatValue(machineCost, "currency")}
+          />
+          <Fact label="Current Miner" value={MINER_LABELS[selectedMiner]} />
+          <Fact label="Current OS" value={OS_LABELS[selectedOS]} />
+          <Fact
+            label={`${MINER_LABELS[selectedMiner]} Hashrate`}
+            value={activeHashrateSummary}
+          />
           {(selectedStrategy === "STRATEGY_2" ||
             selectedStrategy === "STRATEGY_3") && (
-            <Box>
-              <Typography variant="subtitle2" color="text.secondary">
-                Machine Life
-              </Typography>
-              <Typography variant="body2">{`${MACHINE_LIFE_YEARS} Years`}</Typography>
-            </Box>
+            <Fact label="Machine Life" value={`${MACHINE_LIFE_YEARS} Years`} />
           )}
           {selectedStrategy === "STRATEGY_3" && (
-            <Box>
-              <Typography variant="subtitle2" color="text.secondary">
-                USDT/(BTC Collateral) Borrowing Rate
-              </Typography>
-              <Typography variant="body2">{`${BORROWING_RATE_APR.toFixed(2)}%`}</Typography>
-            </Box>
+            <Fact
+              label="USDT/(BTC Collateral) Borrowing Rate"
+              value={`${BORROWING_RATE_APR.toFixed(2)}%`}
+            />
           )}
         </Box>
-      </Paper>
+      </Box>
 
       {viewMode === "GRAPHS" && (
         <PaybackGraphicalView
@@ -1304,6 +1300,7 @@ export default function PaybackAnalysisPage() {
           historyChart={
             /* Same Buy BTC vs Mine BTC history as the scenario table view. */
             <PaybackHistoryChart
+              daylight
               profile="CLIENT"
               miner={selectedMiner}
               os={selectedOS}
@@ -1315,101 +1312,126 @@ export default function PaybackAnalysisPage() {
       {viewMode === "TABLE" && (
         <>
           <PaybackHistoryChart
+            daylight
             profile="CLIENT"
             miner={selectedMiner}
             os={selectedOS}
           />
 
           {/* Data table — horizontally scrollable on mobile */}
-          <TableContainer
-            component={Paper}
-            sx={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}
+          <Box
+            sx={{
+              bgcolor: d.surface,
+              border: `1px solid ${d.border}`,
+              borderRadius: RADIUS_CARD,
+              boxShadow: d.shadow,
+              overflow: "hidden",
+            }}
           >
-            <Table size="small" sx={{ minWidth: 920 }}>
-              <TableHead
-                sx={{
-                  backgroundColor:
-                    theme.palette.mode === "dark"
-                      ? "rgba(255,255,255,0.05)"
-                      : "rgba(0,0,0,0.03)",
-                }}
-              >
-                <TableRow>
-                  <TableCell
-                    sx={{
-                      fontWeight: 700,
-                      minWidth: { xs: 130, sm: 200 },
-                      fontSize: { xs: "0.75rem", sm: "0.85rem" },
-                      px: { xs: 1, sm: 1.5 },
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    Metric
-                  </TableCell>
-                  {columns.map((column) => (
-                    <TableCell
-                      key={column}
-                      sx={{
-                        fontWeight: 700,
-                        fontSize: { xs: "0.65rem", sm: "0.75rem" },
-                        lineHeight: 1.25,
-                        px: { xs: 0.75, sm: 1.25 },
-                        borderLeft: `1px solid ${theme.palette.divider}`,
-                        whiteSpace: "pre-line",
-                      }}
-                      align="right"
-                    >
-                      {column}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {tableRows.map((row) => (
-                  <TableRow key={row.label} hover>
+            <TableContainer
+              sx={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}
+            >
+              <Table size="small" sx={{ minWidth: 920 }}>
+                <TableHead sx={{ backgroundColor: d.tableHead }}>
+                  <TableRow>
                     <TableCell
                       sx={{
+                        fontFamily: fonts.body,
                         fontWeight: 600,
-                        fontSize: { xs: "0.7rem", sm: "0.8rem" },
-                        whiteSpace: "nowrap",
+                        fontSize: 10,
+                        letterSpacing: ".015em",
+                        textTransform: "uppercase",
+                        color: d.muted,
+                        borderBottomColor: d.border,
+                        minWidth: { xs: 130, sm: 200 },
                         px: { xs: 1, sm: 1.5 },
+                        whiteSpace: "nowrap",
                       }}
                     >
-                      {row.label}
+                      Metric
                     </TableCell>
-                    {row.values.map((value, index) => (
+                    {columns.map((column) => (
                       <TableCell
-                        key={`${row.label}-${index}`}
-                        align="right"
+                        key={column}
                         sx={{
-                          fontWeight: 400,
-                          fontSize: { xs: "0.65rem", sm: "0.8rem" },
-                          whiteSpace: "nowrap",
-                          px: { xs: 0.5, sm: 1 },
-                          borderLeft: `1px solid ${theme.palette.divider}`,
-                          ...(row.label === "BTC Price (USD)" && index === 0
-                            ? { backgroundColor: "rgba(255, 193, 7, 0.35)" }
-                            : {}),
-                          ...(row.label === "BTC Price (USD)" &&
-                          index === 8 &&
-                          selectedOS === "CUSTOM"
-                            ? { backgroundColor: "rgba(103, 177, 42, 0.35)" } // graph's Custom OS green
-                            : {}),
-                          ...(row.label === "BTC Price (USD)" &&
-                          index === 8 &&
-                          selectedOS === "STOCK"
-                            ? { backgroundColor: "rgba(21, 101, 192, 0.35)" } // graph's Stock OS blue
-                            : {}),
+                          fontFamily: fonts.body,
+                          fontWeight: 600,
+                          fontSize: { xs: 9, sm: 10 },
+                          letterSpacing: ".01em",
+                          textTransform: "uppercase",
+                          color: d.muted,
+                          lineHeight: 1.25,
+                          px: { xs: 0.75, sm: 1.25 },
+                          borderLeft: `1px solid ${d.border}`,
+                          borderBottomColor: d.border,
+                          whiteSpace: "pre-line",
                         }}
+                        align="right"
                       >
-                        {value}
+                        {column}
                       </TableCell>
                     ))}
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
+                </TableHead>
+                <TableBody>
+                  {tableRows.map((row) => (
+                    <TableRow
+                      key={row.label}
+                      hover
+                      sx={{
+                        "&:hover": { backgroundColor: d.hover },
+                        "& .MuiTableCell-root": {
+                          borderBottomColor: d.border,
+                          fontFamily: fonts.body,
+                        },
+                      }}
+                    >
+                      <TableCell
+                        sx={{
+                          fontWeight: 600,
+                          fontSize: { xs: "0.7rem", sm: "0.8rem" },
+                          color: d.text,
+                          whiteSpace: "nowrap",
+                          px: { xs: 1, sm: 1.5 },
+                        }}
+                      >
+                        {row.label}
+                      </TableCell>
+                      {row.values.map((value, index) => (
+                        <TableCell
+                          key={`${row.label}-${index}`}
+                          align="right"
+                          sx={{
+                            fontWeight: 400,
+                            fontSize: { xs: "0.65rem", sm: "0.8rem" },
+                            color: d.text,
+                            whiteSpace: "nowrap",
+                            px: { xs: 0.5, sm: 1 },
+                            borderLeft: `1px solid ${d.border}`,
+                            ...(row.label === "BTC Price (USD)" && index === 0
+                              ? { backgroundColor: d.amber }
+                              : {}),
+                            ...(row.label === "BTC Price (USD)" &&
+                            index === 8 &&
+                            selectedOS === "CUSTOM"
+                              ? { backgroundColor: d.mint } // Custom OS
+                              : {}),
+                            ...(row.label === "BTC Price (USD)" &&
+                            index === 8 &&
+                            selectedOS === "STOCK"
+                              ? { backgroundColor: d.skySoft } // Stock OS
+                              : {}),
+                          }}
+                        >
+                          {value}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Box>
         </>
       )}
     </Box>
