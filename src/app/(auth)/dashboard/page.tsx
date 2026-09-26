@@ -29,6 +29,7 @@ import AccountBalanceWalletOutlinedIcon from "@mui/icons-material/AccountBalance
 import PaidOutlinedIcon from "@mui/icons-material/PaidOutlined";
 import HourglassBottomOutlinedIcon from "@mui/icons-material/HourglassBottomOutlined";
 import CalendarMonthOutlinedIcon from "@mui/icons-material/CalendarMonthOutlined";
+import MonetizationOnOutlinedIcon from "@mui/icons-material/MonetizationOnOutlined";
 import DashboardHeader from "@/components/DashboardHeader";
 import FactoryStatusCard from "@/components/daylight/FactoryStatusCard";
 import StatCard from "@/components/daylight/StatCard";
@@ -36,6 +37,7 @@ import Segmented from "@/components/daylight/Segmented";
 import PillTab from "@/components/daylight/PillTab";
 import MiningEarningsChart from "@/components/MiningEarningsChart";
 import { useUser } from "@/lib/hooks/useUser";
+import { useBitcoinLivePrice } from "@/components/useBitcoinLivePrice";
 import { formatValue } from "@/lib/helpers/formatValue";
 import { getDaysInCurrentMonth } from "@/lib/helpers/getDaysInCurrentMonth";
 import { useSubaccountFilter } from "@/lib/contexts/subaccountFilter-context";
@@ -57,12 +59,14 @@ export default function DashboardPage() {
   const { loading, error } = useUser();
   const { queryParam: subaccountsParam } = useSubaccountFilter();
   const theme = useTheme();
-  const { d, fonts } = useDaylight();
+  const { d, darkMode, fonts } = useDaylight();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const [balance, setBalance] = React.useState<number>(0);
   const [balanceLoading, setBalanceLoading] = React.useState(true);
   const [dailyCost, setDailyCost] = React.useState<number>(0);
   const [dailyCostLoading, setDailyCostLoading] = React.useState(true);
+  const [totalEarningsBtc, setTotalEarningsBtc] = React.useState<number>(0);
+  const [totalEarningsLoading, setTotalEarningsLoading] = React.useState(true);
   const [minersSummary, setMinersSummary] = React.useState<{
     activePoolNames: string[];
     pools: {
@@ -101,6 +105,18 @@ export default function DashboardPage() {
   // Mining Performance chart granularity: daily (last 31 days) or monthly
   // (every fully-closed calendar month since data began).
   const [granularity, setGranularity] = React.useState<Granularity>("daily");
+
+  const { btcLiveData } = useBitcoinLivePrice();
+  const btcPriceUsd = btcLiveData?.price
+    ? typeof btcLiveData.price === "string"
+      ? parseFloat(btcLiveData.price)
+      : btcLiveData.price
+    : null;
+
+  const totalEarningsUsd = React.useMemo(() => {
+    if (totalEarningsLoading || !btcPriceUsd) return 0;
+    return totalEarningsBtc * btcPriceUsd;
+  }, [totalEarningsBtc, totalEarningsLoading, btcPriceUsd]);
 
   const estimatedMonthlyCost = React.useMemo(() => {
     if (dailyCostLoading) return 0;
@@ -176,6 +192,34 @@ export default function DashboardPage() {
 
     fetchDailyCosts();
   }, []);
+
+  // Fetch total (lifetime) earnings on component mount / subaccount change
+  React.useEffect(() => {
+    const fetchTotalEarnings = async () => {
+      try {
+        setTotalEarningsLoading(true);
+        const response = await fetch(
+          `/api/wallet/earnings-summary?subaccounts=${subaccountsParam}`,
+        );
+
+        if (!response.ok) {
+          console.error("Failed to fetch earnings summary");
+          setTotalEarningsBtc(0);
+          return;
+        }
+
+        const data = await response.json();
+        setTotalEarningsBtc(data.totalEarnings?.btc || 0);
+      } catch (err) {
+        console.error("Error fetching earnings summary:", err);
+        setTotalEarningsBtc(0);
+      } finally {
+        setTotalEarningsLoading(false);
+      }
+    };
+
+    fetchTotalEarnings();
+  }, [subaccountsParam]);
 
   // Fetch workers stats on component mount
   React.useEffect(() => {
@@ -400,6 +444,89 @@ export default function DashboardPage() {
     >
       {/* Page heading */}
       <DashboardHeader daylight />
+
+      {/* Total Earning hero (guide §5 gradient area, mirrors the Wallet
+          page's Total Earnings hero: big USD headline, BTC underneath). */}
+      <Box
+        sx={{
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "20px",
+          maxWidth: { xs: "100%", md: "82%" },
+          p: { xs: "16px 18px", sm: "18px 26px" },
+          mb: { xs: "14px", sm: "18px" },
+          borderRadius: RADIUS_CARD,
+          background: darkMode
+            ? d.mint
+            : "linear-gradient(110deg, #EDF8FF, #F0FAF6)",
+          border: `1px solid ${darkMode ? d.borderMint : "#D7EAF3"}`,
+          boxShadow: d.shadow,
+        }}
+      >
+        <Box>
+          <Typography sx={{ fontSize: 12, color: d.muted }}>
+            Total Earning
+          </Typography>
+          {totalEarningsLoading || !btcPriceUsd ? (
+            <Box
+              sx={{ display: "flex", alignItems: "center", gap: 1, mt: "8px" }}
+            >
+              <CircularProgress size={20} sx={{ color: d.action }} />
+              <Typography sx={{ fontSize: 13, color: d.muted }}>
+                Loading...
+              </Typography>
+            </Box>
+          ) : (
+            <>
+              <Typography
+                sx={{
+                  fontFamily: fonts.heading,
+                  fontWeight: 750,
+                  fontSize: { xs: 28, sm: 34 },
+                  lineHeight: 1.25,
+                  letterSpacing: "-1.2px",
+                  color: d.text,
+                  mt: "2px",
+                  fontVariantNumeric: "tabular-nums",
+                }}
+              >
+                {formatValue(totalEarningsUsd, "currency")}
+              </Typography>
+              <Typography sx={{ fontSize: 11, color: d.muted, mt: "4px" }}>
+                <Box
+                  component="span"
+                  sx={{
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: d.cardMuted,
+                    fontVariantNumeric: "tabular-nums",
+                  }}
+                >
+                  {formatValue(totalEarningsBtc, "BTC")}
+                </Box>
+                {" · Lifetime mining revenue"}
+              </Typography>
+            </>
+          )}
+        </Box>
+        <Box
+          aria-hidden
+          sx={{
+            display: "grid",
+            placeItems: "center",
+            flexShrink: 0,
+            width: { xs: 42, sm: 48 },
+            height: { xs: 42, sm: 48 },
+            borderRadius: "14px",
+            bgcolor: d.surface,
+            color: d.success,
+          }}
+        >
+          <MonetizationOnOutlinedIcon sx={{ fontSize: { xs: 22, sm: 24 } }} />
+        </Box>
+      </Box>
 
       {/* KPI cards - 4 columns, 2 below 960px */}
       <Box

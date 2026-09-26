@@ -24,7 +24,12 @@ import PwaInstallPrompt, {
   PwaQuickInstallButton,
 } from "@/components/pwa/PwaInstallPrompt";
 import { PwaInstallProvider } from "@/components/pwa/PwaInstallContext";
-import { RADIUS_CARD, focusRing, useDaylight } from "@/lib/daylight";
+import {
+  RADIUS_CARD,
+  focusRing,
+  logoFilter,
+  useDaylight,
+} from "@/lib/daylight";
 
 const PASSKEY_OFFER_FLAG = "bf_offer_passkey_setup";
 
@@ -34,7 +39,7 @@ function setPasskeyOfferFlag() {
 }
 
 export default function Login() {
-  const { d, fonts } = useDaylight();
+  const { d, darkMode, fonts } = useDaylight();
   const router = useRouter();
   const [formData, setFormData] = useState({
     email: "",
@@ -209,7 +214,7 @@ export default function Login() {
                 alt="BitFactory Logo"
                 width={220}
                 height={110}
-                style={{ height: "auto" }}
+                style={{ height: "auto", filter: logoFilter(darkMode) }}
               />
             </Box>
 

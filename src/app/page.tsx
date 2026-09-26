@@ -11,10 +11,10 @@ import React from "react";
 import { Box, Typography, Button, Stack } from "@mui/material";
 import Link from "next/link";
 import Image from "next/image";
-import { RADIUS_CARD, useDaylight } from "@/lib/daylight";
+import { RADIUS_CARD, logoFilter, useDaylight } from "@/lib/daylight";
 
 export default function Home() {
-  const { d, fonts } = useDaylight();
+  const { d, darkMode, fonts } = useDaylight();
 
   return (
     <Box
@@ -55,6 +55,7 @@ export default function Home() {
                 borderRadius: 16,
                 display: "block",
                 objectFit: "contain",
+                filter: logoFilter(darkMode),
               }}
             />
           </Box>

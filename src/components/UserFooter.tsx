@@ -4,6 +4,7 @@ import React from "react";
 import { Box, Typography, useTheme } from "@mui/material";
 import Image from "next/image";
 import Link from "next/link";
+import { logoFilter } from "@/lib/daylight";
 
 export default function UserFooter() {
   const theme = useTheme();
@@ -37,7 +38,7 @@ export default function UserFooter() {
           style={{
             cursor: "pointer",
             height: "auto",
-            filter: theme.palette.mode === "dark" ? "brightness(0.9)" : "none",
+            filter: logoFilter(theme.palette.mode === "dark"),
           }}
         />
       </Link>
