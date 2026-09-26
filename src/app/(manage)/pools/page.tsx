@@ -409,8 +409,12 @@ export default function PoolsPage() {
     }
   };
 
+  // A client can hold several Luxor subaccounts, so every client stays
+  // pickable for Luxor; other pools stay at one credential per client.
   const clientsWithoutCredential = clientOptions.filter(
-    (c) => !poolAuths.some((pa) => pa.userId === c.id),
+    (c) =>
+      clientsDialogPool?.name === "Luxor" ||
+      !poolAuths.some((pa) => pa.userId === c.id),
   );
 
   return (

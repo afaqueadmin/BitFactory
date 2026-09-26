@@ -3,6 +3,10 @@ import { verifyJwtToken } from "@/lib/jwt";
 import { createLuxorClient } from "@/lib/luxor";
 import { createBraiinsClient } from "@/lib/braiins";
 import { prisma } from "@/lib/prisma";
+import {
+  selectRequestedSubaccounts,
+  joinSubaccountNames,
+} from "@/lib/luxorSubaccounts";
 
 /**
  * GET /api/wallet/earnings-summary
@@ -91,8 +95,12 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const luxorAuth = poolAuths.find((auth) =>
+    const luxorAuths = poolAuths.filter((auth) =>
       auth.pool.name.toLowerCase().includes("luxor"),
+    );
+    const selectedLuxorAuths = selectRequestedSubaccounts(
+      luxorAuths.map((a) => ({ id: a.id, authKey: a.authKey })),
+      url.searchParams.get("subaccounts"),
     );
     const braiinsAuth = poolAuths.find((auth) =>
       auth.pool.name.toLowerCase().includes("braiins"),
@@ -108,20 +116,25 @@ export async function GET(request: NextRequest) {
     const formatDate = (date: Date) => date.toISOString().split("T")[0];
 
     // Fetch from Luxor
-    if (luxorAuth) {
+    if (selectedLuxorAuths.length > 0) {
       try {
-        const authKey = luxorAuth.authKey;
+        const authKey = joinSubaccountNames(
+          selectedLuxorAuths.map((a) => a.authKey),
+        );
         console.log(
-          `[Earnings Summary API] Fetching Luxor data for auth key: ${authKey}`,
+          `[Earnings Summary API] Fetching Luxor data for auth key(s): ${authKey}`,
         );
         const client = createLuxorClient(authKey);
 
-        // Get payment settings for pending balance
-        const paymentSettings = await client.getSubaccountPaymentSettings(
-          "BTC",
-          authKey,
-        );
-        totalLuxorPending += paymentSettings.balance || 0;
+        // Payment settings are per-subaccount only (no comma-list support),
+        // so pending balance is summed across each selected subaccount.
+        for (const sub of selectedLuxorAuths) {
+          const paymentSettings = await client.getSubaccountPaymentSettings(
+            "BTC",
+            sub.authKey,
+          );
+          totalLuxorPending += paymentSettings.balance || 0;
+        }
 
         // Fetch all transactions to calculate total earnings
         let currentPage = 1;
@@ -193,7 +206,7 @@ export async function GET(request: NextRequest) {
 
     // Determine which pools have a configured account
     const activePoolNames = [];
-    if (luxorAuth) activePoolNames.push("Luxor");
+    if (selectedLuxorAuths.length > 0) activePoolNames.push("Luxor");
     if (braiinsAuth) activePoolNames.push("Braiins");
 
     const response = {
@@ -205,7 +218,11 @@ export async function GET(request: NextRequest) {
       },
       currency: "BTC",
       dataSource:
-        luxorAuth && braiinsAuth ? "both" : luxorAuth ? "luxor" : "braiins",
+        selectedLuxorAuths.length > 0 && braiinsAuth
+          ? "both"
+          : selectedLuxorAuths.length > 0
+            ? "luxor"
+            : "braiins",
       timestamp: new Date().toISOString(),
       activePoolNames,
       poolBreakdown: {

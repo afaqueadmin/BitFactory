@@ -31,17 +31,22 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "User not found" }, { status: 401 });
     }
 
-    const invoices = await prisma.invoice.findMany({
-      where: {
-        userId,
-        status: {
-          in: ["PAID", "ISSUED", "OVERDUE"],
+    const invoices = (
+      await prisma.invoice.findMany({
+        where: {
+          userId,
+          status: {
+            in: ["PAID", "ISSUED", "OVERDUE"],
+          },
         },
-      },
-      include: {
-        costPayments: true,
-      },
-      orderBy: { createdAt: "asc" },
+        include: {
+          costPayments: true,
+        },
+      })
+    ).sort((a, b) => {
+      const aDate = new Date(a.issuedDate || a.invoiceGeneratedDate).getTime();
+      const bDate = new Date(b.issuedDate || b.invoiceGeneratedDate).getTime();
+      return bDate - aDate;
     });
 
     const templatePath = join(

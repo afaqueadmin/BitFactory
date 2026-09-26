@@ -30,11 +30,12 @@ import {
   Customer,
 } from "@/lib/hooks/useInvoices";
 import { useSpaceLocations } from "@/lib/hooks/useSpaceLocations";
-import { getMostCommonMinerLocation } from "@/lib/utils/minerLocation";
+import { getMinerLocations } from "@/lib/utils/minerLocation";
 import {
   LineItemsEditor,
   LineItem,
 } from "@/components/accounting/invoices/LineItemsEditor";
+import { LocationsMultiSelect } from "@/components/accounting/invoices/LocationsMultiSelect";
 
 export default function CreateInvoicePage() {
   const router = useRouter();
@@ -51,7 +52,7 @@ export default function CreateInvoicePage() {
     hardwareId: "",
     billingMonth: now.getMonth(),
     billingYear: now.getFullYear(),
-    machineHostingLocation: "",
+    machineHostingLocation: [] as string[],
   });
 
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
@@ -149,10 +150,13 @@ export default function CreateInvoicePage() {
           lineItemType: "HARDWARE" as const,
         })),
       );
-      const derivedLocation = getMostCommonMinerLocation(customerMiners);
+      const derivedLocations = getMinerLocations(customerMiners);
       setFormData((prev) => ({
         ...prev,
-        machineHostingLocation: derivedLocation || prev.machineHostingLocation,
+        machineHostingLocation:
+          derivedLocations.length > 0
+            ? derivedLocations
+            : prev.machineHostingLocation,
       }));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -266,7 +270,7 @@ export default function CreateInvoicePage() {
         hardwareId: formData.hardwareId || undefined,
         billingMonth: billingMonthDate.toISOString(),
         lineItems,
-        machineHostingLocation: formData.machineHostingLocation || undefined,
+        machineHostingLocation: formData.machineHostingLocation,
       });
 
       // Redirect to accounting dashboard
@@ -519,23 +523,17 @@ export default function CreateInvoicePage() {
                     </MenuItem>
                   ))}
                 </TextField>
-                <TextField
-                  select
-                  label="Machine Hosting Location"
-                  name="machineHostingLocation"
+                <LocationsMultiSelect
                   value={formData.machineHostingLocation}
-                  onChange={handleInputChange}
-                  fullWidth
+                  onChange={(locations) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      machineHostingLocation: locations,
+                    }))
+                  }
+                  options={spaceLocations}
                   disabled={spaceLocationsLoading}
-                  helperText="Shown on the invoice PDF as the Machine Hosting Location. Leave blank to use the default location."
-                >
-                  <MenuItem value="">-- Use Default Location --</MenuItem>
-                  {spaceLocations.map((location) => (
-                    <MenuItem key={location} value={location}>
-                      {location}
-                    </MenuItem>
-                  ))}
-                </TextField>
+                />
                 {/* Status is automatically set to DRAFT when creating invoices */}
               </Stack>
             </Box>

@@ -61,6 +61,7 @@ import {
   HashpricePoint,
 } from "@/hooks/useHashpriceHistory";
 import { useQuery } from "@tanstack/react-query";
+import { useSubaccountFilter } from "@/lib/contexts/subaccountFilter-context";
 
 interface ChartData {
   date: string;
@@ -262,9 +263,11 @@ export default function HashpriceHistoryPage() {
 
   const network = networkData?.data;
 
+  const { queryParam: subaccountsParam } = useSubaccountFilter();
+
   // Fetch historical pool-wide hashprice data from API (for chart and period statistics)
   const { hashpriceData, statistics, isLoading, isError, error, rawResponse } =
-    useHashpriceHistory(queryDays);
+    useHashpriceHistory(queryDays, subaccountsParam);
 
   // Transform API data for chart
   const chartData: ChartData[] = useMemo(() => {

@@ -1,13 +1,12 @@
 // Helper to get user ID from token
-import jwt from "jsonwebtoken";
+import { verifyJwtToken } from "@/lib/jwt";
 
-export const getUserInfoFromToken = (token: string) => {
+export const getUserInfoFromToken = async (
+  token: string,
+): Promise<{ userId: string | null }> => {
   try {
-    const decodedObject = jwt.verify(
-      token,
-      process.env.JWT_SECRET || "your-secret-key",
-    ) as { userId: string };
-    return decodedObject;
+    const { userId } = await verifyJwtToken(token);
+    return { userId };
   } catch {
     return { userId: null };
   }

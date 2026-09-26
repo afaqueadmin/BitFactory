@@ -13,6 +13,10 @@ import {
   fetchLuxorSeries,
   fetchLuxorUptime,
 } from "@/lib/hashrateHistory";
+import {
+  selectRequestedSubaccounts,
+  joinSubaccountNames,
+} from "@/lib/luxorSubaccounts";
 
 /**
  * GET /api/miners/hashrate-history
@@ -153,8 +157,20 @@ export async function GET(request: NextRequest) {
       include: { pool: { select: { id: true, name: true } } },
     });
 
-    const luxorAuth = poolAuths.find((auth) =>
+    const luxorAuths = poolAuths.filter((auth) =>
       auth.pool.name.toLowerCase().includes("luxor"),
+    );
+    const selectedLuxorAuths = selectRequestedSubaccounts(
+      luxorAuths.map((a) => ({ id: a.id, authKey: a.authKey })),
+      searchParams.get("subaccounts"),
+    );
+    const luxorAuth =
+      selectedLuxorAuths.length > 0 ? selectedLuxorAuths[0] : null;
+    // Live fetches below query every selected subaccount at once (Luxor's
+    // subaccount_names accepts a comma list); the DB-backed portion is
+    // scoped to the same set via luxorPoolSubaccountIds below.
+    const luxorAuthKeys = joinSubaccountNames(
+      selectedLuxorAuths.map((a) => a.authKey),
     );
     const braiinsAuth = poolAuths.find((auth) =>
       auth.pool.name.toLowerCase().includes("braiins"),
@@ -164,17 +180,27 @@ export async function GET(request: NextRequest) {
     if (luxorAuth) activePoolNames.push("Luxor");
     if (braiinsAuth) activePoolNames.push("Braiins");
 
-    // Resolve each active pool's PoolSubaccount row so the DB-backed portion
-    // of the series can be queried directly by id. A user with no
+    // Resolve each active pool's PoolSubaccount row(s) so the DB-backed
+    // portion of the series can be queried directly by id. A user with no
     // PoolSubaccount row yet (e.g. added after the last cron sync) simply
-    // falls back to the fully-live path — see the `poolSubaccountId: null`
-    // branches in hashrateHistory.ts.
+    // falls back to the fully-live path — see the empty-array branches in
+    // hashrateHistory.ts. Luxor is scoped to the selected subaccounts (by
+    // name) rather than every PoolSubaccount row the user has, so the
+    // DB-backed history matches the same selection the live calls use.
     const poolSubaccounts = await prisma.poolSubaccount.findMany({
       where: { userId: targetUserId },
       include: { pool: { select: { name: true } } },
     });
-    const luxorPoolSubaccountId =
-      poolSubaccounts.find((s) => s.pool.name === "Luxor")?.id ?? null;
+    const selectedLuxorAuthKeys = new Set(
+      selectedLuxorAuths.map((a) => a.authKey),
+    );
+    const luxorPoolSubaccountIds = poolSubaccounts
+      .filter(
+        (s) =>
+          s.pool.name === "Luxor" &&
+          selectedLuxorAuthKeys.has(s.subaccountName),
+      )
+      .map((s) => s.id);
     const braiinsPoolSubaccountId =
       poolSubaccounts.find((s) => s.pool.name === "Braiins")?.id ?? null;
 
@@ -222,10 +248,10 @@ export async function GET(request: NextRequest) {
       await Promise.all([
         luxorAuth
           ? fetchLuxorSeries(
-              luxorAuth.authKey,
+              luxorAuthKeys,
               window,
               tick,
-              luxorPoolSubaccountId,
+              luxorPoolSubaccountIds,
             ).catch((error) => {
               console.error(
                 "[Hashrate History API] Luxor fetch failed:",
@@ -253,13 +279,13 @@ export async function GET(request: NextRequest) {
             })
           : Promise.resolve(null),
         luxorAuth
-          ? fetchLuxorEarliestData(luxorAuth.authKey)
+          ? fetchLuxorEarliestData(luxorAuthKeys)
           : Promise.resolve(null),
         wantUptime && luxorAuth
           ? fetchLuxorUptime(
-              luxorAuth.authKey,
+              luxorAuthKeys,
               window,
-              luxorPoolSubaccountId,
+              luxorPoolSubaccountIds,
             ).catch((error) => {
               // Uptime is supplementary: log and carry on with the other series.
               console.error(

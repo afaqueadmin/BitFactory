@@ -15,6 +15,7 @@ import FearGreedGauge from "@/components/btc-predictor/FearGreedGauge";
 import CoinGeckoStatsCard from "@/components/btc-predictor/CoinGeckoStatsCard";
 import NewsFeed from "@/components/btc-predictor/NewsFeed";
 import PolymarketEmbed from "@/components/btc-predictor/PolymarketEmbed";
+import { SubaccountFilterProvider } from "@/lib/contexts/subaccountFilter-context";
 
 function SectionHeading({
   icon,
@@ -65,118 +66,123 @@ export default function BTCPricePredictorPage() {
   };
 
   return (
-    <Box>
-      <AppBarComponent />
-
-      <Container
-        maxWidth="lg"
-        sx={{
-          mt: { xs: "72px", sm: "90px" },
-          px: { xs: 1.5, sm: 2, md: 3 },
-          mb: 6,
-        }}
-      >
-        <Typography
-          variant="h4"
-          component="h1"
-          gutterBottom
+    <SubaccountFilterProvider>
+      <Box>
+        <AppBarComponent />
+        <Container
+          maxWidth="lg"
           sx={{
-            fontSize: { xs: "1.6rem", sm: "2rem", md: "2.125rem" },
-            fontWeight: "bold",
+            mt: { xs: "72px", sm: "90px" },
+            px: { xs: 1.5, sm: 2, md: 3 },
+            mb: 6,
           }}
         >
-          BTC Price Analysis
-        </Typography>
-        <Typography
-          variant="body2"
-          color="text.secondary"
-          sx={{ mb: { xs: 2, md: 3 } }}
-        >
-          Live price, market sentiment, prediction markets, and news for Bitcoin
-          — all in one place.
-        </Typography>
+          <Typography
+            variant="h4"
+            component="h1"
+            gutterBottom
+            sx={{
+              fontSize: { xs: "1.6rem", sm: "2rem", md: "2.125rem" },
+              fontWeight: "bold",
+            }}
+          >
+            BTC Price Analysis
+          </Typography>
+          <Typography
+            variant="body2"
+            color="text.secondary"
+            sx={{ mb: { xs: 2, md: 3 } }}
+          >
+            Live price, market sentiment, prediction markets, and news for
+            Bitcoin — all in one place.
+          </Typography>
 
-        <LivePriceHeader />
+          <LivePriceHeader />
 
-        {/* Market Sentiment */}
-        <Box
-          sx={{
-            display: "grid",
-            gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
-            gap: { xs: 2, md: 3 },
-            mb: { xs: 2, md: 3 },
-          }}
-        >
-          <Paper sx={paperSx}>
-            <SectionHeading
-              icon={<PsychologyIcon color="primary" />}
-              title="Fear & Greed Index"
-            />
-            <FearGreedGauge
-              data={insights?.fearGreed}
-              isLoading={insightsLoading}
-            />
-          </Paper>
-
-          <Paper sx={paperSx}>
-            <SectionHeading
-              icon={<QueryStatsIcon color="primary" />}
-              title="CoinGecko Market Stats"
-            />
-            <CoinGeckoStatsCard
-              data={insights?.coingecko}
-              isLoading={insightsLoading}
-            />
-          </Paper>
-        </Box>
-
-        {/* Prediction Markets & News */}
-        <Box
-          sx={{
-            display: "grid",
-            gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
-            gap: { xs: 2, md: 3 },
-            mb: { xs: 2, md: 3 },
-          }}
-        >
-          <Paper sx={paperSx}>
-            <SectionHeading
-              icon={<ShowChartIcon color="primary" />}
-              title="Polymarket"
-            />
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-              Community-driven prediction market probabilities for Bitcoin price
-              outcomes.
-            </Typography>
-            <PolymarketEmbed />
-          </Paper>
-
-          <Paper sx={paperSx}>
-            <SectionHeading
-              icon={<NewspaperIcon color="primary" />}
-              title="Latest Bitcoin News"
-            />
-            <Box sx={{ mt: 2 }}>
-              <NewsFeed
-                articles={articles}
-                isLoading={newsLoading}
-                isError={newsError}
+          {/* Market Sentiment */}
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
+              gap: { xs: 2, md: 3 },
+              mb: { xs: 2, md: 3 },
+            }}
+          >
+            <Paper sx={paperSx}>
+              <SectionHeading
+                icon={<PsychologyIcon color="primary" />}
+                title="Fear & Greed Index"
               />
-            </Box>
-          </Paper>
-        </Box>
+              <FearGreedGauge
+                data={insights?.fearGreed}
+                isLoading={insightsLoading}
+              />
+            </Paper>
 
-        <Typography
-          variant="caption"
-          color="text.secondary"
-          sx={{ display: "block", mt: 3, textAlign: "center" }}
-        >
-          Prediction markets are speculative indicators reflecting crowd
-          positioning, not financial advice.
-        </Typography>
-      </Container>
+            <Paper sx={paperSx}>
+              <SectionHeading
+                icon={<QueryStatsIcon color="primary" />}
+                title="CoinGecko Market Stats"
+              />
+              <CoinGeckoStatsCard
+                data={insights?.coingecko}
+                isLoading={insightsLoading}
+              />
+            </Paper>
+          </Box>
 
-      <UserFooter />
-    </Box>
+          {/* Prediction Markets & News */}
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
+              gap: { xs: 2, md: 3 },
+              mb: { xs: 2, md: 3 },
+            }}
+          >
+            <Paper sx={paperSx}>
+              <SectionHeading
+                icon={<ShowChartIcon color="primary" />}
+                title="Polymarket"
+              />
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{ mb: 1.5 }}
+              >
+                Community-driven prediction market probabilities for Bitcoin
+                price outcomes.
+              </Typography>
+              <PolymarketEmbed />
+            </Paper>
+
+            <Paper sx={paperSx}>
+              <SectionHeading
+                icon={<NewspaperIcon color="primary" />}
+                title="Latest Bitcoin News"
+              />
+              <Box sx={{ mt: 2 }}>
+                <NewsFeed
+                  articles={articles}
+                  isLoading={newsLoading}
+                  isError={newsError}
+                />
+              </Box>
+            </Paper>
+          </Box>
+
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ display: "block", mt: 3, textAlign: "center" }}
+          >
+            Prediction markets are speculative indicators reflecting crowd
+            positioning, not financial advice.
+          </Typography>
+        </Container>
+
+        <UserFooter />
+      </Box>
+    </SubaccountFilterProvider>
   );
 }

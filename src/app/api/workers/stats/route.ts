@@ -3,6 +3,10 @@ import { verifyJwtToken } from "@/lib/jwt";
 import { prisma } from "@/lib/prisma";
 import { createLuxorClient, WorkersResponse, LuxorError } from "@/lib/luxor";
 import { createBraiinsClient, BraiinsError } from "@/lib/braiins";
+import {
+  selectRequestedSubaccounts,
+  joinSubaccountNames,
+} from "@/lib/luxorSubaccounts";
 
 interface WorkersStats {
   activeWorkers: number;
@@ -50,9 +54,15 @@ export async function GET(request: NextRequest) {
       include: { pool: { select: { id: true, name: true } } },
     });
 
-    const luxorAuth = poolAuths.find((auth) =>
+    const luxorAuths = poolAuths.filter((auth) =>
       auth.pool.name.toLowerCase().includes("luxor"),
     );
+    const selectedLuxorAuths = selectRequestedSubaccounts(
+      luxorAuths.map((a) => ({ id: a.id, authKey: a.authKey })),
+      request.nextUrl.searchParams.get("subaccounts"),
+    );
+    const luxorAuth =
+      selectedLuxorAuths.length > 0 ? selectedLuxorAuths[0] : null;
     const braiinsAuth = poolAuths.find((auth) =>
       auth.pool.name.toLowerCase().includes("braiins"),
     );
@@ -85,7 +95,9 @@ export async function GET(request: NextRequest) {
     // Query Luxor
     if (luxorAuth) {
       try {
-        const authKey = luxorAuth.authKey;
+        const authKey = joinSubaccountNames(
+          selectedLuxorAuths.map((a) => a.authKey),
+        );
         const luxorClient = createLuxorClient(authKey);
         const workersData = await luxorClient.request<WorkersResponse>(
           "/pool/workers/BTC",

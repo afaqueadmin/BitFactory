@@ -3,6 +3,14 @@ import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
 import { AuditAction } from "@prisma/client";
 import { logPoolCredentialChange } from "@/lib/audit/logPoolCredentialChange";
+import {
+  LuxorSubaccountConflictError,
+  SUBACCOUNT_TX_OPTIONS,
+  normalizeSubaccountNames,
+  resolveLuxorSubaccounts,
+  setClientGroup,
+  setLuxorSubaccounts,
+} from "@/lib/luxorSubaccounts";
 
 export async function PUT(
   request: NextRequest,
@@ -41,17 +49,16 @@ export async function PUT(
 
     const body = await request.json();
 
-    // "N/A" is only a placeholder label for the "unassigned" option in the
-    // subaccount picker, never a real subaccount name - treat it as a clear.
-    if (body.luxorSubaccountName === "N/A") {
-      body.luxorSubaccountName = null;
-    }
+    // Full set of Luxor subaccounts the client should end up with, or null
+    // when the request doesn't touch subaccounts at all.
+    const requestedSubaccounts = normalizeSubaccountNames(
+      body.luxorSubaccountNames,
+    );
 
-    // First get the current user to check if they have a luxor subaccount and their current segment
+    // First get the current user to check their subaccounts and current segment
     const currentUser = await prisma.user.findUnique({
       where: { id },
       select: {
-        luxorSubaccountName: true,
         role: true,
         franchiseeId: true,
         segment: true,
@@ -136,15 +143,15 @@ export async function PUT(
       // Check subaccount requirement when the resulting segment is an active customer type
       const effectiveSegment =
         segmentUpdate !== undefined ? segmentUpdate : currentUser.segment;
-      const effectiveSubaccount =
-        body.luxorSubaccountName !== undefined
-          ? body.luxorSubaccountName
-          : currentUser.luxorSubaccountName;
+      const effectiveSubaccountCount =
+        requestedSubaccounts !== null
+          ? requestedSubaccounts.length
+          : (await resolveLuxorSubaccounts(id)).length;
 
       if (
         effectiveSegment &&
         effectiveSegment !== "POTENTIAL_CUSTOMER" &&
-        (!effectiveSubaccount || !effectiveSubaccount.trim())
+        effectiveSubaccountCount === 0
       ) {
         return NextResponse.json(
           {
@@ -166,199 +173,67 @@ export async function PUT(
       country: body.country,
       companyUrl: body.companyUrl,
       email: user.role === "SUPER_ADMIN" && body.email ? body.email : undefined,
-      luxorSubaccountName:
-        body.luxorSubaccountName !== undefined
-          ? body.luxorSubaccountName
-          : undefined,
       franchiseeId: franchiseeIdUpdate,
       segment: segmentUpdate,
     };
 
-    const updatedUser = await prisma.user.update({
-      where: { id },
-      data: updateData,
-    });
-
-    const changedFields = Object.fromEntries(
-      Object.entries(updateData).filter(([, value]) => value !== undefined),
-    );
-    if (Object.keys(changedFields).length > 0) {
-      await prisma.auditLog.create({
-        data: {
-          action: AuditAction.USER_UPDATED,
-          entityType: "User",
-          entityId: id,
-          userId,
-          description: `User ${updatedUser.name || updatedUser.email} updated`,
-          changes: JSON.stringify(changedFields),
-        },
-      });
-    }
-
-    // Dual-write: keep the Luxor PoolAuth row in sync with
-    // User.luxorSubaccountName (legacy, still read by ~20 other files) any
-    // time the subaccount value is being touched for a CLIENT.
-    const subaccountName =
-      body.luxorSubaccountName !== undefined
-        ? body.luxorSubaccountName
-        : currentUser?.luxorSubaccountName;
-
-    let luxorPoolAuthId: string | null = null;
-    if (currentUser?.role === "CLIENT" && subaccountName) {
-      try {
-        const luxorPool = await prisma.pool.findUnique({
-          where: { name: "Luxor" },
-          select: { id: true },
+    // Subaccounts and group are CLIENT-only here (franchisees are managed
+    // through /api/franchisees). Everything below is one transaction, so a
+    // rejected subaccount doesn't leave the rest of the edit half-applied.
+    const isClient = currentUser?.role === "CLIENT";
+    let updatedUser;
+    try {
+      updatedUser = await prisma.$transaction(async (tx) => {
+        const updated = await tx.user.update({
+          where: { id },
+          data: updateData,
+          select: { id: true, name: true, email: true, role: true },
         });
-        if (luxorPool) {
-          const existingLuxorAuth = await prisma.poolAuth.findUnique({
-            where: { poolId_userId: { poolId: luxorPool.id, userId: id } },
-            select: { id: true },
-          });
-          const poolAuth = await prisma.poolAuth.upsert({
-            where: { poolId_userId: { poolId: luxorPool.id, userId: id } },
-            create: {
-              poolId: luxorPool.id,
-              userId: id,
-              authKey: subaccountName.trim(),
+
+        const changedFields = Object.fromEntries(
+          Object.entries(updateData).filter(([, value]) => value !== undefined),
+        );
+        if (isClient && requestedSubaccounts !== null) {
+          changedFields.luxorSubaccounts = requestedSubaccounts;
+        }
+        if (Object.keys(changedFields).length > 0) {
+          await tx.auditLog.create({
+            data: {
+              action: AuditAction.USER_UPDATED,
+              entityType: "User",
+              entityId: id,
+              userId,
+              description: `User ${updated.name || updated.email} updated`,
+              changes: JSON.stringify(changedFields),
             },
-            update: { authKey: subaccountName.trim() },
-            select: { id: true },
           });
-          luxorPoolAuthId = poolAuth.id;
-          await logPoolCredentialChange(prisma, {
-            action: existingLuxorAuth
-              ? AuditAction.POOL_CREDENTIAL_UPDATED
-              : AuditAction.POOL_CREDENTIAL_ADDED,
+        }
+
+        if (isClient && requestedSubaccounts !== null) {
+          await setLuxorSubaccounts(tx, {
             userId: id,
+            names: requestedSubaccounts,
             actorId: userId,
-            poolName: "Luxor",
           });
         }
-      } catch (poolAuthError) {
-        console.error(
-          "[User Update API] Failed to sync Luxor PoolAuth:",
-          poolAuthError,
-        );
+
+        // groupId: undefined = leave memberships alone, null/"" = remove from
+        // all groups, an id = put every subaccount of the client in it.
+        if (isClient && body.groupId !== undefined) {
+          await setClientGroup(tx, {
+            userId: id,
+            groupId: body.groupId || null,
+            actorId: userId,
+          });
+        }
+
+        return updated;
+      }, SUBACCOUNT_TX_OPTIONS);
+    } catch (txError) {
+      if (txError instanceof LuxorSubaccountConflictError) {
+        return NextResponse.json({ error: txError.message }, { status: 409 });
       }
-    } else if (
-      currentUser?.role === "CLIENT" &&
-      body.luxorSubaccountName !== undefined &&
-      !body.luxorSubaccountName
-    ) {
-      // Subaccount explicitly unassigned - remove the Luxor PoolAuth too
-      try {
-        const luxorPool = await prisma.pool.findUnique({
-          where: { name: "Luxor" },
-          select: { id: true },
-        });
-        if (luxorPool) {
-          const removed = await prisma.poolAuth.deleteMany({
-            where: { poolId: luxorPool.id, userId: id },
-          });
-          if (removed.count > 0) {
-            await logPoolCredentialChange(prisma, {
-              action: AuditAction.POOL_CREDENTIAL_REMOVED,
-              userId: id,
-              actorId: userId,
-              poolName: "Luxor",
-            });
-          }
-        }
-      } catch (poolAuthError) {
-        console.error(
-          "[User Update API] Failed to remove Luxor PoolAuth:",
-          poolAuthError,
-        );
-      }
-    }
-
-    // Handle group assignment via GroupSubaccount, keyed by PoolAuth when
-    // the client has a Luxor credential, or directly by userId otherwise.
-    if (body.groupId !== undefined && currentUser?.role === "CLIENT") {
-      try {
-        // Look up the existing membership (if any) before removing it, so
-        // the removal can be attributed to the group it actually came from.
-        const existingMembership = await prisma.groupSubaccount.findFirst({
-          where: {
-            OR: [
-              { userId: id },
-              ...(luxorPoolAuthId ? [{ poolAuthId: luxorPoolAuthId }] : []),
-            ],
-          },
-          select: { groupId: true, subaccountName: true },
-        });
-
-        // Remove any existing group membership for this user, whether keyed
-        // by their Luxor credential or directly by userId (subaccount-less).
-        await prisma.groupSubaccount.deleteMany({
-          where: {
-            OR: [
-              { userId: id },
-              ...(luxorPoolAuthId ? [{ poolAuthId: luxorPoolAuthId }] : []),
-            ],
-          },
-        });
-
-        if (existingMembership) {
-          await prisma.auditLog.create({
-            data: {
-              action: AuditAction.GROUP_SUBACCOUNT_REMOVED,
-              entityType: "Group",
-              entityId: existingMembership.groupId,
-              userId,
-              description: `${existingMembership.subaccountName || "Customer"} removed from group`,
-            },
-          });
-        }
-
-        // Then add to the new group (only if groupId is not null/empty)
-        if (body.groupId && body.groupId.trim().length > 0) {
-          if (luxorPoolAuthId) {
-            await prisma.groupSubaccount.create({
-              data: {
-                groupId: body.groupId,
-                subaccountName: subaccountName.trim(),
-                poolAuthId: luxorPoolAuthId,
-                addedBy: userId, // Admin who made the update
-                addedByUserId: userId,
-              },
-            });
-            console.log(
-              `[User Update API] Assigned subaccount "${subaccountName}" to group "${body.groupId}" for user ${id}`,
-            );
-          } else {
-            await prisma.groupSubaccount.create({
-              data: {
-                groupId: body.groupId,
-                userId: id,
-                addedBy: userId,
-                addedByUserId: userId,
-              },
-            });
-            console.log(
-              `[User Update API] Added user ${id} (no subaccount) to group "${body.groupId}"`,
-            );
-          }
-          await prisma.auditLog.create({
-            data: {
-              action: AuditAction.GROUP_SUBACCOUNT_ADDED,
-              entityType: "Group",
-              entityId: body.groupId,
-              userId,
-              description: `${subaccountName?.trim() || "Customer"} added to group`,
-            },
-          });
-        } else {
-          console.log(`[User Update API] Removed user ${id} from all groups`);
-        }
-      } catch (groupError) {
-        console.error(
-          "[User Update API] Failed to update group assignment:",
-          groupError,
-        );
-        // Log error but don't fail the user update
-      }
+      throw txError;
     }
 
     // Sync the Braiins credential when the field is explicitly provided:
@@ -371,23 +246,24 @@ export async function PUT(
         });
         if (braiinsPool) {
           if (body.braiinsAuthKey && body.braiinsAuthKey.trim()) {
-            const existingBraiinsAuth = await prisma.poolAuth.findUnique({
-              where: {
-                poolId_userId: { poolId: braiinsPool.id, userId: id },
-              },
+            const existingBraiinsAuth = await prisma.poolAuth.findFirst({
+              where: { poolId: braiinsPool.id, userId: id },
               select: { id: true },
             });
-            await prisma.poolAuth.upsert({
-              where: {
-                poolId_userId: { poolId: braiinsPool.id, userId: id },
-              },
-              create: {
-                poolId: braiinsPool.id,
-                userId: id,
-                authKey: body.braiinsAuthKey.trim(),
-              },
-              update: { authKey: body.braiinsAuthKey.trim() },
-            });
+            if (existingBraiinsAuth) {
+              await prisma.poolAuth.update({
+                where: { id: existingBraiinsAuth.id },
+                data: { authKey: body.braiinsAuthKey.trim() },
+              });
+            } else {
+              await prisma.poolAuth.create({
+                data: {
+                  poolId: braiinsPool.id,
+                  userId: id,
+                  authKey: body.braiinsAuthKey.trim(),
+                },
+              });
+            }
             console.log(
               `[User Update API] Synced Braiins credential for user ${id}`,
             );

@@ -3,6 +3,10 @@ import { verifyJwtToken } from "@/lib/jwt";
 import { prisma } from "@/lib/prisma";
 import { createLuxorClient, LuxorError } from "@/lib/luxor";
 import { createBraiinsClient } from "@/lib/braiins";
+import {
+  selectRequestedSubaccounts,
+  joinSubaccountNames,
+} from "@/lib/luxorSubaccounts";
 
 /**
  * GET /api/miners/summary
@@ -42,9 +46,15 @@ export async function GET(request: NextRequest) {
       include: { pool: { select: { id: true, name: true } } },
     });
 
-    const luxorAuth = poolAuths.find((auth) =>
+    const luxorAuths = poolAuths.filter((auth) =>
       auth.pool.name.toLowerCase().includes("luxor"),
     );
+    const selectedLuxorAuths = selectRequestedSubaccounts(
+      luxorAuths.map((a) => ({ id: a.id, authKey: a.authKey })),
+      request.nextUrl.searchParams.get("subaccounts"),
+    );
+    const luxorAuth =
+      selectedLuxorAuths.length > 0 ? selectedLuxorAuths[0] : null;
     const braiinsAuth = poolAuths.find((auth) =>
       auth.pool.name.toLowerCase().includes("braiins"),
     );
@@ -126,9 +136,11 @@ export async function GET(request: NextRequest) {
     // Fetch from Luxor
     if (luxorAuth) {
       try {
-        const authKey = luxorAuth.authKey;
+        const authKey = joinSubaccountNames(
+          selectedLuxorAuths.map((a) => a.authKey),
+        );
         console.log(
-          `[Miners Summary API] Fetching Luxor summary for auth key: ${authKey}`,
+          `[Miners Summary API] Fetching Luxor summary for auth key(s): ${authKey}`,
         );
         const luxorClient = createLuxorClient(authKey);
         const summaryData = await luxorClient.getSummary("BTC", {

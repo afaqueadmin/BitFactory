@@ -66,7 +66,7 @@ interface FetchedUser {
   country: string;
   phoneNumber: string;
   companyName: string;
-  luxorSubaccountName: string;
+  luxorSubaccounts: string[];
   pools: string;
   streetAddress: string;
   twoFactorEnabled: boolean;
@@ -109,7 +109,7 @@ interface FranchiseData {
     id: string;
     name: string;
     email: string;
-    luxorSubaccountName: string | null;
+    luxorSubaccounts: string[];
   };
 }
 

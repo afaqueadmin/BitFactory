@@ -5,7 +5,6 @@
  * flow so "primary address" is computed one way everywhere.
  */
 
-import { prisma } from "@/lib/prisma";
 import { createLuxorClient, LuxorError } from "@/lib/luxor";
 import type { PaymentAddress } from "@/lib/types/wallet";
 
@@ -29,49 +28,26 @@ export function selectPrimaryAddress(
 }
 
 /**
- * Resolves the Luxor identifier for a user the same way
- * /api/wallet/settings does: prefer the PoolAuth authKey, fall back to the
- * legacy luxorSubaccountName column.
+ * Fetches the live primary Luxor address for one specific subaccount, for
+ * snapshotting into currentAddress on a new WalletChangeRequest - payment
+ * settings (including payout addresses) are configured per subaccount in
+ * Luxor, not account-wide, so a user with multiple Luxor subaccounts can have
+ * a genuinely different address on each one. Returns null if Luxor has no
+ * addresses on file; best-effort, never throws (a missing snapshot shouldn't
+ * block a client from submitting a request).
  */
-export async function resolveLuxorIdentifier(
-  userId: string,
-): Promise<string | null> {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: {
-      luxorSubaccountName: true,
-      poolAuths: {
-        where: { pool: { name: "Luxor" } },
-        select: { authKey: true },
-      },
-    },
-  });
-
-  return user?.poolAuths[0]?.authKey || user?.luxorSubaccountName || null;
-}
-
-/**
- * Fetches the user's live primary Luxor address, for snapshotting into
- * currentAddress on a new WalletChangeRequest. Returns null if the user has
- * no Luxor identifier configured or Luxor has no addresses on file -
- * best-effort snapshot, never throws (a missing snapshot shouldn't block a
- * client from submitting a request).
- */
-export async function fetchCurrentPrimaryAddress(
-  userId: string,
+export async function fetchAddressForSubaccount(
+  subaccountName: string,
   currency: string = "BTC",
 ): Promise<string | null> {
-  const luxorIdentifier = await resolveLuxorIdentifier(userId);
-  if (!luxorIdentifier) return null;
-
   try {
     const settings = await createLuxorClient(
-      luxorIdentifier,
-    ).getSubaccountPaymentSettings(currency, luxorIdentifier);
+      subaccountName,
+    ).getSubaccountPaymentSettings(currency, subaccountName);
     return selectPrimaryAddress(settings.addresses)?.external_address ?? null;
   } catch (error) {
     console.error(
-      `[Wallet] Could not fetch current Luxor address for user ${userId}:`,
+      `[Wallet] Could not fetch current Luxor address for subaccount ${subaccountName}:`,
       error instanceof LuxorError ? error.message : error,
     );
     return null;

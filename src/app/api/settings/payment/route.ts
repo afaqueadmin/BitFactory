@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
+import { verifyJwtToken } from "@/lib/jwt";
 import { prisma } from "@/lib/prisma";
 
 // GET /api/settings/payment - Fetch payment settings
@@ -11,10 +11,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const decoded = jwt.verify(
-      token,
-      process.env.JWT_SECRET || "your-secret-key",
-    ) as { userId: string };
+    const decoded = await verifyJwtToken(token);
     if (!decoded?.userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -62,10 +59,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const decoded = jwt.verify(
-      token,
-      process.env.JWT_SECRET || "your-secret-key",
-    ) as { userId: string };
+    const decoded = await verifyJwtToken(token);
     if (!decoded?.userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

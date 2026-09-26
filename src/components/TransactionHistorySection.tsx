@@ -76,10 +76,13 @@ interface TransactionResponse {
 
 interface TransactionHistorySectionProps {
   customerId?: string;
+  /** Comma-separated Luxor subaccounts to scope to, or "all" (default). */
+  subaccountsParam?: string;
 }
 
 export default function TransactionHistorySection({
   customerId,
+  subaccountsParam = "all",
 }: TransactionHistorySectionProps) {
   const theme = useTheme();
   const [poolMode, setPoolMode] = useState<"total" | "luxor" | "braiins">(
@@ -140,6 +143,7 @@ export default function TransactionHistorySection({
         type,
         start_date: dateRange.start_date,
         end_date: dateRange.end_date,
+        subaccounts: subaccountsParam,
       });
 
       // Add customerId if provided (for admin access)
@@ -173,11 +177,27 @@ export default function TransactionHistorySection({
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [poolMode, typeFilter, dateMode, presetRange, startDate, endDate]);
+  }, [
+    poolMode,
+    typeFilter,
+    dateMode,
+    presetRange,
+    startDate,
+    endDate,
+    subaccountsParam,
+  ]);
 
   useEffect(() => {
     fetchTransactions(currentPage, typeFilter);
-  }, [currentPage, typeFilter, dateMode, presetRange, startDate, endDate]);
+  }, [
+    currentPage,
+    typeFilter,
+    dateMode,
+    presetRange,
+    startDate,
+    endDate,
+    subaccountsParam,
+  ]);
 
   // Filter transactions by pool mode
   const filteredTransactions =

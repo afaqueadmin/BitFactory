@@ -26,6 +26,11 @@ import { verifyJwtToken } from "@/lib/jwt";
 import { createLuxorClient, LuxorError } from "@/lib/luxor";
 import { prisma } from "@/lib/prisma";
 import { franchiseeUserFilter } from "@/lib/franchiseeScope";
+import {
+  joinSubaccountNames,
+  selectRequestedSubaccounts,
+  type LuxorSubaccount,
+} from "@/lib/luxorSubaccounts";
 
 // ✅ Ensure this runs on Node.js runtime (required for async operations)
 export const runtime = "nodejs";
@@ -158,7 +163,7 @@ const endpointMap: Record<
  * to get the subaccount name.
  *
  * @param request - NextRequest object
- * @returns Object with userId, role, and luxorSubaccountName if valid
+ * @returns Object with userId, role, and the user's Luxor subaccounts if valid
  * @throws Error if token is invalid or user not found
  */
 async function extractUserFromToken(request: NextRequest) {
@@ -171,16 +176,16 @@ async function extractUserFromToken(request: NextRequest) {
   try {
     const decoded = await verifyJwtToken(token);
 
-    // Fetch user from database to get the luxorSubaccountName
+    // Fetch user from database to get their Luxor subaccounts (PoolAuth)
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },
       select: {
         id: true,
-        luxorSubaccountName: true,
         role: true,
         poolAuths: {
           where: { pool: { name: "Luxor" } },
-          select: { authKey: true },
+          orderBy: { createdAt: "asc" },
+          select: { id: true, authKey: true },
         },
       },
     });
@@ -189,11 +194,12 @@ async function extractUserFromToken(request: NextRequest) {
       throw new Error("User not found in database");
     }
 
+    const luxorSubaccounts: LuxorSubaccount[] = user.poolAuths;
+
     return {
       userId: decoded.userId,
       role: decoded.role,
-      luxorSubaccountName: user.luxorSubaccountName,
-      luxorPoolAuthKey: user.poolAuths[0]?.authKey || null,
+      luxorSubaccounts,
     };
   } catch (error) {
     if (error instanceof Error) {
@@ -273,7 +279,7 @@ function checkAdminAccess(
  *
  * Server-side derived only — never trusts a client-supplied subaccount list,
  * matching the same security posture as the existing CLIENT branch (which
- * only ever uses the caller's own DB-stored `luxorSubaccountName`, never a
+ * only ever uses the caller's own DB-stored PoolAuth subaccounts, never a
  * client-supplied value).
  *
  * @param franchiseeUserId - the authenticated FRANCHISEE user's id
@@ -286,17 +292,25 @@ async function getFranchiseeSubaccountNames(
     where: {
       role: "CLIENT",
       isDeleted: false,
-      luxorSubaccountName: { not: null },
-      NOT: { luxorSubaccountName: { contains: "_test" } },
       ...franchiseeUserFilter({ id: franchiseeUserId, role: "FRANCHISEE" }),
     },
-    select: { luxorSubaccountName: true },
+    select: {
+      poolAuths: {
+        where: { pool: { name: "Luxor" } },
+        select: { authKey: true },
+      },
+    },
   });
 
-  return customers
-    .map((c) => c.luxorSubaccountName)
-    .filter((name): name is string => !!name)
-    .join(",");
+  // Every one of each customer's Luxor subaccounts (PoolAuth).
+  const names = new Set<string>();
+  for (const customer of customers) {
+    for (const { authKey: name } of customer.poolAuths) {
+      if (!name.includes("_test")) names.add(name);
+    }
+  }
+
+  return Array.from(names).join(",");
 }
 
 /**
@@ -359,8 +373,7 @@ export async function GET(
     let user: {
       userId: string;
       role: string;
-      luxorSubaccountName: string | null;
-      luxorPoolAuthKey: string | null;
+      luxorSubaccounts: LuxorSubaccount[];
     };
     try {
       user = await extractUserFromToken(request);
@@ -417,7 +430,9 @@ export async function GET(
     let luxorClient;
     try {
       luxorClient = createLuxorClient(
-        user.luxorPoolAuthKey || user.luxorSubaccountName || user.userId,
+        // Only labels the client's log lines.
+        joinSubaccountNames(user.luxorSubaccounts.map((s) => s.authKey)) ||
+          user.userId,
       );
     } catch (clientError) {
       const errorMsg =
@@ -640,12 +655,16 @@ export async function GET(
             );
           }
           console.log(`[Luxor Proxy V2] GET: Getting workers for ${currency}`);
-          const clientLuxorIdentifier =
-            user.luxorPoolAuthKey || user.luxorSubaccountName || undefined;
+          const clientSelectedSubaccounts = joinSubaccountNames(
+            selectRequestedSubaccounts(
+              user.luxorSubaccounts,
+              searchParams.get("subaccounts"),
+            ).map((s) => s.authKey),
+          );
           data = await luxorClient.getWorkers(currency, {
             subaccount_names:
-              user.role === "CLIENT" && clientLuxorIdentifier
-                ? clientLuxorIdentifier
+              user.role === "CLIENT" && clientSelectedSubaccounts
+                ? clientSelectedSubaccounts
                 : user.role === "FRANCHISEE"
                   ? (await getFranchiseeSubaccountNames(user.userId)) ||
                     undefined
@@ -853,18 +872,26 @@ export async function GET(
           // NOTE: Luxor API requires exactly ONE of subaccount_names or site_id, not both
           // Prefer subaccount_names if provided, otherwise use site_id
 
-          const summaryLuxorIdentifier =
-            user.luxorPoolAuthKey || user.luxorSubaccountName || undefined;
+          const summarySelectedSubaccounts = joinSubaccountNames(
+            selectRequestedSubaccounts(
+              user.luxorSubaccounts,
+              searchParams.get("subaccounts"),
+            ).map((s) => s.authKey),
+          );
           data = await luxorClient.getSummary(currency, {
             subaccount_names:
-              user.role === "CLIENT" && summaryLuxorIdentifier
-                ? summaryLuxorIdentifier
+              user.role === "CLIENT" && summarySelectedSubaccounts
+                ? summarySelectedSubaccounts
+                : ["ADMIN", "SUPER_ADMIN", "FRANCHISEE"].includes(user.role)
+                  ? subaccountNamesParam
+                  : undefined,
+            // ADMIN/SUPER_ADMIN/FRANCHISEE fall back to site_id only when no
+            // subaccount_names was supplied by the caller.
+            site_id:
+              ["ADMIN", "SUPER_ADMIN", "FRANCHISEE"].includes(user.role) &&
+              !subaccountNamesParam
+                ? siteId
                 : undefined,
-            // FRANCHISEE intentionally gets the same site-wide summary as
-            // ADMIN/SUPER_ADMIN (uptime/hashrate are not per-customer scoped).
-            site_id: ["ADMIN", "SUPER_ADMIN", "FRANCHISEE"].includes(user.role)
-              ? siteId
-              : undefined,
           });
           break;
 

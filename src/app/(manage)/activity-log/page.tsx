@@ -39,7 +39,7 @@ interface TabVisit {
 interface SessionUser {
   name: string | null;
   email: string;
-  luxorSubaccountName: string | null;
+  luxorSubaccounts: string[];
 }
 
 interface UserSession {
@@ -302,7 +302,9 @@ export default function ActivityLogPage() {
                       </TableCell>
                       <TableCell>
                         <Typography variant="body2">
-                          {session.user.luxorSubaccountName ?? "—"}
+                          {session.user.luxorSubaccounts.length > 0
+                            ? session.user.luxorSubaccounts.join(", ")
+                            : "—"}
                         </Typography>
                       </TableCell>
                       <TableCell>

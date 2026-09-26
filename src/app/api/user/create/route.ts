@@ -4,8 +4,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyJwtToken } from "@/lib/jwt";
 import { AuditAction } from "@prisma/client";
 import { logPoolCredentialChange } from "@/lib/audit/logPoolCredentialChange";
+import {
+  SUBACCOUNT_TX_OPTIONS,
+  findLuxorSubaccountConflicts,
+  normalizeSubaccountNames,
+  setClientGroup,
+  setLuxorSubaccounts,
+} from "@/lib/luxorSubaccounts";
 import { sendWelcomeEmail } from "@/lib/email";
 import normalizeEmailUsername from "@/lib/helpers/normailizeEmailUsername";
+import { generateTempPassword } from "@/lib/helpers/generateTempPassword";
 import { getOrCreatePaybackConfig } from "@/lib/paybackConfigHelpers";
 
 /**
@@ -73,12 +81,19 @@ export async function POST(request: NextRequest) {
       role,
       sendEmail,
       initialDeposit,
-      luxorSubaccountName,
+      luxorSubaccountNames: rawLuxorSubaccountNames,
       braiinsAuthKey,
       groupId,
       franchiseeId,
       segment,
     } = await request.json();
+
+    // Only CLIENT users are given Luxor subaccounts here (franchisees go
+    // through /api/franchisees).
+    const luxorSubaccountNames =
+      role === "CLIENT"
+        ? (normalizeSubaccountNames(rawLuxorSubaccountNames) ?? [])
+        : [];
 
     // Validate input
     if (!name || !email || !role) {
@@ -145,7 +160,7 @@ export async function POST(request: NextRequest) {
       // Enforce subaccount requirement for active customer types
       if (
         resolvedSegment !== "POTENTIAL_CUSTOMER" &&
-        (!luxorSubaccountName || !luxorSubaccountName.trim())
+        luxorSubaccountNames.length === 0
       ) {
         return NextResponse.json(
           {
@@ -154,11 +169,28 @@ export async function POST(request: NextRequest) {
           { status: 400 },
         );
       }
+
+      // Checked up front - the welcome email below goes out before the
+      // account exists, so this must not fail after that point.
+      const conflicts = await findLuxorSubaccountConflicts(
+        luxorSubaccountNames,
+        null,
+      );
+      if (conflicts.length > 0) {
+        return NextResponse.json(
+          {
+            error: `Luxor subaccount already assigned to another user: ${conflicts.join(", ")}`,
+          },
+          { status: 409 },
+        );
+      }
     }
 
     console.log(
       `[User Create API] Creating user "${name}" with role: ${role}${
-        role === "CLIENT" ? `, subaccount: ${luxorSubaccountName}` : ""
+        role === "CLIENT"
+          ? `, subaccounts: ${luxorSubaccountNames.join(", ") || "none"}`
+          : ""
       }`,
     );
 
@@ -181,9 +213,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate a random temporary password
-    const tempPassword = Math.random().toString(36).slice(-8);
+    // Generate a temporary password. Per H-5, this is never returned in the
+    // API response - only sent by email - so if sendEmail is requested, that
+    // send has to succeed BEFORE the account exists, or the new user would be
+    // created with a password nobody (including the admin) can ever see.
+    const tempPassword = generateTempPassword();
     const hashedPassword = await hash(tempPassword, 12);
+
+    let emailSent = false;
+    if (sendEmail) {
+      const emailResult = await sendWelcomeEmail(email, tempPassword);
+      if (!emailResult.success) {
+        console.error("Failed to send welcome email:", emailResult.error);
+        return NextResponse.json(
+          {
+            error:
+              "Failed to send the welcome email, so the account was not created. Please check the email address and try again.",
+          },
+          { status: 502 },
+        );
+      }
+      emailSent = true;
+    }
 
     // Create the user in database
     const { defaultInvoicedAmount } = await getOrCreatePaybackConfig("CLIENT");
@@ -234,101 +285,34 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // For CLIENT role, assign the selected Luxor subaccount
-    // (subaccount already exists in Luxor, we're just assigning it to this user).
-    // Dual-write: User.luxorSubaccountName (legacy, still read by ~20 other
-    // files) and PoolAuth (new source of truth) are kept in sync.
-    let luxorPoolAuthId: string | null = null;
-    if (role === "CLIENT" && luxorSubaccountName) {
+    // For CLIENT role, assign the selected Luxor subaccounts (they already
+    // exist in Luxor, we're just assigning them to this user) and the group -
+    // every subaccount joins it, or the user directly when there are none.
+    if (role === "CLIENT" && (luxorSubaccountNames.length > 0 || groupId)) {
       try {
-        await prisma.user.update({
-          where: { id: newUser.id },
-          data: { luxorSubaccountName: luxorSubaccountName.trim() },
-        });
-        console.log(
-          `[User Create API] Assigned luxorSubaccountName "${luxorSubaccountName}" to user ${newUser.id}`,
-        );
-
-        const luxorPool = await prisma.pool.findUnique({
-          where: { name: "Luxor" },
-          select: { id: true },
-        });
-        if (luxorPool) {
-          const poolAuth = await prisma.poolAuth.upsert({
-            where: {
-              poolId_userId: { poolId: luxorPool.id, userId: newUser.id },
-            },
-            create: {
-              poolId: luxorPool.id,
-              userId: newUser.id,
-              authKey: luxorSubaccountName.trim(),
-            },
-            update: { authKey: luxorSubaccountName.trim() },
-            select: { id: true },
-          });
-          luxorPoolAuthId = poolAuth.id;
-          await logPoolCredentialChange(prisma, {
-            action: AuditAction.POOL_CREDENTIAL_ADDED,
+        await prisma.$transaction(async (tx) => {
+          await setLuxorSubaccounts(tx, {
             userId: newUser.id,
+            names: luxorSubaccountNames,
             actorId: userId,
-            poolName: "Luxor",
           });
-        }
-      } catch (updateError) {
-        console.error(
-          "[User Create API] Failed to update user with subaccount name:",
-          updateError,
-        );
-        // Don't fail user creation if this update fails
-      }
-    }
-
-    // If groupId provided, link the new client to the group - via the Luxor
-    // credential when one was assigned, or directly by userId otherwise.
-    if (role === "CLIENT" && groupId) {
-      try {
-        if (luxorPoolAuthId) {
-          await prisma.groupSubaccount.create({
-            data: {
-              groupId: groupId,
-              subaccountName: luxorSubaccountName.trim(),
-              poolAuthId: luxorPoolAuthId,
-              addedBy: userId, // Admin who added the user
-              addedByUserId: userId,
-            },
-          });
-          console.log(
-            `[User Create API] Added subaccount "${luxorSubaccountName}" to group "${groupId}" for user ${newUser.id}`,
-          );
-        } else {
-          await prisma.groupSubaccount.create({
-            data: {
-              groupId: groupId,
+          if (groupId) {
+            await setClientGroup(tx, {
               userId: newUser.id,
-              addedBy: userId,
-              addedByUserId: userId,
-            },
-          });
-          console.log(
-            `[User Create API] Added user ${newUser.id} (no subaccount) to group "${groupId}"`,
-          );
-        }
-
-        await prisma.auditLog.create({
-          data: {
-            action: AuditAction.GROUP_SUBACCOUNT_ADDED,
-            entityType: "Group",
-            entityId: groupId,
-            userId,
-            description: `${luxorPoolAuthId ? luxorSubaccountName?.trim() : newUser.name || newUser.email} added to group`,
-          },
-        });
-      } catch (groupError) {
-        console.error(
-          "[User Create API] Failed to add user to group:",
-          groupError,
+              groupId,
+              actorId: userId,
+            });
+          }
+        }, SUBACCOUNT_TX_OPTIONS);
+        console.log(
+          `[User Create API] Assigned subaccounts [${luxorSubaccountNames.join(", ")}]${groupId ? ` and group "${groupId}"` : ""} to user ${newUser.id}`,
         );
-        // Don't fail user creation if group assignment fails
+      } catch (assignError) {
+        console.error(
+          "[User Create API] Failed to assign Luxor subaccounts/group:",
+          assignError,
+        );
+        // Don't fail user creation if this fails
       }
     }
 
@@ -340,16 +324,13 @@ export async function POST(request: NextRequest) {
           select: { id: true },
         });
         if (braiinsPool) {
-          await prisma.poolAuth.upsert({
-            where: {
-              poolId_userId: { poolId: braiinsPool.id, userId: newUser.id },
-            },
-            create: {
+          // Brand-new user, so there is no existing PoolAuth row to collide with.
+          await prisma.poolAuth.create({
+            data: {
               poolId: braiinsPool.id,
               userId: newUser.id,
               authKey: braiinsAuthKey.trim(),
             },
-            update: { authKey: braiinsAuthKey.trim() },
           });
           console.log(
             `[User Create API] Assigned Braiins credential to user ${newUser.id}`,
@@ -380,17 +361,6 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    const sendEmailByEnvironment = process.env.NODE_ENV === "production";
-    let emailSent = sendEmailByEnvironment;
-    if (sendEmailByEnvironment && sendEmail) {
-      // Send welcome email with credentials
-      const emailResult = await sendWelcomeEmail(email, tempPassword);
-      if (!emailResult.success) {
-        console.error("Failed to send welcome email:", emailResult.error);
-        emailSent = false;
-      }
-    }
-
     return NextResponse.json(
       {
         message: "User created successfully",
@@ -399,9 +369,8 @@ export async function POST(request: NextRequest) {
           name: newUser.name,
           email: newUser.email,
           role: newUser.role,
-          luxorSubaccountName: role === "CLIENT" ? luxorSubaccountName : null,
+          luxorSubaccounts: luxorSubaccountNames,
         },
-        tempPassword, //@TODO: In production, this should be sent via email instead
         emailSent,
       },
       { status: 201 },

@@ -40,23 +40,24 @@ export async function GET(request: NextRequest) {
       select: {
         id: true,
         name: true,
-        luxorSubaccountName: true,
         poolAuths: {
           where: { pool: { name: "Luxor" } },
+          orderBy: { createdAt: "asc" },
           select: { authKey: true },
         },
       },
       orderBy: { name: "asc" },
     });
 
-    // Format response: "John Doe (Mining-Account-1)" or "John Doe (No subaccount assigned)"
+    // Format response: "John Doe (Mining-Account-1, Mining-Account-2)" or
+    // "John Doe (No subaccount assigned)" - every Luxor subaccount joined.
     const formattedCustomers = customers.map((c) => {
-      const luxorIdentifier = c.poolAuths[0]?.authKey || c.luxorSubaccountName;
+      const names = c.poolAuths.map((pa) => pa.authKey);
       return {
         id: c.id,
-        displayName: `${c.name || "Unnamed Customer"} (${luxorIdentifier || "No subaccount assigned"})`,
+        displayName: `${c.name || "Unnamed Customer"} (${names.length > 0 ? names.join(", ") : "No subaccount assigned"})`,
         name: c.name,
-        luxorSubaccountName: luxorIdentifier,
+        luxorSubaccounts: names,
       };
     });
 

@@ -20,12 +20,16 @@ interface RequestWalletChangeModalProps {
   open: boolean;
   onClose: () => void;
   currentAddress: string;
+  /** Which Luxor subaccount this request is for - each subaccount can have
+   * its own payout address, so the request needs to say which one. */
+  subaccountName: string;
 }
 
 export default function RequestWalletChangeModal({
   open,
   onClose,
   currentAddress,
+  subaccountName,
 }: RequestWalletChangeModalProps) {
   const createRequest = useCreateWalletChangeRequest();
   const { user } = useUser();
@@ -64,6 +68,7 @@ export default function RequestWalletChangeModal({
     try {
       await createRequest.mutateAsync({
         requestedAddress: trimmed,
+        subaccountName,
         reason: reason.trim() || undefined,
         currentPassword: requires2fa ? undefined : currentPassword,
         twoFactorToken: requires2fa ? twoFactorToken.trim() : undefined,
@@ -89,6 +94,15 @@ export default function RequestWalletChangeModal({
             This submits a request for admin review. Your payout address on
             Luxor only changes once an admin approves it.
           </Alert>
+
+          <Alert severity="warning">
+            For your security, once this request is approved your payouts will
+            be frozen for 24 hours while we finish updating your payout address.
+          </Alert>
+
+          <Typography variant="body2" color="text.secondary">
+            Subaccount: <strong>{subaccountName}</strong>
+          </Typography>
 
           <Typography variant="body2" color="text.secondary">
             Current address: <strong>{currentAddress}</strong>

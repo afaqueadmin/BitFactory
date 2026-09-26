@@ -4,18 +4,25 @@ export interface WalletChangeRequestItem {
   id: string;
   userId: string;
   currency: string;
+  subaccountName: string | null;
   currentAddress: string | null;
   requestedAddress: string;
   reason: string | null;
-  status: "PENDING" | "APPROVED" | "REJECTED";
+  status: "PENDING" | "CONFIRMED" | "APPROVED" | "REJECTED";
   rejectionReason: string | null;
   reviewedById: string | null;
   reviewedAt: string | null;
-  appliedAt: string | null;
   createdAt: string;
   updatedAt: string;
   user: { id: string; name: string | null; email: string };
   reviewedBy: { id: string; name: string | null; email: string } | null;
+  // Admin-only - stripped from the response for CLIENT/FRANCHISEE callers.
+  confirmedById?: string | null;
+  confirmedAt?: string | null;
+  confirmationMethod?: "CALL" | "EMAIL" | null;
+  confirmationContact?: string | null;
+  confirmationNote?: string | null;
+  confirmedBy?: { id: string; name: string | null; email: string } | null;
 }
 
 export function useWalletChangeRequests(filters?: { status?: string }) {
@@ -49,6 +56,7 @@ export function useCreateWalletChangeRequest() {
   return useMutation({
     mutationFn: async (input: {
       requestedAddress: string;
+      subaccountName?: string;
       reason?: string;
       currentPassword?: string;
       twoFactorToken?: string;
@@ -71,18 +79,53 @@ export function useCreateWalletChangeRequest() {
   });
 }
 
+interface StepUpCredentials {
+  currentPassword?: string;
+  twoFactorToken?: string;
+}
+
 export function useReviewWalletChangeRequest() {
   const queryClient = useQueryClient();
 
+  const confirmMutation = useMutation({
+    mutationFn: async (
+      input: {
+        id: string;
+        confirmationMethod: "CALL" | "EMAIL";
+        confirmationContact: string;
+        confirmationNote: string;
+      } & StepUpCredentials,
+    ) => {
+      const { id, ...body } = input;
+      const res = await fetch(`/api/wallet/change-requests/${id}/confirm`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const body2 = await res.json().catch(() => ({}));
+        throw new Error(body2.error || "Failed to confirm request");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["wallet-change-requests"] });
+    },
+  });
+
   const approveMutation = useMutation({
-    mutationFn: async (id: string) => {
+    mutationFn: async (input: { id: string } & StepUpCredentials) => {
+      const { id, ...body } = input;
       const res = await fetch(`/api/wallet/change-requests/${id}/approve`, {
         method: "POST",
         credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
       });
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error || "Failed to approve request");
+        const body2 = await res.json().catch(() => ({}));
+        throw new Error(body2.error || "Failed to approve request");
       }
       return res.json();
     },
@@ -92,19 +135,19 @@ export function useReviewWalletChangeRequest() {
   });
 
   const rejectMutation = useMutation({
-    mutationFn: async (input: { id: string; rejectionReason: string }) => {
-      const res = await fetch(
-        `/api/wallet/change-requests/${input.id}/reject`,
-        {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ rejectionReason: input.rejectionReason }),
-        },
-      );
+    mutationFn: async (
+      input: { id: string; rejectionReason: string } & StepUpCredentials,
+    ) => {
+      const { id, ...body } = input;
+      const res = await fetch(`/api/wallet/change-requests/${id}/reject`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error || "Failed to reject request");
+        const body2 = await res.json().catch(() => ({}));
+        throw new Error(body2.error || "Failed to reject request");
       }
       return res.json();
     },
@@ -114,6 +157,8 @@ export function useReviewWalletChangeRequest() {
   });
 
   return {
+    confirm: confirmMutation.mutateAsync,
+    confirming: confirmMutation.isPending,
     approve: approveMutation.mutateAsync,
     approving: approveMutation.isPending,
     reject: rejectMutation.mutateAsync,

@@ -50,7 +50,6 @@ export async function GET(request: NextRequest) {
         name: true,
         email: true,
         phoneNumber: true,
-        luxorSubaccountName: true,
         initialDeposit: true,
         status: true,
         rejectionReason: true,
@@ -166,6 +165,17 @@ export async function POST(request: NextRequest) {
           initialDeposit !== ""
             ? initialDeposit
             : null,
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phoneNumber: true,
+        initialDeposit: true,
+        status: true,
+        rejectionReason: true,
+        reviewedAt: true,
+        createdAt: true,
       },
     });
 

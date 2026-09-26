@@ -14,12 +14,9 @@ import {
   FormControlLabel,
   Checkbox,
   Alert,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
 } from "@mui/material";
 import { Close as CloseIcon } from "@mui/icons-material";
+import LuxorSubaccountMultiSelect from "@/components/LuxorSubaccountMultiSelect";
 
 interface FranchiseData {
   id: string;
@@ -36,7 +33,7 @@ interface FranchiseData {
     id: string;
     name: string;
     email: string;
-    luxorSubaccountName: string | null;
+    luxorSubaccounts: string[];
   };
 }
 
@@ -45,19 +42,6 @@ interface EditFranchiseeModalProps {
   onClose: () => void;
   onSuccess: (text: string) => void;
   franchise: FranchiseData | null;
-}
-
-interface Subaccount {
-  id: number;
-  name: string;
-  created_at: string;
-  url: string;
-}
-
-interface ProxyResponse<T = Record<string, unknown>> {
-  success: boolean;
-  data?: T;
-  error?: string;
 }
 
 const toFormData = (franchise: FranchiseData | null) => ({
@@ -70,7 +54,9 @@ const toFormData = (franchise: FranchiseData | null) => ({
   state: franchise?.state || "",
   postalCode: franchise?.postalCode || "",
   isActive: franchise?.isActive ?? true,
-  luxorSubaccountName: franchise?.franchisee?.luxorSubaccountName || "",
+  // The franchisee's full set of Luxor subaccounts - the server adds/removes
+  // the difference on save.
+  luxorSubaccountNames: franchise?.franchisee?.luxorSubaccounts ?? [],
   braiinsAuthKey: "",
 });
 
@@ -83,14 +69,11 @@ export default function EditFranchiseeModal({
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState(toFormData(franchise));
   const [error, setError] = useState("");
-  const [subaccounts, setSubaccounts] = useState<Subaccount[]>([]);
-  const [fetchingSubaccounts, setFetchingSubaccounts] = useState(false);
 
   useEffect(() => {
     if (open) {
       setFormData(toFormData(franchise));
       setError("");
-      fetchSubaccounts(franchise?.franchisee?.luxorSubaccountName || null);
       if (franchise?.franchisee?.id) {
         loadCurrentBraiinsAuth(franchise.franchisee.id);
       }
@@ -123,68 +106,6 @@ export default function EditFranchiseeModal({
         "[EditFranchiseeModal] Error loading current Braiins credential:",
         err,
       );
-    }
-  };
-
-  /**
-   * Same exclude-already-assigned pattern as CreateFranchiseeModal, except
-   * the franchise's own currently-assigned subaccount must stay selectable
-   * even though it's "assigned" (to this same franchisee).
-   */
-  const fetchSubaccounts = async (currentName: string | null) => {
-    try {
-      setFetchingSubaccounts(true);
-      setSubaccounts([]);
-
-      const luxorResponse = await fetch("/api/luxor?endpoint=subaccounts");
-      if (!luxorResponse.ok) {
-        throw new Error(`Luxor API returned status ${luxorResponse.status}`);
-      }
-
-      const luxorData: ProxyResponse<Record<string, unknown>> =
-        await luxorResponse.json();
-      if (!luxorData.success) {
-        throw new Error(luxorData.error || "Failed to fetch subaccounts");
-      }
-
-      const responseData = luxorData.data as Record<string, unknown>;
-      let luxorSubaccountsList: Subaccount[] = [];
-      if (responseData && Array.isArray(responseData.subaccounts)) {
-        luxorSubaccountsList = (
-          responseData.subaccounts as Array<Record<string, unknown>>
-        ).map(
-          (sub: Record<string, unknown>) =>
-            ({
-              id: Number(sub.id || 0),
-              name: String(sub.name || ""),
-              created_at: String(sub.created_at || ""),
-              url: String(sub.url || ""),
-            }) as Subaccount,
-        );
-      }
-
-      const dbResponse = await fetch("/api/user/subaccounts/existing");
-      let assignedSubaccountNames: string[] = [];
-      if (dbResponse.ok) {
-        const dbData = await dbResponse.json();
-        if (dbData.success && Array.isArray(dbData.data)) {
-          assignedSubaccountNames = dbData.data.map(
-            (item: { luxorSubaccountName: string }) => item.luxorSubaccountName,
-          );
-        }
-      }
-
-      const selectableSubaccounts = luxorSubaccountsList.filter(
-        (sub) =>
-          !assignedSubaccountNames.includes(sub.name) ||
-          sub.name === currentName,
-      );
-      setSubaccounts(selectableSubaccounts);
-    } catch (err) {
-      console.error("[EditFranchiseeModal] Error fetching subaccounts:", err);
-      setSubaccounts([]);
-    } finally {
-      setFetchingSubaccounts(false);
     }
   };
 
@@ -317,33 +238,18 @@ export default function EditFranchiseeModal({
               required
             />
 
-            <FormControl fullWidth disabled={fetchingSubaccounts}>
-              <InputLabel>Luxor Subaccount (Optional)</InputLabel>
-              <Select
-                value={formData.luxorSubaccountName}
-                onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    luxorSubaccountName: e.target.value,
-                  }))
-                }
-                label="Luxor Subaccount (Optional)"
-              >
-                <MenuItem value="">None</MenuItem>
-                {fetchingSubaccounts ? (
-                  <MenuItem disabled>
-                    <CircularProgress size={20} sx={{ mr: 1 }} />
-                    Loading subaccounts...
-                  </MenuItem>
-                ) : (
-                  subaccounts.map((subaccount) => (
-                    <MenuItem key={subaccount.name} value={subaccount.name}>
-                      {subaccount.name}
-                    </MenuItem>
-                  ))
-                )}
-              </Select>
-            </FormControl>
+            <LuxorSubaccountMultiSelect
+              open={open}
+              value={formData.luxorSubaccountNames}
+              onChange={(names) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  luxorSubaccountNames: names,
+                }))
+              }
+              ownNames={franchise?.franchisee?.luxorSubaccounts ?? []}
+              label="Luxor Subaccounts (Optional)"
+            />
 
             <TextField
               fullWidth

@@ -14,7 +14,6 @@ export interface InvoiceEmailPayload {
   dueDate: Date;
   totalMiners: number;
   unitPrice: number;
-  luxorSubaccountName?: string | null;
   customerId?: string | null;
   hardwareModel?: string | null;
   billingMonth?: Date | null;
@@ -28,7 +27,7 @@ export interface InvoiceEmailPayload {
     lineItemType?: "HARDWARE" | "HOSTING_COLOCATION";
   }>;
   invoiceType?: string | null;
-  machineHostingLocation?: string | null;
+  machineHostingLocation?: string[] | null;
 }
 
 export interface EmailSendResult {

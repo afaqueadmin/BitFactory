@@ -15,9 +15,73 @@ import React from "react";
 import { Box, Typography, Skeleton } from "@mui/material";
 import { useUser } from "@/lib/hooks/useUser";
 import BtcPriceLabel from "@/components/BtcPriceLabel";
+import { useDaylight } from "@/lib/daylight";
 
-export default function DashboardHeader() {
+export default function DashboardHeader({
+  daylight = false,
+}: {
+  /** Render with the Daylight page-heading styling (guide §2). */
+  daylight?: boolean;
+}) {
   const { user, loading } = useUser();
+  const { d, fonts } = useDaylight();
+
+  if (daylight) {
+    return (
+      <Box
+        component="section"
+        aria-labelledby="dashboard-greeting"
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexWrap: "wrap",
+          gap: 2,
+          mb: { xs: "20px", md: "26px" },
+        }}
+      >
+        <Box sx={{ minWidth: 0 }}>
+          <Typography
+            id="dashboard-greeting"
+            component="h1"
+            sx={{
+              fontFamily: fonts.heading,
+              fontWeight: 750,
+              fontSize: { xs: 27, md: 32 },
+              lineHeight: 1.3,
+              letterSpacing: "-.035em",
+              color: d.text,
+              overflowWrap: "anywhere",
+            }}
+          >
+            {loading ? (
+              <Skeleton width={220} />
+            ) : (
+              <>
+                Hello,&nbsp;
+                <Box component="span" sx={{ color: d.action }}>
+                  {user?.name || "Guest"}
+                </Box>
+              </>
+            )}
+          </Typography>
+          <Typography
+            sx={{
+              fontFamily: fonts.body,
+              fontSize: { xs: 12, md: 13 },
+              lineHeight: { xs: 1.7, md: 1.5 },
+              color: d.muted,
+              mt: "7px",
+            }}
+          >
+            Here&rsquo;s how your mining operation is doing today.
+          </Typography>
+        </Box>
+
+        <BtcPriceLabel daylight />
+      </Box>
+    );
+  }
 
   return (
     <Box

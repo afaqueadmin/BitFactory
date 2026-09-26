@@ -19,6 +19,11 @@ import {
 } from "@mui/material";
 import { Close as CloseIcon } from "@mui/icons-material";
 import { useUser } from "@/lib/hooks/useUser";
+import LuxorSubaccountMultiSelect from "@/components/LuxorSubaccountMultiSelect";
+
+// Placeholder Group value shown when the client's subaccounts are split
+// across several groups.
+const MIXED_GROUPS = "__mixed__";
 
 interface Group {
   id: string;
@@ -48,7 +53,7 @@ interface EditCustomerModalProps {
     companyName?: string;
     streetAddress?: string;
     companyUrl?: string;
-    luxorSubaccountName?: string;
+    luxorSubaccounts?: string[];
     braiinsAuthKey?: string;
     groupId?: string;
     franchiseeId?: string | null;
@@ -65,50 +70,60 @@ export default function EditCustomerModal({
 }: EditCustomerModalProps) {
   const { user } = useUser();
   const [loading, setLoading] = useState(false);
-  const [fetchingSubaccounts, setFetchingSubaccounts] = useState(false);
   const [fetchingGroups, setFetchingGroups] = useState(false);
-  const [subaccounts, setSubaccounts] = useState<
-    Array<{ name: string; id: number }>
-  >([]);
+  // The customer's Luxor subaccounts as currently saved - kept selectable in
+  // the picker. Edits to formData.luxorSubaccountNames are only saved (added
+  // / removed together) when the form is submitted.
+  const [savedSubaccounts, setSavedSubaccounts] = useState<string[]>([]);
+  const [loadingSubaccounts, setLoadingSubaccounts] = useState(false);
+  // The customer's subaccounts can sit in different groups (the groups pages
+  // manage them one at a time). Then the Group field shows "Multiple groups"
+  // and is left untouched on save unless the admin picks a group.
+  const [groupIsMixed, setGroupIsMixed] = useState(false);
+  const [groupTouched, setGroupTouched] = useState(false);
   const [groups, setGroups] = useState<Group[]>([]);
   const [franchises, setFranchises] = useState<Franchise[]>([]);
   const [fetchingFranchises, setFetchingFranchises] = useState(false);
-  const [formData, setFormData] = useState(
-    initialData || {
-      id: "",
-      name: "",
-      email: "",
-      city: "",
-      country: "",
-      phoneNumber: "",
-      companyName: "",
-      streetAddress: "",
-      companyUrl: "",
-      luxorSubaccountName: "",
-      braiinsAuthKey: "",
-      groupId: "",
-      franchiseeId: "",
-      segment: "",
-    },
-  );
+  const [formData, setFormData] = useState({
+    id: "",
+    name: "",
+    email: "",
+    city: "",
+    country: "",
+    phoneNumber: "",
+    companyName: "",
+    streetAddress: "",
+    companyUrl: "",
+    ...initialData,
+    luxorSubaccountNames: initialData?.luxorSubaccounts ?? [],
+    braiinsAuthKey: "",
+    groupId: "",
+    franchiseeId: initialData?.franchiseeId || "",
+    segment: initialData?.segment || "",
+  });
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
   useEffect(() => {
     if (initialData && open) {
-      setFormData({
+      setFormData((prev) => ({
+        ...prev,
         ...initialData,
+        luxorSubaccountNames: initialData.luxorSubaccounts ?? [],
         braiinsAuthKey: "",
+        groupId: "",
         franchiseeId: initialData.franchiseeId || "",
         segment: initialData.segment || "",
-      });
+      }));
+      setSavedSubaccounts(initialData.luxorSubaccounts ?? []);
+      setGroupIsMixed(false);
+      setGroupTouched(false);
       setError("");
       setSuccess("");
-      fetchSubaccounts();
       fetchGroups();
       if (customerId) {
         loadCurrentGroup(customerId);
-        loadCurrentBraiinsAuth(customerId);
+        loadCurrentPoolAuths(customerId);
       }
       fetchFranchises();
     }
@@ -132,102 +147,6 @@ export default function EditCustomerModal({
       setFranchises([]);
     } finally {
       setFetchingFranchises(false);
-    }
-  };
-
-  const fetchSubaccounts = async () => {
-    try {
-      setFetchingSubaccounts(true);
-      setSubaccounts([]);
-
-      console.log(
-        "[EditCustomerModal] Fetching subaccounts from V2 Luxor API and filtering assigned ones",
-      );
-
-      // Fetch all subaccounts from Luxor
-      const luxorResponse = await fetch("/api/luxor?endpoint=subaccounts");
-
-      if (!luxorResponse.ok) {
-        throw new Error(`Luxor API returned status ${luxorResponse.status}`);
-      }
-
-      const luxorData: Record<string, unknown> = await luxorResponse.json();
-
-      if (!(luxorData as Record<string, unknown>).success) {
-        const errorMessage = (luxorData as Record<string, unknown>).error;
-        throw new Error(
-          typeof errorMessage === "string"
-            ? errorMessage
-            : "Failed to fetch subaccounts",
-        );
-      }
-
-      // Extract subaccounts array from response
-      const responseData = (luxorData as Record<string, unknown>).data as
-        | Record<string, unknown>
-        | undefined;
-      let luxorSubaccountsList: Array<{ name: string; id: number }> = [];
-
-      if (responseData && Array.isArray(responseData.subaccounts)) {
-        luxorSubaccountsList = (
-          responseData.subaccounts as Array<Record<string, unknown>>
-        ).map((sub: Record<string, unknown>) => ({
-          id: Number(sub.id || 0),
-          name: String(sub.name || ""),
-        }));
-      }
-
-      console.log(
-        `[EditCustomerModal] Fetched ${luxorSubaccountsList.length} subaccounts from Luxor`,
-      );
-
-      // Fetch assigned subaccounts from database
-      console.log(
-        "[EditCustomerModal] Fetching already-assigned subaccounts...",
-      );
-      const dbResponse = await fetch("/api/user/subaccounts/existing");
-
-      let assignedSubaccountNames: string[] = [];
-      if (dbResponse.ok) {
-        const dbData: Record<string, unknown> = await dbResponse.json();
-        if (
-          (dbData as Record<string, unknown>).success &&
-          Array.isArray((dbData as Record<string, unknown>).data)
-        ) {
-          assignedSubaccountNames = (
-            (dbData as Record<string, unknown>).data as Array<{
-              luxorSubaccountName: string;
-            }>
-          ).map((item: { luxorSubaccountName: string }) =>
-            item.luxorSubaccountName === formData.luxorSubaccountName
-              ? "" // Exclude current user's assigned subaccount
-              : item.luxorSubaccountName,
-          );
-        }
-      }
-
-      console.log(
-        `[EditCustomerModal] Found ${assignedSubaccountNames.length} already-assigned subaccounts:`,
-        assignedSubaccountNames,
-      );
-
-      // Filter out assigned subaccounts (except current user's)
-      const unassignedSubaccounts = luxorSubaccountsList.filter(
-        (sub) => !assignedSubaccountNames.includes(sub.name),
-      );
-
-      console.log(
-        `[EditCustomerModal] Filtered to ${unassignedSubaccounts.length} unassigned subaccounts`,
-      );
-
-      setSubaccounts(unassignedSubaccounts);
-    } catch (err) {
-      console.error("[EditCustomerModal] Error fetching subaccounts:", err);
-      setError(
-        err instanceof Error ? err.message : "Failed to fetch subaccounts",
-      );
-    } finally {
-      setFetchingSubaccounts(false);
     }
   };
 
@@ -267,8 +186,8 @@ export default function EditCustomerModal({
   };
 
   /**
-   * Load the customer's current group assignment (single lookup by userId,
-   * backed by the PoolAuth-based relation rather than scanning every group)
+   * Load the customer's current group assignment. When their subaccounts sit
+   * in more than one group, the field shows "Multiple groups" instead.
    */
   const loadCurrentGroup = async (custId: string) => {
     try {
@@ -279,10 +198,14 @@ export default function EditCustomerModal({
       if (!response.ok) return;
 
       const data = await response.json();
+      const groupIds: string[] = Array.isArray(data.groupIds)
+        ? data.groupIds
+        : [];
 
+      setGroupIsMixed(groupIds.length > 1);
       setFormData((prev) => ({
         ...prev,
-        groupId: data.group?.id || "",
+        groupId: groupIds.length > 1 ? "" : data.group?.id || "",
       }));
     } catch (err) {
       console.error("[EditCustomerModal] Error loading current group:", err);
@@ -290,10 +213,12 @@ export default function EditCustomerModal({
   };
 
   /**
-   * Load the customer's current Braiins credential, if any
+   * Load the customer's current pool credentials - their Luxor subaccounts
+   * and Braiins credential, if any
    */
-  const loadCurrentBraiinsAuth = async (custId: string) => {
+  const loadCurrentPoolAuths = async (custId: string) => {
     try {
+      setLoadingSubaccounts(true);
       const response = await fetch(`/api/pool-auth?userId=${custId}`);
 
       if (!response.ok) return;
@@ -301,19 +226,34 @@ export default function EditCustomerModal({
       const data = await response.json();
       if (!data.success || !Array.isArray(data.data)) return;
 
-      const braiinsEntry = (
-        data.data as Array<{ authKey: string; pool: { name: string } }>
-      ).find((entry) => entry.pool.name === "Braiins");
+      const entries = data.data as Array<{
+        id: string;
+        authKey: string;
+        createdAt: string;
+        pool: { name: string };
+      }>;
 
+      const braiinsEntry = entries.find(
+        (entry) => entry.pool.name === "Braiins",
+      );
+      const luxorNames = entries
+        .filter((entry) => entry.pool.name === "Luxor")
+        .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+        .map((entry) => entry.authKey);
+
+      setSavedSubaccounts(luxorNames);
       setFormData((prev) => ({
         ...prev,
         braiinsAuthKey: braiinsEntry?.authKey || "",
+        luxorSubaccountNames: luxorNames,
       }));
     } catch (err) {
       console.error(
-        "[EditCustomerModal] Error loading current Braiins credential:",
+        "[EditCustomerModal] Error loading current pool credentials:",
         err,
       );
+    } finally {
+      setLoadingSubaccounts(false);
     }
   };
 
@@ -345,12 +285,10 @@ export default function EditCustomerModal({
     }
 
     // Subaccount is required for active customer types
-    const isSubaccountEmpty =
-      !formData.luxorSubaccountName ||
-      formData.luxorSubaccountName === "N/A" ||
-      !formData.luxorSubaccountName.trim();
-
-    if (formData.segment !== "POTENTIAL_CUSTOMER" && isSubaccountEmpty) {
+    if (
+      formData.segment !== "POTENTIAL_CUSTOMER" &&
+      formData.luxorSubaccountNames.length === 0
+    ) {
       setError(
         "A Luxor subaccount must be assigned for active customer types (Corporate, SME, Self Mining, or Retail)",
       );
@@ -373,13 +311,14 @@ export default function EditCustomerModal({
           companyName: formData.companyName,
           streetAddress: formData.streetAddress,
           companyUrl: formData.companyUrl,
-          luxorSubaccountName:
-            formData.luxorSubaccountName &&
-            formData.luxorSubaccountName !== "N/A"
-              ? formData.luxorSubaccountName
-              : null,
+          // The full set - the server adds/removes the difference.
+          luxorSubaccountNames: formData.luxorSubaccountNames,
           braiinsAuthKey: formData.braiinsAuthKey || null,
-          groupId: formData.groupId || null,
+          // Leave split group memberships alone unless the admin chose a group.
+          groupId:
+            groupIsMixed && !groupTouched
+              ? undefined
+              : formData.groupId || null,
           franchiseeId: formData.franchiseeId || null,
           segment: formData.franchiseeId ? undefined : formData.segment,
         }),
@@ -533,43 +472,28 @@ export default function EditCustomerModal({
               type="url"
               placeholder="https://example.com"
             />
-            <FormControl
-              fullWidth
-              disabled={fetchingSubaccounts}
+            {/* Every Luxor subaccount of this client - added/removed
+                together when the form is saved. */}
+            <LuxorSubaccountMultiSelect
+              open={open}
+              value={formData.luxorSubaccountNames}
+              onChange={(names) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  luxorSubaccountNames: names,
+                }))
+              }
+              ownNames={savedSubaccounts}
+              disabled={loadingSubaccounts}
               required={formData.segment !== "POTENTIAL_CUSTOMER"}
-            >
-              <InputLabel>
-                {formData.segment === "POTENTIAL_CUSTOMER"
-                  ? "Luxor Subaccount (Optional)"
-                  : "Luxor Subaccount"}
-              </InputLabel>
-              <Select
-                value={formData.luxorSubaccountName || ""}
-                onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    luxorSubaccountName:
-                      e.target.value === "N/A" ? "" : e.target.value,
-                  }))
-                }
-                label={
-                  formData.segment === "POTENTIAL_CUSTOMER"
-                    ? "Luxor Subaccount (Optional)"
-                    : "Luxor Subaccount"
-                }
-              >
-                <MenuItem value="N/A">
-                  {formData.segment === "POTENTIAL_CUSTOMER"
-                    ? "None (Unassigned)"
-                    : "N/A (Unassigned)"}
-                </MenuItem>
-                {subaccounts.map((sub) => (
-                  <MenuItem key={sub.id} value={sub.name}>
-                    {sub.name}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+              label={
+                formData.segment === "POTENTIAL_CUSTOMER"
+                  ? "Luxor Subaccounts (Optional)"
+                  : "Luxor Subaccounts"
+              }
+              helperText="Changes are saved when you click Update."
+            />
+
             <TextField
               fullWidth
               label="Braiins Auth Key (Optional)"
@@ -585,15 +509,26 @@ export default function EditCustomerModal({
             <FormControl fullWidth disabled={fetchingGroups}>
               <InputLabel>Group (Optional)</InputLabel>
               <Select
-                value={formData.groupId || ""}
-                onChange={(e) =>
+                value={
+                  groupIsMixed && !groupTouched
+                    ? MIXED_GROUPS
+                    : formData.groupId || ""
+                }
+                onChange={(e) => {
+                  if (e.target.value === MIXED_GROUPS) return;
+                  setGroupTouched(true);
                   setFormData((prev) => ({
                     ...prev,
                     groupId: e.target.value,
-                  }))
-                }
+                  }));
+                }}
                 label="Group (Optional)"
               >
+                {groupIsMixed && !groupTouched && (
+                  <MenuItem value={MIXED_GROUPS} disabled>
+                    Multiple groups (unchanged)
+                  </MenuItem>
+                )}
                 <MenuItem value="">No Group</MenuItem>
                 {groups.map((group) => (
                   <MenuItem key={group.id} value={group.id}>

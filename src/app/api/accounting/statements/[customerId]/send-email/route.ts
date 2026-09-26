@@ -58,7 +58,6 @@ export async function POST(
         email: true,
         name: true,
         companyName: true,
-        luxorSubaccountName: true,
       },
     });
 

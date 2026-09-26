@@ -30,7 +30,7 @@ interface User {
   name: string | null;
   email: string;
   role?: string;
-  luxorSubaccountName?: string | null;
+  luxorSubaccounts?: string[];
   segment?: string | null;
 }
 

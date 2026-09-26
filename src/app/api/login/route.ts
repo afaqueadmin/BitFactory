@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { generateTokens } from "@/lib/jwt";
+import { checkAuthRateLimit, getClientIp } from "@/lib/rateLimit";
 
 // Add runtime config for Node.js runtime
 export const runtime = "nodejs";
@@ -42,6 +43,24 @@ export async function POST(request: NextRequest) {
         { error: "Invalid email format" },
         { status: 400 },
       );
+    }
+
+    // Observe-only for now: records real attempt volume and logs what would
+    // have been blocked, without rejecting anyone yet. See H-1 in the plan.
+    try {
+      const rl = await checkAuthRateLimit("login", {
+        email,
+        ip: getClientIp(request.headers),
+      });
+      if (rl.blocked) {
+        console.warn("[rateLimit:observe] login would be blocked", {
+          email,
+          emailRemaining: rl.email?.remaining,
+          ipRemaining: rl.ip?.remaining,
+        });
+      }
+    } catch (rlError) {
+      console.error("[rateLimit:observe] login check failed:", rlError);
     }
 
     // Match the exact account by email, case-insensitively.

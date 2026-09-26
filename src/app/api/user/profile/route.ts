@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
+import { resolveLuxorSubaccounts } from "@/lib/luxorSubaccounts";
 
 // Route segment config
 export const runtime = "nodejs";
@@ -113,6 +114,11 @@ export async function GET(request: NextRequest) {
       take: 10,
     });
 
+    // Every Luxor subaccount this user has, for the client-side subaccount
+    // filter. Cheap enough to resolve unconditionally rather than special
+    // casing by role.
+    const luxorSubaccounts = await resolveLuxorSubaccounts(userId);
+
     console.log("Profile API [GET]: Successfully fetched data");
 
     // Keep the response shape flat (twoFactorEnabled as a top-level boolean)
@@ -125,6 +131,7 @@ export async function GET(request: NextRequest) {
           ...userFields,
           twoFactorEnabled: twoFactorAuth?.enabled ?? false,
         },
+        subaccounts: luxorSubaccounts,
         recentActivities,
       },
       {

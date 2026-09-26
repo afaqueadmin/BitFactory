@@ -8,93 +8,94 @@ datasource db {
 }
 
 model User {
-  id                           String                       @id @default(cuid())
-  email                        String                       @unique
-  name                         String?
-  password                     String
-  createdAt                    DateTime                     @default(now())
-  updatedAt                    DateTime                     @updatedAt
-  companyName                  String?
-  profileImage                 String?
-  profileImageId               String?
-  city                         String?
-  country                      String?
-  dateOfBirth                  DateTime?
-  phoneNumber                  String?
-  streetAddress                String?
-  twoFactorEnabled             Boolean                      @default(false)
-  twoFactorSecret              String?
-  twoFactorBackupCodes         String[]
-  role                         Role                         @default(CLIENT)
-  idNumber                     String?
-  luxorSubaccountName          String?
-  companyUrl                   String?
-  isDeleted                    Boolean                      @default(false)
-  franchiseeId                 String?
-  franchisee                   Franchise?                   @relation("FranchiseUsers", fields: [franchiseeId], references: [id])
-  segment                      Segment?
-  auditLogs                    AuditLog[]                   @relation("auditLogs")
-  costPayments                 CostPayment[]
-  pricingCreated               CustomerPricingConfig[]      @relation("pricingConfigsCreated")
-  pricingUpdated               CustomerPricingConfig[]      @relation("pricingConfigsUpdated")
-  pricingConfigs               CustomerPricingConfig[]      @relation("pricingConfigs")
-  createdGroups                Group[]
-  franchisesOwned              Franchise[]                  @relation("FranchiseFranchisee")
-  franchisesCreated            Franchise[]                  @relation("FranchiseCreatedBy")
-  hardwareProcurementHistory   HardwareProcurementHistory[]
-  invoicesCreated              Invoice[]                    @relation("invoicesCreated")
-  invoicesUpdated              Invoice[]                    @relation("invoicesUpdated")
-  invoices                     Invoice[]                    @relation("invoices")
-  memos                        Memo[]                       @relation("memos")
-  memosCreated                 Memo[]                       @relation("memosCreated")
-  memosVoided                  Memo[]                       @relation("memosVoided")
-  vendorInvoicesCreated        VendorInvoice[]              @relation("vendorInvoicesCreated")
-  vendorInvoicesUpdated        VendorInvoice[]              @relation("vendorInvoicesUpdated")
-  hardwarePurchasesCreated     HardwarePurchaseInvoice[]    @relation("hardwarePurchasesCreated")
-  hardwarePurchasesUpdated     HardwarePurchaseInvoice[]    @relation("hardwarePurchasesUpdated")
-  createdMinerHistory          MinerOwnershipHistory[]      @relation("createdBy")
-  ownedMinerHistory            MinerOwnershipHistory[]      @relation("owner")
-  miners                       Miner[]
-  minersCreated                Miner[]                      @relation("MinerCreatedBy")
-  minersUpdated                Miner[]                      @relation("MinerUpdatedBy")
-  minersDeleted                Miner[]                      @relation("MinerDeletedBy")
-  hardwareCreated              Hardware[]                   @relation("HardwareCreatedBy")
-  hardwareUpdated              Hardware[]                   @relation("HardwareUpdatedBy")
-  hardwareDeleted              Hardware[]                   @relation("HardwareDeletedBy")
-  minerRateHistoryCreated      MinerRateHistory[]           @relation("MinerRateHistoryCreatedBy")
-  emailSendRunsCreated         EmailSendRun[]               @relation("emailSendRunsCreated")
-  emailSendResults             EmailSendResult[]            @relation("emailSendResults")
-  recurringCreated             RecurringInvoice[]           @relation("recurringInvoicesCreated")
-  recurringUpdated             RecurringInvoice[]           @relation("recurringInvoicesUpdated")
-  recurringInvoices            RecurringInvoice[]           @relation("recurringInvoices")
-  blacklisted                  TokenBlacklist[]
-  activities                   UserActivity[]
-  sessions                     UserSession[]
-  paymentDetailsUpdates        PaymentDetails[]
-  poolAuths                    PoolAuth[]
-  poolSubaccounts              PoolSubaccount[]
-  webauthnCredentials          WebAuthnCredential[]
-  twoFactorAuth                TwoFactorAuth?
-  invoicedAmount               Decimal                      @db.Decimal(12, 2)
-  createdRepairNotes           MinerRepairNote[]            @relation("CreatedRepairNotes")
-  createdMinerPoolHistory      MinerPoolHistory[]           @relation("MinerPoolHistoryCreatedBy")
-  createdHashrateBenchmarks    MinerHashrateBenchmark[]     @relation("MinerHashrateBenchmarkCreatedBy")
-  acknowledgedHashrateAlerts   MinerHashrateAlertLog[]      @relation("MinerHashrateAlertAcknowledgedBy")
-  addedGroupSubaccounts        GroupSubaccount[]            @relation("GroupSubaccountAddedBy")
-  groupMemberships             GroupSubaccount[]            @relation("GroupSubaccountUser")
-  customerRequestsSubmitted    FranchiseCustomerRequest[]   @relation("CustomerRequestsSubmitted")
-  customerRequestsReviewed     FranchiseCustomerRequest[]   @relation("CustomerRequestsReviewed")
-  customerRequestCreatedFrom   FranchiseCustomerRequest?    @relation("CustomerRequestsCreatedUser")
-  incentiveRatesCreated        FranchiseIncentiveRate[]     @relation("incentiveRatesCreated")
-  incentiveRatesUpdated        FranchiseIncentiveRate[]     @relation("incentiveRatesUpdated")
-  incentiveEntriesAsClient     IncentiveEntry[]             @relation("incentiveEntriesClient")
-  incentivePayoutsCreated      IncentivePayoutBatch[]       @relation("incentivePayoutsCreated")
-  ticketsRaised                SupportTicket[]              @relation("ticketsRaised")
-  ticketsAssigned              SupportTicket[]              @relation("ticketsAssigned")
-  ticketsRaisedOnBehalf        SupportTicket[]              @relation("ticketsOnBehalfOf")
-  ticketMessages               TicketMessage[]              @relation("ticketMessagesAuthored")
-  walletChangeRequests         WalletChangeRequest[]        @relation("walletChangeRequests")
-  walletChangeRequestsReviewed WalletChangeRequest[]        @relation("walletChangeRequestsReviewed")
+  id                            String                       @id @default(cuid())
+  email                         String                       @unique
+  name                          String?
+  password                      String
+  createdAt                     DateTime                     @default(now())
+  updatedAt                     DateTime                     @updatedAt
+  companyName                   String?
+  profileImage                  String?
+  profileImageId                String?
+  city                          String?
+  country                       String?
+  dateOfBirth                   DateTime?
+  phoneNumber                   String?
+  streetAddress                 String?
+  twoFactorEnabled              Boolean                      @default(false)
+  twoFactorSecret               String?
+  twoFactorBackupCodes          String[]
+  role                          Role                         @default(CLIENT)
+  idNumber                      String?
+  luxorSubaccountName           String?
+  companyUrl                    String?
+  isDeleted                     Boolean                      @default(false)
+  franchiseeId                  String?
+  franchisee                    Franchise?                   @relation("FranchiseUsers", fields: [franchiseeId], references: [id])
+  segment                       Segment?
+  auditLogs                     AuditLog[]                   @relation("auditLogs")
+  costPayments                  CostPayment[]
+  pricingCreated                CustomerPricingConfig[]      @relation("pricingConfigsCreated")
+  pricingUpdated                CustomerPricingConfig[]      @relation("pricingConfigsUpdated")
+  pricingConfigs                CustomerPricingConfig[]      @relation("pricingConfigs")
+  createdGroups                 Group[]
+  franchisesOwned               Franchise[]                  @relation("FranchiseFranchisee")
+  franchisesCreated             Franchise[]                  @relation("FranchiseCreatedBy")
+  hardwareProcurementHistory    HardwareProcurementHistory[]
+  invoicesCreated               Invoice[]                    @relation("invoicesCreated")
+  invoicesUpdated               Invoice[]                    @relation("invoicesUpdated")
+  invoices                      Invoice[]                    @relation("invoices")
+  memos                         Memo[]                       @relation("memos")
+  memosCreated                  Memo[]                       @relation("memosCreated")
+  memosVoided                   Memo[]                       @relation("memosVoided")
+  vendorInvoicesCreated         VendorInvoice[]              @relation("vendorInvoicesCreated")
+  vendorInvoicesUpdated         VendorInvoice[]              @relation("vendorInvoicesUpdated")
+  hardwarePurchasesCreated      HardwarePurchaseInvoice[]    @relation("hardwarePurchasesCreated")
+  hardwarePurchasesUpdated      HardwarePurchaseInvoice[]    @relation("hardwarePurchasesUpdated")
+  createdMinerHistory           MinerOwnershipHistory[]      @relation("createdBy")
+  ownedMinerHistory             MinerOwnershipHistory[]      @relation("owner")
+  miners                        Miner[]
+  minersCreated                 Miner[]                      @relation("MinerCreatedBy")
+  minersUpdated                 Miner[]                      @relation("MinerUpdatedBy")
+  minersDeleted                 Miner[]                      @relation("MinerDeletedBy")
+  hardwareCreated               Hardware[]                   @relation("HardwareCreatedBy")
+  hardwareUpdated               Hardware[]                   @relation("HardwareUpdatedBy")
+  hardwareDeleted               Hardware[]                   @relation("HardwareDeletedBy")
+  minerRateHistoryCreated       MinerRateHistory[]           @relation("MinerRateHistoryCreatedBy")
+  emailSendRunsCreated          EmailSendRun[]               @relation("emailSendRunsCreated")
+  emailSendResults              EmailSendResult[]            @relation("emailSendResults")
+  recurringCreated              RecurringInvoice[]           @relation("recurringInvoicesCreated")
+  recurringUpdated              RecurringInvoice[]           @relation("recurringInvoicesUpdated")
+  recurringInvoices             RecurringInvoice[]           @relation("recurringInvoices")
+  blacklisted                   TokenBlacklist[]
+  activities                    UserActivity[]
+  sessions                      UserSession[]
+  paymentDetailsUpdates         PaymentDetails[]
+  poolAuths                     PoolAuth[]
+  poolSubaccounts               PoolSubaccount[]
+  webauthnCredentials           WebAuthnCredential[]
+  twoFactorAuth                 TwoFactorAuth?
+  invoicedAmount                Decimal                      @db.Decimal(12, 2)
+  createdRepairNotes            MinerRepairNote[]            @relation("CreatedRepairNotes")
+  createdMinerPoolHistory       MinerPoolHistory[]           @relation("MinerPoolHistoryCreatedBy")
+  createdHashrateBenchmarks     MinerHashrateBenchmark[]     @relation("MinerHashrateBenchmarkCreatedBy")
+  acknowledgedHashrateAlerts    MinerHashrateAlertLog[]      @relation("MinerHashrateAlertAcknowledgedBy")
+  addedGroupSubaccounts         GroupSubaccount[]            @relation("GroupSubaccountAddedBy")
+  groupMemberships              GroupSubaccount[]            @relation("GroupSubaccountUser")
+  customerRequestsSubmitted     FranchiseCustomerRequest[]   @relation("CustomerRequestsSubmitted")
+  customerRequestsReviewed      FranchiseCustomerRequest[]   @relation("CustomerRequestsReviewed")
+  customerRequestCreatedFrom    FranchiseCustomerRequest?    @relation("CustomerRequestsCreatedUser")
+  incentiveRatesCreated         FranchiseIncentiveRate[]     @relation("incentiveRatesCreated")
+  incentiveRatesUpdated         FranchiseIncentiveRate[]     @relation("incentiveRatesUpdated")
+  incentiveEntriesAsClient      IncentiveEntry[]             @relation("incentiveEntriesClient")
+  incentivePayoutsCreated       IncentivePayoutBatch[]       @relation("incentivePayoutsCreated")
+  ticketsRaised                 SupportTicket[]              @relation("ticketsRaised")
+  ticketsAssigned               SupportTicket[]              @relation("ticketsAssigned")
+  ticketsRaisedOnBehalf         SupportTicket[]              @relation("ticketsOnBehalfOf")
+  ticketMessages                TicketMessage[]              @relation("ticketMessagesAuthored")
+  walletChangeRequests          WalletChangeRequest[]        @relation("walletChangeRequests")
+  walletChangeRequestsConfirmed WalletChangeRequest[]        @relation("walletChangeRequestsConfirmed")
+  walletChangeRequestsReviewed  WalletChangeRequest[]        @relation("walletChangeRequestsReviewed")
 
   @@index([isDeleted])
   @@index([franchiseeId])
@@ -167,6 +168,7 @@ model FranchiseCustomerRequest {
 
 enum RequestStatus {
   PENDING
+  CONFIRMED
   APPROVED
   REJECTED
 }
@@ -180,21 +182,31 @@ enum RequestStatus {
 // Braiins is out of scope: braiins.ts has no equivalent "configured payout
 // address" API to read or write against.
 model WalletChangeRequest {
-  id               String        @id @default(cuid())
-  userId           String
-  user             User          @relation("walletChangeRequests", fields: [userId], references: [id])
-  currency         String        @default("BTC")
-  currentAddress   String?
-  requestedAddress String
-  reason           String?       @db.Text
-  status           RequestStatus @default(PENDING)
-  rejectionReason  String?
-  reviewedById     String?
-  reviewedBy       User?         @relation("walletChangeRequestsReviewed", fields: [reviewedById], references: [id])
-  reviewedAt       DateTime?
-  appliedAt        DateTime?
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
+  id                  String        @id @default(cuid())
+  userId              String
+  user                User          @relation("walletChangeRequests", fields: [userId], references: [id])
+  currency            String        @default("BTC")
+  // Which Luxor subaccount this request is for - a snapshot (like
+  // currentAddress), not a live FK, since that's all the admin needs to
+  // know which one to update manually on Luxor. Null on rows submitted
+  // before multi-subaccount support existed.
+  subaccountName      String?
+  currentAddress      String?
+  requestedAddress    String
+  reason              String?       @db.Text
+  status              RequestStatus @default(PENDING)
+  rejectionReason     String?
+  confirmedById       String?
+  confirmedBy         User?         @relation("walletChangeRequestsConfirmed", fields: [confirmedById], references: [id])
+  confirmedAt         DateTime?
+  confirmationMethod  String?
+  confirmationContact String?
+  confirmationNote    String?       @db.Text
+  reviewedById        String?
+  reviewedBy          User?         @relation("walletChangeRequestsReviewed", fields: [reviewedById], references: [id])
+  reviewedAt          DateTime?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
 
   @@index([userId])
   @@index([status])
@@ -211,6 +223,19 @@ model TokenBlacklist {
 
   @@index([token])
   @@map("token_blacklist")
+}
+
+// One row per recorded attempt against a rate-limited auth action. `key` is
+// "<scope>:<axis>:<identifier>" (see src/lib/rateLimit.ts). Standalone on
+// purpose - no relation to users, so it can never affect user rows.
+model AuthAttempt {
+  id        String   @id @default(cuid())
+  key       String
+  createdAt DateTime @default(now())
+
+  @@index([key, createdAt])
+  @@index([createdAt])
+  @@map("auth_attempts")
 }
 
 model WebAuthnCredential {
@@ -470,7 +495,9 @@ model PoolAuth {
   groupSubaccounts GroupSubaccount[]
   poolSubaccounts  PoolSubaccount[]
 
-  @@unique([poolId, userId])
+  // One subaccount/token belongs to exactly one user per pool. A user can
+  // still hold several rows per pool (multiple Luxor subaccounts).
+  @@unique([poolId, authKey])
   @@index([userId])
   @@index([poolId])
   @@map("pool_auths")
@@ -558,8 +585,10 @@ model PoolWorkerDailyMetric {
 
   hashrate       Decimal?
   efficiency     Decimal?
-  staleShares    Int?
-  rejectedShares Int?
+  // Luxor's GET /pool/workers reports these as fractions (e.g. 0.0102), not
+  // whole counts, so they must not be Int.
+  staleShares    Decimal?
+  rejectedShares Decimal?
   estRevenue     Decimal? @db.Decimal(20, 8)
   firmware       String?
   status         String? // normalized ACTIVE/INACTIVE
@@ -779,7 +808,7 @@ model Invoice {
   issuedDate             DateTime?
   dueDate                DateTime
   billingMonth           DateTime? // Format: First day of month (e.g., 2026-04-01 for April 2026)
-  machineHostingLocation String?
+  machineHostingLocation String[]              @default([])
   paidDate               DateTime?
   createdBy              String
   updatedBy              String?
@@ -1227,6 +1256,7 @@ enum AuditAction {
   TICKET_PRIORITY_CHANGED
   TICKET_CLOSED
   WALLET_CHANGE_REQUESTED
+  WALLET_CHANGE_CONFIRMED
   WALLET_CHANGE_APPROVED
   WALLET_CHANGE_REJECTED
   USER_PASSWORD_RESET

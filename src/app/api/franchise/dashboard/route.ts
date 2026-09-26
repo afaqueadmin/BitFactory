@@ -4,15 +4,17 @@
  * Franchisee-facing dashboard stats — scoped to the calling franchisee's
  * own customers. FRANCHISEE role only.
  *
- * Card scope:
- * - Customers (active/inactive), Total Customers: scoped via franchiseeUserFilter
- * - Monthly Revenue (30 days), Total Customer Balance: scoped by customer id
- * - Hashrate (5m/24h), Uptime (24h): intentionally global/unscoped, same as admin
- * - Miners (active/inactive/actionRequired), Total Mined Revenue: scoped —
- *   the Luxor side relies on src/app/api/luxor/route.ts's `workers`/`revenue`
- *   cases, which resolve the franchisee's own subaccount names server-side
- *   (workers) or accept an explicit `subaccount_name` param (revenue); the
- *   Braiins side filters PoolAuth by the franchisee's own customer ids.
+ * Card scope, all scoped to this franchisee's own customers:
+ * - Customers (active/inactive), Total Customers: via franchiseeUserFilter
+ * - Monthly Revenue (30 days), Total Customer Balance: by customer id
+ * - Hashrate (5m/24h), Uptime (24h): via getFranchiseeTrackedLuxorSubaccounts
+ *   (the franchisee's own customers' Luxor subaccounts, cross-checked
+ *   against Luxor's live subaccount list the same way the admin dashboard
+ *   does)
+ * - Miners (active/inactive/actionRequired), Total Mined Revenue: same
+ *   subaccount list, passed explicitly to the `workers`/`revenue` proxy
+ *   cases (the Braiins side filters PoolAuth by the franchisee's own
+ *   customer ids directly)
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -61,11 +63,41 @@ interface FranchiseeDashboardStats {
 }
 
 /**
- * Fetch all accessible Luxor subaccount names. Deliberately unscoped — the
- * hashrate/uptime cards are meant to match what admin sees, not be filtered
- * to the franchisee's own customers.
+ * Fetch this franchisee's own customers' Luxor subaccount names, cross-
+ * checked against Luxor's own live subaccount list - same approach as the
+ * admin dashboard's getTrackedLuxorSubaccounts. Every Luxor PoolAuth row per
+ * customer, deduped and excluding test accounts.
  */
-async function getAllSubaccountNames(request: NextRequest): Promise<string[]> {
+async function getFranchiseeTrackedLuxorSubaccounts(
+  request: NextRequest,
+  currentUser: { id: string; role: string },
+): Promise<string[]> {
+  const customers = await prisma.user.findMany({
+    where: {
+      role: "CLIENT",
+      isDeleted: false,
+      ...franchiseeUserFilter(currentUser),
+    },
+    select: {
+      poolAuths: {
+        where: { pool: { name: "Luxor" } },
+        select: { authKey: true },
+      },
+    },
+  });
+
+  const dbNames = new Set<string>();
+  for (const customer of customers) {
+    for (const { authKey: name } of customer.poolAuths) {
+      if (!name.includes("_test")) dbNames.add(name);
+    }
+  }
+  const dbSubaccountNames = Array.from(dbNames);
+
+  if (dbSubaccountNames.length === 0) {
+    return [];
+  }
+
   try {
     const url = new URL("/api/luxor?endpoint=subaccounts", request.url);
     const luxorRequest = new NextRequest(url, {
@@ -75,29 +107,26 @@ async function getAllSubaccountNames(request: NextRequest): Promise<string[]> {
 
     const response = await fetch(luxorRequest);
     if (!response.ok) {
-      return [];
+      // Live check unavailable - fall back to the DB list unfiltered.
+      return dbSubaccountNames;
     }
 
     const result = await response.json();
-    if (result.success && result.data?.subaccounts) {
-      const subaccounts = result.data.subaccounts as Array<{
-        id: number;
-        name: string;
-      }>;
-      return subaccounts.map((s) => s.name);
-    }
+    const liveNames = new Set(
+      result.success
+        ? ((
+            result.data?.subaccounts as Array<{ name: string }> | undefined
+          )?.map((s) => s.name) ?? [])
+        : [],
+    );
 
-    // Fallback: all subaccounts known in the DB (also unscoped, matching admin)
-    const usersWithSubaccounts = await prisma.user.findMany({
-      where: { luxorSubaccountName: { not: null } },
-      select: { luxorSubaccountName: true },
-    });
-    return usersWithSubaccounts
-      .map((u) => u.luxorSubaccountName)
-      .filter((name): name is string => name !== null);
+    return dbSubaccountNames.filter((name) => liveNames.has(name));
   } catch (error) {
-    console.error("[Franchise Dashboard] Error fetching subaccounts:", error);
-    return [];
+    console.error(
+      "[Franchise Dashboard] Error fetching subaccounts from Luxor API:",
+      error,
+    );
+    return dbSubaccountNames;
   }
 }
 
@@ -321,10 +350,10 @@ export async function GET(request: NextRequest) {
       where: {
         role: "CLIENT",
         isDeleted: false,
-        NOT: { luxorSubaccountName: { contains: "_test" } },
+        poolAuths: { none: { authKey: { contains: "_test" } } },
         ...franchiseeUserFilter(currentUser),
       },
-      include: { miners: true },
+      select: { id: true, miners: true },
     });
 
     const activeCustomerCount = totalCustomers.filter(
@@ -333,6 +362,13 @@ export async function GET(request: NextRequest) {
     ).length;
     const inactiveCustomerCount = totalCustomers.length - activeCustomerCount;
     const customerIds = totalCustomers.map((c) => c.id);
+
+    // Every one of this franchisee's customers' Luxor subaccounts - reused
+    // below for both the Miners/Revenue cards and the Hashrate/Uptime cards.
+    const trackedLuxorSubaccounts = await getFranchiseeTrackedLuxorSubaccounts(
+      request,
+      currentUser,
+    );
 
     // ========== FINANCIAL (scoped) ==========
     const totalCustomerBalanceAgg = await prisma.costPayment.aggregate({
@@ -372,10 +408,7 @@ export async function GET(request: NextRequest) {
         },
       });
 
-      const franchiseeSubaccountNames = totalCustomers
-        .map((c) => c.luxorSubaccountName)
-        .filter((name): name is string => !!name)
-        .join(",");
+      const franchiseeSubaccountNames = trackedLuxorSubaccounts.join(",");
 
       if (franchiseeSubaccountNames) {
         const workersData = await fetchScopedWorkers(request);
@@ -459,7 +492,7 @@ export async function GET(request: NextRequest) {
       warnings.push("Failed to fetch Braiins miners/revenue data");
     }
 
-    // ========== HASHRATE / UPTIME (global, unscoped — same as admin) ==========
+    // ========== HASHRATE / UPTIME (scoped to this franchisee's customers) ==========
     // Kept separate per pool (not just combined) so the pool-mode toggle can
     // show Luxor-only / Braiins-only / combined, exactly like admin.
     let luxorHashrate5m = 0;
@@ -467,9 +500,11 @@ export async function GET(request: NextRequest) {
     let luxorUptime24h = 0;
 
     try {
-      const subaccountNames = await getAllSubaccountNames(request);
-      if (subaccountNames.length > 0) {
-        const summaryData = await fetchSummary(request, subaccountNames);
+      if (trackedLuxorSubaccounts.length > 0) {
+        const summaryData = await fetchSummary(
+          request,
+          trackedLuxorSubaccounts,
+        );
         if (summaryData) {
           luxorHashrate5m = summaryData.hashrate_5m;
           luxorHashrate24h = summaryData.hashrate_24h;

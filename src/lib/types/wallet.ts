@@ -45,6 +45,13 @@ export interface LuxorAddress {
 export interface WalletFetchResponse {
   success: boolean;
   data?: LuxorPaymentSettings;
+  /**
+   * Payment settings for every subaccount currently in view (the client's
+   * full list, or the subset selected via the subaccount filter). `data`
+   * above always mirrors subaccounts[0] for callers that haven't been
+   * updated to read this array yet.
+   */
+  subaccounts?: LuxorPaymentSettings[];
   error?: string;
   code?: string;
   timestamp: string;

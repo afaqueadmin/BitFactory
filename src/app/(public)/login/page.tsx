@@ -152,198 +152,198 @@ export default function Login() {
 
   return (
     <PwaInstallProvider>
-    <Box
-      sx={{
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        p: 2,
-      }}
-    >
-      {/* Forgot Password Modal */}
-      <ForgotPasswordModal
-        open={showForgotPassword}
-        onClose={() => setShowForgotPassword(false)}
-      />
-
-      {showTwoFactor ? (
-        <TwoFactorVerification
-          email={formData.email}
-          onVerified={handleTwoFactorVerified}
+      <Box
+        sx={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          p: 2,
+        }}
+      >
+        {/* Forgot Password Modal */}
+        <ForgotPasswordModal
+          open={showForgotPassword}
+          onClose={() => setShowForgotPassword(false)}
         />
-      ) : (
-        <Paper
-          elevation={3}
-          sx={{
-            p: 4,
-            width: "100%",
-            maxWidth: 400,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-          }}
-        >
-          {/* Logo */}
-          <Box mb={1} sx={{ display: "flex", justifyContent: "center" }}>
-            <Image
-              src="/BitfactoryLogo.webp"
-              alt="BitFactory Logo"
-              width={220}
-              height={48}
-              style={{ height: "auto" }}
-            />
-          </Box>
 
-          <Typography variant="body2" color="text.main" mb={3} fontSize={16}>
-            Login To Your Bitcoin Mining Factory.
-          </Typography>
-
-          {/* Error Message */}
-          {error && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {error}
-            </Alert>
-          )}
-
-          <Box component="form" onSubmit={handleSubmit} noValidate>
-            <TextField
-              fullWidth
-              required
-              name="email"
-              label="Email Address"
-              type="email"
-              value={formData.email}
-              onChange={handleChange}
-              margin="normal"
-            />
-
-            <TextField
-              fullWidth
-              required
-              name="password"
-              label="Password"
-              type={showPassword ? "text" : "password"}
-              value={formData.password}
-              onChange={handleChange}
-              margin="normal"
-              InputProps={{
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <IconButton
-                      onClick={() => setShowPassword(!showPassword)}
-                      edge="end"
-                    >
-                      {showPassword ? <VisibilityOff /> : <Visibility />}
-                    </IconButton>
-                  </InputAdornment>
-                ),
-              }}
-            />
-
-            <Box display="flex" mt={1}>
-              <Button
-                variant="text"
-                size="small"
-                onClick={handleForgotPassword}
-                sx={{ textTransform: "none" }}
-              >
-                Forgot password?
-              </Button>
+        {showTwoFactor ? (
+          <TwoFactorVerification
+            email={formData.email}
+            onVerified={handleTwoFactorVerified}
+          />
+        ) : (
+          <Paper
+            elevation={3}
+            sx={{
+              p: 4,
+              width: "100%",
+              maxWidth: 400,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+            }}
+          >
+            {/* Logo */}
+            <Box mb={1} sx={{ display: "flex", justifyContent: "center" }}>
+              <Image
+                src="/BitfactoryLogo.webp"
+                alt="BitFactory Logo"
+                width={220}
+                height={110}
+                style={{ height: "auto" }}
+              />
             </Box>
 
-            {webAuthnSupported && (
-              <Button
-                fullWidth
-                variant="contained"
-                sx={{
-                  mt: 3,
-                  mb: 1,
-                  bgcolor: "#0f766e",
-                  color: "#ffffff",
-                  boxShadow: "0 8px 24px rgba(15, 118, 110, 0.28)",
-                  "&:hover": {
-                    bgcolor: "#115e59",
-                    boxShadow: "0 10px 28px rgba(15, 118, 110, 0.34)",
-                  },
-                }}
-                onClick={handlePasskeyLogin}
-                disabled={passKeyLoading || !formData.email}
-                startIcon={
-                  passKeyLoading ? (
-                    <CircularProgress size={20} />
-                  ) : (
-                    <FingerprintIcon />
-                  )
-                }
-              >
-                {passKeyLoading ? "Authenticating..." : "Login with Passkey"}
-              </Button>
+            <Typography variant="body2" color="text.main" mb={3} fontSize={16}>
+              Login To Your Bitcoin Mining Factory.
+            </Typography>
+
+            {/* Error Message */}
+            {error && (
+              <Alert severity="error" sx={{ mb: 2 }}>
+                {error}
+              </Alert>
             )}
 
-            <Button
-              type="submit"
-              fullWidth
-              variant="contained"
-              color="primary"
-              sx={{ mt: 1, mb: 1 }}
-              disabled={isLoading || !formData.password}
-              startIcon={isLoading ? <CircularProgress size={20} /> : null}
-            >
-              {isLoading ? "Loading..." : "Login with Password"}
-            </Button>
+            <Box component="form" onSubmit={handleSubmit} noValidate>
+              <TextField
+                fullWidth
+                required
+                name="email"
+                label="Email Address"
+                type="email"
+                value={formData.email}
+                onChange={handleChange}
+                margin="normal"
+              />
 
-            {/* Signup prompt (inline, no gap) */}
-            <Box
-              mt={2}
-              display="flex"
-              justifyContent="center"
-              alignItems="center"
-            >
-              <Typography
-                variant="body2"
-                color="text.secondary"
-                component="span"
-                sx={{ mr: 0 }}
-              >
-                Don&apos;t have an account?
-              </Typography>
+              <TextField
+                fullWidth
+                required
+                name="password"
+                label="Password"
+                type={showPassword ? "text" : "password"}
+                value={formData.password}
+                onChange={handleChange}
+                margin="normal"
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton
+                        onClick={() => setShowPassword(!showPassword)}
+                        edge="end"
+                      >
+                        {showPassword ? <VisibilityOff /> : <Visibility />}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
+              />
+
+              <Box display="flex" mt={1}>
+                <Button
+                  variant="text"
+                  size="small"
+                  onClick={handleForgotPassword}
+                  sx={{ textTransform: "none" }}
+                >
+                  Forgot password?
+                </Button>
+              </Box>
+
+              {webAuthnSupported && (
+                <Button
+                  fullWidth
+                  variant="contained"
+                  sx={{
+                    mt: 3,
+                    mb: 1,
+                    bgcolor: "#0f766e",
+                    color: "#ffffff",
+                    boxShadow: "0 8px 24px rgba(15, 118, 110, 0.28)",
+                    "&:hover": {
+                      bgcolor: "#115e59",
+                      boxShadow: "0 10px 28px rgba(15, 118, 110, 0.34)",
+                    },
+                  }}
+                  onClick={handlePasskeyLogin}
+                  disabled={passKeyLoading || !formData.email}
+                  startIcon={
+                    passKeyLoading ? (
+                      <CircularProgress size={20} />
+                    ) : (
+                      <FingerprintIcon />
+                    )
+                  }
+                >
+                  {passKeyLoading ? "Authenticating..." : "Login with Passkey"}
+                </Button>
+              )}
+
               <Button
-                component="a"
-                href="https://www.bitfactory.ae"
-                target="_blank"
-                rel="noopener noreferrer"
-                variant="text"
-                size="medium"
-                sx={{ textTransform: "none", ml: 0 }}
+                type="submit"
+                fullWidth
+                variant="contained"
+                color="primary"
+                sx={{ mt: 1, mb: 1 }}
+                disabled={isLoading || !formData.password}
+                startIcon={isLoading ? <CircularProgress size={20} /> : null}
               >
-                Sign up
+                {isLoading ? "Loading..." : "Login with Password"}
               </Button>
-            </Box>
 
-            {/* Quick Mobile App Install Pill for Mobile/Tablet */}
-            <Box mt={2} display="flex" justifyContent="center">
-              <PwaQuickInstallButton />
-            </Box>
-          </Box>
-
-          {/* Passkey unavailable notice */}
-          {!webAuthnSupported && (
-            <Card sx={{ mt: 2, bgcolor: "info.lighter" }}>
-              <CardContent>
-                <Typography variant="caption" color="info.main">
-                  ℹ️ Passkey authentication is not available in your browser.
-                  Please update your browser or use the password login method.
+              {/* Signup prompt (inline, no gap) */}
+              <Box
+                mt={2}
+                display="flex"
+                justifyContent="center"
+                alignItems="center"
+              >
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  component="span"
+                  sx={{ mr: 0 }}
+                >
+                  Don&apos;t have an account?
                 </Typography>
-              </CardContent>
-            </Card>
-          )}
-        </Paper>
-      )}
+                <Button
+                  component="a"
+                  href="https://www.bitfactory.ae"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  variant="text"
+                  size="medium"
+                  sx={{ textTransform: "none", ml: 0 }}
+                >
+                  Sign up
+                </Button>
+              </Box>
 
-      {/* PWA Mobile/Tablet Install Modal Popup */}
-      <PwaInstallPrompt />
-    </Box>
+              {/* Quick Mobile App Install Pill for Mobile/Tablet */}
+              <Box mt={2} display="flex" justifyContent="center">
+                <PwaQuickInstallButton />
+              </Box>
+            </Box>
+
+            {/* Passkey unavailable notice */}
+            {!webAuthnSupported && (
+              <Card sx={{ mt: 2, bgcolor: "info.lighter" }}>
+                <CardContent>
+                  <Typography variant="caption" color="info.main">
+                    ℹ️ Passkey authentication is not available in your browser.
+                    Please update your browser or use the password login method.
+                  </Typography>
+                </CardContent>
+              </Card>
+            )}
+          </Paper>
+        )}
+
+        {/* PWA Mobile/Tablet Install Modal Popup */}
+        <PwaInstallPrompt />
+      </Box>
     </PwaInstallProvider>
   );
 }

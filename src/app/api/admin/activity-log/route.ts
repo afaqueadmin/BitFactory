@@ -46,9 +46,9 @@ export async function GET(request: NextRequest) {
             select: {
               name: true,
               email: true,
-              luxorSubaccountName: true,
               poolAuths: {
                 where: { pool: { name: "Luxor" } },
+                orderBy: { createdAt: "asc" },
                 select: { authKey: true },
               },
             },
@@ -80,16 +80,15 @@ export async function GET(request: NextRequest) {
       }),
     ]);
 
-    // Resolve each session's Luxor subaccount from PoolAuth (falling back to
-    // the legacy field) so the response shape stays unchanged for consumers.
+    // Flatten each session user's Luxor subaccounts (PoolAuth) into
+    // user.luxorSubaccounts.
     const transformedSessions = sessions.map((session) => {
       const { poolAuths, ...user } = session.user;
       return {
         ...session,
         user: {
           ...user,
-          luxorSubaccountName:
-            poolAuths[0]?.authKey || session.user.luxorSubaccountName,
+          luxorSubaccounts: poolAuths.map((pa) => pa.authKey),
         },
       };
     });

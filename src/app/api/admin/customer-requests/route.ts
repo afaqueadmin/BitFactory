@@ -46,7 +46,21 @@ export async function GET(request: NextRequest) {
           ? { status: status as "PENDING" | "APPROVED" | "REJECTED" }
           : {},
       orderBy: { createdAt: "desc" },
-      include: {
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phoneNumber: true,
+        initialDeposit: true,
+        status: true,
+        rejectionReason: true,
+        reviewedAt: true,
+        createdAt: true,
+        updatedAt: true,
+        franchiseId: true,
+        requestedById: true,
+        reviewedById: true,
+        createdUserId: true,
         franchise: {
           select: { id: true, businessName: true, franchiseCode: true },
         },
@@ -56,10 +70,26 @@ export async function GET(request: NextRequest) {
         reviewedBy: {
           select: { id: true, name: true, email: true },
         },
+        // Subaccounts are assigned at approval as the created customer's
+        // Luxor PoolAuth rows - shown from there, not stored on the request.
+        createdUser: {
+          select: {
+            poolAuths: {
+              where: { pool: { name: "Luxor" } },
+              orderBy: { createdAt: "asc" },
+              select: { authKey: true },
+            },
+          },
+        },
       },
     });
 
-    return NextResponse.json({ success: true, data: requests });
+    const data = requests.map(({ createdUser, ...r }) => ({
+      ...r,
+      luxorSubaccounts: createdUser?.poolAuths.map((pa) => pa.authKey) ?? [],
+    }));
+
+    return NextResponse.json({ success: true, data });
   } catch (error) {
     console.error("[Admin Customer Requests API] GET error:", error);
     return NextResponse.json(

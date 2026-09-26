@@ -22,6 +22,7 @@ import {
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import { visuallyHidden } from "@mui/utils";
+import { RADIUS_CARD, useDaylight } from "@/lib/daylight";
 
 interface ElectricityData {
   id: string;
@@ -150,10 +151,12 @@ interface EnhancedTableHeadProps {
   onRequestSort: (event: React.MouseEvent<unknown>, property: OrderBy) => void;
   order: Order;
   orderBy: string;
+  daylight?: boolean;
 }
 
 function EnhancedTableHead(props: EnhancedTableHeadProps) {
-  const { order, orderBy, onRequestSort } = props;
+  const { order, orderBy, onRequestSort, daylight } = props;
+  const { d, fonts } = useDaylight();
   const createSortHandler =
     (property: OrderBy) => (event: React.MouseEvent<unknown>) => {
       onRequestSort(event, property);
@@ -176,6 +179,15 @@ function EnhancedTableHead(props: EnhancedTableHeadProps) {
                 headCell.id === "consumption" || headCell.id === "narration"
                   ? { xs: "none", sm: "table-cell" }
                   : "table-cell",
+              ...(daylight && {
+                borderBottomColor: d.border,
+                backgroundColor: d.tableHead,
+                fontFamily: fonts.body,
+                color: d.muted,
+                fontSize: 10,
+                letterSpacing: ".015em",
+                textTransform: "uppercase",
+              }),
             }}
           >
             <TableSortLabel
@@ -184,8 +196,12 @@ function EnhancedTableHead(props: EnhancedTableHeadProps) {
               onClick={createSortHandler(headCell.id)}
               sx={{
                 fontWeight: "bold",
+                color: "inherit",
                 "&.Mui-active": {
-                  color: "primary.main",
+                  color: daylight ? d.action : "primary.main",
+                },
+                "& .MuiTableSortLabel-icon": {
+                  color: daylight ? `${d.action} !important` : undefined,
                 },
               }}
             >
@@ -205,12 +221,17 @@ function EnhancedTableHead(props: EnhancedTableHeadProps) {
 
 interface ElectricityCostTableProps {
   customerId?: string;
+  /** Daylight styling: white card chrome, guide-style header row, Manrope
+   * title and Inter body text. Data-fetching and sorting are unchanged. */
+  daylight?: boolean;
 }
 
 export default function ElectricityCostTable({
   customerId,
+  daylight = false,
 }: ElectricityCostTableProps) {
   const theme = useTheme();
+  const { d, fonts } = useDaylight();
   const [order, setOrder] = useState<Order>("desc");
   const [orderBy, setOrderBy] = useState<OrderBy>("date");
   const [page, setPage] = useState(0);
@@ -313,19 +334,19 @@ export default function ElectricityCostTable({
 
   const getAmountColor = (amount: string) => {
     if (amount.includes("-")) {
-      return theme.palette.error.main;
+      return daylight ? d.danger : theme.palette.error.main;
     }
-    return theme.palette.text.primary;
+    return daylight ? d.text : theme.palette.text.primary;
   };
 
   const getBalanceColor = (balance: string) => {
     if (balance.includes("+")) {
-      return theme.palette.success.main;
+      return daylight ? d.success : theme.palette.success.main;
     }
     if (balance.includes("-")) {
-      return theme.palette.error.main;
+      return daylight ? d.danger : theme.palette.error.main;
     }
-    return theme.palette.text.primary;
+    return daylight ? d.text : theme.palette.text.primary;
   };
 
   return (
@@ -340,7 +361,15 @@ export default function ElectricityCostTable({
           mb: 2,
         }}
       >
-        <Typography variant="h6" fontWeight="bold">
+        <Typography
+          variant="h6"
+          fontWeight="bold"
+          sx={
+            daylight
+              ? { fontFamily: fonts.heading, fontWeight: 750, color: d.text }
+              : undefined
+          }
+        >
           Account Statement
         </Typography>
         <TextField
@@ -352,13 +381,31 @@ export default function ElectricityCostTable({
           sx={{
             maxWidth: { sm: 280 },
             "& .MuiOutlinedInput-root": {
-              backgroundColor: theme.palette.background.paper,
+              backgroundColor: daylight
+                ? d.surface
+                : theme.palette.background.paper,
+              ...(daylight && {
+                borderRadius: "8px",
+                fontFamily: fonts.body,
+                "& fieldset": { borderColor: d.inputBorder },
+                "&:hover fieldset": { borderColor: d.action },
+              }),
             },
+            ...(daylight && {
+              "& .MuiOutlinedInput-root.Mui-focused fieldset": {
+                borderColor: d.action,
+                borderWidth: "2px",
+              },
+            }),
           }}
           InputProps={{
             startAdornment: (
               <InputAdornment position="start">
-                <SearchIcon sx={{ color: theme.palette.text.secondary }} />
+                <SearchIcon
+                  sx={{
+                    color: daylight ? d.muted : theme.palette.text.secondary,
+                  }}
+                />
               </InputAdornment>
             ),
           }}
@@ -374,23 +421,37 @@ export default function ElectricityCostTable({
       <Paper
         sx={{
           width: "100%",
-          borderRadius: 2.5,
+          borderRadius: daylight ? RADIUS_CARD : 2.5,
           overflow: "hidden",
+          backgroundColor: daylight ? d.surface : undefined,
+          backgroundImage: daylight ? "none" : undefined,
           border: `1px solid ${
-            theme.palette.mode === "dark"
-              ? "rgba(255, 255, 255, 0.08)"
-              : "rgba(0, 0, 0, 0.08)"
+            daylight
+              ? d.border
+              : theme.palette.mode === "dark"
+                ? "rgba(255, 255, 255, 0.08)"
+                : "rgba(0, 0, 0, 0.08)"
           }`,
-          boxShadow: theme.shadows[1],
+          boxShadow: daylight ? d.shadow : theme.shadows[1],
         }}
       >
         {loading ? (
           <Box sx={{ display: "flex", justifyContent: "center", p: 4 }}>
-            <CircularProgress size={28} />
+            <CircularProgress
+              sx={daylight ? { color: d.action } : undefined}
+              size={28}
+            />
           </Box>
         ) : data.length === 0 ? (
           <Box sx={{ p: 3, textAlign: "center" }}>
-            <Typography color="text.secondary">
+            <Typography
+              color="text.secondary"
+              sx={
+                daylight
+                  ? { fontFamily: fonts.body, color: d.muted }
+                  : undefined
+              }
+            >
               No cost payments found
             </Typography>
           </Box>
@@ -406,6 +467,7 @@ export default function ElectricityCostTable({
                   order={order}
                   orderBy={orderBy}
                   onRequestSort={handleRequestSort}
+                  daylight={daylight}
                 />
                 <TableBody>
                   {visibleRows.map((row) => {
@@ -415,9 +477,18 @@ export default function ElectricityCostTable({
                         key={row.id}
                         sx={{
                           cursor: "pointer",
+                          fontFamily: daylight ? fonts.body : undefined,
                           "&:nth-of-type(odd)": {
-                            backgroundColor: theme.palette.action.hover,
+                            backgroundColor: daylight
+                              ? d.canvas
+                              : theme.palette.action.hover,
                           },
+                          ...(daylight && {
+                            "&:hover": { backgroundColor: d.hover },
+                            "& .MuiTableCell-root": {
+                              borderBottomColor: d.border,
+                            },
+                          }),
                         }}
                       >
                         <TableCell
@@ -529,7 +600,14 @@ export default function ElectricityCostTable({
               onPageChange={handleChangePage}
               onRowsPerPageChange={handleChangeRowsPerPage}
               sx={{
-                borderTop: `1px solid ${theme.palette.divider}`,
+                borderTop: `1px solid ${daylight ? d.border : theme.palette.divider}`,
+                ...(daylight && {
+                  fontFamily: fonts.body,
+                  color: d.muted,
+                  "& .MuiSelect-select, & .MuiTablePagination-actions button": {
+                    color: d.text,
+                  },
+                }),
                 "& .MuiTablePagination-toolbar": {
                   paddingLeft: { xs: 1, sm: 2 },
                   paddingRight: { xs: 1, sm: 1 },

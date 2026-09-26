@@ -54,8 +54,8 @@ interface WorkerMetric {
   date: string;
   hashrate: string | null;
   efficiency: string | null;
-  staleShares: number | null;
-  rejectedShares: number | null;
+  staleShares: string | null;
+  rejectedShares: string | null;
   estRevenue: string | null;
   firmware: string | null;
   status: string | null;
@@ -305,10 +305,10 @@ export default function PoolWorkerMetricsPage() {
                         : `${fmt(row.efficiency, 2)}%`}
                     </TableCell>
                     <TableCell align="right">
-                      {row.staleShares ?? "—"}
+                      {fmt(row.staleShares, 6)}
                     </TableCell>
                     <TableCell align="right">
-                      {row.rejectedShares ?? "—"}
+                      {fmt(row.rejectedShares, 6)}
                     </TableCell>
                     <TableCell align="right">
                       {fmt(row.estRevenue, 8)}

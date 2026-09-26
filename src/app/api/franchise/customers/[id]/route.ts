@@ -61,13 +61,13 @@ export async function PUT(
       city,
       country,
       companyUrl,
-      luxorSubaccountName,
+      luxorSubaccountNames,
     } = body;
 
     // Franchisees are not permitted to view, assign, or remove a customer's
-    // subaccount — reject the request outright rather than silently
+    // subaccounts — reject the request outright rather than silently
     // dropping the field, so a direct API call can't slip it through.
-    if (luxorSubaccountName !== undefined) {
+    if (luxorSubaccountNames !== undefined) {
       return NextResponse.json(
         {
           success: false,

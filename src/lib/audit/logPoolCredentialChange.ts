@@ -16,6 +16,11 @@ export async function logPoolCredentialChange(
     userId: string;
     actorId: string;
     poolName: string;
+    /**
+     * Shown in the description. Only pass non-secret identifiers (Luxor
+     * subaccount names) - never a Braiins API token.
+     */
+    credentialName?: string;
   },
 ) {
   const verb =
@@ -31,7 +36,7 @@ export async function logPoolCredentialChange(
       entityType: "User",
       entityId: args.userId,
       userId: args.actorId,
-      description: `${args.poolName} pool credential ${verb}`,
+      description: `${args.poolName} pool credential ${verb}${args.credentialName ? ` (${args.credentialName})` : ""}`,
     },
   });
 }

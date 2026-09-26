@@ -70,7 +70,7 @@ interface Franchise {
     id: string;
     name: string;
     email: string;
-    luxorSubaccountName: string | null;
+    luxorSubaccounts: string[];
   };
   createdBy: { id: string; name: string; email: string };
   _count?: { users: number };

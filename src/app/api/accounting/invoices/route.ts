@@ -89,8 +89,6 @@ export async function GET(request: NextRequest) {
           return [{ totalAmount: sortDirection }, { createdAt: defaultSort }];
         case "status":
           return [{ status: sortDirection }, { createdAt: defaultSort }];
-        case "issuedDate":
-          return [{ issuedDate: sortDirection }, { createdAt: defaultSort }];
         case "paidDate":
           return [{ paidDate: sortDirection }, { createdAt: defaultSort }];
         case "dueDate":
@@ -150,7 +148,11 @@ export async function GET(request: NextRequest) {
     let invoices;
     let total;
 
-    if (sortBy === "paidPastDue" || sortBy === "daysUntilDue") {
+    if (
+      sortBy === "paidPastDue" ||
+      sortBy === "daysUntilDue" ||
+      sortBy === "issuedDate"
+    ) {
       const allMatchingInvoices = await prisma.invoice.findMany({
         where,
         include,
@@ -165,6 +167,21 @@ export async function GET(request: NextRequest) {
           if (aIssuedPriority !== bIssuedPriority) {
             return aIssuedPriority - bIssuedPriority;
           }
+        }
+
+        if (sortBy === "issuedDate") {
+          // issuedDate can be null on invoices created before it was
+          // tracked (or backfilled without it) - fall back to
+          // invoiceGeneratedDate, matching what the UI displays for those
+          // rows, so a row's position always matches the date shown.
+          const aDate = new Date(
+            a.issuedDate || a.invoiceGeneratedDate,
+          ).getTime();
+          const bDate = new Date(
+            b.issuedDate || b.invoiceGeneratedDate,
+          ).getTime();
+          const cmp = aDate - bDate;
+          return sortDirection === "asc" ? cmp : -cmp;
         }
 
         const aValue =
@@ -254,13 +271,26 @@ export async function POST(request: NextRequest) {
     if (
       machineHostingLocation !== undefined &&
       machineHostingLocation !== null &&
-      typeof machineHostingLocation !== "string"
+      (!Array.isArray(machineHostingLocation) ||
+        machineHostingLocation.some((loc) => typeof loc !== "string"))
     ) {
       return NextResponse.json(
-        { error: "machineHostingLocation must be a string" },
+        { error: "machineHostingLocation must be an array of strings" },
         { status: 400 },
       );
     }
+
+    const normalizedMachineHostingLocation: string[] = Array.isArray(
+      machineHostingLocation,
+    )
+      ? Array.from(
+          new Set(
+            machineHostingLocation
+              .map((loc: string) => loc.trim())
+              .filter((loc: string) => loc.length > 0),
+          ),
+        )
+      : [];
 
     // Status is always DRAFT when creating new invoices
     // Admins can change to ISSUED after creation via the status change endpoint
@@ -388,15 +418,16 @@ export async function POST(request: NextRequest) {
     }
 
     // Fetch customer to get their Luxor identifier for the invoice number
-    // prefix. PoolAuth is the source of truth; luxorSubaccountName is a
-    // fallback for any row the dual-write hasn't caught up on.
+    // prefix - their oldest Luxor subaccount (PoolAuth), so it stays the same
+    // no matter how many more they're given later.
     const customer = await prisma.user.findUnique({
       where: { id: customerId },
       select: {
         name: true,
-        luxorSubaccountName: true,
         poolAuths: {
           where: { pool: { name: "Luxor" } },
+          orderBy: { createdAt: "asc" },
+          take: 1,
           select: { authKey: true },
         },
       },
@@ -414,7 +445,6 @@ export async function POST(request: NextRequest) {
     // human-readable instead of blocking invoice creation.
     const luxorIdentifier =
       customer.poolAuths[0]?.authKey ||
-      customer.luxorSubaccountName ||
       customer.name?.trim().split(/\s+/)[0] ||
       "Customer";
 
@@ -467,11 +497,7 @@ export async function POST(request: NextRequest) {
         billingMonth: billingMonth
           ? normalizeBillingMonth(billingMonth)
           : undefined,
-        machineHostingLocation:
-          typeof machineHostingLocation === "string" &&
-          machineHostingLocation.trim()
-            ? machineHostingLocation.trim()
-            : undefined,
+        machineHostingLocation: normalizedMachineHostingLocation,
         createdBy: userId,
         lineItems: hasLineItems ? { create: validatedLineItems } : undefined,
       },

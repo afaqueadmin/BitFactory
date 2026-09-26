@@ -17,7 +17,14 @@ import { logPoolCredentialChange } from "@/lib/audit/logPoolCredentialChange";
 import { hash } from "bcrypt";
 import { sendWelcomeEmail } from "@/lib/email";
 import normalizeEmailUsername from "@/lib/helpers/normailizeEmailUsername";
+import { generateTempPassword } from "@/lib/helpers/generateTempPassword";
 import { getOrCreatePaybackConfig } from "@/lib/paybackConfigHelpers";
+import {
+  SUBACCOUNT_TX_OPTIONS,
+  findLuxorSubaccountConflicts,
+  normalizeSubaccountNames,
+  setLuxorSubaccounts,
+} from "@/lib/luxorSubaccounts";
 
 interface ApiResponse<T = Record<string, unknown>> {
   success: boolean;
@@ -97,7 +104,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
             id: true,
             name: true,
             email: true,
-            luxorSubaccountName: true,
+            poolAuths: {
+              where: { pool: { name: "Luxor" } },
+              orderBy: { createdAt: "asc" },
+              select: { authKey: true },
+            },
           },
         },
         createdBy: {
@@ -110,8 +121,19 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       orderBy: { createdAt: "desc" },
     });
 
+    const data = franchises.map(({ franchisee, ...franchise }) => {
+      const { poolAuths, ...franchiseeFields } = franchisee;
+      return {
+        ...franchise,
+        franchisee: {
+          ...franchiseeFields,
+          luxorSubaccounts: poolAuths.map((pa) => pa.authKey),
+        },
+      };
+    });
+
     return NextResponse.json(
-      { success: true, data: franchises } as unknown as ApiResponse,
+      { success: true, data } as unknown as ApiResponse,
       { status: 200 },
     );
   } catch (error) {
@@ -176,9 +198,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       city,
       state,
       postalCode,
-      luxorSubaccountName,
+      luxorSubaccountNames: rawLuxorSubaccountNames,
       braiinsAuthKey,
     } = body;
+    const luxorSubaccountNames =
+      normalizeSubaccountNames(rawLuxorSubaccountNames) ?? [];
 
     const requiredFields: Record<string, unknown> = {
       name,
@@ -228,10 +252,50 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
+    // Checked before the welcome email goes out (below), since the account
+    // must not be created at all if its subaccounts can't be assigned.
+    const conflicts = await findLuxorSubaccountConflicts(
+      luxorSubaccountNames,
+      null,
+    );
+    if (conflicts.length > 0) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Luxor subaccount already assigned to another user: ${conflicts.join(", ")}`,
+        } as ApiResponse,
+        { status: 409 },
+      );
+    }
+
     const franchiseCode = await generateFranchiseCode(businessName);
 
-    const tempPassword = Math.random().toString(36).slice(-8);
+    // Per H-5, tempPassword is never returned in the response - only sent by
+    // email - so a requested send has to succeed before the account exists,
+    // matching /api/user/create.
+    const tempPassword = generateTempPassword();
     const hashedPassword = await hash(tempPassword, 12);
+
+    let emailSent = false;
+    if (sendEmail) {
+      const emailResult = await sendWelcomeEmail(email, tempPassword);
+      if (!emailResult.success) {
+        console.error(
+          "[Franchisees API] Failed to send welcome email:",
+          emailResult.error,
+        );
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "Failed to send the welcome email, so the franchisee was not created. Please check the email address and try again.",
+          } as ApiResponse,
+          { status: 502 },
+        );
+      }
+      emailSent = true;
+    }
+
     const { defaultInvoicedAmount } = await getOrCreatePaybackConfig("CLIENT");
 
     const { franchisee, franchise } = await prisma.$transaction(async (tx) => {
@@ -243,9 +307,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           role: "FRANCHISEE",
           invoicedAmount: defaultInvoicedAmount,
           segment: "FRANCHISEE",
-          luxorSubaccountName: luxorSubaccountName
-            ? luxorSubaccountName.trim()
-            : null,
         },
       });
 
@@ -278,40 +339,24 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return { franchisee, franchise };
     });
 
-    // Dual-write: keep the Luxor PoolAuth row in sync with
-    // User.luxorSubaccountName (legacy, still read by ~20 other files) —
-    // same pattern as /api/user/create for CLIENT.
-    if (luxorSubaccountName && luxorSubaccountName.trim()) {
+    // Assign the selected Luxor subaccounts (same path as /api/user/create).
+    if (luxorSubaccountNames.length > 0) {
       try {
-        const luxorPool = await prisma.pool.findUnique({
-          where: { name: "Luxor" },
-          select: { id: true },
-        });
-        if (luxorPool) {
-          await prisma.poolAuth.upsert({
-            where: {
-              poolId_userId: { poolId: luxorPool.id, userId: franchisee.id },
-            },
-            create: {
-              poolId: luxorPool.id,
+        await prisma.$transaction(
+          (tx) =>
+            setLuxorSubaccounts(tx, {
               userId: franchisee.id,
-              authKey: luxorSubaccountName.trim(),
-            },
-            update: { authKey: luxorSubaccountName.trim() },
-          });
-          console.log(
-            `[Franchisees API] Synced Luxor PoolAuth for franchisee ${franchisee.id}`,
-          );
-          await logPoolCredentialChange(prisma, {
-            action: AuditAction.POOL_CREDENTIAL_ADDED,
-            userId: franchisee.id,
-            actorId: authUser.userId,
-            poolName: "Luxor",
-          });
-        }
+              names: luxorSubaccountNames,
+              actorId: authUser.userId,
+            }),
+          SUBACCOUNT_TX_OPTIONS,
+        );
+        console.log(
+          `[Franchisees API] Assigned Luxor subaccounts [${luxorSubaccountNames.join(", ")}] to franchisee ${franchisee.id}`,
+        );
       } catch (poolAuthError) {
         console.error(
-          "[Franchisees API] Failed to sync Luxor PoolAuth:",
+          "[Franchisees API] Failed to assign Luxor subaccounts:",
           poolAuthError,
         );
         // Don't fail franchisee creation if this fails
@@ -326,16 +371,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           select: { id: true },
         });
         if (braiinsPool) {
-          await prisma.poolAuth.upsert({
-            where: {
-              poolId_userId: { poolId: braiinsPool.id, userId: franchisee.id },
-            },
-            create: {
+          // Brand-new franchisee, so there is no existing PoolAuth row to collide with.
+          await prisma.poolAuth.create({
+            data: {
               poolId: braiinsPool.id,
               userId: franchisee.id,
               authKey: braiinsAuthKey.trim(),
             },
-            update: { authKey: braiinsAuthKey.trim() },
           });
           console.log(
             `[Franchisees API] Assigned Braiins credential to franchisee ${franchisee.id}`,
@@ -365,19 +407,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       },
     });
 
-    let emailSent = false;
-    if (sendEmail) {
-      const emailResult = await sendWelcomeEmail(email, tempPassword);
-      if (!emailResult.success) {
-        console.error(
-          "[Franchisees API] Failed to send welcome email:",
-          emailResult.error,
-        );
-      } else {
-        emailSent = true;
-      }
-    }
-
     return NextResponse.json(
       {
         success: true,
@@ -389,7 +418,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             email: franchisee.email,
             role: franchisee.role,
           },
-          tempPassword,
           emailSent,
         },
         message: "Franchisee created successfully",

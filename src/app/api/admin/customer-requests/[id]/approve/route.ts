@@ -13,7 +13,14 @@ import { verifyJwtToken } from "@/lib/jwt";
 import { AuditAction } from "@prisma/client";
 import { sendWelcomeEmail } from "@/lib/email";
 import normalizeEmailUsername from "@/lib/helpers/normailizeEmailUsername";
+import { generateTempPassword } from "@/lib/helpers/generateTempPassword";
 import { getOrCreatePaybackConfig } from "@/lib/paybackConfigHelpers";
+import {
+  SUBACCOUNT_TX_OPTIONS,
+  findLuxorSubaccountConflicts,
+  normalizeSubaccountNames,
+  setLuxorSubaccounts,
+} from "@/lib/luxorSubaccounts";
 
 export async function POST(
   request: NextRequest,
@@ -121,13 +128,12 @@ export async function POST(
           : null
         : customerRequest.initialDeposit;
 
-    const luxorSubaccountName =
-      typeof body.luxorSubaccountName === "string" &&
-      body.luxorSubaccountName.trim()
-        ? body.luxorSubaccountName.trim()
-        : customerRequest.luxorSubaccountName;
+    // Franchisees never submit subaccounts - the admin assigns one or more
+    // here, and they become the new customer's Luxor PoolAuth rows.
+    const luxorSubaccountNames =
+      normalizeSubaccountNames(body.luxorSubaccountNames) ?? [];
 
-    if (!luxorSubaccountName) {
+    if (luxorSubaccountNames.length === 0) {
       return NextResponse.json(
         { success: false, error: "A Luxor subaccount must be selected" },
         { status: 400 },
@@ -150,22 +156,44 @@ export async function POST(
       );
     }
 
-    const existingSubaccount = await prisma.user.findFirst({
-      where: { luxorSubaccountName },
-      select: { id: true },
-    });
-    if (existingSubaccount) {
+    const conflicts = await findLuxorSubaccountConflicts(
+      luxorSubaccountNames,
+      null,
+    );
+    if (conflicts.length > 0) {
       return NextResponse.json(
         {
           success: false,
-          error: "This Luxor subaccount is already assigned",
+          error: `Luxor subaccount already assigned to another user: ${conflicts.join(", ")}`,
         },
-        { status: 400 },
+        { status: 409 },
       );
     }
 
-    const tempPassword = Math.random().toString(36).slice(-8);
+    // Per H-5, tempPassword is never returned in the response - only sent by
+    // email - so, unlike /api/user/create and /api/franchisees, there's no
+    // opt-out here: this route has no "skip email" toggle, so the send must
+    // succeed before the account exists or the admin has no way to give the
+    // new customer their password.
+    const tempPassword = generateTempPassword();
     const hashedPassword = await hash(tempPassword, 12);
+
+    const emailResult = await sendWelcomeEmail(email, tempPassword);
+    if (!emailResult.success) {
+      console.error(
+        "[Admin Customer Requests API] Failed to send welcome email:",
+        emailResult.error,
+      );
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Failed to send the welcome email, so the customer was not created. Please check the email address and try again.",
+        },
+        { status: 502 },
+      );
+    }
+
     const { defaultInvoicedAmount } = await getOrCreatePaybackConfig("CLIENT");
 
     const newUser = await prisma.$transaction(async (tx) => {
@@ -178,9 +206,14 @@ export async function POST(
           role: "CLIENT",
           segment: "RETAIL",
           franchiseeId: customerRequest.franchiseId,
-          luxorSubaccountName,
           invoicedAmount: defaultInvoicedAmount,
         },
+      });
+
+      await setLuxorSubaccounts(tx, {
+        userId: user.id,
+        names: luxorSubaccountNames,
+        actorId: decoded.userId,
       });
 
       if (initialDeposit && Number(initialDeposit) > 0) {
@@ -201,7 +234,6 @@ export async function POST(
           email,
           phoneNumber,
           initialDeposit,
-          luxorSubaccountName,
           status: "APPROVED",
           reviewedById: decoded.userId,
           reviewedAt: new Date(),
@@ -215,32 +247,19 @@ export async function POST(
           entityType: "FranchiseCustomerRequest",
           entityId: id,
           userId: decoded.userId,
-          description: `Customer request for ${name} (${email}) approved`,
+          description: `Customer request for ${name} (${email}) approved with Luxor subaccount(s): ${luxorSubaccountNames.join(", ")}`,
         },
       });
 
       return user;
-    });
-
-    let emailSent = false;
-    if (process.env.NODE_ENV === "production") {
-      const emailResult = await sendWelcomeEmail(newUser.email, tempPassword);
-      emailSent = emailResult.success;
-      if (!emailResult.success) {
-        console.error(
-          "[Admin Customer Requests API] Failed to send welcome email:",
-          emailResult.error,
-        );
-      }
-    }
+    }, SUBACCOUNT_TX_OPTIONS);
 
     return NextResponse.json({
       success: true,
       message: "Request approved and customer created",
       data: {
         user: { id: newUser.id, name: newUser.name, email: newUser.email },
-        tempPassword,
-        emailSent,
+        emailSent: true,
       },
     });
   } catch (error) {

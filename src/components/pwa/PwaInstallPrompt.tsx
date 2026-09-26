@@ -125,7 +125,7 @@ export default function PwaInstallPrompt() {
             src="/BitfactoryLogo.webp"
             alt="BitFactory"
             width={180}
-            height={40}
+            height={90}
             style={{ height: "auto" }}
             priority
           />
@@ -226,8 +226,8 @@ export default function PwaInstallPrompt() {
                     lineHeight: 1.6,
                   }}
                 >
-                  Your browser didn&apos;t offer an automatic install this
-                  time. Open the browser menu (⋮) and choose{" "}
+                  Your browser didn&apos;t offer an automatic install this time.
+                  Open the browser menu (⋮) and choose{" "}
                   <strong>Add to Home screen</strong> or{" "}
                   <strong>Install app</strong>.
                 </Typography>

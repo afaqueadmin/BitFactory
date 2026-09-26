@@ -2,8 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyJwtToken } from "@/lib/jwt";
 import { createLuxorClient } from "@/lib/luxor";
 import { createBraiinsClient } from "@/lib/braiins";
-import { groupMinersByPool, getLuxorGroups, getBraiinsGroups } from "@/lib/poolAggregation";
+import {
+  groupMinersByPool,
+  getLuxorGroups,
+  getBraiinsGroups,
+} from "@/lib/poolAggregation";
 import { prisma } from "@/lib/prisma";
+import {
+  selectRequestedSubaccounts,
+  joinSubaccountNames,
+} from "@/lib/luxorSubaccounts";
 
 interface ApiResponse<T = unknown> {
   success: boolean;
@@ -65,10 +73,14 @@ export async function GET(
       include: { pool: { select: { id: true, name: true } } },
     });
 
-    // Create a map of poolId -> authKey for quick lookup
-    const authKeyByPoolId = new Map<string, string>();
+    // Map of poolId -> authKeys. A pool can now have more than one PoolAuth
+    // row per user (multiple Luxor subaccounts), so this collects all of
+    // them rather than keeping only the last one seen.
+    const authKeysByPoolId = new Map<string, string[]>();
     poolAuths.forEach((auth) => {
-      authKeyByPoolId.set(auth.poolId, auth.authKey);
+      const existing = authKeysByPoolId.get(auth.poolId) || [];
+      existing.push(auth.authKey);
+      authKeysByPoolId.set(auth.poolId, existing);
     });
 
     // Group miners by pool
@@ -107,19 +119,22 @@ export async function GET(
         const poolId = minerWithPool?.poolId;
 
         if (!poolId) {
-          console.warn(
-            `[24h Revenue API] Luxor group has no poolId, skipping`,
-          );
+          console.warn(`[24h Revenue API] Luxor group has no poolId, skipping`);
           continue;
         }
 
-        const authKey = authKeyByPoolId.get(poolId);
-        if (!authKey) {
+        const poolAuthKeys = authKeysByPoolId.get(poolId);
+        if (!poolAuthKeys || poolAuthKeys.length === 0) {
           console.warn(
             `[24h Revenue API] No auth key found for Luxor pool ${poolId}`,
           );
           continue;
         }
+        const selectedAuthKeys = selectRequestedSubaccounts(
+          poolAuthKeys.map((k) => ({ id: null, authKey: k })),
+          searchParams.get("subaccounts"),
+        ).map((s) => s.authKey);
+        const authKey = joinSubaccountNames(selectedAuthKeys);
 
         const luxorClient = createLuxorClient(authKey);
         const response = await luxorClient.getTransactions(currency, {
@@ -156,7 +171,7 @@ export async function GET(
           continue;
         }
 
-        const authKey = authKeyByPoolId.get(poolId);
+        const authKey = authKeysByPoolId.get(poolId)?.[0];
         if (!authKey) {
           console.warn(
             `[24h Revenue API] No auth key found for Braiins pool ${poolId}`,
@@ -177,13 +192,17 @@ export async function GET(
           }
         }
       } catch (error) {
-        console.error(`[Wallet API] Error fetching Braiins daily rewards:`, error);
+        console.error(
+          `[Wallet API] Error fetching Braiins daily rewards:`,
+          error,
+        );
       }
     }
 
     const totalRevenueCrypto = luxorRevenueCrypto + braiinsRevenueCrypto;
     const totalRevenueUsd = luxorRevenueUsd;
-    const totalTransactionCount = luxorTransactionCount + braiinsTransactionCount;
+    const totalTransactionCount =
+      luxorTransactionCount + braiinsTransactionCount;
 
     return NextResponse.json(
       {

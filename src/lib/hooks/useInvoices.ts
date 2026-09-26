@@ -180,7 +180,7 @@ export function useCreateInvoice() {
       billingMonth?: string;
       invoiceGeneratedDate?: string;
       lineItems?: InvoiceLineItemInput[];
-      machineHostingLocation?: string;
+      machineHostingLocation?: string[];
     }) => {
       const res = await fetch("/api/accounting/invoices", {
         method: "POST",
@@ -212,7 +212,7 @@ export interface Customer {
   id: string;
   displayName: string; // "John Doe (Mining-Account-1)"
   name: string | null;
-  luxorSubaccountName: string | null;
+  luxorSubaccounts: string[];
 }
 
 export function useCustomers() {

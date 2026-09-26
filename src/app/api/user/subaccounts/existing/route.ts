@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
+import { listAssignedLuxorSubaccountNames } from "@/lib/luxorSubaccounts";
 
 /**
  * GET /api/user/subaccounts/existing
@@ -8,7 +8,7 @@ import { verifyJwtToken } from "@/lib/jwt";
  * Fetch all luxor subaccount names that are already assigned to users in the database.
  * Used when creating new users to filter out already-assigned subaccounts from the dropdown.
  *
- * Returns list of subaccount names that should be excluded from selection.
+ * Returns `data: string[]` - subaccount names that should be excluded from selection.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -35,28 +35,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Fetch all non-null luxorSubaccountName values from database, plus all
-    // Luxor PoolAuth.authKey values. Unioned because some users (notably
-    // Franchisees) are only ever written to luxorSubaccountName, not PoolAuth.
-    const [usersWithSubaccounts, luxorPoolAuths] = await Promise.all([
-      prisma.user.findMany({
-        where: { luxorSubaccountName: { not: null } },
-        select: { luxorSubaccountName: true },
-      }),
-      prisma.poolAuth.findMany({
-        where: { pool: { name: "Luxor" } },
-        select: { authKey: true },
-      }),
-    ]);
-
-    const existingSubaccounts = Array.from(
-      new Set([
-        ...(usersWithSubaccounts
-          .map((user) => user.luxorSubaccountName)
-          .filter(Boolean) as string[]),
-        ...luxorPoolAuths.map((pa) => pa.authKey),
-      ]),
-    );
+    // Every Luxor subaccount assigned to any user (one PoolAuth row each).
+    const existingSubaccounts = await listAssignedLuxorSubaccountNames();
 
     console.log(
       `[API] Found ${existingSubaccounts.length} assigned subaccounts in database:`,
@@ -65,9 +45,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      data: existingSubaccounts.map((name) => ({
-        luxorSubaccountName: name,
-      })),
+      data: existingSubaccounts,
       count: existingSubaccounts.length,
     });
   } catch (error) {

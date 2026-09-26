@@ -1,29 +1,26 @@
 /**
  * POST /api/wallet/change-requests/[id]/approve
  *
- * Approves a PENDING wallet change request and pushes the new address to
- * Luxor: fetches the subaccount's live payment settings, replaces the
- * external_address on the primary (highest revenue_allocation) entry with
- * the requested address - leaving address_id/address_name/revenue_allocation
- * and any other split-payout addresses untouched - then PUTs the full
- * addresses array back via updatePaymentSettings (Luxor's API is a full
- * array replace, not a single-field patch).
+ * Final step of admin review - only available once the request is CONFIRMED
+ * (see .../confirm). Marks the request APPROVED and starts the client's
+ * 24-hour payout freeze window (anchored to reviewedAt). Requires the
+ * admin's own step-up re-authentication (password or 2FA), same as confirm.
  *
- * The row is claimed via a status-guarded updateMany *before* calling Luxor,
- * so two concurrent approve calls on the same request can't both reach
- * Luxor: only the caller whose updateMany actually matched a PENDING row
- * proceeds, the other gets "already reviewed" immediately. If the Luxor
- * call then fails, the claim is reverted back to PENDING so the request
- * isn't left stuck APPROVED-but-not-applied. ADMIN/SUPER_ADMIN only.
+ * Deliberately does NOT push anything to Luxor - the admin updates the
+ * payout address on Luxor manually, outside this app, the same way they
+ * verify with the client at the confirm step. This app only tracks the
+ * request's review state and the resulting freeze window.
+ *
+ * The row is claimed via a status-guarded updateMany, so two concurrent
+ * approve calls on the same request can't both succeed: only the caller
+ * whose updateMany actually matched a CONFIRMED row proceeds.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { AuditAction } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
-import { createLuxorClient, LuxorError } from "@/lib/luxor";
-import { walletCache } from "@/lib/cache";
-import { resolveLuxorIdentifier, selectPrimaryAddress } from "@/lib/wallet";
+import { verifyStepUp } from "@/lib/auth/stepUp";
 import { sendWalletChangeRequestApprovedEmail } from "@/lib/email";
 
 async function requireAdmin(request: NextRequest) {
@@ -54,6 +51,11 @@ export async function POST(
     }
 
     const { id } = await params;
+    const body = await request.json().catch(() => ({}));
+    const { currentPassword, twoFactorToken } = body as {
+      currentPassword?: string;
+      twoFactorToken?: string;
+    };
 
     const walletChangeRequest = await prisma.walletChangeRequest.findUnique({
       where: { id },
@@ -65,10 +67,34 @@ export async function POST(
         { status: 404 },
       );
     }
+    if (walletChangeRequest.status !== "CONFIRMED") {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            walletChangeRequest.status === "PENDING"
+              ? "Confirm this request with the client before approving it"
+              : `Request has already been ${walletChangeRequest.status.toLowerCase()}`,
+        },
+        { status: 400 },
+      );
+    }
+
+    const stepUp = await verifyStepUp(
+      auth.decoded.userId,
+      { currentPassword, twoFactorToken },
+      "approve a wallet change request",
+    );
+    if (!stepUp.ok) {
+      return NextResponse.json(
+        { success: false, error: stepUp.error, code: stepUp.code },
+        { status: stepUp.status },
+      );
+    }
 
     const now = new Date();
     const claim = await prisma.walletChangeRequest.updateMany({
-      where: { id, status: "PENDING" },
+      where: { id, status: "CONFIRMED" },
       data: {
         status: "APPROVED",
         reviewedById: auth.decoded.userId,
@@ -85,106 +111,20 @@ export async function POST(
       );
     }
 
-    const revertClaim = () =>
-      prisma.walletChangeRequest.update({
-        where: { id },
-        data: { status: "PENDING", reviewedById: null, reviewedAt: null },
-      });
-
-    const luxorIdentifier = await resolveLuxorIdentifier(
-      walletChangeRequest.userId,
-    );
-    if (!luxorIdentifier) {
-      await revertClaim();
-      return NextResponse.json(
-        {
-          success: false,
-          error: "This user has no Luxor subaccount configured",
-        },
-        { status: 422 },
-      );
-    }
-
-    const luxorClient = createLuxorClient(luxorIdentifier);
-
-    try {
-      const currentSettings = await luxorClient.getSubaccountPaymentSettings(
-        walletChangeRequest.currency,
-        luxorIdentifier,
-      );
-
-      const primary = selectPrimaryAddress(currentSettings.addresses);
-      if (!primary) {
-        await revertClaim();
-        return NextResponse.json(
-          {
-            success: false,
-            error:
-              "This subaccount has no existing payout address on Luxor to update",
+    await prisma.auditLog.create({
+      data: {
+        action: AuditAction.WALLET_CHANGE_APPROVED,
+        entityType: "WalletChangeRequest",
+        entityId: id,
+        userId: auth.decoded.userId,
+        description: `Wallet change approved: ${walletChangeRequest.currentAddress ?? "(not configured)"} -> ${walletChangeRequest.requestedAddress}. Admin must update the address on Luxor manually.`,
+        changes: JSON.stringify({
+          requestedAddress: {
+            from: walletChangeRequest.currentAddress,
+            to: walletChangeRequest.requestedAddress,
           },
-          { status: 422 },
-        );
-      }
-
-      const rebuiltAddresses = currentSettings.addresses.map((address) =>
-        address.address_id === primary.address_id
-          ? {
-              ...address,
-              external_address: walletChangeRequest.requestedAddress,
-            }
-          : address,
-      );
-
-      await luxorClient.updatePaymentSettings(
-        walletChangeRequest.currency,
-        luxorIdentifier,
-        { addresses: rebuiltAddresses },
-      );
-    } catch (error) {
-      console.error(
-        "[Wallet Change Requests API] Luxor update failed:",
-        error instanceof LuxorError ? error.message : error,
-      );
-      await revertClaim();
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            error instanceof LuxorError
-              ? `Luxor rejected the update: ${error.message}`
-              : "Failed to push the new address to Luxor",
-        },
-        { status: 502 },
-      );
-    }
-
-    walletCache.invalidate(
-      `wallet_${walletChangeRequest.userId}_${walletChangeRequest.currency}`,
-    );
-
-    const updated = await prisma.$transaction(async (tx) => {
-      const result = await tx.walletChangeRequest.update({
-        where: { id },
-        data: { appliedAt: now },
-      });
-
-      await tx.auditLog.create({
-        data: {
-          action: AuditAction.WALLET_CHANGE_APPROVED,
-          entityType: "WalletChangeRequest",
-          entityId: id,
-          userId: auth.decoded.userId,
-          description: `Wallet change approved and applied on Luxor: ${walletChangeRequest.currentAddress ?? "(not configured)"} -> ${walletChangeRequest.requestedAddress}`,
-          changes: JSON.stringify({
-            requestedAddress: {
-              from: walletChangeRequest.currentAddress,
-              to: walletChangeRequest.requestedAddress,
-            },
-          }),
-        },
-      });
-
-      return result;
+        }),
+      },
     });
 
     try {
@@ -192,6 +132,7 @@ export async function POST(
         walletChangeRequest.user.email,
         walletChangeRequest.currentAddress,
         walletChangeRequest.requestedAddress,
+        now,
       );
     } catch (emailError) {
       console.error(
@@ -200,10 +141,14 @@ export async function POST(
       );
     }
 
+    const updated = await prisma.walletChangeRequest.findUnique({
+      where: { id },
+    });
+
     return NextResponse.json({
       success: true,
       data: updated,
-      message: "Wallet change approved and applied on Luxor",
+      message: "Wallet change approved",
     });
   } catch (error) {
     console.error("[Wallet Change Requests API] approve error:", error);

@@ -102,8 +102,8 @@ export const sendWelcomeEmail = async (email: string, tempPassword: string) => {
     html: `
       <h1>Welcome to BitFactory!</h1>
       <p>Your account has been created successfully. Here are your login credentials:</p>
-      <p><strong>URL:</strong><a href="my.bitfactory.ae" target="_blank"> my.bitfactory.ae</a></p>
-      <p><strong>Username:</strong> ${email}</p>
+      <p><strong>URL:</strong><a href="https://my.bitfactory.ae" target="_blank"> my.bitfactory.ae</a></p>
+      <p><strong>Username:</strong> ${escapeHtml(email)}</p>
       <p><strong>Temporary Password:</strong> ${tempPassword}</p>
       <p>For security reasons, please change your password immediately after logging in.</p>
       <p>If you have any questions, please don't hesitate to contact our support team.</p>
@@ -207,6 +207,133 @@ export const sendPasswordChangedNotificationEmail = async (
   }
 };
 
+export interface SecurityEventDetails {
+  ipAddress: string;
+  userAgent: string;
+  occurredAt: Date;
+}
+
+/**
+ * Shared shell for the account-security notifications below (2FA, passkey and
+ * email changes). Like sendPasswordChangedNotificationEmail these are pure
+ * notifications - never put a credential or secret in them. `message` is an
+ * HTML fragment, so callers must escapeHtml() any dynamic value they put in it.
+ */
+const sendSecurityNotificationEmail = async (params: {
+  to: string;
+  subject: string;
+  heading: string;
+  message: string;
+  details: SecurityEventDetails;
+  logLabel: string;
+}) => {
+  const { to, subject, heading, message, details, logLabel } = params;
+  const mailOptions = {
+    from: `BitFactory Admin <${process.env.SMTP_FROM}>`,
+    to,
+    subject,
+    html: `
+      <h1>${heading}</h1>
+      <p>${message}</p>
+      <table style="border-collapse: collapse;">
+        <tr>
+          <td style="padding: 4px 12px 4px 0;"><strong>Date &amp; Time:</strong></td>
+          <td style="padding: 4px 0;">${details.occurredAt.toLocaleString("en-US", { dateStyle: "long", timeStyle: "short" })}</td>
+        </tr>
+        <tr>
+          <td style="padding: 4px 12px 4px 0;"><strong>IP Address:</strong></td>
+          <td style="padding: 4px 0;">${escapeHtml(details.ipAddress)}</td>
+        </tr>
+        <tr>
+          <td style="padding: 4px 12px 4px 0;"><strong>Device/Browser:</strong></td>
+          <td style="padding: 4px 0;">${escapeHtml(details.userAgent)}</td>
+        </tr>
+      </table>
+      <p>If you made this change, no further action is required.</p>
+      <p><strong>If you did not make this change, please contact our support team immediately</strong> - your account may be compromised.</p>
+      <br>
+      <p>Best regards,</p>
+      <p>The BitFactory Team</p>
+    `,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    return { success: true };
+  } catch (error) {
+    console.error(`Error sending ${logLabel} notification email:`, error);
+    return { success: false, error };
+  }
+};
+
+export const sendTwoFactorEnabledEmail = (
+  email: string,
+  details: SecurityEventDetails,
+) =>
+  sendSecurityNotificationEmail({
+    to: email,
+    subject: "Two-Factor Authentication Enabled - BitFactory",
+    heading: "Two-Factor Authentication Enabled",
+    message: `Two-factor authentication was just turned on for your BitFactory account (${escapeHtml(email)}).`,
+    details,
+    logLabel: "2FA enabled",
+  });
+
+export const sendTwoFactorDisabledEmail = (
+  email: string,
+  details: SecurityEventDetails,
+) =>
+  sendSecurityNotificationEmail({
+    to: email,
+    subject: "Two-Factor Authentication Disabled - BitFactory",
+    heading: "Two-Factor Authentication Disabled",
+    message: `Two-factor authentication was just turned off for your BitFactory account (${escapeHtml(email)}). Your account is now protected by your password alone.`,
+    details,
+    logLabel: "2FA disabled",
+  });
+
+export const sendPasskeyRegisteredEmail = (
+  email: string,
+  details: SecurityEventDetails,
+) =>
+  sendSecurityNotificationEmail({
+    to: email,
+    subject: "New Passkey Added - BitFactory",
+    heading: "New Passkey Added",
+    message: `A new passkey was just added to your BitFactory account (${escapeHtml(email)}). A passkey can be used to sign in to your account.`,
+    details,
+    logLabel: "passkey registered",
+  });
+
+export const sendPasskeyRemovedEmail = (
+  email: string,
+  details: SecurityEventDetails,
+) =>
+  sendSecurityNotificationEmail({
+    to: email,
+    subject: "Passkey Removed - BitFactory",
+    heading: "Passkey Removed",
+    message: `A passkey was just removed from your BitFactory account (${escapeHtml(email)}).`,
+    details,
+    logLabel: "passkey removed",
+  });
+
+// Goes to the OLD address on purpose: the person who owns the account before
+// the change is the one who needs to spot an unauthorised one.
+export const sendEmailChangeNotificationEmail = (
+  oldEmail: string,
+  newEmail: string,
+  details: SecurityEventDetails,
+) =>
+  sendSecurityNotificationEmail({
+    to: oldEmail,
+    subject: "Your Account Email Was Changed - BitFactory",
+    heading: "Account Email Changed",
+    message: `The email address on your BitFactory account was just changed from ${escapeHtml(oldEmail)} to ${escapeHtml(newEmail)}.`,
+    details,
+    logLabel: "email change",
+  });
+
 export const sendWalletChangeRequestSubmittedEmail = async (
   email: string,
   requestedAddress: string,
@@ -241,18 +368,20 @@ export const sendWalletChangeRequestApprovedEmail = async (
   email: string,
   oldAddress: string | null,
   newAddress: string,
+  approvedAt: Date = new Date(),
 ) => {
+  const freezeEnds = new Date(approvedAt.getTime() + 24 * 60 * 60 * 1000);
   const mailOptions = {
     from:
       `BitFactory Admin <${process.env.SMTP_FROM}>` || "noreply@bitfactory.com",
     to: email,
-    subject: "Wallet Address Updated - BitFactory",
+    subject: "Wallet Change Approved - BitFactory",
     html: `
-      <h1>Wallet Address Updated</h1>
-      <p>Your payout wallet address has been changed:</p>
+      <h1>Wallet Change Approved</h1>
+      <p>Your wallet change request has been approved by an administrator:</p>
       <p><strong>Previous:</strong> ${oldAddress || "Not configured"}</p>
       <p><strong>New:</strong> ${newAddress}</p>
-      <p>This change is now live and future payouts will be sent to the new address.</p>
+      <p>For your security, payouts are frozen for 24 hours from approval, until ${freezeEnds.toUTCString()}. Our team updates the payout address on your behalf during this window.</p>
       <p><strong>If you did not request this, please contact our support team immediately.</strong></p>
       <br>
       <p>Best regards,</p>
@@ -988,7 +1117,7 @@ export const generateInvoicePDF = async (
   paidDate?: Date | null,
   lineItems?: InvoicePdfLineItem[] | null,
   invoiceType?: string | null,
-  machineHostingLocationOverride?: string | null,
+  machineHostingLocationOverride?: string[] | null,
 ): Promise<Buffer> => {
   try {
     // Load PDF template
@@ -1112,8 +1241,9 @@ export const generateInvoicePDF = async (
           }
         : {}),
       // Per-invoice override wins over the global PaymentDetails default
-      ...(machineHostingLocationOverride
-        ? { machineHostingLocation: machineHostingLocationOverride }
+      ...(machineHostingLocationOverride &&
+      machineHostingLocationOverride.length > 0
+        ? { machineHostingLocation: machineHostingLocationOverride.join(", ") }
         : {}),
     };
 

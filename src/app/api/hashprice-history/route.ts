@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyJwtToken } from "@/lib/jwt";
 import { prisma } from "@/lib/prisma";
+import {
+  resolveLuxorSubaccounts,
+  selectRequestedSubaccounts,
+} from "@/lib/luxorSubaccounts";
+import { weightedAverage } from "@/lib/hashrateHistory";
 
 interface HashpricePoint {
   date: string;
@@ -106,16 +111,13 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const poolAuth = await prisma.poolAuth.findUnique({
-      where: {
-        poolId_userId: {
-          poolId: luxorPool.id,
-          userId,
-        },
-      },
-    });
+    const allLuxorSubaccounts = await resolveLuxorSubaccounts(userId);
+    const selectedLuxorSubaccounts = selectRequestedSubaccounts(
+      allLuxorSubaccounts,
+      request.nextUrl.searchParams.get("subaccounts"),
+    );
 
-    if (!poolAuth) {
+    if (selectedLuxorSubaccounts.length === 0) {
       console.log(
         `[Hashprice History API] No PoolAuth found for user ${userId} on Luxor pool`,
       );
@@ -129,19 +131,18 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Step 4: Resolve the PoolSubaccount row backing this user's subaccount
-    const poolSubaccount = await prisma.poolSubaccount.findUnique({
+    // Step 4: Resolve every PoolSubaccount row backing the selected subaccounts
+    const selectedAuthKeys = selectedLuxorSubaccounts.map((s) => s.authKey);
+    const poolSubaccounts = await prisma.poolSubaccount.findMany({
       where: {
-        poolId_subaccountName: {
-          poolId: luxorPool.id,
-          subaccountName: poolAuth.authKey,
-        },
+        poolId: luxorPool.id,
+        subaccountName: { in: selectedAuthKeys },
       },
     });
 
-    if (!poolSubaccount) {
+    if (poolSubaccounts.length === 0) {
       console.log(
-        `[Hashprice History API] No PoolSubaccount row for '${poolAuth.authKey}' — nothing backfilled yet`,
+        `[Hashprice History API] No PoolSubaccount rows for [${selectedAuthKeys.join(", ")}] — nothing backfilled yet`,
       );
       return NextResponse.json(
         {
@@ -162,24 +163,52 @@ export async function GET(request: NextRequest) {
 
     const snapshots = await prisma.poolSubaccountDailySnapshot.findMany({
       where: {
-        poolSubaccountId: poolSubaccount.id,
+        poolSubaccountId: { in: poolSubaccounts.map((s) => s.id) },
         date: { gte: startDate, lte: endDate },
       },
       orderBy: { date: "asc" },
     });
 
-    const hashpriceData: HashpricePoint[] = snapshots
-      .filter((snapshot) => snapshot.hashprice != null)
-      .map((snapshot) => ({
-        date: snapshot.date.toISOString().split("T")[0],
-        timestamp: snapshot.date.getTime(),
-        hashprice: Number(snapshot.hashprice),
-        revenue: Number(snapshot.totalRevenue),
-        hashrate: snapshot.hashrate != null ? Number(snapshot.hashrate) : 0,
-      }));
+    // Combine same-day rows from more than one subaccount: hashrate and
+    // revenue are additive, hashprice is a hashrate-weighted average (same
+    // rationale as the hashrate chart's efficiency/uptime combining).
+    const byDate = new Map<number, typeof snapshots>();
+    for (const snap of snapshots) {
+      const t = snap.date.getTime();
+      const existing = byDate.get(t);
+      if (existing) existing.push(snap);
+      else byDate.set(t, [snap]);
+    }
+
+    const hashpriceData: HashpricePoint[] = Array.from(byDate.entries())
+      .sort(([a], [b]) => a - b)
+      .map(([t, rows]) => {
+        const hashrate = rows.reduce(
+          (sum, r) => sum + (r.hashrate != null ? Number(r.hashrate) : 0),
+          0,
+        );
+        const revenue = rows.reduce(
+          (sum, r) => sum + Number(r.totalRevenue),
+          0,
+        );
+        const hashprice = weightedAverage(
+          rows.map((r) => ({
+            value: r.hashprice !== null ? Number(r.hashprice) : null,
+            weight: r.hashrate != null ? Number(r.hashrate) : 0,
+          })),
+        );
+        return {
+          date: new Date(t).toISOString().split("T")[0],
+          timestamp: t,
+          hashprice,
+          revenue,
+          hashrate,
+        };
+      })
+      .filter((point): point is HashpricePoint => point.hashprice !== null);
 
     console.log(
-      `[Hashprice History API] Found ${hashpriceData.length} snapshot day(s) for subaccount '${poolAuth.authKey}'`,
+      `[Hashprice History API] Found ${hashpriceData.length} snapshot day(s) for subaccount(s) [${selectedAuthKeys.join(", ")}]`,
     );
 
     // Calculate statistics

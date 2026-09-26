@@ -1,15 +1,35 @@
 "use client";
 
-import { Box, Typography, useTheme } from "@mui/material";
+/**
+ * Miners page (authenticated) - BitFactory Daylight theme (v1.3)
+ *
+ * Composes:
+ * - Page heading + pool mode Segmented control (Total / Luxor / Braiins)
+ * - Four Daylight KPI StatCards (efficiency, hashrate, uptime, hashprice)
+ * - HashrateHistoryChart (Daylight variant)
+ * - Pool comparison cards (only in Total mode, with more than one pool)
+ * - Miner filter PillTabs + HostedMinersList (Daylight variant)
+ *
+ * Layout mirrors the dashboard page: max content width 1600px (page padding
+ * comes from the (auth) layout), KPI row 4 columns / 2 below 960px.
+ */
+
+import { Box, Typography } from "@mui/material";
 import HostedMinersList from "@/components/HostedMinersList";
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import ShareEfficiencyCard from "@/components/dashboardCards/ShareEfficiencyCard";
-import Uptime24HoursCard from "@/components/dashboardCards/Uptime24HoursCard";
-import HashRate24HoursCard from "@/components/dashboardCards/HashRate24HoursCard";
-import HashpriceCard from "@/components/dashboardCards/HashpriceCard";
+import SsidChartOutlinedIcon from "@mui/icons-material/SsidChartOutlined";
+import BoltOutlinedIcon from "@mui/icons-material/BoltOutlined";
+import AccessTimeOutlinedIcon from "@mui/icons-material/AccessTimeOutlined";
+import ShowChartOutlinedIcon from "@mui/icons-material/ShowChartOutlined";
 import HashrateHistoryChart from "@/components/HashrateHistoryChart";
+import StatCard from "@/components/daylight/StatCard";
+import Segmented, { SegmentedOption } from "@/components/daylight/Segmented";
+import PillTab from "@/components/daylight/PillTab";
 import { formatHashrate } from "@/lib/workerNormalization";
+import { formatValue } from "@/lib/helpers/formatValue";
+import { useSubaccountFilter } from "@/lib/contexts/subaccountFilter-context";
+import { RADIUS_CARD, useDaylight } from "@/lib/daylight";
 
 interface MinersSummary {
   totalHashrate: number;
@@ -39,88 +59,70 @@ interface MinersSummary {
   };
 }
 
+type PoolMode = "total" | "luxor" | "braiins";
+
+const EMPTY_SUMMARY: MinersSummary = {
+  totalHashrate: 0,
+  activeMiners: 0,
+  totalRevenue: 0,
+  hashprice: 0,
+  efficiency_5m: 0,
+  uptime_24h: 0,
+  activePoolNames: [],
+  pools: {
+    luxor: {
+      miners: 0,
+      hashrate: 0,
+      activeWorkers: 0,
+      hashprice: 0,
+      efficiency_5m: 0,
+      uptime_24h: 0,
+    },
+    braiins: {
+      miners: 0,
+      hashrate: 0,
+      activeWorkers: 0,
+      hashprice: 0,
+      efficiency_5m: 0,
+      uptime_24h: 0,
+    },
+  },
+};
+
+const POOL_MODE_OPTIONS: SegmentedOption<PoolMode>[] = [
+  { id: "total", label: "Total" },
+  { id: "luxor", label: "Luxor" },
+  { id: "braiins", label: "Braiins" },
+];
+
 export default function Miners() {
-  const theme = useTheme();
-  const [poolMode, setPoolMode] = useState<"total" | "luxor" | "braiins">(
-    "total",
-  );
+  const { d, fonts } = useDaylight();
+  const { queryParam: subaccountsParam } = useSubaccountFilter();
+  const [poolMode, setPoolMode] = useState<PoolMode>("total");
   const [minerFilter, setMinerFilter] = useState<"all" | "luxor" | "braiins">(
     "all",
   );
 
   // Fetch miners summary using TanStack Query
   const {
-    data: minersSummary = {
-      data: {
-        totalHashrate: 0,
-        activeMiners: 0,
-        totalRevenue: 0,
-        hashprice: 0,
-        efficiency_5m: 0,
-        uptime_24h: 0,
-        activePoolNames: [],
-        pools: {
-          luxor: {
-            miners: 0,
-            hashrate: 0,
-            activeWorkers: 0,
-            hashprice: 0,
-            efficiency_5m: 0,
-            uptime_24h: 0,
-          },
-          braiins: {
-            miners: 0,
-            hashrate: 0,
-            activeWorkers: 0,
-            hashprice: 0,
-            efficiency_5m: 0,
-            uptime_24h: 0,
-          },
-        },
-      } as MinersSummary,
-    },
+    data: minersSummary = { data: EMPTY_SUMMARY },
     isLoading: summaryLoading,
   } = useQuery({
-    queryKey: ["miners-summary"],
+    queryKey: ["miners-summary", subaccountsParam],
     queryFn: async () => {
-      const response = await fetch("/api/miners/summary", {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
+      const response = await fetch(
+        `/api/miners/summary?subaccounts=${subaccountsParam}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
         },
-      });
+      );
 
       if (!response.ok) {
         console.error("Failed to fetch miners summary");
-        return {
-          data: {
-            totalHashrate: 0,
-            activeMiners: 0,
-            totalRevenue: 0,
-            hashprice: 0,
-            efficiency_5m: 0,
-            uptime_24h: 0,
-            activePoolNames: [],
-            pools: {
-              luxor: {
-                miners: 0,
-                hashrate: 0,
-                activeWorkers: 0,
-                hashprice: 0,
-                efficiency_5m: 0,
-                uptime_24h: 0,
-              },
-              braiins: {
-                miners: 0,
-                hashrate: 0,
-                activeWorkers: 0,
-                hashprice: 0,
-                efficiency_5m: 0,
-                uptime_24h: 0,
-              },
-            },
-          },
-        };
+        return { data: EMPTY_SUMMARY };
       }
 
       const result = await response.json();
@@ -130,6 +132,8 @@ export default function Miners() {
   });
 
   const data = minersSummary.data as MinersSummary;
+  const hasMultiplePools =
+    !!data.activePoolNames && data.activePoolNames.length > 1;
 
   // Reset poolMode if not applicable
   useEffect(() => {
@@ -141,516 +145,343 @@ export default function Miners() {
         setPoolMode("total");
       }
     }
-  }, [data.activePoolNames]);
+  }, [data.activePoolNames, poolMode]);
 
-  // Log current pool mode selection
-  useEffect(() => {
-    console.log(`[Miners Page] Pool Mode Changed: ${poolMode}`, {
-      hashrate: data.pools?.[poolMode as keyof typeof data.pools]?.hashrate,
-      efficiency_5m:
-        data.pools?.[poolMode as keyof typeof data.pools]?.efficiency_5m,
-      uptime_24h: data.pools?.[poolMode as keyof typeof data.pools]?.uptime_24h,
-      hashprice: data.pools?.[poolMode as keyof typeof data.pools]?.hashprice,
-    });
-  }, [poolMode, data]);
-
-  // Get values based on selected pool mode
+  // Get values based on selected pool mode. Note: the root summary's
+  // aggregate hashrate field is named `totalHashrate`, not `hashrate` - only
+  // the per-pool breakdown uses `hashrate`.
   const getMetric = (
     metric: "hashrate" | "hashprice" | "efficiency_5m" | "uptime_24h",
   ) => {
     if (poolMode === "total") {
-      switch (metric) {
-        case "hashrate":
-          return data.totalHashrate;
-        case "hashprice":
-          return data.hashprice;
-        case "efficiency_5m":
-          return data.efficiency_5m;
-        case "uptime_24h":
-          return data.uptime_24h;
-      }
-    } else if (poolMode === "luxor") {
-      switch (metric) {
-        case "hashrate":
-          return data.pools?.luxor?.hashrate;
-        case "hashprice":
-          return data.pools?.luxor?.hashprice;
-        case "efficiency_5m":
-          return data.pools?.luxor?.efficiency_5m;
-        case "uptime_24h":
-          return data.pools?.luxor?.uptime_24h;
-      }
-    } else {
-      switch (metric) {
-        case "hashrate":
-          return data.pools?.braiins?.hashrate;
-        case "hashprice":
-          return data.pools?.braiins?.hashprice;
-        case "efficiency_5m":
-          return data.pools?.braiins?.efficiency_5m;
-        case "uptime_24h":
-          return data.pools?.braiins?.uptime_24h;
-      }
+      return metric === "hashrate" ? data.totalHashrate : data[metric];
     }
+    return data.pools?.[poolMode]?.[metric];
   };
+
+  const isBraiinsMode = poolMode === "braiins";
+  const efficiency = getMetric("efficiency_5m") || 0;
+  const uptime = getMetric("uptime_24h") || 0;
+  const hashprice = getMetric("hashprice") || 0;
+  // Braiins publishes neither share efficiency nor uptime, and no hashprice.
+  const efficiencyUnavailable = isBraiinsMode && !summaryLoading;
+  const uptimeUnavailable = isBraiinsMode && !summaryLoading;
+  const hashpriceUnavailable = isBraiinsMode && !summaryLoading;
+
+  const luxorMiners = data.pools?.luxor?.miners || 0;
+  const braiinsMiners = data.pools?.braiins?.miners || 0;
 
   return (
     <Box
-      sx={{
-        p: { xs: 1.5, sm: 2.5, md: 3 },
-        mt: { xs: 0.5, md: 1 },
-        minHeight: "100vh",
-      }}
+      sx={{ maxWidth: 1600, mx: "auto", fontFamily: fonts.body, color: d.text }}
     >
-      {/* Page Heading */}
-      <Box sx={{ mb: { xs: 2, md: 3 } }}>
-        <Typography
-          variant="h4"
-          component="h1"
-          sx={{
-            fontWeight: "bold",
-            color: "text.primary",
-            fontSize: { xs: "1.5rem", sm: "2rem", md: "2.5rem" },
-            letterSpacing: "-0.02em",
-          }}
-        >
-          Miners
-        </Typography>
-      </Box>
-
-      {/* Pool Mode Toggle Buttons - Only show if multiple pools */}
-      {data.activePoolNames && data.activePoolNames.length > 1 && (
-        <Box
-          sx={{
-            display: "flex",
-            gap: 0.75,
-            mb: { xs: 2, md: 3 },
-            overflowX: "auto",
-            pb: { xs: 0.5, sm: 0 },
-            scrollbarWidth: "none",
-            "&::-webkit-scrollbar": { display: "none" },
-          }}
-        >
-          <Box
-            component="button"
-            onClick={() => setPoolMode("total")}
+      {/* Page heading */}
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexWrap: "wrap",
+          gap: 2,
+          mb: { xs: "20px", md: "26px" },
+        }}
+      >
+        <Box sx={{ minWidth: 0 }}>
+          <Typography
+            component="h1"
             sx={{
-              px: { xs: 1.5, sm: 2 },
-              py: { xs: 0.6, sm: 0.75 },
-              borderRadius: 2.5,
-              border: "none",
-              cursor: "pointer",
-              fontSize: { xs: "0.75rem", sm: "0.8rem" },
-              fontWeight: poolMode === "total" ? 700 : 500,
-              whiteSpace: "nowrap",
-              backgroundColor:
-                poolMode === "total"
-                  ? "primary.main"
-                  : theme.palette.mode === "dark"
-                    ? "rgba(255, 255, 255, 0.06)"
-                    : "rgba(0, 0, 0, 0.05)",
-              color:
-                poolMode === "total"
-                  ? "primary.contrastText"
-                  : "text.secondary",
-              boxShadow:
-                poolMode === "total"
-                  ? "0 2px 8px rgba(0, 198, 255, 0.35)"
-                  : "none",
-              transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+              fontFamily: fonts.heading,
+              fontWeight: 750,
+              fontSize: { xs: 27, md: 32 },
+              lineHeight: 1.3,
+              letterSpacing: "-.035em",
+              color: d.text,
             }}
           >
-            Total
-          </Box>
-
-          {data.activePoolNames.includes("Luxor") && (
-            <Box
-              component="button"
-              onClick={() => setPoolMode("luxor")}
-              sx={{
-                px: { xs: 1.5, sm: 2 },
-                py: { xs: 0.6, sm: 0.75 },
-                borderRadius: 2.5,
-                border: "none",
-                cursor: "pointer",
-                fontSize: { xs: "0.75rem", sm: "0.8rem" },
-                fontWeight: poolMode === "luxor" ? 700 : 500,
-                whiteSpace: "nowrap",
-                backgroundColor:
-                  poolMode === "luxor"
-                    ? "#1565C0"
-                    : theme.palette.mode === "dark"
-                      ? "rgba(255, 255, 255, 0.06)"
-                      : "rgba(0, 0, 0, 0.05)",
-                color: poolMode === "luxor" ? "#FFFFFF" : "text.secondary",
-                boxShadow:
-                  poolMode === "luxor"
-                    ? "0 2px 8px rgba(21, 101, 192, 0.4)"
-                    : "none",
-                transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
-              }}
-            >
-              🔷 Luxor
-            </Box>
-          )}
-
-          {data.activePoolNames.includes("Braiins") && (
-            <Box
-              component="button"
-              onClick={() => setPoolMode("braiins")}
-              sx={{
-                px: { xs: 1.5, sm: 2 },
-                py: { xs: 0.6, sm: 0.75 },
-                borderRadius: 2.5,
-                border: "none",
-                cursor: "pointer",
-                fontSize: { xs: "0.75rem", sm: "0.8rem" },
-                fontWeight: poolMode === "braiins" ? 700 : 500,
-                whiteSpace: "nowrap",
-                backgroundColor:
-                  poolMode === "braiins"
-                    ? "#FB8C00"
-                    : theme.palette.mode === "dark"
-                      ? "rgba(255, 255, 255, 0.06)"
-                      : "rgba(0, 0, 0, 0.05)",
-                color: poolMode === "braiins" ? "#FFFFFF" : "text.secondary",
-                boxShadow:
-                  poolMode === "braiins"
-                    ? "0 2px 8px rgba(251, 140, 0, 0.4)"
-                    : "none",
-                transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
-              }}
-            >
-              🔶 Braiins
-            </Box>
-          )}
+            Miners
+          </Typography>
+          <Typography
+            sx={{
+              fontSize: { xs: 12, md: 13 },
+              lineHeight: { xs: 1.7, md: 1.5 },
+              color: d.muted,
+              mt: "7px",
+            }}
+          >
+            Live performance and fleet health across your pools.
+          </Typography>
         </Box>
-      )}
 
-      {/* 4 gradient stat cards — 2-col on mobile, 4-col on desktop */}
+        {hasMultiplePools && (
+          <Segmented
+            value={poolMode}
+            onChange={setPoolMode}
+            ariaLabel="Pool mode"
+            options={POOL_MODE_OPTIONS.filter(
+              (o) =>
+                o.id === "total" ||
+                data.activePoolNames.includes(
+                  o.id === "luxor" ? "Luxor" : "Braiins",
+                ),
+            )}
+          />
+        )}
+      </Box>
+
+      {/* KPI cards - 4 columns, 2 below 960px */}
       <Box
         sx={{
           display: "grid",
-          gridTemplateColumns: { xs: "1fr 1fr", md: "1fr 1fr 1fr 1fr" },
-          gap: { xs: 1.5, sm: 2, md: 3 },
-          mb: { xs: 2, md: 4 },
+          gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+          gap: { xs: "10px", sm: "16px" },
+          mb: { xs: "18px", sm: "22px" },
+          "@media (max-width:959.95px)": {
+            gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+          },
         }}
       >
-        <ShareEfficiencyCard
-          value={getMetric("efficiency_5m") || 0}
-          loading={summaryLoading}
-          poolMode={poolMode}
+        <StatCard
+          title="Share Efficiency (5 min)"
+          value={
+            efficiencyUnavailable
+              ? "Not available"
+              : formatValue(efficiency, "percentage")
+          }
+          caption={
+            efficiencyUnavailable
+              ? "Braiins doesn't report share efficiency"
+              : "Last 5 minutes"
+          }
+          tone="sky"
+          icon={<SsidChartOutlinedIcon />}
+          isLoading={summaryLoading}
         />
-        <HashRate24HoursCard
-          value={getMetric("hashrate") || 0}
-          loading={summaryLoading}
-          poolMode={poolMode}
+        <StatCard
+          title="Hashrate (24 hours)"
+          value={formatHashrate(getMetric("hashrate") || 0)}
+          caption="Average over the last 24 hours"
+          tone="sky"
+          icon={<BoltOutlinedIcon />}
+          isLoading={summaryLoading}
         />
-        <Uptime24HoursCard
-          value={getMetric("uptime_24h") || 0}
-          loading={summaryLoading}
-          poolMode={poolMode}
+        <StatCard
+          title="Uptime (24 hours)"
+          value={
+            uptimeUnavailable
+              ? "Not available"
+              : formatValue(uptime, "percentage")
+          }
+          caption={
+            uptimeUnavailable
+              ? "Braiins doesn't report uptime"
+              : "Last 24 hours"
+          }
+          tone="mint"
+          icon={<AccessTimeOutlinedIcon />}
+          isLoading={summaryLoading}
         />
-        <HashpriceCard
-          value={getMetric("hashprice") || 0}
-          loading={summaryLoading}
-          poolMode={poolMode}
+        <StatCard
+          title="Hashprice"
+          value={
+            hashpriceUnavailable
+              ? "Not available"
+              : formatValue(hashprice, "BTC", {
+                  minimumFractionDigits: 5,
+                  maximumFractionDigits: 5,
+                })
+          }
+          caption={
+            hashpriceUnavailable
+              ? "Braiins doesn't report hashprice"
+              : "BTC / PH/s / day"
+          }
+          tone="amber"
+          icon={<ShowChartOutlinedIcon />}
+          isLoading={summaryLoading}
         />
       </Box>
 
       {/* Hashrate & Shares Efficiency history — follows the pool toggle above */}
-      <HashrateHistoryChart poolMode={poolMode} />
+      <HashrateHistoryChart
+        daylight
+        poolMode={poolMode}
+        subaccountsParam={subaccountsParam}
+      />
 
       {/* Pool Comparison Cards - Only show if multiple pools and in total mode */}
-      {poolMode === "total" &&
-        data.activePoolNames &&
-        data.activePoolNames.length > 1 &&
-        data.pools && (
-          <Box
-            sx={{
-              display: "grid",
-              gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
-              gap: { xs: 1.5, sm: 2, md: 3 },
-              mb: { xs: 2.5, md: 4 },
-            }}
-          >
-            {/* Luxor Comparison Card */}
-            <Box
-              sx={{
-                p: { xs: 1.75, sm: 2.5 },
-                borderRadius: 2.5,
-                backgroundColor:
-                  theme.palette.mode === "dark"
-                    ? "rgba(21, 101, 192, 0.1)"
-                    : "rgba(21, 101, 192, 0.04)",
-                border: `1px solid ${
-                  theme.palette.mode === "dark"
-                    ? "rgba(21, 101, 192, 0.4)"
-                    : "rgba(21, 101, 192, 0.25)"
-                }`,
-                backdropFilter: "blur(8px)",
-              }}
-            >
-              <Typography
-                variant="subtitle1"
-                sx={{
-                  fontWeight: 700,
-                  mb: 1.5,
-                  color: "#1565C0",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 0.75,
-                }}
-              >
-                🔷 Luxor Pool
-              </Typography>
-              <Box
-                sx={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(3, 1fr)",
-                  gap: 1,
-                }}
-              >
-                <Box>
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    sx={{ display: "block", fontSize: "0.72rem" }}
-                  >
-                    Miners
-                  </Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                    {data.pools.luxor.miners}
-                  </Typography>
-                </Box>
-                <Box>
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    sx={{ display: "block", fontSize: "0.72rem" }}
-                  >
-                    Hashrate
-                  </Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                    {formatHashrate(data.pools.luxor.hashrate)}
-                  </Typography>
-                </Box>
-                <Box>
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    sx={{ display: "block", fontSize: "0.72rem" }}
-                  >
-                    Active
-                  </Typography>
-                  <Typography
-                    variant="body2"
-                    sx={{ fontWeight: 700, color: "success.main" }}
-                  >
-                    {data.pools.luxor.activeWorkers}
-                  </Typography>
-                </Box>
-              </Box>
-            </Box>
-
-            {/* Braiins Comparison Card */}
-            <Box
-              sx={{
-                p: { xs: 1.75, sm: 2.5 },
-                borderRadius: 2.5,
-                backgroundColor:
-                  theme.palette.mode === "dark"
-                    ? "rgba(255, 165, 0, 0.1)"
-                    : "rgba(255, 165, 0, 0.04)",
-                border: `1px solid ${
-                  theme.palette.mode === "dark"
-                    ? "rgba(255, 165, 0, 0.4)"
-                    : "rgba(255, 165, 0, 0.25)"
-                }`,
-                backdropFilter: "blur(8px)",
-              }}
-            >
-              <Typography
-                variant="subtitle1"
-                sx={{
-                  fontWeight: 700,
-                  mb: 1.5,
-                  color: "#FB8C00",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 0.75,
-                }}
-              >
-                🔶 Braiins Pool
-              </Typography>
-              <Box
-                sx={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(3, 1fr)",
-                  gap: 1,
-                }}
-              >
-                <Box>
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    sx={{ display: "block", fontSize: "0.72rem" }}
-                  >
-                    Miners
-                  </Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                    {data.pools.braiins.miners}
-                  </Typography>
-                </Box>
-                <Box>
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    sx={{ display: "block", fontSize: "0.72rem" }}
-                  >
-                    Hashrate
-                  </Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                    {formatHashrate(data.pools.braiins.hashrate)}
-                  </Typography>
-                </Box>
-                <Box>
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    sx={{ display: "block", fontSize: "0.72rem" }}
-                  >
-                    Active
-                  </Typography>
-                  <Typography
-                    variant="body2"
-                    sx={{ fontWeight: 700, color: "success.main" }}
-                  >
-                    {data.pools.braiins.activeWorkers}
-                  </Typography>
-                </Box>
-              </Box>
-            </Box>
-          </Box>
-        )}
+      {poolMode === "total" && hasMultiplePools && data.pools && (
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
+            gap: { xs: "12px", sm: "16px" },
+            mb: { xs: "18px", md: "22px" },
+          }}
+        >
+          <PoolSummaryCard
+            label="Luxor Pool"
+            dot={d.poolLuxor}
+            miners={luxorMiners}
+            hashrate={data.pools.luxor.hashrate}
+            active={data.pools.luxor.activeWorkers}
+          />
+          <PoolSummaryCard
+            label="Braiins Pool"
+            dot={d.poolBraiins}
+            miners={braiinsMiners}
+            hashrate={data.pools.braiins.hashrate}
+            active={data.pools.braiins.activeWorkers}
+          />
+        </Box>
+      )}
 
       {/* Miner Filter Buttons - Only show if multiple pools */}
-      {data.activePoolNames && data.activePoolNames.length > 1 && (
+      {hasMultiplePools && (
         <Box
           sx={{
             display: "flex",
-            gap: 0.75,
-            mb: 2.5,
+            gap: "4px",
+            mb: "18px",
             overflowX: "auto",
-            pb: { xs: 0.5, sm: 0 },
+            pb: { xs: "4px", sm: 0 },
             scrollbarWidth: "none",
             "&::-webkit-scrollbar": { display: "none" },
           }}
         >
-          <Box
-            component="button"
+          <PillTab
+            active={minerFilter === "all"}
             onClick={() => setMinerFilter("all")}
-            sx={{
-              px: { xs: 1.5, sm: 2 },
-              py: { xs: 0.6, sm: 0.75 },
-              borderRadius: 2.5,
-              border: "none",
-              cursor: "pointer",
-              fontSize: { xs: "0.75rem", sm: "0.8rem" },
-              fontWeight: minerFilter === "all" ? 700 : 500,
-              whiteSpace: "nowrap",
-              backgroundColor:
-                minerFilter === "all"
-                  ? "primary.main"
-                  : theme.palette.mode === "dark"
-                    ? "rgba(255, 255, 255, 0.06)"
-                    : "rgba(0, 0, 0, 0.05)",
-              color:
-                minerFilter === "all"
-                  ? "primary.contrastText"
-                  : "text.secondary",
-              boxShadow:
-                minerFilter === "all"
-                  ? "0 2px 8px rgba(0, 198, 255, 0.35)"
-                  : "none",
-              transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
-            }}
           >
-            All Miners (
-            {(data.pools?.luxor?.miners || 0) +
-              (data.pools?.braiins?.miners || 0)}
-            )
-          </Box>
+            All Miners ({luxorMiners + braiinsMiners})
+          </PillTab>
 
           {data.activePoolNames.includes("Luxor") && (
-            <Box
-              component="button"
+            <PillTab
+              active={minerFilter === "luxor"}
               onClick={() => setMinerFilter("luxor")}
-              sx={{
-                px: { xs: 1.5, sm: 2 },
-                py: { xs: 0.6, sm: 0.75 },
-                borderRadius: 2.5,
-                border: "none",
-                cursor: "pointer",
-                fontSize: { xs: "0.75rem", sm: "0.8rem" },
-                fontWeight: minerFilter === "luxor" ? 700 : 500,
-                whiteSpace: "nowrap",
-                backgroundColor:
-                  minerFilter === "luxor"
-                    ? "#1565C0"
-                    : theme.palette.mode === "dark"
-                      ? "rgba(255, 255, 255, 0.06)"
-                      : "rgba(0, 0, 0, 0.05)",
-                color: minerFilter === "luxor" ? "#FFFFFF" : "text.secondary",
-                boxShadow:
-                  minerFilter === "luxor"
-                    ? "0 2px 8px rgba(21, 101, 192, 0.4)"
-                    : "none",
-                transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
-              }}
+              dot={d.poolLuxor}
             >
-              🔷 Luxor ({data.pools?.luxor?.miners || 0})
-            </Box>
+              Luxor ({luxorMiners})
+            </PillTab>
           )}
 
           {data.activePoolNames.includes("Braiins") && (
-            <Box
-              component="button"
+            <PillTab
+              active={minerFilter === "braiins"}
               onClick={() => setMinerFilter("braiins")}
-              sx={{
-                px: { xs: 1.5, sm: 2 },
-                py: { xs: 0.6, sm: 0.75 },
-                borderRadius: 2.5,
-                border: "none",
-                cursor: "pointer",
-                fontSize: { xs: "0.75rem", sm: "0.8rem" },
-                fontWeight: minerFilter === "braiins" ? 700 : 500,
-                whiteSpace: "nowrap",
-                backgroundColor:
-                  minerFilter === "braiins"
-                    ? "#FB8C00"
-                    : theme.palette.mode === "dark"
-                      ? "rgba(255, 255, 255, 0.06)"
-                      : "rgba(0, 0, 0, 0.05)",
-                color: minerFilter === "braiins" ? "#FFFFFF" : "text.secondary",
-                boxShadow:
-                  minerFilter === "braiins"
-                    ? "0 2px 8px rgba(251, 140, 0, 0.4)"
-                    : "none",
-                transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
-              }}
+              dot={d.poolBraiins}
             >
-              🔶 Braiins ({data.pools?.braiins?.miners || 0})
-            </Box>
+              Braiins ({braiinsMiners})
+            </PillTab>
           )}
         </Box>
       )}
 
       {/* Hosted Miners List with Pool Filter */}
       <HostedMinersList
+        daylight
         poolFilter={minerFilter}
         repairButtonLabel="Repair history"
+        subaccountsParam={subaccountsParam}
       />
+    </Box>
+  );
+}
+
+/** Daylight pool comparison card: coloured dot + label header, 3-column
+ * mini stats (Miners / Hashrate / Active), matching the guide's card chrome. */
+function PoolSummaryCard({
+  label,
+  dot,
+  miners,
+  hashrate,
+  active,
+}: {
+  label: string;
+  dot: string;
+  miners: number;
+  hashrate: number;
+  active: number;
+}) {
+  const { d, fonts } = useDaylight();
+
+  return (
+    <Box
+      sx={{
+        p: { xs: "16px 18px", sm: "20px 22px" },
+        bgcolor: d.surface,
+        border: `1px solid ${d.border}`,
+        borderRadius: RADIUS_CARD,
+        boxShadow: d.shadow,
+        fontFamily: fonts.body,
+      }}
+    >
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
+          mb: "16px",
+          fontFamily: fonts.heading,
+          fontWeight: 700,
+          fontSize: 15,
+          color: d.text,
+        }}
+      >
+        <Box
+          component="span"
+          aria-hidden
+          sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: dot }}
+        />
+        {label}
+      </Box>
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: "repeat(3, 1fr)",
+          gap: "10px",
+        }}
+      >
+        <PoolStat label="Miners" value={miners} />
+        <PoolStat label="Hashrate" value={formatHashrate(hashrate)} />
+        <PoolStat label="Active" value={active} color={d.success} />
+      </Box>
+    </Box>
+  );
+}
+
+function PoolStat({
+  label,
+  value,
+  color,
+}: {
+  label: string;
+  value: React.ReactNode;
+  color?: string;
+}) {
+  const { d, fonts } = useDaylight();
+  return (
+    <Box>
+      <Box
+        sx={{
+          fontSize: 10,
+          color: d.muted,
+          mb: "3px",
+          fontFamily: fonts.body,
+        }}
+      >
+        {label}
+      </Box>
+      <Box
+        sx={{
+          fontWeight: 700,
+          fontSize: 13,
+          color: color || d.text,
+          fontFamily: fonts.body,
+        }}
+      >
+        {value}
+      </Box>
     </Box>
   );
 }

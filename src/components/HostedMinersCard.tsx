@@ -120,19 +120,25 @@ export default function HostedMinersCard({
             </Typography>
           </Box>
           <Tooltip title="Refresh worker data">
-            <IconButton
-              onClick={handleRefresh}
-              disabled={loading || isRefreshing}
-              size="small"
-              sx={{
-                color: "primary.main",
-                "&:hover": {
-                  backgroundColor: "action.hover",
-                },
-              }}
-            >
-              {isRefreshing ? <CircularProgress size={20} /> : <RefreshIcon />}
-            </IconButton>
+            <span>
+              <IconButton
+                onClick={handleRefresh}
+                disabled={loading || isRefreshing}
+                size="small"
+                sx={{
+                  color: "primary.main",
+                  "&:hover": {
+                    backgroundColor: "action.hover",
+                  },
+                }}
+              >
+                {isRefreshing ? (
+                  <CircularProgress size={20} />
+                ) : (
+                  <RefreshIcon />
+                )}
+              </IconButton>
+            </span>
           </Tooltip>
         </Box>
 

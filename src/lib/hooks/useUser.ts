@@ -26,8 +26,14 @@ interface UserData {
   twoFactorEnabled: boolean;
 }
 
+interface LuxorSubaccount {
+  id: string | null;
+  authKey: string;
+}
+
 interface UserResponse {
   user: UserData;
+  subaccounts: LuxorSubaccount[];
   recentActivities: UserActivity[];
 }
 
@@ -112,6 +118,7 @@ export function useUser() {
 
         return {
           user: profileData.user,
+          subaccounts: profileData.subaccounts || [],
           recentActivities: profileData.recentActivities || [],
         };
       } catch (err) {
@@ -125,6 +132,7 @@ export function useUser() {
 
   return {
     user: data?.user || null,
+    subaccounts: data?.subaccounts || [],
     recentActivities: data?.recentActivities || [],
     loading,
     error: queryError?.message || null,

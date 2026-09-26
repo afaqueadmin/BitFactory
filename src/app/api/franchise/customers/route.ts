@@ -99,8 +99,8 @@ export async function GET(request: NextRequest) {
         phoneNumber: c.phoneNumber || "N/A",
         companyName: c.companyName || "N/A",
         streetAddress: c.streetAddress || "N/A",
-        pools: c.poolAuths
-          .map((pa) => pa.pool.name)
+        // Distinct pool names - a client can hold several Luxor subaccounts.
+        pools: Array.from(new Set(c.poolAuths.map((pa) => pa.pool.name)))
           .sort()
           .join(", "),
         twoFactorEnabled: c.twoFactorAuth?.enabled ?? false,

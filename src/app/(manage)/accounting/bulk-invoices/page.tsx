@@ -37,13 +37,15 @@ import {
   LineItemsEditor,
   LineItem,
 } from "@/components/accounting/invoices/LineItemsEditor";
-import { getMostCommonMinerLocation } from "@/lib/utils/minerLocation";
+import { LocationsMultiSelect } from "@/components/accounting/invoices/LocationsMultiSelect";
+import { getMinerLocations } from "@/lib/utils/minerLocation";
+import { useSpaceLocations } from "@/lib/hooks/useSpaceLocations";
 
 interface CustomerLineItemsState {
   lineItems: LineItem[];
   loading: boolean;
   error?: string | null;
-  machineHostingLocation?: string | null;
+  machineHostingLocation?: string[];
 }
 
 // Default to current month/year — user must select billing month from dropdown
@@ -84,6 +86,7 @@ export default function BulkInvoicesPage() {
     error: createError,
   } = useCreateInvoice();
   const { checkAlreadyPaid } = useCheckAlreadyPaidCustomers();
+  const { locations: spaceLocations } = useSpaceLocations();
 
   const defaultBilling = { month: now.getMonth(), year: now.getFullYear() };
 
@@ -180,11 +183,9 @@ export default function BulkInvoicesPage() {
           }),
         );
 
-        // Auto-calculate the machine hosting location from the majority of
-        // this customer's miners' locations, same as the single-invoice form
-        const machineHostingLocation = getMostCommonMinerLocation(
-          data?.miners || [],
-        );
+        // Auto-add every distinct location of this customer's miners, same
+        // as the single-invoice form
+        const machineHostingLocation = getMinerLocations(data?.miners || []);
 
         setCustomerLineItems((prev) => ({
           ...prev,
@@ -404,7 +405,7 @@ export default function BulkInvoicesPage() {
           billingMonth: billingMonthDate.toISOString(),
           lineItems,
           machineHostingLocation:
-            customerLineItems[customerId]?.machineHostingLocation || undefined,
+            customerLineItems[customerId]?.machineHostingLocation || [],
         });
       }
 
@@ -597,18 +598,24 @@ export default function BulkInvoicesPage() {
                                   }
                                   hardwareList={hardwareList}
                                 />
-                                <Typography
-                                  variant="caption"
-                                  color="textSecondary"
-                                  sx={{ display: "block", mt: 0.5 }}
-                                >
-                                  Machine Hosting Location on the invoice will
-                                  be auto-calculated from the majority of this
-                                  customer&apos;s miners&apos; locations
-                                  {lineItemsState?.machineHostingLocation
-                                    ? `: ${lineItemsState.machineHostingLocation}`
-                                    : " (no located miners found)."}
-                                </Typography>
+                                <Box sx={{ mt: 1 }}>
+                                  <LocationsMultiSelect
+                                    value={
+                                      lineItemsState?.machineHostingLocation ??
+                                      []
+                                    }
+                                    onChange={(locations) =>
+                                      setCustomerLineItems((prev) => ({
+                                        ...prev,
+                                        [customer.id]: {
+                                          ...prev[customer.id],
+                                          machineHostingLocation: locations,
+                                        },
+                                      }))
+                                    }
+                                    options={spaceLocations}
+                                  />
+                                </Box>
                               </>
                             )}
                           </Box>

@@ -32,17 +32,21 @@ export interface HashpriceHistoryResponse {
  * @param days - Number of days to fetch (1-365, default 30)
  * @returns HashpricePoint array with statistics
  */
-export const useHashpriceHistory = (days: number = 30) => {
+export const useHashpriceHistory = (
+  days: number = 30,
+  subaccountsParam: string = "all",
+) => {
   const {
     data: response,
     isLoading,
     error,
     isError,
   } = useQuery<HashpriceHistoryResponse>({
-    queryKey: ["hashprice-history", days],
+    queryKey: ["hashprice-history", days, subaccountsParam],
     queryFn: async () => {
       const params = new URLSearchParams();
       params.append("days", String(days));
+      params.append("subaccounts", subaccountsParam);
 
       const fetchResponse = await fetch(`/api/hashprice-history?${params}`, {
         method: "GET",
