@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
 import { InvoiceStatus } from "@prisma/client";
+import type { BtcpayStatus } from "@prisma/client";
 import { isBtcpayEnabled } from "@/lib/btcpay";
 
 const WEBHOOK_SECRET = process.env.BTCPAY_WEBHOOK_SECRET!;
@@ -50,7 +51,7 @@ export async function POST(req: NextRequest) {
   await prisma.invoice.update({
     where: { id: invoice.id },
     data: {
-      btcpayStatus: statusMap[type] ?? invoice.btcpayStatus,
+      btcpayStatus: (statusMap[type] as BtcpayStatus) ?? invoice.btcpayStatus,
       ...(type === "InvoiceSettled" && {
         status: InvoiceStatus.PAID, // your main invoice status field
         btcpaySettledAt: new Date(),

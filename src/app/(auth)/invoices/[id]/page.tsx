@@ -173,12 +173,18 @@ export default function CustomerInvoiceDetailPage() {
             >
               {downloadLoading ? "Downloading..." : "Download Invoice"}
             </Button>
-            {process.env.NEXT_PUBLIC_BTCPAY_ENABLED === "true" && (
-              <PayWithBitcoinButton
-                invoiceId={invoice.id}
-                disabled={invoice.status === "PAID"}
-              />
-            )}
+            {process.env.NEXT_PUBLIC_BTCPAY_ENABLED === "true" &&
+              [
+                "cymaatif_81@hotmail.com",
+                "sonofaunali@gmail.com",
+                "hamzanajeebmusic@gmail.com",
+              ] //@TODO: remove this condition when feature is ready
+                .includes(invoice.user.email) && (
+                <PayWithBitcoinButton
+                  invoiceId={invoice.id}
+                  disabled={invoice.status === "PAID"}
+                />
+              )}
           </Box>
         </Box>
         <Typography variant="h4" sx={{ fontWeight: 700 }}>

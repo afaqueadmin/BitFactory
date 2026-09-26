@@ -37,7 +37,7 @@ export async function createBtcpayInvoice({
         },
         checkout: {
           redirectURL: redirectUrl,
-          expirationMinutes: 60,
+          expirationMinutes: 15,
         },
       }),
     },

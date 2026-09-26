@@ -28,7 +28,6 @@ export async function POST(
 
   const { id } = await params;
 
-  console.log("params", params);
   const invoice = await prisma.invoice.findUnique({
     where: { id: id },
     include: { user: true },
@@ -62,7 +61,7 @@ export async function POST(
     invoice.btcpayCheckoutUrl &&
     (invoice.btcpayStatus === "New" || invoice.btcpayStatus === "Processing") &&
     invoice.btcpayCreatedAt &&
-    Date.now() - invoice.btcpayCreatedAt.getTime() < 60 * 60 * 1000; // 60 min window
+    Date.now() - invoice.btcpayCreatedAt.getTime() < 15 * 60 * 1000; // 5 min window
 
   if (isReusable) {
     return NextResponse.json({ checkoutUrl: invoice.btcpayCheckoutUrl });
