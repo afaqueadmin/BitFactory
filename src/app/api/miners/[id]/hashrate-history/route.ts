@@ -11,8 +11,10 @@ import {
 } from "@/lib/hashrateWindows";
 import {
   PoolSeries,
+  WorkerSubaccount,
   fetchWorkerEarliestData,
-  fetchWorkerLuxorSeries,
+  fetchWorkerLuxorSeriesAcrossSubaccounts,
+  resolveWorkerSubaccounts,
 } from "@/lib/hashrateHistory";
 
 /**
@@ -175,12 +177,23 @@ export async function GET(
       });
     }
 
-    const poolSubaccount = await prisma.poolSubaccount.findFirst({
+    // A client can have several Luxor subaccounts and a miner can move between
+    // them, so every one is considered - its full history is merged across
+    // whichever subaccounts it was in. Deliberately not scoped to the page's
+    // subaccount picker: this chart is about one miner, not a subaccount.
+    const poolSubaccounts = await prisma.poolSubaccount.findMany({
       where: { userId: miner.userId, pool: { name: "Luxor" } },
       include: { poolAuth: true },
+      orderBy: { createdAt: "asc" },
     });
+    const luxorSubaccounts: WorkerSubaccount[] = poolSubaccounts
+      .filter((s) => !!s.poolAuth)
+      .map((s) => ({
+        poolSubaccountId: s.id,
+        subaccountName: s.poolAuth!.authKey,
+      }));
 
-    if (!poolSubaccount || !poolSubaccount.poolAuth) {
+    if (luxorSubaccounts.length === 0) {
       return NextResponse.json({
         success: true,
         data: {
@@ -197,15 +210,23 @@ export async function GET(
       });
     }
 
+    const workerSubaccounts = await resolveWorkerSubaccounts(
+      luxorSubaccounts,
+      miner.name,
+      window,
+    );
+
     const [points, earliestData] = await Promise.all([
-      fetchWorkerLuxorSeries(
-        poolSubaccount.poolAuth.authKey,
+      fetchWorkerLuxorSeriesAcrossSubaccounts(
+        workerSubaccounts,
         miner.name,
         window,
         tick,
-        poolSubaccount.id,
       ),
-      fetchWorkerEarliestData(poolSubaccount.id, miner.name),
+      fetchWorkerEarliestData(
+        luxorSubaccounts.map((s) => s.poolSubaccountId),
+        miner.name,
+      ),
     ]);
 
     const luxor: PoolSeries = {
@@ -236,6 +257,7 @@ export async function GET(
 
     console.log(
       `[Miner Hashrate History API] miner=${miner.id} worker=${miner.name} tick=${tick} ` +
+        `subaccounts=${workerSubaccounts.map((s) => s.subaccountName).join(",")} ` +
         `window=${start.toISOString()}→${end.toISOString()} points=${points.length}`,
     );
 

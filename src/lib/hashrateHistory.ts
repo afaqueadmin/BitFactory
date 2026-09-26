@@ -663,19 +663,123 @@ export async function fetchWorkerLuxorSeries(
     .sort((a, b) => a.t - b.t);
 }
 
+/** One of a user's Luxor subaccounts, as needed for a worker-level lookup. */
+export interface WorkerSubaccount {
+  poolSubaccountId: string;
+  /** The subaccount's Luxor name (its PoolAuth.authKey). */
+  subaccountName: string;
+}
+
 /**
- * Earliest day this worker has a recorded daily metric, from the DB only
- * (no live equivalent is fetched — unlike fetchLuxorEarliestData, an extra
- * live call per worker per chart load isn't worth it for a single miner's
- * paging affordance). Returns null if the worker has no DB rows yet, which
- * the UI treats as "no known limit" rather than "no history".
+ * Narrows a user's Luxor subaccounts down to the ones this worker actually
+ * has daily rows in over the window. A miner can move between a client's
+ * subaccounts (its history is then split across them), and nothing on Miner
+ * records which subaccount it's in, so PoolWorkerDailyMetric - written per
+ * subaccount by the worker crons - is the only evidence. Falls back to every
+ * subaccount when none match (a brand-new miner, or a window the crons never
+ * covered), so a miner is never silently shown as having no history.
+ */
+export async function resolveWorkerSubaccounts(
+  subaccounts: WorkerSubaccount[],
+  workerName: string,
+  window: Window,
+): Promise<WorkerSubaccount[]> {
+  if (subaccounts.length <= 1) return subaccounts;
+
+  const rows = await prisma.poolWorkerDailyMetric.findMany({
+    where: {
+      poolSubaccountId: { in: subaccounts.map((s) => s.poolSubaccountId) },
+      workerName,
+      date: { gte: dbRangeStart(window), lte: window.end },
+    },
+    distinct: ["poolSubaccountId"],
+    select: { poolSubaccountId: true },
+  });
+
+  const matched = new Set(rows.map((r) => r.poolSubaccountId));
+  const narrowed = subaccounts.filter((s) => matched.has(s.poolSubaccountId));
+  return narrowed.length > 0 ? narrowed : subaccounts;
+}
+
+/**
+ * A worker's series across several subaccounts, merged onto one time axis.
+ * Luxor's worker-history endpoint takes a single subaccount in its path, so
+ * this is one fetchWorkerLuxorSeries call per subaccount.
+ *
+ * A worker only hashes in one subaccount at a time, so hashrate is summed per
+ * timestamp - on the day it moves, the two partial values add back up to the
+ * full day. Efficiency is averaged weighted by hashrate (plain mean of the
+ * non-null values if every sample is at zero hashrate).
+ */
+export async function fetchWorkerLuxorSeriesAcrossSubaccounts(
+  subaccounts: WorkerSubaccount[],
+  workerName: string,
+  window: Window,
+  tick: TickSize,
+): Promise<HashratePoint[]> {
+  const series = await Promise.all(
+    subaccounts.map((s) =>
+      fetchWorkerLuxorSeries(
+        s.subaccountName,
+        workerName,
+        window,
+        tick,
+        s.poolSubaccountId,
+      ),
+    ),
+  );
+
+  if (series.length === 1) return series[0];
+
+  const merged = new Map<
+    number,
+    { hashrate: number; effWeighted: number; effWeight: number; effs: number[] }
+  >();
+  for (const points of series) {
+    for (const p of points) {
+      let row = merged.get(p.t);
+      if (!row) {
+        row = { hashrate: 0, effWeighted: 0, effWeight: 0, effs: [] };
+        merged.set(p.t, row);
+      }
+      row.hashrate += p.hashrate;
+      if (p.efficiency !== null) {
+        row.effWeighted += p.efficiency * p.hashrate;
+        row.effWeight += p.hashrate;
+        row.effs.push(p.efficiency);
+      }
+    }
+  }
+
+  return Array.from(merged.entries())
+    .map(([t, row]) => ({
+      t,
+      hashrate: row.hashrate,
+      efficiency:
+        row.effs.length === 0
+          ? null
+          : row.effWeight > 0
+            ? row.effWeighted / row.effWeight
+            : row.effs.reduce((a, b) => a + b, 0) / row.effs.length,
+    }))
+    .sort((a, b) => a.t - b.t);
+}
+
+/**
+ * Earliest day this worker has a recorded daily metric in any of the given
+ * subaccounts, from the DB only (no live equivalent is fetched — unlike
+ * fetchLuxorEarliestData, an extra live call per worker per chart load isn't
+ * worth it for a single miner's paging affordance). Returns null if the
+ * worker has no DB rows yet, which the UI treats as "no known limit" rather
+ * than "no history".
  */
 export async function fetchWorkerEarliestData(
-  poolSubaccountId: string,
+  poolSubaccountIds: string[],
   workerName: string,
 ): Promise<number | null> {
+  if (poolSubaccountIds.length === 0) return null;
   const earliest = await prisma.poolWorkerDailyMetric.findFirst({
-    where: { poolSubaccountId, workerName },
+    where: { poolSubaccountId: { in: poolSubaccountIds }, workerName },
     orderBy: { date: "asc" },
     select: { date: true },
   });
