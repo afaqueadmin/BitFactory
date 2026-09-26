@@ -1,9 +1,21 @@
 "use client";
 
+/**
+ * Security Settings page (authenticated) - BitFactory Daylight theme (v1.3)
+ *
+ * Composes:
+ * - Page heading
+ * - Daylight password-change card
+ * - TwoFactorSettings / PasskeySettings (shared with admin, opt-in `daylight`)
+ * - Daylight "Recent Activity" data table
+ *
+ * All fetch/change-password/polling logic is unchanged from the previous
+ * implementation.
+ */
+
 import React, { useState, useEffect } from "react";
 import {
   Box,
-  Paper,
   Typography,
   Button,
   TextField,
@@ -15,10 +27,10 @@ import {
   TableHead,
   TableRow,
   CircularProgress,
-  Alert,
 } from "@mui/material";
 import TwoFactorSettings from "@/components/TwoFactorSettings";
 import PasskeySettings from "@/components/PasskeySettings";
+import { RADIUS_CARD, useDaylight } from "@/lib/daylight";
 
 // Create a Grid component that includes the 'item' prop
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -38,6 +50,7 @@ interface Activity {
 }
 
 export default function SecuritySettingsPage() {
+  const { d, fonts } = useDaylight();
   const [userData, setUserData] = useState<UserData | null>(null);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
@@ -200,6 +213,67 @@ export default function SecuritySettingsPage() {
     }
   };
 
+  const inputSx = {
+    "& .MuiOutlinedInput-root": {
+      borderRadius: "8px",
+      fontFamily: fonts.body,
+      "& fieldset": { borderColor: d.inputBorder },
+      "&:hover fieldset": { borderColor: d.action },
+    },
+    "& .MuiOutlinedInput-root.Mui-focused fieldset": {
+      borderColor: d.action,
+      borderWidth: "2px",
+    },
+    "& .MuiInputLabel-root": { fontFamily: fonts.body, color: d.muted },
+    "& .MuiFormHelperText-root": { fontFamily: fonts.body },
+  };
+
+  const alertSx = (tone: "success" | "error") => ({
+    mb: 2,
+    borderRadius: "8px",
+    bgcolor: tone === "success" ? d.mint : d.dangerSoft,
+    color: tone === "success" ? d.success : d.danger,
+    fontFamily: fonts.body,
+    fontSize: 13,
+    p: 1.5,
+  });
+
+  const primaryBtnSx = {
+    px: 4,
+    py: 1.2,
+    textTransform: "none",
+    fontFamily: fonts.body,
+    fontWeight: 650,
+    borderRadius: "8px",
+    bgcolor: d.action,
+    color: "#fff",
+    boxShadow: "none",
+    "&:hover": { bgcolor: d.actionHover, boxShadow: "none" },
+    "&.Mui-disabled": { bgcolor: d.border, color: d.muted },
+  } as const;
+
+  const outlineBtnSx = {
+    px: 4,
+    py: 1.2,
+    textTransform: "none",
+    fontFamily: fonts.body,
+    fontWeight: 600,
+    borderRadius: "8px",
+    color: d.text,
+    borderColor: d.inputBorder,
+    "&:hover": { bgcolor: d.hover, borderColor: d.action },
+  } as const;
+
+  const headerCellSx = {
+    fontFamily: fonts.body,
+    fontWeight: 600,
+    fontSize: 10,
+    letterSpacing: ".015em",
+    textTransform: "uppercase" as const,
+    color: d.muted,
+    borderBottomColor: d.border,
+  };
+
   if (loading) {
     return (
       <Box
@@ -210,113 +284,97 @@ export default function SecuritySettingsPage() {
           minHeight: "60vh",
         }}
       >
-        <CircularProgress />
+        <CircularProgress sx={{ color: d.action }} />
       </Box>
     );
   }
 
   if (!userData) {
     return (
-      <Box sx={{ p: 3 }}>
-        <Alert severity="error">Failed to load security settings</Alert>
+      <Box sx={{ maxWidth: 1200, mx: "auto" }}>
+        <Box sx={alertSx("error")}>Failed to load security settings</Box>
       </Box>
     );
   }
 
   return (
     <Box
-      sx={{
-        p: { xs: 2, sm: 3 },
-        mt: { xs: 1, sm: 2 },
-        maxWidth: 1200,
-        mx: "auto",
-        minHeight: "100vh",
-        bgcolor: (theme) =>
-          theme.palette.mode === "dark" ? "background.default" : "grey.50",
-      }}
+      sx={{ maxWidth: 1200, mx: "auto", fontFamily: fonts.body, color: d.text }}
     >
-      <Typography
-        variant="h4"
-        fontWeight="bold"
-        gutterBottom
-        sx={{
-          color: (theme) =>
-            theme.palette.mode === "dark" ? "primary.light" : "primary.dark",
-          mb: 3,
-          borderBottom: (theme) => `2px solid ${theme.palette.primary.main}`,
-          pb: 1,
-        }}
-      >
-        Security Settings
-      </Typography>
+      <Box sx={{ mb: { xs: "20px", md: "26px" } }}>
+        <Typography
+          component="h1"
+          sx={{
+            fontFamily: fonts.heading,
+            fontWeight: 750,
+            fontSize: { xs: 27, md: 32 },
+            lineHeight: 1.3,
+            letterSpacing: "-.035em",
+            color: d.text,
+          }}
+        >
+          Security Settings
+        </Typography>
+        <Typography
+          sx={{
+            fontSize: { xs: 12, md: 13 },
+            lineHeight: { xs: 1.7, md: 1.5 },
+            color: d.muted,
+            mt: "7px",
+          }}
+        >
+          Manage your password, two-factor authentication and passkeys.
+        </Typography>
+      </Box>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
-        </Alert>
-      )}
+      {error && <Box sx={alertSx("error")}>{error}</Box>}
 
       {/* Password Settings Section */}
-      <Paper
-        elevation={3}
+      <Box
         sx={{
-          p: { xs: 2, sm: 4 },
-          mb: 4,
-          borderRadius: 2,
-          background: (theme) =>
-            theme.palette.mode === "dark"
-              ? "linear-gradient(145deg, rgba(40,40,40,0.9), rgba(30,30,30,0.9))"
-              : "linear-gradient(145deg, rgba(255,255,255,0.9), rgba(250,250,250,0.9))",
-          backdropFilter: "blur(10px)",
-          border: (theme) => `1px solid ${theme.palette.divider}`,
+          p: { xs: 2.5, sm: 4 },
+          mb: 3,
+          bgcolor: d.surface,
+          border: `1px solid ${d.border}`,
+          borderRadius: RADIUS_CARD,
+          boxShadow: d.shadow,
         }}
       >
         <Typography
-          variant="h6"
-          fontWeight="medium"
-          gutterBottom
           sx={{
-            color: (theme) =>
-              theme.palette.mode === "dark" ? "primary.light" : "primary.dark",
-            mb: 3,
+            fontFamily: fonts.heading,
+            fontWeight: 700,
+            fontSize: 18,
+            color: d.text,
+            mb: 2,
           }}
         >
           Password Settings
         </Typography>
 
         {passwordFormError && (
-          <Alert severity="error" sx={{ mb: 2 }}>
-            {passwordFormError}
-          </Alert>
+          <Box sx={alertSx("error")}>{passwordFormError}</Box>
         )}
         {passwordFormSuccess && (
-          <Alert severity="success" sx={{ mb: 2 }}>
-            {passwordFormSuccess}
-          </Alert>
+          <Box sx={alertSx("success")}>{passwordFormSuccess}</Box>
         )}
 
         {!showPasswordForm ? (
           <>
-            <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
+            <Typography
+              sx={{
+                fontFamily: fonts.body,
+                fontSize: 13,
+                color: d.muted,
+                mb: 2,
+              }}
+            >
               Change your account password to keep your account secure.
             </Typography>
             <Button
               variant="contained"
               onClick={() => setShowPasswordForm(true)}
-              sx={{
-                px: 4,
-                py: 1,
-                background: (theme) =>
-                  `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.primary.dark})`,
-                boxShadow: (theme) =>
-                  `0 4px 20px ${theme.palette.primary.main}40`,
-                "&:hover": {
-                  background: (theme) =>
-                    `linear-gradient(45deg, ${theme.palette.primary.dark}, ${theme.palette.primary.main})`,
-                  boxShadow: (theme) =>
-                    `0 6px 25px ${theme.palette.primary.main}60`,
-                },
-              }}
+              sx={primaryBtnSx}
             >
               Change Password
             </Button>
@@ -339,6 +397,7 @@ export default function SecuritySettingsPage() {
                   required
                   error={!!passwordErrors.currentPassword}
                   helperText={passwordErrors.currentPassword}
+                  sx={inputSx}
                 />
               </Grid>
               <Grid item xs={12}>
@@ -356,6 +415,7 @@ export default function SecuritySettingsPage() {
                   required
                   error={!!passwordErrors.newPassword}
                   helperText={passwordErrors.newPassword}
+                  sx={inputSx}
                 />
               </Grid>
               <Grid item xs={12}>
@@ -373,31 +433,19 @@ export default function SecuritySettingsPage() {
                   required
                   error={!!passwordErrors.confirmPassword}
                   helperText={passwordErrors.confirmPassword}
+                  sx={inputSx}
                 />
               </Grid>
               <Grid item xs={12}>
-                <Box sx={{ display: "flex", gap: 2 }}>
+                <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
                   <Button
                     type="submit"
                     variant="contained"
                     disabled={isPasswordChanging}
-                    sx={{
-                      px: 4,
-                      py: 1,
-                      background: (theme) =>
-                        `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.primary.dark})`,
-                      boxShadow: (theme) =>
-                        `0 4px 20px ${theme.palette.primary.main}40`,
-                      "&:hover": {
-                        background: (theme) =>
-                          `linear-gradient(45deg, ${theme.palette.primary.dark}, ${theme.palette.primary.main})`,
-                        boxShadow: (theme) =>
-                          `0 6px 25px ${theme.palette.primary.main}60`,
-                      },
-                    }}
+                    sx={primaryBtnSx}
                   >
                     {isPasswordChanging ? (
-                      <CircularProgress size={24} color="inherit" />
+                      <CircularProgress size={22} sx={{ color: "#fff" }} />
                     ) : (
                       "Save Password"
                     )}
@@ -414,10 +462,7 @@ export default function SecuritySettingsPage() {
                       setPasswordErrors({});
                       setPasswordFormError(null);
                     }}
-                    sx={{
-                      px: 4,
-                      py: 1,
-                    }}
+                    sx={outlineBtnSx}
                   >
                     Cancel
                   </Button>
@@ -426,120 +471,71 @@ export default function SecuritySettingsPage() {
             </Grid>
           </Box>
         )}
-      </Paper>
+      </Box>
 
       {/* Two Factor Authentication Section */}
-      <Box sx={{ mt: 4 }}>
-        <TwoFactorSettings twoFactorEnabled={userData.twoFactorEnabled} />
+      <Box sx={{ mt: 3 }}>
+        <TwoFactorSettings
+          twoFactorEnabled={userData.twoFactorEnabled}
+          daylight
+        />
       </Box>
 
       {/* Passkey Settings Section */}
-      <Box sx={{ mt: 4 }}>
-        <PasskeySettings />
+      <Box sx={{ mt: 3 }}>
+        <PasskeySettings daylight />
       </Box>
 
       {/* Recent Activity Section */}
-      <Box sx={{ mt: 4 }}>
+      <Box sx={{ mt: 3 }}>
         <Typography
-          variant="h5"
-          fontWeight="bold"
-          gutterBottom
           sx={{
-            color: (theme) =>
-              theme.palette.mode === "dark" ? "primary.light" : "primary.dark",
-            borderBottom: (theme) => `2px solid ${theme.palette.primary.main}`,
-            pb: 1,
-            mb: 3,
+            fontFamily: fonts.heading,
+            fontWeight: 700,
+            fontSize: 20,
+            color: d.text,
+            mb: 2,
           }}
         >
           Recent Activity
         </Typography>
-        <Paper
-          elevation={3}
+        <Box
           sx={{
-            width: "100%",
+            bgcolor: d.surface,
+            border: `1px solid ${d.border}`,
+            borderRadius: RADIUS_CARD,
+            boxShadow: d.shadow,
             overflow: "hidden",
-            borderRadius: 2,
-            background: (theme) =>
-              theme.palette.mode === "dark"
-                ? "linear-gradient(145deg, rgba(40,40,40,0.9), rgba(30,30,30,0.9))"
-                : "linear-gradient(145deg, rgba(255,255,255,0.9), rgba(250,250,250,0.9))",
-            backdropFilter: "blur(10px)",
-            border: (theme) => `1px solid ${theme.palette.divider}`,
           }}
         >
-          <TableContainer
-            sx={{
-              maxHeight: 440,
-              "&::-webkit-scrollbar": {
-                width: "8px",
-                height: "8px",
-              },
-              "&::-webkit-scrollbar-track": {
-                background: "transparent",
-              },
-              "&::-webkit-scrollbar-thumb": {
-                background: (theme) =>
-                  theme.palette.mode === "dark"
-                    ? "rgba(255,255,255,0.2)"
-                    : "rgba(0,0,0,0.2)",
-                borderRadius: "4px",
-                "&:hover": {
-                  background: (theme) =>
-                    theme.palette.mode === "dark"
-                      ? "rgba(255,255,255,0.3)"
-                      : "rgba(0,0,0,0.3)",
-                },
-              },
-            }}
-          >
-            <Table stickyHeader>
+          <TableContainer sx={{ maxHeight: 440 }}>
+            <Table stickyHeader size="small">
               <TableHead>
                 <TableRow>
                   <TableCell
-                    sx={{
-                      fontWeight: "bold",
-                      background: (theme) =>
-                        theme.palette.mode === "dark"
-                          ? "rgba(0,0,0,0.5)"
-                          : "rgba(255,255,255,0.9)",
-                      color: (theme) => theme.palette.primary.main,
-                    }}
+                    sx={{ ...headerCellSx, backgroundColor: d.tableHead }}
                   >
                     Date
                   </TableCell>
                   <TableCell
-                    sx={{
-                      fontWeight: "bold",
-                      background: (theme) =>
-                        theme.palette.mode === "dark"
-                          ? "rgba(0,0,0,0.5)"
-                          : "rgba(255,255,255,0.9)",
-                      color: (theme) => theme.palette.primary.main,
-                    }}
+                    sx={{ ...headerCellSx, backgroundColor: d.tableHead }}
                   >
                     Activity
                   </TableCell>
                   <TableCell
                     sx={{
-                      fontWeight: "bold",
-                      background: (theme) =>
-                        theme.palette.mode === "dark"
-                          ? "rgba(0,0,0,0.5)"
-                          : "rgba(255,255,255,0.9)",
-                      color: (theme) => theme.palette.primary.main,
+                      ...headerCellSx,
+                      backgroundColor: d.tableHead,
+                      display: { xs: "none", sm: "table-cell" },
                     }}
                   >
                     IP Address
                   </TableCell>
                   <TableCell
                     sx={{
-                      fontWeight: "bold",
-                      background: (theme) =>
-                        theme.palette.mode === "dark"
-                          ? "rgba(0,0,0,0.5)"
-                          : "rgba(255,255,255,0.9)",
-                      color: (theme) => theme.palette.primary.main,
+                      ...headerCellSx,
+                      backgroundColor: d.tableHead,
+                      display: { xs: "none", md: "table-cell" },
                     }}
                   >
                     Device
@@ -552,35 +548,36 @@ export default function SecuritySettingsPage() {
                     key={activity.id}
                     hover
                     sx={{
-                      transition: "background-color 0.2s",
-                      "&:hover": {
-                        backgroundColor: (theme) =>
-                          theme.palette.mode === "dark"
-                            ? "rgba(255,255,255,0.05)"
-                            : "rgba(0,0,0,0.05)",
+                      "&:hover": { backgroundColor: d.hover },
+                      "& .MuiTableCell-root": {
+                        borderBottomColor: d.border,
+                        fontFamily: fonts.body,
                       },
                     }}
                   >
-                    <TableCell
-                      sx={{ color: (theme) => theme.palette.text.secondary }}
-                    >
+                    <TableCell sx={{ fontSize: 12, color: d.muted }}>
                       {new Date(activity.createdAt).toLocaleString()}
                     </TableCell>
                     <TableCell
-                      sx={{
-                        color: (theme) => theme.palette.primary.main,
-                        fontWeight: "medium",
-                      }}
+                      sx={{ fontSize: 13, color: d.text, fontWeight: 600 }}
                     >
                       {activity.type}
                     </TableCell>
                     <TableCell
-                      sx={{ color: (theme) => theme.palette.text.secondary }}
+                      sx={{
+                        fontSize: 12,
+                        color: d.muted,
+                        display: { xs: "none", sm: "table-cell" },
+                      }}
                     >
                       {activity.ipAddress}
                     </TableCell>
                     <TableCell
-                      sx={{ color: (theme) => theme.palette.text.secondary }}
+                      sx={{
+                        fontSize: 12,
+                        color: d.muted,
+                        display: { xs: "none", md: "table-cell" },
+                      }}
                     >
                       {activity.userAgent}
                     </TableCell>
@@ -593,9 +590,9 @@ export default function SecuritySettingsPage() {
                       align="center"
                       sx={{
                         py: 6,
-                        color: (theme) => theme.palette.text.secondary,
-                        fontStyle: "italic",
-                        fontSize: "0.95rem",
+                        color: d.muted,
+                        fontFamily: fonts.body,
+                        fontSize: 13,
                       }}
                     >
                       No recent activity
@@ -605,7 +602,7 @@ export default function SecuritySettingsPage() {
               </TableBody>
             </Table>
           </TableContainer>
-        </Paper>
+        </Box>
       </Box>
     </Box>
   );
