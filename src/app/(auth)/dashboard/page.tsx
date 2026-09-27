@@ -454,7 +454,6 @@ export default function DashboardPage() {
           alignItems: "center",
           justifyContent: "space-between",
           gap: "20px",
-          maxWidth: { xs: "100%", md: "82%" },
           p: { xs: "16px 18px", sm: "18px 26px" },
           mb: { xs: "14px", sm: "18px" },
           borderRadius: RADIUS_CARD,
