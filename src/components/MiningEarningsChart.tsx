@@ -536,7 +536,11 @@ export default function MiningEarningsChart({
 
               <XAxis
                 dataKey="date"
-                interval={xAxisInterval}
+                // Daylight: let Recharts drop labels based on the chart's
+                // actual rendered width (it sits beside Factory Status, so
+                // viewport breakpoints don't reflect the space available).
+                interval={daylight ? "preserveStartEnd" : xAxisInterval}
+                minTickGap={daylight ? 16 : undefined}
                 tick={{
                   fontSize: isMobile ? 10 : 11,
                   fill: axisTextColor,
@@ -569,9 +573,9 @@ export default function MiningEarningsChart({
                     return String(value);
                   }
                 }}
-                angle={isMobile ? -25 : -35}
-                textAnchor="end"
-                height={isMobile ? 40 : 50}
+                angle={daylight ? 0 : isMobile ? -25 : -35}
+                textAnchor={daylight ? "middle" : "end"}
+                height={daylight ? 30 : isMobile ? 40 : 50}
                 tickLine={false}
                 axisLine={{
                   stroke: daylight
