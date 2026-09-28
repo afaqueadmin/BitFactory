@@ -177,9 +177,11 @@ enum RequestStatus {
 // Luxor subaccount. currentAddress snapshots the live Luxor address at
 // request time so the request row itself is a permanent audit record of
 // what the address was and what it changed to - no separate history table.
-// On approval, the address is pushed to Luxor directly (see
-// /api/wallet/change-requests/[id]/approve) and appliedAt is stamped.
-// Braiins is out of scope: braiins.ts has no equivalent "configured payout
+// Review is two steps: an admin confirms the change with the client
+// (/api/wallet/change-requests/[id]/confirm), then approves it
+// (.../approve), which starts the client's 24-hour payout freeze window.
+// Nothing is pushed to Luxor at either step - the admin updates the payout
+// address on Luxor manually, outside this app. Braiins is out of scope: braiins.ts has no equivalent "configured payout
 // address" API to read or write against.
 model WalletChangeRequest {
   id                  String        @id @default(cuid())

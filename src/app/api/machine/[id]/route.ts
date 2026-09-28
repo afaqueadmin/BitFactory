@@ -134,6 +134,16 @@ export async function PUT(
       );
     }
 
+    // A deleted miner has already returned its hardware unit to stock, so
+    // editing it (e.g. changing hardware) would move stock it no longer holds.
+    if (existingMiner.isDeleted) {
+      console.error(`[Miners API] PUT: Miner is deleted - ${id}`);
+      return NextResponse.json<ApiResponse>(
+        { success: false, error: "Cannot edit a deleted miner" },
+        { status: 400 },
+      );
+    }
+
     const body = await request.json();
     const {
       name,
@@ -710,6 +720,7 @@ export async function DELETE(
         id: true,
         name: true,
         hardwareId: true,
+        isDeleted: true,
         user: { select: { franchiseeId: true } },
       },
     });
@@ -719,6 +730,14 @@ export async function DELETE(
       return NextResponse.json<ApiResponse>(
         { success: false, error: "Miner not found" },
         { status: 404 },
+      );
+    }
+
+    if (existingMiner.isDeleted) {
+      console.error(`[Miners API] DELETE: Miner already deleted - ${id}`);
+      return NextResponse.json<ApiResponse>(
+        { success: false, error: "Miner is already deleted" },
+        { status: 400 },
       );
     }
 
@@ -736,21 +755,25 @@ export async function DELETE(
     }
 
     // Delete miner and restore hardware quantity in transaction
-    await prisma.$transaction(async (tx) => {
+    const deleted = await prisma.$transaction(async (tx) => {
       // Delete the miner
       // await tx.miner.delete({
       //   where: { id },
       // });
 
-      // Soft delete hardware by setting isDeleted to true
-      await tx.miner.update({
-        where: { id },
+      // Soft delete the miner. Guarded on isDeleted so a concurrent delete
+      // of the same miner can't return its hardware unit to stock twice.
+      const { count } = await tx.miner.updateMany({
+        where: { id, isDeleted: false },
         data: {
           isDeleted: true,
           deletedById: actorUserId,
           deletedAt: new Date(),
         },
       });
+      if (count === 0) {
+        return false;
+      }
 
       // Restore hardware quantity
       await tx.hardware.update({
@@ -771,7 +794,17 @@ export async function DELETE(
           description: `Miner ${existingMiner.name} deleted`,
         },
       });
+
+      return true;
     });
+
+    if (!deleted) {
+      console.error(`[Miners API] DELETE: Miner already deleted - ${id}`);
+      return NextResponse.json<ApiResponse>(
+        { success: false, error: "Miner is already deleted" },
+        { status: 400 },
+      );
+    }
 
     console.log(`[Miners API] DELETE: Successfully deleted miner ${id}`);
 

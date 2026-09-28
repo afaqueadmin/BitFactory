@@ -100,12 +100,16 @@ export async function checkHashrateBenchmarks(
     where: { userId: { in: userIds }, pool: { name: "Luxor" } },
     select: { id: true, userId: true },
   });
-  const subaccountIdByUserId = new Map(
-    poolSubaccounts.map((s) => [s.userId, s.id]),
-  );
-  const relevantSubaccountIds = Array.from(
-    new Set(Array.from(subaccountIdByUserId.values())),
-  );
+  // A client can have several Luxor subaccounts, and a miner can report under
+  // any of them (or move between them), so every one is kept per owner.
+  const subaccountIdsByUserId = new Map<string, string[]>();
+  for (const s of poolSubaccounts) {
+    if (!s.userId) continue;
+    const ids = subaccountIdsByUserId.get(s.userId) ?? [];
+    ids.push(s.id);
+    subaccountIdsByUserId.set(s.userId, ids);
+  }
+  const relevantSubaccountIds = poolSubaccounts.map((s) => s.id);
 
   const alerts: HashrateBenchmarkAlert[] = [];
 
@@ -146,16 +150,23 @@ export async function checkHashrateBenchmarks(
     for (const miner of miners) {
       if (alreadyLoggedIds.has(miner.id)) continue;
 
-      const subaccountId = subaccountIdByUserId.get(miner.userId);
-      if (!subaccountId) continue; // owner has no Luxor subaccount - can't evaluate
+      const subaccountIds = subaccountIdsByUserId.get(miner.userId);
+      if (!subaccountIds) continue; // owner has no Luxor subaccount - can't evaluate
 
-      const metric = metricByKey.get(`${subaccountId}::${miner.name}`);
-      if (!metric) continue; // no row at all for this day (yet) - not a false positive
+      const minerMetrics = subaccountIds
+        .map((id) => metricByKey.get(`${id}::${miner.name}`))
+        .filter((m): m is NonNullable<typeof m> => m !== undefined);
+      if (minerMetrics.length === 0) continue; // no row at all for this day (yet) - not a false positive
 
+      // A worker only hashes in one subaccount at a time, so hashrate is summed
+      // across them (same rule as fetchWorkerLuxorSeriesAcrossSubaccounts) - a
+      // stale row left in the subaccount it moved away from can't read as 0.
+      const reported = minerMetrics.filter((m) => m.hashrate != null);
       let actualThs: number;
-      if (metric.hashrate != null) {
-        actualThs = Number(metric.hashrate) / HS_PER_THS;
-      } else if (metric.status === "INACTIVE") {
+      if (reported.length > 0) {
+        actualThs =
+          reported.reduce((sum, m) => sum + Number(m.hashrate), 0) / HS_PER_THS;
+      } else if (minerMetrics.some((m) => m.status === "INACTIVE")) {
         // AUTO miner, pool confirmed no hashing that day - real 0, not missing data.
         actualThs = 0;
       } else {

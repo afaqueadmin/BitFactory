@@ -172,7 +172,7 @@ export async function POST(
       where: {
         id: { in: minerIds },
       },
-      select: { id: true, spaceId: true },
+      select: { id: true, spaceId: true, poolId: true },
     });
 
     if (existingMiners.length !== minerIds.length) {
@@ -216,25 +216,57 @@ export async function POST(
       updateData.poolId = updates.poolId;
     }
 
-    // Update all miners
-    const hasDirectFieldChanges = Object.keys(updateData).length > 0;
-    await prisma.miner.updateMany({
-      where: { id: { in: minerIds } },
-      data: { ...updateData, updatedById: userId },
-    });
+    // Miners actually moving to a different (non-null) pool get a pool
+    // history entry, same as a single-miner PUT
+    const newPoolId = updates.poolId ?? null;
+    const poolChangedMinerIds = newPoolId
+      ? existingMiners
+          .filter((miner) => miner.poolId !== newPoolId)
+          .map((miner) => miner.id)
+      : [];
 
-    if (hasDirectFieldChanges) {
-      await prisma.auditLog.createMany({
-        data: minerIds.map((minerId) => ({
-          action: AuditAction.MINER_UPDATED,
-          entityType: "Miner",
-          entityId: minerId,
-          userId,
-          description: "Miner updated (bulk edit)",
-          changes: JSON.stringify(updateData),
-        })),
-      });
-    }
+    // Update all miners, together with their audit and pool history entries
+    const hasDirectFieldChanges = Object.keys(updateData).length > 0;
+    await prisma.$transaction([
+      prisma.miner.updateMany({
+        where: { id: { in: minerIds } },
+        data: { ...updateData, updatedById: userId },
+      }),
+      ...(hasDirectFieldChanges
+        ? [
+            prisma.auditLog.createMany({
+              data: minerIds.map((minerId) => ({
+                action: AuditAction.MINER_UPDATED,
+                entityType: "Miner",
+                entityId: minerId,
+                userId,
+                description: "Miner updated (bulk edit)",
+                changes: JSON.stringify(updateData),
+              })),
+            }),
+          ]
+        : []),
+      ...(newPoolId && poolChangedMinerIds.length > 0
+        ? [
+            prisma.minerPoolHistory.createMany({
+              data: poolChangedMinerIds.map((minerId) => ({
+                minerId,
+                poolId: newPoolId,
+                createdById: userId,
+              })),
+            }),
+            prisma.auditLog.createMany({
+              data: poolChangedMinerIds.map((minerId) => ({
+                action: AuditAction.MINER_POOL_CHANGED,
+                entityType: "Miner",
+                entityId: minerId,
+                userId,
+                description: "Miner reassigned to a different pool (bulk edit)",
+              })),
+            }),
+          ]
+        : []),
+    ]);
 
     // Handle rate history updates
     if (updates.rate_per_kwh !== undefined) {

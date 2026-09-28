@@ -53,6 +53,7 @@ const MINER_B = {
 };
 
 const SUBACCOUNT_1 = { id: "sub-1", userId: "user-1" };
+const SUBACCOUNT_2 = { id: "sub-2", userId: "user-1" };
 
 /** Wires up findMany mocks to return per-day fixtures keyed by date. */
 function setupDayFixtures(
@@ -62,6 +63,7 @@ function setupDayFixtures(
       workerName: string;
       hashrate: number | null;
       status?: string | null;
+      poolSubaccountId?: string;
     }>
   >,
   alertedMinerIdsByDay: Record<string, string[]> = {},
@@ -70,7 +72,7 @@ function setupDayFixtures(
     async ({ where }: { where: { date: Date } }) => {
       const rows = metricsByDay[dateKey(where.date)] || [];
       return rows.map((r) => ({
-        poolSubaccountId: SUBACCOUNT_1.id,
+        poolSubaccountId: r.poolSubaccountId ?? SUBACCOUNT_1.id,
         workerName: r.workerName,
         hashrate: r.hashrate,
         status: r.status ?? null,
@@ -258,5 +260,80 @@ describe("checkHashrateBenchmarks", () => {
     const result = await checkHashrateBenchmarks(NOW);
 
     expect(result.alerts.map((a) => a.minerId)).toEqual(["miner-a"]);
+  });
+
+  describe("owner with several Luxor subaccounts", () => {
+    beforeEach(() => {
+      poolSubaccountFindManyMock.mockResolvedValue([
+        SUBACCOUNT_1,
+        SUBACCOUNT_2,
+      ]);
+    });
+
+    it("evaluates a miner that reports only under the owner's second subaccount", async () => {
+      minerFindManyMock.mockResolvedValue([MINER_A]);
+      setupDayFixtures({
+        [dateKey(DAY_0)]: [
+          {
+            workerName: "WorkerA",
+            hashrate: 150e12,
+            poolSubaccountId: "sub-2",
+          },
+        ],
+      });
+
+      const result = await checkHashrateBenchmarks(NOW);
+
+      expect(
+        workerMetricFindManyMock.mock.calls[0][0].where.poolSubaccountId,
+      ).toEqual({ in: ["sub-1", "sub-2"] });
+      expect(result.alerts).toHaveLength(1);
+      expect(result.alerts[0]).toMatchObject({
+        minerId: "miner-a",
+        actualHashrateThs: 150,
+      });
+    });
+
+    it("does not read a stale INACTIVE row in the old subaccount as 0 once the miner moved", async () => {
+      minerFindManyMock.mockResolvedValue([MINER_A]);
+      setupDayFixtures({
+        [dateKey(DAY_0)]: [
+          {
+            workerName: "WorkerA",
+            hashrate: null,
+            status: "INACTIVE",
+            poolSubaccountId: "sub-1",
+          },
+          {
+            workerName: "WorkerA",
+            hashrate: 250e12,
+            poolSubaccountId: "sub-2",
+          },
+        ],
+      });
+
+      const result = await checkHashrateBenchmarks(NOW);
+
+      expect(result.alerts).toEqual([]);
+      expect(alertLogCreateManyMock).not.toHaveBeenCalled();
+    });
+
+    it("sums the hashrate of a miner that moved subaccount part-way through the day", async () => {
+      minerFindManyMock.mockResolvedValue([MINER_A]);
+      setupDayFixtures({
+        [dateKey(DAY_0)]: [
+          { workerName: "WorkerA", hashrate: 80e12, poolSubaccountId: "sub-1" },
+          {
+            workerName: "WorkerA",
+            hashrate: 150e12,
+            poolSubaccountId: "sub-2",
+          },
+        ],
+      });
+
+      const result = await checkHashrateBenchmarks(NOW);
+
+      expect(result.alerts).toEqual([]); // 80 + 150 = 230 TH/s, above the 200 TH/s benchmark
+    });
   });
 });

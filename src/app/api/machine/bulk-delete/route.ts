@@ -13,6 +13,9 @@ interface ApiResponse<T = unknown> {
   error?: string;
 }
 
+/** Thrown inside the delete transaction to roll it back. */
+class ConcurrentDeleteError extends Error {}
+
 async function verifyAdminAuth(request: NextRequest) {
   const token = request.cookies.get("token")?.value;
 
@@ -97,11 +100,26 @@ export async function POST(
       );
     }
 
+    // Already-deleted miners (e.g. selected with "Show Deleted" on) are
+    // skipped - they've already returned their hardware unit to stock.
+    const liveMiners = existingMiners.filter((m) => !m.isDeleted);
+    const skippedMinerIds = existingMiners
+      .filter((m) => m.isDeleted)
+      .map((m) => m.id);
+
+    if (liveMiners.length === 0) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "All selected miners are already deleted",
+        },
+        { status: 400 },
+      );
+    }
+
     // Miners owned by a customer assigned to a franchisee cannot be deleted
     // until that customer is unassigned first.
-    const franchiseLinkedMiners = existingMiners.filter(
-      (m) => m.user.franchiseeId,
-    );
+    const franchiseLinkedMiners = liveMiners.filter((m) => m.user.franchiseeId);
     if (franchiseLinkedMiners.length > 0) {
       const customerNames = [
         ...new Set(franchiseLinkedMiners.map((m) => m.user.name || m.user.id)),
@@ -115,11 +133,13 @@ export async function POST(
       );
     }
 
+    const liveMinerIds = liveMiners.map((m) => m.id);
+
     // Process bulk delete in transaction
     const result = await prisma.$transaction(async (tx) => {
       // Get miners with details for response
       const deletedMiners = await tx.miner.findMany({
-        where: { id: { in: minerIds } },
+        where: { id: { in: liveMinerIds }, isDeleted: false },
         include: {
           hardware: { select: { id: true, model: true } },
           space: { select: { name: true } },
@@ -138,15 +158,21 @@ export async function POST(
       //   where: { id: { in: minerIds } },
       // });
 
-      // Soft-Delete all miners (Do not delete rate history)
-      await tx.miner.updateMany({
-        where: { id: { in: minerIds } },
+      // Soft-Delete all miners (Do not delete rate history). Guarded on
+      // isDeleted: if a concurrent delete got to any of them first, roll back
+      // rather than return their hardware units to stock a second time.
+      const deletedMinerIds = deletedMiners.map((m) => m.id);
+      const { count } = await tx.miner.updateMany({
+        where: { id: { in: deletedMinerIds }, isDeleted: false },
         data: {
           isDeleted: true,
           deletedById: actorUserId,
           deletedAt: new Date(),
         },
       });
+      if (count !== deletedMinerIds.length) {
+        throw new ConcurrentDeleteError();
+      }
 
       // Restore hardware quantities
       for (const [hwId, count] of Object.entries(hardwareQuantities)) {
@@ -175,6 +201,8 @@ export async function POST(
           spaceName: m.space.name,
         })),
         hardwareRestored: hardwareQuantities,
+        skippedCount: skippedMinerIds.length,
+        skippedMinerIds,
       };
     });
 
@@ -183,6 +211,16 @@ export async function POST(
       data: result,
     });
   } catch (error) {
+    if (error instanceof ConcurrentDeleteError) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Some of these miners were deleted by another request. Refresh and try again.",
+        },
+        { status: 409 },
+      );
+    }
     console.error("Bulk delete error:", error);
     return NextResponse.json(
       {
