@@ -149,6 +149,16 @@ interface Miner {
       email: string;
     };
   }>;
+  restarts?: Array<{
+    id: string;
+    restartedAt: string;
+    note: string | null;
+    createdAt: string;
+    createdBy: {
+      name: string | null;
+      email: string;
+    };
+  }>;
 }
 
 interface MinersTableProps {
@@ -940,6 +950,7 @@ export default function MinersTable({
               const rateHistory = miner?.rateHistory || [];
               const ownershipHistory = miner?.ownershipHistory || [];
               const repairHistory = miner?.repairNotes || [];
+              const restartHistory = miner?.restarts || [];
 
               // Show miner hardware info at top of modal
               const hasSNorMAC = miner?.serialNumber || miner?.macAddress;
@@ -959,6 +970,11 @@ export default function MinersTable({
                 ...repairHistory.map((h) => ({
                   type: "repair",
                   createdAt: new Date(h.dateOfEntry),
+                  data: h,
+                })),
+                ...restartHistory.map((h) => ({
+                  type: "restart",
+                  createdAt: new Date(h.restartedAt),
                   data: h,
                 })),
               ].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
@@ -1098,6 +1114,77 @@ export default function MinersTable({
                                 color="text.secondary"
                               >
                                 Logged by:{" "}
+                                {(
+                                  activity.data as {
+                                    createdBy?: {
+                                      name: string | null;
+                                      email: string;
+                                    };
+                                  }
+                                ).createdBy?.name ||
+                                  (
+                                    activity.data as {
+                                      createdBy?: {
+                                        name: string | null;
+                                        email: string;
+                                      };
+                                    }
+                                  ).createdBy?.email ||
+                                  "Unknown"}
+                              </Typography>
+                            </>
+                          ) : activity.type === "restart" ? (
+                            <>
+                              <Box
+                                sx={{
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  alignItems: "center",
+                                }}
+                              >
+                                <Typography
+                                  variant="body2"
+                                  sx={{
+                                    fontWeight: "600",
+                                    color: "warning.main",
+                                  }}
+                                >
+                                  🔄 Miner Restarted
+                                </Typography>
+                                <Typography
+                                  variant="caption"
+                                  color="text.secondary"
+                                >
+                                  {activity.createdAt.toLocaleDateString(
+                                    "en-CA",
+                                  )}{" "}
+                                  {activity.createdAt.toLocaleTimeString(
+                                    "en-US",
+                                    {
+                                      hour: "2-digit",
+                                      minute: "2-digit",
+                                      hour12: false,
+                                    },
+                                  )}
+                                </Typography>
+                              </Box>
+                              {(activity.data as { note: string | null })
+                                .note && (
+                                <Typography
+                                  variant="body2"
+                                  sx={{ whiteSpace: "pre-wrap" }}
+                                >
+                                  {
+                                    (activity.data as { note: string | null })
+                                      .note
+                                  }
+                                </Typography>
+                              )}
+                              <Typography
+                                variant="caption"
+                                color="text.secondary"
+                              >
+                                Recorded by:{" "}
                                 {(
                                   activity.data as {
                                     createdBy?: {

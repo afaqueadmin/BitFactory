@@ -313,6 +313,23 @@ export async function GET(
             dateOfEntry: "desc",
           },
         },
+        restarts: {
+          select: {
+            id: true,
+            restartedAt: true,
+            note: true,
+            createdAt: true,
+            createdBy: {
+              select: {
+                name: true,
+                email: true,
+              },
+            },
+          },
+          orderBy: {
+            restartedAt: "desc",
+          },
+        },
         pool: {
           select: {
             id: true,

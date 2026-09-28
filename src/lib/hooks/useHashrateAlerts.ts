@@ -14,6 +14,14 @@ export interface HashrateAlertItem {
     name: string;
     user: { name: string | null; companyName: string | null };
   };
+  /** Latest restart recorded against this alert (at most one entry). */
+  restarts: Array<{
+    id: string;
+    restartedAt: string;
+    note: string | null;
+    createdAt: string;
+    createdBy: { id: string; name: string | null; email: string };
+  }>;
 }
 
 export function useHashrateAlerts(filters?: { acknowledged?: boolean }) {
@@ -55,6 +63,38 @@ export function useAcknowledgeHashrateAlert() {
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error || "Failed to acknowledge alert");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["hashrate-alerts"] });
+    },
+  });
+}
+
+export function useRecordMinerRestart() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: {
+      minerId: string;
+      alertId: string;
+      restartedAt: string;
+      note?: string;
+    }) => {
+      const res = await fetch(`/api/machine/${input.minerId}/restarts`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          alertId: input.alertId,
+          restartedAt: input.restartedAt,
+          note: input.note,
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || "Failed to record restart");
       }
       return res.json();
     },

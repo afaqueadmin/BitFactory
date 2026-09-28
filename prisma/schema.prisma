@@ -80,6 +80,7 @@ model User {
   createdMinerPoolHistory       MinerPoolHistory[]           @relation("MinerPoolHistoryCreatedBy")
   createdHashrateBenchmarks     MinerHashrateBenchmark[]     @relation("MinerHashrateBenchmarkCreatedBy")
   acknowledgedHashrateAlerts    MinerHashrateAlertLog[]      @relation("MinerHashrateAlertAcknowledgedBy")
+  minerRestartsCreated          MinerRestart[]               @relation("MinerRestartCreatedBy")
   addedGroupSubaccounts         GroupSubaccount[]            @relation("GroupSubaccountAddedBy")
   groupMemberships              GroupSubaccount[]            @relation("GroupSubaccountUser")
   customerRequestsSubmitted     FranchiseCustomerRequest[]   @relation("CustomerRequestsSubmitted")
@@ -423,6 +424,7 @@ model Miner {
   poolHistory        MinerPoolHistory[]
   hashrateBenchmarks MinerHashrateBenchmark[]
   hashrateAlertLogs  MinerHashrateAlertLog[]
+  restarts           MinerRestart[]
   hardware           Hardware                 @relation(fields: [hardwareId], references: [id])
   space              Space                    @relation(fields: [spaceId], references: [id])
   user               User                     @relation(fields: [userId], references: [id])
@@ -729,13 +731,38 @@ model MinerHashrateAlertLog {
   acknowledgedAt    DateTime?
   acknowledgedById  String?
 
-  miner          Miner @relation(fields: [minerId], references: [id], onDelete: Cascade)
-  acknowledgedBy User? @relation("MinerHashrateAlertAcknowledgedBy", fields: [acknowledgedById], references: [id])
+  miner          Miner          @relation(fields: [minerId], references: [id], onDelete: Cascade)
+  acknowledgedBy User?          @relation("MinerHashrateAlertAcknowledgedBy", fields: [acknowledgedById], references: [id])
+  restarts       MinerRestart[]
 
   @@unique([minerId, date])
   @@index([minerId])
   @@index([acknowledgedAt])
   @@map("miner_hashrate_alert_logs")
+}
+
+// A restart an admin performed on the miner from the Luxor backend (outside
+// this app) and recorded here - nothing is sent to Luxor. Append-only history,
+// like MinerRateHistory. restartedAt is the admin-entered time of the restart
+// itself; createdAt is when it was recorded. alertId is set when it was
+// recorded from a hashrate alert row, to show which alert it responded to.
+model MinerRestart {
+  id          String   @id @default(cuid())
+  minerId     String
+  alertId     String?
+  restartedAt DateTime
+  note        String?  @db.Text
+  createdById String
+  createdAt   DateTime @default(now())
+
+  miner     Miner                  @relation(fields: [minerId], references: [id], onDelete: Cascade)
+  alert     MinerHashrateAlertLog? @relation(fields: [alertId], references: [id], onDelete: SetNull)
+  createdBy User                   @relation("MinerRestartCreatedBy", fields: [createdById], references: [id])
+
+  @@index([minerId, restartedAt(sort: Desc)])
+  @@index([alertId])
+  @@index([createdById])
+  @@map("miner_restarts")
 }
 
 model HardwareProcurementHistory {
@@ -1305,6 +1332,7 @@ enum AuditAction {
   SPACE_CREATED
   SPACE_UPDATED
   SPACE_DELETED
+  MINER_RESTARTED
 }
 
 enum NotificationType {

@@ -269,6 +269,7 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   [AuditAction.SPACE_CREATED]: "Space Created",
   [AuditAction.SPACE_UPDATED]: "Space Updated",
   [AuditAction.SPACE_DELETED]: "Space Deleted",
+  [AuditAction.MINER_RESTARTED]: "Miner Restarted",
 };
 
 // ============================================================================

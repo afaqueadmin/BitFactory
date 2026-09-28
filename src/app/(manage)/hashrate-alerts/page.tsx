@@ -32,8 +32,23 @@ import {
   useHashrateAlerts,
   useAcknowledgeHashrateAlert,
   useBulkAcknowledgeHashrateAlerts,
+  useRecordMinerRestart,
   type HashrateAlertItem,
 } from "@/lib/hooks/useHashrateAlerts";
+
+/** A Date as the local "YYYY-MM-DDTHH:mm" string a datetime-local input takes. */
+function toDateTimeLocalValue(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function formatDateTime(iso: string): string {
+  const date = new Date(iso);
+  return `${date.toLocaleDateString("en-CA")} ${date.toLocaleTimeString(
+    "en-US",
+    { hour: "2-digit", minute: "2-digit", hour12: false },
+  )}`;
+}
 
 const FILTERS = [
   { value: "false", label: "Pending" },
@@ -59,6 +74,15 @@ export default function HashrateAlertsPage() {
     useAcknowledgeHashrateAlert();
   const { mutateAsync: bulkAcknowledge, isPending: bulkAcknowledging } =
     useBulkAcknowledgeHashrateAlerts();
+  const { mutateAsync: recordRestart, isPending: recordingRestart } =
+    useRecordMinerRestart();
+
+  const [restartTarget, setRestartTarget] = useState<HashrateAlertItem | null>(
+    null,
+  );
+  const [restartAt, setRestartAt] = useState("");
+  const [restartNote, setRestartNote] = useState("");
+  const [restartError, setRestartError] = useState<string | null>(null);
 
   const [actionError, setActionError] = useState<string | null>(null);
   const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
@@ -173,6 +197,37 @@ export default function HashrateAlertsPage() {
     } catch (err) {
       setActionError(
         err instanceof Error ? err.message : "Failed to acknowledge alert",
+      );
+    }
+  };
+
+  const openRestartDialog = (alert: HashrateAlertItem) => {
+    setRestartTarget(alert);
+    setRestartAt(toDateTimeLocalValue(new Date()));
+    setRestartNote("");
+    setRestartError(null);
+  };
+
+  const handleRecordRestart = async () => {
+    if (!restartTarget) return;
+    const restartedAt = new Date(restartAt);
+    if (!restartAt || Number.isNaN(restartedAt.getTime())) {
+      setRestartError("Enter a valid restart date and time");
+      return;
+    }
+    setRestartError(null);
+    try {
+      await recordRestart({
+        minerId: restartTarget.minerId,
+        alertId: restartTarget.id,
+        restartedAt: restartedAt.toISOString(),
+        note: restartNote.trim() || undefined,
+      });
+      setRestartTarget(null);
+      refetch();
+    } catch (err) {
+      setRestartError(
+        err instanceof Error ? err.message : "Failed to record restart",
       );
     }
   };
@@ -411,18 +466,43 @@ export default function HashrateAlertsPage() {
                             alert.acknowledgedBy.email}
                         </Typography>
                       )}
+                      {alert.restarts?.[0] && (
+                        <Typography
+                          variant="caption"
+                          color="text.secondary"
+                          display="block"
+                        >
+                          Restarted{" "}
+                          {formatDateTime(alert.restarts[0].restartedAt)} by{" "}
+                          {alert.restarts[0].createdBy.name ||
+                            alert.restarts[0].createdBy.email}
+                        </Typography>
+                      )}
                     </TableCell>
                     <TableCell align="right">
-                      {!alert.acknowledgedAt && (
+                      <Stack
+                        direction="row"
+                        spacing={1}
+                        justifyContent="flex-end"
+                      >
                         <Button
                           size="small"
-                          variant="contained"
-                          disabled={acknowledging}
-                          onClick={() => handleAcknowledge(alert.id)}
+                          variant="outlined"
+                          onClick={() => openRestartDialog(alert)}
                         >
-                          Acknowledge
+                          Restart
                         </Button>
-                      )}
+                        {!alert.acknowledgedAt && (
+                          <Button
+                            size="small"
+                            variant="contained"
+                            disabled={acknowledging}
+                            onClick={() => handleAcknowledge(alert.id)}
+                          >
+                            Acknowledge
+                          </Button>
+                        )}
+                      </Stack>
                     </TableCell>
                   </TableRow>
                 );
@@ -486,6 +566,64 @@ export default function HashrateAlertsPage() {
             disabled={bulkAcknowledging}
           >
             {bulkAcknowledging ? "Acknowledging..." : "Acknowledge"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={restartTarget !== null}
+        onClose={() => !recordingRestart && setRestartTarget(null)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Record Miner Restart</DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ mb: 2 }}>
+            Record that {restartTarget?.miner.name} (
+            {restartTarget?.miner.user.name ||
+              restartTarget?.miner.user.companyName ||
+              "—"}
+            ) was restarted from the Luxor backend. This only logs the restart -
+            nothing is sent to Luxor, and the alert is not acknowledged.
+          </DialogContentText>
+          {restartError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {restartError}
+            </Alert>
+          )}
+          <Stack spacing={2} sx={{ pt: 1 }}>
+            <TextField
+              label="Restarted at"
+              type="datetime-local"
+              value={restartAt}
+              onChange={(e) => setRestartAt(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+              required
+              fullWidth
+            />
+            <TextField
+              label="Note (optional)"
+              value={restartNote}
+              onChange={(e) => setRestartNote(e.target.value)}
+              multiline
+              minRows={2}
+              fullWidth
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => setRestartTarget(null)}
+            disabled={recordingRestart}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleRecordRestart}
+            disabled={recordingRestart || !restartAt}
+          >
+            {recordingRestart ? "Saving..." : "Record Restart"}
           </Button>
         </DialogActions>
       </Dialog>

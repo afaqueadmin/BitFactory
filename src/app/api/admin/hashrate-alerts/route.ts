@@ -54,6 +54,18 @@ export async function GET(request: NextRequest) {
           },
         },
         acknowledgedBy: { select: { id: true, name: true, email: true } },
+        // Latest restart recorded against this alert, if any
+        restarts: {
+          orderBy: { restartedAt: "desc" },
+          take: 1,
+          select: {
+            id: true,
+            restartedAt: true,
+            note: true,
+            createdAt: true,
+            createdBy: { select: { id: true, name: true, email: true } },
+          },
+        },
       },
     });
 
