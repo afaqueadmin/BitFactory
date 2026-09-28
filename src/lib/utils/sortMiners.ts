@@ -114,6 +114,16 @@ interface Miner {
       email: string;
     };
   }>;
+  restarts?: Array<{
+    id: string;
+    restartedAt: string;
+    note: string | null;
+    createdAt: string;
+    createdBy: {
+      name: string | null;
+      email: string;
+    };
+  }>;
 }
 
 /**
