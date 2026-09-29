@@ -15,8 +15,10 @@ import {
   generateTokens,
   signEnrollmentToken,
   signJwtToken,
+  signPendingTwoFactorToken,
   verifyEnrollmentToken,
   verifyJwtToken,
+  verifyPendingTwoFactorToken,
 } from "@/lib/jwt";
 import { getUserInfoFromToken } from "@/lib/helpers/getUserInfoFromToken";
 
@@ -112,6 +114,34 @@ describe("JWT secret handling", () => {
       );
       expect(await getUserInfoFromToken(enroll)).toEqual({ userId: null });
       expect((await verifyEnrollmentToken(enroll)).userId).toBe("user-6");
+    });
+
+    it("never accepts a pending-2FA token as a session", async () => {
+      const pending = await signPendingTwoFactorToken("user-8", "CLIENT");
+
+      await expect(verifyJwtToken(pending)).rejects.toThrow(
+        "Invalid or expired token",
+      );
+      expect(await getUserInfoFromToken(pending)).toEqual({ userId: null });
+      expect((await verifyPendingTwoFactorToken(pending)).userId).toBe(
+        "user-8",
+      );
+    });
+
+    it("keeps the two login-step tokens distinct", async () => {
+      const pending = await signPendingTwoFactorToken("user-9", "CLIENT");
+      const enroll = await signEnrollmentToken("user-9", "CLIENT");
+      const { accessToken } = await generateTokens("user-9", "CLIENT");
+
+      await expect(verifyEnrollmentToken(pending)).rejects.toThrow(
+        "Invalid or expired enrollment token",
+      );
+      await expect(verifyPendingTwoFactorToken(enroll)).rejects.toThrow(
+        "Invalid or expired pending 2FA token",
+      );
+      await expect(verifyPendingTwoFactorToken(accessToken)).rejects.toThrow(
+        "Invalid or expired pending 2FA token",
+      );
     });
 
     it("never accepts a session token as an enrollment token", async () => {

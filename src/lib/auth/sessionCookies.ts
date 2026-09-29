@@ -4,6 +4,10 @@ import type { NextResponse } from "next/server";
 export const ENROLLMENT_COOKIE = "two_factor_enroll";
 const ENROLLMENT_COOKIE_PATH = "/api/auth/2fa/enroll";
 
+/** Cookie holding the 5-minute "password verified, 2FA code pending" token. */
+export const PENDING_2FA_COOKIE = "two_factor_pending";
+const PENDING_2FA_COOKIE_PATH = "/api/auth/2fa/validate";
+
 const secure = () => process.env.NODE_ENV === "production";
 
 export function redirectPathForRole(role: string): string {
@@ -60,5 +64,29 @@ export function clearEnrollmentCookie(response: NextResponse): void {
     sameSite: "strict",
     maxAge: 0,
     path: ENROLLMENT_COOKIE_PATH,
+  });
+}
+
+/** Scoped to /api/auth/2fa/validate only. */
+export function setPendingTwoFactorCookie(
+  response: NextResponse,
+  token: string,
+): void {
+  response.cookies.set(PENDING_2FA_COOKIE, token, {
+    httpOnly: true,
+    secure: secure(),
+    sameSite: "strict",
+    maxAge: 5 * 60,
+    path: PENDING_2FA_COOKIE_PATH,
+  });
+}
+
+export function clearPendingTwoFactorCookie(response: NextResponse): void {
+  response.cookies.set(PENDING_2FA_COOKIE, "", {
+    httpOnly: true,
+    secure: secure(),
+    sameSite: "strict",
+    maxAge: 0,
+    path: PENDING_2FA_COOKIE_PATH,
   });
 }

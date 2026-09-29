@@ -18,6 +18,7 @@ export default function TwoFactorVerification({
   const { d, fonts } = useDaylight();
   const [token, setToken] = useState("");
   const [error, setError] = useState("");
+  const [expired, setExpired] = useState(false);
   const textFieldRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -36,6 +37,11 @@ export default function TwoFactorVerification({
         credentials: "include",
       });
       const data = await response.json();
+
+      // The password step expired or was already used - start over.
+      if (response.status === 401) {
+        setExpired(true);
+      }
 
       if (!response.ok || data.error) {
         setError(data.error || "Invalid 2FA token");
@@ -94,44 +100,12 @@ export default function TwoFactorVerification({
         </Alert>
       )}
 
-      <Typography sx={{ fontSize: 13, color: d.muted, mb: "16px" }}>
-        Enter the verification code from your authenticator app or use a backup
-        code:
-      </Typography>
-
-      <Box sx={{ display: "flex", gap: "10px", alignItems: "flex-start" }}>
-        <TextField
-          inputRef={textFieldRef}
-          label="Verification Code"
-          value={token}
-          onChange={(e) => setToken(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && token) {
-              handleVerify();
-            }
-          }}
-          fullWidth
-          sx={{
-            "& .MuiOutlinedInput-root": {
-              borderRadius: "8px",
-              fontFamily: fonts.body,
-              "& fieldset": { borderColor: d.inputBorder },
-              "&:hover fieldset": { borderColor: d.action },
-            },
-            "& .MuiOutlinedInput-root.Mui-focused fieldset": {
-              borderColor: d.action,
-              borderWidth: "2px",
-            },
-            "& .MuiInputLabel-root": { fontFamily: fonts.body },
-          }}
-        />
+      {expired ? (
         <Button
-          onClick={handleVerify}
-          disabled={!token}
+          fullWidth
+          onClick={() => window.location.reload()}
           sx={{
             minHeight: 44,
-            px: "18px",
-            flexShrink: 0,
             borderRadius: "8px",
             textTransform: "none",
             fontWeight: 650,
@@ -140,12 +114,66 @@ export default function TwoFactorVerification({
             bgcolor: d.action,
             boxShadow: "none",
             "&:hover": { bgcolor: d.actionHover, boxShadow: "none" },
-            "&.Mui-disabled": { bgcolor: d.border, color: d.muted },
           }}
         >
-          Verify
+          Back to login
         </Button>
-      </Box>
+      ) : (
+        <>
+          <Typography sx={{ fontSize: 13, color: d.muted, mb: "16px" }}>
+            Enter the verification code from your authenticator app or use a
+            backup code:
+          </Typography>
+
+          <Box sx={{ display: "flex", gap: "10px", alignItems: "flex-start" }}>
+            <TextField
+              inputRef={textFieldRef}
+              label="Verification Code"
+              value={token}
+              onChange={(e) => setToken(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && token) {
+                  handleVerify();
+                }
+              }}
+              fullWidth
+              sx={{
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: "8px",
+                  fontFamily: fonts.body,
+                  "& fieldset": { borderColor: d.inputBorder },
+                  "&:hover fieldset": { borderColor: d.action },
+                },
+                "& .MuiOutlinedInput-root.Mui-focused fieldset": {
+                  borderColor: d.action,
+                  borderWidth: "2px",
+                },
+                "& .MuiInputLabel-root": { fontFamily: fonts.body },
+              }}
+            />
+            <Button
+              onClick={handleVerify}
+              disabled={!token}
+              sx={{
+                minHeight: 44,
+                px: "18px",
+                flexShrink: 0,
+                borderRadius: "8px",
+                textTransform: "none",
+                fontWeight: 650,
+                fontFamily: fonts.body,
+                color: "#fff",
+                bgcolor: d.action,
+                boxShadow: "none",
+                "&:hover": { bgcolor: d.actionHover, boxShadow: "none" },
+                "&.Mui-disabled": { bgcolor: d.border, color: d.muted },
+              }}
+            >
+              Verify
+            </Button>
+          </Box>
+        </>
+      )}
     </Box>
   );
 }

@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
-import { generateTokens, signEnrollmentToken } from "@/lib/jwt";
+import {
+  generateTokens,
+  signEnrollmentToken,
+  signPendingTwoFactorToken,
+} from "@/lib/jwt";
 import { twoFactorRequirement } from "@/lib/auth/twoFactorPolicy";
 import {
   redirectPathForRole,
   setEnrollmentCookie,
+  setPendingTwoFactorCookie,
   setSessionCookies,
 } from "@/lib/auth/sessionCookies";
 import {
@@ -111,12 +116,18 @@ export async function POST(request: NextRequest) {
     // Correct password: only failed attempts should count toward a lockout.
     await clearAuthRateLimitForEmail("login", email);
 
-    // Require 2FA only when this specific user has 2FA enabled.
+    // Require 2FA only when this specific user has 2FA enabled. The pending
+    // token proves the password step to /api/auth/2fa/validate (C-3).
     if (user.twoFactorAuth?.enabled) {
-      return NextResponse.json({
+      const response = NextResponse.json({
         requiresTwoFactor: true,
         message: "Please enter your 2FA code",
       });
+      setPendingTwoFactorCookie(
+        response,
+        await signPendingTwoFactorToken(user.id, user.role),
+      );
+      return response;
     }
 
     // M-1: past the grace period, no session until 2FA is set up. The

@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import speakeasy from "speakeasy";
 import { prisma } from "@/lib/prisma";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
-import { generateTokens } from "@/lib/jwt";
+import { generateTokens, verifyPendingTwoFactorToken } from "@/lib/jwt";
+import {
+  PENDING_2FA_COOKIE,
+  clearPendingTwoFactorCookie,
+} from "@/lib/auth/sessionCookies";
 import {
   clearAuthRateLimitForEmail,
   enforceAuthRateLimit,
@@ -10,6 +14,7 @@ import {
 } from "@/lib/rateLimit";
 import { canonicalEmail } from "@/lib/auth/emailIdentity";
 import { consumeBackupCode } from "@/lib/auth/backupCodes";
+import { isTokenBlacklisted } from "@/lib/auth/tokenBlacklist";
 
 export async function POST(req: NextRequest) {
   try {
@@ -31,6 +36,25 @@ export async function POST(req: NextRequest) {
     });
     if (limited) return limited;
 
+    // C-3: a 2FA/backup code only counts as the *second* factor. Require the
+    // pending token /api/login set after a correct password, for this user.
+    const pendingToken = req.cookies.get(PENDING_2FA_COOKIE)?.value;
+    let pendingUserId: string | null = null;
+    if (pendingToken && !(await isTokenBlacklisted(pendingToken))) {
+      try {
+        pendingUserId = (await verifyPendingTwoFactorToken(pendingToken))
+          .userId;
+      } catch {
+        pendingUserId = null;
+      }
+    }
+    if (!pendingUserId) {
+      return NextResponse.json(
+        { error: "Your sign-in has expired. Please log in again." },
+        { status: 401 },
+      );
+    }
+
     const user = await prisma.user.findUnique({
       where: { email: canonicalEmail(email) },
       select: {
@@ -42,7 +66,15 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    if (!user?.twoFactorAuth?.enabled) {
+    // The password was verified for a different account than this email.
+    if (!user || user.id !== pendingUserId) {
+      return NextResponse.json(
+        { error: "Your sign-in has expired. Please log in again." },
+        { status: 401 },
+      );
+    }
+
+    if (!user.twoFactorAuth?.enabled) {
       return NextResponse.json(
         { error: "2FA is not enabled for this user" },
         { status: 400 },
@@ -72,8 +104,10 @@ export async function POST(req: NextRequest) {
         redirectUrl = "/dashboard";
     }
 
-    // Create response WITHOUT cookies yet
+    // Create response WITHOUT cookies yet (only returned on success, which
+    // also uses up the pending token).
     const response = NextResponse.json({ success: true, redirectUrl });
+    clearPendingTwoFactorCookie(response);
 
     if (typeof token !== "string") {
       return NextResponse.json({ error: "Invalid token" }, { status: 400 });
@@ -95,6 +129,30 @@ export async function POST(req: NextRequest) {
 
     if (!totpVerified && !usedBackupCode) {
       return NextResponse.json({ error: "Invalid token" }, { status: 400 });
+    }
+
+    // Spend the pending token: one password check buys one login. The unique
+    // token column makes this atomic, so a replay or a parallel request with
+    // the same token fails here.
+    try {
+      await prisma.tokenBlacklist.create({
+        data: {
+          token: pendingToken!,
+          userId: user.id,
+          expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+        },
+      });
+    } catch (error) {
+      if (
+        error instanceof PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        return NextResponse.json(
+          { error: "Your sign-in has expired. Please log in again." },
+          { status: 401 },
+        );
+      }
+      throw error;
     }
 
     // consumeBackupCode already stamped lastUsedAt when it removed the code.

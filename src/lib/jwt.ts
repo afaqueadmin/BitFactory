@@ -9,9 +9,16 @@ export interface JwtPayload extends JWTPayload {
   mfa?: boolean;
 }
 
-// Short-lived token proving only "password correct, 2FA setup required" -
-// never a session. Lives in its own cookie and is refused by verifyJwtToken.
+// Short-lived tokens that prove one step of a login, never a session. Each
+// lives in its own path-scoped cookie and verifyJwtToken refuses them.
+//   2fa_enroll:  password correct, 2FA must be set up now (M-1)
+//   2fa_pending: password correct, 2FA code still to be entered (C-3)
 const ENROLLMENT_TOKEN_TYPE = "2fa_enroll";
+const PENDING_2FA_TOKEN_TYPE = "2fa_pending";
+const NON_SESSION_TYPES = new Set([
+  ENROLLMENT_TOKEN_TYPE,
+  PENDING_2FA_TOKEN_TYPE,
+]);
 
 // Read lazily (not at import time) so builds and public pages still load when
 // the variable is missing; auth operations fail closed instead of falling back
@@ -38,10 +45,10 @@ export async function verifyJwtToken(token: string): Promise<JwtPayload> {
   try {
     const payload = await decodeJwt(token);
 
-    // A 2FA-enrollment token must never pass as a session, even if someone
+    // A login-step token must never pass as a session, even if someone
     // copies it into the session cookie.
-    if (payload.type === ENROLLMENT_TOKEN_TYPE) {
-      throw new Error("Enrollment token is not a session");
+    if (payload.type && NON_SESSION_TYPES.has(payload.type)) {
+      throw new Error(`${payload.type} token is not a session`);
     }
 
     // Blacklist check is skipped on Edge (middleware) - Prisma can't run
@@ -66,7 +73,7 @@ export async function verifyJwtToken(token: string): Promise<JwtPayload> {
 
 export async function signJwtToken(
   payload: Omit<JwtPayload, "exp">,
-  expiresIn: "1h" | "7d" | "15m" | "2m" = "1h",
+  expiresIn: "1h" | "7d" | "15m" | "5m" | "2m" = "1h",
 ): Promise<string> {
   return await new SignJWT(payload)
     .setProtectedHeader({ alg: "HS256" })
@@ -92,17 +99,39 @@ export function signEnrollmentToken(userId: string, role: string) {
 }
 
 /** Verifies a token from signEnrollmentToken; rejects any other token. */
-export async function verifyEnrollmentToken(
+export function verifyEnrollmentToken(token: string): Promise<JwtPayload> {
+  return verifyLoginStepToken(token, ENROLLMENT_TOKEN_TYPE, "enrollment");
+}
+
+/**
+ * 5-minute token issued by /api/login after a correct password for an
+ * account with 2FA; /api/auth/2fa/validate requires it, so a 2FA or backup
+ * code alone can never log anyone in (C-3).
+ */
+export function signPendingTwoFactorToken(userId: string, role: string) {
+  return signJwtToken({ userId, role, type: PENDING_2FA_TOKEN_TYPE }, "5m");
+}
+
+/** Verifies a token from signPendingTwoFactorToken; rejects any other token. */
+export function verifyPendingTwoFactorToken(
   token: string,
+): Promise<JwtPayload> {
+  return verifyLoginStepToken(token, PENDING_2FA_TOKEN_TYPE, "pending 2FA");
+}
+
+async function verifyLoginStepToken(
+  token: string,
+  type: string,
+  label: string,
 ): Promise<JwtPayload> {
   try {
     const payload = await decodeJwt(token);
-    if (payload.type !== ENROLLMENT_TOKEN_TYPE) {
-      throw new Error("Not an enrollment token");
+    if (payload.type !== type) {
+      throw new Error(`Not a ${label} token`);
     }
     return payload;
   } catch (error) {
-    console.error("verifyEnrollmentToken error:", error);
-    throw new Error("Invalid or expired enrollment token");
+    console.error(`verify ${label} token error:`, error);
+    throw new Error(`Invalid or expired ${label} token`);
   }
 }
