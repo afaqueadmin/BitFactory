@@ -4,6 +4,7 @@ import { verifyJwtToken } from "@/lib/jwt";
 import bcrypt from "bcryptjs";
 import { AuditAction } from "@prisma/client";
 import { sendPasswordResetEmail } from "@/lib/email";
+import { verifyStepUp } from "@/lib/auth/stepUp";
 
 export async function PUT(
   request: NextRequest,
@@ -65,44 +66,62 @@ export async function PUT(
       );
     }
 
-    const { newPassword, emailPassword } = await request.json();
+    const { newPassword, currentPassword, twoFactorToken } =
+      await request.json();
 
-    if (!newPassword || newPassword.length < 8) {
+    if (
+      !newPassword ||
+      typeof newPassword !== "string" ||
+      newPassword.length < 8
+    ) {
       return NextResponse.json(
         { error: "Password must be at least 8 characters long" },
         { status: 400 },
       );
     }
 
-    // Hash the new password
-    const hashedPassword = await bcrypt.hash(newPassword, 12);
-
-    // Update user password
-    const updatedUser = await prisma.user.update({
-      where: { id },
-      data: {
-        password: hashedPassword,
-      },
-      select: {
-        email: true,
-      },
-    });
-
-    // Optionally email the new password to the client
-    if (emailPassword && updatedUser.email) {
-      // Reuse the existing password reset email template
-      void sendPasswordResetEmail(updatedUser.email, newPassword);
+    const stepUp = await verifyStepUp(
+      userId,
+      { currentPassword, twoFactorToken },
+      "reset a user's password",
+    );
+    if (!stepUp.ok) {
+      return NextResponse.json(
+        { error: stepUp.error, code: stepUp.code },
+        { status: stepUp.status },
+      );
     }
 
-    // Audit trail - a single row records both who did this and to whom,
-    // regardless of whether the target was also emailed.
+    // The target is always told. Sending is a precondition for the change
+    // being persisted, same as the self-service change-password route.
+    const emailResult = await sendPasswordResetEmail(
+      targetUser.email,
+      newPassword,
+    );
+    if (!emailResult.success) {
+      return NextResponse.json(
+        {
+          error:
+            "Could not email the user, so the password was not changed. Please try again.",
+        },
+        { status: 502 },
+      );
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
+    await prisma.user.update({
+      where: { id },
+      data: { password: hashedPassword },
+    });
+
+    // Audit trail - a single row records both who did this and to whom.
     await prisma.auditLog.create({
       data: {
         action: AuditAction.USER_PASSWORD_RESET,
         entityType: "User",
         entityId: id,
         userId,
-        description: `Password reset for ${updatedUser.email} by ${
+        description: `Password reset for ${targetUser.email} by ${
           user.role === "SUPER_ADMIN" ? "super admin" : "admin"
         } ${user.email}`,
         ipAddress: request.headers.get("x-forwarded-for") || "unknown",

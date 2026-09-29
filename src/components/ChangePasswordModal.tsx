@@ -13,13 +13,12 @@ import {
   CircularProgress,
   Alert,
 } from "@mui/material";
-import Checkbox from "@mui/material/Checkbox";
-import FormControlLabel from "@mui/material/FormControlLabel";
 import {
   Close as CloseIcon,
   Visibility,
   VisibilityOff,
 } from "@mui/icons-material";
+import { useUser } from "@/lib/hooks/useUser";
 
 interface ChangePasswordModalProps {
   open: boolean;
@@ -40,14 +39,18 @@ export default function ChangePasswordModal({
     newPassword: "",
     confirmPassword: "",
   });
-  const [emailPassword, setEmailPassword] = useState(false);
+  const { user } = useUser();
+  const requires2fa = !!user?.twoFactorEnabled;
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [twoFactorToken, setTwoFactorToken] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
   const handleClose = () => {
     onClose();
     setFormData({ newPassword: "", confirmPassword: "" });
-    setEmailPassword(false);
+    setCurrentPassword("");
+    setTwoFactorToken("");
     setError("");
     setSuccess("");
   };
@@ -68,6 +71,15 @@ export default function ChangePasswordModal({
       return;
     }
 
+    if (requires2fa && !twoFactorToken.trim()) {
+      setError("A 2FA code is required to reset a user's password");
+      return;
+    }
+    if (!requires2fa && !currentPassword) {
+      setError("Your current password is required to reset a user's password");
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -78,7 +90,8 @@ export default function ChangePasswordModal({
         },
         body: JSON.stringify({
           newPassword: formData.newPassword,
-          emailPassword,
+          currentPassword: requires2fa ? undefined : currentPassword,
+          twoFactorToken: requires2fa ? twoFactorToken.trim() : undefined,
         }),
       });
 
@@ -190,16 +203,30 @@ export default function ChangePasswordModal({
               }
               required
             />
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={emailPassword}
-                  onChange={(e) => setEmailPassword(e.target.checked)}
-                  color="primary"
-                />
-              }
-              label="Email new password to client"
-            />
+            <Alert severity="info">
+              The user will be emailed their new password.
+            </Alert>
+            {requires2fa ? (
+              <TextField
+                fullWidth
+                label="Your 2FA Code"
+                value={twoFactorToken}
+                onChange={(e) => setTwoFactorToken(e.target.value)}
+                helperText="Enter the code from your authenticator app, or a backup code"
+                inputProps={{ maxLength: 10 }}
+                required
+              />
+            ) : (
+              <TextField
+                fullWidth
+                label="Your Current Password"
+                type="password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                helperText="Confirm it's you before changing this password"
+                required
+              />
+            )}
           </Box>
         </DialogContent>
         <DialogActions sx={{ px: 3, py: 2 }}>
