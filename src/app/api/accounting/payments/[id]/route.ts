@@ -15,7 +15,19 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    await verifyJwtToken(token);
+    const decoded = await verifyJwtToken(token);
+
+    // Same gate as the list endpoint - any customer's payment can be read here.
+    const requester = await prisma.user.findUnique({
+      where: { id: decoded.userId },
+      select: { role: true },
+    });
+    if (requester?.role !== "ADMIN" && requester?.role !== "SUPER_ADMIN") {
+      return NextResponse.json(
+        { error: "Only administrators can access invoice payments" },
+        { status: 403 },
+      );
+    }
 
     const payment = await prisma.costPayment.findUnique({
       where: { id },
@@ -29,7 +41,8 @@ export async function GET(
             userId: true,
           },
         },
-        user: true,
+        // Never the whole row - it carries the password hash and 2FA data.
+        user: { select: { id: true, name: true, email: true } },
       },
     });
 
