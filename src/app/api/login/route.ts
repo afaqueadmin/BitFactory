@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { generateTokens } from "@/lib/jwt";
 import { checkAuthRateLimit, getClientIp } from "@/lib/rateLimit";
+import { canonicalEmail } from "@/lib/auth/emailIdentity";
 
 // Add runtime config for Node.js runtime
 export const runtime = "nodejs";
@@ -63,16 +64,13 @@ export async function POST(request: NextRequest) {
       console.error("[rateLimit:observe] login check failed:", rlError);
     }
 
-    // Match the exact account by email, case-insensitively.
-    // Avoid dot-stripping normalization here because it can route login to
-    // the wrong account when multiple emails normalize to the same value.
+    // Match the exact account by canonical email (M-4) - case-insensitive,
+    // dots significant. No dot-stripping: it can route login to the wrong
+    // account when multiple emails normalize to the same value.
     const user = await prisma.user.findFirst({
       where: {
         isDeleted: false,
-        email: {
-          equals: email,
-          mode: "insensitive",
-        },
+        email: canonicalEmail(email),
       },
       select: {
         id: true,

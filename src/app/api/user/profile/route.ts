@@ -2,6 +2,33 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
 import { resolveLuxorSubaccounts } from "@/lib/luxorSubaccounts";
+import {
+  canonicalEmail,
+  isEmailTaken,
+  isEmailUniqueViolation,
+} from "@/lib/auth/emailIdentity";
+import { Prisma } from "@prisma/client";
+
+// Everything the profile endpoints return. Explicit so the password hash and
+// 2FA secrets/backup codes never reach the browser.
+const PROFILE_SELECT = {
+  id: true,
+  email: true,
+  name: true,
+  phoneNumber: true,
+  dateOfBirth: true,
+  country: true,
+  city: true,
+  streetAddress: true,
+  profileImage: true,
+  profileImageId: true,
+  companyName: true,
+  idNumber: true,
+  companyUrl: true,
+  role: true,
+  twoFactorAuth: { select: { enabled: true } },
+  isDeleted: true,
+} satisfies Prisma.UserSelect;
 
 // Route segment config
 export const runtime = "nodejs";
@@ -74,24 +101,7 @@ export async function GET(request: NextRequest) {
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        phoneNumber: true,
-        dateOfBirth: true,
-        country: true,
-        city: true,
-        streetAddress: true,
-        profileImage: true,
-        profileImageId: true,
-        companyName: true,
-        idNumber: true,
-        companyUrl: true,
-        role: true,
-        twoFactorAuth: { select: { enabled: true } },
-        isDeleted: true,
-      },
+      select: PROFILE_SELECT,
     });
 
     if (!user) {
@@ -193,7 +203,7 @@ export async function PATCH(request: NextRequest) {
     const data = await request.json();
 
     // Validate required fields
-    if (!data.email?.trim()) {
+    if (typeof data.email !== "string" || !data.email.trim()) {
       return Response.json(
         { error: "Email is required" },
         {
@@ -205,46 +215,52 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    // Check if email is being changed and if it's already taken
-    if (data.email) {
-      const existingUser = await prisma.user.findFirst({
-        where: {
-          email: data.email,
-          NOT: { id: userId },
-        },
-      });
-
-      if (existingUser) {
-        return Response.json(
-          { error: "Email already in use" },
-          {
-            status: 400,
-            headers: {
-              "Cache-Control": "no-store, no-cache, must-revalidate",
-            },
+    const emailInUseResponse = () =>
+      Response.json(
+        { error: "Email already in use" },
+        {
+          status: 400,
+          headers: {
+            "Cache-Control": "no-store, no-cache, must-revalidate",
           },
-        );
-      }
+        },
+      );
+
+    // Case-insensitive, so "John@x.com" can't sit next to "john@x.com".
+    const email = canonicalEmail(data.email);
+    if (await isEmailTaken(email, userId)) {
+      return emailInUseResponse();
     }
 
     // Update user profile
-    const updatedUser = await prisma.user.update({
-      where: { id: userId },
-      data: {
-        email: data.email,
-        name: data.name,
-        phoneNumber: data.phoneNumber,
-        dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : undefined,
-        country: data.country,
-        city: data.city,
-        streetAddress: data.streetAddress,
-        companyName: data.companyName,
-        idNumber: data.idNumber,
-        companyUrl: data.companyUrl,
-        profileImage: data.profileImage,
-        profileImageId: data.profileImageId,
-      },
-    });
+    let updatedUser;
+    try {
+      updatedUser = await prisma.user.update({
+        where: { id: userId },
+        data: {
+          email,
+          name: data.name,
+          phoneNumber: data.phoneNumber,
+          dateOfBirth: data.dateOfBirth
+            ? new Date(data.dateOfBirth)
+            : undefined,
+          country: data.country,
+          city: data.city,
+          streetAddress: data.streetAddress,
+          companyName: data.companyName,
+          idNumber: data.idNumber,
+          companyUrl: data.companyUrl,
+          profileImage: data.profileImage,
+          profileImageId: data.profileImageId,
+        },
+        select: PROFILE_SELECT,
+      });
+    } catch (updateError) {
+      if (isEmailUniqueViolation(updateError)) {
+        return emailInUseResponse();
+      }
+      throw updateError;
+    }
 
     // Log the profile update activity
     await prisma.userActivity.create({

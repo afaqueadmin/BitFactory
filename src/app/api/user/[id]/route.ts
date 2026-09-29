@@ -11,6 +11,11 @@ import {
   setClientGroup,
   setLuxorSubaccounts,
 } from "@/lib/luxorSubaccounts";
+import {
+  canonicalEmail,
+  isEmailTaken,
+  isEmailUniqueViolation,
+} from "@/lib/auth/emailIdentity";
 
 export async function PUT(
   request: NextRequest,
@@ -163,6 +168,28 @@ export async function PUT(
       }
     }
 
+    // Only a SUPER_ADMIN may change a user's email. Same rule as every other
+    // email write (M-4): canonical form, unique case-insensitively.
+    let emailUpdate: string | undefined = undefined;
+    if (user.role === "SUPER_ADMIN" && body.email) {
+      if (typeof body.email !== "string") {
+        return NextResponse.json({ error: "Invalid email" }, { status: 400 });
+      }
+      emailUpdate = canonicalEmail(body.email);
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailUpdate)) {
+        return NextResponse.json(
+          { error: "Invalid email format" },
+          { status: 400 },
+        );
+      }
+      if (await isEmailTaken(emailUpdate, id)) {
+        return NextResponse.json(
+          { error: "Email is already in use" },
+          { status: 409 },
+        );
+      }
+    }
+
     // Update user with provided fields
     const updateData = {
       name: body.name,
@@ -172,7 +199,7 @@ export async function PUT(
       city: body.city,
       country: body.country,
       companyUrl: body.companyUrl,
-      email: user.role === "SUPER_ADMIN" && body.email ? body.email : undefined,
+      email: emailUpdate,
       franchiseeId: franchiseeIdUpdate,
       segment: segmentUpdate,
     };
@@ -232,6 +259,12 @@ export async function PUT(
     } catch (txError) {
       if (txError instanceof LuxorSubaccountConflictError) {
         return NextResponse.json({ error: txError.message }, { status: 409 });
+      }
+      if (isEmailUniqueViolation(txError)) {
+        return NextResponse.json(
+          { error: "Email is already in use" },
+          { status: 409 },
+        );
       }
       throw txError;
     }

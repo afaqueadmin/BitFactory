@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { hash } from "bcrypt";
 import { sendPasswordResetEmail } from "@/lib/email";
-import normalizeEmailUsername from "@/lib/helpers/normailizeEmailUsername";
+import { canonicalEmail } from "@/lib/auth/emailIdentity";
 import { checkAuthRateLimit, getClientIp } from "@/lib/rateLimit";
 
 export async function POST(request: NextRequest) {
@@ -40,16 +40,12 @@ export async function POST(request: NextRequest) {
       `[Password Reset API] Password reset requested for email: ${email}`,
     );
 
-    // Find all users and match by normalizing their stored email usernames
-    const allUsers = await prisma.user.findMany({
+    // Same account rule as login (M-4): exact match on the canonical email.
+    // Soft-deleted accounts can't log in, so they don't get resets either.
+    const user = await prisma.user.findFirst({
+      where: { email: canonicalEmail(email), isDeleted: false },
       select: { id: true, email: true },
     });
-
-    // Find user by comparing normalized email usernames
-    const normalizedUsername = normalizeEmailUsername(email);
-    const user = allUsers.find(
-      (u) => normalizeEmailUsername(u.email) === normalizedUsername,
-    );
 
     if (!user) {
       // For security, don't reveal if email exists or not
@@ -77,7 +73,7 @@ export async function POST(request: NextRequest) {
     console.log(`[Password Reset API] Password reset for user: ${user.id}`);
 
     // Send password reset email
-    const emailResult = await sendPasswordResetEmail(email, tempPassword);
+    const emailResult = await sendPasswordResetEmail(user.email, tempPassword);
 
     if (!emailResult.success) {
       console.error(

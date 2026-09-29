@@ -4,13 +4,14 @@ import { prisma } from "@/lib/prisma";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import { generateTokens } from "@/lib/jwt";
 import { checkAuthRateLimit, getClientIp } from "@/lib/rateLimit";
+import { canonicalEmail } from "@/lib/auth/emailIdentity";
 
 export async function POST(req: NextRequest) {
   try {
     // Get request body
     const { email, token } = await req.json();
     // For login validation
-    if (!email || !token) {
+    if (!email || typeof email !== "string" || !token) {
       return NextResponse.json(
         { error: "Email and token are required" },
         { status: 400 },
@@ -36,7 +37,7 @@ export async function POST(req: NextRequest) {
     }
 
     const user = await prisma.user.findUnique({
-      where: { email },
+      where: { email: canonicalEmail(email) },
       select: {
         id: true,
         role: true,

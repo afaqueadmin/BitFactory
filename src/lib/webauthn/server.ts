@@ -17,6 +17,7 @@ import type {
 } from "@simplewebauthn/types";
 
 import { prisma } from "@/lib/prisma";
+import { canonicalEmail } from "@/lib/auth/emailIdentity";
 import { base64urlToBytes, bufferToBase64url } from "./utils";
 
 function toUint8Array(value: string | Uint8Array | ArrayBuffer): Uint8Array {
@@ -335,7 +336,7 @@ export async function generateWebAuthnAuthenticationOptions(
   config: WebAuthnRuntimeConfig = {},
 ): Promise<PublicKeyCredentialRequestOptionsJSON> {
   const user = await prisma.user.findUnique({
-    where: { email: email.toLowerCase() },
+    where: { email: canonicalEmail(email) },
     select: {
       id: true,
       webauthnCredentials: { select: { credentialId: true, transports: true } },

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { canonicalEmail } from "@/lib/auth/emailIdentity";
 import { verifyWebAuthnAuthentication } from "@/lib/webauthn/server";
 import { WebAuthnAssertionResponse } from "@/types/webauthn";
 import { generateTokens } from "@/lib/jwt";
@@ -71,7 +72,7 @@ export async function POST(request: NextRequest) {
 
     // Get user
     const user = await prisma.user.findUnique({
-      where: { email: email.toLowerCase() },
+      where: { email: canonicalEmail(email) },
       select: {
         id: true,
         email: true,

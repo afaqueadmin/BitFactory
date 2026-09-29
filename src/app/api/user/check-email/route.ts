@@ -1,14 +1,30 @@
-import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
-import normalizeEmailUsername from "@/lib/helpers/normailizeEmailUsername";
+import { isEmailTaken } from "@/lib/auth/emailIdentity";
+import { verifyJwtToken } from "@/lib/jwt";
 
 /**
  * GET /api/user/check-email?email=test@example.com
- * Check if an email is already registered in the database
- * No authentication required (used during user creation flow)
+ * Check if an email is already registered in the database.
+ * ADMIN/SUPER_ADMIN only - it backs the admin create-user and
+ * create-franchisee forms, and left public it would let anyone probe which
+ * emails have accounts.
  */
 export async function GET(request: NextRequest) {
   try {
+    const token = request.cookies.get("token")?.value;
+    if (!token) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    let role: string;
+    try {
+      role = (await verifyJwtToken(token)).role;
+    } catch {
+      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
+    }
+    if (role !== "ADMIN" && role !== "SUPER_ADMIN") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
     const email = request.nextUrl.searchParams.get("email");
 
     console.log(`[Check Email API] Checking email: ${email}`);
@@ -20,18 +36,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Find all users and match by normalizing their stored email usernames
-    const allUsers = await prisma.user.findMany({
-      select: { id: true, email: true },
-    });
-
-    // Find user by comparing normalized email usernames
-    const normalizedUsername = normalizeEmailUsername(email);
-    const existingUser = allUsers.find(
-      (u) => normalizeEmailUsername(u.email) === normalizedUsername,
-    );
-
-    if (existingUser) {
+    if (await isEmailTaken(email)) {
       console.log(`[Check Email API] Email found in database: ${email}`);
       return NextResponse.json({ exists: true }, { status: 200 });
     }

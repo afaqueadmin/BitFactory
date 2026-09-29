@@ -12,7 +12,11 @@ import {
   setLuxorSubaccounts,
 } from "@/lib/luxorSubaccounts";
 import { sendWelcomeEmail } from "@/lib/email";
-import normalizeEmailUsername from "@/lib/helpers/normailizeEmailUsername";
+import {
+  canonicalEmail,
+  isEmailTaken,
+  isEmailUniqueViolation,
+} from "@/lib/auth/emailIdentity";
 import { generateTempPassword } from "@/lib/helpers/generateTempPassword";
 import { getOrCreatePaybackConfig } from "@/lib/paybackConfigHelpers";
 
@@ -77,7 +81,7 @@ export async function POST(request: NextRequest) {
 
     const {
       name,
-      email,
+      email: rawEmail,
       role,
       sendEmail,
       initialDeposit,
@@ -96,12 +100,13 @@ export async function POST(request: NextRequest) {
         : [];
 
     // Validate input
-    if (!name || !email || !role) {
+    if (!name || !rawEmail || typeof rawEmail !== "string" || !role) {
       return NextResponse.json(
         { error: "Name, email, and role are required" },
         { status: 400 },
       );
     }
+    const email = canonicalEmail(rawEmail);
 
     if (
       user &&
@@ -194,19 +199,7 @@ export async function POST(request: NextRequest) {
       }`,
     );
 
-    // Check if email is already in use
-    // Find all users and match by normalizing their stored email usernames
-    const allUsers = await prisma.user.findMany({
-      select: { id: true, email: true },
-    });
-
-    // Find user by comparing normalized email usernames
-    const normalizedUsername = normalizeEmailUsername(email);
-    const existingUser = allUsers.find(
-      (u) => normalizeEmailUsername(u.email) === normalizedUsername,
-    );
-
-    if (existingUser) {
+    if (await isEmailTaken(email)) {
       return NextResponse.json(
         { error: "Email is already in use" },
         { status: 400 },
@@ -254,6 +247,12 @@ export async function POST(request: NextRequest) {
       });
       console.log(`[User Create API] User created in DB: ${newUser.id}`);
     } catch (dbError) {
+      if (isEmailUniqueViolation(dbError)) {
+        return NextResponse.json(
+          { error: "Email is already in use" },
+          { status: 400 },
+        );
+      }
       console.error("[User Create API] Failed to create user in DB:", dbError);
       const message =
         dbError instanceof Error

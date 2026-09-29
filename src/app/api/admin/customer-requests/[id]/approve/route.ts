@@ -12,7 +12,11 @@ import { hash } from "bcrypt";
 import { verifyJwtToken } from "@/lib/jwt";
 import { AuditAction } from "@prisma/client";
 import { sendWelcomeEmail } from "@/lib/email";
-import normalizeEmailUsername from "@/lib/helpers/normailizeEmailUsername";
+import {
+  canonicalEmail,
+  isEmailTaken,
+  isEmailUniqueViolation,
+} from "@/lib/auth/emailIdentity";
 import { generateTempPassword } from "@/lib/helpers/generateTempPassword";
 import { getOrCreatePaybackConfig } from "@/lib/paybackConfigHelpers";
 import {
@@ -99,10 +103,11 @@ export async function POST(
         ? body.name.trim()
         : customerRequest.name;
 
-    const email =
+    const email = canonicalEmail(
       typeof body.email === "string" && body.email.trim()
-        ? body.email.trim()
-        : customerRequest.email;
+        ? body.email
+        : customerRequest.email,
+    );
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       return NextResponse.json(
@@ -141,15 +146,7 @@ export async function POST(
     }
 
     // Re-validate uniqueness at approval time (time may have passed since submission)
-    const allUsers = await prisma.user.findMany({
-      select: { id: true, email: true },
-    });
-    const normalizedUsername = normalizeEmailUsername(email);
-    if (
-      allUsers.some(
-        (u) => normalizeEmailUsername(u.email) === normalizedUsername,
-      )
-    ) {
+    if (await isEmailTaken(email)) {
       return NextResponse.json(
         { success: false, error: "Email is already in use" },
         { status: 400 },
@@ -263,6 +260,12 @@ export async function POST(
       },
     });
   } catch (error) {
+    if (isEmailUniqueViolation(error)) {
+      return NextResponse.json(
+        { success: false, error: "Email is already in use" },
+        { status: 400 },
+      );
+    }
     console.error("[Admin Customer Requests API] approve error:", error);
     return NextResponse.json(
       { success: false, error: "Failed to approve request" },

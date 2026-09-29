@@ -9,6 +9,9 @@ datasource db {
 
 model User {
   id                            String                       @id @default(cuid())
+  /// Stored canonical (trimmed, lowercased) - see src/lib/auth/emailIdentity.ts.
+  /// Also unique on lower(email) via "users_email_lower_key", an expression
+  /// index Prisma can't model (migration 20260929120000_users_email_lower_unique).
   email                         String                       @unique
   name                          String?
   password                      String

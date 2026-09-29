@@ -16,7 +16,7 @@ import { AuditAction } from "@prisma/client";
 import { logPoolCredentialChange } from "@/lib/audit/logPoolCredentialChange";
 import { hash } from "bcrypt";
 import { sendWelcomeEmail } from "@/lib/email";
-import normalizeEmailUsername from "@/lib/helpers/normailizeEmailUsername";
+import { canonicalEmail, isEmailTaken } from "@/lib/auth/emailIdentity";
 import { generateTempPassword } from "@/lib/helpers/generateTempPassword";
 import { getOrCreatePaybackConfig } from "@/lib/paybackConfigHelpers";
 import {
@@ -236,16 +236,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    // Check email uniqueness the same way /api/user/create does
-    const allUsers = await prisma.user.findMany({
-      select: { id: true, email: true },
-    });
-    const normalizedUsername = normalizeEmailUsername(email);
-    const existingUser = allUsers.find(
-      (u) => normalizeEmailUsername(u.email) === normalizedUsername,
-    );
-
-    if (existingUser) {
+    const loginEmail = canonicalEmail(email);
+    if (await isEmailTaken(loginEmail)) {
       return NextResponse.json(
         { success: false, error: "Email is already in use" } as ApiResponse,
         { status: 400 },
@@ -278,7 +270,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     let emailSent = false;
     if (sendEmail) {
-      const emailResult = await sendWelcomeEmail(email, tempPassword);
+      const emailResult = await sendWelcomeEmail(loginEmail, tempPassword);
       if (!emailResult.success) {
         console.error(
           "[Franchisees API] Failed to send welcome email:",
@@ -302,7 +294,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       const franchisee = await tx.user.create({
         data: {
           name: name.trim(),
-          email: email.trim(),
+          email: loginEmail,
           password: hashedPassword,
           role: "FRANCHISEE",
           invoicedAmount: defaultInvoicedAmount,

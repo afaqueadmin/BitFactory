@@ -12,7 +12,7 @@ import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
 import { AuditAction } from "@prisma/client";
 import { getOwnFranchise } from "@/lib/franchiseeScope";
-import normalizeEmailUsername from "@/lib/helpers/normailizeEmailUsername";
+import { canonicalEmail, isEmailTaken } from "@/lib/auth/emailIdentity";
 
 async function requireFranchisee(request: NextRequest) {
   const token = request.cookies.get("token")?.value;
@@ -133,16 +133,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Email uniqueness — same normalized-username comparison used elsewhere
-    const allUsers = await prisma.user.findMany({
-      select: { id: true, email: true },
-    });
-    const normalizedUsername = normalizeEmailUsername(email);
-    if (
-      allUsers.some(
-        (u) => normalizeEmailUsername(u.email) === normalizedUsername,
-      )
-    ) {
+    if (await isEmailTaken(email)) {
       return NextResponse.json(
         { success: false, error: "Email is already in use" },
         { status: 400 },
@@ -154,7 +145,7 @@ export async function POST(request: NextRequest) {
         franchiseId: franchise.id,
         requestedById: auth.decoded.userId,
         name: name.trim(),
-        email: email.trim(),
+        email: canonicalEmail(email),
         phoneNumber:
           typeof phoneNumber === "string" && phoneNumber.trim()
             ? phoneNumber.trim()
