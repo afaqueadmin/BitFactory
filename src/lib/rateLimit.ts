@@ -5,6 +5,7 @@
  * Callers decide what to do on `allowed: false` and whether to fail open or
  * closed if the database itself errors - errors are not swallowed here.
  */
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 // Rows older than this are purged, so no window may be longer than it.
@@ -135,8 +136,8 @@ export interface AuthRateLimitOutcome {
  * An axis is skipped, not counted as blocked, when its identifier is absent
  * (e.g. `getClientIp` returned null) - see its docstring for why.
  *
- * Callers decide what "blocked" means: during the observe-only rollout they
- * only log it, an enforcing caller returns 429.
+ * Auth routes go through enforceAuthRateLimit, which turns "blocked" into a
+ * 429.
  */
 export async function checkAuthRateLimit(
   scope: string,
@@ -166,6 +167,66 @@ export async function checkAuthRateLimit(
     ip,
     blocked: Boolean((email && !email.allowed) || (ip && !ip.allowed)),
   };
+}
+
+const TOO_MANY_ATTEMPTS = "Too many attempts. Please wait and try again.";
+
+/**
+ * Enforcing wrapper for auth routes: records the attempt and returns a 429
+ * response to send back if either axis is over its limit, else null.
+ *
+ * Fails open - if the attempt store itself errors, the request proceeds
+ * (logged). Failing closed would turn any database blip into a full login
+ * outage, and each route still has its own credential check.
+ */
+export async function enforceAuthRateLimit(
+  scope: string,
+  identifiers: { email?: string | null; ip?: string | null },
+  limits?: { perEmail?: RateLimitOptions; perIp?: RateLimitOptions },
+): Promise<NextResponse | null> {
+  let outcome: AuthRateLimitOutcome;
+  try {
+    outcome = await checkAuthRateLimit(scope, identifiers, limits);
+  } catch (error) {
+    console.error(`[rateLimit] ${scope} check failed, allowing:`, error);
+    return null;
+  }
+  if (!outcome.blocked) return null;
+
+  const retryAfterSeconds = Math.max(
+    outcome.email && !outcome.email.allowed
+      ? outcome.email.retryAfterSeconds
+      : 0,
+    outcome.ip && !outcome.ip.allowed ? outcome.ip.retryAfterSeconds : 0,
+  );
+  console.warn(`[rateLimit] ${scope} blocked`, {
+    email: identifiers.email,
+    ip: identifiers.ip,
+    emailBlocked: outcome.email ? !outcome.email.allowed : null,
+    ipBlocked: outcome.ip ? !outcome.ip.allowed : null,
+    retryAfterSeconds,
+  });
+  return NextResponse.json(
+    { error: TOO_MANY_ATTEMPTS, retryAfterSeconds },
+    { status: 429, headers: { "Retry-After": String(retryAfterSeconds) } },
+  );
+}
+
+/**
+ * After a successful authentication, forget that account's attempts for
+ * `scope` so legitimate repeat logins never add up to a lockout - only
+ * failures accumulate. Per-email axis only (see clearRateLimit). Never fails
+ * the caller.
+ */
+export async function clearAuthRateLimitForEmail(
+  scope: string,
+  email: string,
+): Promise<void> {
+  try {
+    await clearRateLimit(buildRateLimitKey(scope, "email", email));
+  } catch (error) {
+    console.error(`[rateLimit] Failed to clear ${scope} attempts:`, error);
+  }
 }
 
 // Keeps the table bounded without needing a cron job. Never fails the caller.

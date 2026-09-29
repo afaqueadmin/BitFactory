@@ -5,7 +5,11 @@ import { verifyWebAuthnAuthentication } from "@/lib/webauthn/server";
 import { WebAuthnAssertionResponse } from "@/types/webauthn";
 import { generateTokens } from "@/lib/jwt";
 import type { AuthenticationResponseJSON } from "@simplewebauthn/types";
-import { checkAuthRateLimit, getClientIp } from "@/lib/rateLimit";
+import {
+  clearAuthRateLimitForEmail,
+  enforceAuthRateLimit,
+  getClientIp,
+} from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
 
@@ -35,30 +39,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Observe-only for now - see H-1 in the plan. This is a full,
-    // independent login entry point (see C-3/Chain B), so it needs the same
-    // protection as password login.
-    try {
-      const rl = await checkAuthRateLimit("webauthn_authenticate", {
-        email,
-        ip: getClientIp(request.headers),
-      });
-      if (rl.blocked) {
-        console.warn(
-          "[rateLimit:observe] webauthn authenticate/verify would be blocked",
-          {
-            email,
-            emailRemaining: rl.email?.remaining,
-            ipRemaining: rl.ip?.remaining,
-          },
-        );
-      }
-    } catch (rlError) {
-      console.error(
-        "[rateLimit:observe] webauthn authenticate/verify check failed:",
-        rlError,
-      );
-    }
+    // H-1: a full, independent login entry point (see C-3/Chain B), so it
+    // gets the same attempt limits as password login.
+    const limited = await enforceAuthRateLimit("webauthn_authenticate", {
+      email,
+      ip: getClientIp(request.headers),
+    });
+    if (limited) return limited;
 
     const response: WebAuthnAssertionResponse = assertion;
 
@@ -170,6 +157,8 @@ export async function POST(request: NextRequest) {
         { status: 401 },
       );
     }
+
+    await clearAuthRateLimitForEmail("webauthn_authenticate", email);
 
     // Update counter to latest value (for cloning detection on next auth)
     await prisma.webAuthnCredential.update({

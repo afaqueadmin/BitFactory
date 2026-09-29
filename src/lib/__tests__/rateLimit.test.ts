@@ -16,7 +16,9 @@ import {
   buildRateLimitKey,
   checkAuthRateLimit,
   checkRateLimit,
+  clearAuthRateLimitForEmail,
   clearRateLimit,
+  enforceAuthRateLimit,
   getClientIp,
 } from "@/lib/rateLimit";
 
@@ -298,5 +300,64 @@ describe("checkAuthRateLimit", () => {
     );
 
     expect(result.blocked).toBe(true);
+  });
+});
+
+describe("enforceAuthRateLimit", () => {
+  it("returns null when within limits", async () => {
+    db.count.mockResolvedValue(1);
+
+    expect(
+      await enforceAuthRateLimit("login", { email: "a@b.com", ip: "1.2.3.4" }),
+    ).toBeNull();
+  });
+
+  it("returns a 429 with Retry-After when blocked", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    db.count.mockResolvedValue(11);
+    // Oldest in-window row 5 minutes old -> 10 minutes left of a 15-min window.
+    db.findFirst.mockResolvedValue({
+      createdAt: new Date(NOW.getTime() - 5 * 60 * 1000),
+    } as never);
+
+    const res = await enforceAuthRateLimit("login", {
+      email: "a@b.com",
+      ip: null,
+    });
+
+    expect(res?.status).toBe(429);
+    expect(res?.headers.get("Retry-After")).toBe("600");
+    expect(await res?.json()).toEqual({
+      error: "Too many attempts. Please wait and try again.",
+      retryAfterSeconds: 600,
+    });
+  });
+
+  it("fails open when the attempt store errors", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    db.create.mockRejectedValue(new Error("db down"));
+
+    expect(
+      await enforceAuthRateLimit("login", { email: "a@b.com", ip: "1.2.3.4" }),
+    ).toBeNull();
+  });
+});
+
+describe("clearAuthRateLimitForEmail", () => {
+  it("clears only the per-email key for that scope", async () => {
+    await clearAuthRateLimitForEmail("login", " A@B.com ");
+
+    expect(db.deleteMany).toHaveBeenCalledWith({
+      where: { key: "login:email:a@b.com" },
+    });
+  });
+
+  it("never throws", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    db.deleteMany.mockRejectedValue(new Error("db down"));
+
+    await expect(
+      clearAuthRateLimitForEmail("login", "a@b.com"),
+    ).resolves.toBeUndefined();
   });
 });

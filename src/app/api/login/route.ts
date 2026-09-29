@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { generateTokens } from "@/lib/jwt";
-import { checkAuthRateLimit, getClientIp } from "@/lib/rateLimit";
+import {
+  clearAuthRateLimitForEmail,
+  enforceAuthRateLimit,
+  getClientIp,
+} from "@/lib/rateLimit";
 import { canonicalEmail } from "@/lib/auth/emailIdentity";
 
 // Add runtime config for Node.js runtime
@@ -46,23 +50,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Observe-only for now: records real attempt volume and logs what would
-    // have been blocked, without rejecting anyone yet. See H-1 in the plan.
-    try {
-      const rl = await checkAuthRateLimit("login", {
-        email,
-        ip: getClientIp(request.headers),
-      });
-      if (rl.blocked) {
-        console.warn("[rateLimit:observe] login would be blocked", {
-          email,
-          emailRemaining: rl.email?.remaining,
-          ipRemaining: rl.ip?.remaining,
-        });
-      }
-    } catch (rlError) {
-      console.error("[rateLimit:observe] login check failed:", rlError);
-    }
+    // H-1: per-email and per-IP attempt limits. Counted before the account
+    // lookup, so the response is the same whether or not the email exists.
+    const limited = await enforceAuthRateLimit("login", {
+      email,
+      ip: getClientIp(request.headers),
+    });
+    if (limited) return limited;
 
     // Match the exact account by canonical email (M-4) - case-insensitive,
     // dots significant. No dot-stripping: it can route login to the wrong
@@ -107,6 +101,9 @@ export async function POST(request: NextRequest) {
         { status: 401 },
       );
     }
+
+    // Correct password: only failed attempts should count toward a lockout.
+    await clearAuthRateLimitForEmail("login", email);
 
     // Require 2FA only when this specific user has 2FA enabled.
     if (user.twoFactorAuth?.enabled) {

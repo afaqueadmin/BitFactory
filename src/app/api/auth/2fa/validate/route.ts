@@ -3,7 +3,11 @@ import speakeasy from "speakeasy";
 import { prisma } from "@/lib/prisma";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import { generateTokens } from "@/lib/jwt";
-import { checkAuthRateLimit, getClientIp } from "@/lib/rateLimit";
+import {
+  clearAuthRateLimitForEmail,
+  enforceAuthRateLimit,
+  getClientIp,
+} from "@/lib/rateLimit";
 import { canonicalEmail } from "@/lib/auth/emailIdentity";
 
 export async function POST(req: NextRequest) {
@@ -18,23 +22,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Observe-only for now - see H-1 in the plan. This is the endpoint that
-    // actually gates a 2FA login, so it matters most once enforcing starts.
-    try {
-      const rl = await checkAuthRateLimit("2fa_validate", {
-        email,
-        ip: getClientIp(req.headers),
-      });
-      if (rl.blocked) {
-        console.warn("[rateLimit:observe] 2fa/validate would be blocked", {
-          email,
-          emailRemaining: rl.email?.remaining,
-          ipRemaining: rl.ip?.remaining,
-        });
-      }
-    } catch (rlError) {
-      console.error("[rateLimit:observe] 2fa/validate check failed:", rlError);
-    }
+    // H-1: this endpoint is what actually gates a 2FA login, so it caps
+    // code/backup-code guessing per account and per IP.
+    const limited = await enforceAuthRateLimit("2fa_validate", {
+      email,
+      ip: getClientIp(req.headers),
+    });
+    if (limited) return limited;
 
     const user = await prisma.user.findUnique({
       where: { email: canonicalEmail(email) },
@@ -102,6 +96,8 @@ export async function POST(req: NextRequest) {
         },
       });
 
+      await clearAuthRateLimitForEmail("2fa_validate", email);
+
       // Backup code verified successfully, now set cookies
       response.cookies.set("token", accessToken, {
         httpOnly: true,
@@ -150,6 +146,8 @@ export async function POST(req: NextRequest) {
         userAgent: req.headers.get("user-agent") || "unknown",
       },
     });
+
+    await clearAuthRateLimitForEmail("2fa_validate", email);
 
     // TOTP verified successfully, now set cookies
     response.cookies.set("token", accessToken, {

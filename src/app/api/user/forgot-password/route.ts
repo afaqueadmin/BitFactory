@@ -3,7 +3,12 @@ import { prisma } from "@/lib/prisma";
 import { hash } from "bcrypt";
 import { sendPasswordResetEmail } from "@/lib/email";
 import { canonicalEmail } from "@/lib/auth/emailIdentity";
-import { checkAuthRateLimit, getClientIp } from "@/lib/rateLimit";
+import { enforceAuthRateLimit, getClientIp } from "@/lib/rateLimit";
+
+const FORGOT_PASSWORD_LIMITS = {
+  perEmail: { max: 3, windowSeconds: 60 * 60 },
+  perIp: { max: 10, windowSeconds: 60 * 60 },
+};
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,27 +19,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Email is required" }, { status: 400 });
     }
 
-    // Observe-only for now - see H-1 in the plan. This route currently
-    // overwrites the password on every call (C-1), so it's the highest
-    // priority one to watch before enforcing.
-    try {
-      const rl = await checkAuthRateLimit("forgot_password", {
-        email,
-        ip: getClientIp(request.headers),
-      });
-      if (rl.blocked) {
-        console.warn("[rateLimit:observe] forgot-password would be blocked", {
-          email,
-          emailRemaining: rl.email?.remaining,
-          ipRemaining: rl.ip?.remaining,
-        });
-      }
-    } catch (rlError) {
-      console.error(
-        "[rateLimit:observe] forgot-password check failed:",
-        rlError,
-      );
-    }
+    // H-1: tighter than the login defaults because, until C-1 is fixed, every
+    // call overwrites the account's password - so this caps how often anyone
+    // can force a reset on someone else. Nothing clears these counters.
+    const limited = await enforceAuthRateLimit(
+      "forgot_password",
+      { email, ip: getClientIp(request.headers) },
+      FORGOT_PASSWORD_LIMITS,
+    );
+    if (limited) return limited;
 
     console.log(
       `[Password Reset API] Password reset requested for email: ${email}`,
