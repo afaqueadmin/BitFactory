@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { verifyJwtToken } from "@/lib/jwt";
+import { signRegistrationChallenge, verifyJwtToken } from "@/lib/jwt";
+import { verifyStepUp } from "@/lib/auth/stepUp";
 import { generateWebAuthnRegistrationOptions } from "@/lib/webauthn/server";
 
 export const runtime = "nodejs";
@@ -18,7 +19,8 @@ function getWebAuthnConfig(request: NextRequest): {
 /**
  * POST /api/auth/webauthn/register/options
  * Get registration options for passkey setup
- * User must be authenticated (have valid JWT)
+ * User must be authenticated (have valid JWT) and re-verify with
+ * { currentPassword } or { twoFactorToken } in the body (C-2).
  */
 export async function POST(request: NextRequest) {
   try {
@@ -33,9 +35,11 @@ export async function POST(request: NextRequest) {
     }
 
     let userId: string;
+    let role: string;
     try {
       const decoded = await verifyJwtToken(token);
       userId = decoded.userId;
+      role = decoded.role;
     } catch (tokenError) {
       console.error(
         "WebAuthn register options: Token verification failed",
@@ -58,6 +62,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
+    // C-2: a passkey is a full, independent way into the account, so adding
+    // one needs the password (or a 2FA code) again, not just a live session.
+    const { currentPassword, twoFactorToken } = await request
+      .json()
+      .catch(() => ({}));
+    const stepUp = await verifyStepUp(
+      userId,
+      { currentPassword, twoFactorToken },
+      "add a passkey",
+    );
+    if (!stepUp.ok) {
+      return NextResponse.json(
+        { error: stepUp.error, code: stepUp.code },
+        { status: stepUp.status },
+      );
+    }
+
     // Generate registration options
     const webAuthnConfig = getWebAuthnConfig(request);
     const options = await generateWebAuthnRegistrationOptions(
@@ -73,7 +94,14 @@ export async function POST(request: NextRequest) {
 
     const response = NextResponse.json(options, { status: 200 });
 
-    response.cookies.set("webauthn_reg_challenge", options.challenge, {
+    // Bound to this user, so /register/verify can't finish it under another
+    // account's session.
+    const boundChallenge = await signRegistrationChallenge(
+      user.id,
+      role,
+      options.challenge,
+    );
+    response.cookies.set("webauthn_reg_challenge", boundChallenge, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",

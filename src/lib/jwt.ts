@@ -13,11 +13,14 @@ export interface JwtPayload extends JWTPayload {
 // lives in its own path-scoped cookie and verifyJwtToken refuses them.
 //   2fa_enroll:  password correct, 2FA must be set up now (M-1)
 //   2fa_pending: password correct, 2FA code still to be entered (C-3)
+//   webauthn_reg: a passkey-registration challenge bound to one user (C-2)
 const ENROLLMENT_TOKEN_TYPE = "2fa_enroll";
 const PENDING_2FA_TOKEN_TYPE = "2fa_pending";
+const WEBAUTHN_REG_TOKEN_TYPE = "webauthn_reg";
 const NON_SESSION_TYPES = new Set([
   ENROLLMENT_TOKEN_TYPE,
   PENDING_2FA_TOKEN_TYPE,
+  WEBAUTHN_REG_TOKEN_TYPE,
 ]);
 
 // Read lazily (not at import time) so builds and public pages still load when
@@ -73,7 +76,7 @@ export async function verifyJwtToken(token: string): Promise<JwtPayload> {
 
 export async function signJwtToken(
   payload: Omit<JwtPayload, "exp">,
-  expiresIn: "1h" | "7d" | "15m" | "5m" | "2m" = "1h",
+  expiresIn: "1h" | "7d" | "15m" | "10m" | "5m" | "2m" = "1h",
 ): Promise<string> {
   return await new SignJWT(payload)
     .setProtectedHeader({ alg: "HS256" })
@@ -117,6 +120,36 @@ export function verifyPendingTwoFactorToken(
   token: string,
 ): Promise<JwtPayload> {
   return verifyLoginStepToken(token, PENDING_2FA_TOKEN_TYPE, "pending 2FA");
+}
+
+/**
+ * Wraps a passkey-registration challenge with the user it was issued to, so
+ * /register/verify can't complete a ceremony started under another account
+ * (and only a user who passed step-up at /register/options gets one).
+ */
+export function signRegistrationChallenge(
+  userId: string,
+  role: string,
+  challenge: string,
+) {
+  return signJwtToken(
+    { userId, role, type: WEBAUTHN_REG_TOKEN_TYPE, challenge },
+    "10m",
+  );
+}
+
+export async function verifyRegistrationChallenge(
+  token: string,
+): Promise<{ userId: string; challenge: string }> {
+  const payload = await verifyLoginStepToken(
+    token,
+    WEBAUTHN_REG_TOKEN_TYPE,
+    "passkey registration",
+  );
+  if (typeof payload.challenge !== "string") {
+    throw new Error("Invalid or expired passkey registration token");
+  }
+  return { userId: payload.userId, challenge: payload.challenge };
 }
 
 async function verifyLoginStepToken(

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import speakeasy from "speakeasy";
 import { getUserInfoFromToken } from "@/lib/helpers/getUserInfoFromToken";
 import { twoFactorRequirement } from "@/lib/auth/twoFactorPolicy";
+import { notifySecurityChangeForUser } from "@/lib/auth/securityAlerts";
 
 export async function POST(req: NextRequest) {
   try {
@@ -75,6 +76,7 @@ export async function POST(req: NextRequest) {
       where: { userId },
       data: {
         secret: null,
+        pendingSecret: null,
         enabled: false,
         backupCodes: [],
       },
@@ -88,6 +90,12 @@ export async function POST(req: NextRequest) {
         userAgent: req.headers.get("user-agent") || "unknown",
       },
     });
+
+    await notifySecurityChangeForUser(
+      userId,
+      { type: "2FA_DISABLED" },
+      req.headers,
+    );
 
     return NextResponse.json({ success: true });
   } catch (error) {

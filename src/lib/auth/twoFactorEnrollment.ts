@@ -21,12 +21,13 @@ export async function beginTwoFactorSetup(userId: string) {
   });
   const qrCode = await QRCode.toDataURL(secret.otpauth_url!);
 
-  // Row may not exist yet for a user's first-ever setup - upsert covers both
-  // that and a re-run (e.g. scanning a fresh QR code).
+  // Stored as pending: any existing 2FA keeps working (secret/enabled are
+  // untouched) until a code from the new secret is confirmed (C-2). Row may
+  // not exist yet for a user's first-ever setup - upsert covers that too.
   await prisma.twoFactorAuth.upsert({
     where: { userId },
-    create: { userId, secret: secret.base32, enabled: false },
-    update: { secret: secret.base32, enabled: false },
+    create: { userId, pendingSecret: secret.base32, enabled: false },
+    update: { pendingSecret: secret.base32 },
   });
 
   return { secret: secret.base32, qrCode };
@@ -50,14 +51,19 @@ export async function completeTwoFactorSetup(
 
   const twoFactorAuth = await prisma.twoFactorAuth.findUnique({
     where: { userId },
-    select: { secret: true },
+    select: { secret: true, pendingSecret: true, enabled: true },
   });
-  if (!twoFactorAuth?.secret) {
+  // The setup in progress; setups started before pendingSecret existed left
+  // their new secret in `secret` with 2FA off.
+  const newSecret =
+    twoFactorAuth?.pendingSecret ??
+    (twoFactorAuth && !twoFactorAuth.enabled ? twoFactorAuth.secret : null);
+  if (!newSecret) {
     return { ok: false, error: "2FA has not been set up" };
   }
 
   const verified = speakeasy.totp.verify({
-    secret: twoFactorAuth.secret,
+    secret: newSecret,
     encoding: "base32",
     token: code,
     window: 1, // Allow 1 time step before/after for clock drift
@@ -66,11 +72,14 @@ export async function completeTwoFactorSetup(
     return { ok: false, error: "Invalid token" };
   }
 
+  // The new authenticator replaces any previous one, with fresh backup codes.
   const backupCodes = generateBackupCodes();
   await prisma.twoFactorAuth.update({
     where: { userId },
     data: {
       enabled: true,
+      secret: newSecret,
+      pendingSecret: null,
       backupCodes: await hashBackupCodes(backupCodes),
       enrolledAt: new Date(),
     },

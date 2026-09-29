@@ -30,6 +30,7 @@ import {
 import { CheckCircleOutline, Close, ErrorOutline } from "@mui/icons-material";
 import { PhotoCamera } from "@mui/icons-material";
 import { RADIUS_CARD, useDaylight } from "@/lib/daylight";
+import { useStepUp } from "@/components/StepUpDialog";
 
 // Create a Grid component that includes the 'item' prop
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -53,6 +54,7 @@ export default function AccountSettings() {
   const { d, fonts } = useDaylight();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const { withStepUp, stepUpDialog } = useStepUp();
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [formData, setFormData] = useState<UserProfile>({
@@ -153,15 +155,19 @@ export default function AccountSettings() {
     setSuccess(null);
 
     try {
-      const response = await fetch("/api/user/profile", {
-        method: "PATCH",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-          "Cache-Control": "no-cache",
-        },
-        body: JSON.stringify(formData),
-      });
+      // C-2: changing the email makes the server ask for the password (or
+      // a 2FA code) first; other edits go straight through.
+      const response = await withStepUp((creds) =>
+        fetch("/api/user/profile", {
+          method: "PATCH",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+            "Cache-Control": "no-cache",
+          },
+          body: JSON.stringify({ ...formData, ...creds }),
+        }),
+      );
 
       const data = await response.json();
 
@@ -216,6 +222,7 @@ export default function AccountSettings() {
     <Box
       sx={{ maxWidth: 1200, mx: "auto", fontFamily: fonts.body, color: d.text }}
     >
+      {stepUpDialog}
       <Box sx={{ mb: { xs: "20px", md: "26px" } }}>
         <Typography
           component="h1"

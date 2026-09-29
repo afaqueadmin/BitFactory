@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getUserInfoFromToken } from "@/lib/helpers/getUserInfoFromToken";
 import { completeTwoFactorSetup } from "@/lib/auth/twoFactorEnrollment";
+import { notifySecurityChangeForUser } from "@/lib/auth/securityAlerts";
 
 export async function POST(req: NextRequest) {
   try {
@@ -37,6 +38,12 @@ export async function POST(req: NextRequest) {
         userAgent: req.headers.get("user-agent") || "unknown",
       },
     });
+
+    await notifySecurityChangeForUser(
+      userId,
+      { type: "2FA_ENABLED" },
+      req.headers,
+    );
 
     return NextResponse.json({
       success: true,

@@ -269,16 +269,19 @@ model WebAuthnCredential {
 // columns for pre-existing accounts). Those legacy columns on User are left
 // in place as a fallback and are not written to going forward.
 model TwoFactorAuth {
-  id          String    @id @default(cuid())
-  userId      String    @unique
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  enabled     Boolean   @default(false)
-  secret      String?
-  backupCodes String[]
-  enrolledAt  DateTime?
-  lastUsedAt  DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id            String    @id @default(cuid())
+  userId        String    @unique
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  enabled       Boolean   @default(false)
+  secret        String?
+  /// New secret from a setup in progress. Becomes `secret` only once a code
+  /// from it is confirmed, so starting setup never switches off working 2FA.
+  pendingSecret String?
+  backupCodes   String[]
+  enrolledAt    DateTime?
+  lastUsedAt    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   @@map("two_factor_auth")
 }

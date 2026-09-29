@@ -15,6 +15,7 @@ import {
   setSessionCookies,
 } from "@/lib/auth/sessionCookies";
 import { completeTwoFactorSetup } from "@/lib/auth/twoFactorEnrollment";
+import { notifySecurityChange } from "@/lib/auth/securityAlerts";
 
 export const runtime = "nodejs";
 
@@ -69,6 +70,12 @@ export async function POST(request: NextRequest) {
     } catch (e) {
       console.error("Failed to create user session:", e);
     }
+
+    await notifySecurityChange(
+      user.email,
+      { type: "2FA_ENABLED" },
+      request.headers,
+    );
 
     // The code just entered is the second factor for this login.
     const { accessToken, refreshToken } = await generateTokens(

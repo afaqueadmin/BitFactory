@@ -29,6 +29,7 @@ import AddIcon from "@mui/icons-material/Add";
 import { isWebAuthnSupported } from "@/lib/webauthn/utils";
 import { registerPasskey, getPasskeys } from "@/lib/webauthn/registration";
 import { RADIUS_CARD, useDaylight } from "@/lib/daylight";
+import { useStepUp } from "@/components/StepUpDialog";
 
 interface Credential {
   id: string;
@@ -45,6 +46,7 @@ export default function PasskeySettings({
   daylight?: boolean;
 } = {}): React.ReactNode {
   const { d, fonts } = useDaylight();
+  const { requestStepUp, stepUpDialog } = useStepUp();
   const [credentials, setCredentials] = useState<Credential[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -96,7 +98,13 @@ export default function PasskeySettings({
     setSuccess(null);
 
     try {
-      const result = await registerPasskey(newCredentialName);
+      let result = await registerPasskey(newCredentialName);
+      // C-2: adding a passkey needs the password / a 2FA code again.
+      if (result.stepUpCode) {
+        const creds = await requestStepUp(result.stepUpCode);
+        if (!creds) return;
+        result = await registerPasskey(newCredentialName, creds);
+      }
 
       if (result.success) {
         setSuccess("Passkey registered successfully!");
@@ -201,45 +209,51 @@ export default function PasskeySettings({
   // Dialogs (add/rename/delete) are left on default MUI styling in both
   // variants - they're genuine overlays, not the page's primary content.
   const addDialog = (
-    <Dialog
-      open={addDialogOpen}
-      onClose={() => setAddDialogOpen(false)}
-      maxWidth="sm"
-      fullWidth
-    >
-      <DialogTitle>Add New Passkey</DialogTitle>
-      <DialogContent>
-        <Box sx={{ pt: 2 }}>
-          {error && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {error}
-            </Alert>
-          )}
-          <TextField
-            autoFocus
-            fullWidth
-            label="Passkey Name"
-            placeholder="e.g., My iPhone, Office Yubikey"
-            value={newCredentialName}
-            onChange={(e) => setNewCredentialName(e.target.value)}
+    <>
+      {stepUpDialog}
+      <Dialog
+        open={addDialogOpen}
+        onClose={() => setAddDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Add New Passkey</DialogTitle>
+        <DialogContent>
+          <Box sx={{ pt: 2 }}>
+            {error && (
+              <Alert severity="error" sx={{ mb: 2 }}>
+                {error}
+              </Alert>
+            )}
+            <TextField
+              autoFocus
+              fullWidth
+              label="Passkey Name"
+              placeholder="e.g., My iPhone, Office Yubikey"
+              value={newCredentialName}
+              onChange={(e) => setNewCredentialName(e.target.value)}
+              disabled={registering}
+              helperText="Give your passkey a friendly name to identify it"
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => setAddDialogOpen(false)}
             disabled={registering}
-            helperText="Give your passkey a friendly name to identify it"
-          />
-        </Box>
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={() => setAddDialogOpen(false)} disabled={registering}>
-          Cancel
-        </Button>
-        <Button
-          onClick={handleAddPasskey}
-          variant="contained"
-          disabled={registering || !newCredentialName.trim()}
-        >
-          {registering ? <CircularProgress size={24} /> : "Register"}
-        </Button>
-      </DialogActions>
-    </Dialog>
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleAddPasskey}
+            variant="contained"
+            disabled={registering || !newCredentialName.trim()}
+          >
+            {registering ? <CircularProgress size={24} /> : "Register"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </>
   );
 
   const editDialog = (

@@ -11,12 +11,14 @@ import {
 } from "@mui/material";
 import { registerPasskey } from "@/lib/webauthn/registration";
 import { isWebAuthnSupported } from "@/lib/webauthn/utils";
+import { useStepUp } from "@/components/StepUpDialog";
 
 const PASSKEY_OFFER_FLAG = "bf_offer_passkey_setup";
 
 export default function PasskeySetupPrompt() {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const { requestStepUp, stepUpDialog } = useStepUp();
 
   useEffect(() => {
     const run = async () => {
@@ -83,7 +85,12 @@ export default function PasskeySetupPrompt() {
   const handleSetup = async () => {
     setLoading(true);
     try {
-      const result = await registerPasskey();
+      let result = await registerPasskey();
+      // C-2: adding a passkey needs the password / a 2FA code again.
+      if (result.stepUpCode) {
+        const creds = await requestStepUp(result.stepUpCode);
+        if (creds) result = await registerPasskey(undefined, creds);
+      }
       if (!result.success) {
         console.error(
           "[PasskeySetupPrompt] Passkey registration failed:",
@@ -100,20 +107,23 @@ export default function PasskeySetupPrompt() {
   };
 
   return (
-    <Dialog open={open} onClose={handleDismiss} maxWidth="xs" fullWidth>
-      <DialogTitle>Set up a passkey?</DialogTitle>
-      <DialogContent>
-        <DialogContentText>
-          For faster and safer logins, would you like to set up a passkey (Face
-          ID / Touch ID / Windows Hello) on this device?
-        </DialogContentText>
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={handleDismiss}>Not now</Button>
-        <Button onClick={handleSetup} variant="contained" disabled={loading}>
-          {loading ? "Setting up..." : "Set up passkey"}
-        </Button>
-      </DialogActions>
-    </Dialog>
+    <>
+      {stepUpDialog}
+      <Dialog open={open} onClose={handleDismiss} maxWidth="xs" fullWidth>
+        <DialogTitle>Set up a passkey?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            For faster and safer logins, would you like to set up a passkey
+            (Face ID / Touch ID / Windows Hello) on this device?
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleDismiss}>Not now</Button>
+          <Button onClick={handleSetup} variant="contained" disabled={loading}>
+            {loading ? "Setting up..." : "Set up passkey"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </>
   );
 }

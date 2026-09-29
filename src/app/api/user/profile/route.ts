@@ -8,6 +8,8 @@ import {
   isEmailUniqueViolation,
 } from "@/lib/auth/emailIdentity";
 import { Prisma } from "@prisma/client";
+import { verifyStepUp } from "@/lib/auth/stepUp";
+import { notifySecurityChange } from "@/lib/auth/securityAlerts";
 import {
   twoFactorEnforceFrom,
   twoFactorRequirement,
@@ -244,6 +246,36 @@ export async function PATCH(request: NextRequest) {
       return emailInUseResponse();
     }
 
+    // C-2: the email is where password resets go, so changing it needs the
+    // password (or a 2FA code) again - not just a live session. Other profile
+    // fields don't.
+    const current = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true },
+    });
+    const emailChanging = !!current && current.email !== email;
+    if (emailChanging) {
+      const stepUp = await verifyStepUp(
+        userId,
+        {
+          currentPassword: data.currentPassword,
+          twoFactorToken: data.twoFactorToken,
+        },
+        "change your email",
+      );
+      if (!stepUp.ok) {
+        return Response.json(
+          { error: stepUp.error, code: stepUp.code },
+          {
+            status: stepUp.status,
+            headers: {
+              "Cache-Control": "no-store, no-cache, must-revalidate",
+            },
+          },
+        );
+      }
+    }
+
     // Update user profile
     let updatedUser;
     try {
@@ -286,6 +318,23 @@ export async function PATCH(request: NextRequest) {
         userAgent: request.headers.get("user-agent") || "unknown",
       },
     });
+
+    // M-5: tell both addresses - the old one is how a hijacked account's
+    // real owner finds out.
+    if (emailChanging && current) {
+      await Promise.all([
+        notifySecurityChange(
+          current.email,
+          { type: "EMAIL_CHANGED_FROM", newEmail: email },
+          request.headers,
+        ),
+        notifySecurityChange(
+          email,
+          { type: "EMAIL_CHANGED_TO", oldEmail: current.email },
+          request.headers,
+        ),
+      ]);
+    }
 
     return Response.json(
       { user: updatedUser },

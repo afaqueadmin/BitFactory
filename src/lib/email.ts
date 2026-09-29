@@ -163,6 +163,66 @@ export const sendPasswordResetEmail = async (
  * email. Sending this successfully is a precondition for the password change
  * being persisted - see the caller.
  */
+/**
+ * M-5: tells the account owner a security setting changed (2FA on/off,
+ * passkey added/removed, email changed), with where it came from and what to
+ * do if it wasn't them. Callers treat a failed send as non-fatal.
+ */
+export const sendSecurityAlertEmail = async (
+  email: string,
+  alert: {
+    subject: string;
+    heading: string;
+    message: string;
+    ipAddress: string;
+    userAgent: string;
+    at?: Date;
+  },
+) => {
+  const at = alert.at ?? new Date();
+  const mailOptions = {
+    from:
+      `BitFactory Admin <${process.env.SMTP_FROM}>` || "noreply@bitfactory.com",
+    to: email,
+    subject: `${alert.subject} - BitFactory`,
+    html: `
+      <h1>${escapeHtml(alert.heading)}</h1>
+      <p>${escapeHtml(alert.message)}</p>
+      <table style="border-collapse: collapse;">
+        <tr>
+          <td style="padding: 4px 12px 4px 0;"><strong>Account:</strong></td>
+          <td style="padding: 4px 0;">${escapeHtml(email)}</td>
+        </tr>
+        <tr>
+          <td style="padding: 4px 12px 4px 0;"><strong>Date &amp; Time:</strong></td>
+          <td style="padding: 4px 0;">${at.toLocaleString("en-US", { dateStyle: "long", timeStyle: "short" })}</td>
+        </tr>
+        <tr>
+          <td style="padding: 4px 12px 4px 0;"><strong>IP Address:</strong></td>
+          <td style="padding: 4px 0;">${escapeHtml(alert.ipAddress)}</td>
+        </tr>
+        <tr>
+          <td style="padding: 4px 12px 4px 0;"><strong>Device/Browser:</strong></td>
+          <td style="padding: 4px 0;">${escapeHtml(alert.userAgent)}</td>
+        </tr>
+      </table>
+      <p>If you made this change, no further action is required.</p>
+      <p><strong>If you did not make this change, please contact our support team immediately</strong> - your account may be compromised.</p>
+      <br>
+      <p>Best regards,</p>
+      <p>The BitFactory Team</p>
+    `,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    return { success: true };
+  } catch (error) {
+    console.error("Error sending security alert email:", error);
+    return { success: false, error };
+  }
+};
+
 export const sendPasswordChangedNotificationEmail = async (
   email: string,
   details: { ipAddress: string; userAgent: string; changedAt: Date },

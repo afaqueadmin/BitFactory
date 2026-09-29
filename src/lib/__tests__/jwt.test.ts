@@ -16,9 +16,11 @@ import {
   signEnrollmentToken,
   signJwtToken,
   signPendingTwoFactorToken,
+  signRegistrationChallenge,
   verifyEnrollmentToken,
   verifyJwtToken,
   verifyPendingTwoFactorToken,
+  verifyRegistrationChallenge,
 } from "@/lib/jwt";
 import { getUserInfoFromToken } from "@/lib/helpers/getUserInfoFromToken";
 
@@ -141,6 +143,26 @@ describe("JWT secret handling", () => {
       );
       await expect(verifyPendingTwoFactorToken(accessToken)).rejects.toThrow(
         "Invalid or expired pending 2FA token",
+      );
+    });
+
+    it("binds a passkey-registration challenge to its user and never treats it as a session", async () => {
+      const token = await signRegistrationChallenge(
+        "user-10",
+        "CLIENT",
+        "chal-abc",
+      );
+
+      expect(await verifyRegistrationChallenge(token)).toEqual({
+        userId: "user-10",
+        challenge: "chal-abc",
+      });
+      await expect(verifyJwtToken(token)).rejects.toThrow(
+        "Invalid or expired token",
+      );
+      const { accessToken } = await generateTokens("user-10", "CLIENT");
+      await expect(verifyRegistrationChallenge(accessToken)).rejects.toThrow(
+        "Invalid or expired passkey registration token",
       );
     });
 

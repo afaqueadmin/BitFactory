@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { verifyJwtToken } from "@/lib/jwt";
+import { verifyJwtToken, verifyRegistrationChallenge } from "@/lib/jwt";
+import { notifySecurityChange } from "@/lib/auth/securityAlerts";
 import { verifyWebAuthnRegistration } from "@/lib/webauthn/server";
 import { WebAuthnAttestationResponse } from "@/types/webauthn";
 import type { RegistrationResponseJSON } from "@simplewebauthn/types";
@@ -76,9 +77,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    const expectedChallenge = request.cookies.get(
-      "webauthn_reg_challenge",
-    )?.value;
+    // C-2: the challenge cookie is a signed token naming the user who passed
+    // step-up at /register/options - it must be this session's user.
+    const challengeToken = request.cookies.get("webauthn_reg_challenge")?.value;
+    let expectedChallenge: string | null = null;
+    if (challengeToken) {
+      try {
+        const bound = await verifyRegistrationChallenge(challengeToken);
+        if (bound.userId === userId) expectedChallenge = bound.challenge;
+      } catch {
+        expectedChallenge = null;
+      }
+    }
 
     if (!expectedChallenge) {
       console.warn(
@@ -168,6 +178,12 @@ export async function POST(request: NextRequest) {
       });
 
       console.log("WebAuthn register verify: Activity logged");
+
+      await notifySecurityChange(
+        user.email,
+        { type: "PASSKEY_ADDED", name: credential.credentialName ?? "Passkey" },
+        request.headers,
+      );
 
       const successResponse = NextResponse.json(
         {

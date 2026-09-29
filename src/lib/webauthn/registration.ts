@@ -38,10 +38,16 @@ function getErrorDetails(error: unknown): {
  * Client-side WebAuthn registration (passkey setup)
  * Called from security settings page
  */
-export async function registerPasskey(credentialName?: string): Promise<{
+export async function registerPasskey(
+  credentialName?: string,
+  /** Re-verification for /register/options (C-2): password or 2FA code. */
+  stepUp: { currentPassword?: string; twoFactorToken?: string } = {},
+): Promise<{
   success: boolean;
   credentialId?: string;
   error?: string;
+  /** Set when the server wants re-verification: prompt, then call again. */
+  stepUpCode?: "PASSWORD_REQUIRED" | "TWO_FACTOR_REQUIRED";
 }> {
   try {
     if (!isWebAuthnSupported()) {
@@ -64,11 +70,27 @@ export async function registerPasskey(credentialName?: string): Promise<{
     // Get registration options from server
     const optionsResponse = await fetch("/api/auth/webauthn/register/options", {
       method: "POST",
+      headers: { "Content-Type": "application/json" },
       credentials: "include",
+      body: JSON.stringify(stepUp),
     });
 
     if (!optionsResponse.ok) {
       const errorData = await optionsResponse.json().catch(() => ({}));
+      if (
+        errorData.code === "PASSWORD_REQUIRED" ||
+        errorData.code === "TWO_FACTOR_REQUIRED"
+      ) {
+        return {
+          success: false,
+          stepUpCode: errorData.code,
+          error: errorData.error,
+        };
+      }
+      if (optionsResponse.status === 400 && errorData.error) {
+        // Wrong password / code: show the server's message as-is.
+        return { success: false, error: errorData.error };
+      }
       console.error("Failed to get registration options:", {
         status: optionsResponse.status,
         error: errorData,
@@ -104,12 +126,10 @@ export async function registerPasskey(credentialName?: string): Promise<{
 
       attestResp = attResp as Record<string, unknown>;
       console.log("WebAuthn registration ceremony completed successfully", {
-        hasAttestationObject: !!(
-          (attestResp.response as Record<string, unknown>)?.attestationObject
-        ),
-        hasClientDataJSON: !!(
-          (attestResp.response as Record<string, unknown>)?.clientDataJSON
-        ),
+        hasAttestationObject: !!(attestResp.response as Record<string, unknown>)
+          ?.attestationObject,
+        hasClientDataJSON: !!(attestResp.response as Record<string, unknown>)
+          ?.clientDataJSON,
       });
     } catch (error: unknown) {
       const errorDetails = getErrorDetails(error);
@@ -193,12 +213,10 @@ export async function registerPasskey(credentialName?: string): Promise<{
         id: attestResp.id,
         rawId: attestResp.rawId,
         response: {
-          clientDataJSON: (
-            attestResp.response as Record<string, unknown>
-          ).clientDataJSON,
-          attestationObject: (
-            attestResp.response as Record<string, unknown>
-          ).attestationObject,
+          clientDataJSON: (attestResp.response as Record<string, unknown>)
+            .clientDataJSON,
+          attestationObject: (attestResp.response as Record<string, unknown>)
+            .attestationObject,
         },
         type: attestResp.type,
         credentialName: credentialName || "My Passkey",

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
+import { notifySecurityChange } from "@/lib/auth/securityAlerts";
 
 export const runtime = "nodejs";
 
@@ -42,7 +43,7 @@ export async function GET(request: NextRequest) {
     console.error("WebAuthn credentials list error:", error);
     return NextResponse.json(
       { error: "Failed to list credentials" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -73,20 +74,24 @@ export async function DELETE(request: NextRequest) {
     if (!credentialId) {
       return NextResponse.json(
         { error: "Credential ID is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     // Verify ownership
     const credential = await prisma.webAuthnCredential.findUnique({
       where: { id: credentialId },
-      select: { userId: true },
+      select: {
+        userId: true,
+        credentialName: true,
+        user: { select: { email: true } },
+      },
     });
 
     if (!credential || credential.userId !== userId) {
       return NextResponse.json(
         { error: "Credential not found or unauthorized" },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -105,7 +110,7 @@ export async function DELETE(request: NextRequest) {
       if (!hasPassword?.password) {
         return NextResponse.json(
           { error: "Cannot delete last authentication method" },
-          { status: 400 }
+          { status: 400 },
         );
       }
     }
@@ -125,12 +130,18 @@ export async function DELETE(request: NextRequest) {
       },
     });
 
+    await notifySecurityChange(
+      credential.user.email,
+      { type: "PASSKEY_REMOVED", name: credential.credentialName ?? "Passkey" },
+      request.headers,
+    );
+
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (error) {
     console.error("WebAuthn credential delete error:", error);
     return NextResponse.json(
       { error: "Failed to delete credential" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -157,10 +168,14 @@ export async function PATCH(request: NextRequest) {
 
     const { credentialId, credentialName } = await request.json();
 
-    if (!credentialId || !credentialName || typeof credentialName !== "string") {
+    if (
+      !credentialId ||
+      !credentialName ||
+      typeof credentialName !== "string"
+    ) {
       return NextResponse.json(
         { error: "Credential ID and name are required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -173,7 +188,7 @@ export async function PATCH(request: NextRequest) {
     if (!credential || credential.userId !== userId) {
       return NextResponse.json(
         { error: "Credential not found or unauthorized" },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -193,7 +208,7 @@ export async function PATCH(request: NextRequest) {
     console.error("WebAuthn credential rename error:", error);
     return NextResponse.json(
       { error: "Failed to update credential" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

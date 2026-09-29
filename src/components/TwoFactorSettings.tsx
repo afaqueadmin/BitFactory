@@ -15,6 +15,7 @@ import {
 } from "@mui/material";
 import Image from "next/image";
 import { useQueryClient } from "@tanstack/react-query";
+import { useStepUp } from "@/components/StepUpDialog";
 import { RADIUS_CARD, useDaylight } from "@/lib/daylight";
 
 export default function TwoFactorSettings({
@@ -26,6 +27,7 @@ export default function TwoFactorSettings({
 }) {
   const { d, fonts } = useDaylight();
   const queryClient = useQueryClient();
+  const { withStepUp, stepUpDialog } = useStepUp();
   const [isTwoFactorEnabled, setIsTwoFactorEnabled] =
     useState(twoFactorEnabled);
   const [setupMode, setSetupMode] = useState(false);
@@ -77,9 +79,14 @@ export default function TwoFactorSettings({
 
   const startSetup = async () => {
     try {
-      const response = await fetch("/api/auth/2fa/setup", {
-        method: "POST",
-      });
+      // C-2: the server asks for the password (or current 2FA code) first.
+      const response = await withStepUp((creds) =>
+        fetch("/api/auth/2fa/setup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(creds),
+        }),
+      );
       const data = await response.json();
 
       if (data.error) {
@@ -332,6 +339,7 @@ export default function TwoFactorSettings({
           )}
 
           {backupCodesDialog}
+          {stepUpDialog}
           {disableDialog}
         </Paper>
       </Box>
@@ -516,6 +524,7 @@ export default function TwoFactorSettings({
       )}
 
       {backupCodesDialog}
+      {stepUpDialog}
       {disableDialog}
     </Box>
   );
