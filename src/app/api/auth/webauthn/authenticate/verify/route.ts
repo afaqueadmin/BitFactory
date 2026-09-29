@@ -184,9 +184,11 @@ export async function POST(request: NextRequest) {
     // via a verified assertion.
 
     // Generate tokens
+    // A verified passkey is itself a second factor (see NOTE above).
     const { accessToken, refreshToken } = await generateTokens(
       user.id,
       user.role,
+      { mfa: true },
     );
 
     // Create session

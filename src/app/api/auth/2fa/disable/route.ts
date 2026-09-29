@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import speakeasy from "speakeasy";
 import { getUserInfoFromToken } from "@/lib/helpers/getUserInfoFromToken";
+import { twoFactorRequirement } from "@/lib/auth/twoFactorPolicy";
 
 export async function POST(req: NextRequest) {
   try {
@@ -16,6 +17,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: "Invalid token", userId },
         { status: 401 },
+      );
+    }
+
+    // M-1: once 2FA is mandatory, it can't be switched off (setting it up
+    // again replaces the authenticator instead).
+    const account = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    });
+    if (account && twoFactorRequirement(account.role, false) === "enforced") {
+      return NextResponse.json(
+        {
+          error:
+            "Two-factor authentication is required for your account and can't be turned off.",
+        },
+        { status: 403 },
       );
     }
 

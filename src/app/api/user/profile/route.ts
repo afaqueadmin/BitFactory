@@ -8,6 +8,10 @@ import {
   isEmailUniqueViolation,
 } from "@/lib/auth/emailIdentity";
 import { Prisma } from "@prisma/client";
+import {
+  twoFactorEnforceFrom,
+  twoFactorRequirement,
+} from "@/lib/auth/twoFactorPolicy";
 
 // Everything the profile endpoints return. Explicit so the password hash and
 // 2FA secrets/backup codes never reach the browser.
@@ -134,12 +138,20 @@ export async function GET(request: NextRequest) {
     // Keep the response shape flat (twoFactorEnabled as a top-level boolean)
     // for existing consumers, even though it now lives in its own table.
     const { twoFactorAuth, ...userFields } = user;
+    const twoFactorEnabled = twoFactorAuth?.enabled ?? false;
 
     return Response.json(
       {
         user: {
           ...userFields,
-          twoFactorEnabled: twoFactorAuth?.enabled ?? false,
+          twoFactorEnabled,
+          // M-1: when set, the account must enable 2FA by this date (shown
+          // as a reminder in the app); null once it's enabled.
+          twoFactorRequiredBy:
+            twoFactorRequirement(userFields.role, twoFactorEnabled) ===
+            "satisfied"
+              ? null
+              : twoFactorEnforceFrom().toISOString(),
         },
         subaccounts: luxorSubaccounts,
         recentActivities,

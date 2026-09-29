@@ -14,6 +14,7 @@ import {
   Alert,
 } from "@mui/material";
 import Image from "next/image";
+import { useQueryClient } from "@tanstack/react-query";
 import { RADIUS_CARD, useDaylight } from "@/lib/daylight";
 
 export default function TwoFactorSettings({
@@ -24,6 +25,7 @@ export default function TwoFactorSettings({
   daylight?: boolean;
 }) {
   const { d, fonts } = useDaylight();
+  const queryClient = useQueryClient();
   const [isTwoFactorEnabled, setIsTwoFactorEnabled] =
     useState(twoFactorEnabled);
   const [setupMode, setSetupMode] = useState(false);
@@ -114,6 +116,8 @@ export default function TwoFactorSettings({
       setSetupMode(false);
       setToken("");
       setIsTwoFactorEnabled(true);
+      // Refresh cached user data so the 2FA reminder disappears right away.
+      void queryClient.invalidateQueries({ queryKey: ["user"] });
       setSuccessMessage("Two-factor authentication enabled successfully.");
     } catch {
       setError("Failed to verify 2FA token");

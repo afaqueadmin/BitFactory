@@ -3,6 +3,7 @@ import React from "react";
 import FranchiseHeader from "@/components/franchise/FranchiseHeader";
 import FranchiseSidebar from "@/components/franchise/FranchiseSidebar";
 import PasskeySetupPrompt from "@/components/PasskeySetupPrompt";
+import TwoFactorReminder from "@/components/TwoFactorReminder";
 import { Box } from "@mui/material";
 
 export default function FranchiseLayout({
@@ -14,6 +15,7 @@ export default function FranchiseLayout({
     <>
       <FranchiseHeader />
       <PasskeySetupPrompt />
+      <TwoFactorReminder />
       <Box sx={{ display: "flex" }}>
         <FranchiseSidebar />
         <Box

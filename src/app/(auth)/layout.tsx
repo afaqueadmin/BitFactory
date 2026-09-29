@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import AppBarComponent from "@/components/AppBar";
 import UserFooter from "@/components/UserFooter";
 import PasskeySetupPrompt from "@/components/PasskeySetupPrompt";
+import TwoFactorReminder from "@/components/TwoFactorReminder";
 import { useAuth } from "@/lib/contexts/auth-context";
 import { SubaccountFilterProvider } from "@/lib/contexts/subaccountFilter-context";
 import { useTheme } from "@/app/theme-provider";
@@ -53,6 +54,7 @@ export default function AuthLayout({
       >
         <AppBarComponent />
         <PasskeySetupPrompt />
+        <TwoFactorReminder />
         <Box
           component="main"
           sx={{

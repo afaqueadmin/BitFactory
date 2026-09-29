@@ -24,6 +24,8 @@ interface UserData {
   profileImageId: string | null;
   role: "ADMIN" | "SUPER_ADMIN" | "CLIENT" | "FRANCHISEE";
   twoFactorEnabled: boolean;
+  /** ISO date by which this account must enable 2FA; null if not needed. */
+  twoFactorRequiredBy?: string | null;
 }
 
 interface LuxorSubaccount {

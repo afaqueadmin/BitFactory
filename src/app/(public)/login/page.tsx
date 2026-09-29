@@ -17,6 +17,7 @@ import Visibility from "@mui/icons-material/Visibility";
 import VisibilityOff from "@mui/icons-material/VisibilityOff";
 import FingerprintIcon from "@mui/icons-material/Fingerprint";
 import TwoFactorVerification from "@/components/TwoFactorVerification";
+import TwoFactorEnrollment from "@/components/TwoFactorEnrollment";
 import ForgotPasswordModal from "@/components/ForgotPasswordModal";
 import { authenticateWithPasskey } from "@/lib/webauthn/authentication";
 import { isWebAuthnSupported } from "@/lib/webauthn/utils";
@@ -49,6 +50,7 @@ export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [showTwoFactor, setShowTwoFactor] = useState(false);
+  const [showTwoFactorSetup, setShowTwoFactorSetup] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [webAuthnSupported, setWebAuthnSupported] = useState(false);
   const [passKeyLoading, setPassKeyLoading] = useState(false);
@@ -88,6 +90,13 @@ export default function Login() {
         // If the server says 2FA is required for this login, go to 2FA flow.
         if (data.requiresTwoFactor) {
           setShowTwoFactor(true);
+          return;
+        }
+
+        // 2FA is mandatory and this account doesn't have it yet: set it up
+        // before the login completes.
+        if (data.requiresTwoFactorSetup) {
+          setShowTwoFactorSetup(true);
           return;
         }
 
@@ -187,7 +196,9 @@ export default function Login() {
           onClose={() => setShowForgotPassword(false)}
         />
 
-        {showTwoFactor ? (
+        {showTwoFactorSetup ? (
+          <TwoFactorEnrollment onComplete={handleTwoFactorVerified} />
+        ) : showTwoFactor ? (
           <TwoFactorVerification
             email={formData.email}
             onVerified={handleTwoFactorVerified}

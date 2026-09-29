@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken, generateTokens } from "@/lib/jwt";
+import { twoFactorRequirement } from "@/lib/auth/twoFactorPolicy";
 
 // Runtime config
 export const runtime = "nodejs";
@@ -50,20 +51,40 @@ export async function GET(request: NextRequest) {
         if (decoded && decoded.type === "refresh") {
           // Get user data - excludes soft-deleted accounts so a deleted
           // user can't keep refreshing into new token pairs indefinitely.
-          const user = await prisma.user.findFirst({
+          const found = await prisma.user.findFirst({
             where: { id: decoded.userId, isDeleted: false },
             select: {
               id: true,
               email: true,
               name: true,
               role: true,
+              twoFactorAuth: { select: { enabled: true } },
             },
           });
 
-          if (user) {
-            // Generate new tokens
+          // M-1: once 2FA is enforced, a password-only session of an account
+          // still without 2FA isn't extended - the next login goes through
+          // forced setup. Sessions from a 2FA code or passkey (mfa) are fine.
+          const blockedByTwoFactorPolicy =
+            !!found &&
+            decoded.mfa !== true &&
+            twoFactorRequirement(
+              found.role,
+              found.twoFactorAuth?.enabled ?? false,
+            ) === "enforced";
+
+          if (found && !blockedByTwoFactorPolicy) {
+            const user = {
+              id: found.id,
+              email: found.email,
+              name: found.name,
+              role: found.role,
+            };
+            // Generate new tokens, keeping how the session was established.
             const { accessToken, refreshToken: newRefreshToken } =
-              await generateTokens(user.id, user.role);
+              await generateTokens(user.id, user.role, {
+                mfa: decoded.mfa === true,
+              });
 
             // Create response with new tokens
             const response = NextResponse.json({

@@ -3,6 +3,7 @@ import React from "react";
 import AdminHeader from "@/components/admin/AdminHeader";
 import AdminSidebar from "@/components/admin/AdminSidebar";
 import PasskeySetupPrompt from "@/components/PasskeySetupPrompt";
+import TwoFactorReminder from "@/components/TwoFactorReminder";
 import { Box } from "@mui/material";
 import { AdminNavProvider } from "@/lib/contexts/admin-nav-context";
 
@@ -15,6 +16,7 @@ export default function ManageLayout({
     <AdminNavProvider>
       <AdminHeader />
       <PasskeySetupPrompt />
+      <TwoFactorReminder />
       <Box sx={{ display: "flex", height: "calc(100vh - 64px)" }}>
         <AdminSidebar />
         <Box

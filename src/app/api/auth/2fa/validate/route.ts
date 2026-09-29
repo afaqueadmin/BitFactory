@@ -55,6 +55,7 @@ export async function POST(req: NextRequest) {
     const { accessToken, refreshToken } = await generateTokens(
       user.id,
       user.role,
+      { mfa: true },
     );
 
     // Determine redirect URL based on role

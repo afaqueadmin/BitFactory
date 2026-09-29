@@ -11,7 +11,13 @@ vi.mock("@/lib/auth/tokenBlacklist", () => ({
   isTokenBlacklisted: (...args: unknown[]) => isTokenBlacklisted(...args),
 }));
 
-import { generateTokens, signJwtToken, verifyJwtToken } from "@/lib/jwt";
+import {
+  generateTokens,
+  signEnrollmentToken,
+  signJwtToken,
+  verifyEnrollmentToken,
+  verifyJwtToken,
+} from "@/lib/jwt";
 import { getUserInfoFromToken } from "@/lib/helpers/getUserInfoFromToken";
 
 const TEST_SECRET = "test-secret-".padEnd(64, "x");
@@ -85,6 +91,41 @@ describe("JWT secret handling", () => {
         "Invalid or expired token",
       );
       expect(isTokenBlacklisted).toHaveBeenCalledWith(accessToken);
+    });
+
+    it("carries the mfa claim on both tokens only when asked", async () => {
+      const plain = await generateTokens("user-5", "ADMIN");
+      expect((await verifyJwtToken(plain.accessToken)).mfa).toBeUndefined();
+
+      const withMfa = await generateTokens("user-5", "ADMIN", { mfa: true });
+      expect((await verifyJwtToken(withMfa.accessToken)).mfa).toBe(true);
+      const refresh = await verifyJwtToken(withMfa.refreshToken);
+      expect(refresh.mfa).toBe(true);
+      expect(refresh.type).toBe("refresh");
+    });
+
+    it("never accepts a 2FA-enrollment token as a session", async () => {
+      const enroll = await signEnrollmentToken("user-6", "ADMIN");
+
+      await expect(verifyJwtToken(enroll)).rejects.toThrow(
+        "Invalid or expired token",
+      );
+      expect(await getUserInfoFromToken(enroll)).toEqual({ userId: null });
+      expect((await verifyEnrollmentToken(enroll)).userId).toBe("user-6");
+    });
+
+    it("never accepts a session token as an enrollment token", async () => {
+      const { accessToken, refreshToken } = await generateTokens(
+        "user-7",
+        "CLIENT",
+      );
+
+      await expect(verifyEnrollmentToken(accessToken)).rejects.toThrow(
+        "Invalid or expired enrollment token",
+      );
+      await expect(verifyEnrollmentToken(refreshToken)).rejects.toThrow(
+        "Invalid or expired enrollment token",
+      );
     });
 
     it("skips the blacklist check on the Edge runtime (middleware) instead of failing to bundle it", async () => {

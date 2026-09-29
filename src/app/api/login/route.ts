@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
-import { generateTokens } from "@/lib/jwt";
+import { generateTokens, signEnrollmentToken } from "@/lib/jwt";
+import { twoFactorRequirement } from "@/lib/auth/twoFactorPolicy";
+import {
+  redirectPathForRole,
+  setEnrollmentCookie,
+  setSessionCookies,
+} from "@/lib/auth/sessionCookies";
 import {
   clearAuthRateLimitForEmail,
   enforceAuthRateLimit,
@@ -113,6 +119,20 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // M-1: past the grace period, no session until 2FA is set up. The
+    // enrollment token only unlocks /api/auth/2fa/enroll/*.
+    if (twoFactorRequirement(user.role, false) === "enforced") {
+      const response = NextResponse.json({
+        requiresTwoFactorSetup: true,
+        message: "Two-factor authentication is required for your account",
+      });
+      setEnrollmentCookie(
+        response,
+        await signEnrollmentToken(user.id, user.role),
+      );
+      return response;
+    }
+
     const ipAddress =
       request.headers.get("x-forwarded-for") ||
       request.headers.get("x-real-ip") ||
@@ -151,19 +171,7 @@ export async function POST(request: NextRequest) {
       user.role,
     );
 
-    // Determine redirect URL based on role
-    let redirectUrl: string;
-    switch (user.role) {
-      case "ADMIN":
-      case "SUPER_ADMIN":
-        redirectUrl = "/adminpanel";
-        break;
-      case "FRANCHISEE":
-        redirectUrl = "/franchise/dashboard";
-        break;
-      default:
-        redirectUrl = "/dashboard";
-    }
+    const redirectUrl = redirectPathForRole(user.role);
 
     // Create response
     const response = NextResponse.json(
@@ -181,23 +189,7 @@ export async function POST(request: NextRequest) {
       { status: 200 },
     );
 
-    // Set cookies with proper flags
-    response.cookies.set("token", accessToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: 60 * 60, // 1 hour
-      path: "/",
-    });
-
-    response.cookies.set("refresh_token", refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: 7 * 24 * 60 * 60, // 7 days
-      path: "/",
-    });
-
+    setSessionCookies(response, accessToken, refreshToken);
     return response;
   } catch (error) {
     console.error("Login error:", error);
