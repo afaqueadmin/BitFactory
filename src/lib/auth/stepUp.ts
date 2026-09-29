@@ -1,6 +1,7 @@
 import { compare } from "bcrypt";
 import speakeasy from "speakeasy";
 import { prisma } from "@/lib/prisma";
+import { consumeBackupCode } from "@/lib/auth/backupCodes";
 
 /**
  * Step-up re-authentication for sensitive actions where a live session cookie
@@ -8,7 +9,6 @@ import { prisma } from "@/lib/prisma";
  * user's own record, never from what the caller sends, so 2FA can't be dodged
  * by supplying a password instead.
  *
- * Same rules as the inline copy in POST /api/wallet/change-requests.
  * Node runtime only (Prisma + bcrypt).
  */
 
@@ -61,21 +61,7 @@ export async function verifyStepUp(
       };
     }
 
-    if (twoFactorAuth.backupCodes?.includes(twoFactorToken)) {
-      await prisma.twoFactorAuth.update({
-        where: { userId },
-        data: {
-          backupCodes: {
-            set: twoFactorAuth.backupCodes.filter(
-              (code) => code !== twoFactorToken,
-            ),
-          },
-          lastUsedAt: new Date(),
-        },
-      });
-      return { ok: true, method: "2FA" };
-    }
-
+    // Authenticator code first (cheap); backup codes cost a bcrypt compare each.
     const verified =
       !!twoFactorAuth.secret &&
       speakeasy.totp.verify({
@@ -84,15 +70,22 @@ export async function verifyStepUp(
         token: twoFactorToken,
         window: 1,
       });
-    if (!verified) {
-      return { ok: false, status: 400, error: "Invalid authentication code" };
+    if (verified) {
+      await prisma.twoFactorAuth.update({
+        where: { userId },
+        data: { lastUsedAt: new Date() },
+      });
+      return { ok: true, method: "2FA" };
     }
 
-    await prisma.twoFactorAuth.update({
-      where: { userId },
-      data: { lastUsedAt: new Date() },
-    });
-    return { ok: true, method: "2FA" };
+    // consumeBackupCode stamps lastUsedAt itself when it removes the code.
+    if (
+      await consumeBackupCode(userId, twoFactorAuth.backupCodes, twoFactorToken)
+    ) {
+      return { ok: true, method: "2FA" };
+    }
+
+    return { ok: false, status: 400, error: "Invalid authentication code" };
   }
 
   const { currentPassword } = credentials;

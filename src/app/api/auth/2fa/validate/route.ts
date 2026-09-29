@@ -9,6 +9,7 @@ import {
   getClientIp,
 } from "@/lib/rateLimit";
 import { canonicalEmail } from "@/lib/auth/emailIdentity";
+import { consumeBackupCode } from "@/lib/auth/backupCodes";
 
 export async function POST(req: NextRequest) {
   try {
@@ -73,53 +74,13 @@ export async function POST(req: NextRequest) {
     // Create response WITHOUT cookies yet
     const response = NextResponse.json({ success: true, redirectUrl });
 
-    // First check if it's a backup code
-    if (twoFactorAuth.backupCodes?.includes(token)) {
-      // Remove the used backup code
-      await prisma.twoFactorAuth.update({
-        where: { userId: user.id },
-        data: {
-          backupCodes: {
-            set: twoFactorAuth.backupCodes.filter((code) => code !== token),
-          },
-          lastUsedAt: new Date(),
-        },
-      });
-
-      // Log the backup code usage
-      await prisma.userActivity.create({
-        data: {
-          userId: user.id,
-          type: "2FA_BACKUP_CODE_USED",
-          ipAddress: req.headers.get("x-forwarded-for") || "unknown",
-          userAgent: req.headers.get("user-agent") || "unknown",
-        },
-      });
-
-      await clearAuthRateLimitForEmail("2fa_validate", email);
-
-      // Backup code verified successfully, now set cookies
-      response.cookies.set("token", accessToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
-        maxAge: 60 * 60, // 1 hour
-        path: "/",
-      });
-
-      response.cookies.set("refresh_token", refreshToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
-        maxAge: 7 * 24 * 60 * 60, // 7 days
-        path: "/",
-      });
-
-      return response;
+    if (typeof token !== "string") {
+      return NextResponse.json({ error: "Invalid token" }, { status: 400 });
     }
 
-    // Verify TOTP
-    const verified =
+    // Authenticator code first - it's cheap, while a backup-code check costs
+    // up to one bcrypt compare per remaining code.
+    const totpVerified =
       !!twoFactorAuth.secret &&
       speakeasy.totp.verify({
         secret: twoFactorAuth.secret,
@@ -127,21 +88,28 @@ export async function POST(req: NextRequest) {
         token: token,
         window: 1,
       });
+    const usedBackupCode =
+      !totpVerified &&
+      (await consumeBackupCode(user.id, twoFactorAuth.backupCodes, token));
 
-    if (!verified) {
+    if (!totpVerified && !usedBackupCode) {
       return NextResponse.json({ error: "Invalid token" }, { status: 400 });
     }
 
-    await prisma.twoFactorAuth.update({
-      where: { userId: user.id },
-      data: { lastUsedAt: new Date() },
-    });
+    // consumeBackupCode already stamped lastUsedAt when it removed the code.
+    if (totpVerified) {
+      await prisma.twoFactorAuth.update({
+        where: { userId: user.id },
+        data: { lastUsedAt: new Date() },
+      });
+    }
 
-    // Log successful 2FA verification
     await prisma.userActivity.create({
       data: {
         userId: user.id,
-        type: "2FA_VERIFICATION_SUCCESS",
+        type: usedBackupCode
+          ? "2FA_BACKUP_CODE_USED"
+          : "2FA_VERIFICATION_SUCCESS",
         ipAddress: req.headers.get("x-forwarded-for") || "unknown",
         userAgent: req.headers.get("user-agent") || "unknown",
       },
@@ -149,7 +117,7 @@ export async function POST(req: NextRequest) {
 
     await clearAuthRateLimitForEmail("2fa_validate", email);
 
-    // TOTP verified successfully, now set cookies
+    // Verified, now set cookies
     response.cookies.set("token", accessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",

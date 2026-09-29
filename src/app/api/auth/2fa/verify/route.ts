@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import speakeasy from "speakeasy";
 import { prisma } from "@/lib/prisma";
 import { getUserInfoFromToken } from "@/lib/helpers/getUserInfoFromToken";
+import { generateBackupCodes, hashBackupCodes } from "@/lib/auth/backupCodes";
 
 export async function POST(req: NextRequest) {
   try {
@@ -50,17 +51,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid token" }, { status: 400 });
     }
 
-    // Generate backup codes
-    const backupCodes = Array.from({ length: 10 }, () =>
-      Math.random().toString(36).substring(2, 8).toUpperCase(),
-    );
+    // Backup codes: returned to the user once below, stored only as hashes.
+    const backupCodes = generateBackupCodes();
 
     // Enable 2FA and save backup codes
     await prisma.twoFactorAuth.update({
       where: { userId },
       data: {
         enabled: true,
-        backupCodes,
+        backupCodes: await hashBackupCodes(backupCodes),
         enrolledAt: new Date(),
       },
     });

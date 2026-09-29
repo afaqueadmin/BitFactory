@@ -6,6 +6,7 @@ vi.mock("@/lib/prisma", () => ({
   prisma: {
     user: { findUnique: vi.fn() },
     twoFactorAuth: { update: vi.fn() },
+    $executeRaw: vi.fn(),
   },
 }));
 
@@ -14,6 +15,7 @@ import { verifyStepUp } from "@/lib/auth/stepUp";
 
 const findUser = vi.mocked(prisma.user.findUnique);
 const updateTwoFactor = vi.mocked(prisma.twoFactorAuth.update);
+const executeRaw = vi.mocked(prisma.$executeRaw);
 
 const PASSWORD = "correct-horse-battery";
 const ACTION = "add a passkey";
@@ -141,15 +143,36 @@ describe("verifyStepUp - account with 2FA enabled", () => {
     expect(updateTwoFactor).not.toHaveBeenCalled();
   });
 
-  it("accepts a backup code and consumes it", async () => {
+  it("accepts a hashed backup code and consumes it", async () => {
+    const hashed = [await hash("AAAAAAAAAA", 4), await hash("BBBBBBBBBB", 4)];
+    findUser.mockResolvedValue(userWith2FA(secret, hashed));
+    executeRaw.mockResolvedValue(1 as never);
+
+    expect(
+      await verifyStepUp("u1", { twoFactorToken: "aaaaa-aaaaa" }, ACTION),
+    ).toEqual({ ok: true, method: "2FA" });
+    expect(executeRaw).toHaveBeenCalledTimes(1);
+    // Removal is the atomic array_remove, not a read-modify-write update.
+    expect(updateTwoFactor).not.toHaveBeenCalled();
+  });
+
+  it("still accepts a legacy plaintext backup code", async () => {
     findUser.mockResolvedValue(userWith2FA(secret, ["AAAAAA", "BBBBBB"]));
+    executeRaw.mockResolvedValue(1 as never);
 
     expect(
       await verifyStepUp("u1", { twoFactorToken: "AAAAAA" }, ACTION),
     ).toEqual({ ok: true, method: "2FA" });
-    expect(updateTwoFactor).toHaveBeenCalledWith({
-      where: { userId: "u1" },
-      data: { backupCodes: { set: ["BBBBBB"] }, lastUsedAt: expect.any(Date) },
-    });
+  });
+
+  it("rejects a backup code already used by a concurrent request", async () => {
+    findUser.mockResolvedValue(
+      userWith2FA(secret, [await hash("AAAAAAAAAA", 4)]),
+    );
+    executeRaw.mockResolvedValue(0 as never);
+
+    expect(
+      await verifyStepUp("u1", { twoFactorToken: "AAAAAAAAAA" }, ACTION),
+    ).toEqual({ ok: false, status: 400, error: "Invalid authentication code" });
   });
 });

@@ -36,9 +36,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { AuditAction, Prisma } from "@prisma/client";
-import { compare } from "bcrypt";
-import speakeasy from "speakeasy";
 import { validate, Network } from "bitcoin-address-validation";
+import { verifyStepUp } from "@/lib/auth/stepUp";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
 import { fetchAddressForSubaccount } from "@/lib/wallet";
@@ -223,93 +222,23 @@ export async function POST(request: NextRequest) {
     // Which method is required is decided from the user's own record, never
     // from what the client claims - so a caller can't dodge 2FA just by
     // sending currentPassword instead of twoFactorToken.
-    const authUser = await prisma.user.findUnique({
-      where: { id: auth.decoded.userId },
-      select: {
-        email: true,
-        password: true,
-        twoFactorAuth: {
-          select: { enabled: true, secret: true, backupCodes: true },
-        },
-      },
-    });
-    if (!authUser) {
+    const stepUp = await verifyStepUp(
+      auth.decoded.userId,
+      { currentPassword, twoFactorToken },
+      "request a wallet change",
+    );
+    if (!stepUp.ok) {
       return NextResponse.json(
-        { success: false, error: "User not found" },
-        { status: 404 },
+        { success: false, error: stepUp.error, code: stepUp.code },
+        { status: stepUp.status },
       );
     }
+    const verifiedVia = stepUp.method;
 
-    let verifiedVia: "2FA" | "PASSWORD";
-
-    if (authUser.twoFactorAuth?.enabled) {
-      const twoFactorAuth = authUser.twoFactorAuth;
-      if (!twoFactorToken || typeof twoFactorToken !== "string") {
-        return NextResponse.json(
-          {
-            success: false,
-            error: "A 2FA code is required to request a wallet change",
-            code: "TWO_FACTOR_REQUIRED",
-          },
-          { status: 400 },
-        );
-      }
-
-      const isBackupCode = twoFactorAuth.backupCodes?.includes(twoFactorToken);
-      if (isBackupCode) {
-        await prisma.twoFactorAuth.update({
-          where: { userId: auth.decoded.userId },
-          data: {
-            backupCodes: {
-              set: twoFactorAuth.backupCodes.filter(
-                (code) => code !== twoFactorToken,
-              ),
-            },
-            lastUsedAt: new Date(),
-          },
-        });
-      } else {
-        const verified =
-          !!twoFactorAuth.secret &&
-          speakeasy.totp.verify({
-            secret: twoFactorAuth.secret,
-            encoding: "base32",
-            token: twoFactorToken,
-            window: 1,
-          });
-        if (!verified) {
-          return NextResponse.json(
-            { success: false, error: "Invalid authentication code" },
-            { status: 400 },
-          );
-        }
-        await prisma.twoFactorAuth.update({
-          where: { userId: auth.decoded.userId },
-          data: { lastUsedAt: new Date() },
-        });
-      }
-      verifiedVia = "2FA";
-    } else {
-      if (!currentPassword || typeof currentPassword !== "string") {
-        return NextResponse.json(
-          {
-            success: false,
-            error:
-              "Your current password is required to request a wallet change",
-            code: "PASSWORD_REQUIRED",
-          },
-          { status: 400 },
-        );
-      }
-      const passwordValid = await compare(currentPassword, authUser.password);
-      if (!passwordValid) {
-        return NextResponse.json(
-          { success: false, error: "Current password is incorrect" },
-          { status: 400 },
-        );
-      }
-      verifiedVia = "PASSWORD";
-    }
+    const authUser = await prisma.user.findUniqueOrThrow({
+      where: { id: auth.decoded.userId },
+      select: { email: true },
+    });
 
     const freezeWindowStart = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const existingActive = await prisma.walletChangeRequest.findFirst({
