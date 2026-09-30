@@ -2,6 +2,10 @@ import speakeasy from "speakeasy";
 import QRCode from "qrcode";
 import { prisma } from "@/lib/prisma";
 import { generateBackupCodes, hashBackupCodes } from "@/lib/auth/backupCodes";
+import {
+  clearUserFactorAttempts,
+  recordUserFactorAttempt,
+} from "@/lib/rateLimit";
 
 /**
  * Authenticator-app enrollment, shared by the settings page
@@ -35,7 +39,9 @@ export async function beginTwoFactorSetup(userId: string) {
 
 export type CompleteSetupResult =
   | { ok: true; backupCodes: string[] }
-  | { ok: false; error: string };
+  | { ok: false; status: 400 | 429 | 503; error: string };
+
+const CONFIRM_SCOPE = "2fa_confirm";
 
 /**
  * Confirms the first code from the authenticator app, enables 2FA and returns
@@ -46,7 +52,7 @@ export async function completeTwoFactorSetup(
   code: unknown,
 ): Promise<CompleteSetupResult> {
   if (!code || typeof code !== "string") {
-    return { ok: false, error: "Token is required" };
+    return { ok: false, status: 400, error: "Token is required" };
   }
 
   const twoFactorAuth = await prisma.twoFactorAuth.findUnique({
@@ -59,7 +65,13 @@ export async function completeTwoFactorSetup(
     twoFactorAuth?.pendingSecret ??
     (twoFactorAuth && !twoFactorAuth.enabled ? twoFactorAuth.secret : null);
   if (!newSecret) {
-    return { ok: false, error: "2FA has not been set up" };
+    return { ok: false, status: 400, error: "2FA has not been set up" };
+  }
+
+  // N-1: limited like every other code check made inside a session.
+  const attempt = await recordUserFactorAttempt(CONFIRM_SCOPE, userId);
+  if (!attempt.allowed) {
+    return { ok: false, status: attempt.status, error: attempt.error };
   }
 
   const verified = speakeasy.totp.verify({
@@ -69,8 +81,9 @@ export async function completeTwoFactorSetup(
     window: 1, // Allow 1 time step before/after for clock drift
   });
   if (!verified) {
-    return { ok: false, error: "Invalid token" };
+    return { ok: false, status: 400, error: "Invalid token" };
   }
+  await clearUserFactorAttempts(CONFIRM_SCOPE, userId);
 
   // The new authenticator replaces any previous one, with fresh backup codes.
   const backupCodes = generateBackupCodes();

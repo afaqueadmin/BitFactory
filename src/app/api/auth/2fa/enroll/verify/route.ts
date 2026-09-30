@@ -48,7 +48,10 @@ export async function POST(request: NextRequest) {
     const { token } = await request.json();
     const result = await completeTwoFactorSetup(user.id, token);
     if (!result.ok) {
-      return NextResponse.json({ error: result.error }, { status: 400 });
+      return NextResponse.json(
+        { error: result.error },
+        { status: result.status },
+      );
     }
 
     const ipAddress =

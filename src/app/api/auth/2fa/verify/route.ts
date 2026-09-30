@@ -24,7 +24,10 @@ export async function POST(req: NextRequest) {
 
     const result = await completeTwoFactorSetup(userId, token);
     if (!result.ok) {
-      return NextResponse.json({ error: result.error }, { status: 400 });
+      return NextResponse.json(
+        { error: result.error },
+        { status: result.status },
+      );
     }
     // Backup codes: returned to the user once below, stored only as hashes.
     const { backupCodes } = result;

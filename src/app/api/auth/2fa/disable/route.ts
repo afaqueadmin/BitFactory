@@ -4,6 +4,10 @@ import speakeasy from "speakeasy";
 import { getUserInfoFromToken } from "@/lib/helpers/getUserInfoFromToken";
 import { twoFactorRequirement } from "@/lib/auth/twoFactorPolicy";
 import { notifySecurityChangeForUser } from "@/lib/auth/securityAlerts";
+import {
+  clearUserFactorAttempts,
+  recordUserFactorAttempt,
+} from "@/lib/rateLimit";
 
 export async function POST(req: NextRequest) {
   try {
@@ -55,6 +59,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // N-1: a stolen session mustn't be able to guess its way to turning 2FA off.
+    const attempt = await recordUserFactorAttempt("2fa_disable", userId);
+    if (!attempt.allowed) {
+      return NextResponse.json(
+        { error: attempt.error },
+        { status: attempt.status },
+      );
+    }
+
     const isValid = speakeasy.totp.verify({
       secret: twoFactorAuth.secret,
       encoding: "base32",
@@ -68,6 +81,7 @@ export async function POST(req: NextRequest) {
         { status: 400 },
       );
     }
+    await clearUserFactorAttempts("2fa_disable", userId);
 
     // Disable 2FA by clearing the secret and backup codes - the row itself
     // is kept (not deleted), so enrolledAt/lastUsedAt history survives a

@@ -18,8 +18,10 @@ import {
   checkRateLimit,
   clearAuthRateLimitForEmail,
   clearRateLimit,
+  clearUserFactorAttempts,
   enforceAuthRateLimit,
   getClientIp,
+  recordUserFactorAttempt,
 } from "@/lib/rateLimit";
 
 const db = vi.mocked(prisma.authAttempt);
@@ -358,6 +360,62 @@ describe("clearAuthRateLimitForEmail", () => {
 
     await expect(
       clearAuthRateLimitForEmail("login", "a@b.com"),
+    ).resolves.toBeUndefined();
+  });
+});
+
+describe("recordUserFactorAttempt", () => {
+  it("allows attempts within the per-user limit", async () => {
+    db.count.mockResolvedValue(5 as never);
+
+    expect(await recordUserFactorAttempt("step_up", "user1")).toEqual({
+      allowed: true,
+    });
+    expect(db.create).toHaveBeenCalledWith({
+      data: { key: "step_up:user:user1" },
+    });
+  });
+
+  it("blocks the attempt after the limit with a wait time", async () => {
+    db.count.mockResolvedValue(6 as never);
+    // Oldest counted row expires 10 minutes from now.
+    db.findFirst.mockResolvedValue({
+      createdAt: new Date(NOW.getTime() - 5 * 60 * 1000),
+    } as never);
+
+    expect(await recordUserFactorAttempt("step_up", "user1")).toEqual({
+      allowed: false,
+      status: 429,
+      error:
+        "Too many incorrect attempts. Please wait 10 minutes and try again.",
+      retryAfterSeconds: 600,
+    });
+  });
+
+  it("fails closed when the attempt store errors", async () => {
+    db.create.mockRejectedValue(new Error("db down"));
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    expect(await recordUserFactorAttempt("step_up", "user1")).toMatchObject({
+      allowed: false,
+      status: 503,
+    });
+  });
+});
+
+describe("clearUserFactorAttempts", () => {
+  it("deletes that user's attempts for the scope", async () => {
+    await clearUserFactorAttempts("2fa_disable", "user1");
+    expect(db.deleteMany).toHaveBeenCalledWith({
+      where: { key: "2fa_disable:user:user1" },
+    });
+  });
+
+  it("never throws", async () => {
+    db.deleteMany.mockRejectedValue(new Error("db down"));
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    await expect(
+      clearUserFactorAttempts("step_up", "user1"),
     ).resolves.toBeUndefined();
   });
 });

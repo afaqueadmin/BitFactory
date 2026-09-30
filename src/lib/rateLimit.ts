@@ -229,6 +229,80 @@ export async function clearAuthRateLimitForEmail(
   }
 }
 
+/**
+ * Per-user limit on submitting a password or 2FA code from inside a signed-in
+ * session (step-up re-verification, 2FA disable/confirm, password change).
+ * These are what stop a stolen session from guessing its way to the password
+ * or a 2FA code (N-1). Only one account is involved, so there is no IP axis.
+ */
+export const USER_FACTOR_LIMIT: RateLimitOptions = {
+  max: 5,
+  windowSeconds: 15 * 60,
+};
+
+export type UserFactorAttempt =
+  | { allowed: true }
+  | { allowed: false; status: 429; error: string; retryAfterSeconds: number }
+  | { allowed: false; status: 503; error: string };
+
+/**
+ * Records one password/code submission for `userId` under `scope` and says
+ * whether it may be checked. Call it only when a credential was actually
+ * sent, and call clearUserFactorAttempts after it verifies, so only failures
+ * add up.
+ *
+ * Fails closed: if the attempt store errors, the action is refused. Unlike
+ * login, these are rare actions by one signed-in user, and each of them
+ * writes to the same database anyway.
+ */
+export async function recordUserFactorAttempt(
+  scope: string,
+  userId: string,
+  limit: RateLimitOptions = USER_FACTOR_LIMIT,
+): Promise<UserFactorAttempt> {
+  let result: RateLimitResult;
+  try {
+    result = await checkRateLimit(
+      buildRateLimitKey(scope, "user", userId),
+      limit,
+    );
+  } catch (error) {
+    console.error(`[rateLimit] ${scope} check failed, refusing:`, error);
+    return {
+      allowed: false,
+      status: 503,
+      error: "Couldn't verify right now. Please try again in a moment.",
+    };
+  }
+  if (result.allowed) return { allowed: true };
+
+  console.warn(`[rateLimit] ${scope} blocked`, {
+    userId,
+    retryAfterSeconds: result.retryAfterSeconds,
+  });
+  const minutes = Math.max(1, Math.ceil(result.retryAfterSeconds / 60));
+  return {
+    allowed: false,
+    status: 429,
+    error: `Too many incorrect attempts. Please wait ${minutes} minute${
+      minutes === 1 ? "" : "s"
+    } and try again.`,
+    retryAfterSeconds: result.retryAfterSeconds,
+  };
+}
+
+/** Forgets `userId`'s attempts for `scope` after a success. Never fails. */
+export async function clearUserFactorAttempts(
+  scope: string,
+  userId: string,
+): Promise<void> {
+  try {
+    await clearRateLimit(buildRateLimitKey(scope, "user", userId));
+  } catch (error) {
+    console.error(`[rateLimit] Failed to clear ${scope} attempts:`, error);
+  }
+}
+
 // Keeps the table bounded without needing a cron job. Never fails the caller.
 async function purgeExpiredSometimes(): Promise<void> {
   if (Math.random() >= PURGE_PROBABILITY) return;

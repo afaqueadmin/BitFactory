@@ -10,12 +10,23 @@ vi.mock("@/lib/prisma", () => ({
   },
 }));
 
+vi.mock("@/lib/rateLimit", () => ({
+  recordUserFactorAttempt: vi.fn(),
+  clearUserFactorAttempts: vi.fn(),
+}));
+
 import { prisma } from "@/lib/prisma";
+import {
+  clearUserFactorAttempts,
+  recordUserFactorAttempt,
+} from "@/lib/rateLimit";
 import { verifyStepUp } from "@/lib/auth/stepUp";
 
 const findUser = vi.mocked(prisma.user.findUnique);
 const updateTwoFactor = vi.mocked(prisma.twoFactorAuth.update);
 const executeRaw = vi.mocked(prisma.$executeRaw);
+const recordAttempt = vi.mocked(recordUserFactorAttempt);
+const clearAttempts = vi.mocked(clearUserFactorAttempts);
 
 const PASSWORD = "correct-horse-battery";
 const ACTION = "add a passkey";
@@ -35,6 +46,7 @@ function userWith2FA(secret: string, backupCodes: string[] = []) {
 
 beforeEach(async () => {
   vi.clearAllMocks();
+  recordAttempt.mockResolvedValue({ allowed: true });
   passwordHash = await hash(PASSWORD, 4);
 });
 
@@ -174,5 +186,75 @@ describe("verifyStepUp - account with 2FA enabled", () => {
     expect(
       await verifyStepUp("u1", { twoFactorToken: "AAAAAAAAAA" }, ACTION),
     ).toEqual({ ok: false, status: 400, error: "Invalid authentication code" });
+  });
+});
+
+describe("verifyStepUp - attempt limit (N-1)", () => {
+  const secret = speakeasy.generateSecret().base32;
+
+  it("doesn't count a request that sends no credential", async () => {
+    findUser.mockResolvedValue(userWithout2FA());
+    await verifyStepUp("u1", {}, ACTION);
+    findUser.mockResolvedValue(userWith2FA(secret));
+    await verifyStepUp("u1", {}, ACTION);
+
+    expect(recordAttempt).not.toHaveBeenCalled();
+  });
+
+  it("counts every submitted password or code under one shared scope", async () => {
+    findUser.mockResolvedValue(userWithout2FA());
+    await verifyStepUp("u1", { currentPassword: "nope" }, ACTION);
+    findUser.mockResolvedValue(userWith2FA(secret));
+    await verifyStepUp("u1", { twoFactorToken: "000000" }, "approve");
+
+    expect(recordAttempt.mock.calls).toEqual([
+      ["step_up", "u1"],
+      ["step_up", "u1"],
+    ]);
+  });
+
+  it("refuses once blocked, without checking the password", async () => {
+    findUser.mockResolvedValue(userWithout2FA());
+    recordAttempt.mockResolvedValue({
+      allowed: false,
+      status: 429,
+      error:
+        "Too many incorrect attempts. Please wait 3 minutes and try again.",
+      retryAfterSeconds: 150,
+    });
+
+    expect(
+      await verifyStepUp("u1", { currentPassword: PASSWORD }, ACTION),
+    ).toEqual({
+      ok: false,
+      status: 429,
+      error:
+        "Too many incorrect attempts. Please wait 3 minutes and try again.",
+    });
+    expect(clearAttempts).not.toHaveBeenCalled();
+  });
+
+  it("refuses a correct 2FA code once blocked", async () => {
+    findUser.mockResolvedValue(userWith2FA(secret));
+    recordAttempt.mockResolvedValue({
+      allowed: false,
+      status: 503,
+      error: "Couldn't verify right now. Please try again in a moment.",
+    });
+    const token = speakeasy.totp({ secret, encoding: "base32" });
+
+    expect(
+      await verifyStepUp("u1", { twoFactorToken: token }, ACTION),
+    ).toMatchObject({ ok: false, status: 503 });
+    expect(updateTwoFactor).not.toHaveBeenCalled();
+  });
+
+  it("clears the count after a success, not after a failure", async () => {
+    findUser.mockResolvedValue(userWithout2FA());
+    await verifyStepUp("u1", { currentPassword: "nope" }, ACTION);
+    expect(clearAttempts).not.toHaveBeenCalled();
+
+    await verifyStepUp("u1", { currentPassword: PASSWORD }, ACTION);
+    expect(clearAttempts).toHaveBeenCalledWith("step_up", "u1");
   });
 });

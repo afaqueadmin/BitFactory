@@ -3,6 +3,11 @@ import { hash, compare } from "bcrypt";
 import { NextRequest, NextResponse } from "next/server";
 import { verifyJwtToken } from "@/lib/jwt";
 import { sendPasswordChangedNotificationEmail } from "@/lib/email";
+import {
+  clearUserFactorAttempts,
+  recordUserFactorAttempt,
+} from "@/lib/rateLimit";
+import { STEP_UP_SCOPE } from "@/lib/auth/stepUp";
 
 export async function POST(request: NextRequest) {
   try {
@@ -69,6 +74,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
+    // N-1: shares the step-up budget, since the current-password check here
+    // is the same guess a stolen session would make there.
+    const attempt = await recordUserFactorAttempt(STEP_UP_SCOPE, userId);
+    if (!attempt.allowed) {
+      return NextResponse.json(
+        { error: attempt.error },
+        { status: attempt.status },
+      );
+    }
+
     // Verify current password
     const passwordValid = await compare(currentPassword, user.password);
     if (!passwordValid) {
@@ -77,6 +92,7 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       );
     }
+    await clearUserFactorAttempts(STEP_UP_SCOPE, userId);
 
     // Hash new password
     const hashedPassword = await hash(newPassword, 12);

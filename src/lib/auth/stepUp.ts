@@ -2,6 +2,10 @@ import { compare } from "bcrypt";
 import speakeasy from "speakeasy";
 import { prisma } from "@/lib/prisma";
 import { consumeBackupCode } from "@/lib/auth/backupCodes";
+import {
+  clearUserFactorAttempts,
+  recordUserFactorAttempt,
+} from "@/lib/rateLimit";
 
 /**
  * Step-up re-authentication for sensitive actions where a live session cookie
@@ -9,8 +13,16 @@ import { consumeBackupCode } from "@/lib/auth/backupCodes";
  * user's own record, never from what the caller sends, so 2FA can't be dodged
  * by supplying a password instead.
  *
+ * Wrong passwords/codes are limited per user (N-1), with one budget shared by
+ * every caller - otherwise a stolen session could keep guessing, or move to
+ * another route for a fresh budget. A request with no credential (the
+ * client asking which factor is needed) isn't counted.
+ *
  * Node runtime only (Prisma + bcrypt).
  */
+
+/** Rate-limit scope; also used by /api/user/change-password's own check. */
+export const STEP_UP_SCOPE = "step_up";
 
 export interface StepUpCredentials {
   currentPassword?: unknown;
@@ -21,7 +33,7 @@ export type StepUpResult =
   | { ok: true; method: "2FA" | "PASSWORD" }
   | {
       ok: false;
-      status: 400 | 404;
+      status: 400 | 404 | 429 | 503;
       error: string;
       code?: "TWO_FACTOR_REQUIRED" | "PASSWORD_REQUIRED";
     };
@@ -61,6 +73,9 @@ export async function verifyStepUp(
       };
     }
 
+    const limited = await limitAttempt(userId);
+    if (limited) return limited;
+
     // Authenticator code first (cheap); backup codes cost a bcrypt compare each.
     const verified =
       !!twoFactorAuth.secret &&
@@ -75,6 +90,7 @@ export async function verifyStepUp(
         where: { userId },
         data: { lastUsedAt: new Date() },
       });
+      await clearUserFactorAttempts(STEP_UP_SCOPE, userId);
       return { ok: true, method: "2FA" };
     }
 
@@ -82,6 +98,7 @@ export async function verifyStepUp(
     if (
       await consumeBackupCode(userId, twoFactorAuth.backupCodes, twoFactorToken)
     ) {
+      await clearUserFactorAttempts(STEP_UP_SCOPE, userId);
       return { ok: true, method: "2FA" };
     }
 
@@ -97,8 +114,19 @@ export async function verifyStepUp(
       code: "PASSWORD_REQUIRED",
     };
   }
+
+  const limited = await limitAttempt(userId);
+  if (limited) return limited;
+
   if (!(await compare(currentPassword, user.password))) {
     return { ok: false, status: 400, error: "Current password is incorrect" };
   }
+  await clearUserFactorAttempts(STEP_UP_SCOPE, userId);
   return { ok: true, method: "PASSWORD" };
+}
+
+async function limitAttempt(userId: string): Promise<StepUpResult | null> {
+  const attempt = await recordUserFactorAttempt(STEP_UP_SCOPE, userId);
+  if (attempt.allowed) return null;
+  return { ok: false, status: attempt.status, error: attempt.error };
 }

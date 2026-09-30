@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { canonicalEmail } from "@/lib/auth/emailIdentity";
 import { generateWebAuthnAuthenticationOptions } from "@/lib/webauthn/server";
+import { enforceAuthRateLimit, getClientIp } from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
 
@@ -27,6 +28,18 @@ export async function POST(request: NextRequest) {
     if (!email || typeof email !== "string") {
       return NextResponse.json({ error: "Email is required" }, { status: 400 });
     }
+
+    // N-1: public and answers per email, so cap how fast it can be probed.
+    // Looser than login: every passkey sign-in attempt starts here.
+    const limited = await enforceAuthRateLimit(
+      "webauthn_options",
+      { email, ip: getClientIp(request.headers) },
+      {
+        perEmail: { max: 20, windowSeconds: 15 * 60 },
+        perIp: { max: 60, windowSeconds: 15 * 60 },
+      },
+    );
+    if (limited) return limited;
 
     // A deleted account is treated like an unknown email (N-3).
     const user = await prisma.user.findFirst({
