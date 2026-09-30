@@ -215,7 +215,9 @@ export async function generateWebAuthnRegistrationOptions(
       // Passkeys are discoverable credentials, and Firefox/Windows Hello are more reliable
       // when we keep the library's recommended defaults instead of discouraging them.
       residentKey: "preferred",
-      userVerification: "preferred",
+      // N-10: a passkey counts as a second factor, so the device must check
+      // a PIN or biometric, not just a touch.
+      userVerification: "required",
     },
     supportedAlgorithmIDs: [-7, -257],
   });
@@ -256,7 +258,7 @@ export async function verifyWebAuthnRegistration(
       expectedChallenge: challenge,
       expectedRPID: config.rpId || getWebAuthnRpId(),
       expectedOrigin: config.origin || getExpectedOrigin(),
-      requireUserVerification: false,
+      requireUserVerification: true, // N-10
       supportedAlgorithmIDs: [-7, -257],
     });
 
@@ -388,7 +390,9 @@ export async function generatePasskeySignInOptions(
     rpID: config.rpId || getWebAuthnRpId(),
     timeout: 120000, // Extended from 60s to 120s for mobile reliability
     allowCredentials,
-    userVerification: "preferred",
+    // N-10: a passkey counts as a second factor, so the device must check
+    // a PIN or biometric, not just a touch.
+    userVerification: "required",
   });
 
   return { options, bindTo };
@@ -483,7 +487,7 @@ export async function verifyWebAuthnAuthentication(
       expectedChallenge: challenge,
       expectedRPID: config.rpId || getWebAuthnRpId(),
       expectedOrigin: config.origin || getExpectedOrigin(),
-      requireUserVerification: false,
+      requireUserVerification: true, // N-10
       credential: {
         id: credential.id,
         publicKey: matchingCredentialData.publicKey as unknown as Uint8Array,
