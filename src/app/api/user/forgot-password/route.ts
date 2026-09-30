@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { sessionCutoffNow } from "@/lib/auth/sessionRevocation";
 import { hash } from "bcrypt";
 import { sendPasswordResetEmail } from "@/lib/email";
 import { canonicalEmail } from "@/lib/auth/emailIdentity";
@@ -60,7 +61,11 @@ export async function POST(request: NextRequest) {
     // Update user password
     await prisma.user.update({
       where: { id: user.id },
-      data: { password: hashedPassword },
+      // N-2: a reset ends every existing session.
+      data: {
+        password: hashedPassword,
+        sessionsValidAfter: sessionCutoffNow(),
+      },
     });
 
     console.log(`[Password Reset API] Password reset for user: ${user.id}`);

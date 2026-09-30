@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
 import { notifySecurityChange } from "@/lib/auth/securityAlerts";
+import { signOutOtherDevices } from "@/lib/auth/sessionRevocation";
 
 export const runtime = "nodejs";
 
@@ -136,7 +137,10 @@ export async function DELETE(request: NextRequest) {
       request.headers,
     );
 
-    return NextResponse.json({ success: true }, { status: 200 });
+    // N-2: other devices are signed out; this one gets fresh tokens.
+    const response = NextResponse.json({ success: true }, { status: 200 });
+    await signOutOtherDevices(request, response, userId);
+    return response;
   } catch (error) {
     console.error("WebAuthn credential delete error:", error);
     return NextResponse.json(

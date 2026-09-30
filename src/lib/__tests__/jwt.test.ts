@@ -7,8 +7,10 @@ import { SignJWT } from "jose";
 // the flaky Neon connection seen all session would otherwise make this suite
 // fail intermittently for reasons unrelated to what it's testing.
 const isTokenBlacklisted = vi.fn().mockResolvedValue(false);
+const isTokenRevokedForUser = vi.fn().mockResolvedValue(false);
 vi.mock("@/lib/auth/tokenBlacklist", () => ({
   isTokenBlacklisted: (...args: unknown[]) => isTokenBlacklisted(...args),
+  isTokenRevokedForUser: (...args: unknown[]) => isTokenRevokedForUser(...args),
 }));
 
 import {
@@ -43,6 +45,7 @@ describe("JWT secret handling", () => {
     vi.unstubAllEnvs();
     vi.restoreAllMocks();
     isTokenBlacklisted.mockReset().mockResolvedValue(false);
+    isTokenRevokedForUser.mockReset().mockResolvedValue(false);
   });
 
   describe("with JWT_SECRET set", () => {
@@ -191,6 +194,38 @@ describe("JWT secret handling", () => {
 
       expect(payload.userId).toBe("user-4");
       expect(isTokenBlacklisted).not.toHaveBeenCalled();
+    });
+
+    it("rejects a session issued before the account was signed out everywhere (N-2)", async () => {
+      const { accessToken, refreshToken } = await generateTokens(
+        "user-6",
+        "CLIENT",
+      );
+      isTokenRevokedForUser.mockResolvedValue(true);
+
+      await expect(verifyJwtToken(accessToken)).rejects.toThrow(
+        "Invalid or expired token",
+      );
+      await expect(verifyJwtToken(refreshToken)).rejects.toThrow(
+        "Invalid or expired token",
+      );
+      expect(isTokenRevokedForUser).toHaveBeenCalledWith(
+        "user-6",
+        expect.any(Number),
+      );
+    });
+
+    it("also rejects a half-finished login once the account is signed out everywhere", async () => {
+      const pending = await signPendingTwoFactorToken("user-7", "CLIENT");
+      const enroll = await signEnrollmentToken("user-7", "CLIENT");
+      isTokenRevokedForUser.mockResolvedValue(true);
+
+      await expect(verifyPendingTwoFactorToken(pending)).rejects.toThrow(
+        "Invalid or expired pending 2FA token",
+      );
+      await expect(verifyEnrollmentToken(enroll)).rejects.toThrow(
+        "Invalid or expired enrollment token",
+      );
     });
   });
 

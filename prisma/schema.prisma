@@ -33,6 +33,9 @@ model User {
   luxorSubaccountName           String?
   companyUrl                    String?
   isDeleted                     Boolean                      @default(false)
+  /// Tokens issued before this moment are rejected - signs the account out
+  /// on every device (src/lib/auth/sessionRevocation.ts). Null = never.
+  sessionsValidAfter            DateTime?
   franchiseeId                  String?
   franchisee                    Franchise?                   @relation("FranchiseUsers", fields: [franchiseeId], references: [id])
   segment                       Segment?
@@ -1295,6 +1298,7 @@ enum AuditAction {
   WALLET_CHANGE_APPROVED
   WALLET_CHANGE_REJECTED
   USER_PASSWORD_RESET
+  USER_SESSIONS_REVOKED
   TWO_FACTOR_ENABLED
   TWO_FACTOR_DISABLED
   VENDOR_INVOICE_CREATED

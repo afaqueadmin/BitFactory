@@ -44,6 +44,32 @@ async function decodeJwt(token: string): Promise<JwtPayload> {
   return payload as JwtPayload;
 }
 
+/**
+ * Rejects a token that was logged out (blacklisted) or issued before the
+ * account was signed out everywhere (N-2).
+ *
+ * Skipped on Edge (the proxy) - Prisma can't run there. Sensitive server
+ * actions all go through Node-runtime API routes, which do reach this check,
+ * so a revoked token is still rejected before it can do anything; only
+ * page-routing decisions made by the proxy itself don't see the revocation
+ * until the token's own (short) expiry.
+ */
+async function assertNotRevoked(
+  token: string,
+  payload: JwtPayload,
+): Promise<void> {
+  if (process.env.NEXT_RUNTIME === "edge") return;
+  const { isTokenBlacklisted, isTokenRevokedForUser } =
+    await import("@/lib/auth/tokenBlacklist");
+  const [blacklisted, revoked] = await Promise.all([
+    isTokenBlacklisted(token),
+    isTokenRevokedForUser(payload.userId, payload.iat),
+  ]);
+  if (blacklisted || revoked) {
+    throw new Error("Token has been revoked");
+  }
+}
+
 export async function verifyJwtToken(token: string): Promise<JwtPayload> {
   try {
     const payload = await decodeJwt(token);
@@ -54,19 +80,7 @@ export async function verifyJwtToken(token: string): Promise<JwtPayload> {
       throw new Error(`${payload.type} token is not a session`);
     }
 
-    // Blacklist check is skipped on Edge (middleware) - Prisma can't run
-    // there. Sensitive server actions all go through Node-runtime API
-    // routes, which do reach this check, so a token revoked at logout is
-    // still rejected before it can do anything; only page-routing decisions
-    // made by middleware itself don't see the revocation until the token's
-    // own (short) expiry.
-    if (process.env.NEXT_RUNTIME !== "edge") {
-      const { isTokenBlacklisted } = await import("@/lib/auth/tokenBlacklist");
-      if (await isTokenBlacklisted(token)) {
-        throw new Error("Token has been revoked");
-      }
-    }
-
+    await assertNotRevoked(token, payload);
     return payload;
   } catch (error) {
     console.error("verifyJwtToken error:", error);
@@ -162,6 +176,8 @@ async function verifyLoginStepToken(
     if (payload.type !== type) {
       throw new Error(`Not a ${label} token`);
     }
+    // A password or 2FA change also cancels a login that was half done.
+    await assertNotRevoked(token, payload);
     return payload;
   } catch (error) {
     console.error(`verify ${label} token error:`, error);

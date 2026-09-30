@@ -222,6 +222,7 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   [AuditAction.WALLET_CHANGE_APPROVED]: "Wallet Change Approved",
   [AuditAction.WALLET_CHANGE_REJECTED]: "Wallet Change Rejected",
   [AuditAction.USER_PASSWORD_RESET]: "User Password Reset",
+  [AuditAction.USER_SESSIONS_REVOKED]: "User Signed Out Everywhere",
   [AuditAction.TWO_FACTOR_ENABLED]: "Two-Factor Authentication Enabled",
   [AuditAction.TWO_FACTOR_DISABLED]: "Two-Factor Authentication Disabled",
   [AuditAction.VENDOR_INVOICE_CREATED]: "Vendor Invoice Created",

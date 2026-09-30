@@ -4,6 +4,7 @@ import speakeasy from "speakeasy";
 import { getUserInfoFromToken } from "@/lib/helpers/getUserInfoFromToken";
 import { twoFactorRequirement } from "@/lib/auth/twoFactorPolicy";
 import { notifySecurityChangeForUser } from "@/lib/auth/securityAlerts";
+import { signOutOtherDevices } from "@/lib/auth/sessionRevocation";
 import {
   clearUserFactorAttempts,
   recordUserFactorAttempt,
@@ -111,7 +112,10 @@ export async function POST(req: NextRequest) {
       req.headers,
     );
 
-    return NextResponse.json({ success: true });
+    // N-2: other devices are signed out; this one gets fresh tokens.
+    const response = NextResponse.json({ success: true });
+    await signOutOtherDevices(req, response, userId);
+    return response;
   } catch (error) {
     console.error("Error disabling 2FA:", error);
     return NextResponse.json(

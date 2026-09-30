@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { sessionCutoffNow } from "@/lib/auth/sessionRevocation";
 import { verifyJwtToken } from "@/lib/jwt";
 import { AuditAction } from "@prisma/client";
 import { logPoolCredentialChange } from "@/lib/audit/logPoolCredentialChange";
@@ -65,6 +66,7 @@ export async function PUT(
       where: { id },
       select: {
         role: true,
+        email: true,
         franchiseeId: true,
         segment: true,
       },
@@ -202,6 +204,11 @@ export async function PUT(
       email: emailUpdate,
       franchiseeId: franchiseeIdUpdate,
       segment: segmentUpdate,
+      // N-2: a new login email signs the account out everywhere.
+      sessionsValidAfter:
+        emailUpdate && emailUpdate !== currentUser?.email
+          ? sessionCutoffNow()
+          : undefined,
     };
 
     // Subaccounts and group are CLIENT-only here (franchisees are managed
@@ -451,7 +458,8 @@ export async function DELETE(
     // Soft delete user by setting isDeleted to true
     await prisma.user.update({
       where: { id },
-      data: { isDeleted: true },
+      // N-2: a deleted account is signed out everywhere at once.
+      data: { isDeleted: true, sessionsValidAfter: sessionCutoffNow() },
     });
 
     await prisma.auditLog.create({

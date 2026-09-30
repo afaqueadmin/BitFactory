@@ -10,6 +10,7 @@ import {
 import { Prisma } from "@prisma/client";
 import { verifyStepUp } from "@/lib/auth/stepUp";
 import { notifySecurityChange } from "@/lib/auth/securityAlerts";
+import { signOutOtherDevices } from "@/lib/auth/sessionRevocation";
 import {
   twoFactorEnforceFrom,
   twoFactorRequirement,
@@ -336,7 +337,7 @@ export async function PATCH(request: NextRequest) {
       ]);
     }
 
-    return Response.json(
+    const response = NextResponse.json(
       { user: updatedUser },
       {
         status: 200,
@@ -345,6 +346,12 @@ export async function PATCH(request: NextRequest) {
         },
       },
     );
+    // N-2: a new email changes where password resets go, so other devices
+    // are signed out; this one gets fresh tokens.
+    if (emailChanging) {
+      await signOutOtherDevices(request, response, userId);
+    }
+    return response;
   } catch (error) {
     console.error("Profile API [PATCH]: Error:", error);
     return Response.json(

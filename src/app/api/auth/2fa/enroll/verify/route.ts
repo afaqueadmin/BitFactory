@@ -16,6 +16,7 @@ import {
 } from "@/lib/auth/sessionCookies";
 import { completeTwoFactorSetup } from "@/lib/auth/twoFactorEnrollment";
 import { notifySecurityChange } from "@/lib/auth/securityAlerts";
+import { revokeAllSessions } from "@/lib/auth/sessionRevocation";
 
 export const runtime = "nodejs";
 
@@ -79,6 +80,10 @@ export async function POST(request: NextRequest) {
       { type: "2FA_ENABLED" },
       request.headers,
     );
+
+    // N-2: 2FA changed, so any older session ends; the one issued below is
+    // newer than the cutoff and stays valid.
+    await revokeAllSessions(user.id);
 
     // The code just entered is the second factor for this login.
     const { accessToken, refreshToken } = await generateTokens(

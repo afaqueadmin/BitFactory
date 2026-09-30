@@ -426,6 +426,45 @@ export default function CustomerOverviewContent() {
     handleMenuClose();
   };
 
+  // Same tier rule the API enforces for password resets and sign-outs.
+  const canManageSessionsOf = (target: FetchedUser | null) =>
+    !!target &&
+    !(
+      (currentUserRole === "ADMIN" &&
+        (target.role === "ADMIN" || target.role === "SUPER_ADMIN")) ||
+      (currentUserRole === "SUPER_ADMIN" && target.role === "SUPER_ADMIN")
+    );
+
+  const handleSignOutEverywhere = async () => {
+    if (!selectedCustomer) return;
+    const target = selectedCustomer;
+    handleMenuClose();
+
+    if (
+      !window.confirm(
+        `Sign "${target.name}" out on all devices? They will need to log in again.`,
+      )
+    ) {
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `/api/user/${target.id}/sign-out-everywhere`,
+        { method: "POST" },
+      );
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to sign the user out");
+      }
+      setResponseNotification(data.message || "User signed out on all devices");
+    } catch (err) {
+      setResponseNotification(
+        err instanceof Error ? err.message : "Failed to sign the user out",
+      );
+    }
+  };
+
   const handleDeleteCustomer = async () => {
     if (!selectedCustomer) return;
 
@@ -1019,6 +1058,12 @@ export default function CustomerOverviewContent() {
       >
         <MenuItem onClick={handleEditCustomer}>Edit Customer</MenuItem>
         <MenuItem onClick={handleChangePassword}>Change Password</MenuItem>
+        <MenuItem
+          onClick={handleSignOutEverywhere}
+          disabled={!canManageSessionsOf(selectedCustomer)}
+        >
+          Sign Out All Devices
+        </MenuItem>
         <MenuItem
           onClick={handleDeleteCustomer}
           sx={{ color: "error.main" }}

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken, verifyRegistrationChallenge } from "@/lib/jwt";
 import { notifySecurityChange } from "@/lib/auth/securityAlerts";
+import { signOutOtherDevices } from "@/lib/auth/sessionRevocation";
 import { verifyWebAuthnRegistration } from "@/lib/webauthn/server";
 import { WebAuthnAttestationResponse } from "@/types/webauthn";
 import type { RegistrationResponseJSON } from "@simplewebauthn/types";
@@ -200,6 +201,8 @@ export async function POST(request: NextRequest) {
         maxAge: 0,
         path: "/",
       });
+      // N-2: other devices are signed out; this one gets fresh tokens.
+      await signOutOtherDevices(request, successResponse, userId);
       return successResponse;
     } catch (dbError: unknown) {
       const errorMsg =

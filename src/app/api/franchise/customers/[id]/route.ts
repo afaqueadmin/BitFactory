@@ -9,6 +9,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { sessionCutoffNow } from "@/lib/auth/sessionRevocation";
 import { verifyJwtToken } from "@/lib/jwt";
 import { assertFranchiseeOwnsCustomer } from "@/lib/franchiseeScope";
 
@@ -156,7 +157,8 @@ export async function DELETE(
 
     await prisma.user.update({
       where: { id },
-      data: { isDeleted: true },
+      // N-2: a deleted account is signed out everywhere at once.
+      data: { isDeleted: true, sessionsValidAfter: sessionCutoffNow() },
     });
 
     return NextResponse.json({

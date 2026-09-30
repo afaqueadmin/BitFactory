@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getUserInfoFromToken } from "@/lib/helpers/getUserInfoFromToken";
 import { completeTwoFactorSetup } from "@/lib/auth/twoFactorEnrollment";
 import { notifySecurityChangeForUser } from "@/lib/auth/securityAlerts";
+import { signOutOtherDevices } from "@/lib/auth/sessionRevocation";
 
 export async function POST(req: NextRequest) {
   try {
@@ -48,10 +49,14 @@ export async function POST(req: NextRequest) {
       req.headers,
     );
 
-    return NextResponse.json({
+    // N-2: other devices are signed out; this one gets fresh tokens, marked
+    // 2FA-verified since a code from the new authenticator was just entered.
+    const response = NextResponse.json({
       success: true,
       backupCodes,
     });
+    await signOutOtherDevices(req, response, userId, { mfa: true });
+    return response;
   } catch (error) {
     console.error("2FA verification error:", error);
     return NextResponse.json(

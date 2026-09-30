@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { sessionCutoffNow } from "@/lib/auth/sessionRevocation";
 import { verifyJwtToken } from "@/lib/jwt";
 import bcrypt from "bcryptjs";
 import { AuditAction } from "@prisma/client";
@@ -111,7 +112,11 @@ export async function PUT(
     const hashedPassword = await bcrypt.hash(newPassword, 12);
     await prisma.user.update({
       where: { id },
-      data: { password: hashedPassword },
+      // N-2: the user didn't make this change - sign them out everywhere.
+      data: {
+        password: hashedPassword,
+        sessionsValidAfter: sessionCutoffNow(),
+      },
     });
 
     // Audit trail - a single row records both who did this and to whom.

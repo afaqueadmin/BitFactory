@@ -8,6 +8,7 @@ import {
   recordUserFactorAttempt,
 } from "@/lib/rateLimit";
 import { STEP_UP_SCOPE } from "@/lib/auth/stepUp";
+import { signOutOtherDevices } from "@/lib/auth/sessionRevocation";
 
 export async function POST(request: NextRequest) {
   try {
@@ -136,10 +137,13 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json(
+    // N-2: other devices are signed out; this one gets fresh tokens.
+    const response = NextResponse.json(
       { message: "Password changed successfully" },
       { status: 200 },
     );
+    await signOutOtherDevices(request, response, userId);
+    return response;
   } catch (error) {
     console.error("Password change error:", error);
     return NextResponse.json(
