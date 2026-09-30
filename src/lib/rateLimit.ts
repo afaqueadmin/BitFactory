@@ -25,6 +25,8 @@ export interface RateLimitResult {
   remaining: number;
   /** Seconds until an attempt would be allowed again; 0 when allowed. */
   retryAfterSeconds: number;
+  /** Attempts in the window, this one included. */
+  used: number;
 }
 
 export function buildRateLimitKey(
@@ -84,6 +86,7 @@ export async function checkRateLimit(
       allowed: true,
       remaining: Math.max(0, max - used),
       retryAfterSeconds: 0,
+      used,
     };
   }
 
@@ -105,7 +108,7 @@ export async function checkRateLimit(
       )
     : windowSeconds;
 
-  return { allowed: false, remaining: 0, retryAfterSeconds };
+  return { allowed: false, remaining: 0, retryAfterSeconds, used };
 }
 
 /**
@@ -301,6 +304,63 @@ export async function clearUserFactorAttempts(
   } catch (error) {
     console.error(`[rateLimit] Failed to clear ${scope} attempts:`, error);
   }
+}
+
+/**
+ * Longer-term cap on 2FA codes at login (N-13), on top of the 15-minute
+ * limit: 30 wrong codes in 24 hours locks the 2FA step for that account
+ * until they age out. Only someone who already has the password reaches this
+ * step, so a lock means the password is known - the owner gets an alert.
+ */
+export const TWO_FACTOR_LOGIN_DAILY_LIMIT: RateLimitOptions = {
+  max: 30,
+  windowSeconds: 24 * 60 * 60,
+};
+const TWO_FACTOR_LOGIN_DAILY_SCOPE = "2fa_validate_daily";
+
+export type TwoFactorLoginAttempt =
+  | { allowed: true }
+  | { allowed: false; retryAfterSeconds: number; justLocked: boolean };
+
+/**
+ * Records one 2FA code submission at login for `userId`. A success must be
+ * followed by clearTwoFactorLoginAttempts, so only failures add up.
+ * `justLocked` is true only for the attempt that crossed the limit, so the
+ * alert goes out once.
+ *
+ * Fails open, like the other login limits: a database blip mustn't lock
+ * everyone out, and the 15-minute limit still applies.
+ */
+export async function recordTwoFactorLoginAttempt(
+  userId: string,
+): Promise<TwoFactorLoginAttempt> {
+  let result: RateLimitResult;
+  try {
+    result = await checkRateLimit(
+      buildRateLimitKey(TWO_FACTOR_LOGIN_DAILY_SCOPE, "user", userId),
+      TWO_FACTOR_LOGIN_DAILY_LIMIT,
+    );
+  } catch (error) {
+    console.error(
+      `[rateLimit] ${TWO_FACTOR_LOGIN_DAILY_SCOPE} check failed, allowing:`,
+      error,
+    );
+    return { allowed: true };
+  }
+  if (result.allowed) return { allowed: true };
+  console.warn(`[rateLimit] ${TWO_FACTOR_LOGIN_DAILY_SCOPE} blocked`, {
+    userId,
+    retryAfterSeconds: result.retryAfterSeconds,
+  });
+  return {
+    allowed: false,
+    retryAfterSeconds: result.retryAfterSeconds,
+    justLocked: result.used === TWO_FACTOR_LOGIN_DAILY_LIMIT.max + 1,
+  };
+}
+
+export function clearTwoFactorLoginAttempts(userId: string): Promise<void> {
+  return clearUserFactorAttempts(TWO_FACTOR_LOGIN_DAILY_SCOPE, userId);
 }
 
 // Keeps the table bounded without needing a cron job. Never fails the caller.

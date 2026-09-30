@@ -9,9 +9,12 @@ import {
 } from "@/lib/auth/sessionCookies";
 import {
   clearAuthRateLimitForEmail,
+  clearTwoFactorLoginAttempts,
   enforceAuthRateLimit,
   getClientIp,
+  recordTwoFactorLoginAttempt,
 } from "@/lib/rateLimit";
+import { notifySecurityChangeForUser } from "@/lib/auth/securityAlerts";
 import { canonicalEmail } from "@/lib/auth/emailIdentity";
 import { consumeBackupCode } from "@/lib/auth/backupCodes";
 import { isTokenBlacklisted } from "@/lib/auth/tokenBlacklist";
@@ -114,6 +117,31 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid token" }, { status: 400 });
     }
 
+    // N-13: 30 wrong codes in 24 hours locks this step for the account.
+    const daily = await recordTwoFactorLoginAttempt(user.id);
+    if (!daily.allowed) {
+      if (daily.justLocked) {
+        await notifySecurityChangeForUser(
+          user.id,
+          { type: "2FA_LOCKED" },
+          req.headers,
+        );
+      }
+      const hours = Math.max(1, Math.ceil(daily.retryAfterSeconds / 3600));
+      return NextResponse.json(
+        {
+          error: `Too many incorrect codes. Two-factor sign-in for this account is locked for up to ${hours} hour${
+            hours === 1 ? "" : "s"
+          }. You can still sign in with a passkey.`,
+          retryAfterSeconds: daily.retryAfterSeconds,
+        },
+        {
+          status: 429,
+          headers: { "Retry-After": String(daily.retryAfterSeconds) },
+        },
+      );
+    }
+
     // Authenticator code first - it's cheap, while a backup-code check costs
     // up to one bcrypt compare per remaining code.
     const totpVerified =
@@ -176,6 +204,7 @@ export async function POST(req: NextRequest) {
     });
 
     await clearAuthRateLimitForEmail("2fa_validate", email);
+    await clearTwoFactorLoginAttempts(user.id);
 
     // Verified, now set cookies
     response.cookies.set("token", accessToken, {

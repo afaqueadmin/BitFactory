@@ -18,9 +18,11 @@ import {
   checkRateLimit,
   clearAuthRateLimitForEmail,
   clearRateLimit,
+  clearTwoFactorLoginAttempts,
   clearUserFactorAttempts,
   enforceAuthRateLimit,
   getClientIp,
+  recordTwoFactorLoginAttempt,
   recordUserFactorAttempt,
 } from "@/lib/rateLimit";
 
@@ -107,6 +109,7 @@ describe("checkRateLimit", () => {
       allowed: true,
       remaining: 4,
       retryAfterSeconds: 0,
+      used: 1,
     });
 
     db.count.mockResolvedValueOnce(5);
@@ -114,6 +117,7 @@ describe("checkRateLimit", () => {
       allowed: true,
       remaining: 0,
       retryAfterSeconds: 0,
+      used: 5,
     });
   });
 
@@ -130,6 +134,7 @@ describe("checkRateLimit", () => {
       allowed: false,
       remaining: 0,
       retryAfterSeconds: 300,
+      used: 6,
     });
     expect(db.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({ orderBy: { createdAt: "asc" }, skip: 1 }),
@@ -417,5 +422,53 @@ describe("clearUserFactorAttempts", () => {
     await expect(
       clearUserFactorAttempts("step_up", "user1"),
     ).resolves.toBeUndefined();
+  });
+});
+
+describe("recordTwoFactorLoginAttempt (N-13)", () => {
+  const lockedRow = () =>
+    db.findFirst.mockResolvedValue({
+      createdAt: new Date(NOW.getTime() - 60 * 60 * 1000),
+    } as never);
+
+  it("allows up to 30 attempts in 24 hours, keyed per user", async () => {
+    db.count.mockResolvedValue(30 as never);
+    expect(await recordTwoFactorLoginAttempt("user1")).toEqual({
+      allowed: true,
+    });
+    expect(db.create).toHaveBeenCalledWith({
+      data: { key: "2fa_validate_daily:user:user1" },
+    });
+  });
+
+  it("locks on the 31st and flags only that attempt as the one that locked", async () => {
+    lockedRow();
+    db.count.mockResolvedValueOnce(31 as never);
+    expect(await recordTwoFactorLoginAttempt("user1")).toEqual({
+      allowed: false,
+      retryAfterSeconds: 23 * 60 * 60,
+      justLocked: true,
+    });
+
+    db.count.mockResolvedValueOnce(32 as never);
+    expect(await recordTwoFactorLoginAttempt("user1")).toMatchObject({
+      allowed: false,
+      justLocked: false,
+    });
+  });
+
+  it("fails open when the attempt store errors", async () => {
+    db.create.mockRejectedValue(new Error("db down"));
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(await recordTwoFactorLoginAttempt("user1")).toEqual({
+      allowed: true,
+    });
+  });
+
+  it("clears that user's daily count", async () => {
+    await clearTwoFactorLoginAttempts("user1");
+    expect(db.deleteMany).toHaveBeenCalledWith({
+      where: { key: "2fa_validate_daily:user:user1" },
+    });
   });
 });

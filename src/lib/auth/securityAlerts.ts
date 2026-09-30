@@ -9,6 +9,7 @@ import { sendSecurityAlertEmail } from "@/lib/email";
 type SecurityEvent =
   | { type: "2FA_ENABLED" }
   | { type: "2FA_DISABLED" }
+  | { type: "2FA_LOCKED" }
   | { type: "PASSKEY_ADDED"; name: string }
   | { type: "PASSKEY_REMOVED"; name: string }
   | { type: "EMAIL_CHANGED_FROM"; newEmail: string }
@@ -29,6 +30,13 @@ function describe(event: SecurityEvent) {
         heading: "Two-factor authentication turned off",
         message:
           "Two-factor authentication was turned off for your BitFactory account. Your account is now protected by your password only.",
+      };
+    case "2FA_LOCKED":
+      return {
+        subject: "Sign-In Locked After Wrong 2FA Codes",
+        heading: "Two-factor sign-in locked",
+        message:
+          "Someone entered the correct password for your BitFactory account, then 30 wrong two-factor codes within 24 hours. Two-factor sign-in is locked for up to 24 hours. If this wasn't you, your password is known to someone else: reset it as soon as possible. You can still sign in with a passkey.",
       };
     case "PASSKEY_ADDED":
       return {
