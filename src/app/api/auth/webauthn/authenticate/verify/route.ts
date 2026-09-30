@@ -5,6 +5,10 @@ import { verifyWebAuthnAuthentication } from "@/lib/webauthn/server";
 import { WebAuthnAssertionResponse } from "@/types/webauthn";
 import { Prisma } from "@prisma/client";
 import { generateTokens, verifyAuthenticationChallenge } from "@/lib/jwt";
+import {
+  redirectPathForRole,
+  setSessionCookies,
+} from "@/lib/auth/sessionCookies";
 import type { AuthenticationResponseJSON } from "@simplewebauthn/types";
 import {
   clearAuthRateLimitForEmail,
@@ -245,12 +249,10 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Determine redirect URL based on role
-    let redirectUrl = "/dashboard";
-    if (user.role === "ADMIN" || user.role === "SUPER_ADMIN") {
-      redirectUrl = "/manage/dashboard";
-    }
-
+    // N-9: same cookies and redirect as every other login route. This used
+    // to set "refreshToken" (the app reads "refresh_token"), so passkey
+    // sessions couldn't refresh and ended after an hour, and it sent admins
+    // to /manage/dashboard and franchisees to the client dashboard.
     const response_obj = NextResponse.json(
       {
         success: true,
@@ -259,35 +261,12 @@ export async function POST(request: NextRequest) {
           email: user.email,
           role: user.role,
         },
-        redirectUrl,
+        redirectUrl: redirectPathForRole(user.role),
+        sessionId: userSession.id,
       },
       { status: 200 },
     );
-
-    // Set secure, httpOnly cookies
-    response_obj.cookies.set("token", accessToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: 60 * 60, // 1 hour
-      path: "/",
-    });
-
-    response_obj.cookies.set("refreshToken", refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: 7 * 24 * 60 * 60, // 7 days
-      path: "/",
-    });
-
-    response_obj.cookies.set("sessionId", userSession.id, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: 7 * 24 * 60 * 60, // 7 days
-      path: "/",
-    });
+    setSessionCookies(response_obj, accessToken, refreshToken);
 
     response_obj.cookies.set("webauthn_auth_challenge", "", {
       httpOnly: true,
