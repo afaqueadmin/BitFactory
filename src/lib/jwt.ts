@@ -17,10 +17,13 @@ export interface JwtPayload extends JWTPayload {
 const ENROLLMENT_TOKEN_TYPE = "2fa_enroll";
 const PENDING_2FA_TOKEN_TYPE = "2fa_pending";
 const WEBAUTHN_REG_TOKEN_TYPE = "webauthn_reg";
+//   webauthn_auth: a passkey sign-in challenge bound to one user (N-5)
+const WEBAUTHN_AUTH_TOKEN_TYPE = "webauthn_auth";
 const NON_SESSION_TYPES = new Set([
   ENROLLMENT_TOKEN_TYPE,
   PENDING_2FA_TOKEN_TYPE,
   WEBAUTHN_REG_TOKEN_TYPE,
+  WEBAUTHN_AUTH_TOKEN_TYPE,
 ]);
 
 // Read lazily (not at import time) so builds and public pages still load when
@@ -164,6 +167,41 @@ export async function verifyRegistrationChallenge(
     throw new Error("Invalid or expired passkey registration token");
   }
   return { userId: payload.userId, challenge: payload.challenge };
+}
+
+/**
+ * Wraps a passkey sign-in challenge with the user it was issued for (N-5).
+ * The server, not the browser, decides the challenge: /authenticate/verify
+ * only accepts a challenge it signed, for that same user, and spends the
+ * token on success so a captured sign-in can't be replayed.
+ */
+export function signAuthenticationChallenge(
+  userId: string,
+  role: string,
+  challenge: string,
+) {
+  return signJwtToken(
+    { userId, role, type: WEBAUTHN_AUTH_TOKEN_TYPE, challenge },
+    "5m",
+  );
+}
+
+export async function verifyAuthenticationChallenge(
+  token: string,
+): Promise<{ userId: string; challenge: string; exp?: number }> {
+  const payload = await verifyLoginStepToken(
+    token,
+    WEBAUTHN_AUTH_TOKEN_TYPE,
+    "passkey sign-in",
+  );
+  if (typeof payload.challenge !== "string") {
+    throw new Error("Invalid or expired passkey sign-in token");
+  }
+  return {
+    userId: payload.userId,
+    challenge: payload.challenge,
+    exp: payload.exp,
+  };
 }
 
 async function verifyLoginStepToken(

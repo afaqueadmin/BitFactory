@@ -3,7 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { canonicalEmail } from "@/lib/auth/emailIdentity";
 import { verifyWebAuthnAuthentication } from "@/lib/webauthn/server";
 import { WebAuthnAssertionResponse } from "@/types/webauthn";
-import { generateTokens } from "@/lib/jwt";
+import { Prisma } from "@prisma/client";
+import { generateTokens, verifyAuthenticationChallenge } from "@/lib/jwt";
 import type { AuthenticationResponseJSON } from "@simplewebauthn/types";
 import {
   clearAuthRateLimitForEmail,
@@ -94,11 +95,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const expectedChallenge = request.cookies.get(
+    // N-5: only a challenge this server signed, for this same user, and not
+    // used before (verifyAuthenticationChallenge rejects spent tokens).
+    const challengeToken = request.cookies.get(
       "webauthn_auth_challenge",
     )?.value;
+    let expectedChallenge: string | null = null;
+    if (challengeToken) {
+      try {
+        const bound = await verifyAuthenticationChallenge(challengeToken);
+        if (bound.userId === user.id) expectedChallenge = bound.challenge;
+      } catch {
+        expectedChallenge = null;
+      }
+    }
 
-    if (!expectedChallenge) {
+    if (!challengeToken || !expectedChallenge) {
       console.warn(
         "WebAuthn authenticate verify: No authentication challenge cookie",
         { userId: user.id },
@@ -157,6 +169,30 @@ export async function POST(request: NextRequest) {
         { error: "Authentication failed" },
         { status: 401 },
       );
+    }
+
+    // Spend the challenge: one challenge buys one sign-in. The unique token
+    // column makes this atomic, so a replay or a parallel request with the
+    // same challenge fails here.
+    try {
+      await prisma.tokenBlacklist.create({
+        data: {
+          token: challengeToken,
+          userId: user.id,
+          expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+        },
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        return NextResponse.json(
+          { error: "Authentication failed" },
+          { status: 401 },
+        );
+      }
+      throw error;
     }
 
     await clearAuthRateLimitForEmail("webauthn_authenticate", email);

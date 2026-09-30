@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { canonicalEmail } from "@/lib/auth/emailIdentity";
 import { generateWebAuthnAuthenticationOptions } from "@/lib/webauthn/server";
 import { enforceAuthRateLimit, getClientIp } from "@/lib/rateLimit";
+import { signAuthenticationChallenge } from "@/lib/jwt";
 
 export const runtime = "nodejs";
 
@@ -47,6 +48,7 @@ export async function POST(request: NextRequest) {
       select: {
         id: true,
         email: true,
+        role: true,
         webauthnCredentials: {
           select: { credentialId: true },
         },
@@ -80,7 +82,15 @@ export async function POST(request: NextRequest) {
 
     const response = NextResponse.json(options, { status: 200 });
 
-    response.cookies.set("webauthn_auth_challenge", options.challenge, {
+    // N-5: the cookie holds the challenge signed and bound to this user, not
+    // the raw challenge - a raw value is whatever the browser sends back, so
+    // a captured sign-in could be replayed by setting it.
+    const boundChallenge = await signAuthenticationChallenge(
+      user.id,
+      user.role,
+      options.challenge,
+    );
+    response.cookies.set("webauthn_auth_challenge", boundChallenge, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",

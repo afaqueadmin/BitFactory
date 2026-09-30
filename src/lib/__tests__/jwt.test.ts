@@ -18,7 +18,9 @@ import {
   signEnrollmentToken,
   signJwtToken,
   signPendingTwoFactorToken,
+  signAuthenticationChallenge,
   signRegistrationChallenge,
+  verifyAuthenticationChallenge,
   verifyEnrollmentToken,
   verifyJwtToken,
   verifyPendingTwoFactorToken,
@@ -166,6 +168,38 @@ describe("JWT secret handling", () => {
       const { accessToken } = await generateTokens("user-10", "CLIENT");
       await expect(verifyRegistrationChallenge(accessToken)).rejects.toThrow(
         "Invalid or expired passkey registration token",
+      );
+    });
+
+    it("binds a passkey sign-in challenge to its user, apart from registration and sessions (N-5)", async () => {
+      const token = await signAuthenticationChallenge(
+        "user-11",
+        "CLIENT",
+        "chal-xyz",
+      );
+
+      expect(await verifyAuthenticationChallenge(token)).toMatchObject({
+        userId: "user-11",
+        challenge: "chal-xyz",
+      });
+      await expect(verifyJwtToken(token)).rejects.toThrow(
+        "Invalid or expired token",
+      );
+      await expect(verifyRegistrationChallenge(token)).rejects.toThrow(
+        "Invalid or expired passkey registration token",
+      );
+      const reg = await signRegistrationChallenge("user-11", "CLIENT", "c");
+      await expect(verifyAuthenticationChallenge(reg)).rejects.toThrow(
+        "Invalid or expired passkey sign-in token",
+      );
+    });
+
+    it("rejects a passkey sign-in challenge that was already used (N-5)", async () => {
+      const token = await signAuthenticationChallenge("user-12", "CLIENT", "c");
+      isTokenBlacklisted.mockResolvedValue(true);
+
+      await expect(verifyAuthenticationChallenge(token)).rejects.toThrow(
+        "Invalid or expired passkey sign-in token",
       );
     });
 
