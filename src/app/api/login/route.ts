@@ -23,6 +23,11 @@ import { canonicalEmail } from "@/lib/auth/emailIdentity";
 // Add runtime config for Node.js runtime
 export const runtime = "nodejs";
 
+// bcrypt hash (cost 12, like real passwords) of a random value nobody knows.
+// Compared against when the email has no account (N-12).
+const DUMMY_PASSWORD_HASH =
+  "$2b$12$UOwU4ppKZQpp237QTb84t.uNrZ/GpJGr0Qpxbbxl46MpXYChuyJmq";
+
 export async function POST(request: NextRequest) {
   try {
     let body;
@@ -88,6 +93,9 @@ export async function POST(request: NextRequest) {
     });
 
     if (!user) {
+      // N-12: spend the same bcrypt time as a real password check, so the
+      // response time doesn't reveal whether the email has an account.
+      await bcrypt.compare(password, DUMMY_PASSWORD_HASH).catch(() => false);
       return NextResponse.json(
         { error: "Invalid email or password" },
         { status: 401 },
