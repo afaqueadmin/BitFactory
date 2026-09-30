@@ -6,6 +6,7 @@ import bcrypt from "bcryptjs";
 import { AuditAction } from "@prisma/client";
 import { sendPasswordResetEmail } from "@/lib/email";
 import { verifyStepUp } from "@/lib/auth/stepUp";
+import { canManageAccount } from "@/lib/auth/accountTiers";
 
 export async function PUT(
   request: NextRequest,
@@ -54,13 +55,7 @@ export async function PUT(
     // An ADMIN cannot reset another ADMIN's or a SUPER_ADMIN's password.
     // A SUPER_ADMIN can reset an ADMIN's password, but not another
     // SUPER_ADMIN's. Only CLIENT/FRANCHISEE targets are unrestricted.
-    const targetIsAdminTier =
-      targetUser.role === "ADMIN" || targetUser.role === "SUPER_ADMIN";
-    const forbidden =
-      (user.role === "ADMIN" && targetIsAdminTier) ||
-      (user.role === "SUPER_ADMIN" && targetUser.role === "SUPER_ADMIN");
-
-    if (forbidden) {
+    if (!canManageAccount(user.role, targetUser.role)) {
       return NextResponse.json(
         { error: "You do not have permission to reset this user's password" },
         { status: 403 },

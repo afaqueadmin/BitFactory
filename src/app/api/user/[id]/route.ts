@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sessionCutoffNow } from "@/lib/auth/sessionRevocation";
+import { canManageAccount } from "@/lib/auth/accountTiers";
 import { verifyJwtToken } from "@/lib/jwt";
 import { AuditAction } from "@prisma/client";
 import { logPoolCredentialChange } from "@/lib/audit/logPoolCredentialChange";
@@ -397,6 +398,23 @@ export async function DELETE(
       );
     }
 
+    const targetUser = await prisma.user.findUnique({
+      where: { id },
+      select: { role: true, franchiseeId: true, name: true, email: true },
+    });
+    if (!targetUser) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
+    // N-8: same tier rule as password reset - an ADMIN can't delete another
+    // ADMIN or a SUPER_ADMIN, and nobody deletes a SUPER_ADMIN here.
+    if (!canManageAccount(user.role, targetUser.role)) {
+      return NextResponse.json(
+        { error: "You do not have permission to delete this user" },
+        { status: 403 },
+      );
+    }
+
     // Check if user has any miners linked
     const minerCount = await prisma.miner.count({
       where: { userId: id, isDeleted: false },
@@ -413,12 +431,7 @@ export async function DELETE(
 
     // A customer assigned to a franchisee cannot be deleted until unassigned
     // (set franchiseeId back to null / direct BitFactory customer) first.
-    const targetUser = await prisma.user.findUnique({
-      where: { id },
-      select: { franchiseeId: true, name: true, email: true },
-    });
-
-    if (targetUser?.franchiseeId) {
+    if (targetUser.franchiseeId) {
       return NextResponse.json(
         {
           error:
@@ -468,7 +481,7 @@ export async function DELETE(
         entityType: "User",
         entityId: id,
         userId,
-        description: `User ${targetUser?.name || targetUser?.email || id} deleted`,
+        description: `User ${targetUser.name || targetUser.email || id} deleted`,
       },
     });
 

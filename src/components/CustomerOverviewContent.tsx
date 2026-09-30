@@ -56,6 +56,7 @@ import CreateUserModal from "@/components/CreateUserModal";
 import EditCustomerModal from "@/components/EditCustomerModal";
 import EditFranchiseeModal from "@/components/EditFranchiseeModal";
 import ChangePasswordModal from "@/components/ChangePasswordModal";
+import { canManageAccount } from "@/lib/auth/accountTiers";
 
 interface FetchedUser {
   id: string;
@@ -426,14 +427,10 @@ export default function CustomerOverviewContent() {
     handleMenuClose();
   };
 
-  // Same tier rule the API enforces for password resets and sign-outs.
-  const canManageSessionsOf = (target: FetchedUser | null) =>
-    !!target &&
-    !(
-      (currentUserRole === "ADMIN" &&
-        (target.role === "ADMIN" || target.role === "SUPER_ADMIN")) ||
-      (currentUserRole === "SUPER_ADMIN" && target.role === "SUPER_ADMIN")
-    );
+  // Same tier rule the API enforces (src/lib/auth/accountTiers.ts) for
+  // password resets, sign-outs and deletion.
+  const canManage = (target: FetchedUser | null) =>
+    !!target && canManageAccount(currentUserRole, target.role);
 
   const handleSignOutEverywhere = async () => {
     if (!selectedCustomer) return;
@@ -1060,14 +1057,18 @@ export default function CustomerOverviewContent() {
         <MenuItem onClick={handleChangePassword}>Change Password</MenuItem>
         <MenuItem
           onClick={handleSignOutEverywhere}
-          disabled={!canManageSessionsOf(selectedCustomer)}
+          disabled={!canManage(selectedCustomer)}
         >
           Sign Out All Devices
         </MenuItem>
         <MenuItem
           onClick={handleDeleteCustomer}
           sx={{ color: "error.main" }}
-          disabled={selectedCustomer ? selectedCustomer.isDeleted : true}
+          disabled={
+            !selectedCustomer ||
+            selectedCustomer.isDeleted ||
+            !canManage(selectedCustomer)
+          }
         >
           Delete Customer
         </MenuItem>

@@ -14,6 +14,7 @@ import { AuditAction } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
 import { sessionCutoffNow } from "@/lib/auth/sessionRevocation";
+import { canManageAccount } from "@/lib/auth/accountTiers";
 
 export const runtime = "nodejs";
 
@@ -55,12 +56,7 @@ export async function POST(
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    const targetIsAdminTier =
-      target.role === "ADMIN" || target.role === "SUPER_ADMIN";
-    const forbidden =
-      (actor.role === "ADMIN" && targetIsAdminTier) ||
-      (actor.role === "SUPER_ADMIN" && target.role === "SUPER_ADMIN");
-    if (forbidden) {
+    if (!canManageAccount(actor.role, target.role)) {
       return NextResponse.json(
         { error: "You do not have permission to sign this user out" },
         { status: 403 },
