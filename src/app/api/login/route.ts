@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import bcrypt from "bcryptjs";
+import { compare } from "bcrypt";
 import {
   generateTokens,
   signEnrollmentToken,
@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
     if (!user) {
       // N-12: spend the same bcrypt time as a real password check, so the
       // response time doesn't reveal whether the email has an account.
-      await bcrypt.compare(password, DUMMY_PASSWORD_HASH).catch(() => false);
+      await compare(password, DUMMY_PASSWORD_HASH).catch(() => false);
       return NextResponse.json(
         { error: "Invalid email or password" },
         { status: 401 },
@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
     // Check password with timing attack protection
     let isPasswordValid = false;
     try {
-      isPasswordValid = await bcrypt.compare(password, user.password);
+      isPasswordValid = await compare(password, user.password);
     } catch (e) {
       console.error("Password comparison error:", e);
       return NextResponse.json(

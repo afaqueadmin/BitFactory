@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sessionCutoffNow } from "@/lib/auth/sessionRevocation";
 import { verifyJwtToken } from "@/lib/jwt";
-import bcrypt from "bcryptjs";
+import { hash } from "bcrypt";
 import { AuditAction } from "@prisma/client";
 import { sendPasswordResetEmail } from "@/lib/email";
 import { verifyStepUp } from "@/lib/auth/stepUp";
@@ -104,7 +104,7 @@ export async function PUT(
       );
     }
 
-    const hashedPassword = await bcrypt.hash(newPassword, 12);
+    const hashedPassword = await hash(newPassword, 12);
     await prisma.user.update({
       where: { id },
       // N-2: the user didn't make this change - sign them out everywhere.
