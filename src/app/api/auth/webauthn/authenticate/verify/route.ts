@@ -28,6 +28,22 @@ function getWebAuthnConfig(request: NextRequest): {
  * POST /api/auth/webauthn/authenticate/verify
  * Verify assertion response and authenticate user
  */
+/** The one failure reply for every "can't proceed" case (N-4). */
+function authenticationFailed() {
+  const response = NextResponse.json(
+    { error: "Authentication failed" },
+    { status: 401 },
+  );
+  response.cookies.set("webauthn_auth_challenge", "", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+    maxAge: 0,
+    path: "/",
+  });
+  return response;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { email, assertion } = await request.json();
@@ -58,6 +74,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // N-4: every "can't proceed" case below answers the same 401, and the
+    // challenge is checked before the account is looked up, so the reply
+    // never says whether the email has an account or any passkeys.
+    //
+    // N-5: only a challenge this server signed and not used before
+    // (verifyAuthenticationChallenge rejects spent tokens).
+    const challengeToken = request.cookies.get(
+      "webauthn_auth_challenge",
+    )?.value;
+    let bound: { userId: string; challenge: string } | null = null;
+    if (challengeToken) {
+      try {
+        bound = await verifyAuthenticationChallenge(challengeToken);
+      } catch {
+        bound = null;
+      }
+    }
+    if (!challengeToken || !bound) {
+      console.warn(
+        "WebAuthn authenticate verify: Missing or invalid challenge",
+      );
+      return authenticationFailed();
+    }
+
     // Same account rule as password login: a deleted account can't sign in,
     // even with a passkey it registered before it was deleted (N-3).
     const user = await prisma.user.findFirst({
@@ -66,60 +106,28 @@ export async function POST(request: NextRequest) {
         id: true,
         email: true,
         role: true,
-        twoFactorEnabled: true,
         webauthnCredentials: {
           select: { id: true, credentialId: true },
         },
       },
     });
 
-    // Same generic message as the other "can't proceed" cases below - the
-    // paired /authenticate/options route already avoids revealing whether an
-    // email is registered, so this route shouldn't undo that here.
-    if (!user) {
-      console.warn("WebAuthn authenticate verify: User not found", { email });
-      return NextResponse.json(
-        { error: "Authentication failed" },
-        { status: 401 },
-      );
-    }
-
-    // Check if user has any credentials
-    if (!user.webauthnCredentials || user.webauthnCredentials.length === 0) {
-      console.warn("WebAuthn authenticate verify: User has no credentials", {
-        userId: user.id,
-      });
-      return NextResponse.json(
-        { error: "Authentication failed" },
-        { status: 401 },
-      );
-    }
-
-    // N-5: only a challenge this server signed, for this same user, and not
-    // used before (verifyAuthenticationChallenge rejects spent tokens).
-    const challengeToken = request.cookies.get(
-      "webauthn_auth_challenge",
-    )?.value;
-    let expectedChallenge: string | null = null;
-    if (challengeToken) {
-      try {
-        const bound = await verifyAuthenticationChallenge(challengeToken);
-        if (bound.userId === user.id) expectedChallenge = bound.challenge;
-      } catch {
-        expectedChallenge = null;
-      }
-    }
-
-    if (!challengeToken || !expectedChallenge) {
+    // The challenge must have been issued for this same account. A decoy
+    // challenge (email without an account or passkeys) never matches.
+    if (
+      !user ||
+      user.webauthnCredentials.length === 0 ||
+      bound.userId !== user.id
+    ) {
       console.warn(
-        "WebAuthn authenticate verify: No authentication challenge cookie",
-        { userId: user.id },
+        "WebAuthn authenticate verify: No matching account/passkey",
+        {
+          email,
+        },
       );
-      return NextResponse.json(
-        { error: "Challenge not found or expired" },
-        { status: 400 },
-      );
+      return authenticationFailed();
     }
+    const expectedChallenge = bound.challenge;
 
     // Verify the assertion
     let verified;

@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { canonicalEmail } from "@/lib/auth/emailIdentity";
-import { generateWebAuthnAuthenticationOptions } from "@/lib/webauthn/server";
+import { generatePasskeySignInOptions } from "@/lib/webauthn/server";
 import { enforceAuthRateLimit, getClientIp } from "@/lib/rateLimit";
 import { signAuthenticationChallenge } from "@/lib/jwt";
 
@@ -21,6 +19,10 @@ function getWebAuthnConfig(request: NextRequest): {
  * POST /api/auth/webauthn/authenticate/options
  * Get authentication options for passkey login
  * Email required, no auth needed (public endpoint)
+ *
+ * N-4: every email gets the same kind of reply - options with a credential
+ * list and a challenge cookie - whether or not it has an account (deleted
+ * ones included, N-3) or any passkeys. See generatePasskeySignInOptions.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -42,52 +44,18 @@ export async function POST(request: NextRequest) {
     );
     if (limited) return limited;
 
-    // A deleted account is treated like an unknown email (N-3).
-    const user = await prisma.user.findFirst({
-      where: { email: canonicalEmail(email), isDeleted: false },
-      select: {
-        id: true,
-        email: true,
-        role: true,
-        webauthnCredentials: {
-          select: { credentialId: true },
-        },
-      },
-    });
-
-    if (!user) {
-      const webAuthnConfig = getWebAuthnConfig(request);
-      // Don't reveal if user exists, but still provide options
-      // (allows for user enumeration attack mitigation - return empty options)
-      return NextResponse.json(
-        {
-          publicKey: {
-            challenge: await generateRandomChallenge(),
-            timeout: 60000,
-            rpId: webAuthnConfig.rpId,
-            userVerification: "preferred",
-            allowCredentials: [],
-          },
-        },
-        { status: 200 },
-      );
-    }
-
-    // User has credentials, generate authentication options
-    const webAuthnConfig = getWebAuthnConfig(request);
-    const options = await generateWebAuthnAuthenticationOptions(
+    const { options, bindTo } = await generatePasskeySignInOptions(
       email,
-      webAuthnConfig,
+      getWebAuthnConfig(request),
     );
 
     const response = NextResponse.json(options, { status: 200 });
 
-    // N-5: the cookie holds the challenge signed and bound to this user, not
-    // the raw challenge - a raw value is whatever the browser sends back, so
-    // a captured sign-in could be replayed by setting it.
+    // N-5: the cookie holds the challenge signed and bound to the account
+    // (or decoy), not the raw challenge - a raw value is whatever the browser
+    // sends back, so a captured sign-in could be replayed by setting it.
     const boundChallenge = await signAuthenticationChallenge(
-      user.id,
-      user.role,
+      bindTo,
       options.challenge,
     );
     response.cookies.set("webauthn_auth_challenge", boundChallenge, {
@@ -106,12 +74,4 @@ export async function POST(request: NextRequest) {
       { status: 500 },
     );
   }
-}
-
-async function generateRandomChallenge(): Promise<string> {
-  const buffer = Buffer.alloc(32);
-  for (let i = 0; i < buffer.length; i++) {
-    buffer[i] = Math.floor(Math.random() * 256);
-  }
-  return buffer.toString("base64url");
 }

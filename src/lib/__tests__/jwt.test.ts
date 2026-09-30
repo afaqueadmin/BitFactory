@@ -172,11 +172,7 @@ describe("JWT secret handling", () => {
     });
 
     it("binds a passkey sign-in challenge to its user, apart from registration and sessions (N-5)", async () => {
-      const token = await signAuthenticationChallenge(
-        "user-11",
-        "CLIENT",
-        "chal-xyz",
-      );
+      const token = await signAuthenticationChallenge("user-11", "chal-xyz");
 
       expect(await verifyAuthenticationChallenge(token)).toMatchObject({
         userId: "user-11",
@@ -195,7 +191,7 @@ describe("JWT secret handling", () => {
     });
 
     it("rejects a passkey sign-in challenge that was already used (N-5)", async () => {
-      const token = await signAuthenticationChallenge("user-12", "CLIENT", "c");
+      const token = await signAuthenticationChallenge("user-12", "c");
       isTokenBlacklisted.mockResolvedValue(true);
 
       await expect(verifyAuthenticationChallenge(token)).rejects.toThrow(

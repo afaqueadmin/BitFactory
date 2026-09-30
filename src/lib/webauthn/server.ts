@@ -16,6 +16,7 @@ import type {
   AuthenticationResponseJSON,
 } from "@simplewebauthn/types";
 
+import { createHmac } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { canonicalEmail } from "@/lib/auth/emailIdentity";
 import { base64urlToBytes, bufferToBase64url } from "./utils";
@@ -328,13 +329,28 @@ export async function verifyWebAuthnRegistration(
   }
 }
 
+type Transport = "usb" | "nfc" | "ble" | "internal" | "hybrid";
+
 /**
- * Generate authentication options for passkey login
+ * Passkey sign-in options for `email`, and the id the challenge must be bound
+ * to. The reply looks the same whether or not the email has an account or
+ * any passkeys (N-4): an email without them gets decoy credentials shaped
+ * like the most common real ones (one 16-byte synced passkey), derived from
+ * the email so repeated requests return the same decoys, and a decoy user id
+ * of the same length as a real one. A decoy can never complete a sign-in -
+ * no account has that id.
+ *
+ * Real credentials are still listed for real users, because passkeys are
+ * registered with residentKey "preferred" and a non-discoverable one only
+ * works when its id is offered.
  */
-export async function generateWebAuthnAuthenticationOptions(
+export async function generatePasskeySignInOptions(
   email: string,
   config: WebAuthnRuntimeConfig = {},
-): Promise<PublicKeyCredentialRequestOptionsJSON> {
+): Promise<{
+  options: PublicKeyCredentialRequestOptionsJSON;
+  bindTo: string;
+}> {
   const user = await prisma.user.findFirst({
     where: { email: canonicalEmail(email), isDeleted: false },
     select: {
@@ -343,21 +359,29 @@ export async function generateWebAuthnAuthenticationOptions(
     },
   });
 
-  let allowCredentials: Array<{
+  let bindTo: string;
+  let allowCredentials: {
     type: "public-key";
     id: string;
-    transports?: ("usb" | "nfc" | "ble" | "internal" | "hybrid")[];
-  }> = [];
-
-  // If user exists and has credentials, provide list
-  if (user && user.webauthnCredentials && user.webauthnCredentials.length > 0) {
+    transports: Transport[];
+  }[];
+  if (user && user.webauthnCredentials.length > 0) {
+    bindTo = user.id;
     allowCredentials = user.webauthnCredentials.map((cred) => ({
       type: "public-key" as const,
       id: bufferToBase64url(cred.credentialId),
-      transports: (cred.transports as
-        | ("usb" | "nfc" | "ble" | "internal" | "hybrid")[]
-        | undefined) || ["internal", "usb", "ble", "nfc", "hybrid"],
+      transports: cred.transports as Transport[],
     }));
+  } else {
+    const decoy = decoyFor(email);
+    bindTo = decoy.userId;
+    allowCredentials = [
+      {
+        type: "public-key",
+        id: decoy.credentialId,
+        transports: ["hybrid", "internal"],
+      },
+    ];
   }
 
   const options = await generateAuthenticationOptions({
@@ -367,14 +391,21 @@ export async function generateWebAuthnAuthenticationOptions(
     userVerification: "preferred",
   });
 
-  if (user) {
-    storeAuthenticationChallenge(user.id, options.challenge);
-  } else {
-    // Store with a throwaway key for non-existent users (don't store for real)
-    // This prevents user enumeration but doesn't store meaningful challenge
-  }
+  return { options, bindTo };
+}
 
-  return options;
+/** Stable per-email decoy values, keyed with the JWT secret. */
+function decoyFor(email: string): { userId: string; credentialId: string } {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) throw new Error("JWT_SECRET environment variable is not set");
+  const digest = createHmac("sha256", secret)
+    .update(`passkey-decoy:${canonicalEmail(email)}`)
+    .digest();
+  return {
+    // Same length and alphabet as a Prisma cuid() ("c" + 24 chars).
+    userId: "c" + digest.subarray(0, 12).toString("hex"),
+    credentialId: bufferToBase64url(digest.subarray(16, 32)),
+  };
 }
 
 /**

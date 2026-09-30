@@ -175,13 +175,11 @@ export async function verifyRegistrationChallenge(
  * only accepts a challenge it signed, for that same user, and spends the
  * token on success so a captured sign-in can't be replayed.
  */
-export function signAuthenticationChallenge(
-  userId: string,
-  role: string,
-  challenge: string,
-) {
+export function signAuthenticationChallenge(userId: string, challenge: string) {
+  // Fixed role: the token is issued for any email (N-4 decoys included), so
+  // it must not vary with what kind of account, if any, the email has.
   return signJwtToken(
-    { userId, role, type: WEBAUTHN_AUTH_TOKEN_TYPE, challenge },
+    { userId, role: "PASSKEY", type: WEBAUTHN_AUTH_TOKEN_TYPE, challenge },
     "5m",
   );
 }
