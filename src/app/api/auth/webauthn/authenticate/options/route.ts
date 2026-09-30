@@ -28,9 +28,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Email is required" }, { status: 400 });
     }
 
-    // Get user
-    const user = await prisma.user.findUnique({
-      where: { email: canonicalEmail(email) },
+    // A deleted account is treated like an unknown email (N-3).
+    const user = await prisma.user.findFirst({
+      where: { email: canonicalEmail(email), isDeleted: false },
       select: {
         id: true,
         email: true,

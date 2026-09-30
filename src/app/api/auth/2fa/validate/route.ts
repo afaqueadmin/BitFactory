@@ -55,8 +55,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const user = await prisma.user.findUnique({
-      where: { email: canonicalEmail(email) },
+    // isDeleted: the account may have been deleted after the password step.
+    const user = await prisma.user.findFirst({
+      where: { email: canonicalEmail(email), isDeleted: false },
       select: {
         id: true,
         role: true,

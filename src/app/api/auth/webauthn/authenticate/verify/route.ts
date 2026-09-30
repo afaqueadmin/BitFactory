@@ -57,9 +57,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get user
-    const user = await prisma.user.findUnique({
-      where: { email: canonicalEmail(email) },
+    // Same account rule as password login: a deleted account can't sign in,
+    // even with a passkey it registered before it was deleted (N-3).
+    const user = await prisma.user.findFirst({
+      where: { email: canonicalEmail(email), isDeleted: false },
       select: {
         id: true,
         email: true,

@@ -335,8 +335,8 @@ export async function generateWebAuthnAuthenticationOptions(
   email: string,
   config: WebAuthnRuntimeConfig = {},
 ): Promise<PublicKeyCredentialRequestOptionsJSON> {
-  const user = await prisma.user.findUnique({
-    where: { email: canonicalEmail(email) },
+  const user = await prisma.user.findFirst({
+    where: { email: canonicalEmail(email), isDeleted: false },
     select: {
       id: true,
       webauthnCredentials: { select: { credentialId: true, transports: true } },
