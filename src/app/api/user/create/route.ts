@@ -66,13 +66,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get user from database
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
+    // N-11: the caller must exist, not be deleted, and be an admin. This
+    // used to skip both role checks when the caller's row wasn't found.
+    const user = await prisma.user.findFirst({
+      where: { id: userId, isDeleted: false },
       select: { role: true },
     });
 
-    if (user && user.role !== "ADMIN" && user.role !== "SUPER_ADMIN") {
+    if (!user || (user.role !== "ADMIN" && user.role !== "SUPER_ADMIN")) {
       return NextResponse.json(
         { error: "Only administrators can create users" },
         { status: 403 },
@@ -109,7 +110,6 @@ export async function POST(request: NextRequest) {
     const email = canonicalEmail(rawEmail);
 
     if (
-      user &&
       user.role !== "SUPER_ADMIN" &&
       ["ADMIN", "SUPER_ADMIN"].includes(role)
     ) {
