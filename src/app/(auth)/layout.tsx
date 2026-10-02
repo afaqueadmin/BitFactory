@@ -25,7 +25,7 @@ export default function AuthLayout({
 
   // The Daylight page treatment (pale canvas, guide padding) is currently
   // rolled out on the client dashboard, miners, wallet, transaction,
-  // invoices, BTC price history, hashprice history, payback analysis,
+  // invoices, BTC price history, BTC price predictor, hashprice history, payback analysis,
   // account settings, security settings and support pages; other client
   // pages keep their existing look and only pick up the new header.
   const isDaylightPage =
@@ -35,6 +35,7 @@ export default function AuthLayout({
     pathname === "/transaction" ||
     pathname === "/invoices" ||
     pathname === "/btc-price-history" ||
+    pathname === "/btc-price-forecast" ||
     pathname === "/hashprice-history" ||
     pathname === "/payback-analysis" ||
     pathname === "/account-settings" ||

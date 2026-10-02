@@ -41,6 +41,7 @@ const publicPaths = new Set([
 // onboarded customers) can reuse the exact same set below.
 const clientPaths = [
   "/account-settings",
+  "/btc-price-forecast",
   "/btc-price-history",
   "/btc-price-predictor",
   "/clientworkers",

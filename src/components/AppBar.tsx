@@ -41,6 +41,7 @@ import SwapHorizOutlinedIcon from "@mui/icons-material/SwapHorizOutlined";
 import ReceiptLongOutlinedIcon from "@mui/icons-material/ReceiptLongOutlined";
 import CurrencyBitcoinIcon from "@mui/icons-material/CurrencyBitcoin";
 import InsightsOutlinedIcon from "@mui/icons-material/InsightsOutlined";
+import TrendingUpOutlinedIcon from "@mui/icons-material/TrendingUpOutlined";
 import ShowChartOutlinedIcon from "@mui/icons-material/ShowChartOutlined";
 import SavingsOutlinedIcon from "@mui/icons-material/SavingsOutlined";
 import SupportAgentOutlinedIcon from "@mui/icons-material/SupportAgentOutlined";
@@ -116,6 +117,11 @@ const toolLinks: NavLink[] = [
     href: "/btc-price-predictor",
     label: "BTC Market Sentiments",
     icon: <InsightsOutlinedIcon />,
+  },
+  {
+    href: "/btc-price-forecast",
+    label: "BTC Price Predictor",
+    icon: <TrendingUpOutlinedIcon />,
   },
   {
     href: "/hashprice-history",
