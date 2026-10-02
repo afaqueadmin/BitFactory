@@ -13,16 +13,21 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const viewport: Viewport = {
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#0f766e" },
-    { media: "(prefers-color-scheme: dark)", color: "#090d16" },
-  ],
-  width: "device-width",
-  initialScale: 1,
-  maximumScale: 5,
-  viewportFit: "cover",
-};
+// Theme follows the app's darkMode cookie (light by default), never the
+// device's prefers-color-scheme. "only light" also opts out of mobile
+// browsers' automatic dark rendering.
+export async function generateViewport(): Promise<Viewport> {
+  const cookieStore = await cookies();
+  const darkMode = cookieStore.get("darkMode")?.value === "true";
+  return {
+    themeColor: darkMode ? "#090d16" : "#0f766e",
+    colorScheme: darkMode ? "dark" : "only light",
+    width: "device-width",
+    initialScale: 1,
+    maximumScale: 5,
+    viewportFit: "cover",
+  };
+}
 
 export const metadata: Metadata = {
   title: "BitFactory",
@@ -69,7 +74,11 @@ export default async function RootLayout({
   const initialDarkMode = cookieStore.get("darkMode")?.value === "true";
 
   return (
-    <html lang="en">
+    <html
+      lang="en"
+      style={{ colorScheme: initialDarkMode ? "dark" : "light" }}
+      suppressHydrationWarning
+    >
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         suppressHydrationWarning={true}

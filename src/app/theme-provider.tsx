@@ -41,6 +41,19 @@ export function ThemeProvider({
 
   React.useEffect(() => {
     document.cookie = `${DARK_MODE_COOKIE}=${darkMode}; path=/; max-age=31536000; samesite=lax`;
+    // Keep native UI (scrollbars, form controls) and the browser chrome in
+    // step with the in-app toggle rather than the device theme.
+    document.documentElement.style.colorScheme = darkMode ? "dark" : "light";
+    document
+      .querySelectorAll('meta[name="color-scheme"]')
+      .forEach((m) =>
+        m.setAttribute("content", darkMode ? "dark" : "only light"),
+      );
+    document
+      .querySelectorAll('meta[name="theme-color"]')
+      .forEach((m) =>
+        m.setAttribute("content", darkMode ? "#090d16" : "#0f766e"),
+      );
   }, [darkMode]);
 
   const toggleDarkMode = React.useCallback(() => {
