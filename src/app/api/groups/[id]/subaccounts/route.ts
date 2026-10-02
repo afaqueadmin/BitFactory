@@ -1,15 +1,41 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { verifyJwtToken } from "@/lib/jwt";
 
 /**
  * GET /api/groups/[id]/subaccounts
- * Fetch all subaccounts in a group with user details
+ * Fetch all subaccounts in a group with user details. Admins only: it returns
+ * customers' names, emails and Luxor subaccounts (previously open to anyone,
+ * signed in or not - N-15).
  */
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    const token = request.cookies.get("token")?.value;
+    if (!token) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized" },
+        { status: 401 },
+      );
+    }
+    let role: string;
+    try {
+      ({ role } = await verifyJwtToken(token));
+    } catch {
+      return NextResponse.json(
+        { success: false, error: "Invalid token" },
+        { status: 401 },
+      );
+    }
+    if (role !== "ADMIN" && role !== "SUPER_ADMIN") {
+      return NextResponse.json(
+        { success: false, error: "Admin access required" },
+        { status: 403 },
+      );
+    }
+
     const { id: groupId } = await params;
 
     console.log("[Groups API] Fetching subaccounts for group:", groupId);

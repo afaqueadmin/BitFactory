@@ -1,11 +1,30 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { generateInvoicePDF } from "@/lib/email";
+import { verifyJwtToken } from "@/lib/jwt";
 
 /**
  * Test endpoint to preview invoice PDF with sample data
  * Usage: GET /api/test/preview-invoice-pdf
+ * Admins only (N-16: was open to anyone, signed in or not).
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const token = request.cookies.get("token")?.value;
+  let role: string | null = null;
+  try {
+    if (token) ({ role } = await verifyJwtToken(token));
+  } catch {
+    role = null;
+  }
+  if (!role) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (role !== "ADMIN" && role !== "SUPER_ADMIN") {
+    return NextResponse.json(
+      { error: "Admin access required" },
+      { status: 403 },
+    );
+  }
+
   try {
     console.log("[Preview PDF] Generating sample invoice PDF...");
 

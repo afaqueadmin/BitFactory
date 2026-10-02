@@ -24,11 +24,21 @@ export async function POST(
       );
     }
 
-    const user = await verifyJwtToken(token);
-    if (!user) {
+    let user;
+    try {
+      user = await verifyJwtToken(token);
+    } catch {
       return NextResponse.json(
         { success: false, error: "Invalid token" },
         { status: 401 },
+      );
+    }
+
+    // N-15: was any signed-in user, including customers.
+    if (user.role !== "ADMIN" && user.role !== "SUPER_ADMIN") {
+      return NextResponse.json(
+        { success: false, error: "Admin access required" },
+        { status: 403 },
       );
     }
 

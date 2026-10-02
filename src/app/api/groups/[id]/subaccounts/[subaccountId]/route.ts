@@ -14,9 +14,7 @@ export async function DELETE(
   try {
     const { id: groupId, subaccountId } = await params;
 
-    // Verify authentication (this route previously had none - needed here
-    // to attribute the removal for the audit log, same minimal check as
-    // the sibling bulk-remove route)
+    // Admins only (N-15: was any signed-in user, including customers).
     const token = request.cookies.get("token")?.value;
     if (!token) {
       return NextResponse.json(
@@ -24,15 +22,36 @@ export async function DELETE(
         { status: 401 },
       );
     }
-    const user = await verifyJwtToken(token);
-    if (!user) {
+    let user;
+    try {
+      user = await verifyJwtToken(token);
+    } catch {
       return NextResponse.json(
         { success: false, error: "Invalid token" },
         { status: 401 },
       );
     }
+    if (user.role !== "ADMIN" && user.role !== "SUPER_ADMIN") {
+      return NextResponse.json(
+        { success: false, error: "Admin access required" },
+        { status: 403 },
+      );
+    }
 
     console.log("[Groups API] Removing subaccount:", subaccountId);
+
+    // Only a member of the group named in the URL, so the audit entry below
+    // is about the right group.
+    const member = await prisma.groupSubaccount.findFirst({
+      where: { id: subaccountId, groupId },
+      select: { id: true },
+    });
+    if (!member) {
+      return NextResponse.json(
+        { success: false, error: "Subaccount not found in this group" },
+        { status: 404 },
+      );
+    }
 
     const groupSubaccount = await prisma.groupSubaccount.delete({
       where: { id: subaccountId },
