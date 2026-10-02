@@ -45,7 +45,9 @@ export async function PUT(
       );
     }
 
-    const owns = await assertFranchiseeOwnsCustomer(auth.decoded.userId, id);
+    const owns = await assertFranchiseeOwnsCustomer(auth.decoded.userId, id, {
+      activeOnly: true,
+    });
     if (!owns) {
       return NextResponse.json(
         { success: false, error: "Customer not found" },
@@ -133,7 +135,9 @@ export async function DELETE(
       );
     }
 
-    const owns = await assertFranchiseeOwnsCustomer(auth.decoded.userId, id);
+    const owns = await assertFranchiseeOwnsCustomer(auth.decoded.userId, id, {
+      activeOnly: true,
+    });
     if (!owns) {
       return NextResponse.json(
         { success: false, error: "Customer not found" },

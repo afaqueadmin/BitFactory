@@ -38,15 +38,22 @@ export async function getOwnFranchise(franchiseeUserId: string) {
   });
 }
 
-/** True if `customerId` is a CLIENT user attached to this franchisee's franchise. */
+/**
+ * True if `customerId` is a CLIENT user attached to this franchisee's franchise.
+ * Deleted customers still count by default, so their history stays readable;
+ * pass `activeOnly` for anything that changes the account (password reset,
+ * edit, delete) - a deleted customer must stay as it was.
+ */
 export async function assertFranchiseeOwnsCustomer(
   franchiseeUserId: string,
   customerId: string,
+  { activeOnly = false }: { activeOnly?: boolean } = {},
 ): Promise<boolean> {
   const owned = await prisma.user.findFirst({
     where: {
       id: customerId,
       franchisee: { franchiseeId: franchiseeUserId },
+      ...(activeOnly ? { isDeleted: false } : {}),
     },
     select: { id: true },
   });

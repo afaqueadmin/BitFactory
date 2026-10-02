@@ -43,8 +43,9 @@ export async function PUT(
       );
     }
 
-    const targetUser = await prisma.user.findUnique({
-      where: { id },
+    // A deleted account can't sign in, and must not be revived by a reset.
+    const targetUser = await prisma.user.findFirst({
+      where: { id, isDeleted: false },
       select: { role: true, email: true },
     });
 

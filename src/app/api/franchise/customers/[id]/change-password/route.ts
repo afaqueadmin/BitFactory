@@ -47,7 +47,10 @@ export async function PUT(
       );
     }
 
-    const owns = await assertFranchiseeOwnsCustomer(decoded.userId, id);
+    // A deleted customer can't sign in, and must not be revived by a reset.
+    const owns = await assertFranchiseeOwnsCustomer(decoded.userId, id, {
+      activeOnly: true,
+    });
     if (!owns) {
       return NextResponse.json(
         { success: false, error: "Customer not found" },
