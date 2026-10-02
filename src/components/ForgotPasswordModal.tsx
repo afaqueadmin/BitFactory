@@ -57,15 +57,8 @@ export default function ForgotPasswordModal({
         throw new Error(data.error || "Failed to process password reset");
       }
 
+      // Stays open so the user can read where to look next; Close dismisses.
       setSuccess(true);
-      console.log(
-        "[ForgotPasswordModal] Password reset email sent successfully",
-      );
-
-      // Close modal after 2 seconds
-      setTimeout(() => {
-        handleClose();
-      }, 2000);
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
       console.error("[ForgotPasswordModal] Error:", err);
@@ -126,15 +119,16 @@ export default function ForgotPasswordModal({
           <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
             {success ? (
               <Alert severity="success">
-                Password reset email sent successfully! Check your inbox for the
-                temporary password.
+                If an account exists for {email}, we&apos;ve emailed it a link
+                to reset the password. The link works once and expires in 30
+                minutes. Your current password still works until you use it.
               </Alert>
             ) : (
               <>
                 <Box>
                   <p style={{ marginTop: 0, marginBottom: 16, fontSize: 14 }}>
-                    Enter your email address and we&apos;ll send you a temporary
-                    password to reset your account.
+                    Enter your email address and we&apos;ll send you a link to
+                    choose a new password.
                   </p>
                 </Box>
 
@@ -177,7 +171,7 @@ export default function ForgotPasswordModal({
               {loading ? (
                 <CircularProgress size={24} color="inherit" />
               ) : (
-                "Send Reset Email"
+                "Send Reset Link"
               )}
             </Button>
           )}

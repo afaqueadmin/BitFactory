@@ -155,6 +155,40 @@ export const sendPasswordResetEmail = async (
 };
 
 /**
+ * C-1: the forgotten-password link. Nothing about the account has changed
+ * when this is sent - the password only changes if the link is used.
+ */
+export const sendPasswordResetLinkEmail = async (
+  email: string,
+  details: { resetUrl: string; validMinutes: number; ipAddress: string },
+) => {
+  const mailOptions = {
+    from:
+      `BitFactory Admin <${process.env.SMTP_FROM}>` || "noreply@bitfactory.com",
+    to: email,
+    subject: "Reset Your Password - BitFactory",
+    html: `
+      <h1>Reset your password</h1>
+      <p>Someone asked to reset the password for your BitFactory account (${escapeHtml(email)}). To choose a new password, use this link:</p>
+      <p><a href="${escapeHtml(details.resetUrl)}" target="_blank" rel="noopener noreferrer"><strong>Reset my password</strong></a></p>
+      <p>The link works once and expires in ${details.validMinutes} minutes. If your account has two-factor authentication, you'll also need a code from your authenticator app or a backup code.</p>
+      <p>If you didn't ask for this, you can ignore this email: your password hasn't been changed. The request came from IP address ${escapeHtml(details.ipAddress)}.</p>
+      <br>
+      <p>Best regards,</p>
+      <p>The BitFactory Team</p>
+    `,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    return { success: true };
+  } catch (error) {
+    console.error("Error sending password reset link email:", error);
+    return { success: false, error };
+  }
+};
+
+/**
  * Sent whenever a user changes their own password via the self-service flow
  * (src/app/api/user/change-password/route.ts). Unlike sendPasswordResetEmail
  * (admin/franchisee sets a new password for someone else, so the recipient

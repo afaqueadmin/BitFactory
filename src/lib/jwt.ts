@@ -19,11 +19,14 @@ const PENDING_2FA_TOKEN_TYPE = "2fa_pending";
 const WEBAUTHN_REG_TOKEN_TYPE = "webauthn_reg";
 //   webauthn_auth: a passkey sign-in challenge bound to one user (N-5)
 const WEBAUTHN_AUTH_TOKEN_TYPE = "webauthn_auth";
+//   pwd_reset: the emailed forgotten-password link for one user (C-1)
+const PASSWORD_RESET_TOKEN_TYPE = "pwd_reset";
 const NON_SESSION_TYPES = new Set([
   ENROLLMENT_TOKEN_TYPE,
   PENDING_2FA_TOKEN_TYPE,
   WEBAUTHN_REG_TOKEN_TYPE,
   WEBAUTHN_AUTH_TOKEN_TYPE,
+  PASSWORD_RESET_TOKEN_TYPE,
 ]);
 
 // Read lazily (not at import time) so builds and public pages still load when
@@ -93,7 +96,7 @@ export async function verifyJwtToken(token: string): Promise<JwtPayload> {
 
 export async function signJwtToken(
   payload: Omit<JwtPayload, "exp">,
-  expiresIn: "1h" | "7d" | "15m" | "10m" | "5m" | "2m" = "1h",
+  expiresIn: "1h" | "7d" | "30m" | "15m" | "10m" | "5m" | "2m" = "1h",
 ): Promise<string> {
   return await new SignJWT(payload)
     .setProtectedHeader({ alg: "HS256" })
@@ -200,6 +203,36 @@ export async function verifyAuthenticationChallenge(
     challenge: payload.challenge,
     exp: payload.exp,
   };
+}
+
+/**
+ * 30-minute token for the forgotten-password link (C-1). `pwd` is a
+ * fingerprint of the password hash at the time it was sent, so the link dies
+ * as soon as the password changes - after it's used, or any other reset.
+ */
+export function signPasswordResetToken(
+  userId: string,
+  role: string,
+  pwd: string,
+) {
+  return signJwtToken(
+    { userId, role, type: PASSWORD_RESET_TOKEN_TYPE, pwd },
+    "30m",
+  );
+}
+
+export async function verifyPasswordResetToken(
+  token: string,
+): Promise<{ userId: string; pwd: string; exp?: number }> {
+  const payload = await verifyLoginStepToken(
+    token,
+    PASSWORD_RESET_TOKEN_TYPE,
+    "password reset",
+  );
+  if (typeof payload.pwd !== "string") {
+    throw new Error("Invalid or expired password reset token");
+  }
+  return { userId: payload.userId, pwd: payload.pwd, exp: payload.exp };
 }
 
 async function verifyLoginStepToken(

@@ -21,6 +21,7 @@ const singleSegmentPattern = (base: string): PathMatcher => ({
 const publicPaths = new Set([
   "/",
   "/login",
+  "/reset-password", // C-1: forgotten-password link
   "/api/auth/2fa/validate", // Adding 2FA validation endpoint
   "/manifest.json",
   "/sw.js",
