@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import speakeasy from "speakeasy";
+import { verifyTotpCode } from "@/lib/auth/totpSecret";
 import { getUserInfoFromToken } from "@/lib/helpers/getUserInfoFromToken";
 import { twoFactorRequirement } from "@/lib/auth/twoFactorPolicy";
 import { notifySecurityChangeForUser } from "@/lib/auth/securityAlerts";
@@ -69,14 +69,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const isValid = speakeasy.totp.verify({
-      secret: twoFactorAuth.secret,
-      encoding: "base32",
-      token,
-      window: 1, // Allow 1 time step before/after for clock drift
-    });
-
-    if (!isValid) {
+    if (!verifyTotpCode(twoFactorAuth.secret, token)) {
       return NextResponse.json(
         { error: "Invalid verification code" },
         { status: 400 },

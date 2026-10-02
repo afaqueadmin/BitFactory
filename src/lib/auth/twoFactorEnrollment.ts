@@ -3,6 +3,11 @@ import QRCode from "qrcode";
 import { prisma } from "@/lib/prisma";
 import { generateBackupCodes, hashBackupCodes } from "@/lib/auth/backupCodes";
 import {
+  encryptTotpSecret,
+  isEncryptedTotpSecret,
+  verifyTotpCode,
+} from "@/lib/auth/totpSecret";
+import {
   clearUserFactorAttempts,
   recordUserFactorAttempt,
 } from "@/lib/rateLimit";
@@ -28,10 +33,12 @@ export async function beginTwoFactorSetup(userId: string) {
   // Stored as pending: any existing 2FA keeps working (secret/enabled are
   // untouched) until a code from the new secret is confirmed (C-2). Row may
   // not exist yet for a user's first-ever setup - upsert covers that too.
+  // Encrypted at rest; only the user sees it in plain, once, right here.
+  const pendingSecret = encryptTotpSecret(secret.base32);
   await prisma.twoFactorAuth.upsert({
     where: { userId },
-    create: { userId, pendingSecret: secret.base32, enabled: false },
-    update: { pendingSecret: secret.base32 },
+    create: { userId, pendingSecret, enabled: false },
+    update: { pendingSecret },
   });
 
   return { secret: secret.base32, qrCode };
@@ -74,24 +81,21 @@ export async function completeTwoFactorSetup(
     return { ok: false, status: attempt.status, error: attempt.error };
   }
 
-  const verified = speakeasy.totp.verify({
-    secret: newSecret,
-    encoding: "base32",
-    token: code,
-    window: 1, // Allow 1 time step before/after for clock drift
-  });
-  if (!verified) {
+  if (!verifyTotpCode(newSecret, code)) {
     return { ok: false, status: 400, error: "Invalid token" };
   }
   await clearUserFactorAttempts(CONFIRM_SCOPE, userId);
 
   // The new authenticator replaces any previous one, with fresh backup codes.
+  // A setup started before encryption existed is encrypted on the way in.
   const backupCodes = generateBackupCodes();
   await prisma.twoFactorAuth.update({
     where: { userId },
     data: {
       enabled: true,
-      secret: newSecret,
+      secret: isEncryptedTotpSecret(newSecret)
+        ? newSecret
+        : encryptTotpSecret(newSecret),
       pendingSecret: null,
       backupCodes: await hashBackupCodes(backupCodes),
       enrolledAt: new Date(),

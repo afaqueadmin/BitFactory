@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import speakeasy from "speakeasy";
 import { prisma } from "@/lib/prisma";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import { generateTokens, verifyPendingTwoFactorToken } from "@/lib/jwt";
@@ -17,6 +16,7 @@ import {
 import { notifySecurityChangeForUser } from "@/lib/auth/securityAlerts";
 import { canonicalEmail } from "@/lib/auth/emailIdentity";
 import { consumeBackupCode } from "@/lib/auth/backupCodes";
+import { verifyTotpCode } from "@/lib/auth/totpSecret";
 import { isTokenBlacklisted } from "@/lib/auth/tokenBlacklist";
 
 export async function POST(req: NextRequest) {
@@ -144,14 +144,7 @@ export async function POST(req: NextRequest) {
 
     // Authenticator code first - it's cheap, while a backup-code check costs
     // up to one bcrypt compare per remaining code.
-    const totpVerified =
-      !!twoFactorAuth.secret &&
-      speakeasy.totp.verify({
-        secret: twoFactorAuth.secret,
-        encoding: "base32",
-        token: token,
-        window: 1,
-      });
+    const totpVerified = verifyTotpCode(twoFactorAuth.secret, token);
     const usedBackupCode =
       !totpVerified &&
       (await consumeBackupCode(user.id, twoFactorAuth.backupCodes, token));

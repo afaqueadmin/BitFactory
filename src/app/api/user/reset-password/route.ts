@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse, after } from "next/server";
 import { hash } from "bcrypt";
-import speakeasy from "speakeasy";
 import { prisma } from "@/lib/prisma";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import { sendPasswordChangedNotificationEmail } from "@/lib/email";
 import { resolveResetLink } from "@/lib/auth/passwordReset";
 import { sessionCutoffNow } from "@/lib/auth/sessionRevocation";
 import { consumeBackupCode } from "@/lib/auth/backupCodes";
+import { verifyTotpCode } from "@/lib/auth/totpSecret";
 import { notifySecurityChangeForUser } from "@/lib/auth/securityAlerts";
 import {
   clearAuthRateLimitForEmail,
@@ -106,14 +106,7 @@ export async function POST(request: NextRequest) {
       }
 
       const code = twoFactorCode.trim();
-      const totpVerified =
-        !!target.twoFactor.secret &&
-        speakeasy.totp.verify({
-          secret: target.twoFactor.secret,
-          encoding: "base32",
-          token: code,
-          window: 1,
-        });
+      const totpVerified = verifyTotpCode(target.twoFactor.secret, code);
       usedBackupCode =
         !totpVerified &&
         (await consumeBackupCode(

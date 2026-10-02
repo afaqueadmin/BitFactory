@@ -1,7 +1,7 @@
 import { compare } from "bcrypt";
-import speakeasy from "speakeasy";
 import { prisma } from "@/lib/prisma";
 import { consumeBackupCode } from "@/lib/auth/backupCodes";
+import { verifyTotpCode } from "@/lib/auth/totpSecret";
 import {
   clearUserFactorAttempts,
   recordUserFactorAttempt,
@@ -77,15 +77,7 @@ export async function verifyStepUp(
     if (limited) return limited;
 
     // Authenticator code first (cheap); backup codes cost a bcrypt compare each.
-    const verified =
-      !!twoFactorAuth.secret &&
-      speakeasy.totp.verify({
-        secret: twoFactorAuth.secret,
-        encoding: "base32",
-        token: twoFactorToken,
-        window: 1,
-      });
-    if (verified) {
+    if (verifyTotpCode(twoFactorAuth.secret, twoFactorToken)) {
       await prisma.twoFactorAuth.update({
         where: { userId },
         data: { lastUsedAt: new Date() },
