@@ -10,6 +10,17 @@ function setPasskeyOfferFlag() {
   sessionStorage.setItem(PASSKEY_OFFER_FLAG, "1");
 }
 
+// Pages a signed-out visitor is meant to be on, so a failed auth check there
+// must not bounce them to /login (C-1: the emailed reset link lands on
+// /reset-password without a session). Keep in step with publicPaths in
+// src/proxy.ts.
+function shouldRedirectToLogin(): boolean {
+  const path = window.location.pathname;
+  return (
+    path !== "/" && !path.startsWith("/login") && path !== "/reset-password"
+  );
+}
+
 interface User {
   id: string;
   email: string;
@@ -82,11 +93,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         setUser(null);
-        // Only redirect to login if we're not already there and not on the public home page
-        if (
-          !window.location.pathname.startsWith("/login") &&
-          window.location.pathname !== "/"
-        ) {
+        if (shouldRedirectToLogin()) {
           router.replace("/login");
         }
         return;
@@ -99,20 +106,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // This shouldn't happen, but handle it just in case
         console.error("No user data in successful auth check response");
         setUser(null);
-        if (
-          !window.location.pathname.startsWith("/login") &&
-          window.location.pathname !== "/"
-        ) {
+        if (shouldRedirectToLogin()) {
           router.replace("/login");
         }
       }
     } catch (error) {
       console.error("Auth check failed:", error);
       setUser(null);
-      if (
-        !window.location.pathname.startsWith("/login") &&
-        window.location.pathname !== "/"
-      ) {
+      if (shouldRedirectToLogin()) {
         router.replace("/login");
       }
     } finally {
