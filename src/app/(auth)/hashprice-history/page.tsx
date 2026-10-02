@@ -336,7 +336,7 @@ export default function HashpriceHistoryPage() {
             color: d.text,
           }}
         >
-          Hashprice History
+          Hash Rewards
         </Typography>
         <Typography
           sx={{ fontSize: { xs: 12, md: 13 }, color: d.muted, mt: "7px" }}

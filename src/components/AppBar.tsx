@@ -43,6 +43,8 @@ import CurrencyBitcoinIcon from "@mui/icons-material/CurrencyBitcoin";
 import InsightsOutlinedIcon from "@mui/icons-material/InsightsOutlined";
 import ShowChartOutlinedIcon from "@mui/icons-material/ShowChartOutlined";
 import SavingsOutlinedIcon from "@mui/icons-material/SavingsOutlined";
+import SupportAgentOutlinedIcon from "@mui/icons-material/SupportAgentOutlined";
+import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import { useAuth } from "@/lib/contexts/auth-context";
 import { useSubaccountFilter } from "@/lib/contexts/subaccountFilter-context";
 import Link from "next/link";
@@ -65,6 +67,9 @@ import {
 /** Height of the mobile bottom navigation (guide §7 / preview). */
 const BOTTOM_NAV_HEIGHT = 72;
 const SAFE_BOTTOM = "env(safe-area-inset-bottom, 0px)";
+/** Viewport heights at which the desktop sidebar tightens its spacing. */
+const SHORT = "@media (max-height: 820px)";
+const VERY_SHORT = "@media (max-height: 700px)";
 
 interface NavLink {
   href: string;
@@ -104,17 +109,17 @@ const mainLinks: NavLink[] = [
 const toolLinks: NavLink[] = [
   {
     href: "/btc-price-history",
-    label: "BTC Price",
+    label: "BTC Price History",
     icon: <CurrencyBitcoinIcon />,
   },
   {
     href: "/btc-price-predictor",
-    label: "BTC Predictor",
+    label: "BTC Market Sentiments",
     icon: <InsightsOutlinedIcon />,
   },
   {
     href: "/hashprice-history",
-    label: "Hashprice",
+    label: "Hash Rewards",
     icon: <ShowChartOutlinedIcon />,
   },
   {
@@ -319,7 +324,8 @@ export default function AppBarComponent() {
       sx={{
         m: 0,
         mt: first ? 0 : "22px",
-        mb: "8px",
+        mb: "6px",
+        [SHORT]: { mt: first ? 0 : "16px", mb: "4px" },
         px: "15px",
         fontSize: 10,
         fontWeight: 700,
@@ -335,10 +341,13 @@ export default function AppBarComponent() {
   const navItem = (
     link: NavLink,
     {
-      minHeight = 40,
+      minHeight,
       onNavigate,
     }: { minHeight?: number; onNavigate?: () => void } = {},
   ) => {
+    // Desktop sidebar items (no explicit height) shrink on short screens so
+    // the whole sidebar fits without scrolling.
+    const inSidebar = minHeight === undefined;
     const active = isActive(link.href);
     return (
       <ButtonBase
@@ -355,9 +364,10 @@ export default function AppBarComponent() {
           width: "100%",
           justifyContent: "flex-start",
           gap: "12px",
-          minHeight,
-          px: "14px",
-          my: "2px",
+          minHeight: minHeight ?? 38,
+          px: "12px",
+          my: "4px",
+          lineHeight: 1.25,
           borderRadius: "9px",
           fontFamily: fonts.body,
           fontSize: 13,
@@ -368,10 +378,25 @@ export default function AppBarComponent() {
           "&:hover": { bgcolor: active ? d.skySoft : d.hover },
           "&:focus-visible": focusRing(d.action),
           "& > svg": { fontSize: 20, flexShrink: 0 },
+          ...(inSidebar && {
+            gap: "10px",
+            px: "10px",
+            // Keep every label on one line in the full-width sidebar; the
+            // narrower sidebars on smaller screens fall back to wrapping.
+            "& > .nav-label": {
+              minWidth: 0,
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            },
+            [MQ.compact]: { "& > .nav-label": { whiteSpace: "normal" } },
+            [SHORT]: { minHeight: 34, my: "3px" },
+            [VERY_SHORT]: { minHeight: 30, my: "2px", fontSize: 12.5 },
+          }),
         }}
       >
         {link.icon}
-        {link.label}
+        <span className="nav-label">{link.label}</span>
         {link.href === "/invoices" && unpaidCount > 0 ? countChip() : null}
       </ButtonBase>
     );
@@ -417,8 +442,13 @@ export default function AppBarComponent() {
           flexDirection: "column",
           ...sidebarWidthStyles("width"),
           [MQ.mobile]: { display: "none" },
+          // Spacing below compacts on short screens so everything fits; scrolling
+          // stays as a last resort on tiny windows but without a visible bar.
           overflowY: "auto",
-          p: "26px 16px 18px",
+          scrollbarWidth: "none",
+          "&::-webkit-scrollbar": { display: "none" },
+          p: "22px 12px 14px",
+          [SHORT]: { pt: "16px", pb: "10px" },
           bgcolor: d.surface,
           borderRight: `1px solid ${d.border}`,
           zIndex: 1202,
@@ -456,8 +486,9 @@ export default function AppBarComponent() {
             display: "flex",
             alignItems: "center",
             gap: "10px",
-            m: "22px 4px 26px",
-            p: "11px 10px",
+            m: "18px 4px 18px",
+            p: "10px",
+            [SHORT]: { m: "12px 4px 12px", p: "7px 10px" },
             bgcolor: d.canvas,
             border: `1px solid ${d.border}`,
             borderRadius: "10px",
@@ -513,43 +544,85 @@ export default function AppBarComponent() {
         </Box>
 
         {/* Help card + footer */}
-        <Box sx={{ mt: "auto", pt: "18px" }}>
-          <Box
+        <Box sx={{ mt: "auto", pt: "14px", [SHORT]: { pt: "10px" } }}>
+          <ButtonBase
+            component={Link}
+            href="/support"
+            aria-current={isActive("/support") ? "page" : undefined}
+            onClick={() => trackTab("/support", "Support")}
             sx={{
-              m: "0 4px 18px",
-              p: "17px",
+              display: "flex",
+              alignItems: "center",
+              gap: "10px",
+              width: "calc(100% - 8px)",
+              m: "0 4px 12px",
+              p: "10px 12px",
+              [SHORT]: { mb: "8px", py: "8px" },
+              textAlign: "left",
+              fontFamily: fonts.body,
               background: darkMode
                 ? d.skySoft
                 : "linear-gradient(140deg, #EFF8FF, #F4FBF8)",
               border: `1px solid ${darkMode ? d.borderSky : "#DEEDF3"}`,
               borderRadius: "12px",
+              transition: "border-color .15s, box-shadow .15s",
+              "&:hover": {
+                borderColor: d.action,
+                boxShadow: "0 2px 8px rgba(20, 90, 140, .08)",
+                "& .support-arrow": { transform: "translateX(2px)" },
+              },
+              "&:focus-visible": focusRing(d.action),
             }}
           >
-            <Box sx={{ fontWeight: 650, fontSize: 13, color: d.text }}>
-              Need help?
-            </Box>
             <Box
-              component="p"
-              sx={{ m: "8px 0 12px", fontSize: 12, color: d.muted }}
-            >
-              Questions about your miners, wallet or invoices? We&rsquo;re here
-              to help.
-            </Box>
-            <Box
-              component={Link}
-              href="/support"
+              aria-hidden
               sx={{
-                fontSize: 12,
-                fontWeight: 650,
+                display: "grid",
+                placeItems: "center",
+                flexShrink: 0,
+                width: 30,
+                height: 30,
+                borderRadius: "50%",
+                bgcolor: d.surface,
                 color: d.action,
-                textDecoration: "none",
-                "&:hover": { color: d.actionHover },
-                "&:focus-visible": focusRing(d.action),
+                "& > svg": { fontSize: 18 },
               }}
             >
-              Contact support
+              <SupportAgentOutlinedIcon />
             </Box>
-          </Box>
+            <Box sx={{ minWidth: 0, flex: 1, lineHeight: 1.3 }}>
+              <Box
+                sx={{
+                  fontWeight: 650,
+                  fontSize: 13,
+                  color: d.text,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                Need help?
+              </Box>
+              <Box
+                sx={{
+                  fontSize: 11.5,
+                  fontWeight: 600,
+                  color: d.action,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                Contact support
+              </Box>
+            </Box>
+            <ChevronRightRoundedIcon
+              className="support-arrow"
+              aria-hidden
+              sx={{
+                fontSize: 18,
+                color: d.action,
+                flexShrink: 0,
+                transition: "transform .15s",
+              }}
+            />
+          </ButtonBase>
           <Box sx={{ px: "12px", fontSize: 10, color: d.muted }}>
             © {new Date().getFullYear()} BitFactory
           </Box>

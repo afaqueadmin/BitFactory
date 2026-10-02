@@ -58,13 +58,26 @@ export default function PwaRegister() {
       "serviceWorker" in navigator &&
       process.env.NODE_ENV !== "production"
     ) {
-      // Also register in dev if explicitly desired or log readiness
+      // No service worker in dev: it serves /_next/static from cache first,
+      // and dev chunk URLs aren't content-hashed, so after an edit the browser
+      // gets stale chunks ("module factory is not available"). Remove any
+      // worker and cache left over from an earlier dev session.
       navigator.serviceWorker
-        .register("/sw.js", { scope: "/" })
-        .then((reg) =>
-          console.log("Dev BitFactory Service Worker registered:", reg.scope),
-        )
-        .catch((err) => console.log("Dev SW notice:", err.message));
+        .getRegistrations()
+        .then((regs) => Promise.all(regs.map((r) => r.unregister())))
+        .catch(() => {});
+      if ("caches" in window) {
+        caches
+          .keys()
+          .then((names) =>
+            Promise.all(
+              names
+                .filter((n) => n.startsWith("bitfactory-pwa"))
+                .map((n) => caches.delete(n)),
+            ),
+          )
+          .catch(() => {});
+      }
     }
   }, []);
 

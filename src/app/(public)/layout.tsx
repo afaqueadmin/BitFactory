@@ -1,21 +1,13 @@
 "use client";
 
-import React, { useState } from "react";
-import { ThemeProvider, createTheme } from "@mui/material/styles";
-import CssBaseline from "@mui/material/CssBaseline";
+import React from "react";
+import ForceLightTheme from "@/components/ForceLightTheme";
 
-const lightTheme = createTheme({ palette: { mode: "light" } });
-const darkTheme = createTheme({ palette: { mode: "dark" } });
-
-export default function PublicLayout({ children }: { children: React.ReactNode }) {
-    const [darkMode, setDarkMode] = useState(false);
-
-    const toggleDarkMode = () => setDarkMode(!darkMode);
-
-    return (
-        <ThemeProvider theme={darkMode ? darkTheme : lightTheme}>
-            <CssBaseline />
-            {children}
-        </ThemeProvider>
-    );
+// Public pages (login, reset-password) are always light.
+export default function PublicLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return <ForceLightTheme>{children}</ForceLightTheme>;
 }

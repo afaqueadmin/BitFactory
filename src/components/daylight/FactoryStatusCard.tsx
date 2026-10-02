@@ -5,8 +5,9 @@
  * FactoryStatusCard - Daylight version of the "Factory Status" fleet card.
  *
  * Same data as HostedMinersCard (running / inactive workers plus the per-pool
- * breakdown), laid out like the Daylight "fleet health" card: status ring,
- * legend rows, pool rows and a "view all miners" link.
+ * breakdown), laid out top to bottom for the narrow dashboard side column:
+ * uptime ring + status summary, running / inactive stat tiles, per-pool
+ * progress rows and a "view all miners" link.
  */
 
 import React, { useState } from "react";
@@ -66,7 +67,9 @@ export default function FactoryStatusCard({
   const ringTrack = errorCount > 0 ? d.danger : d.border;
 
   const status = (() => {
-    if (total === 0) return null;
+    if (total === 0) {
+      return { label: "No workers", bg: d.hover, color: d.muted };
+    }
     if (allHealthy) {
       return { label: "All running", bg: d.mint, color: d.success };
     }
@@ -138,7 +141,7 @@ export default function FactoryStatusCard({
             Factory Status
           </Typography>
           <Typography
-            sx={{ fontSize: { xs: 10, sm: 11 }, color: d.muted, mt: "4px" }}
+            sx={{ fontSize: { xs: 11, sm: 12 }, color: d.muted, mt: "4px" }}
           >
             Live worker health across your pools
           </Typography>
@@ -150,8 +153,8 @@ export default function FactoryStatusCard({
               disabled={loading || isRefreshing}
               aria-label="Refresh worker data"
               sx={{
-                width: 40,
-                height: 40,
+                width: 36,
+                height: 36,
                 flexShrink: 0,
                 border: `1px solid ${d.border}`,
                 borderRadius: "10px",
@@ -162,9 +165,9 @@ export default function FactoryStatusCard({
               }}
             >
               {isRefreshing ? (
-                <CircularProgress size={18} sx={{ color: d.action }} />
+                <CircularProgress size={16} sx={{ color: d.action }} />
               ) : (
-                <RefreshIcon fontSize="small" />
+                <RefreshIcon sx={{ fontSize: 18 }} />
               )}
             </IconButton>
           </span>
@@ -172,7 +175,7 @@ export default function FactoryStatusCard({
       </Box>
 
       {/* Body */}
-      <Box sx={{ p: { xs: "18px", sm: "20px 24px" }, flex: 1 }}>
+      <Box sx={{ p: { xs: "18px", sm: "20px 24px 22px" }, flex: 1 }}>
         {error && (
           <Box
             role="alert"
@@ -183,7 +186,7 @@ export default function FactoryStatusCard({
               borderRadius: "8px",
               bgcolor: d.dangerSoft,
               color: d.danger,
-              fontSize: 11,
+              fontSize: 12,
             }}
           >
             {error}
@@ -200,25 +203,24 @@ export default function FactoryStatusCard({
           </Box>
         ) : (
           <>
-            {/* Ring + headline */}
+            {/* Uptime ring + summary */}
             <Box
               sx={{
                 display: "flex",
                 alignItems: "center",
-                gap: { xs: "12px", sm: "20px" },
-                mb: "23px",
+                gap: "16px",
               }}
             >
               <Box
                 role="img"
-                aria-label={`${runningCount} of ${total} miners running`}
+                aria-label={`${runningCount} of ${total} workers running`}
                 sx={{
                   position: "relative",
                   display: "grid",
                   placeItems: "center",
                   flexShrink: 0,
-                  width: { xs: 83, sm: 102 },
-                  height: { xs: 83, sm: 102 },
+                  width: 88,
+                  height: 88,
                   borderRadius: "50%",
                   background:
                     total > 0
@@ -227,7 +229,7 @@ export default function FactoryStatusCard({
                   "&::before": {
                     content: '""',
                     position: "absolute",
-                    inset: "9px",
+                    inset: "8px",
                     borderRadius: "50%",
                     background: d.surface,
                   },
@@ -239,6 +241,7 @@ export default function FactoryStatusCard({
                     textAlign: "center",
                     fontSize: 10,
                     color: d.muted,
+                    lineHeight: 1.2,
                   }}
                 >
                   <Box
@@ -247,110 +250,136 @@ export default function FactoryStatusCard({
                       display: "block",
                       fontFamily: fonts.heading,
                       fontWeight: 750,
-                      fontSize: { xs: 23, sm: 26 },
+                      fontSize: 20,
                       color: d.text,
-                      lineHeight: 1.2,
                     }}
                   >
-                    {runningCount}
+                    {total > 0 ? `${Math.round(runningPct)}%` : "—"}
                   </Box>
-                  running
+                  online
                 </Box>
               </Box>
 
               <Box sx={{ minWidth: 0 }}>
-                <Box sx={{ fontSize: 11, color: d.muted }}>
-                  <Box
-                    component="strong"
-                    sx={{
-                      display: "block",
-                      fontFamily: fonts.heading,
-                      fontWeight: 700,
-                      fontSize: { xs: 18, sm: 22 },
-                      color: d.text,
-                    }}
-                  >
-                    {total}
-                  </Box>
-                  total workers
-                </Box>
-                {status && (
+                <Box
+                  component="span"
+                  sx={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    px: "10px",
+                    py: "4px",
+                    borderRadius: "20px",
+                    bgcolor: status.bg,
+                    color: status.color,
+                    fontSize: 12,
+                    fontWeight: 600,
+                  }}
+                >
                   <Box
                     component="span"
                     sx={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: "5px",
-                      mt: "8px",
-                      px: "9px",
-                      py: "4px",
-                      borderRadius: "20px",
-                      bgcolor: status.bg,
-                      color: status.color,
-                      fontSize: { xs: 11, sm: 10 },
-                      fontWeight: 550,
+                      width: 6,
+                      height: 6,
+                      borderRadius: "50%",
+                      bgcolor: "currentColor",
                     }}
-                  >
-                    <Box
-                      component="span"
-                      sx={{
-                        width: 4,
-                        height: 4,
-                        borderRadius: "50%",
-                        bgcolor: "currentColor",
-                      }}
-                    />
-                    {status.label}
-                  </Box>
-                )}
+                  />
+                  {status.label}
+                </Box>
+                <Typography
+                  sx={{
+                    mt: "8px",
+                    fontSize: 12,
+                    lineHeight: 1.45,
+                    color: d.muted,
+                  }}
+                >
+                  <Box component="b" sx={{ color: d.text, fontWeight: 650 }}>
+                    {runningCount}
+                  </Box>{" "}
+                  of{" "}
+                  <Box component="b" sx={{ color: d.text, fontWeight: 650 }}>
+                    {total}
+                  </Box>{" "}
+                  workers running
+                </Typography>
               </Box>
             </Box>
 
-            {/* Legend rows */}
-            <LegendRow
-              color={ringColor}
-              label="Running"
-              value={runningCount}
-              valueColor={d.text}
-            />
-            <LegendRow
-              color={d.danger}
-              label={`Error${errorCount !== 1 ? "s" : ""} / inactive`}
-              value={errorCount}
-              valueColor={errorCount > 0 ? d.danger : d.text}
-            />
+            {/* Running / inactive tiles */}
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: "10px",
+                mt: "20px",
+              }}
+            >
+              <StatTile
+                label="Running"
+                value={runningCount}
+                dot={d.success}
+                valueColor={d.text}
+              />
+              <StatTile
+                label="Inactive"
+                value={errorCount}
+                dot={d.danger}
+                valueColor={errorCount > 0 ? d.danger : d.text}
+                highlight={errorCount > 0}
+              />
+            </Box>
 
             {/* Pool breakdown */}
             {(pools.length > 0 || showTotalMiners) && (
-              <Box
-                sx={{
-                  mt: "18px",
-                  pt: "6px",
-                  borderTop: `1px solid ${d.border}`,
-                }}
-              >
-                {showTotalMiners && (
-                  <LegendRow
-                    label="Total miners"
-                    value={totalMinerCount as number}
-                    valueColor={d.text}
-                  />
-                )}
-                {pools.map((pool) => (
-                  <LegendRow
-                    key={pool.key}
-                    color={pool.color}
-                    label={pool.name}
-                    value={`${pool.stats!.activeWorkers} active${
-                      pool.stats!.inactiveWorkers > 0
-                        ? ` · ${pool.stats!.inactiveWorkers} inactive`
-                        : ""
-                    }`}
-                    valueColor={
-                      pool.stats!.inactiveWorkers > 0 ? d.danger : d.text
-                    }
-                  />
-                ))}
+              <Box sx={{ mt: "22px" }}>
+                <Box
+                  sx={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "baseline",
+                    mb: "12px",
+                  }}
+                >
+                  <Typography
+                    component="h3"
+                    sx={{
+                      fontSize: 11,
+                      fontWeight: 650,
+                      letterSpacing: ".06em",
+                      textTransform: "uppercase",
+                      color: d.muted,
+                    }}
+                  >
+                    By pool
+                  </Typography>
+                  {showTotalMiners && (
+                    <Typography sx={{ fontSize: 12, color: d.muted }}>
+                      <Box
+                        component="b"
+                        sx={{ color: d.text, fontWeight: 650 }}
+                      >
+                        {totalMinerCount}
+                      </Box>{" "}
+                      miners
+                    </Typography>
+                  )}
+                </Box>
+
+                <Box
+                  sx={{ display: "flex", flexDirection: "column", gap: "14px" }}
+                >
+                  {pools.map((pool) => (
+                    <PoolRow
+                      key={pool.key}
+                      name={pool.name}
+                      color={pool.color}
+                      active={pool.stats!.activeWorkers}
+                      inactive={pool.stats!.inactiveWorkers}
+                    />
+                  ))}
+                </Box>
               </Box>
             )}
           </>
@@ -369,7 +398,7 @@ export default function FactoryStatusCard({
           p: { xs: "14px 18px", sm: "16px 24px" },
           borderTop: `1px solid ${d.border}`,
           borderRadius: `0 0 ${RADIUS_CARD} ${RADIUS_CARD}`,
-          fontSize: { xs: 11, sm: 12 },
+          fontSize: { xs: 12, sm: 13 },
           fontWeight: 600,
           color: d.action,
           textDecoration: "none",
@@ -387,28 +416,88 @@ export default function FactoryStatusCard({
   );
 }
 
-function LegendRow({
-  color,
+function StatTile({
   label,
   value,
+  dot,
   valueColor,
+  highlight = false,
 }: {
-  color?: string;
   label: string;
-  value: React.ReactNode;
+  value: number;
+  dot: string;
   valueColor: string;
+  highlight?: boolean;
 }) {
+  const { d, fonts } = useDaylight();
   return (
     <Box
       sx={{
-        display: "flex",
-        alignItems: "center",
-        gap: "8px",
-        fontSize: { xs: 10, sm: 11 },
-        my: "12px",
+        p: "10px 12px",
+        borderRadius: "10px",
+        border: `1px solid ${highlight ? d.borderDanger : d.border}`,
+        bgcolor: highlight ? d.dangerSoft : d.canvas,
+        minWidth: 0,
       }}
     >
-      {color && (
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          gap: "6px",
+          fontSize: 11,
+          color: d.muted,
+        }}
+      >
+        <Box
+          component="span"
+          aria-hidden
+          sx={{ width: 7, height: 7, borderRadius: "2px", bgcolor: dot }}
+        />
+        {label}
+      </Box>
+      <Box
+        sx={{
+          mt: "4px",
+          fontFamily: fonts.heading,
+          fontWeight: 750,
+          fontSize: 20,
+          lineHeight: 1.2,
+          color: valueColor,
+        }}
+      >
+        {value}
+      </Box>
+    </Box>
+  );
+}
+
+function PoolRow({
+  name,
+  color,
+  active,
+  inactive,
+}: {
+  name: string;
+  color: string;
+  active: number;
+  inactive: number;
+}) {
+  const { d } = useDaylight();
+  const poolTotal = active + inactive;
+  const pct = poolTotal > 0 ? (active / poolTotal) * 100 : 0;
+
+  return (
+    <Box>
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
+          fontSize: 12,
+          mb: "6px",
+        }}
+      >
         <Box
           component="span"
           aria-hidden
@@ -420,13 +509,43 @@ function LegendRow({
             flexShrink: 0,
           }}
         />
-      )}
-      <span>{label}</span>
+        <Box component="span" sx={{ fontWeight: 600, color: d.text }}>
+          {name}
+        </Box>
+        <Box component="span" sx={{ ml: "auto", color: d.muted }}>
+          <Box component="b" sx={{ color: d.text, fontWeight: 650 }}>
+            {active}
+          </Box>
+          /{poolTotal} active
+          {inactive > 0 && (
+            <Box component="span" sx={{ color: d.danger, fontWeight: 600 }}>
+              {" "}
+              · {inactive} down
+            </Box>
+          )}
+        </Box>
+      </Box>
       <Box
-        component="b"
-        sx={{ ml: "auto", fontWeight: 650, color: valueColor }}
+        role="progressbar"
+        aria-label={`${name}: ${active} of ${poolTotal} workers active`}
+        aria-valuemin={0}
+        aria-valuemax={poolTotal}
+        aria-valuenow={active}
+        sx={{
+          height: 6,
+          borderRadius: "3px",
+          bgcolor: inactive > 0 ? d.dangerSoft : d.border,
+          overflow: "hidden",
+        }}
       >
-        {value}
+        <Box
+          sx={{
+            width: `${pct}%`,
+            height: "100%",
+            borderRadius: "3px",
+            bgcolor: color,
+          }}
+        />
       </Box>
     </Box>
   );

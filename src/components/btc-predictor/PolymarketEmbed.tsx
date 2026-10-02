@@ -26,9 +26,12 @@ export default function PolymarketEmbed() {
           mx: "auto",
         }}
       >
+        {/* Embed a single active market: with `event=` the widget charts the
+            event's first sub-market, which is a closed one with no price
+            history, so the chart rendered with no line. */}
         <iframe
           title="polymarket-market-iframe"
-          src="https://embed.polymarket.com/market?event=what-price-will-bitcoin-hit-before-2027&theme=dark&buttons=false&border=true&height=500&width=700"
+          src="https://embed.polymarket.com/market?market=will-bitcoin-reach-100000-by-december-31-2026-571-361-361&theme=dark&buttons=false&border=true&height=500&width=700"
           frameBorder="0"
           style={{
             width: "100%",

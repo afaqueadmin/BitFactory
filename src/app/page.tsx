@@ -12,8 +12,18 @@ import { Box, Typography, Button, Stack } from "@mui/material";
 import Link from "next/link";
 import Image from "next/image";
 import { RADIUS_CARD, logoFilter, useDaylight } from "@/lib/daylight";
+import ForceLightTheme from "@/components/ForceLightTheme";
 
+// The welcome page is always light, like login.
 export default function Home() {
+  return (
+    <ForceLightTheme>
+      <Welcome />
+    </ForceLightTheme>
+  );
+}
+
+function Welcome() {
   const { d, darkMode, fonts } = useDaylight();
 
   return (

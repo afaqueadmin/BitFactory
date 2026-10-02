@@ -227,7 +227,7 @@ export default function BtcPriceHistoryPage() {
             color: d.text,
           }}
         >
-          Bitcoin Price History
+          BTC Price History
         </Typography>
         <Typography
           sx={{

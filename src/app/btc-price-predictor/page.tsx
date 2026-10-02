@@ -123,7 +123,7 @@ export default function BTCPricePredictorPage() {
                   color: d.text,
                 }}
               >
-                BTC Price Analysis
+                BTC Market Sentiments
               </Typography>
               <Typography
                 sx={{
@@ -203,7 +203,7 @@ export default function BTCPricePredictorPage() {
                   tone="amber"
                 />
                 <NewsFeed
-                  articles={articles}
+                  articles={articles.slice(0, 5)}
                   isLoading={newsLoading}
                   isError={newsError}
                 />
