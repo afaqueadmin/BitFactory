@@ -45,6 +45,14 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  // Only this site's own files. Other sites' images (news covers, Cloudinary
+  // profile pictures) load straight from the page; fetching them from here
+  // would need them in the Content-Security-Policy's connect-src, and caching
+  // other sites' content isn't this worker's job.
+  if (url.origin !== self.location.origin) {
+    return;
+  }
+
   // Bypass API routes, WebSocket, dynamic data, and authentication endpoints completely
   if (
     url.pathname.startsWith("/api/") ||
