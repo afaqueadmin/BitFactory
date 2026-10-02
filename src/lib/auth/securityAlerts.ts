@@ -11,9 +11,7 @@ type SecurityEvent =
   | { type: "2FA_DISABLED" }
   | { type: "2FA_LOCKED" }
   | { type: "PASSKEY_ADDED"; name: string }
-  | { type: "PASSKEY_REMOVED"; name: string }
-  | { type: "EMAIL_CHANGED_FROM"; newEmail: string }
-  | { type: "EMAIL_CHANGED_TO"; oldEmail: string };
+  | { type: "PASSKEY_REMOVED"; name: string };
 
 function describe(event: SecurityEvent) {
   switch (event.type) {
@@ -49,18 +47,6 @@ function describe(event: SecurityEvent) {
         subject: "Passkey Removed",
         heading: "A passkey was removed",
         message: `The passkey "${event.name}" was removed from your BitFactory account.`,
-      };
-    case "EMAIL_CHANGED_FROM":
-      return {
-        subject: "Your Account Email Was Changed",
-        heading: "Your account email was changed",
-        message: `The email address for your BitFactory account was changed to ${event.newEmail}. This address will no longer receive account emails or be able to reset the password.`,
-      };
-    case "EMAIL_CHANGED_TO":
-      return {
-        subject: "Your Account Email Was Changed",
-        heading: "This is now your account email",
-        message: `This address is now the email for your BitFactory account (previously ${event.oldEmail}).`,
       };
   }
 }

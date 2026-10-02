@@ -14,7 +14,6 @@ import {
   Alert,
 } from "@mui/material";
 import { Close as CloseIcon } from "@mui/icons-material";
-import { useStepUp } from "@/components/StepUpDialog";
 
 interface AdminProfileFormProps {
   open: boolean;
@@ -41,7 +40,6 @@ export default function AdminProfileForm({
   initialData,
 }: AdminProfileFormProps) {
   const [loading, setLoading] = useState(false);
-  const { withStepUp, stepUpDialog } = useStepUp();
   const [formData, setFormData] = useState(
     initialData || {
       name: "",
@@ -88,30 +86,25 @@ export default function AdminProfileForm({
     setSuccess("");
 
     try {
-      // C-2: changing the email makes the server ask for the password (or
-      // a 2FA code) first; other edits go straight through.
-      const response = await withStepUp((creds) =>
-        fetch("/api/user/profile", {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          credentials: "include",
-          body: JSON.stringify({
-            email: formData.email,
-            name: formData.name,
-            phoneNumber: formData.phoneNumber,
-            country: formData.country,
-            city: formData.city,
-            companyName: formData.companyName,
-            streetAddress: formData.streetAddress,
-            idNumber: formData.idNumber,
-            companyUrl: formData.companyUrl,
-            dateOfBirth: formData.dateOfBirth,
-            ...creds,
-          }),
+      // The email isn't sent: it can't be changed from your own profile (N-6).
+      const response = await fetch("/api/user/profile", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          name: formData.name,
+          phoneNumber: formData.phoneNumber,
+          country: formData.country,
+          city: formData.city,
+          companyName: formData.companyName,
+          streetAddress: formData.streetAddress,
+          idNumber: formData.idNumber,
+          companyUrl: formData.companyUrl,
+          dateOfBirth: formData.dateOfBirth,
         }),
-      );
+      });
 
       const data = await response.json();
 
@@ -133,7 +126,6 @@ export default function AdminProfileForm({
 
   return (
     <>
-      {stepUpDialog}
       <Dialog
         open={open}
         onClose={handleClose}

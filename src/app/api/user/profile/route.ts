@@ -2,15 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
 import { resolveLuxorSubaccounts } from "@/lib/luxorSubaccounts";
-import {
-  canonicalEmail,
-  isEmailTaken,
-  isEmailUniqueViolation,
-} from "@/lib/auth/emailIdentity";
+import { canonicalEmail } from "@/lib/auth/emailIdentity";
 import { Prisma } from "@prisma/client";
-import { verifyStepUp } from "@/lib/auth/stepUp";
-import { notifySecurityChange } from "@/lib/auth/securityAlerts";
-import { signOutOtherDevices } from "@/lib/auth/sessionRevocation";
 import {
   twoFactorEnforceFrom,
   twoFactorRequirement,
@@ -217,58 +210,28 @@ export async function PATCH(request: NextRequest) {
 
     const data = await request.json();
 
-    // Validate required fields
-    if (typeof data.email !== "string" || !data.email.trim()) {
-      return Response.json(
-        { error: "Email is required" },
-        {
-          status: 400,
-          headers: {
-            "Cache-Control": "no-store, no-cache, must-revalidate",
-          },
-        },
-      );
-    }
-
-    const emailInUseResponse = () =>
-      Response.json(
-        { error: "Email already in use" },
-        {
-          status: 400,
-          headers: {
-            "Cache-Control": "no-store, no-cache, must-revalidate",
-          },
-        },
-      );
-
-    // Case-insensitive, so "John@x.com" can't sit next to "john@x.com".
-    const email = canonicalEmail(data.email);
-    if (await isEmailTaken(email, userId)) {
-      return emailInUseResponse();
-    }
-
-    // C-2: the email is where password resets go, so changing it needs the
-    // password (or a 2FA code) again - not just a live session. Other profile
-    // fields don't.
-    const current = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { email: true },
-    });
-    const emailChanging = !!current && current.email !== email;
-    if (emailChanging) {
-      const stepUp = await verifyStepUp(
-        userId,
-        {
-          currentPassword: data.currentPassword,
-          twoFactorToken: data.twoFactorToken,
-        },
-        "change your email",
-      );
-      if (!stepUp.ok) {
+    // N-6: the email is where password resets go, and nothing here proves the
+    // new address belongs to the user, so it can't be changed from your own
+    // profile - only by a SUPER_ADMIN (PUT /api/user/[id]). The forms send the
+    // current email back unchanged, which is fine.
+    if (data.email !== undefined) {
+      const current = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { email: true },
+      });
+      if (
+        typeof data.email !== "string" ||
+        !current ||
+        canonicalEmail(data.email) !== canonicalEmail(current.email)
+      ) {
         return Response.json(
-          { error: stepUp.error, code: stepUp.code },
           {
-            status: stepUp.status,
+            error:
+              "Your email can't be changed here. Please contact support to change it.",
+            code: "EMAIL_CHANGE_NOT_ALLOWED",
+          },
+          {
+            status: 403,
             headers: {
               "Cache-Control": "no-store, no-cache, must-revalidate",
             },
@@ -278,34 +241,23 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Update user profile
-    let updatedUser;
-    try {
-      updatedUser = await prisma.user.update({
-        where: { id: userId },
-        data: {
-          email,
-          name: data.name,
-          phoneNumber: data.phoneNumber,
-          dateOfBirth: data.dateOfBirth
-            ? new Date(data.dateOfBirth)
-            : undefined,
-          country: data.country,
-          city: data.city,
-          streetAddress: data.streetAddress,
-          companyName: data.companyName,
-          idNumber: data.idNumber,
-          companyUrl: data.companyUrl,
-          profileImage: data.profileImage,
-          profileImageId: data.profileImageId,
-        },
-        select: PROFILE_SELECT,
-      });
-    } catch (updateError) {
-      if (isEmailUniqueViolation(updateError)) {
-        return emailInUseResponse();
-      }
-      throw updateError;
-    }
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        name: data.name,
+        phoneNumber: data.phoneNumber,
+        dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : undefined,
+        country: data.country,
+        city: data.city,
+        streetAddress: data.streetAddress,
+        companyName: data.companyName,
+        idNumber: data.idNumber,
+        companyUrl: data.companyUrl,
+        profileImage: data.profileImage,
+        profileImageId: data.profileImageId,
+      },
+      select: PROFILE_SELECT,
+    });
 
     // Log the profile update activity
     await prisma.userActivity.create({
@@ -320,24 +272,7 @@ export async function PATCH(request: NextRequest) {
       },
     });
 
-    // M-5: tell both addresses - the old one is how a hijacked account's
-    // real owner finds out.
-    if (emailChanging && current) {
-      await Promise.all([
-        notifySecurityChange(
-          current.email,
-          { type: "EMAIL_CHANGED_FROM", newEmail: email },
-          request.headers,
-        ),
-        notifySecurityChange(
-          email,
-          { type: "EMAIL_CHANGED_TO", oldEmail: current.email },
-          request.headers,
-        ),
-      ]);
-    }
-
-    const response = NextResponse.json(
+    return NextResponse.json(
       { user: updatedUser },
       {
         status: 200,
@@ -346,12 +281,6 @@ export async function PATCH(request: NextRequest) {
         },
       },
     );
-    // N-2: a new email changes where password resets go, so other devices
-    // are signed out; this one gets fresh tokens.
-    if (emailChanging) {
-      await signOutOtherDevices(request, response, userId);
-    }
-    return response;
   } catch (error) {
     console.error("Profile API [PATCH]: Error:", error);
     return Response.json(
