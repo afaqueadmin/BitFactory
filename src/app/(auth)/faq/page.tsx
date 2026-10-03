@@ -40,7 +40,8 @@ export default function FaqPage() {
   const [expanded, setExpanded] = useState<string | false>(false);
 
   // Category filter first, then the search narrows the questions inside each
-  // remaining category; categories left with no matches are dropped.
+  // remaining category; while searching, categories with no matches are
+  // dropped (otherwise empty categories still show, with a placeholder).
   const visible = useMemo<FaqCategory[]>(() => {
     const q = query.trim().toLowerCase();
     return FAQ_CATEGORIES.filter((c) => category === ALL || c.id === category)
@@ -54,7 +55,7 @@ export default function FaqPage() {
             )
           : c.items,
       }))
-      .filter((c) => c.items.length > 0);
+      .filter((c) => !q || c.items.length > 0);
   }, [category, query]);
 
   const totalCount = FAQ_CATEGORIES.reduce((n, c) => n + c.items.length, 0);
@@ -137,7 +138,7 @@ export default function FaqPage() {
               mt: "7px",
             }}
           >
-            Quick answers about your miners, wallet, billing and account.
+            Learn about Bitcoin, mining and using the BitFactory platform.
           </Typography>
         </Box>
 
@@ -228,6 +229,18 @@ export default function FaqPage() {
               )}
 
               <Box sx={{ mt: "14px" }}>
+                {c.items.length === 0 && (
+                  <Typography
+                    sx={{
+                      fontSize: 13,
+                      color: d.muted,
+                      borderTop: `1px solid ${d.border}`,
+                      pt: "14px",
+                    }}
+                  >
+                    No questions in this category yet.
+                  </Typography>
+                )}
                 {c.items.map((item) => (
                   <Accordion
                     key={item.id}

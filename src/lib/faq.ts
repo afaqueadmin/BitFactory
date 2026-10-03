@@ -25,79 +25,21 @@ export interface FaqCategory {
 
 export const FAQ_CATEGORIES: FaqCategory[] = [
   {
-    id: "general",
-    title: "General",
-    description: "Getting around the BitFactory client portal.",
-    items: [
-      {
-        id: "general-dashboard",
-        question: "What can I see on my dashboard?",
-        answer:
-          "The dashboard gives you an overview of your mining operation: fleet status, hashrate history, mining earnings and the current BTC price.\n\nUse the subaccount filter in the top bar to narrow the figures to specific subaccounts.",
-      },
-      {
-        id: "general-dark-mode",
-        question: "Can I switch to dark mode?",
-        answer:
-          "Yes. Use the sun/moon button in the top bar to toggle between light and dark mode.",
-      },
-    ],
+    id: "bitcoin-fundamentals",
+    title: "Bitcoin Fundamentals",
+    description: "What Bitcoin is, how it works and why it matters.",
+    items: [],
   },
   {
-    id: "miners",
-    title: "Miners & Hashrate",
-    description: "Your hosted machines and their performance.",
-    items: [
-      {
-        id: "miners-status",
-        question: "Where can I check the status of my miners?",
-        answer:
-          "Open the Miners page from the sidebar. It lists every machine hosted for you along with its current status and hashrate.",
-      },
-    ],
+    id: "mining-explained",
+    title: "Mining Explained",
+    description: "How Bitcoin mining works, from hashrate to rewards.",
+    items: [],
   },
   {
-    id: "wallet",
-    title: "Wallet & Payouts",
-    description: "Earnings, balances and payout addresses.",
-    items: [
-      {
-        id: "wallet-change-address",
-        question: "How do I change my payout wallet address?",
-        answer:
-          "Go to the Wallet page and submit a wallet change request. You can follow the status of the request in the request history on the same page.",
-      },
-      {
-        id: "wallet-transactions",
-        question: "Where can I see my past transactions?",
-        answer: "The Transactions page shows your full transaction history.",
-      },
-    ],
-  },
-  {
-    id: "billing",
-    title: "Billing & Invoices",
-    description: "Invoices and payments.",
-    items: [
-      {
-        id: "billing-invoices",
-        question: "Where can I find my invoices?",
-        answer:
-          "Open the Invoices page from the sidebar. A counter next to the menu item shows how many invoices are still unpaid.",
-      },
-    ],
-  },
-  {
-    id: "account",
-    title: "Account & Security",
-    description: "Profile, passwords, 2FA and passkeys.",
-    items: [
-      {
-        id: "account-2fa",
-        question: "How do I enable two-factor authentication?",
-        answer:
-          "Open the account menu in the top-right corner and choose Security Settings. From there you can set up two-factor authentication and passkeys.",
-      },
-    ],
+    id: "platform-technical",
+    title: "Platform & Technical",
+    description: "Using the BitFactory portal and technical troubleshooting.",
+    items: [],
   },
 ];
