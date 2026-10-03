@@ -67,7 +67,7 @@ export const BASE_CASE_BTC_PRICE = 150_000;
 // The track the slider opens on. It is a starting window, not a limit: type
 // any price into the field and the track stretches to include it.
 const DEFAULT_SLIDER_MIN = 50_000;
-const DEFAULT_SLIDER_MAX = 350_000;
+const DEFAULT_SLIDER_MAX = 500_000;
 const PRICE_SLIDER_STEP = 5_000;
 
 /** Breakpoints to snap to while walking through the numbers. */
@@ -76,6 +76,7 @@ const PRICE_MARKS = [
   { value: 200_000, label: "$200k" },
   { value: 250_000, label: "$250k" },
   { value: 300_000, label: "$300k" },
+  { value: 400_000, label: "$400k" },
 ];
 
 const roundToStep = (v: number) =>

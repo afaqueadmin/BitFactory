@@ -5,6 +5,7 @@ import {
   calculateLoanInterest,
   calculateStrategy2Values,
   calculateStrategy3Values,
+  FIXED_SCENARIO_PRICES,
   NEXT_HALVING_DATE,
 } from "@/lib/helpers/paybackCalculations";
 
@@ -157,5 +158,57 @@ describe("calculateStrategy3Values", () => {
       strategy3.roiLifetimeStock / 5,
       8,
     );
+  });
+});
+
+describe("FIXED_SCENARIO_PRICES", () => {
+  // Representative S21 XP inputs; only the BTC price varies between columns.
+  const START = new Date(Date.UTC(2026, 9, 1));
+  const run = (price: number) =>
+    calculateStrategy2Values(
+      price,
+      0.00044827,
+      270,
+      300,
+      2,
+      2.5,
+      200,
+      6000,
+      undefined,
+      START,
+    );
+
+  it("includes the $400k, $450k and $500k scenarios, in ascending order", () => {
+    expect(FIXED_SCENARIO_PRICES.slice(-3)).toEqual([400000, 450000, 500000]);
+    const sorted = [...FIXED_SCENARIO_PRICES].sort((a, b) => a - b);
+    expect(FIXED_SCENARIO_PRICES).toEqual(sorted);
+  });
+
+  it("computes every scenario with the same model: BTC output is price-independent and revenue scales with price", () => {
+    const base = run(100000);
+    for (const price of FIXED_SCENARIO_PRICES) {
+      const v = run(price);
+      const k = price / 100000;
+      expect(v.dailyBtcStock).toBe(base.dailyBtcStock);
+      expect(v.dailyBtcLux).toBe(base.dailyBtcLux);
+      expect(v.lifetimeBtcStock).toBe(base.lifetimeBtcStock);
+      expect(v.monthlyRevenueStock).toBeCloseTo(
+        base.monthlyRevenueStock * k,
+        6,
+      );
+      expect(v.monthlyRevenueLux).toBeCloseTo(base.monthlyRevenueLux * k, 6);
+      expect(v.netRevenueStock).toBeCloseTo(v.monthlyRevenueStock - 200, 6);
+      expect(v.paybackMonthsStock).toBeCloseTo(
+        v.netRevenueStock > 0 ? 6000 / v.netRevenueStock : Infinity,
+        6,
+      );
+    }
+  });
+
+  it("pays back faster at each higher scenario price", () => {
+    const months = FIXED_SCENARIO_PRICES.map((p) => run(p).paybackMonthsLux);
+    for (let i = 1; i < months.length; i++) {
+      expect(months[i]).toBeLessThan(months[i - 1]);
+    }
   });
 });

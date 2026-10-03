@@ -85,17 +85,13 @@ const OS_OPTIONS: SegmentedOption<OsSelection>[] = [
   { id: "CUSTOM", label: "Custom OS" },
 ];
 
+// CURRENT (live price), one column per fixed scenario price, then BREAKEVEN.
 const columns = [
   "CURRENT",
-  "Scenario: 1",
-  "Scenario: 2",
-  "Scenario: 3",
-  "Scenario: 4",
-  "Scenario: 5",
-  "Scenario: 6",
-  "Scenario: 7",
+  ...FIXED_SCENARIO_PRICES.map((_, i) => `Scenario: ${i + 1}`),
   "BREAKEVEN\n(Hosting Charges)",
 ];
+const BREAKEVEN_COLUMN = columns.length - 1;
 
 // Data Sources:
 // - BTC Price: CoinGecko API (live market price)
@@ -606,20 +602,16 @@ export default function PaybackAnalysisPage() {
     label: "BTC Price (USD)",
     values: [
       liveBtcPrice || formatValue(resolvedBtcPriceValue, "currency"),
-      "$100,000",
-      "$125,000",
-      "$150,000",
-      "$200,000",
-      "$250,000",
-      "$300,000",
-      "$350,000",
+      ...FIXED_SCENARIO_PRICES.map(
+        (price) => `$${price.toLocaleString("en-US")}`,
+      ),
       formatValue(selectedBreakevenPrice, "currency"),
     ],
   };
 
   const rewardRow = {
     label: "Reward (BTC/PH/Day)",
-    values: Array.from({ length: 9 }, () =>
+    values: Array.from({ length: columns.length }, () =>
       resolvedRewardBtcPerPhDay.toFixed(8),
     ),
   };
@@ -633,20 +625,20 @@ export default function PaybackAnalysisPage() {
         {
           label: "Pool Commission (Stock OS)",
           values: Array.from(
-            { length: 9 },
+            { length: columns.length },
             () => `${config.poolCommissionStockOs.toFixed(2)}%`,
           ),
         },
         {
           label: "Pool Commission (Custom OS)",
           values: Array.from(
-            { length: 9 },
+            { length: columns.length },
             () => `${config.poolCommissionLuxos.toFixed(2)}%`,
           ),
         },
         {
           label: `${MINER_LABELS[selectedMiner]} Hashrate (TH) (Stock OS)`,
-          values: Array.from({ length: 9 }, () =>
+          values: Array.from({ length: columns.length }, () =>
             formatValue(activeHashrateStockOs, "number", {
               minimumFractionDigits: 2,
               maximumFractionDigits: 2,
@@ -655,7 +647,7 @@ export default function PaybackAnalysisPage() {
         },
         {
           label: `${MINER_LABELS[selectedMiner]} Hashrate (TH) (Custom OS)`,
-          values: Array.from({ length: 9 }, () =>
+          values: Array.from({ length: columns.length }, () =>
             formatValue(activeHashrateLuxos, "number", {
               minimumFractionDigits: 2,
               maximumFractionDigits: 2,
@@ -694,7 +686,7 @@ export default function PaybackAnalysisPage() {
     });
     allDynamicRows.push({
       label: "Electricity & Hosting Charges",
-      values: Array.from({ length: 9 }, () =>
+      values: Array.from({ length: columns.length }, () =>
         formatValue(monthlyElectricityHosting, "currency"),
       ),
     });
@@ -713,7 +705,7 @@ export default function PaybackAnalysisPage() {
     allDynamicRows.push({
       label: "Payback Months (Stock OS)",
       values: calculatedValues.map((calc, index) =>
-        index === 8 // BREAKEVEN column
+        index === BREAKEVEN_COLUMN
           ? "--"
           : calc.paybackMonthsStock === Infinity
             ? "∞"
@@ -723,7 +715,7 @@ export default function PaybackAnalysisPage() {
     allDynamicRows.push({
       label: "Payback Months (Custom OS)",
       values: calculatedValues.map((calc, index) =>
-        index === 8 // BREAKEVEN column
+        index === BREAKEVEN_COLUMN
           ? "--"
           : calc.paybackMonthsLux === Infinity
             ? "∞"
@@ -773,13 +765,13 @@ export default function PaybackAnalysisPage() {
         // Price-independent: the loan funds the same bills in every scenario.
         allDynamicRows.push({
           label: `Loan Interest (${BORROWING_RATE_APR.toFixed(2)}% APR)`,
-          values: Array.from({ length: 9 }, () =>
+          values: Array.from({ length: columns.length }, () =>
             formatValue(loanInterest, "currency"),
           ),
         });
         allDynamicRows.push({
           label: "Loan Balance at End of Life",
-          values: Array.from({ length: 9 }, () =>
+          values: Array.from({ length: columns.length }, () =>
             formatValue(
               monthlyElectricityHosting * MACHINE_LIFE_YEARS * 12 +
                 loanInterest,
@@ -791,7 +783,7 @@ export default function PaybackAnalysisPage() {
       allDynamicRows.push({
         label: "Net Profit over Lifetime (Stock OS)",
         values: calculatedValues.map((calc, index) =>
-          index === 8
+          index === BREAKEVEN_COLUMN
             ? "--"
             : formatValue(calc.netProfitLifetimeStock, "currency"),
         ),
@@ -799,7 +791,7 @@ export default function PaybackAnalysisPage() {
       allDynamicRows.push({
         label: "Net Profit over Lifetime (Custom OS)",
         values: calculatedValues.map((calc, index) =>
-          index === 8
+          index === BREAKEVEN_COLUMN
             ? "--"
             : formatValue(calc.netProfitLifetimeLux, "currency"),
         ),
@@ -807,7 +799,7 @@ export default function PaybackAnalysisPage() {
       allDynamicRows.push({
         label: "Return Multiple (X) (Stock OS)",
         values: calculatedValues.map((calc, index) =>
-          index === 8
+          index === BREAKEVEN_COLUMN
             ? "--"
             : formatValue(calc.returnMultipleStock, "number", {
                 minimumFractionDigits: 2,
@@ -818,7 +810,7 @@ export default function PaybackAnalysisPage() {
       allDynamicRows.push({
         label: "Return Multiple (X) (Custom OS)",
         values: calculatedValues.map((calc, index) =>
-          index === 8
+          index === BREAKEVEN_COLUMN
             ? "--"
             : formatValue(calc.returnMultipleLux, "number", {
                 minimumFractionDigits: 2,
@@ -829,7 +821,7 @@ export default function PaybackAnalysisPage() {
       allDynamicRows.push({
         label: "ROI over Lifetime (Stock OS)",
         values: calculatedValues.map((calc, index) =>
-          index === 8
+          index === BREAKEVEN_COLUMN
             ? "--"
             : `${formatValue(calc.roiLifetimeStock, "number", { maximumFractionDigits: 0 })}%`,
         ),
@@ -837,7 +829,7 @@ export default function PaybackAnalysisPage() {
       allDynamicRows.push({
         label: "ROI over Lifetime (Custom OS)",
         values: calculatedValues.map((calc, index) =>
-          index === 8
+          index === BREAKEVEN_COLUMN
             ? "--"
             : `${formatValue(calc.roiLifetimeLux, "number", { maximumFractionDigits: 0 })}%`,
         ),
@@ -845,7 +837,7 @@ export default function PaybackAnalysisPage() {
       allDynamicRows.push({
         label: "ROI/Year (Stock OS)",
         values: calculatedValues.map((calc, index) =>
-          index === 8
+          index === BREAKEVEN_COLUMN
             ? "--"
             : `${formatValue(calc.roiPerYearStock, "number", { maximumFractionDigits: 0 })}%`,
         ),
@@ -853,7 +845,7 @@ export default function PaybackAnalysisPage() {
       allDynamicRows.push({
         label: "ROI/Year (Custom OS)",
         values: calculatedValues.map((calc, index) =>
-          index === 8
+          index === BREAKEVEN_COLUMN
             ? "--"
             : `${formatValue(calc.roiPerYearLux, "number", { maximumFractionDigits: 0 })}%`,
         ),
@@ -1331,7 +1323,7 @@ export default function PaybackAnalysisPage() {
             <TableContainer
               sx={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}
             >
-              <Table size="small" sx={{ minWidth: 920 }}>
+              <Table size="small" sx={{ minWidth: 1160 }}>
                 <TableHead sx={{ backgroundColor: d.tableHead }}>
                   <TableRow>
                     <TableCell
@@ -1345,6 +1337,7 @@ export default function PaybackAnalysisPage() {
                         borderBottomColor: d.border,
                         minWidth: { xs: 130, sm: 200 },
                         px: { xs: 1, sm: 1.5 },
+                        py: { xs: "9px", sm: "11px" },
                         whiteSpace: "nowrap",
                       }}
                     >
@@ -1362,6 +1355,7 @@ export default function PaybackAnalysisPage() {
                           color: d.muted,
                           lineHeight: 1.25,
                           px: { xs: 0.75, sm: 1.25 },
+                          py: { xs: "9px", sm: "11px" },
                           borderLeft: `1px solid ${d.border}`,
                           borderBottomColor: d.border,
                           whiteSpace: "pre-line",
@@ -1393,6 +1387,7 @@ export default function PaybackAnalysisPage() {
                           color: d.text,
                           whiteSpace: "nowrap",
                           px: { xs: 1, sm: 1.5 },
+                          py: { xs: "9px", sm: "11px" },
                         }}
                       >
                         {row.label}
@@ -1407,17 +1402,18 @@ export default function PaybackAnalysisPage() {
                             color: d.text,
                             whiteSpace: "nowrap",
                             px: { xs: 0.5, sm: 1 },
+                            py: { xs: "9px", sm: "11px" },
                             borderLeft: `1px solid ${d.border}`,
                             ...(row.label === "BTC Price (USD)" && index === 0
                               ? { backgroundColor: d.amber }
                               : {}),
                             ...(row.label === "BTC Price (USD)" &&
-                            index === 8 &&
+                            index === BREAKEVEN_COLUMN &&
                             selectedOS === "CUSTOM"
                               ? { backgroundColor: d.mint } // Custom OS
                               : {}),
                             ...(row.label === "BTC Price (USD)" &&
-                            index === 8 &&
+                            index === BREAKEVEN_COLUMN &&
                             selectedOS === "STOCK"
                               ? { backgroundColor: d.skySoft } // Stock OS
                               : {}),

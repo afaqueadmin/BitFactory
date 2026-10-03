@@ -11,7 +11,8 @@ export const FALLBACK_REWARD_BTC_PER_PH_DAY = 0.00044827;
 
 // Scenario BTC prices (fixed steps; breakeven price comes from DB separately)
 export const FIXED_SCENARIO_PRICES = [
-  100000, 125000, 150000, 200000, 250000, 300000, 350000,
+  100000, 125000, 150000, 200000, 250000, 300000, 350000, 400000, 450000,
+  500000,
 ];
 
 export interface CalculationValues {
