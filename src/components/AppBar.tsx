@@ -47,6 +47,7 @@ import SavingsOutlinedIcon from "@mui/icons-material/SavingsOutlined";
 import SupportAgentOutlinedIcon from "@mui/icons-material/SupportAgentOutlined";
 import HelpOutlineRoundedIcon from "@mui/icons-material/HelpOutlineRounded";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
+import RelationshipManagerCard from "@/components/daylight/RelationshipManagerCard";
 import { useAuth } from "@/lib/contexts/auth-context";
 import { useSubaccountFilter } from "@/lib/contexts/subaccountFilter-context";
 import Link from "next/link";
@@ -556,8 +557,9 @@ export default function AppBarComponent() {
           {navGroups()}
         </Box>
 
-        {/* Support button + footer */}
+        {/* RM card + support button + footer */}
         <Box sx={{ mt: "auto", pt: "14px", [SHORT]: { pt: "10px" } }}>
+          <RelationshipManagerCard compact />
           <ButtonBase
             component={Link}
             href="/support"
@@ -903,6 +905,9 @@ export default function AppBarComponent() {
           sx={{ p: 1.5, overflowY: "auto" }}
         >
           {navGroups({ minHeight: 44, onNavigate: handleCloseMobileNav })}
+          <Box sx={{ mt: "18px" }}>
+            <RelationshipManagerCard compact />
+          </Box>
         </Box>
       </Drawer>
 

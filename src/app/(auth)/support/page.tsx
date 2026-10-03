@@ -5,6 +5,7 @@
  *
  * Composes:
  * - Page heading + "Raise a Ticket" button
+ * - Relationship manager card (hidden when no RM is assigned)
  * - Daylight ticket list table (guide-style header row, soft-tone pills)
  *
  * CreateTicketModal is a genuine overlay shared with the franchise support
@@ -18,6 +19,7 @@ import { useTickets } from "@/lib/hooks/useTickets";
 import { useUser } from "@/lib/hooks/useUser";
 import TicketListTable from "@/components/tickets/TicketListTable";
 import CreateTicketModal from "@/components/tickets/CreateTicketModal";
+import RelationshipManagerCard from "@/components/daylight/RelationshipManagerCard";
 import { useDaylight } from "@/lib/daylight";
 
 export default function SupportPage() {
@@ -88,6 +90,8 @@ export default function SupportPage() {
           Raise a Ticket
         </Button>
       </Box>
+
+      <RelationshipManagerCard />
 
       <TicketListTable
         tickets={tickets}

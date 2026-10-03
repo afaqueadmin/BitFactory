@@ -80,6 +80,7 @@ Reach for these before writing new one-off styles:
 | `FactoryStatusCard` | The dashboard's "fleet health" card (status ring + legend rows + pool breakdown + "view all miners" link). |
 | `Segmented<T>` | Small track of 2-3 mutually exclusive options (e.g. Daily/Monthly). Generic over the option id type. |
 | `PillTab` | Single pill for a scrollable row of filters (pool selector, miner filter), with an optional colour dot. |
+| `RelationshipManagerCard` | Customer's RM (name + mailto button) from `/api/user/relationship-manager`. `compact` for the sidebar/mobile drawer, full card on the Support page. Renders nothing when no RM is assigned. |
 
 ---
 
