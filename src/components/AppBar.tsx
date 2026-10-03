@@ -577,15 +577,14 @@ export default function AppBarComponent() {
               fontSize: 13,
               fontWeight: 650,
               textAlign: "left",
-              // Dark mode's action blue is light, so it takes dark text.
-              color: darkMode ? "#0D2433" : "#fff",
-              bgcolor: d.action,
+              color: d.action,
+              bgcolor: d.skySoft,
+              border: `1px solid ${d.borderSky}`,
               borderRadius: "10px",
-              boxShadow: darkMode ? "none" : "0 4px 12px rgba(22,117,169,.22)",
-              transition: "background-color .15s, box-shadow .15s",
+              transition: "border-color .15s, box-shadow .15s",
               "&:hover": {
-                bgcolor: d.actionHover,
-                boxShadow: darkMode ? "none" : "0 6px 16px rgba(22,117,169,.3)",
+                borderColor: d.action,
+                boxShadow: "0 2px 8px rgba(20, 90, 140, .08)",
                 "& .support-arrow": { transform: "translateX(3px)" },
               },
               "&:focus-visible": focusRing(d.action),
@@ -600,9 +599,7 @@ export default function AppBarComponent() {
                 width: 28,
                 height: 28,
                 borderRadius: "8px",
-                bgcolor: darkMode
-                  ? "rgba(13,36,51,.14)"
-                  : "rgba(255,255,255,.18)",
+                bgcolor: d.surface,
                 "& > svg": { fontSize: 17 },
               }}
             >
