@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
+  PAST_SHARE,
   buildForecastBaseline,
+  buildForecastChartSeries,
   buildHalvingForecast,
 } from "@/lib/helpers/btcPriceForecast";
 
@@ -104,5 +106,54 @@ describe("buildHalvingForecast", () => {
     expect(rows[1].priceLow).toBe(rows[1].productionCost); // floored at 1x
     expect(rows[1].priceHigh).toBeCloseTo(80000 * 2.2);
     expect(rows[0].priceLow).toBe(80000);
+  });
+});
+
+describe("buildForecastChartSeries", () => {
+  const history = [
+    point("2026-08-01", 60000, 40000, 30000),
+    point("2026-08-31", 70000, 42000, 31000),
+    point("2026-09-30", 80000, 40000, 32000),
+  ];
+  const baseline = buildForecastBaseline(history, "STOCK")!;
+  const rows = buildHalvingForecast(baseline, 1.8);
+
+  it("puts the past in the first PAST_SHARE of the chart, forecast after", () => {
+    const { points, todayX, xOf } = buildForecastChartSeries(
+      history,
+      "STOCK",
+      rows,
+    );
+    expect(points[0].x).toBe(0);
+    expect(todayX).toBe(PAST_SHARE);
+    expect(points[points.length - 1].x).toBe(1);
+    expect(xOf(Date.UTC(2026, 7, 31))).toBeCloseTo(PAST_SHARE / 2, 5);
+    // Strictly increasing positions.
+    for (let i = 1; i < points.length; i++) {
+      expect(points[i].x).toBeGreaterThan(points[i - 1].x);
+    }
+  });
+
+  it("joins past and forecast lines at today", () => {
+    const { points } = buildForecastChartSeries(history, "STOCK", rows);
+    const past = points.filter((p) => p.row === null);
+    expect(past).toHaveLength(2); // today comes from rows[0]
+    expect(past.every((p) => p.forecastPrice === null)).toBe(true);
+    const today = points.find((p) => p.row?.halvings === 0)!;
+    expect(today.pastPrice).toBe(80000);
+    expect(today.forecastPrice).toBe(80000);
+    expect(today.forecastLabel).toBeNull();
+    const halving = points.find((p) => p.row?.halvings === 1)!;
+    expect(halving.pastPrice).toBeNull();
+    expect(halving.forecastLabel).toBe(halving.forecastPrice);
+  });
+
+  it("uses the selected OS for past cost", () => {
+    const custom = buildForecastChartSeries(
+      history,
+      "CUSTOM",
+      buildHalvingForecast(buildForecastBaseline(history, "CUSTOM")!, 1.8),
+    );
+    expect(custom.points[0].cost).toBe(30000);
   });
 });

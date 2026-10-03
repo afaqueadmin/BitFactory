@@ -24,6 +24,7 @@ import {
   ComposedChart,
   LabelList,
   Line,
+  ReferenceArea,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
@@ -37,18 +38,28 @@ import Segmented from "@/components/daylight/Segmented";
 import { usePaybackHistory } from "@/hooks/usePaybackHistory";
 import { MINER_LABELS, MinerModel } from "@/lib/helpers/paybackCalculations";
 import {
-  ForecastRow,
+  ForecastChartPoint,
   OsVariant,
   PREVIOUS_HALVING_DATE,
   historyDayMs,
   buildForecastBaseline,
+  buildForecastChartSeries,
   buildHalvingForecast,
 } from "@/lib/helpers/btcPriceForecast";
 import { RADIUS_CARD, useDaylight } from "@/lib/daylight";
 
-// Matched 1:1 to PaybackHistoryChart so the two charts read as one story.
+// Past price and cost match PaybackHistoryChart 1:1 (the "Buy vs Mine"
+// chart this one continues); the forecast is light green so it reads as a
+// different, estimated series.
 const COLOR_COST = "#1976D2";
 const COLOR_PRICE = "#F59E0B";
+const COLOR_FORECAST = "#4CC38A";
+
+/** Candidate ticks for the log price axis. */
+const LOG_TICKS = [
+  10_000, 25_000, 50_000, 100_000, 250_000, 500_000, 1_000_000, 2_500_000,
+  5_000_000, 10_000_000, 25_000_000,
+];
 
 const MINER_OPTIONS = (["S21PRO", "S21XP"] as MinerModel[]).map((id) => ({
   id,
@@ -91,11 +102,8 @@ const formatHalvingMonth = (ms: number): string =>
     ms,
   );
 
-/** Recharts range-area accessor: the low/high premium band. */
-const priceBand = (row: ForecastRow): [number, number] => [
-  row.priceLow,
-  row.priceHigh,
-];
+/** Recharts range-area accessor: the likely-range band (forecast only). */
+const priceBand = (p: ForecastChartPoint) => p.band;
 
 function Swatch({ color, band }: { color: string; band?: boolean }) {
   return (
@@ -379,10 +387,56 @@ export default function BtcPriceForecastPage() {
   const epochProgress = nextRow
     ? (now - epochStart) / (nextRow.timestamp - epochStart)
     : 0;
-  const rowByTimestamp = useMemo(
-    () => new Map(rows.map((r) => [r.timestamp, r])),
-    [rows],
+  const series = useMemo(
+    () => buildForecastChartSeries(historyData, os, rows),
+    [historyData, os, rows],
   );
+  const pointByX = useMemo(
+    () => new Map(series.points.map((p) => [p.x, p])),
+    [series],
+  );
+  // X ticks: start of history, today, then each halving.
+  const xTicks = useMemo(() => {
+    const ticks: { x: number; label: string }[] = [];
+    const first = series.points[0];
+    if (first && first.row === null) {
+      ticks.push({
+        x: first.x,
+        label: new Intl.DateTimeFormat("en-US", {
+          month: "short",
+          day: "numeric",
+          timeZone: "UTC",
+        }).format(first.timestamp),
+      });
+    }
+    for (const r of rows) {
+      ticks.push({
+        x: series.xOf(r.timestamp),
+        label: r.halvings === 0 ? "Today" : r.label,
+      });
+    }
+    return ticks;
+  }, [series, rows]);
+  const tickLabelByX = useMemo(
+    () => new Map(xTicks.map((t) => [t.x, t.label])),
+    [xTicks],
+  );
+  // Log price axis: the past (~$40-90K) and the 2044 forecast (~$2.5M) both
+  // need to be readable on one chart.
+  const yTicks = useMemo(() => {
+    const values = series.points.flatMap((p) =>
+      [p.pastPrice, p.forecastPrice, p.cost, p.band?.[0], p.band?.[1]].filter(
+        (v): v is number => typeof v === "number" && v > 0,
+      ),
+    );
+    if (values.length === 0) return LOG_TICKS.slice(0, 3);
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const lo = [...LOG_TICKS].reverse().find((t) => t <= min) ?? LOG_TICKS[0];
+    const hi =
+      LOG_TICKS.find((t) => t >= max) ?? LOG_TICKS[LOG_TICKS.length - 1];
+    return LOG_TICKS.filter((t) => t >= lo && t <= hi);
+  }, [series]);
   const ready = !!baseline && premium !== null && !!finalRow;
   const osLabel = os === "STOCK" ? "Stock OS" : "Custom OS";
 
@@ -584,11 +638,12 @@ export default function BtcPriceForecastPage() {
           {/* Chart */}
           <Box sx={cardSx}>
             <Typography sx={cardTitleSx}>
-              Cost to mine vs predicted price
+              Past price, cost to mine and predicted price
             </Typography>
             <Typography sx={{ fontSize: 12, color: d.muted, mt: "3px" }}>
-              Predicted price = cost to mine × {formatMultiple(premium)}, the
-              average premium BTC has traded at over its cost.
+              Left: daily history from the Buy vs Mine chart. Right: forecast at
+              each halving — predicted price = cost to mine ×{" "}
+              {formatMultiple(premium)}, the average premium BTC has traded at.
             </Typography>
             <Box
               sx={{
@@ -601,9 +656,10 @@ export default function BtcPriceForecastPage() {
               }}
             >
               {[
-                { color: COLOR_PRICE, label: "Predicted price" },
-                { color: COLOR_PRICE, band: true, label: "Likely range" },
+                { color: COLOR_PRICE, label: "Past BTC price" },
                 { color: COLOR_COST, label: "Cost to mine" },
+                { color: COLOR_FORECAST, label: "Predicted price" },
+                { color: COLOR_FORECAST, band: true, label: "Likely range" },
               ].map((item) => (
                 <Box
                   key={item.label}
@@ -620,10 +676,10 @@ export default function BtcPriceForecastPage() {
               ))}
             </Box>
 
-            <Box sx={{ width: "100%", height: isMobile ? 280 : 380 }}>
+            <Box sx={{ width: "100%", height: isMobile ? 300 : 400 }}>
               <ResponsiveContainer>
                 <ComposedChart
-                  data={rows}
+                  data={series.points}
                   margin={{
                     top: 24,
                     right: isMobile ? 8 : 24,
@@ -641,38 +697,62 @@ export default function BtcPriceForecastPage() {
                     >
                       <stop
                         offset="0%"
-                        stopColor={COLOR_PRICE}
-                        stopOpacity={0.25}
+                        stopColor={COLOR_FORECAST}
+                        stopOpacity={0.3}
                       />
                       <stop
                         offset="100%"
-                        stopColor={COLOR_PRICE}
-                        stopOpacity={0.06}
+                        stopColor={COLOR_FORECAST}
+                        stopOpacity={0.08}
                       />
                     </linearGradient>
                   </defs>
+                  {/* Past region, shaded and labelled so the two time
+                      scales aren't mistaken for one. */}
+                  <ReferenceArea
+                    x1={0}
+                    x2={series.todayX}
+                    fill={d.canvas}
+                    fillOpacity={0.9}
+                    label={{
+                      value: "Past · daily",
+                      position: "insideTopLeft",
+                      fill: d.muted,
+                      fontSize: 11,
+                    }}
+                  />
+                  <ReferenceArea
+                    x1={series.todayX}
+                    x2={1}
+                    fill="transparent"
+                    label={{
+                      value: "Forecast · by halving",
+                      position: "insideTopRight",
+                      fill: d.muted,
+                      fontSize: 11,
+                    }}
+                  />
                   <CartesianGrid
                     strokeDasharray="3 3"
                     vertical={false}
                     stroke={d.border}
                   />
-                  {/* Real time axis: today -> 2028 is ~1.5 years, the rest 4. */}
                   <XAxis
-                    dataKey="timestamp"
+                    dataKey="x"
                     type="number"
-                    scale="time"
-                    domain={["dataMin", "dataMax"]}
-                    ticks={rows.map((r) => r.timestamp)}
-                    tickFormatter={(ms: number) =>
-                      rowByTimestamp.get(ms)?.label ?? ""
-                    }
+                    domain={[0, 1]}
+                    ticks={xTicks.map((t) => t.x)}
+                    tickFormatter={(x: number) => tickLabelByX.get(x) ?? ""}
                     tick={{ fontSize: 11, fill: d.muted }}
                     tickLine={false}
                     stroke={d.border}
-                    padding={{ left: 16, right: 16 }}
+                    padding={{ left: 8, right: 16 }}
                   />
                   <YAxis
-                    domain={[0, "auto"]}
+                    scale="log"
+                    domain={[yTicks[0], yTicks[yTicks.length - 1]]}
+                    ticks={yTicks}
+                    allowDataOverflow
                     tickFormatter={formatCompactUsd}
                     tick={{ fontSize: 11, fill: d.muted }}
                     tickLine={false}
@@ -682,8 +762,11 @@ export default function BtcPriceForecastPage() {
                   <Tooltip
                     cursor={{ stroke: d.inputBorder, strokeDasharray: "3 3" }}
                     content={({ active, label }) => {
-                      const row = rowByTimestamp.get(Number(label));
-                      if (!active || !row) return null;
+                      const point = pointByX.get(Number(label));
+                      if (!active || !point) return null;
+                      const row = point.row;
+                      const isFuture = !!row && row.halvings > 0;
+                      const price = point.forecastPrice ?? point.pastPrice ?? 0;
                       return (
                         <Box
                           sx={{
@@ -692,7 +775,7 @@ export default function BtcPriceForecastPage() {
                             borderRadius: "10px",
                             boxShadow: "0 8px 24px rgba(0,0,0,.12)",
                             p: "10px 12px",
-                            minWidth: 190,
+                            minWidth: 200,
                             fontFamily: fonts.body,
                             fontSize: 12,
                             color: d.text,
@@ -706,33 +789,34 @@ export default function BtcPriceForecastPage() {
                               mb: "6px",
                             }}
                           >
-                            {row.halvings === 0
-                              ? `Today · ${formatDay(row.timestamp)}`
-                              : `${row.label} halving`}
+                            {!row
+                              ? formatDay(point.timestamp)
+                              : row.halvings === 0
+                                ? `Today · ${formatDay(row.timestamp)}`
+                                : `${row.label} halving`}
                           </Typography>
                           {[
                             {
-                              color: COLOR_PRICE,
-                              label: row.halvings === 0 ? "Price" : "Predicted",
-                              value: formatUsd(row.predictedPrice),
+                              color: isFuture ? COLOR_FORECAST : COLOR_PRICE,
+                              label: isFuture ? "Predicted" : "BTC price",
+                              value: formatUsd(price),
                               band: false,
                             },
-                            // Today is the actual spot price, so only future
-                            // points carry a prediction range.
-                            ...(row.halvings === 0
-                              ? []
-                              : [
+                            // Only predictions carry a range.
+                            ...(isFuture && row
+                              ? [
                                   {
-                                    color: COLOR_PRICE,
+                                    color: COLOR_FORECAST,
                                     label: "Likely range",
                                     value: `${formatUsd(row.priceLow)} – ${formatUsd(row.priceHigh)}`,
                                     band: true,
                                   },
-                                ]),
+                                ]
+                              : []),
                             {
                               color: COLOR_COST,
                               label: "Cost to mine",
-                              value: formatUsd(row.productionCost),
+                              value: formatUsd(point.cost),
                               band: false,
                             },
                           ].map((item) => (
@@ -784,29 +868,21 @@ export default function BtcPriceForecastPage() {
                                 fontWeight: 700,
                                 fontVariantNumeric: "tabular-nums",
                                 color:
-                                  row.predictedPrice >= row.productionCost
-                                    ? d.success
-                                    : d.danger,
+                                  price >= point.cost ? d.success : d.danger,
                               }}
                             >
-                              {formatSignedPercent(
-                                row.predictedPrice / row.productionCost - 1,
-                              )}
+                              {formatSignedPercent(price / point.cost - 1)}
                             </Box>
                           </Box>
                         </Box>
                       );
                     }}
                   />
-                  {/* Marks the halving the countdown card counts to. */}
-                  {nextRow && (
-                    <ReferenceLine
-                      x={nextRow.timestamp}
-                      stroke={d.success}
-                      strokeDasharray="4 4"
-                      strokeOpacity={0.8}
-                    />
-                  )}
+                  <ReferenceLine
+                    x={series.todayX}
+                    stroke={d.inputBorder}
+                    strokeWidth={1.5}
+                  />
                   <Area
                     type="linear"
                     dataKey={priceBand}
@@ -817,37 +893,63 @@ export default function BtcPriceForecastPage() {
                     activeDot={false}
                   />
                   <Line
-                    type="linear"
-                    dataKey="predictedPrice"
-                    name="Predicted price"
+                    type="monotone"
+                    dataKey="pastPrice"
+                    name="Past BTC price"
                     stroke={COLOR_PRICE}
                     strokeWidth={2.5}
+                    dot={false}
+                    activeDot={{ r: 5, fill: COLOR_PRICE }}
+                    isAnimationActive={false}
+                  />
+                  {/* Daily breakeven in the past; flat between halvings and
+                      doubling at each one in the forecast. */}
+                  <Line
+                    type="stepAfter"
+                    dataKey="cost"
+                    name="Cost to mine"
+                    stroke={COLOR_COST}
+                    strokeWidth={2.5}
+                    dot={false}
+                    activeDot={{ r: 5, fill: COLOR_COST }}
+                    isAnimationActive={false}
+                  />
+                  <Line
+                    type="linear"
+                    dataKey="forecastPrice"
+                    name="Predicted price"
+                    stroke={COLOR_FORECAST}
+                    strokeWidth={2.5}
                     dot={{ r: 4, fill: d.surface, strokeWidth: 2.5 }}
-                    activeDot={{ r: 6, fill: COLOR_PRICE }}
+                    activeDot={{ r: 6, fill: COLOR_FORECAST }}
+                    isAnimationActive={false}
                   >
                     {!isMobile && (
                       <LabelList
-                        dataKey="predictedPrice"
+                        dataKey="forecastLabel"
                         position="top"
                         offset={10}
-                        formatter={(v) => formatCompactUsd(Number(v))}
+                        formatter={(v) =>
+                          v == null ? "" : formatCompactUsd(Number(v))
+                        }
                         style={{ fontSize: 11, fontWeight: 600, fill: d.text }}
                       />
                     )}
                   </Line>
-                  {/* Cost is flat between halvings and jumps at each one. */}
-                  <Line
-                    type="stepAfter"
-                    dataKey="productionCost"
-                    name="Cost to mine"
-                    stroke={COLOR_COST}
-                    strokeWidth={2.5}
-                    dot={{ r: 4, fill: d.surface, strokeWidth: 2.5 }}
-                    activeDot={{ r: 6, fill: COLOR_COST }}
-                  />
                 </ComposedChart>
               </ResponsiveContainer>
             </Box>
+            <Typography
+              sx={{
+                fontSize: 11,
+                color: d.muted,
+                mt: "6px",
+                textAlign: "right",
+              }}
+            >
+              Price axis is logarithmic — each step up is a multiple, so the
+              past and the forecast fit on one chart.
+            </Typography>
           </Box>
 
           {/* Table */}

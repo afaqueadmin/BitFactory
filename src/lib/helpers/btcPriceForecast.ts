@@ -232,3 +232,112 @@ export const buildHalvingForecast = (
 
   return rows;
 };
+
+/**
+ * Share of the chart's width given to the past. The history is only months
+ * long while the forecast spans decades, so on one true time axis the past
+ * would be a sliver; instead each side gets its own linear time scale.
+ */
+export const PAST_SHARE = 0.25;
+
+export interface ForecastChartPoint {
+  /** Position on the chart, 0..1 (past: 0..PAST_SHARE, future: the rest). */
+  x: number;
+  timestamp: number;
+  /** Actual daily BTC price (history only, through today). */
+  pastPrice: number | null;
+  /** Predicted price (today onwards, so the two lines meet). */
+  forecastPrice: number | null;
+  /** Predicted price on halving points only - drives the point labels. */
+  forecastLabel: number | null;
+  /** Cost to mine: daily breakeven in the past, doubling steps after. */
+  cost: number;
+  /** Likely price range (today onwards). */
+  band: [number, number] | null;
+  /** The forecast row for today and each halving, null for other days. */
+  row: ForecastRow | null;
+}
+
+export interface ForecastChartSeries {
+  points: ForecastChartPoint[];
+  /** Maps a timestamp to its chart position. */
+  xOf: (timestamp: number) => number;
+  todayX: number;
+}
+
+/**
+ * Joins the daily "Buy vs Mine" history to the halving forecast on one
+ * chart: past price + cost up to today, then the forecast from today on.
+ * `rows` must come from buildHalvingForecast on the same history/OS, so
+ * rows[0] is today (the latest history day).
+ */
+export const buildForecastChartSeries = (
+  history: PaybackHistoryPoint[],
+  os: OsVariant,
+  rows: ForecastRow[],
+): ForecastChartSeries => {
+  const today = rows[0];
+  const last = rows[rows.length - 1];
+  if (!today || !last) {
+    return { points: [], xOf: () => 0, todayX: 0 };
+  }
+
+  const past = (history ?? [])
+    .filter(
+      (p) =>
+        p &&
+        typeof p.date === "string" &&
+        Number.isFinite(toUtcMs(p.date)) &&
+        isUsable(p, os) &&
+        toUtcMs(p.date) < today.timestamp,
+    )
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  const start = past.length > 0 ? toUtcMs(past[0].date) : today.timestamp;
+  const pastSpan = today.timestamp - start;
+  const futureSpan = last.timestamp - today.timestamp;
+  const pastShare = pastSpan > 0 ? PAST_SHARE : 0;
+
+  const xOf = (timestamp: number): number => {
+    if (timestamp <= today.timestamp) {
+      return pastSpan > 0
+        ? ((timestamp - start) / pastSpan) * pastShare
+        : pastShare;
+    }
+    return futureSpan > 0
+      ? pastShare +
+          ((timestamp - today.timestamp) / futureSpan) * (1 - pastShare)
+      : 1;
+  };
+
+  const points: ForecastChartPoint[] = past.map((p) => {
+    const timestamp = toUtcMs(p.date);
+    return {
+      x: xOf(timestamp),
+      timestamp,
+      pastPrice: p.btcPriceUsd,
+      forecastPrice: null,
+      forecastLabel: null,
+      cost: breakevenOf(p, os),
+      band: null,
+      row: null,
+    };
+  });
+
+  for (const row of rows) {
+    const isToday = row.halvings === 0;
+    points.push({
+      x: xOf(row.timestamp),
+      timestamp: row.timestamp,
+      // Today belongs to both lines so they join up.
+      pastPrice: isToday ? row.predictedPrice : null,
+      forecastPrice: row.predictedPrice,
+      forecastLabel: isToday ? null : row.predictedPrice,
+      cost: row.productionCost,
+      band: [row.priceLow, row.priceHigh],
+      row,
+    });
+  }
+
+  return { points, xOf, todayX: xOf(today.timestamp) };
+};
