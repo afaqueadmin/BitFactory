@@ -48,6 +48,7 @@ import SupportAgentOutlinedIcon from "@mui/icons-material/SupportAgentOutlined";
 import HelpOutlineRoundedIcon from "@mui/icons-material/HelpOutlineRounded";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import RelationshipManagerCard from "@/components/daylight/RelationshipManagerCard";
+import { useRelationshipManager } from "@/lib/hooks/useRelationshipManager";
 import { useAuth } from "@/lib/contexts/auth-context";
 import { useSubaccountFilter } from "@/lib/contexts/subaccountFilter-context";
 import Link from "next/link";
@@ -166,6 +167,7 @@ export default function AppBarComponent() {
   const pathname = usePathname(); // Get current path
 
   const { user } = useUser();
+  const { rm } = useRelationshipManager();
 
   const { data: invoicesData } = useQuery<{ invoices: Invoice[] }>({
     queryKey: ["invoices-unread", user?.id],
@@ -803,6 +805,21 @@ export default function AppBarComponent() {
             onClose={handleClose}
             slotProps={{ paper: { sx: menuPaperSx } }}
           >
+            {/* Phones have no sidebar, so the RM card leads the account menu. */}
+            {rm && (
+              <Box
+                sx={{
+                  display: "none",
+                  [MQ.mobile]: { display: "block" },
+                  minWidth: 260,
+                  p: "4px 4px 0",
+                  mb: "4px",
+                  borderBottom: `1px solid ${d.border}`,
+                }}
+              >
+                <RelationshipManagerCard compact />
+              </Box>
+            )}
             {user?.role === "FRANCHISEE" && (
               <MenuItem
                 component={Link}
