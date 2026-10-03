@@ -9,8 +9,8 @@
  * is applied to estimate the price at each halving. See
  * lib/helpers/btcPriceForecast.ts for the model and its assumptions.
  *
- * Kept deliberately simple: miner/firmware picker → three KPI cards → chart →
- * table → one-line disclaimer.
+ * Kept deliberately simple: miner/firmware picker → three KPI cards (price,
+ * cost, next-halving countdown) → chart → table → one-line disclaimer.
  *
  * Data: /api/payback-history (CLIENT profile, ALL range) - the same series
  * PaybackHistoryChart plots.
@@ -24,6 +24,7 @@ import {
   ComposedChart,
   LabelList,
   Line,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -31,14 +32,15 @@ import {
 } from "recharts";
 import CurrencyBitcoinIcon from "@mui/icons-material/CurrencyBitcoin";
 import PrecisionManufacturingOutlinedIcon from "@mui/icons-material/PrecisionManufacturingOutlined";
-import TrendingUpOutlinedIcon from "@mui/icons-material/TrendingUpOutlined";
-import StatCard from "@/components/daylight/StatCard";
+import HourglassTopOutlinedIcon from "@mui/icons-material/HourglassTopOutlined";
 import Segmented from "@/components/daylight/Segmented";
 import { usePaybackHistory } from "@/hooks/usePaybackHistory";
 import { MINER_LABELS, MinerModel } from "@/lib/helpers/paybackCalculations";
 import {
   ForecastRow,
   OsVariant,
+  PREVIOUS_HALVING_DATE,
+  historyDayMs,
   buildForecastBaseline,
   buildHalvingForecast,
 } from "@/lib/helpers/btcPriceForecast";
@@ -79,6 +81,16 @@ const formatDay = (ms: number): string =>
         timeZone: "UTC",
       }).format(ms);
 
+const formatSignedPercent = (value: number): string => {
+  const pct = Math.round(value * 100);
+  return `${pct > 0 ? "+" : ""}${pct}%`;
+};
+
+const formatHalvingMonth = (ms: number): string =>
+  new Intl.DateTimeFormat("en-US", { month: "long", timeZone: "UTC" }).format(
+    ms,
+  );
+
 /** Recharts range-area accessor: the low/high premium band. */
 const priceBand = (row: ForecastRow): [number, number] => [
   row.priceLow,
@@ -100,6 +112,232 @@ function Swatch({ color, band }: { color: string; band?: boolean }) {
         opacity: band ? 0.3 : 1,
       }}
     />
+  );
+}
+
+const MS_PER_DAY = 1000 * 60 * 60 * 24;
+
+const formatPercent = (value: number): string => `${Math.round(value * 100)}%`;
+
+type KpiTone = "amber" | "sky" | "mint";
+
+/**
+ * Forecast KPI card. All three cards share one fixed structure - title/icon,
+ * big value, a labelled bar, then two label/value rows pinned to the bottom -
+ * so they line up row for row whatever their content. Same Daylight tones as
+ * StatCard.
+ */
+function KpiCard({
+  tone,
+  icon,
+  title,
+  value,
+  unit,
+  bar,
+  rows,
+  isLoading,
+}: {
+  tone: KpiTone;
+  icon: React.ReactNode;
+  title: string;
+  value: string;
+  unit?: string;
+  bar?: { label: string; fraction: number };
+  rows: { label: string; value: React.ReactNode }[];
+  isLoading: boolean;
+}) {
+  const { d, fonts } = useDaylight();
+  const t = {
+    amber: { bg: d.amber, border: d.borderAmber, accent: d.warning },
+    sky: { bg: d.skySoft, border: d.borderSky, accent: d.action },
+    mint: { bg: d.mint, border: d.borderMint, accent: d.success },
+  }[tone];
+  const fraction = Math.min(1, Math.max(0, bar?.fraction ?? 0));
+
+  return (
+    <Box
+      role="article"
+      aria-label={title}
+      sx={{
+        minWidth: 0,
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        bgcolor: t.bg,
+        border: `1px solid ${t.border}`,
+        borderRadius: RADIUS_CARD,
+        boxShadow: d.shadow,
+        p: { xs: "16px 15px", sm: "19px 20px" },
+        fontFamily: fonts.body,
+      }}
+    >
+      {/* Title + icon */}
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: 1,
+          fontSize: { xs: 11, sm: 12 },
+          color: d.cardMuted,
+        }}
+      >
+        <span>{title}</span>
+        <Box
+          aria-hidden
+          sx={{
+            display: "grid",
+            placeItems: "center",
+            flexShrink: 0,
+            width: { xs: 23, sm: 29 },
+            height: { xs: 23, sm: 29 },
+            borderRadius: { xs: "6px", sm: "8px" },
+            bgcolor: d.surface,
+            color: t.accent,
+            "& svg": { fontSize: { xs: 13, sm: 16 } },
+          }}
+        >
+          {icon}
+        </Box>
+      </Box>
+
+      {isLoading ? (
+        <>
+          <Skeleton
+            variant="rounded"
+            sx={{ mt: "9px", mb: "5px", height: 36, width: "65%" }}
+          />
+          <Skeleton variant="rounded" sx={{ mt: "8px", height: 6 }} />
+          <Skeleton variant="text" sx={{ mt: "14px", width: "90%" }} />
+          <Skeleton variant="text" sx={{ width: "80%" }} />
+        </>
+      ) : (
+        <>
+          {/* Value */}
+          <Typography
+            component="p"
+            sx={{
+              fontFamily: fonts.heading,
+              fontWeight: 750,
+              fontSize: { xs: 24, sm: 28 },
+              lineHeight: 1.4,
+              letterSpacing: { xs: "-.8px", sm: "-1px" },
+              color: d.text,
+              m: "9px 0 10px",
+              fontVariantNumeric: "tabular-nums",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {value}
+            {unit && (
+              <Box
+                component="span"
+                sx={{
+                  fontFamily: fonts.body,
+                  fontWeight: 500,
+                  fontSize: { xs: 11, sm: 13 },
+                  letterSpacing: 0,
+                  ml: "6px",
+                  color: d.cardMuted,
+                }}
+              >
+                {unit}
+              </Box>
+            )}
+          </Typography>
+
+          {/* Labelled bar */}
+          {bar && (
+            <Box>
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  fontSize: 11,
+                  color: d.cardMuted,
+                  mb: "5px",
+                }}
+              >
+                <span>{bar.label}</span>
+                <Box
+                  component="span"
+                  sx={{
+                    fontWeight: 700,
+                    color: t.accent,
+                    fontVariantNumeric: "tabular-nums",
+                  }}
+                >
+                  {formatPercent(fraction)}
+                </Box>
+              </Box>
+              <Box
+                role="progressbar"
+                aria-label={bar.label}
+                aria-valuenow={Math.round(fraction * 100)}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                sx={{
+                  height: 6,
+                  borderRadius: "999px",
+                  bgcolor: d.surface,
+                  overflow: "hidden",
+                }}
+              >
+                <Box
+                  sx={{
+                    width: `${fraction * 100}%`,
+                    height: "100%",
+                    borderRadius: "999px",
+                    bgcolor: t.accent,
+                  }}
+                />
+              </Box>
+            </Box>
+          )}
+
+          {/* Detail rows, pinned to the bottom so all cards align */}
+          <Box
+            sx={{
+              mt: "auto",
+              pt: "14px",
+              display: "flex",
+              flexDirection: "column",
+              gap: "6px",
+            }}
+          >
+            {rows.map((row) => (
+              <Box
+                key={row.label}
+                sx={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "baseline",
+                  gap: "10px",
+                  pt: "6px",
+                  borderTop: `1px dashed ${t.border}`,
+                  fontSize: { xs: 11, sm: 12 },
+                }}
+              >
+                <Box component="span" sx={{ color: d.cardMuted }}>
+                  {row.label}
+                </Box>
+                <Box
+                  component="span"
+                  sx={{
+                    fontWeight: 650,
+                    color: d.text,
+                    textAlign: "right",
+                    fontVariantNumeric: "tabular-nums",
+                  }}
+                >
+                  {row.value}
+                </Box>
+              </Box>
+            ))}
+          </Box>
+        </>
+      )}
+    </Box>
   );
 }
 
@@ -131,6 +369,16 @@ export default function BtcPriceForecastPage() {
     [baseline, premium],
   );
   const finalRow = rows[rows.length - 1];
+  const nextRow = rows.find((r) => r.halvings === 1);
+  // Fixed at mount; day-level precision doesn't need a ticking clock.
+  const [now] = useState(() => Date.now());
+  const daysLeft = nextRow
+    ? Math.max(0, Math.ceil((nextRow.timestamp - now) / MS_PER_DAY))
+    : 0;
+  const epochStart = PREVIOUS_HALVING_DATE.getTime();
+  const epochProgress = nextRow
+    ? (now - epochStart) / (nextRow.timestamp - epochStart)
+    : 0;
   const rowByTimestamp = useMemo(
     () => new Map(rows.map((r) => [r.timestamp, r])),
     [rows],
@@ -250,37 +498,76 @@ export default function BtcPriceForecastPage() {
             mb: { xs: "16px", md: "20px" },
           }}
         >
-          <StatCard
+          <KpiCard
             tone="amber"
             icon={<CurrencyBitcoinIcon />}
             title="BTC price today"
             isLoading={!ready}
             value={baseline ? formatUsd(baseline.btcPriceUsd) : ""}
-            caption={
+            bar={
               baseline
-                ? `${formatMultiple(baseline.premiums.CURRENT ?? 1)} the cost to mine`
+                ? {
+                    label: "Mining margin",
+                    fraction:
+                      1 - baseline.productionCost / baseline.btcPriceUsd,
+                  }
                 : undefined
             }
+            rows={[
+              {
+                label: "Premium over cost",
+                value: baseline
+                  ? formatMultiple(baseline.premiums.CURRENT ?? 1)
+                  : "—",
+              },
+              {
+                label: "Price as of",
+                value: baseline ? formatDay(historyDayMs(baseline.date)) : "—",
+              },
+            ]}
           />
-          <StatCard
+          <KpiCard
             tone="sky"
             icon={<PrecisionManufacturingOutlinedIcon />}
             title="Cost to mine 1 BTC today"
             isLoading={!ready}
             value={baseline ? formatUsd(baseline.productionCost) : ""}
-            caption={`${MINER_LABELS[miner]} · ${osLabel}`}
-          />
-          <StatCard
-            tone="mint"
-            icon={<TrendingUpOutlinedIcon />}
-            title={`Predicted price in ${finalRow?.label ?? "2044"}`}
-            isLoading={!ready}
-            value={finalRow ? formatCompactUsd(finalRow.predictedPrice) : ""}
-            caption={
-              finalRow
-                ? `${formatMultiple(finalRow.multipleOfToday)} today's price`
+            bar={
+              baseline
+                ? {
+                    label: "Share of BTC price",
+                    fraction: baseline.productionCost / baseline.btcPriceUsd,
+                  }
                 : undefined
             }
+            rows={[
+              { label: "Miner", value: `${MINER_LABELS[miner]} · ${osLabel}` },
+              {
+                label: `After ${nextRow?.label ?? "next"} halving`,
+                value: nextRow ? formatUsd(nextRow.productionCost) : "—",
+              },
+            ]}
+          />
+          <KpiCard
+            tone="mint"
+            icon={<HourglassTopOutlinedIcon />}
+            title="Next halving"
+            isLoading={!ready}
+            value={daysLeft.toLocaleString("en-US")}
+            unit="days to go"
+            bar={{ label: "Cycle progress", fraction: epochProgress }}
+            rows={[
+              {
+                label: "Expected",
+                value: nextRow ? `~${formatDay(nextRow.timestamp)}` : "—",
+              },
+              {
+                label: "Block reward",
+                value: nextRow
+                  ? `${nextRow.blockReward * 2} → ${nextRow.blockReward} BTC`
+                  : "—",
+              },
+            ]}
           />
         </Box>
       )}
@@ -475,10 +762,51 @@ export default function BtcPriceForecastPage() {
                               </Box>
                             </Box>
                           ))}
+                          {/* Buy vs mine gap - same figure as the table's
+                              Premium column. */}
+                          <Box
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              mt: "6px",
+                              pt: "6px",
+                              borderTop: `1px solid ${d.border}`,
+                            }}
+                          >
+                            <Box component="span" sx={{ color: d.muted }}>
+                              Premium (buy vs mine)
+                            </Box>
+                            <Box
+                              component="span"
+                              sx={{
+                                ml: "auto",
+                                pl: "12px",
+                                fontWeight: 700,
+                                fontVariantNumeric: "tabular-nums",
+                                color:
+                                  row.predictedPrice >= row.productionCost
+                                    ? d.success
+                                    : d.danger,
+                              }}
+                            >
+                              {formatSignedPercent(
+                                row.predictedPrice / row.productionCost - 1,
+                              )}
+                            </Box>
+                          </Box>
                         </Box>
                       );
                     }}
                   />
+                  {/* Marks the halving the countdown card counts to. */}
+                  {nextRow && (
+                    <ReferenceLine
+                      x={nextRow.timestamp}
+                      stroke={d.success}
+                      strokeDasharray="4 4"
+                      strokeOpacity={0.8}
+                    />
+                  )}
                   <Area
                     type="linear"
                     dataKey={priceBand}
@@ -543,8 +871,12 @@ export default function BtcPriceForecastPage() {
                     <Box component="th" sx={thSx}>
                       Predicted price
                     </Box>
-                    <Box component="th" sx={thSx}>
-                      vs today
+                    <Box
+                      component="th"
+                      sx={thSx}
+                      title="How much more buying 1 BTC costs than mining it: (price − cost to mine) ÷ cost to mine"
+                    >
+                      Premium
                     </Box>
                   </tr>
                 </thead>
@@ -564,7 +896,25 @@ export default function BtcPriceForecastPage() {
                           component="td"
                           sx={{ ...tdSx, textAlign: "left", fontWeight: 600 }}
                         >
-                          {isToday ? "Today" : row.label}
+                          {isToday ? (
+                            "Today"
+                          ) : (
+                            <>
+                              {row.label}
+                              {/* Estimated month; every projected halving
+                                  lands in April. */}
+                              <Box
+                                component="span"
+                                sx={{
+                                  color: d.muted,
+                                  fontWeight: 500,
+                                  ml: "5px",
+                                }}
+                              >
+                                (~{formatHalvingMonth(row.timestamp)})
+                              </Box>
+                            </>
+                          )}
                         </Box>
                         <Box component="td" sx={{ ...tdSx, color: d.muted }}>
                           {row.blockReward} BTC
@@ -575,15 +925,21 @@ export default function BtcPriceForecastPage() {
                         <Box component="td" sx={{ ...tdSx, fontWeight: 700 }}>
                           {formatUsd(row.predictedPrice)}
                         </Box>
+                        {/* Buy vs mine gap: how much more buying costs. */}
                         <Box
                           component="td"
                           sx={{
                             ...tdSx,
+                            color:
+                              row.predictedPrice >= row.productionCost
+                                ? d.success
+                                : d.danger,
                             fontWeight: 600,
-                            color: isToday ? d.muted : d.success,
                           }}
                         >
-                          {isToday ? "—" : formatMultiple(row.multipleOfToday)}
+                          {formatSignedPercent(
+                            row.predictedPrice / row.productionCost - 1,
+                          )}
                         </Box>
                       </Box>
                     );

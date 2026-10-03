@@ -155,9 +155,9 @@ function EarningsFigure({
             sx={{
               fontFamily: fonts.heading,
               fontWeight: 750,
-              fontSize: hero ? { xs: 30, sm: 40 } : { xs: 18, sm: 24 },
+              fontSize: hero ? { xs: 26, sm: 34 } : { xs: 18, sm: 24 },
               lineHeight: 1.2,
-              letterSpacing: hero ? "-1.5px" : "-.5px",
+              letterSpacing: hero ? "-1px" : "-.5px",
               color: d.text,
               mt: hero ? "8px" : "10px",
               fontVariantNumeric: "tabular-nums",

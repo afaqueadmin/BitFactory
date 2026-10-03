@@ -17,6 +17,9 @@ import { NEXT_HALVING_DATE } from "@/lib/helpers/paybackCalculations";
  * so the true cost step is slightly under 2x.
  */
 
+/** The most recent halving (block 840,000), start of the current epoch. */
+export const PREVIOUS_HALVING_DATE = new Date(Date.UTC(2024, 3, 20));
+
 /** Current (post-April-2024) block subsidy. */
 export const CURRENT_BLOCK_REWARD = 3.125;
 
