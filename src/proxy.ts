@@ -46,6 +46,7 @@ const clientPaths = [
   "/btc-price-predictor",
   "/clientworkers",
   "/dashboard",
+  "/faq",
   "/hashprice-history",
   "/invoices",
   "/luxor",

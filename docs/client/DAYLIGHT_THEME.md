@@ -217,7 +217,8 @@ Client pages under `(auth)`, gated via `isDaylightPage` in
 `src/app/(auth)/layout.tsx`:
 `/dashboard`, `/miners`, `/wallet`, `/transaction`, `/invoices`,
 `/btc-price-history`, `/hashprice-history`, `/payback-analysis`,
-`/account-settings`, `/security-setting`, `/support`, `/support/[id]`.
+`/account-settings`, `/security-setting`, `/support`, `/support/[id]`, `/faq`
+(content in `src/lib/faq.ts`).
 
 Pages outside `(auth)` (themed unconditionally, no gating needed):
 `/` (welcome), `/login` (incl. `TwoFactorVerification`), `/btc-price-predictor`.

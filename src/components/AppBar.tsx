@@ -45,6 +45,7 @@ import TrendingUpOutlinedIcon from "@mui/icons-material/TrendingUpOutlined";
 import ShowChartOutlinedIcon from "@mui/icons-material/ShowChartOutlined";
 import SavingsOutlinedIcon from "@mui/icons-material/SavingsOutlined";
 import SupportAgentOutlinedIcon from "@mui/icons-material/SupportAgentOutlined";
+import HelpOutlineRoundedIcon from "@mui/icons-material/HelpOutlineRounded";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import { useAuth } from "@/lib/contexts/auth-context";
 import { useSubaccountFilter } from "@/lib/contexts/subaccountFilter-context";
@@ -86,7 +87,7 @@ const getInitials = (name?: string | null) => {
   return (first + last).toUpperCase();
 };
 
-// Sidebar groups (preview: "Menu" and "Tools" sections).
+// Sidebar groups ("Menu", "Market & tools" and "Help" sections).
 const mainLinks: NavLink[] = [
   {
     href: "/dashboard",
@@ -135,7 +136,11 @@ const toolLinks: NavLink[] = [
   },
 ];
 
-const allLinks = [...mainLinks, ...toolLinks];
+const helpLinks: NavLink[] = [
+  { href: "/faq", label: "FAQ", icon: <HelpOutlineRoundedIcon /> },
+];
+
+const allLinks = [...mainLinks, ...toolLinks, ...helpLinks];
 
 // Primary destinations for the mobile bottom navigation; everything else is
 // reachable through the "Menu" tab, which opens the full drawer.
@@ -417,6 +422,8 @@ export default function AppBarComponent() {
       {mainLinks.map((l) => navItem(l, opts))}
       {navLabel("Market & tools")}
       {toolLinks.map((l) => navItem(l, opts))}
+      {navLabel("Help")}
+      {helpLinks.map((l) => navItem(l, opts))}
     </>
   );
 
