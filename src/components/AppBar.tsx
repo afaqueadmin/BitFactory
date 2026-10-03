@@ -566,16 +566,18 @@ export default function AppBarComponent() {
             sx={{
               display: "flex",
               alignItems: "center",
-              gap: "10px",
+              gap: "8px",
               width: "calc(100% - 8px)",
               minHeight: 44,
               m: "0 4px 12px",
               pl: "8px",
-              pr: "12px",
+              pr: "10px",
+              py: "6px",
               [SHORT]: { mb: "8px", minHeight: 40 },
               fontFamily: fonts.body,
-              fontSize: 13,
+              fontSize: 12.5,
               fontWeight: 650,
+              lineHeight: 1.25,
               textAlign: "left",
               color: d.action,
               bgcolor: d.skySoft,
@@ -596,8 +598,8 @@ export default function AppBarComponent() {
                 display: "grid",
                 placeItems: "center",
                 flexShrink: 0,
-                width: 28,
-                height: 28,
+                width: 26,
+                height: 26,
                 borderRadius: "8px",
                 bgcolor: d.surface,
                 "& > svg": { fontSize: 17 },
@@ -610,9 +612,9 @@ export default function AppBarComponent() {
               sx={{
                 flex: 1,
                 minWidth: 0,
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
+                // Wraps onto a second line on narrow sidebars rather than
+                // cutting the label off.
+                overflowWrap: "break-word",
               }}
             >
               Contact support
@@ -624,6 +626,7 @@ export default function AppBarComponent() {
                 fontSize: 18,
                 flexShrink: 0,
                 transition: "transform .15s",
+                [MQ.compact]: { display: "none" },
               }}
             />
           </ButtonBase>
