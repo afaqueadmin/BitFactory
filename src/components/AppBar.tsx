@@ -89,7 +89,7 @@ const getInitials = (name?: string | null) => {
   return (first + last).toUpperCase();
 };
 
-// Sidebar groups ("Menu", "Market & tools" and "Help" sections).
+// Sidebar groups ("Menu" and "Market & tools" sections).
 const mainLinks: NavLink[] = [
   {
     href: "/dashboard",
@@ -136,13 +136,10 @@ const toolLinks: NavLink[] = [
     label: "Payback Analysis",
     icon: <SavingsOutlinedIcon />,
   },
-];
-
-const helpLinks: NavLink[] = [
   { href: "/faq", label: "FAQ", icon: <HelpOutlineRoundedIcon /> },
 ];
 
-const allLinks = [...mainLinks, ...toolLinks, ...helpLinks];
+const allLinks = [...mainLinks, ...toolLinks];
 
 // Primary destinations for the mobile bottom navigation; everything else is
 // reachable through the "Menu" tab, which opens the full drawer.
@@ -425,8 +422,6 @@ export default function AppBarComponent() {
       {mainLinks.map((l) => navItem(l, opts))}
       {navLabel("Market & tools")}
       {toolLinks.map((l) => navItem(l, opts))}
-      {navLabel("Help")}
-      {helpLinks.map((l) => navItem(l, opts))}
     </>
   );
 
