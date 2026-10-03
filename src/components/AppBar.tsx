@@ -556,7 +556,7 @@ export default function AppBarComponent() {
           {navGroups()}
         </Box>
 
-        {/* Help card + footer */}
+        {/* Support button + footer */}
         <Box sx={{ mt: "auto", pt: "14px", [SHORT]: { pt: "10px" } }}>
           <ButtonBase
             component={Link}
@@ -568,21 +568,25 @@ export default function AppBarComponent() {
               alignItems: "center",
               gap: "10px",
               width: "calc(100% - 8px)",
+              minHeight: 44,
               m: "0 4px 12px",
-              p: "10px 12px",
-              [SHORT]: { mb: "8px", py: "8px" },
-              textAlign: "left",
+              pl: "8px",
+              pr: "12px",
+              [SHORT]: { mb: "8px", minHeight: 40 },
               fontFamily: fonts.body,
-              background: darkMode
-                ? d.skySoft
-                : "linear-gradient(140deg, #EFF8FF, #F4FBF8)",
-              border: `1px solid ${darkMode ? d.borderSky : "#DEEDF3"}`,
-              borderRadius: "12px",
-              transition: "border-color .15s, box-shadow .15s",
+              fontSize: 13,
+              fontWeight: 650,
+              textAlign: "left",
+              // Dark mode's action blue is light, so it takes dark text.
+              color: darkMode ? "#0D2433" : "#fff",
+              bgcolor: d.action,
+              borderRadius: "10px",
+              boxShadow: darkMode ? "none" : "0 4px 12px rgba(22,117,169,.22)",
+              transition: "background-color .15s, box-shadow .15s",
               "&:hover": {
-                borderColor: d.action,
-                boxShadow: "0 2px 8px rgba(20, 90, 140, .08)",
-                "& .support-arrow": { transform: "translateX(2px)" },
+                bgcolor: d.actionHover,
+                boxShadow: darkMode ? "none" : "0 6px 16px rgba(22,117,169,.3)",
+                "& .support-arrow": { transform: "translateX(3px)" },
               },
               "&:focus-visible": focusRing(d.action),
             }}
@@ -593,44 +597,34 @@ export default function AppBarComponent() {
                 display: "grid",
                 placeItems: "center",
                 flexShrink: 0,
-                width: 30,
-                height: 30,
-                borderRadius: "50%",
-                bgcolor: d.surface,
-                color: d.action,
-                "& > svg": { fontSize: 18 },
+                width: 28,
+                height: 28,
+                borderRadius: "8px",
+                bgcolor: darkMode
+                  ? "rgba(13,36,51,.14)"
+                  : "rgba(255,255,255,.18)",
+                "& > svg": { fontSize: 17 },
               }}
             >
               <SupportAgentOutlinedIcon />
             </Box>
-            <Box sx={{ minWidth: 0, flex: 1, lineHeight: 1.3 }}>
-              <Box
-                sx={{
-                  fontWeight: 650,
-                  fontSize: 13,
-                  color: d.text,
-                  whiteSpace: "nowrap",
-                }}
-              >
-                Need help?
-              </Box>
-              <Box
-                sx={{
-                  fontSize: 11.5,
-                  fontWeight: 600,
-                  color: d.action,
-                  whiteSpace: "nowrap",
-                }}
-              >
-                Contact support
-              </Box>
+            <Box
+              component="span"
+              sx={{
+                flex: 1,
+                minWidth: 0,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              Contact support
             </Box>
             <ChevronRightRoundedIcon
               className="support-arrow"
               aria-hidden
               sx={{
                 fontSize: 18,
-                color: d.action,
                 flexShrink: 0,
                 transition: "transform .15s",
               }}
