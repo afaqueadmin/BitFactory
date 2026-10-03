@@ -78,6 +78,125 @@ const POOL_MODE_OPTIONS: SegmentedOption<PoolMode>[] = [
   { id: "braiins", label: "Braiins" },
 ];
 
+/**
+ * One figure in the wallet balance hero: label, BTC amount, USD equivalent.
+ * The `hero` variant (Total Earnings) is larger; the others sit to its right
+ * (below it on mobile) separated by a divider, so all three line up.
+ */
+function EarningsFigure({
+  area,
+  label,
+  btc,
+  usd,
+  isLoading,
+  error,
+  hero = false,
+}: {
+  area: string;
+  label: string;
+  btc: number;
+  usd: string;
+  isLoading: boolean;
+  error?: string | null;
+  hero?: boolean;
+}) {
+  const { d, darkMode, fonts } = useDaylight();
+  const divider = `1px solid ${darkMode ? d.borderSky : "#D7EAF3"}`;
+
+  return (
+    <Box
+      sx={{
+        gridArea: area,
+        minWidth: 0,
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+        p: hero
+          ? { xs: "22px 20px", sm: "26px 30px" }
+          : { xs: "18px 20px", sm: "26px 28px" },
+        // Dividers: below the hero on mobile, left of each meta column on
+        // desktop, and between the two meta columns on mobile.
+        ...(hero
+          ? { borderBottom: { xs: divider, md: "none" } }
+          : {
+              borderLeft: {
+                xs: area === "pending" ? divider : "none",
+                md: divider,
+              },
+            }),
+      }}
+    >
+      <Typography
+        sx={{
+          fontSize: { xs: 11, sm: 12 },
+          fontWeight: 600,
+          letterSpacing: ".04em",
+          textTransform: "uppercase",
+          color: d.muted,
+        }}
+      >
+        {label}
+      </Typography>
+
+      {isLoading ? (
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: "12px" }}>
+          <CircularProgress size={hero ? 20 : 16} sx={{ color: d.action }} />
+          <Typography sx={{ fontSize: 13, color: d.muted }}>
+            Loading...
+          </Typography>
+        </Box>
+      ) : error ? (
+        <Typography sx={{ fontSize: 12, color: d.danger, mt: "12px" }}>
+          {error}
+        </Typography>
+      ) : (
+        <>
+          <Typography
+            sx={{
+              fontFamily: fonts.heading,
+              fontWeight: 750,
+              fontSize: hero ? { xs: 30, sm: 40 } : { xs: 18, sm: 24 },
+              lineHeight: 1.2,
+              letterSpacing: hero ? "-1.5px" : "-.5px",
+              color: d.text,
+              mt: hero ? "8px" : "10px",
+              fontVariantNumeric: "tabular-nums",
+              overflowWrap: "anywhere",
+            }}
+          >
+            ₿ {btc.toFixed(8)}
+          </Typography>
+          <Typography
+            sx={{
+              fontFamily: fonts.heading,
+              fontWeight: 700,
+              fontSize: hero ? { xs: 20, sm: 24 } : { xs: 14, sm: 16 },
+              lineHeight: 1.3,
+              color: d.success,
+              mt: "6px",
+              fontVariantNumeric: "tabular-nums",
+            }}
+          >
+            ≈ ${usd}
+            <Box
+              component="span"
+              sx={{
+                fontFamily: fonts.body,
+                fontWeight: 600,
+                fontSize: hero ? { xs: 12, sm: 13 } : 11,
+                color: d.muted,
+                ml: "5px",
+              }}
+            >
+              USD
+            </Box>
+          </Typography>
+        </>
+      )}
+    </Box>
+  );
+}
+
 export default function WalletPage() {
   const { d, darkMode, fonts } = useDaylight();
   const [summary, setSummary] = useState<EarningsSummary | null>(null);
@@ -446,133 +565,52 @@ export default function WalletPage() {
       )}
 
       {/* Balance hero (guide §5): Total Earnings, with Revenue (24h) and
-          Pending Payouts as meta figures alongside it. */}
+          Pending Payouts alongside it. All three share one label -> BTC ->
+          USD structure, top-aligned in a grid with dividers between them. */}
       <Box
         sx={{
-          display: "flex",
-          flexWrap: "wrap",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: "24px",
-          p: { xs: "22px", sm: "26px 30px" },
+          display: "grid",
+          gridTemplateColumns: {
+            xs: "1fr 1fr",
+            md: "minmax(0, 1.7fr) minmax(0, 1fr) minmax(0, 1fr)",
+          },
+          gridTemplateAreas: {
+            xs: '"total total" "revenue pending"',
+            md: '"total revenue pending"',
+          },
+          alignItems: "stretch",
           mb: { xs: "18px", sm: "22px" },
           borderRadius: RADIUS_CARD,
+          overflow: "hidden",
           background: darkMode
             ? d.skySoft
             : "linear-gradient(110deg, #EDF8FF, #F0FAF6)",
           border: `1px solid ${darkMode ? d.borderSky : "#D7EAF3"}`,
         }}
       >
-        <Box>
-          <Typography sx={{ fontSize: 12, color: d.muted }}>
-            Total Earnings{poolSuffix}
-          </Typography>
-          {isLoading ? (
-            <Box
-              sx={{ display: "flex", alignItems: "center", gap: 1, mt: "8px" }}
-            >
-              <CircularProgress size={20} sx={{ color: d.action }} />
-              <Typography sx={{ fontSize: 13, color: d.muted }}>
-                Loading...
-              </Typography>
-            </Box>
-          ) : (
-            <>
-              <Typography
-                sx={{
-                  fontFamily: fonts.heading,
-                  fontWeight: 750,
-                  fontSize: { xs: 32, sm: 40 },
-                  letterSpacing: "-1.5px",
-                  color: d.text,
-                  mt: "4px",
-                  fontVariantNumeric: "tabular-nums",
-                }}
-              >
-                ₿ {getTotalEarnings().toFixed(8)}
-              </Typography>
-              <Typography sx={{ fontSize: 12, color: d.muted, mt: "6px" }}>
-                ≈ ${usdEquivalent(getTotalEarnings())} USD
-              </Typography>
-            </>
-          )}
-        </Box>
-
-        <Box
-          sx={{
-            display: "flex",
-            gap: { xs: "24px", sm: "40px" },
-            flexWrap: "wrap",
-          }}
-        >
-          <Box>
-            <Typography sx={{ fontSize: 11, color: d.muted }}>
-              Revenue (24h){poolSuffix}
-            </Typography>
-            {revenue24hLoading ? (
-              <CircularProgress size={16} sx={{ color: d.action, mt: "8px" }} />
-            ) : revenue24hError ? (
-              <Typography sx={{ fontSize: 11, color: d.danger, mt: "8px" }}>
-                {revenue24hError}
-              </Typography>
-            ) : (
-              <>
-                <Typography
-                  component="strong"
-                  sx={{
-                    display: "block",
-                    fontFamily: fonts.heading,
-                    fontWeight: 700,
-                    fontSize: 23,
-                    color: d.text,
-                    mt: "8px",
-                    fontVariantNumeric: "tabular-nums",
-                  }}
-                >
-                  ₿ {getRevenue24h().toFixed(8)}
-                </Typography>
-                <Typography
-                  component="small"
-                  sx={{ fontSize: 11, color: d.muted }}
-                >
-                  ≈ ${usdEquivalent(getRevenue24h())}
-                </Typography>
-              </>
-            )}
-          </Box>
-
-          <Box>
-            <Typography sx={{ fontSize: 11, color: d.muted }}>
-              Pending Payouts{poolSuffix}
-            </Typography>
-            {isLoading ? (
-              <CircularProgress size={16} sx={{ color: d.action, mt: "8px" }} />
-            ) : (
-              <>
-                <Typography
-                  component="strong"
-                  sx={{
-                    display: "block",
-                    fontFamily: fonts.heading,
-                    fontWeight: 700,
-                    fontSize: 23,
-                    color: d.text,
-                    mt: "8px",
-                    fontVariantNumeric: "tabular-nums",
-                  }}
-                >
-                  ₿ {getPendingPayouts().toFixed(8)}
-                </Typography>
-                <Typography
-                  component="small"
-                  sx={{ fontSize: 11, color: d.muted }}
-                >
-                  ≈ ${usdEquivalent(getPendingPayouts())}
-                </Typography>
-              </>
-            )}
-          </Box>
-        </Box>
+        <EarningsFigure
+          area="total"
+          hero
+          label={`Total Earnings${poolSuffix}`}
+          isLoading={isLoading}
+          btc={getTotalEarnings()}
+          usd={usdEquivalent(getTotalEarnings())}
+        />
+        <EarningsFigure
+          area="revenue"
+          label={`Revenue (24h)${poolSuffix}`}
+          isLoading={revenue24hLoading}
+          error={revenue24hError}
+          btc={getRevenue24h()}
+          usd={usdEquivalent(getRevenue24h())}
+        />
+        <EarningsFigure
+          area="pending"
+          label={`Pending Payouts${poolSuffix}`}
+          isLoading={isLoading}
+          btc={getPendingPayouts()}
+          usd={usdEquivalent(getPendingPayouts())}
+        />
       </Box>
 
       {/* Wallet address / payment frequency / next payout - one group per

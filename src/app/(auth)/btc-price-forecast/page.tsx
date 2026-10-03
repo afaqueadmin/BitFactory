@@ -428,11 +428,25 @@ export default function BtcPriceForecastPage() {
                               color: COLOR_PRICE,
                               label: row.halvings === 0 ? "Price" : "Predicted",
                               value: formatUsd(row.predictedPrice),
+                              band: false,
                             },
+                            // Today is the actual spot price, so only future
+                            // points carry a prediction range.
+                            ...(row.halvings === 0
+                              ? []
+                              : [
+                                  {
+                                    color: COLOR_PRICE,
+                                    label: "Likely range",
+                                    value: `${formatUsd(row.priceLow)} – ${formatUsd(row.priceHigh)}`,
+                                    band: true,
+                                  },
+                                ]),
                             {
                               color: COLOR_COST,
                               label: "Cost to mine",
                               value: formatUsd(row.productionCost),
+                              band: false,
                             },
                           ].map((item) => (
                             <Box
@@ -444,7 +458,7 @@ export default function BtcPriceForecastPage() {
                                 py: "2px",
                               }}
                             >
-                              <Swatch color={item.color} />
+                              <Swatch color={item.color} band={item.band} />
                               <Box component="span" sx={{ color: d.muted }}>
                                 {item.label}
                               </Box>
@@ -453,7 +467,7 @@ export default function BtcPriceForecastPage() {
                                 sx={{
                                   ml: "auto",
                                   pl: "12px",
-                                  fontWeight: 700,
+                                  fontWeight: item.band ? 500 : 700,
                                   fontVariantNumeric: "tabular-nums",
                                 }}
                               >
