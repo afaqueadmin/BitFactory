@@ -82,40 +82,6 @@ export const useVendorInvoices = (
   };
 };
 
-export const useCreateVendorInvoice = () => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (data: {
-      invoiceNumber: string;
-      billingDate: string;
-      dueDate: string;
-      totalMiners: number;
-      unitPrice: number;
-      miscellaneousCharges: number;
-      totalAmount: number;
-      notes?: string;
-      paymentStatus: "Paid" | "Pending" | "Cancelled";
-    }) => {
-      const response = await fetch("/api/vendor-invoices", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to create vendor invoice");
-      }
-
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["vendorInvoices"] });
-    },
-  });
-};
-
 export const useDeleteVendorInvoice = () => {
   const queryClient = useQueryClient();
 
