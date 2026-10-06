@@ -45,6 +45,7 @@ import {
 import { useUser } from "@/lib/hooks/useUser";
 import { StatusBadge } from "@/components/accounting/common/StatusBadge";
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
+import { InvoicePaymentsCard } from "@/components/accounting/common/InvoicePaymentsCard";
 import { DateDisplay } from "@/components/accounting/common/DateDisplay";
 import EditIcon from "@mui/icons-material/Edit";
 import DownloadIcon from "@mui/icons-material/Download";
@@ -647,6 +648,13 @@ export default function InvoiceDetailPage() {
           </Card>
         </Box>
       </Box>
+      {/* Payments (every non-voided payment, with its receiving account) */}
+      <InvoicePaymentsCard
+        payments={invoice.costPayments}
+        invoiceType={invoice.invoiceType}
+        btcpayStatus={invoice.btcpayStatus}
+        btcpaySettledAt={invoice.btcpaySettledAt}
+      />
       {/* Customer & Relationship Manager Information Section */}
       <Box sx={{ mt: 4 }}>
         <Card>

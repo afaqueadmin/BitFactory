@@ -44,6 +44,7 @@ import {
 import { useUser } from "@/lib/hooks/useUser";
 import { StatusBadge } from "@/components/accounting/common/StatusBadge";
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
+import { InvoicePaymentsCard } from "@/components/accounting/common/InvoicePaymentsCard";
 import { DateDisplay } from "@/components/accounting/common/DateDisplay";
 import EditIcon from "@mui/icons-material/Edit";
 import DownloadIcon from "@mui/icons-material/Download";
@@ -719,75 +720,13 @@ export default function InvoiceDetailPage() {
           </Card>
         </Box>
       </Box>
-      {/* Invoice Narration */}
-      {invoice.costPayments && invoice.costPayments.length > 0 && (
-        <Box sx={{ mt: 4 }}>
-          <Card>
-            <CardHeader title="Invoice Narration" />
-            <Divider />
-            <CardContent>
-              <Stack spacing={2}>
-                {invoice.costPayments
-                  .filter(
-                    (payment: { narration?: string | null }) =>
-                      payment.narration,
-                  )
-                  .map(
-                    (
-                      payment: {
-                        id: string;
-                        amount: number;
-                        narration?: string | null;
-                        createdAt: string;
-                      },
-                      index: number,
-                      filtered: { id: string }[],
-                    ) => (
-                      <Box
-                        key={payment.id}
-                        sx={{
-                          pb: 2,
-                          borderBottom:
-                            index < filtered.length - 1
-                              ? "1px solid #eee"
-                              : "none",
-                        }}
-                      >
-                        <Box
-                          sx={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            mb: 0.5,
-                          }}
-                        >
-                          <Typography variant="body2" color="textSecondary">
-                            Payment of{" "}
-                            <CurrencyDisplay value={payment.amount} />
-                          </Typography>
-                          <Typography variant="body2" color="textSecondary">
-                            {new Date(payment.createdAt).toLocaleDateString()}
-                          </Typography>
-                        </Box>
-                        <Typography variant="body1">
-                          {payment.narration}
-                        </Typography>
-                      </Box>
-                    ),
-                  )}
-                {invoice.costPayments.every(
-                  (payment: { narration?: string | null }) =>
-                    !payment.narration,
-                ) && (
-                  <Typography color="textSecondary">
-                    No narration added for this invoice
-                  </Typography>
-                )}
-              </Stack>
-            </CardContent>
-          </Card>
-        </Box>
-      )}
+      {/* Payments (every non-voided payment, with its receiving account) */}
+      <InvoicePaymentsCard
+        payments={invoice.costPayments}
+        invoiceType={invoice.invoiceType}
+        btcpayStatus={invoice.btcpayStatus}
+        btcpaySettledAt={invoice.btcpaySettledAt}
+      />
       {/* Customer & Relationship Manager Information Section */}
       <Box sx={{ mt: 4 }}>
         <Card>
