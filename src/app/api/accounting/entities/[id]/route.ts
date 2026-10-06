@@ -100,6 +100,7 @@ export async function DELETE(
             banks: true,
             vendorInvoicePayments: true,
             hardwarePurchasePayments: true,
+            costPayments: true,
           },
         },
       },
@@ -108,9 +109,16 @@ export async function DELETE(
       return NextResponse.json({ error: "Entity not found" }, { status: 404 });
     }
 
-    const { banks, vendorInvoicePayments, hardwarePurchasePayments } =
-      existing._count;
-    if (banks > 0 || vendorInvoicePayments + hardwarePurchasePayments > 0) {
+    const {
+      banks,
+      vendorInvoicePayments,
+      hardwarePurchasePayments,
+      costPayments,
+    } = existing._count;
+    if (
+      banks > 0 ||
+      vendorInvoicePayments + hardwarePurchasePayments + costPayments > 0
+    ) {
       return NextResponse.json(
         {
           error:

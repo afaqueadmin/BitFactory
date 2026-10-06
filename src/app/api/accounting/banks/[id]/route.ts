@@ -12,11 +12,13 @@ import {
 } from "@/lib/accounting/masterData";
 
 async function paymentReferenceCount(bankId: string): Promise<number> {
-  const [vendor, hardware] = await Promise.all([
+  // Farm Tariff, Hardware Purchase, and Hosting / Hardware Sales payments.
+  const [vendor, hardware, received] = await Promise.all([
     prisma.vendorInvoice.count({ where: { paymentBankId: bankId } }),
     prisma.hardwarePurchaseInvoice.count({ where: { paymentBankId: bankId } }),
+    prisma.costPayment.count({ where: { bankId } }),
   ]);
-  return vendor + hardware;
+  return vendor + hardware + received;
 }
 
 export async function PUT(

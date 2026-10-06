@@ -27,6 +27,7 @@ export async function PUT(
           select: {
             vendorInvoicePayments: true,
             hardwarePurchasePayments: true,
+            costPayments: true,
           },
         },
       },
@@ -53,9 +54,15 @@ export async function PUT(
       if (code !== existing.code) {
         // Recorded amounts are stored in this currency; changing its code
         // would change what those amounts mean.
-        const { vendorInvoicePayments, hardwarePurchasePayments } =
-          existing._count;
-        if (vendorInvoicePayments + hardwarePurchasePayments > 0) {
+        const {
+          vendorInvoicePayments,
+          hardwarePurchasePayments,
+          costPayments,
+        } = existing._count;
+        if (
+          vendorInvoicePayments + hardwarePurchasePayments + costPayments >
+          0
+        ) {
           return NextResponse.json(
             {
               error:
@@ -144,6 +151,7 @@ export async function DELETE(
             banks: true,
             vendorInvoicePayments: true,
             hardwarePurchasePayments: true,
+            costPayments: true,
           },
         },
       },
@@ -155,9 +163,16 @@ export async function DELETE(
       );
     }
 
-    const { banks, vendorInvoicePayments, hardwarePurchasePayments } =
-      existing._count;
-    if (banks > 0 || vendorInvoicePayments + hardwarePurchasePayments > 0) {
+    const {
+      banks,
+      vendorInvoicePayments,
+      hardwarePurchasePayments,
+      costPayments,
+    } = existing._count;
+    if (
+      banks > 0 ||
+      vendorInvoicePayments + hardwarePurchasePayments + costPayments > 0
+    ) {
       return NextResponse.json(
         {
           error:
