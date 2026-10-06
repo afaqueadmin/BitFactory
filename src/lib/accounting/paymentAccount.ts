@@ -17,7 +17,10 @@ export async function validatePaymentAccount({
   entityId: unknown;
   bankId: unknown;
   currencyId: unknown;
-}): Promise<{ currencyCode: string } | { error: string }> {
+}): Promise<
+  | { currencyCode: string; entityName: string; bankName: string }
+  | { error: string }
+> {
   if (
     typeof entityId !== "string" ||
     !entityId ||
@@ -32,7 +35,7 @@ export async function validatePaymentAccount({
   const bank = await prisma.accountingBank.findUnique({
     where: { id: bankId },
     include: {
-      entity: { select: { id: true, isActive: true } },
+      entity: { select: { id: true, name: true, isActive: true } },
       currencies: {
         where: { currencyId },
         include: { currency: { select: { code: true, isActive: true } } },
@@ -53,7 +56,11 @@ export async function validatePaymentAccount({
     return { error: "The selected bank does not hold the selected currency" };
   }
 
-  return { currencyCode: link.currency.code };
+  return {
+    currencyCode: link.currency.code,
+    entityName: bank.entity.name,
+    bankName: bank.name,
+  };
 }
 
 /**

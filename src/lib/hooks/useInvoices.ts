@@ -15,6 +15,17 @@ export interface AuditLogWithUser extends AuditLog {
   };
 }
 
+/**
+ * A payment as admin invoice responses return it: with its receiving
+ * account and currency (null on older and automatic payments). Customer
+ * responses omit these fields entirely.
+ */
+export interface CostPaymentWithAccount extends CostPayment {
+  entity?: { id: string; name: string } | null;
+  bank?: { id: string; name: string } | null;
+  currency?: { id: string; code: string; name: string } | null;
+}
+
 // Line item shape used for create/update requests and in the LineItemsEditor
 export interface InvoiceLineItemInput {
   hardwareId: string;
@@ -35,7 +46,7 @@ export interface InvoiceWithDetails extends Invoice {
     email: string;
     name: string | null;
   };
-  costPayments?: CostPayment[];
+  costPayments?: CostPaymentWithAccount[];
   lineItems?: InvoiceLineItem[];
   group?: {
     id: string;
@@ -456,6 +467,24 @@ export function useSendInvoiceEmail() {
     error: mutation.error instanceof Error ? mutation.error.message : null,
   };
 }
+/**
+ * Body of POST /api/accounting/invoices/[id]/record-payment. Amounts are in
+ * the selected currency (sent as typed text so no float rounding creeps in);
+ * exchangeRate is 1 USD = X currency.
+ */
+export interface RecordPaymentInput {
+  amountPaid: string;
+  paymentDate: string;
+  notes?: string;
+  hostingAmountPaid?: string;
+  hostingNotes?: string;
+  markAsPaid?: boolean;
+  entityId: string;
+  bankId: string;
+  currencyId: string;
+  exchangeRate: string;
+}
+
 export function useRecordPayment() {
   const queryClient = useQueryClient();
 
@@ -465,14 +494,7 @@ export function useRecordPayment() {
       data,
     }: {
       invoiceId: string;
-      data: {
-        amountPaid: number;
-        paymentDate: string;
-        notes?: string;
-        hostingAmountPaid?: number;
-        hostingNotes?: string;
-        markAsPaid?: boolean;
-      };
+      data: RecordPaymentInput;
     }) => {
       const res = await fetch(
         `/api/accounting/invoices/${invoiceId}/record-payment`,
@@ -485,7 +507,8 @@ export function useRecordPayment() {
       );
 
       if (!res.ok) {
-        throw new Error("Failed to record payment");
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || "Failed to record payment");
       }
 
       return await res.json();
@@ -497,17 +520,8 @@ export function useRecordPayment() {
   });
 
   return {
-    recordPayment: (
-      invoiceId: string,
-      data: {
-        amountPaid: number;
-        paymentDate: string;
-        notes?: string;
-        hostingAmountPaid?: number;
-        hostingNotes?: string;
-        markAsPaid?: boolean;
-      },
-    ) => mutation.mutateAsync({ invoiceId, data }),
+    recordPayment: (invoiceId: string, data: RecordPaymentInput) =>
+      mutation.mutateAsync({ invoiceId, data }),
     loading: mutation.isPending,
     error: mutation.error instanceof Error ? mutation.error.message : null,
   };

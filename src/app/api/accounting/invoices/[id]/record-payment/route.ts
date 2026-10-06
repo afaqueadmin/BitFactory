@@ -1,7 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Decimal } from "@prisma/client/runtime/library";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
-import { AuditAction, InvoiceStatus } from "@prisma/client";
+import { AuditAction } from "@prisma/client";
+import {
+  parseDecimal,
+  toUsd,
+  validatePaymentAccount,
+} from "@/lib/accounting/paymentAccount";
+import { costPaymentAccountInclude } from "@/lib/accounting/costPaymentAccounts";
+
+/** An entered amount: 0 or more, at most 2 decimal places (0 when blank). */
+function parseEnteredAmount(value: unknown): Decimal | null {
+  if (value === undefined || value === null || value === "") {
+    return new Decimal(0);
+  }
+  const parsed = parseDecimal(value, { allowZero: true });
+  return parsed && parsed.decimalPlaces() <= 2 ? parsed : null;
+}
 
 export async function POST(
   request: NextRequest,
@@ -38,11 +54,46 @@ export async function POST(
       hostingAmountPaid,
       hostingNotes,
       markAsPaid,
+      entityId,
+      bankId,
+      currencyId,
+      exchangeRate,
     } = body;
 
-    if (!paymentDate) {
+    const receivedOn =
+      typeof paymentDate === "string" && paymentDate
+        ? new Date(paymentDate)
+        : null;
+    if (!receivedOn || Number.isNaN(receivedOn.getTime())) {
       return NextResponse.json(
         { error: "Payment date is required" },
+        { status: 400 },
+      );
+    }
+
+    // Receiving account and currency are required on every payment,
+    // including a zero-amount "Mark as Paid".
+    const account = await validatePaymentAccount({
+      entityId,
+      bankId,
+      currencyId,
+    });
+    if ("error" in account) {
+      return NextResponse.json({ error: account.error }, { status: 400 });
+    }
+    const rate = parseDecimal(exchangeRate);
+    if (!rate || rate.decimalPlaces() > 8) {
+      return NextResponse.json(
+        {
+          error:
+            "Exchange rate must be greater than 0 (up to 8 decimal places)",
+        },
+        { status: 400 },
+      );
+    }
+    if (account.currencyCode === "USD" && !rate.equals(1)) {
+      return NextResponse.json(
+        { error: "USD payments must use an exchange rate of 1" },
         { status: 400 },
       );
     }
@@ -86,11 +137,26 @@ export async function POST(
       (li) => li.lineItemType === "HOSTING_COLOCATION",
     );
 
-    const hardwareAmount = Number(amountPaid) || 0;
-    const hostingAmount = hasHosting ? Number(hostingAmountPaid) || 0 : 0;
+    // Amounts are entered in the selected currency; balances stay in USD.
+    const hardwareOriginal = parseEnteredAmount(amountPaid);
+    const hostingOriginal = hasHosting
+      ? parseEnteredAmount(hostingAmountPaid)
+      : new Decimal(0);
+    if (!hardwareOriginal || !hostingOriginal) {
+      return NextResponse.json(
+        { error: "Amounts must be 0 or more, with up to 2 decimal places" },
+        { status: 400 },
+      );
+    }
+    const hardwareAmount = toUsd(hardwareOriginal, rate).toNumber();
+    const hostingAmount = toUsd(hostingOriginal, rate).toNumber();
 
     if (hasHosting) {
-      if (!markAsPaid && hardwareAmount <= 0 && hostingAmount <= 0) {
+      if (
+        !markAsPaid &&
+        hardwareOriginal.lessThanOrEqualTo(0) &&
+        hostingOriginal.lessThanOrEqualTo(0)
+      ) {
         return NextResponse.json(
           {
             error:
@@ -99,28 +165,39 @@ export async function POST(
           { status: 400 },
         );
       }
-    } else if (!markAsPaid && hardwareAmount <= 0) {
+    } else if (!markAsPaid && hardwareOriginal.lessThanOrEqualTo(0)) {
       return NextResponse.json(
         { error: "Amount paid must be greater than 0" },
         { status: 400 },
       );
     }
 
-    // Calculate outstanding balance (allow overpayment for admins)
-    const totalPaid = invoice.costPayments.reduce(
-      (sum, p) => sum + p.amount,
-      0,
-    );
+    // Calculate outstanding balance (allow overpayment for admins). Voided
+    // payments (e.g. reversed memo adjustments) don't count.
+    const totalPaid = invoice.costPayments
+      .filter((p) => !p.isDeleted)
+      .reduce((sum, p) => sum + p.amount, 0);
+
+    // Fields shared by every payment row created by this request.
+    const accountFields = {
+      entityId: entityId as string,
+      bankId: bankId as string,
+      currencyId: currencyId as string,
+      exchangeRate: rate,
+      paymentDate: receivedOn,
+    };
 
     // Create cost payment entries with invoiceId (this replaces the old InvoicePayment table)
     const costPaymentIds: string[] = [];
 
-    if (!hasHosting || hardwareAmount > 0 || markAsPaid) {
+    if (!hasHosting || hardwareOriginal.greaterThan(0) || markAsPaid) {
       const hardwarePayment = await prisma.costPayment.create({
         data: {
           userId: invoice.userId,
           invoiceId: id,
           amount: hardwareAmount,
+          originalAmount: hardwareOriginal,
+          ...accountFields,
           type:
             invoice.invoiceType === "HARDWARE_SALES"
               ? "HARDWARE_SALES"
@@ -132,12 +209,14 @@ export async function POST(
       costPaymentIds.push(hardwarePayment.id);
     }
 
-    if (hasHosting && (hostingAmount > 0 || markAsPaid)) {
+    if (hasHosting && (hostingOriginal.greaterThan(0) || markAsPaid)) {
       const hostingPayment = await prisma.costPayment.create({
         data: {
           userId: invoice.userId,
           invoiceId: id,
           amount: hostingAmount,
+          originalAmount: hostingOriginal,
+          ...accountFields,
           type: "PAYMENT",
           consumption: 0,
           narration: hostingNotes || null,
@@ -157,7 +236,7 @@ export async function POST(
         where: { id },
         data: {
           status: "PAID",
-          paidDate: new Date(paymentDate),
+          paidDate: receivedOn,
         },
       });
     }
@@ -175,6 +254,14 @@ export async function POST(
           amountPaid: hardwareAmount,
           ...(hasHosting ? { hostingAmountPaid: hostingAmount } : {}),
           paymentDate,
+          entity: account.entityName,
+          bank: account.bankName,
+          currency: account.currencyCode,
+          exchangeRate: rate.toString(),
+          originalAmountPaid: hardwareOriginal.toString(),
+          ...(hasHosting
+            ? { originalHostingAmountPaid: hostingOriginal.toString() }
+            : {}),
           costPaymentIds,
           isPaid: Math.abs(remainingBalance) < 0.01,
           remainingBalance: remainingBalance.toFixed(2),
@@ -185,11 +272,12 @@ export async function POST(
     // Fetch and return updated invoice with all payments. This overwrites
     // the client's cached invoice (["invoice", id]) via setQueryData, so it
     // must include lineItems or the split-payment form loses its
-    // hasHosting/isSplitPayment signal after a successful submission.
+    // hasHosting/isSplitPayment signal after a successful submission, and
+    // the payment account relations or the Payments card shows "—".
     const finalInvoice = await prisma.invoice.findUnique({
       where: { id },
       include: {
-        costPayments: true,
+        costPayments: { include: costPaymentAccountInclude },
         lineItems: true,
         user: {
           select: {

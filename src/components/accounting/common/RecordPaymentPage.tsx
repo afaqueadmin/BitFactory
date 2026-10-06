@@ -24,11 +24,24 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import Link from "next/link";
 import { useInvoice, useRecordPayment } from "@/lib/hooks/useInvoices";
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
+import {
+  EMPTY_PAYMENT_ACCOUNT,
+  PaymentAccountFields,
+  PaymentAccountValue,
+  isPaymentAccountComplete,
+  parseExchangeRate,
+} from "@/components/accounting/common/PaymentAccountFields";
 import { CostPayment } from "@prisma/client";
 
 interface RecordPaymentPageProps {
   basePath: string;
 }
+
+/** Typed amount as a number; blank or invalid counts as 0. */
+const toNumber = (value: string) => {
+  const n = Number(value);
+  return value.trim() !== "" && Number.isFinite(n) ? n : 0;
+};
 
 export default function RecordPaymentPage({
   basePath,
@@ -45,14 +58,20 @@ export default function RecordPaymentPage({
     error: paymentError,
   } = useRecordPayment();
 
+  // Amounts are kept as typed text, in the selected currency.
   const [formData, setFormData] = useState({
-    amountPaid: 0,
-    hostingAmountPaid: 0,
+    amountPaid: "",
+    hostingAmountPaid: "",
     paymentDate: new Date().toISOString().split("T")[0],
     notes: "",
     hostingNotes: "",
     markAsPaid: false,
   });
+  // One receiving account, currency and rate for the whole payment; in the
+  // split form it applies to both sections (D7).
+  const [account, setAccount] = useState<PaymentAccountValue>(
+    EMPTY_PAYMENT_ACCOUNT,
+  );
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -70,14 +89,16 @@ export default function RecordPaymentPage({
   const isSplitPayment =
     invoice?.invoiceType === "HARDWARE_SALES" && hasHostingLineItem;
 
-  // Calculate paid amount from cost payments
-  const paidAmount =
-    invoice && invoice.costPayments
-      ? invoice.costPayments.reduce(
-          (sum: number, payment: CostPayment) => sum + payment.amount,
-          0,
-        )
-      : 0;
+  // Voided payments (e.g. reversed memo adjustments) don't count as paid.
+  const activePayments: CostPayment[] = (invoice?.costPayments ?? []).filter(
+    (payment: CostPayment) => !payment.isDeleted,
+  );
+
+  // Calculate paid amount from cost payments (USD)
+  const paidAmount = activePayments.reduce(
+    (sum: number, payment: CostPayment) => sum + payment.amount,
+    0,
+  );
 
   const outstandingAmount = invoice
     ? Number(invoice.totalAmount) - paidAmount
@@ -109,35 +130,41 @@ export default function RecordPaymentPage({
             0,
           )
       : 0;
-  const hardwarePaid =
-    invoice && invoice.costPayments
-      ? invoice.costPayments
-          .filter((p: CostPayment) => p.type === "HARDWARE_SALES")
-          .reduce((sum: number, p: CostPayment) => sum + p.amount, 0)
-      : 0;
-  const hostingPaid =
-    invoice && invoice.costPayments
-      ? invoice.costPayments
-          .filter((p: CostPayment) => p.type === "PAYMENT")
-          .reduce((sum: number, p: CostPayment) => sum + p.amount, 0)
-      : 0;
+  const hardwarePaid = activePayments
+    .filter((p: CostPayment) => p.type === "HARDWARE_SALES")
+    .reduce((sum: number, p: CostPayment) => sum + p.amount, 0);
+  const hostingPaid = activePayments
+    .filter((p: CostPayment) => p.type === "PAYMENT")
+    .reduce((sum: number, p: CostPayment) => sum + p.amount, 0);
   const hardwareOutstanding = hardwareSubtotal - hardwarePaid;
   const hostingOutstanding = hostingSubtotal - hostingPaid;
 
+  // Entered amounts, and their USD value at the chosen rate.
+  const rate = parseExchangeRate(account);
+  const currencyCode = account.currencyCode;
+  const enteredAmount = toNumber(formData.amountPaid);
+  const enteredHosting = isSplitPayment
+    ? toNumber(formData.hostingAmountPaid)
+    : 0;
+  const enteredTotal = enteredAmount + enteredHosting;
+  const enteredTotalUsd = rate ? enteredTotal / rate : 0;
+  const amountLabel = currencyCode
+    ? `Amount Paid (${currencyCode})`
+    : "Amount Paid";
+  const usdHint = (value: number) =>
+    rate && value > 0 && currencyCode !== "USD"
+      ? ` ≈ $${(value / rate).toFixed(2)} USD`
+      : "";
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, checked, type } = e.target;
-    const fieldValue =
-      type === "checkbox"
-        ? checked
-        : name === "amountPaid" || name === "hostingAmountPaid"
-          ? parseFloat(value) || 0
-          : value;
+    const fieldValue = type === "checkbox" ? checked : value;
 
     if (name === "markAsPaid" && checked) {
       setFormData((prev) => ({
         ...prev,
-        amountPaid: 0,
-        hostingAmountPaid: 0,
+        amountPaid: "",
+        hostingAmountPaid: "",
       }));
     }
     setFormData((prev) => ({
@@ -154,30 +181,39 @@ export default function RecordPaymentPage({
       setError(null);
 
       // Validate
+      if (!isPaymentAccountComplete(account)) {
+        throw new Error(
+          "Select the entity, bank and currency, and enter the exchange rate",
+        );
+      }
       if (!formData.markAsPaid) {
         if (isSplitPayment) {
-          if (formData.amountPaid <= 0 && formData.hostingAmountPaid <= 0) {
+          if (enteredAmount <= 0 && enteredHosting <= 0) {
             throw new Error(
               "Enter a Hardware Sales Payment amount and/or a Hosting and Colocation Payment amount greater than 0",
             );
           }
-        } else if (formData.amountPaid <= 0) {
+        } else if (enteredAmount <= 0) {
           throw new Error("Payment amount must be greater than 0");
         }
       }
 
       // Call API to record payment
       await recordPayment(invoiceId, {
-        amountPaid: formData.amountPaid,
+        amountPaid: formData.amountPaid.trim() || "0",
         paymentDate: formData.paymentDate,
         notes: formData.notes,
         ...(isSplitPayment
           ? {
-              hostingAmountPaid: formData.hostingAmountPaid,
+              hostingAmountPaid: formData.hostingAmountPaid.trim() || "0",
               hostingNotes: formData.hostingNotes,
             }
           : {}),
         markAsPaid: formData.markAsPaid,
+        entityId: account.entityId,
+        bankId: account.bankId,
+        currencyId: account.currencyId,
+        exchangeRate: account.exchangeRate.trim(),
       });
 
       // Redirect back to invoice detail
@@ -215,6 +251,26 @@ export default function RecordPaymentPage({
     );
   }
 
+  const accountBlock = (
+    <Box>
+      <h3 style={{ marginTop: 0, marginBottom: 16 }}>Received Into</h3>
+      <PaymentAccountFields
+        value={account}
+        onChange={setAccount}
+        disabled={loading || paymentLoading}
+      />
+      {isSplitPayment && (
+        <Typography
+          variant="caption"
+          color="textSecondary"
+          sx={{ display: "block", mt: 1 }}
+        >
+          Applies to both the hardware and hosting payments.
+        </Typography>
+      )}
+    </Box>
+  );
+
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
       <Stack direction="row" spacing={2} sx={{ mb: 4 }}>
@@ -251,6 +307,10 @@ export default function RecordPaymentPage({
         <Paper sx={{ p: 4 }}>
           <form onSubmit={handleSubmit}>
             <Stack spacing={3}>
+              {accountBlock}
+
+              <Divider />
+
               {isSplitPayment ? (
                 <>
                   <Box>
@@ -259,15 +319,15 @@ export default function RecordPaymentPage({
                     </h3>
                     <Stack spacing={2}>
                       <TextField
-                        label="Amount Paid (USD)"
+                        label={amountLabel}
                         name="amountPaid"
                         type="number"
                         value={formData.amountPaid}
                         onChange={handleInputChange}
                         fullWidth
                         inputProps={{ min: 0, step: 0.01 }}
-                        helperText="Enter the hardware sales payment amount"
-                        disabled={formData.markAsPaid}
+                        helperText={`Enter the hardware sales payment amount${usdHint(enteredAmount)}`}
+                        disabled={formData.markAsPaid || !rate}
                       />
                       <TextField
                         label="Notes (Optional)"
@@ -288,15 +348,15 @@ export default function RecordPaymentPage({
                     </h3>
                     <Stack spacing={2}>
                       <TextField
-                        label="Amount Paid (USD)"
+                        label={amountLabel}
                         name="hostingAmountPaid"
                         type="number"
                         value={formData.hostingAmountPaid}
                         onChange={handleInputChange}
                         fullWidth
                         inputProps={{ min: 0, step: 0.01 }}
-                        helperText="Enter the hosting and colocation payment amount"
-                        disabled={formData.markAsPaid}
+                        helperText={`Enter the hosting and colocation payment amount${usdHint(enteredHosting)}`}
+                        disabled={formData.markAsPaid || !rate}
                       />
                       <TextField
                         label="Notes (Optional)"
@@ -348,16 +408,20 @@ export default function RecordPaymentPage({
                     >
                       <Box sx={{ flex: 1 }}>
                         <TextField
-                          label="Amount Paid (USD)"
+                          label={amountLabel}
                           name="amountPaid"
                           type="number"
                           value={formData.amountPaid}
                           onChange={handleInputChange}
                           fullWidth
                           inputProps={{ min: 0, step: 0.01 }}
-                          helperText="Enter the payment amount"
+                          helperText={
+                            rate
+                              ? `Enter the payment amount${usdHint(enteredAmount)}`
+                              : "Choose the currency and rate first"
+                          }
                           required={!formData.markAsPaid}
-                          disabled={formData.markAsPaid}
+                          disabled={formData.markAsPaid || !rate}
                         />
                       </Box>
                       <Box
@@ -418,11 +482,11 @@ export default function RecordPaymentPage({
                   disabled={
                     loading ||
                     paymentLoading ||
+                    !isPaymentAccountComplete(account) ||
                     (!formData.markAsPaid &&
                       (isSplitPayment
-                        ? formData.amountPaid <= 0 &&
-                          formData.hostingAmountPaid <= 0
-                        : formData.amountPaid <= 0))
+                        ? enteredAmount <= 0 && enteredHosting <= 0
+                        : enteredAmount <= 0))
                   }
                 >
                   {loading ? "Recording..." : "Record Payment"}
@@ -432,9 +496,9 @@ export default function RecordPaymentPage({
           </form>
         </Paper>
 
-        {/* Invoice Summary */}
+        {/* Invoice Summary (USD) */}
         <Card>
-          <CardHeader title="Invoice Summary" />
+          <CardHeader title="Invoice Summary" subheader="Amounts in USD" />
           <Divider />
           <CardContent>
             <Stack spacing={2}>
@@ -510,33 +574,24 @@ export default function RecordPaymentPage({
                 />
               </Box>
 
-              {(formData.amountPaid > 0 ||
-                (isSplitPayment && formData.hostingAmountPaid > 0)) && (
+              {enteredTotal > 0 && rate && (
                 <Box
                   sx={{
                     p: 1.5,
                     backgroundColor:
-                      formData.amountPaid +
-                        (isSplitPayment ? formData.hostingAmountPaid : 0) >
-                      outstandingAmount
+                      enteredTotalUsd > outstandingAmount
                         ? "#fff3cd"
                         : "#e8f5e9",
                     borderRadius: 1,
                   }}
                 >
                   <Typography color="textSecondary" variant="body2">
-                    {formData.amountPaid +
-                      (isSplitPayment ? formData.hostingAmountPaid : 0) >
-                    outstandingAmount
+                    {enteredTotalUsd > outstandingAmount
                       ? "Positive Balance After Payment"
                       : "Remaining After Payment"}
                   </Typography>
                   <CurrencyDisplay
-                    value={Math.abs(
-                      outstandingAmount -
-                        (formData.amountPaid +
-                          (isSplitPayment ? formData.hostingAmountPaid : 0)),
-                    )}
+                    value={Math.abs(outstandingAmount - enteredTotalUsd)}
                     fontWeight="bold"
                   />
                 </Box>

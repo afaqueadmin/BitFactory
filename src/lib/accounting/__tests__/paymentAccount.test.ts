@@ -61,9 +61,10 @@ describe("validatePaymentAccount", () => {
   const ids = { entityId: "e1", bankId: "b1", currencyId: "c1" };
   const bank = (overrides: Record<string, unknown> = {}) => ({
     id: "b1",
+    name: "Ruya",
     entityId: "e1",
     isActive: true,
-    entity: { id: "e1", isActive: true },
+    entity: { id: "e1", name: "Higgs Ltd", isActive: true },
     currencies: [{ currency: { code: "AED", isActive: true } }],
     ...overrides,
   });
@@ -76,7 +77,11 @@ describe("validatePaymentAccount", () => {
 
   it("returns the currency code for a valid selection", async () => {
     findUnique.mockResolvedValueOnce(bank() as never);
-    expect(await validatePaymentAccount(ids)).toEqual({ currencyCode: "AED" });
+    expect(await validatePaymentAccount(ids)).toEqual({
+      currencyCode: "AED",
+      entityName: "Higgs Ltd",
+      bankName: "Ruya",
+    });
   });
 
   it("rejects a bank from another entity", async () => {
