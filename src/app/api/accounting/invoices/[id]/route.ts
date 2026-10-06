@@ -6,6 +6,11 @@ import { sendInvoiceCancellationEmail } from "@/lib/email";
 import { getGroupByUserId } from "@/lib/groupUtils";
 import { accrueIncentivesForInvoice } from "@/lib/incentives/accrue";
 import { reverseIncentivesForInvoice } from "@/lib/incentives/reverse";
+import { assertFranchiseeOwnsCustomer } from "@/lib/franchiseeScope";
+import {
+  costPaymentAccountInclude,
+  costPaymentAccountOmit,
+} from "@/lib/accounting/costPaymentAccounts";
 
 function normalizeBillingMonth(billingMonth: string | Date): Date {
   const parsedBillingMonth = new Date(billingMonth);
@@ -31,28 +36,72 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    await verifyJwtToken(token);
+    let requesterId: string;
+    try {
+      ({ userId: requesterId } = await verifyJwtToken(token));
+    } catch {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
-    const invoice = await prisma.invoice.findUnique({
-      where: { id },
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            name: true,
-          },
-        },
-        createdByUser: { select: { id: true, email: true, name: true } },
-        updatedByUser: { select: { id: true, email: true, name: true } },
-        costPayments: true,
-        notifications: true,
-        lineItems: true,
-      },
+    const requester = await prisma.user.findUnique({
+      where: { id: requesterId },
+      select: { role: true },
     });
+    if (!requester) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const isAdmin =
+      requester.role === "ADMIN" || requester.role === "SUPER_ADMIN";
+
+    const userSelect = { select: { id: true, email: true, name: true } };
+
+    // Admins get everything, including each payment's receiving account.
+    // Customers and franchisees get only what the customer invoice page
+    // uses: no staff details, no email log, no voided payments and no
+    // payment-account columns (§2c P2-1, P2-3, P2-7).
+    const invoice = isAdmin
+      ? await prisma.invoice.findUnique({
+          where: { id },
+          include: {
+            user: userSelect,
+            createdByUser: userSelect,
+            updatedByUser: userSelect,
+            costPayments: { include: costPaymentAccountInclude },
+            notifications: true,
+            lineItems: true,
+          },
+        })
+      : await prisma.invoice.findUnique({
+          where: { id },
+          include: {
+            user: userSelect,
+            costPayments: {
+              where: { isDeleted: false },
+              omit: costPaymentAccountOmit,
+            },
+            lineItems: true,
+          },
+        });
 
     if (!invoice) {
       return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
+    }
+
+    // Non-admins may open their own invoices, and franchisees also their
+    // customers' (as the list API allows); drafts stay hidden. Anything
+    // else reads as not found, so it doesn't reveal that the invoice exists.
+    if (!isAdmin) {
+      const allowed =
+        invoice.status !== InvoiceStatus.DRAFT &&
+        (invoice.userId === requesterId ||
+          (requester.role === "FRANCHISEE" &&
+            (await assertFranchiseeOwnsCustomer(requesterId, invoice.userId))));
+      if (!allowed) {
+        return NextResponse.json(
+          { error: "Invoice not found" },
+          { status: 404 },
+        );
+      }
     }
 
     // Fetch group information for this customer
@@ -278,7 +327,9 @@ export async function PATCH(
         user: { select: { id: true, email: true, name: true } },
         createdByUser: { select: { id: true, email: true, name: true } },
         updatedByUser: { select: { id: true, email: true, name: true } },
-        costPayments: true,
+        // Keep the payment accounts: this response replaces the cached
+        // invoice, and the Payments card would otherwise show "—".
+        costPayments: { include: costPaymentAccountInclude },
         lineItems: true,
       },
     });
@@ -376,7 +427,9 @@ export async function PUT(
         user: { select: { id: true, email: true, name: true } },
         createdByUser: { select: { id: true, email: true, name: true } },
         updatedByUser: { select: { id: true, email: true, name: true } },
-        costPayments: true,
+        // Keep the payment accounts: this response replaces the cached
+        // invoice, and the Payments card would otherwise show "—".
+        costPayments: { include: costPaymentAccountInclude },
       },
     });
 

@@ -14,7 +14,25 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    await verifyJwtToken(token);
+    let userId: string;
+    try {
+      ({ userId } = await verifyJwtToken(token));
+    } catch {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Admin-only: entries hold internal details such as the payment
+    // account and exchange rate, which customers don't see (§2c P2-4).
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    });
+    if (user?.role !== "ADMIN" && user?.role !== "SUPER_ADMIN") {
+      return NextResponse.json(
+        { error: "Only administrators can view invoice audit logs" },
+        { status: 403 },
+      );
+    }
 
     // Fetch audit logs for this invoice
     const auditLogs = await prisma.auditLog.findMany({
