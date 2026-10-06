@@ -40,7 +40,8 @@ export async function GET(request: NextRequest) {
           },
         },
         include: {
-          costPayments: true,
+          // Voided payments (e.g. reversed memo adjustments) aren't paid.
+          costPayments: { where: { isDeleted: false } },
         },
       })
     ).sort((a, b) => {

@@ -53,7 +53,9 @@ export async function GET(request: NextRequest) {
             id: true,
             totalAmount: true,
             status: true,
+            // Voided payments (e.g. reversed memo adjustments) aren't paid.
             costPayments: {
+              where: { isDeleted: false },
               select: {
                 amount: true,
                 createdAt: true,

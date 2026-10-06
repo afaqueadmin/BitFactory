@@ -82,7 +82,8 @@ export async function POST(
         status: { not: "CANCELLED" },
       },
       include: {
-        costPayments: true,
+        // Voided payments (e.g. reversed memo adjustments) aren't paid.
+        costPayments: { where: { isDeleted: false } },
       },
       orderBy: { createdAt: "asc" },
     });

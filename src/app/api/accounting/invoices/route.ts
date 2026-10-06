@@ -7,6 +7,7 @@ import {
 } from "@/lib/hostingEligibility";
 import { InvoiceStatus, AuditAction, Prisma } from "@prisma/client";
 import { assertFranchiseeOwnsCustomer } from "@/lib/franchiseeScope";
+import { costPaymentAccountOmit } from "@/lib/accounting/costPaymentAccounts";
 
 function normalizeBillingMonth(billingMonth: string | Date): Date {
   const parsedBillingMonth = new Date(billingMonth);
@@ -104,7 +105,12 @@ export async function GET(request: NextRequest) {
 
     const include: Record<string, unknown> = {
       user: { select: { id: true, email: true, name: true } },
-      costPayments: true,
+      // Customers and franchisees don't get voided payments or the
+      // payment-account columns (§2c P2-5, P2-7).
+      costPayments:
+        userRole === "ADMIN" || userRole === "SUPER_ADMIN"
+          ? true
+          : { where: { isDeleted: false }, omit: costPaymentAccountOmit },
     };
 
     // Only include createdByUser when customerId is not passed

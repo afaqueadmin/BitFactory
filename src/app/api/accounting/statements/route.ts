@@ -69,7 +69,8 @@ export async function GET(request: NextRequest) {
         status: { not: InvoiceStatus.CANCELLED },
       },
       include: {
-        costPayments: true,
+        // Voided payments (e.g. reversed memo adjustments) aren't paid.
+        costPayments: { where: { isDeleted: false } },
         notifications: true,
       },
       orderBy: { createdAt: "asc" },
