@@ -17,6 +17,10 @@ import SaveIcon from "@mui/icons-material/Save";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
+import {
+  PdfUploadField,
+  UploadedPdf,
+} from "@/components/accounting/common/PdfUploadField";
 
 export interface VendorInvoiceFormData {
   invoiceNumber: string;
@@ -45,6 +49,8 @@ export default function CreateVendorInvoicePage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [invoicePdf, setInvoicePdf] = useState<UploadedPdf | null>(null);
+  const [pdfUploading, setPdfUploading] = useState(false);
 
   // Fetch machines using TanStack Query
   const { data: machines } = useQuery({
@@ -165,6 +171,10 @@ export default function CreateVendorInvoicePage() {
         setError("Unit price cannot be negative");
         return;
       }
+      if (!invoicePdf) {
+        setError("Please upload the vendor invoice PDF");
+        return;
+      }
 
       // Validate dates
       const billingDate = new Date(formData.billingDate);
@@ -223,7 +233,7 @@ export default function CreateVendorInvoicePage() {
           miscellaneousCharges: Number(formData.miscellaneousCharges) || 0,
           totalAmount: totalAmount,
           notes: formData.notes || null,
-          paymentStatus: "Pending",
+          invoicePdfKey: invoicePdf.key,
         }),
       });
 
@@ -379,6 +389,17 @@ export default function CreateVendorInvoicePage() {
               placeholder="Add any additional notes or comments..."
               disabled={saving}
             />
+
+            {/* Row 5: Vendor invoice PDF (required) */}
+            <PdfUploadField
+              label="Vendor Invoice PDF"
+              purpose="vendor-invoice"
+              value={invoicePdf}
+              onChange={setInvoicePdf}
+              onUploadingChange={setPdfUploading}
+              required
+              disabled={saving}
+            />
           </Stack>
 
           {/* Total Amount Summary */}
@@ -448,7 +469,7 @@ export default function CreateVendorInvoicePage() {
               type="submit"
               variant="contained"
               startIcon={saving ? <CircularProgress size={20} /> : <SaveIcon />}
-              disabled={saving}
+              disabled={saving || pdfUploading || !invoicePdf}
             >
               {saving ? "Recording..." : "Record Vendor Invoice"}
             </Button>

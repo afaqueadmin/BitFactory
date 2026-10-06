@@ -14,6 +14,7 @@ import {
   CircularProgress,
   Alert,
   Stack,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import { Close as CloseIcon } from "@mui/icons-material";
@@ -73,6 +74,9 @@ export default function EditVendorInvoiceModal({
   const [error, setError] = useState<string | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  // Paid invoices keep their amounts (they must match the recorded payment)
+  // and can't be deleted.
+  const [isPaid, setIsPaid] = useState(false);
   const deleteVendorInvoice = useDeleteVendorInvoice();
 
   // Fetch invoice details when modal opens
@@ -93,6 +97,7 @@ export default function EditVendorInvoiceModal({
           const data = await response.json();
           const invoice = data.data;
 
+          setIsPaid(invoice.paymentStatus === "Paid");
           setFormData({
             invoiceNumber: invoice.invoiceNumber,
             billingDate: invoice.billingDate.split("T")[0],
@@ -118,6 +123,7 @@ export default function EditVendorInvoiceModal({
       fetchInvoice();
     } else if (invoiceData) {
       // Use provided invoice data
+      setIsPaid(invoiceData.paymentStatus === "Paid");
       setFormData({
         invoiceNumber: invoiceData.invoiceNumber,
         billingDate: new Date(invoiceData.billingDate)
@@ -229,13 +235,17 @@ export default function EditVendorInvoiceModal({
           invoiceNumber: formData.invoiceNumber,
           billingDate: formData.billingDate,
           dueDate: formData.dueDate,
-          totalMiners: Number(formData.totalMiners) || 0,
-          unitPrice: Number(formData.unitPrice) || 0,
-          miscellaneousCharges: Number(formData.miscellaneousCharges) || 0,
-          totalAmount: totalAmount,
+          // Amounts are locked on paid invoices, so they aren't sent.
+          ...(isPaid
+            ? {}
+            : {
+                totalMiners: Number(formData.totalMiners) || 0,
+                unitPrice: Number(formData.unitPrice) || 0,
+                miscellaneousCharges:
+                  Number(formData.miscellaneousCharges) || 0,
+                totalAmount: totalAmount,
+              }),
           notes: formData.notes || null,
-          paymentStatus: invoiceData?.paymentStatus,
-          paidDate: invoiceData?.paidDate || null,
         }),
       });
 
@@ -310,6 +320,13 @@ export default function EditVendorInvoiceModal({
               </Alert>
             )}
 
+            {isPaid && (
+              <Alert severity="info" sx={{ mb: 3 }}>
+                This invoice is paid, so its amounts are locked and it
+                can&apos;t be deleted.
+              </Alert>
+            )}
+
             <form onSubmit={handleSubmit}>
               <Stack spacing={3}>
                 {/* Row 1: Invoice Number and Billing Date */}
@@ -370,7 +387,7 @@ export default function EditVendorInvoiceModal({
                       htmlInput: { min: 0, step: 1 },
                     }}
                     required
-                    disabled={saving}
+                    disabled={saving || isPaid}
                     size="small"
                   />
                   <TextField
@@ -384,7 +401,7 @@ export default function EditVendorInvoiceModal({
                       htmlInput: { min: 0, step: 0.01 },
                     }}
                     required
-                    disabled={saving}
+                    disabled={saving || isPaid}
                     size="small"
                   />
                 </Stack>
@@ -400,7 +417,7 @@ export default function EditVendorInvoiceModal({
                   slotProps={{
                     htmlInput: { step: 0.01 },
                   }}
-                  disabled={saving}
+                  disabled={saving || isPaid}
                   size="small"
                 />
 
@@ -482,14 +499,18 @@ export default function EditVendorInvoiceModal({
       </DialogContent>
 
       <DialogActions sx={{ p: 2, justifyContent: "space-between" }}>
-        <Button
-          onClick={() => setDeleteConfirmOpen(true)}
-          color="error"
-          startIcon={<DeleteIcon />}
-          disabled={saving || loading || !invoiceId}
-        >
-          Delete Invoice
-        </Button>
+        <Tooltip title={isPaid ? "Paid invoices can't be deleted" : ""}>
+          <span>
+            <Button
+              onClick={() => setDeleteConfirmOpen(true)}
+              color="error"
+              startIcon={<DeleteIcon />}
+              disabled={saving || loading || !invoiceId || isPaid}
+            >
+              Delete Invoice
+            </Button>
+          </span>
+        </Tooltip>
         <Box sx={{ display: "flex", gap: 1 }}>
           <Button onClick={onClose} disabled={saving || loading}>
             Cancel

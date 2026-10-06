@@ -197,9 +197,7 @@ export default function AdminDashboard() {
 
   const { vendorInvoices } = useVendorInvoices(1, 100000, undefined);
   const vendorInvoicesTotalAmount = vendorInvoices
-    .filter(
-      (invoice) => invoice.paymentStatus !== "Cancelled" && !invoice.isDeleted,
-    )
+    .filter((invoice) => invoice.paymentStatus !== "Cancelled")
     .reduce((sum, invoice) => sum + Number(invoice.totalAmount), 0);
 
   const hostingProfit = hostingRevenueData?.hostingRevenue
@@ -795,7 +793,7 @@ export default function AdminDashboard() {
             borderColor="#757575"
             value={vendorInvoicesTotalAmount}
             type="currency"
-            infoText="Sum of the total amount on all Vendor Invoices (what Bitfactory owes the hosting vendor), excluding Cancelled and deleted ones. Includes both Pending and Paid vendor invoices, not just paid ones."
+            infoText="Sum of the total amount on all Vendor Invoices (what Bitfactory owes the hosting vendor), excluding Cancelled ones. Includes both Pending and Paid vendor invoices, not just paid ones."
           />
 
           {/* Hosting Profit - implemented */}
