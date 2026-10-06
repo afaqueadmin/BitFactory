@@ -17,7 +17,8 @@ function originOf(url: string | undefined): string | null {
  * loads (checked by crawling every page per role with it enforced): fonts are
  * self-hosted by next/font; images from Cloudinary, the news feed and
  * data:/blob: (2FA QR code, uploads); browser fetches of the BTC price from
- * public exchange APIs; and two iframes - Polymarket and the BTCPay checkout.
+ * public exchange APIs and PDF uploads to R2; and two iframes - Polymarket
+ * and the BTCPay checkout.
  *
  * 'unsafe-inline' scripts are needed by Next.js's inline bootstrap scripts
  * (no nonce setup); styles by MUI/emotion. The rest still blocks script from
@@ -32,6 +33,8 @@ function contentSecurityPolicy(): string {
   const frames = ["'self'", "https://embed.polymarket.com"];
   const btcpay = originOf(process.env.BTCPAY_URL);
   if (btcpay) frames.push(btcpay);
+  // Accounting PDFs upload from the browser straight to R2 (src/lib/storage/r2.ts)
+  const r2 = originOf(process.env.S3_API_ENDPOINT);
   const directives: Record<string, string[]> = {
     "default-src": ["'self'"],
     "script-src": [
@@ -61,6 +64,7 @@ function contentSecurityPolicy(): string {
       "https://api.kraken.com",
       "https://api.coingecko.com",
       "https://mempool.space",
+      ...(r2 ? [r2] : []),
       ...(isDev ? ["ws:", "wss:"] : []),
     ],
     "frame-src": frames,
