@@ -22,6 +22,10 @@ import {
   VENDOR_NAME_OPTIONS,
   VendorNameValue,
 } from "@/lib/hooks/useHardwarePurchases";
+import {
+  PdfUploadField,
+  UploadedPdf,
+} from "@/components/accounting/common/PdfUploadField";
 
 export interface HardwarePurchaseFormData {
   invoiceNumber: string;
@@ -54,6 +58,8 @@ export default function CreateHardwarePurchasePage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [invoicePdf, setInvoicePdf] = useState<UploadedPdf | null>(null);
+  const [pdfUploading, setPdfUploading] = useState(false);
   const createHardwarePurchase = useCreateHardwarePurchase();
 
   // Calculate total amount
@@ -125,6 +131,10 @@ export default function CreateHardwarePurchasePage() {
         setError("Unit price cannot be negative");
         return;
       }
+      if (!invoicePdf) {
+        setError("Please upload the vendor invoice PDF");
+        return;
+      }
 
       const totalAmount = calculateTotalAmount();
 
@@ -139,7 +149,7 @@ export default function CreateHardwarePurchasePage() {
         miscellaneousCharges: Number(formData.miscellaneousCharges) || 0,
         totalAmount: totalAmount,
         notes: formData.notes || undefined,
-        paymentStatus: "Pending",
+        invoicePdfKey: invoicePdf.key,
       });
 
       setSuccess(true);
@@ -325,6 +335,17 @@ export default function CreateHardwarePurchasePage() {
               placeholder="Add any additional notes or comments..."
               disabled={saving}
             />
+
+            {/* Row 7: Vendor invoice PDF (required) */}
+            <PdfUploadField
+              label="Vendor Invoice PDF"
+              purpose="hardware-purchase-invoice"
+              value={invoicePdf}
+              onChange={setInvoicePdf}
+              onUploadingChange={setPdfUploading}
+              required
+              disabled={saving}
+            />
           </Stack>
 
           {/* Total Amount Summary */}
@@ -394,7 +415,7 @@ export default function CreateHardwarePurchasePage() {
               type="submit"
               variant="contained"
               startIcon={saving ? <CircularProgress size={20} /> : <SaveIcon />}
-              disabled={saving}
+              disabled={saving || pdfUploading || !invoicePdf}
             >
               {saving ? "Recording..." : "Record Hardware Purchase"}
             </Button>

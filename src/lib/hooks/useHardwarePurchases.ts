@@ -29,6 +29,16 @@ export interface HardwarePurchaseInvoice {
   totalAmount: number;
   paymentStatus: "Paid" | "Pending" | "Cancelled";
   notes: string | null;
+  invoicePdfKey: string | null;
+  // Set when the payment is recorded; amounts arrive as decimal strings.
+  paymentEntityId: string | null;
+  paymentBankId: string | null;
+  paymentCurrencyId: string | null;
+  paymentAmount: string | null;
+  paymentExchangeRate: string | null;
+  paymentAmountUsd: string | null;
+  transactionFee: string | null;
+  paymentReceiptKey: string | null;
   createdBy: string;
   updatedBy: string | null;
   createdAt: Date;
@@ -120,7 +130,7 @@ export const useCreateHardwarePurchase = () => {
       miscellaneousCharges: number;
       totalAmount: number;
       notes?: string;
-      paymentStatus: "Paid" | "Pending" | "Cancelled";
+      invoicePdfKey: string;
     }) => {
       const response = await fetch("/api/hardware-purchases", {
         method: "POST",

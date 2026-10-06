@@ -4,6 +4,12 @@ import { verifyJwtToken } from "@/lib/jwt";
 import { Decimal } from "@prisma/client/runtime/library";
 import { AuditAction } from "@prisma/client";
 import {
+  checkVendorInvoiceUpdate,
+  deleteInvoicePdfs,
+  PDF_DELETE_FAILED_MESSAGE,
+  vendorPaymentInclude,
+} from "@/lib/accounting/vendorInvoiceRules";
+import {
   VENDOR_NAME_OPTIONS,
   VendorNameValue,
 } from "@/lib/hooks/useHardwarePurchases";
@@ -54,6 +60,7 @@ export async function GET(
     }
     const invoice = await prisma.hardwarePurchaseInvoice.findUnique({
       where: { id: invoiceId },
+      include: vendorPaymentInclude,
     });
 
     if (!invoice) {
@@ -119,6 +126,32 @@ export async function PUT(
     }
 
     const body: UpdateHardwarePurchaseRequest = await request.json();
+
+    const ruleError = checkVendorInvoiceUpdate(
+      {
+        paymentStatus: existingInvoice.paymentStatus,
+        paidDate: existingInvoice.paidDate,
+        amounts: {
+          quantity: existingInvoice.quantity,
+          unitPrice: existingInvoice.unitPrice,
+          miscellaneousCharges: existingInvoice.miscellaneousCharges,
+          totalAmount: existingInvoice.totalAmount,
+        },
+      },
+      {
+        paymentStatus: body.paymentStatus,
+        paidDate: body.paidDate,
+        amounts: {
+          quantity: body.quantity,
+          unitPrice: body.unitPrice,
+          miscellaneousCharges: body.miscellaneousCharges,
+          totalAmount: body.totalAmount,
+        },
+      },
+    );
+    if (ruleError) {
+      return NextResponse.json({ error: ruleError }, { status: 400 });
+    }
 
     // Validate required fields if they are being updated
     if (body.quantity !== undefined && body.quantity < 0) {
@@ -226,6 +259,7 @@ export async function PUT(
     const updatedInvoice = await prisma.hardwarePurchaseInvoice.update({
       where: { id: invoiceId },
       data: updateData,
+      include: vendorPaymentInclude,
     });
 
     const changedFields: Partial<UpdateDataType> = { ...updateData };
@@ -296,6 +330,28 @@ export async function DELETE(
       );
     }
 
+    if (existingInvoice.paymentStatus === "Paid") {
+      return NextResponse.json(
+        { error: "Paid invoices can't be deleted" },
+        { status: 400 },
+      );
+    }
+
+    // Remove its PDFs from R2 first; if that fails, keep the invoice so
+    // no file is left without a record pointing at it.
+    try {
+      await deleteInvoicePdfs([
+        existingInvoice.invoicePdfKey,
+        existingInvoice.paymentReceiptKey,
+      ]);
+    } catch (error) {
+      console.error("Error deleting hardware purchase PDFs:", error);
+      return NextResponse.json(
+        { error: PDF_DELETE_FAILED_MESSAGE },
+        { status: 500 },
+      );
+    }
+
     await prisma.hardwarePurchaseInvoice.delete({ where: { id: invoiceId } });
 
     await prisma.auditLog.create({
@@ -305,6 +361,10 @@ export async function DELETE(
         entityId: invoiceId,
         userId,
         description: `Hardware purchase invoice ${existingInvoice.invoiceNumber} deleted`,
+        changes: JSON.stringify({
+          invoicePdfKey: existingInvoice.invoicePdfKey,
+          paymentReceiptKey: existingInvoice.paymentReceiptKey,
+        }),
       },
     });
 

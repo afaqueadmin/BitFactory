@@ -6,8 +6,8 @@ import {
   Container,
   Paper,
   Stack,
-  TextField,
   CircularProgress,
+  Link as MuiLink,
   Alert,
   Typography,
   Divider,
@@ -20,16 +20,21 @@ import {
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
-import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CancelIcon from "@mui/icons-material/Cancel";
+import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
 import Link from "next/link";
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
 import { DateDisplay } from "@/components/accounting/common/DateDisplay";
 import { StatusBadge } from "@/components/accounting/common/StatusBadge";
+import {
+  VendorPaymentSection,
+  VendorSideInvoice,
+} from "@/components/accounting/common/VendorPaymentSection";
 import { VENDOR_NAME_LABELS } from "@/lib/hooks/useHardwarePurchases";
 
-interface HardwarePurchaseDetail {
+interface HardwarePurchaseDetail extends VendorSideInvoice {
   id: string;
+  invoicePdfKey: string | null;
   invoiceNumber: string;
   vendorName: string;
   hardwareDescription: string;
@@ -66,8 +71,6 @@ export default function HardwarePurchaseDetailPage() {
   const [invoice, setInvoice] = useState<HardwarePurchaseDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [paidDate, setPaidDate] = useState<string>("");
-  const [saving, setSaving] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [openCancelDialog, setOpenCancelDialog] = useState(false);
   const [cancelLoading, setCancelLoading] = useState(false);
@@ -88,11 +91,6 @@ export default function HardwarePurchaseDetailPage() {
 
         const data = await response.json();
         setInvoice(data.data);
-
-        // Set initial paid date if already paid
-        if (data.data.paidDate) {
-          setPaidDate(data.data.paidDate.split("T")[0]);
-        }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load invoice");
       } finally {
@@ -105,47 +103,15 @@ export default function HardwarePurchaseDetailPage() {
     }
   }, [invoiceId]);
 
-  const handleMarkAsPaid = async () => {
-    if (!paidDate) {
-      setError("Please select a paid date");
-      return;
-    }
-
-    setSaving(true);
+  const handlePaid = (updated: VendorSideInvoice) => {
+    setInvoice(updated as HardwarePurchaseDetail);
     setError(null);
-    setSuccessMessage(null);
+    setSuccessMessage("Invoice marked as paid successfully!");
 
-    try {
-      const response = await fetch(`/api/hardware-purchases/${invoiceId}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          paymentStatus: "Paid",
-          paidDate: new Date(paidDate).toISOString(),
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        setError(errorData.error || "Failed to mark invoice as paid");
-        return;
-      }
-
-      const data = await response.json();
-      setInvoice(data.data);
-      setSuccessMessage("Invoice marked as paid successfully!");
-
-      // Redirect after success
-      setTimeout(() => {
-        router.push("/accounting/hardware-purchases");
-      }, 1500);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to mark as paid");
-    } finally {
-      setSaving(false);
-    }
+    // Redirect after success
+    setTimeout(() => {
+      router.push("/accounting/hardware-purchases");
+    }, 1500);
   };
 
   const handleCancelInvoice = async () => {
@@ -376,6 +342,35 @@ export default function HardwarePurchaseDetailPage() {
                 <CurrencyDisplay value={unitTotal} />
               </Typography>
             </Box>
+
+            {/* Vendor Invoice PDF */}
+            <Box>
+              <Typography
+                variant="subtitle2"
+                color="textSecondary"
+                sx={{ fontWeight: "600", mb: 0.5 }}
+              >
+                Vendor Invoice PDF
+              </Typography>
+              <Typography variant="body1">
+                {invoice.invoicePdfKey ? (
+                  <MuiLink
+                    href={`/api/hardware-purchases/${invoice.id}/documents/invoice`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    sx={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 0.5,
+                    }}
+                  >
+                    <PictureAsPdfIcon fontSize="small" /> View invoice PDF
+                  </MuiLink>
+                ) : (
+                  "No PDF"
+                )}
+              </Typography>
+            </Box>
           </Box>
 
           <Divider />
@@ -547,66 +542,13 @@ export default function HardwarePurchaseDetailPage() {
                 Payment Information
               </Typography>
 
-              <Stack spacing={2}>
-                {/* Paid Date Input */}
-                <TextField
-                  fullWidth
-                  label="Paid Date"
-                  type="date"
-                  value={paidDate}
-                  onChange={(e) => setPaidDate(e.target.value)}
-                  disabled={invoice.paymentStatus === "Paid" || saving}
-                  slotProps={{
-                    inputLabel: { shrink: true },
-                  }}
-                />
-
-                {invoice.paymentStatus === "Paid" && (
-                  <Alert severity="success">
-                    This invoice has been marked as paid on{" "}
-                    <DateDisplay
-                      date={new Date(invoice.paidDate!)}
-                      format="date"
-                    />
-                  </Alert>
-                )}
-
-                {/* Action Buttons */}
-                {invoice.paymentStatus !== "Paid" && (
-                  <Stack
-                    direction={{ xs: "column", sm: "row" }}
-                    spacing={2}
-                    sx={{ mt: 2 }}
-                  >
-                    <Button
-                      fullWidth
-                      variant="contained"
-                      color="success"
-                      startIcon={
-                        saving ? (
-                          <CircularProgress size={20} />
-                        ) : (
-                          <CheckCircleIcon />
-                        )
-                      }
-                      onClick={handleMarkAsPaid}
-                      disabled={saving || !paidDate}
-                    >
-                      {saving ? "Processing..." : "Mark as Paid"}
-                    </Button>
-                    <Button
-                      fullWidth
-                      variant="outlined"
-                      color="error"
-                      startIcon={<CancelIcon />}
-                      onClick={() => setOpenCancelDialog(true)}
-                      disabled={saving}
-                    >
-                      Cancel Invoice
-                    </Button>
-                  </Stack>
-                )}
-              </Stack>
+              <VendorPaymentSection
+                invoice={invoice}
+                apiBase="/api/hardware-purchases"
+                receiptPurpose="hardware-purchase-receipt"
+                onPaid={handlePaid}
+                onCancelClick={() => setOpenCancelDialog(true)}
+              />
             </Box>
           )}
 

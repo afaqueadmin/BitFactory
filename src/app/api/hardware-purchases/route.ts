@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
 import { Decimal } from "@prisma/client/runtime/library";
 import { AuditAction } from "@prisma/client";
+import { verifyUploadedPdf } from "@/lib/storage/r2";
 import {
   VENDOR_NAME_OPTIONS,
   VendorNameValue,
@@ -21,7 +22,7 @@ interface CreateHardwarePurchaseRequest {
   miscellaneousCharges: number;
   totalAmount: number;
   notes?: string;
-  paymentStatus: "Paid" | "Pending" | "Cancelled";
+  invoicePdfKey: string;
 }
 
 export async function POST(request: NextRequest) {
@@ -86,7 +87,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create the hardware purchase invoice
+    if (!body.invoicePdfKey) {
+      return NextResponse.json(
+        { error: "The vendor invoice PDF is required" },
+        { status: 400 },
+      );
+    }
+    const pdf = await verifyUploadedPdf(
+      body.invoicePdfKey,
+      "hardware-purchase-invoice",
+    );
+    if (!pdf.ok) {
+      return NextResponse.json({ error: pdf.error }, { status: 400 });
+    }
+
+    // Create the hardware purchase invoice. New invoices always start
+    // Pending; they become Paid only through the record-payment route.
     const hardwarePurchase = await prisma.hardwarePurchaseInvoice.create({
       data: {
         invoiceNumber: body.invoiceNumber,
@@ -98,8 +114,9 @@ export async function POST(request: NextRequest) {
         unitPrice: new Decimal(body.unitPrice),
         miscellaneousCharges: new Decimal(body.miscellaneousCharges || 0),
         totalAmount: new Decimal(body.totalAmount),
-        paymentStatus: body.paymentStatus || "Pending",
+        paymentStatus: "Pending",
         notes: body.notes || null,
+        invoicePdfKey: pdf.key,
         createdBy: userId,
       },
     });
