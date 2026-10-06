@@ -103,6 +103,8 @@ model User {
   walletChangeRequests          WalletChangeRequest[]        @relation("walletChangeRequests")
   walletChangeRequestsConfirmed WalletChangeRequest[]        @relation("walletChangeRequestsConfirmed")
   walletChangeRequestsReviewed  WalletChangeRequest[]        @relation("walletChangeRequestsReviewed")
+  accountingEntitiesCreated     AccountingEntity[]           @relation("accountingEntitiesCreated")
+  accountingBanksCreated        AccountingBank[]             @relation("accountingBanksCreated")
 
   @@index([isDeleted])
   @@index([franchiseeId])
@@ -952,14 +954,34 @@ model VendorInvoice {
   updatedBy            String?
   createdAt            DateTime            @default(now())
   updatedAt            DateTime            @updatedAt
+  // R2 object key of the vendor's invoice PDF. Null on invoices recorded
+  // before PDF uploads existed.
+  invoicePdfKey        String?
+  // Payment details, set together by POST /api/vendor-invoices/[id]/record-payment.
+  // paymentAmount and transactionFee are in the payment currency;
+  // paymentExchangeRate is 1 USD = X currency.
+  paymentEntityId      String?
+  paymentBankId        String?
+  paymentCurrencyId    String?
+  paymentAmount        Decimal?            @db.Decimal(18, 2)
+  paymentExchangeRate  Decimal?            @db.Decimal(18, 8)
+  paymentAmountUsd     Decimal?            @db.Decimal(12, 2)
+  transactionFee       Decimal?            @db.Decimal(18, 2)
+  paymentReceiptKey    String?
   createdByUser        User                @relation("vendorInvoicesCreated", fields: [createdBy], references: [id])
   updatedByUser        User?               @relation("vendorInvoicesUpdated", fields: [updatedBy], references: [id])
+  paymentEntity        AccountingEntity?   @relation("vendorInvoicePaymentEntity", fields: [paymentEntityId], references: [id], onDelete: Restrict)
+  paymentBank          AccountingBank?     @relation("vendorInvoicePaymentBank", fields: [paymentBankId], references: [id], onDelete: Restrict)
+  paymentCurrency      AccountingCurrency? @relation("vendorInvoicePaymentCurrency", fields: [paymentCurrencyId], references: [id], onDelete: Restrict)
 
   @@index([paymentStatus])
   @@index([billingDate])
   @@index([dueDate])
   @@index([createdAt])
   @@index([isDeleted])
+  @@index([paymentEntityId])
+  @@index([paymentBankId])
+  @@index([paymentCurrencyId])
   @@map("vendor_invoices")
 }
 
@@ -982,15 +1004,95 @@ model HardwarePurchaseInvoice {
   updatedBy            String?
   createdAt            DateTime            @default(now())
   updatedAt            DateTime            @updatedAt
+  // Same PDF and payment columns as VendorInvoice; set by
+  // POST /api/hardware-purchases/[id]/record-payment.
+  invoicePdfKey        String?
+  paymentEntityId      String?
+  paymentBankId        String?
+  paymentCurrencyId    String?
+  paymentAmount        Decimal?            @db.Decimal(18, 2)
+  paymentExchangeRate  Decimal?            @db.Decimal(18, 8)
+  paymentAmountUsd     Decimal?            @db.Decimal(12, 2)
+  transactionFee       Decimal?            @db.Decimal(18, 2)
+  paymentReceiptKey    String?
   createdByUser        User                @relation("hardwarePurchasesCreated", fields: [createdBy], references: [id])
   updatedByUser        User?               @relation("hardwarePurchasesUpdated", fields: [updatedBy], references: [id])
+  paymentEntity        AccountingEntity?   @relation("hardwarePurchasePaymentEntity", fields: [paymentEntityId], references: [id], onDelete: Restrict)
+  paymentBank          AccountingBank?     @relation("hardwarePurchasePaymentBank", fields: [paymentBankId], references: [id], onDelete: Restrict)
+  paymentCurrency      AccountingCurrency? @relation("hardwarePurchasePaymentCurrency", fields: [paymentCurrencyId], references: [id], onDelete: Restrict)
 
   @@index([paymentStatus])
   @@index([billingDate])
   @@index([dueDate])
   @@index([createdAt])
   @@index([isDeleted])
+  @@index([paymentEntityId])
+  @@index([paymentBankId])
+  @@index([paymentCurrencyId])
   @@map("hardware_purchase_invoices")
+}
+
+// Accounting master data: the entities that pay or receive money, their
+// banks, and the currencies each bank holds. Payment forms cascade
+// Entity -> Bank -> Currency.
+model AccountingEntity {
+  id                       String                    @id @default(cuid())
+  name                     String                    @unique
+  isActive                 Boolean                   @default(true)
+  createdBy                String
+  createdAt                DateTime                  @default(now())
+  updatedAt                DateTime                  @updatedAt
+  createdByUser            User                      @relation("accountingEntitiesCreated", fields: [createdBy], references: [id])
+  banks                    AccountingBank[]
+  vendorInvoicePayments    VendorInvoice[]           @relation("vendorInvoicePaymentEntity")
+  hardwarePurchasePayments HardwarePurchaseInvoice[] @relation("hardwarePurchasePaymentEntity")
+
+  @@index([createdBy])
+  @@map("accounting_entities")
+}
+
+model AccountingBank {
+  id                       String                    @id @default(cuid())
+  entityId                 String
+  name                     String
+  isActive                 Boolean                   @default(true)
+  createdBy                String
+  createdAt                DateTime                  @default(now())
+  updatedAt                DateTime                  @updatedAt
+  entity                   AccountingEntity          @relation(fields: [entityId], references: [id])
+  createdByUser            User                      @relation("accountingBanksCreated", fields: [createdBy], references: [id])
+  currencies               AccountingBankCurrency[]
+  vendorInvoicePayments    VendorInvoice[]           @relation("vendorInvoicePaymentBank")
+  hardwarePurchasePayments HardwarePurchaseInvoice[] @relation("hardwarePurchasePaymentBank")
+
+  @@unique([entityId, name])
+  @@index([createdBy])
+  @@map("accounting_banks")
+}
+
+model AccountingCurrency {
+  id                       String                    @id @default(cuid())
+  code                     String                    @unique
+  name                     String
+  isActive                 Boolean                   @default(true)
+  createdAt                DateTime                  @default(now())
+  updatedAt                DateTime                  @updatedAt
+  banks                    AccountingBankCurrency[]
+  vendorInvoicePayments    VendorInvoice[]           @relation("vendorInvoicePaymentCurrency")
+  hardwarePurchasePayments HardwarePurchaseInvoice[] @relation("hardwarePurchasePaymentCurrency")
+
+  @@map("accounting_currencies")
+}
+
+model AccountingBankCurrency {
+  bankId     String
+  currencyId String
+  bank       AccountingBank     @relation(fields: [bankId], references: [id], onDelete: Cascade)
+  currency   AccountingCurrency @relation(fields: [currencyId], references: [id])
+
+  @@id([bankId, currencyId])
+  @@index([currencyId])
+  @@map("accounting_bank_currencies")
 }
 
 model RecurringInvoice {
@@ -1307,6 +1409,17 @@ enum AuditAction {
   HARDWARE_PURCHASE_INVOICE_CREATED
   HARDWARE_PURCHASE_INVOICE_UPDATED
   HARDWARE_PURCHASE_INVOICE_DELETED
+  VENDOR_INVOICE_PAID
+  HARDWARE_PURCHASE_INVOICE_PAID
+  ACCOUNTING_ENTITY_CREATED
+  ACCOUNTING_ENTITY_UPDATED
+  ACCOUNTING_ENTITY_DELETED
+  ACCOUNTING_BANK_CREATED
+  ACCOUNTING_BANK_UPDATED
+  ACCOUNTING_BANK_DELETED
+  ACCOUNTING_CURRENCY_CREATED
+  ACCOUNTING_CURRENCY_UPDATED
+  ACCOUNTING_CURRENCY_DELETED
   FRANCHISE_CREATED
   FRANCHISE_UPDATED
   FRANCHISE_DELETED
