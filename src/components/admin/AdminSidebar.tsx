@@ -45,6 +45,7 @@ import {
   SwapHoriz as PoolTransactionsIcon,
   SupportAgent as SupportIcon,
   AccountBalanceWallet as WalletRequestsIcon,
+  AccountBalance as PaymentAccountsIcon,
   TrendingDown as HashrateAlertsIcon,
   Close as CloseIcon,
 } from "@mui/icons-material";
@@ -254,6 +255,11 @@ const sidebarItems: SidebarItem[] = [
         title: "Pricing",
         icon: <HostingPricesIcon />,
         path: "/accounting/pricing",
+      },
+      {
+        title: "Entities, Banks & Currencies",
+        icon: <PaymentAccountsIcon />,
+        path: "/accounting/payment-accounts",
       },
     ],
   },

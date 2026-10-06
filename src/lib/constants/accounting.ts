@@ -234,6 +234,18 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
     "Hardware Purchase Invoice Updated",
   [AuditAction.HARDWARE_PURCHASE_INVOICE_DELETED]:
     "Hardware Purchase Invoice Deleted",
+  [AuditAction.VENDOR_INVOICE_PAID]: "Vendor Invoice Paid",
+  [AuditAction.HARDWARE_PURCHASE_INVOICE_PAID]:
+    "Hardware Purchase Invoice Paid",
+  [AuditAction.ACCOUNTING_ENTITY_CREATED]: "Accounting Entity Created",
+  [AuditAction.ACCOUNTING_ENTITY_UPDATED]: "Accounting Entity Updated",
+  [AuditAction.ACCOUNTING_ENTITY_DELETED]: "Accounting Entity Deleted",
+  [AuditAction.ACCOUNTING_BANK_CREATED]: "Accounting Bank Created",
+  [AuditAction.ACCOUNTING_BANK_UPDATED]: "Accounting Bank Updated",
+  [AuditAction.ACCOUNTING_BANK_DELETED]: "Accounting Bank Deleted",
+  [AuditAction.ACCOUNTING_CURRENCY_CREATED]: "Accounting Currency Created",
+  [AuditAction.ACCOUNTING_CURRENCY_UPDATED]: "Accounting Currency Updated",
+  [AuditAction.ACCOUNTING_CURRENCY_DELETED]: "Accounting Currency Deleted",
   [AuditAction.FRANCHISE_CREATED]: "Franchise Created",
   [AuditAction.FRANCHISE_UPDATED]: "Franchise Updated",
   [AuditAction.FRANCHISE_DELETED]: "Franchise Deleted",
