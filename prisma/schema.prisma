@@ -647,25 +647,43 @@ model PoolTransaction {
 }
 
 model CostPayment {
-  id          String      @id @default(cuid())
-  userId      String
-  invoiceId   String?
-  memoId      String?
-  amount      Float
-  consumption Float
-  type        PaymentType
-  createdAt   DateTime    @default(now())
-  narration   String?
-  isDeleted   Boolean     @default(false)
-  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  invoice     Invoice?    @relation("invoiceCostPayments", fields: [invoiceId], references: [id], onDelete: Cascade)
-  memo        Memo?       @relation(fields: [memoId], references: [id])
+  id             String              @id @default(cuid())
+  userId         String
+  invoiceId      String?
+  memoId         String?
+  amount         Float
+  consumption    Float
+  type           PaymentType
+  createdAt      DateTime            @default(now())
+  narration      String?
+  isDeleted      Boolean             @default(false)
+  // Receiving account and currency, set by the admin record-payment route
+  // (Hosting & Colocation, Hardware Sales). Null on older rows and on
+  // payments created elsewhere (Confirmo, memos, franchise, cron).
+  // originalAmount is in the payment currency; amount stays USD
+  // (originalAmount / exchangeRate, where 1 USD = exchangeRate currency).
+  entityId       String?
+  bankId         String?
+  currencyId     String?
+  originalAmount Decimal?            @db.Decimal(18, 2)
+  exchangeRate   Decimal?            @db.Decimal(18, 8)
+  // Date the payment was received (D11); createdAt is when it was recorded.
+  paymentDate    DateTime?
+  user           User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  invoice        Invoice?            @relation("invoiceCostPayments", fields: [invoiceId], references: [id], onDelete: Cascade)
+  memo           Memo?               @relation(fields: [memoId], references: [id])
+  entity         AccountingEntity?   @relation(fields: [entityId], references: [id], onDelete: Restrict)
+  bank           AccountingBank?     @relation(fields: [bankId], references: [id], onDelete: Restrict)
+  currency       AccountingCurrency? @relation(fields: [currencyId], references: [id], onDelete: Restrict)
 
   @@index([userId])
   @@index([invoiceId])
   @@index([memoId])
   @@index([createdAt])
   @@index([isDeleted])
+  @@index([entityId])
+  @@index([bankId])
+  @@index([currencyId])
   @@map("cost_payments")
 }
 
@@ -1042,6 +1060,7 @@ model AccountingEntity {
   banks                    AccountingBank[]
   vendorInvoicePayments    VendorInvoice[]           @relation("vendorInvoicePaymentEntity")
   hardwarePurchasePayments HardwarePurchaseInvoice[] @relation("hardwarePurchasePaymentEntity")
+  costPayments             CostPayment[]
 
   @@index([createdBy])
   @@map("accounting_entities")
@@ -1060,6 +1079,7 @@ model AccountingBank {
   currencies               AccountingBankCurrency[]
   vendorInvoicePayments    VendorInvoice[]           @relation("vendorInvoicePaymentBank")
   hardwarePurchasePayments HardwarePurchaseInvoice[] @relation("hardwarePurchasePaymentBank")
+  costPayments             CostPayment[]
 
   @@unique([entityId, name])
   @@index([createdBy])
@@ -1076,6 +1096,7 @@ model AccountingCurrency {
   banks                    AccountingBankCurrency[]
   vendorInvoicePayments    VendorInvoice[]           @relation("vendorInvoicePaymentCurrency")
   hardwarePurchasePayments HardwarePurchaseInvoice[] @relation("hardwarePurchasePaymentCurrency")
+  costPayments             CostPayment[]
 
   @@map("accounting_currencies")
 }
