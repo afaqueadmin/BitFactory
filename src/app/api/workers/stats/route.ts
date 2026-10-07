@@ -6,6 +6,7 @@ import { createBraiinsClient, BraiinsError } from "@/lib/braiins";
 import {
   selectRequestedSubaccounts,
   joinSubaccountNames,
+  countDistinctWorkers,
 } from "@/lib/luxorSubaccounts";
 
 interface WorkersStats {
@@ -108,8 +109,11 @@ export async function GET(request: NextRequest) {
           },
         );
 
-        const active = workersData.total_active || 0;
-        const inactive = workersData.total_inactive || 0;
+        // Not total_active/total_inactive: those double-count a miner that
+        // moved between the selected subaccounts.
+        const { active, inactive } = countDistinctWorkers(
+          workersData.workers || [],
+        );
 
         console.log(
           `[Workers Stats API] Luxor: ${active} active, ${inactive} inactive`,

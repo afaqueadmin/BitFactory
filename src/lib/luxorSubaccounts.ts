@@ -11,6 +11,7 @@
 import { prisma } from "@/lib/prisma";
 import { AuditAction, Prisma } from "@prisma/client";
 import { logPoolCredentialChange } from "@/lib/audit/logPoolCredentialChange";
+import type { Worker } from "@/lib/luxor";
 
 export interface LuxorSubaccount {
   id: string | null;
@@ -43,6 +44,26 @@ export function joinSubaccountNames(authKeys: string[]): string {
     .map((k) => k.trim())
     .filter(Boolean)
     .join(",");
+}
+
+/**
+ * Counts distinct workers in a (possibly multi-subaccount) Luxor workers
+ * list. A miner moved between subaccounts leaves its old entry behind as
+ * INACTIVE while the new one is ACTIVE, so Luxor's total_active /
+ * total_inactive count it twice. Workers are keyed by name (trimmed,
+ * case-insensitive); a name is active if any of its entries is ACTIVE.
+ */
+export function countDistinctWorkers(
+  workers: Pick<Worker, "name" | "status">[],
+): { active: number; inactive: number } {
+  const byName = new Map<string, boolean>();
+  for (const w of workers) {
+    const name = w.name.trim().toLowerCase();
+    byName.set(name, byName.get(name) === true || w.status === "ACTIVE");
+  }
+  let active = 0;
+  for (const isActive of byName.values()) if (isActive) active++;
+  return { active, inactive: byName.size - active };
 }
 
 /**
