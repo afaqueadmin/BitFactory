@@ -95,6 +95,7 @@ const securePaths = {
     "/incentives/payouts",
     "/tickets",
     "/wallet-requests",
+    "/payment-frequency-requests",
     "/hashrate-alerts",
     // Add admin-specific public paths if any
   ]),

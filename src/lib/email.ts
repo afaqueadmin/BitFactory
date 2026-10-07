@@ -521,6 +521,110 @@ export const sendWalletChangeRequestRejectedEmail = async (
   }
 };
 
+// Schedules are passed pre-formatted (formatPaymentSchedule), e.g.
+// "Weekly (Monday)".
+export const sendPaymentFrequencyChangeRequestSubmittedEmail = async (
+  email: string,
+  subaccountName: string,
+  requestedSchedule: string,
+) => {
+  const mailOptions = {
+    from:
+      `BitFactory Admin <${process.env.SMTP_FROM}>` || "noreply@bitfactory.com",
+    to: email,
+    subject: "Payment Frequency Change Request Received - BitFactory",
+    html: `
+      <h1>Payment Frequency Change Request Received</h1>
+      <p>We've received a request to change the payout schedule on your subaccount <strong>${escapeHtml(subaccountName)}</strong> to:</p>
+      <p><strong>${escapeHtml(requestedSchedule)}</strong></p>
+      <p>This change will not take effect until an administrator reviews and approves it.</p>
+      <p>If you did not request this, please contact our support team immediately.</p>
+      <br>
+      <p>Best regards,</p>
+      <p>The BitFactory Team</p>
+    `,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    return { success: true };
+  } catch (error) {
+    console.error(
+      "Error sending payment frequency change submitted email:",
+      error,
+    );
+    return { success: false, error };
+  }
+};
+
+export const sendPaymentFrequencyChangeRequestApprovedEmail = async (
+  email: string,
+  subaccountName: string,
+  previousSchedule: string,
+  newSchedule: string,
+) => {
+  const mailOptions = {
+    from:
+      `BitFactory Admin <${process.env.SMTP_FROM}>` || "noreply@bitfactory.com",
+    to: email,
+    subject: "Payment Frequency Change Approved - BitFactory",
+    html: `
+      <h1>Payment Frequency Change Approved</h1>
+      <p>Your payment frequency change request for subaccount <strong>${escapeHtml(subaccountName)}</strong> has been approved by an administrator:</p>
+      <p><strong>Previous:</strong> ${escapeHtml(previousSchedule)}</p>
+      <p><strong>New:</strong> ${escapeHtml(newSchedule)}</p>
+      <p>Our team updates the payout schedule on your behalf; it may take a short while before the new schedule shows on your wallet page.</p>
+      <p><strong>If you did not request this, please contact our support team immediately.</strong></p>
+      <br>
+      <p>Best regards,</p>
+      <p>The BitFactory Team</p>
+    `,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    return { success: true };
+  } catch (error) {
+    console.error(
+      "Error sending payment frequency change approved email:",
+      error,
+    );
+    return { success: false, error };
+  }
+};
+
+export const sendPaymentFrequencyChangeRequestRejectedEmail = async (
+  email: string,
+  rejectionReason: string,
+) => {
+  const mailOptions = {
+    from:
+      `BitFactory Admin <${process.env.SMTP_FROM}>` || "noreply@bitfactory.com",
+    to: email,
+    subject: "Payment Frequency Change Request Rejected - BitFactory",
+    html: `
+      <h1>Payment Frequency Change Request Rejected</h1>
+      <p>Your recent payment frequency change request was reviewed and rejected by an administrator.</p>
+      <p><strong>Reason:</strong> ${escapeHtml(rejectionReason)}</p>
+      <p>Your payout schedule has not been changed. If you have questions, please contact our support team.</p>
+      <br>
+      <p>Best regards,</p>
+      <p>The BitFactory Team</p>
+    `,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    return { success: true };
+  } catch (error) {
+    console.error(
+      "Error sending payment frequency change rejected email:",
+      error,
+    );
+    return { success: false, error };
+  }
+};
+
 export const sendInvoiceEmail = async (
   email: string,
   customerName: string,

@@ -11,6 +11,7 @@
  * - ProfitLossChart (Daylight variant)
  * - Statement download card
  * - Wallet Change Requests (Daylight WalletChangeRequestHistory)
+ * - Payment Frequency Requests (Daylight PaymentFrequencyChangeRequestHistory)
  * - ElectricityCostTable (Daylight variant)
  */
 
@@ -34,6 +35,9 @@ import { useWalletChangeRequests } from "@/lib/hooks/useWalletChangeRequests";
 import RequestWalletChangeModal from "@/components/wallet/RequestWalletChangeModal";
 import WalletChangeRequestHistory from "@/components/wallet/WalletChangeRequestHistory";
 import WalletSubaccountCards from "@/components/wallet/WalletSubaccountCards";
+import { usePaymentFrequencyChangeRequests } from "@/lib/hooks/usePaymentFrequencyChangeRequests";
+import RequestPaymentFrequencyChangeModal from "@/components/wallet/RequestPaymentFrequencyChangeModal";
+import PaymentFrequencyChangeRequestHistory from "@/components/wallet/PaymentFrequencyChangeRequestHistory";
 import { useFreezeRemaining } from "@/components/wallet/FreezeCountdown";
 import { useSubaccountFilter } from "@/lib/contexts/subaccountFilter-context";
 import Segmented, { SegmentedOption } from "@/components/daylight/Segmented";
@@ -237,6 +241,19 @@ export default function WalletPage() {
     latestApprovedRequest?.reviewedAt,
   );
   const hasPendingWalletChange = !!activeWalletChangeRequest || isPayoutFrozen;
+
+  // Payment frequency change request state - one open request is allowed
+  // per subaccount, so each card looks up its own by subaccount name.
+  const [frequencyChangeSubaccount, setFrequencyChangeSubaccount] =
+    useState<LuxorPaymentSettings | null>(null);
+  const { requests: frequencyChangeRequests } =
+    usePaymentFrequencyChangeRequests();
+  const activeFrequencyChangeFor = (subaccountName: string | undefined) =>
+    frequencyChangeRequests.find(
+      (req) =>
+        req.subaccountName === subaccountName &&
+        (req.status === "PENDING" || req.status === "CONFIRMED"),
+    );
 
   const { user } = useUser();
   const { queryParam: subaccountsParam } = useSubaccountFilter();
@@ -659,6 +676,12 @@ export default function WalletPage() {
                 freezeLabel={freezeLabel}
                 activeWalletChangeRequest={activeWalletChangeRequest}
                 onRequestChange={() => setRequestChangeSubaccount(settings)}
+                activeFrequencyChangeRequest={activeFrequencyChangeFor(
+                  settings.subaccount?.name,
+                )}
+                onRequestFrequencyChange={() =>
+                  setFrequencyChangeSubaccount(settings)
+                }
               />
             ))
           )}
@@ -822,6 +845,25 @@ export default function WalletPage() {
         {sectionHeading("Wallet Change Requests")}
         <WalletChangeRequestHistory daylight />
       </Box>
+
+      {/* Payment Frequency Change Requests */}
+      <Box sx={{ width: "100%", mt: { xs: "20px", md: "26px" } }}>
+        {sectionHeading("Payment Frequency Requests")}
+        <PaymentFrequencyChangeRequestHistory daylight />
+      </Box>
+
+      {frequencyChangeSubaccount && (
+        <RequestPaymentFrequencyChangeModal
+          open={!!frequencyChangeSubaccount}
+          onClose={() => setFrequencyChangeSubaccount(null)}
+          subaccountName={
+            frequencyChangeSubaccount.subaccount?.name ||
+            String(frequencyChangeSubaccount.subaccount?.id ?? "")
+          }
+          currentFrequency={frequencyChangeSubaccount.payment_frequency}
+          currentDayOfWeek={frequencyChangeSubaccount.day_of_week}
+        />
+      )}
 
       {requestChangeSubaccount && (
         <RequestWalletChangeModal

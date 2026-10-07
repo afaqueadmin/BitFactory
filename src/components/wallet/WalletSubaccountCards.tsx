@@ -21,6 +21,7 @@ import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import CheckIcon from "@mui/icons-material/Check";
 import { LuxorPaymentSettings } from "@/lib/types/wallet";
 import { WalletChangeRequestItem } from "@/lib/hooks/useWalletChangeRequests";
+import { PaymentFrequencyChangeRequestItem } from "@/lib/hooks/usePaymentFrequencyChangeRequests";
 import { RADIUS_CARD, focusRing, useDaylight } from "@/lib/daylight";
 
 const toProperCase = (text: string): string => {
@@ -41,6 +42,11 @@ interface WalletSubaccountCardsProps {
   freezeLabel: string | null;
   activeWalletChangeRequest: WalletChangeRequestItem | undefined;
   onRequestChange: () => void;
+  /** This subaccount's open (PENDING/CONFIRMED) payment frequency change
+   * request, if any - one is allowed per subaccount, so the page matches it
+   * by subaccount name, unlike the account-wide wallet change state above. */
+  activeFrequencyChangeRequest: PaymentFrequencyChangeRequestItem | undefined;
+  onRequestFrequencyChange: () => void;
   /** Daylight styling: flat soft-tone cards instead of the saturated
    * gradients (guide §4: "do not use gradients on KPI cards"). */
   daylight?: boolean;
@@ -55,10 +61,51 @@ export default function WalletSubaccountCards({
   freezeLabel,
   activeWalletChangeRequest,
   onRequestChange,
+  activeFrequencyChangeRequest,
+  onRequestFrequencyChange,
   daylight = false,
 }: WalletSubaccountCardsProps) {
   const [copiedAddress, setCopiedAddress] = useState(false);
   const { d, fonts } = useDaylight();
+
+  // Shared by the wallet address and payment frequency cards' "Request
+  // Change" button / pending-status pill.
+  const statusPillSx = {
+    mt: 1,
+    display: "inline-block",
+    backgroundColor: daylight ? d.amber : "rgba(255,255,255,0.2)",
+    color: daylight ? d.warning : undefined,
+    px: 1,
+    py: 0.25,
+    borderRadius: daylight ? "999px" : 1,
+    fontWeight: 600,
+  };
+  const requestButtonSx = {
+    mt: 1,
+    borderRadius: daylight ? "8px" : 2,
+    fontSize: "0.72rem",
+    py: 0.3,
+    textTransform: "none",
+    fontWeight: 600,
+    ...(daylight
+      ? {
+          fontFamily: fonts.body,
+          color: d.action,
+          borderColor: d.action,
+          "&:hover": {
+            borderColor: d.actionHover,
+            backgroundColor: d.hover,
+          },
+        }
+      : {
+          color: "white",
+          borderColor: "rgba(255,255,255,0.5)",
+          "&:hover": {
+            borderColor: "white",
+            backgroundColor: "rgba(255,255,255,0.15)",
+          },
+        }),
+  } as const;
 
   const primaryAddress = (): string => {
     if (!settings.addresses || settings.addresses.length === 0) {
@@ -206,19 +253,7 @@ export default function WalletSubaccountCards({
         </Typography>
 
         {hasPendingWalletChange ? (
-          <Typography
-            variant="caption"
-            sx={{
-              mt: 1,
-              display: "inline-block",
-              backgroundColor: daylight ? d.amber : "rgba(255,255,255,0.2)",
-              color: daylight ? d.warning : undefined,
-              px: 1,
-              py: 0.25,
-              borderRadius: daylight ? "999px" : 1,
-              fontWeight: 600,
-            }}
-          >
+          <Typography variant="caption" sx={statusPillSx}>
             {isPayoutFrozen && freezeLabel
               ? `🔒 ${freezeLabel}`
               : activeWalletChangeRequest?.status === "CONFIRMED"
@@ -230,32 +265,7 @@ export default function WalletSubaccountCards({
             size="small"
             variant="outlined"
             onClick={onRequestChange}
-            sx={{
-              mt: 1,
-              borderRadius: daylight ? "8px" : 2,
-              fontSize: "0.72rem",
-              py: 0.3,
-              textTransform: "none",
-              fontWeight: 600,
-              ...(daylight
-                ? {
-                    fontFamily: fonts.body,
-                    color: d.action,
-                    borderColor: d.action,
-                    "&:hover": {
-                      borderColor: d.actionHover,
-                      backgroundColor: d.hover,
-                    },
-                  }
-                : {
-                    color: "white",
-                    borderColor: "rgba(255,255,255,0.5)",
-                    "&:hover": {
-                      borderColor: "white",
-                      backgroundColor: "rgba(255,255,255,0.15)",
-                    },
-                  }),
-            }}
+            sx={requestButtonSx}
           >
             Request Change
           </Button>
@@ -326,6 +336,23 @@ export default function WalletSubaccountCards({
             </Typography>
           )}
         </Box>
+
+        {activeFrequencyChangeRequest ? (
+          <Typography variant="caption" sx={statusPillSx}>
+            {activeFrequencyChangeRequest.status === "CONFIRMED"
+              ? "✅ Confirmed — awaiting final approval"
+              : "⏳ Change pending review"}
+          </Typography>
+        ) : (
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={onRequestFrequencyChange}
+            sx={requestButtonSx}
+          >
+            Request Change
+          </Button>
+        )}
       </Paper>
 
       {/* Next payout */}

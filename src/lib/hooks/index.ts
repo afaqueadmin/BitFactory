@@ -23,6 +23,11 @@ export {
   useReviewWalletChangeRequest,
 } from "./useWalletChangeRequests";
 export {
+  usePaymentFrequencyChangeRequests,
+  useCreatePaymentFrequencyChangeRequest,
+  useReviewPaymentFrequencyChangeRequest,
+} from "./usePaymentFrequencyChangeRequests";
+export {
   useHashrateAlerts,
   useAcknowledgeHashrateAlert,
 } from "./useHashrateAlerts";

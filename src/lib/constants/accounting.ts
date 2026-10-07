@@ -221,6 +221,14 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   [AuditAction.WALLET_CHANGE_CONFIRMED]: "Wallet Change Confirmed With Client",
   [AuditAction.WALLET_CHANGE_APPROVED]: "Wallet Change Approved",
   [AuditAction.WALLET_CHANGE_REJECTED]: "Wallet Change Rejected",
+  [AuditAction.PAYMENT_FREQUENCY_CHANGE_REQUESTED]:
+    "Payment Frequency Change Requested",
+  [AuditAction.PAYMENT_FREQUENCY_CHANGE_CONFIRMED]:
+    "Payment Frequency Change Confirmed With Client",
+  [AuditAction.PAYMENT_FREQUENCY_CHANGE_APPROVED]:
+    "Payment Frequency Change Approved",
+  [AuditAction.PAYMENT_FREQUENCY_CHANGE_REJECTED]:
+    "Payment Frequency Change Rejected",
   [AuditAction.USER_PASSWORD_RESET]: "User Password Reset",
   [AuditAction.USER_SESSIONS_REVOKED]: "User Signed Out Everywhere",
   [AuditAction.TWO_FACTOR_ENABLED]: "Two-Factor Authentication Enabled",

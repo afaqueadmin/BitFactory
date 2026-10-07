@@ -53,3 +53,32 @@ export async function fetchAddressForSubaccount(
     return null;
   }
 }
+
+/**
+ * Fetches the live Luxor payout schedule for one subaccount, for
+ * snapshotting into currentFrequency/currentDayOfWeek on a new
+ * PaymentFrequencyChangeRequest. day_of_week is only meaningful for WEEKLY,
+ * so it's dropped for any other frequency. Returns null if Luxor can't be
+ * reached; best-effort, never throws.
+ */
+export async function fetchPaymentScheduleForSubaccount(
+  subaccountName: string,
+  currency: string = "BTC",
+): Promise<{ frequency: string; dayOfWeek: string | null } | null> {
+  try {
+    const settings = await createLuxorClient(
+      subaccountName,
+    ).getSubaccountPaymentSettings(currency, subaccountName);
+    const frequency = settings.payment_frequency || "UNSPECIFIED";
+    return {
+      frequency,
+      dayOfWeek: frequency === "WEEKLY" ? settings.day_of_week || null : null,
+    };
+  } catch (error) {
+    console.error(
+      `[Wallet] Could not fetch current Luxor payment schedule for subaccount ${subaccountName}:`,
+      error instanceof LuxorError ? error.message : error,
+    );
+    return null;
+  }
+}
