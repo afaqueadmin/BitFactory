@@ -8,6 +8,7 @@ import {
   VENDOR_NAME_OPTIONS,
   VendorNameValue,
 } from "@/lib/hooks/useHardwarePurchases";
+import { parseHardwarePurchaseQuery } from "./query";
 
 const VALID_VENDOR_NAMES = VENDOR_NAME_OPTIONS.map((o) => o.value);
 
@@ -180,36 +181,14 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "10");
-    const paymentStatus = searchParams.get("paymentStatus");
-    const sortByParam = searchParams.get("sortBy");
-    const sortOrderParam = searchParams.get("sortOrder");
+    const { where, orderBy } = parseHardwarePurchaseQuery(searchParams);
 
     const skip = (page - 1) * limit;
-
-    const where: Record<string, unknown> = {};
-    if (paymentStatus) {
-      where.paymentStatus = paymentStatus;
-    }
-
-    const sortableFields = [
-      "invoiceNumber",
-      "vendorName",
-      "totalAmount",
-      "paymentStatus",
-      "billingDate",
-      "paidDate",
-      "dueDate",
-      "createdAt",
-    ];
-    const sortBy = sortableFields.includes(sortByParam || "")
-      ? (sortByParam as string)
-      : "createdAt";
-    const sortOrder = sortOrderParam === "asc" ? "asc" : "desc";
 
     const [hardwarePurchases, total] = await Promise.all([
       prisma.hardwarePurchaseInvoice.findMany({
         where,
-        orderBy: { [sortBy]: sortOrder },
+        orderBy,
         skip,
         take: limit,
       }),

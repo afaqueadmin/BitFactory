@@ -5,9 +5,17 @@ import {
   HOSTING_INELIGIBLE_ERROR,
   isHostingEligibleSegment,
 } from "@/lib/hostingEligibility";
-import { InvoiceStatus, AuditAction, Prisma } from "@prisma/client";
+import { InvoiceStatus, AuditAction } from "@prisma/client";
 import { assertFranchiseeOwnsCustomer } from "@/lib/franchiseeScope";
 import { costPaymentAccountOmit } from "@/lib/accounting/costPaymentAccounts";
+import {
+  buildInvoiceListWhere,
+  buildInvoiceOrderBy,
+  DEFAULT_INVOICE_ORDER,
+  isInMemoryInvoiceSort,
+  parseInvoiceListSort,
+  sortInvoicesInMemory,
+} from "./query";
 
 function normalizeBillingMonth(billingMonth: string | Date): Date {
   const parsedBillingMonth = new Date(billingMonth);
@@ -54,54 +62,16 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const status = searchParams.get("status");
-    const invoiceType = searchParams.get("invoiceType");
-    const sortBy = searchParams.get("sortBy");
-    const sortDirection: Prisma.SortOrder =
-      searchParams.get("sortDirection") === "desc" ? "desc" : "asc";
+    const { sortBy, sortDirection } = parseInvoiceListSort(searchParams);
     const page = parseInt(searchParams.get("page") || "1", 10);
     const limit = parseInt(searchParams.get("limit") || "10", 10);
 
-    const where: Record<string, unknown> = {};
-    if (customerId) {
-      where.userId = customerId;
-      where.status = {
-        not: InvoiceStatus.DRAFT,
-      };
-    }
-    if (status) {
-      where.status = status as InvoiceStatus;
-    }
-    if (invoiceType) {
-      where.invoiceType = invoiceType;
-    }
-    // Note: CANCELLED invoices are now included in the dashboard table
-    // They won't affect calculations (amount, outstanding, etc) as they're already excluded from those queries
+    const where = buildInvoiceListWhere(
+      searchParams,
+      userRole === "ADMIN" || userRole === "SUPER_ADMIN",
+    );
 
     const skip = (page - 1) * limit;
-    const defaultSort: Prisma.SortOrder = "desc";
-
-    const orderBy: Prisma.InvoiceOrderByWithRelationInput[] = (() => {
-      switch (sortBy) {
-        case "invoiceNumber":
-          return [{ invoiceNumber: sortDirection }, { createdAt: defaultSort }];
-        case "customer":
-          return [
-            { user: { name: sortDirection } },
-            { createdAt: defaultSort },
-          ];
-        case "amount":
-          return [{ totalAmount: sortDirection }, { createdAt: defaultSort }];
-        case "status":
-          return [{ status: sortDirection }, { createdAt: defaultSort }];
-        case "paidDate":
-          return [{ paidDate: sortDirection }, { createdAt: defaultSort }];
-        case "dueDate":
-          return [{ dueDate: sortDirection }, { createdAt: defaultSort }];
-        default:
-          return [{ createdAt: defaultSort }];
-      }
-    })();
 
     const include: Record<string, unknown> = {
       user: { select: { id: true, email: true, name: true } },
@@ -118,95 +88,21 @@ export async function GET(request: NextRequest) {
       include.createdByUser = { select: { id: true, email: true, name: true } };
     }
 
-    const getPaidPastDueDays = (invoice: {
-      status: InvoiceStatus;
-      paidDate: Date | null;
-      dueDate: Date;
-    }) => {
-      if (invoice.status !== InvoiceStatus.PAID || !invoice.paidDate) {
-        return null;
-      }
-
-      const diffDays = Math.ceil(
-        (new Date(invoice.paidDate).getTime() -
-          new Date(invoice.dueDate).getTime()) /
-          (1000 * 60 * 60 * 24),
-      );
-
-      return Math.max(0, diffDays);
-    };
-
-    const getDaysUntilDue = (invoice: {
-      status: InvoiceStatus;
-      dueDate: Date;
-    }) => {
-      if (invoice.status === InvoiceStatus.PAID) {
-        return null;
-      }
-
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      const due = new Date(invoice.dueDate);
-      due.setHours(0, 0, 0, 0);
-
-      return Math.ceil(
-        (due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
-      );
-    };
-
     let invoices;
     let total;
 
-    if (
-      sortBy === "paidPastDue" ||
-      sortBy === "daysUntilDue" ||
-      sortBy === "issuedDate"
-    ) {
+    if (isInMemoryInvoiceSort(sortBy)) {
       const allMatchingInvoices = await prisma.invoice.findMany({
         where,
         include,
-        orderBy: [{ createdAt: "desc" }],
+        orderBy: DEFAULT_INVOICE_ORDER,
       });
 
-      const sorted = [...allMatchingInvoices].sort((a, b) => {
-        if (sortBy === "daysUntilDue") {
-          const aIssuedPriority = a.status === InvoiceStatus.ISSUED ? 0 : 1;
-          const bIssuedPriority = b.status === InvoiceStatus.ISSUED ? 0 : 1;
-
-          if (aIssuedPriority !== bIssuedPriority) {
-            return aIssuedPriority - bIssuedPriority;
-          }
-        }
-
-        if (sortBy === "issuedDate") {
-          // issuedDate can be null on invoices created before it was
-          // tracked (or backfilled without it) - fall back to
-          // invoiceGeneratedDate, matching what the UI displays for those
-          // rows, so a row's position always matches the date shown.
-          const aDate = new Date(
-            a.issuedDate || a.invoiceGeneratedDate,
-          ).getTime();
-          const bDate = new Date(
-            b.issuedDate || b.invoiceGeneratedDate,
-          ).getTime();
-          const cmp = aDate - bDate;
-          return sortDirection === "asc" ? cmp : -cmp;
-        }
-
-        const aValue =
-          sortBy === "paidPastDue" ? getPaidPastDueDays(a) : getDaysUntilDue(a);
-        const bValue =
-          sortBy === "paidPastDue" ? getPaidPastDueDays(b) : getDaysUntilDue(b);
-
-        // Keep rows with no sortable value at the end for both directions.
-        if (aValue === null && bValue === null) return 0;
-        if (aValue === null) return 1;
-        if (bValue === null) return -1;
-
-        const cmp = aValue - bValue;
-        return sortDirection === "asc" ? cmp : -cmp;
-      });
+      const sorted = sortInvoicesInMemory(
+        allMatchingInvoices,
+        sortBy,
+        sortDirection,
+      );
 
       total = sorted.length;
       invoices = sorted.slice(skip, skip + limit);
@@ -215,7 +111,7 @@ export async function GET(request: NextRequest) {
         prisma.invoice.findMany({
           where,
           include,
-          orderBy,
+          orderBy: buildInvoiceOrderBy(sortBy, sortDirection),
           skip,
           take: limit,
         }),

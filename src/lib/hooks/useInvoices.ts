@@ -64,6 +64,8 @@ export function useInvoices(
   invoiceType?: string,
   sortBy?: string,
   sortDirection?: "asc" | "desc",
+  // Admin pages: keep DRAFT invoices when filtering by customer.
+  includeDrafts?: boolean,
 ) {
   const { data, isLoading, error } = useQuery({
     queryKey: [
@@ -75,6 +77,7 @@ export function useInvoices(
       invoiceType,
       sortBy,
       sortDirection,
+      includeDrafts,
     ],
     queryFn: async () => {
       const params = new URLSearchParams();
@@ -85,6 +88,7 @@ export function useInvoices(
       if (invoiceType) params.append("invoiceType", invoiceType);
       if (sortBy) params.append("sortBy", sortBy);
       if (sortDirection) params.append("sortDirection", sortDirection);
+      if (includeDrafts) params.append("includeDrafts", "true");
 
       const res = await fetch(`/api/accounting/invoices?${params}`, {
         method: "GET",

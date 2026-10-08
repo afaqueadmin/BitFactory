@@ -4,6 +4,7 @@ import { verifyJwtToken } from "@/lib/jwt";
 import { Decimal } from "@prisma/client/runtime/library";
 import { AuditAction } from "@prisma/client";
 import { verifyUploadedPdf } from "@/lib/storage/r2";
+import { parseVendorInvoiceQuery } from "./query";
 
 interface CreateVendorInvoiceRequest {
   invoiceNumber: string;
@@ -150,30 +151,9 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "10");
-    const paymentStatus = searchParams.get("paymentStatus");
-    const sortByParam = searchParams.get("sortBy");
-    const sortOrderParam = searchParams.get("sortOrder");
+    const { where, orderBy } = parseVendorInvoiceQuery(searchParams);
 
     const skip = (page - 1) * limit;
-
-    const where: Record<string, unknown> = {};
-    if (paymentStatus) {
-      where.paymentStatus = paymentStatus;
-    }
-
-    const sortableFields = [
-      "invoiceNumber",
-      "totalAmount",
-      "paymentStatus",
-      "billingDate",
-      "paidDate",
-      "dueDate",
-      "createdAt",
-    ];
-    const sortBy = sortableFields.includes(sortByParam || "")
-      ? (sortByParam as string)
-      : "createdAt";
-    const sortOrder = sortOrderParam === "asc" ? "asc" : "desc";
 
     const [vendorInvoices, total] = await Promise.all([
       prisma.vendorInvoice.findMany({
@@ -186,7 +166,7 @@ export async function GET(request: NextRequest) {
             select: { id: true, email: true, name: true },
           },
         },
-        orderBy: { [sortBy]: sortOrder },
+        orderBy,
         skip,
         take: limit,
       }),

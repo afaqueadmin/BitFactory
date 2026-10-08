@@ -35,6 +35,8 @@ import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay"
 import { DateDisplay } from "@/components/accounting/common/DateDisplay";
 import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
+import DownloadIcon from "@mui/icons-material/Download";
+import { downloadExport } from "@/lib/downloadExport";
 import {
   useVendorInvoices,
   VendorInvoice,
@@ -58,6 +60,8 @@ export default function FarmTariffs() {
   );
   const [selectedInvoiceData, setSelectedInvoiceData] =
     useState<VendorInvoice | null>(null);
+  const [exporting, setExporting] = useState<"csv" | "pdf" | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
   const {
     vendorInvoices,
     total,
@@ -74,6 +78,29 @@ export default function FarmTariffs() {
       setSortOrder("asc");
     }
     setPage(1);
+  };
+
+  const handleExport = async (format: "csv" | "pdf") => {
+    try {
+      setExporting(format);
+      setExportError(null);
+      const params = new URLSearchParams({
+        format,
+        sortBy,
+        sortOrder,
+        tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      });
+      await downloadExport(
+        `/api/vendor-invoices/export?${params.toString()}`,
+        `farm-tariffs-${new Date().toLocaleDateString("en-CA")}.${format}`,
+      );
+    } catch (err) {
+      setExportError(
+        err instanceof Error ? err.message : "Failed to download export",
+      );
+    } finally {
+      setExporting(null);
+    }
   };
 
   const handleEditClick = (invoiceId: string, invoiceData: VendorInvoice) => {
@@ -263,6 +290,52 @@ export default function FarmTariffs() {
           {/*        </Button>*/}
           {/*    </Link>*/}
           {/*</Box>*/}
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "flex-end",
+              gap: 1,
+              p: 2,
+            }}
+          >
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={
+                exporting === "csv" ? (
+                  <CircularProgress size={16} />
+                ) : (
+                  <DownloadIcon />
+                )
+              }
+              onClick={() => void handleExport("csv")}
+              disabled={exporting !== null || total === 0}
+            >
+              Download CSV
+            </Button>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={
+                exporting === "pdf" ? (
+                  <CircularProgress size={16} />
+                ) : (
+                  <DownloadIcon />
+                )
+              }
+              onClick={() => void handleExport("pdf")}
+              disabled={exporting !== null || total === 0}
+            >
+              Download PDF
+            </Button>
+          </Box>
+          {exportError && (
+            <Box sx={{ px: 2 }}>
+              <Alert severity="error" sx={{ mb: 1 }}>
+                {exportError}
+              </Alert>
+            </Box>
+          )}
           <TableContainer>
             <Table>
               <TableHead sx={{ backgroundColor: "#f5f5f5" }}>

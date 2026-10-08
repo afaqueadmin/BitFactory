@@ -52,7 +52,9 @@ import { StatusBadge } from "@/components/accounting/common/StatusBadge";
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
 import { DateDisplay } from "@/components/accounting/common/DateDisplay";
 import AddIcon from "@mui/icons-material/Add";
+import DownloadIcon from "@mui/icons-material/Download";
 import { InvoiceStatus } from "@prisma/client";
+import { downloadExport } from "@/lib/downloadExport";
 
 type SortKey =
   | "invoiceNumber"
@@ -111,6 +113,8 @@ export default function AccountingDashboard() {
   const [alreadyPaidInvoices, setAlreadyPaidInvoices] = useState<
     { invoiceId: string; customerName: string }[]
   >([]);
+  const [exporting, setExporting] = useState<"csv" | "pdf" | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
   const {
     invoices,
     total,
@@ -124,6 +128,7 @@ export default function AccountingDashboard() {
     "ELECTRICITY_CHARGES",
     sortBy,
     sortDirection,
+    true,
   );
 
   const {
@@ -167,6 +172,33 @@ export default function AccountingDashboard() {
   ) => {
     setStatusFilter(event.target.value);
     setPage(1);
+  };
+
+  const handleExport = async (format: "csv" | "pdf") => {
+    try {
+      setExporting(format);
+      setExportError(null);
+      const params = new URLSearchParams({
+        format,
+        invoiceType: "ELECTRICITY_CHARGES",
+        includeDrafts: "true",
+        sortBy,
+        sortDirection,
+        tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      });
+      if (customerFilter) params.set("customerId", customerFilter);
+      if (statusFilter) params.set("status", statusFilter);
+      await downloadExport(
+        `/api/accounting/invoices/export?${params.toString()}`,
+        `hosting-and-colocation-${new Date().toLocaleDateString("en-CA")}.${format}`,
+      );
+    } catch (err) {
+      setExportError(
+        err instanceof Error ? err.message : "Failed to download export",
+      );
+    } finally {
+      setExporting(null);
+    }
   };
 
   const handleRequestSort = (property: SortKey) => {
@@ -654,6 +686,36 @@ export default function AccountingDashboard() {
               <MenuItem value="PAID">Paid</MenuItem>
               <MenuItem value="CANCELLED">Cancelled</MenuItem>
             </TextField>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={
+                exporting === "csv" ? (
+                  <CircularProgress size={16} />
+                ) : (
+                  <DownloadIcon />
+                )
+              }
+              onClick={() => void handleExport("csv")}
+              disabled={exporting !== null || total === 0}
+            >
+              Download CSV
+            </Button>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={
+                exporting === "pdf" ? (
+                  <CircularProgress size={16} />
+                ) : (
+                  <DownloadIcon />
+                )
+              }
+              onClick={() => void handleExport("pdf")}
+              disabled={exporting !== null || total === 0}
+            >
+              Download PDF
+            </Button>
             <Box sx={{ flexGrow: 1 }} />
             {isAdmin && (
               <>
@@ -665,11 +727,7 @@ export default function AccountingDashboard() {
                   onChange={(e) =>
                     setBulkStatus(
                       e.target.value as
-                        | ""
-                        | "ISSUED"
-                        | "PAID"
-                        | "OVERDUE"
-                        | "CANCELLED",
+                        "" | "ISSUED" | "PAID" | "OVERDUE" | "CANCELLED",
                     )
                   }
                   sx={{ minWidth: 180 }}
@@ -725,6 +783,13 @@ export default function AccountingDashboard() {
                 </Alert>
               </Box>
             )}
+          {exportError && (
+            <Box sx={{ px: 2 }}>
+              <Alert severity="error" sx={{ mb: 1 }}>
+                {exportError}
+              </Alert>
+            </Box>
+          )}
           <TableContainer>
             <Table>
               <TableHead sx={{ backgroundColor: "#f5f5f5" }}>
