@@ -94,6 +94,8 @@ export default function AccountingDashboard() {
   const [pageSize, setPageSize] = useState(10);
   const [customerFilter, setCustomerFilter] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("");
+  const [startDateFilter, setStartDateFilter] = useState("");
+  const [endDateFilter, setEndDateFilter] = useState("");
   const [sortBy, setSortBy] = useState<SortKey>("dueDate");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [selectedInvoiceIds, setSelectedInvoiceIds] = useState<string[]>([]);
@@ -129,6 +131,11 @@ export default function AccountingDashboard() {
     sortBy,
     sortDirection,
     true,
+    {
+      startDate: startDateFilter || undefined,
+      endDate: endDateFilter || undefined,
+      keepPrevious: true,
+    },
   );
 
   const {
@@ -174,6 +181,16 @@ export default function AccountingDashboard() {
     setPage(1);
   };
 
+  // Rows outside the new range leave the table, so drop them from the bulk
+  // selection rather than acting on invoices that are no longer shown.
+  const handleDateFilterChange =
+    (setter: (value: string) => void) =>
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      setter(event.target.value);
+      setSelectedInvoiceIds([]);
+      setPage(1);
+    };
+
   const handleExport = async (format: "csv" | "pdf") => {
     try {
       setExporting(format);
@@ -188,6 +205,8 @@ export default function AccountingDashboard() {
       });
       if (customerFilter) params.set("customerId", customerFilter);
       if (statusFilter) params.set("status", statusFilter);
+      if (startDateFilter) params.set("startDate", startDateFilter);
+      if (endDateFilter) params.set("endDate", endDateFilter);
       await downloadExport(
         `/api/accounting/invoices/export?${params.toString()}`,
         `hosting-and-colocation-${new Date().toLocaleDateString("en-CA")}.${format}`,
@@ -686,6 +705,26 @@ export default function AccountingDashboard() {
               <MenuItem value="PAID">Paid</MenuItem>
               <MenuItem value="CANCELLED">Cancelled</MenuItem>
             </TextField>
+            <TextField
+              label="Issued from"
+              type="date"
+              size="small"
+              value={startDateFilter}
+              onChange={handleDateFilterChange(setStartDateFilter)}
+              InputLabelProps={{ shrink: true }}
+              inputProps={{ max: endDateFilter || undefined }}
+              sx={{ minWidth: 170 }}
+            />
+            <TextField
+              label="Issued to"
+              type="date"
+              size="small"
+              value={endDateFilter}
+              onChange={handleDateFilterChange(setEndDateFilter)}
+              InputLabelProps={{ shrink: true }}
+              inputProps={{ min: startDateFilter || undefined }}
+              sx={{ minWidth: 170 }}
+            />
             <Button
               variant="outlined"
               size="small"

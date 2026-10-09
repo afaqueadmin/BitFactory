@@ -25,6 +25,7 @@ import {
   TableSortLabel,
   IconButton,
   Tooltip,
+  TextField,
 } from "@mui/material";
 import Link from "next/link";
 import { useState } from "react";
@@ -62,13 +63,19 @@ export default function FarmTariffs() {
     useState<VendorInvoice | null>(null);
   const [exporting, setExporting] = useState<"csv" | "pdf" | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [startDateFilter, setStartDateFilter] = useState("");
+  const [endDateFilter, setEndDateFilter] = useState("");
   const {
     vendorInvoices,
     total,
+    summary,
     loading: invoicesLoading,
     error: invoicesError,
     refetch,
-  } = useVendorInvoices(page, pageSize, undefined, sortBy, sortOrder);
+  } = useVendorInvoices(page, pageSize, undefined, sortBy, sortOrder, {
+    startDate: startDateFilter || undefined,
+    endDate: endDateFilter || undefined,
+  });
 
   const handleSort = (field: string) => {
     if (sortBy === field) {
@@ -90,6 +97,8 @@ export default function FarmTariffs() {
         sortOrder,
         tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
       });
+      if (startDateFilter) params.set("startDate", startDateFilter);
+      if (endDateFilter) params.set("endDate", endDateFilter);
       await downloadExport(
         `/api/vendor-invoices/export?${params.toString()}`,
         `farm-tariffs-${new Date().toLocaleDateString("en-CA")}.${format}`,
@@ -169,10 +178,6 @@ export default function FarmTariffs() {
     );
   }
 
-  const unpaidInvoices = vendorInvoices.filter(
-    (inv) => inv.paymentStatus !== "Paid",
-  );
-
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
       {/* Header */}
@@ -216,28 +221,21 @@ export default function FarmTariffs() {
         <Box>
           <StatsCard
             label="Unpaid Invoices"
-            value={unpaidInvoices.length}
+            value={summary.unpaidCount}
             color="warning"
           />
         </Box>
         <Box>
           <StatsCard
             label="Overdue Invoices"
-            value={
-              unpaidInvoices.filter(
-                (inv) => calculateDaysUntilDue(inv.dueDate) < 0,
-              ).length
-            }
+            value={summary.overdueCount}
             color="error"
           />
         </Box>
         <Box>
           <StatsCard
             label="Total Outstanding"
-            value={unpaidInvoices.reduce(
-              (sum, inv) => sum + Number(inv.totalAmount),
-              0,
-            )}
+            value={summary.totalOutstanding}
             isCurrency
             color="primary"
           />
@@ -293,11 +291,39 @@ export default function FarmTariffs() {
           <Box
             sx={{
               display: "flex",
-              justifyContent: "flex-end",
+              flexWrap: "wrap",
+              alignItems: "center",
               gap: 1,
               p: 2,
             }}
           >
+            <TextField
+              label="Issued from"
+              type="date"
+              size="small"
+              value={startDateFilter}
+              onChange={(e) => {
+                setStartDateFilter(e.target.value);
+                setPage(1);
+              }}
+              InputLabelProps={{ shrink: true }}
+              inputProps={{ max: endDateFilter || undefined }}
+              sx={{ minWidth: 170 }}
+            />
+            <TextField
+              label="Issued to"
+              type="date"
+              size="small"
+              value={endDateFilter}
+              onChange={(e) => {
+                setEndDateFilter(e.target.value);
+                setPage(1);
+              }}
+              InputLabelProps={{ shrink: true }}
+              inputProps={{ min: startDateFilter || undefined }}
+              sx={{ minWidth: 170 }}
+            />
+            <Box sx={{ flexGrow: 1 }} />
             <Button
               variant="outlined"
               size="small"

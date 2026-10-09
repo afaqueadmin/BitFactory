@@ -2,8 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
 import { Decimal } from "@prisma/client/runtime/library";
-import { AuditAction } from "@prisma/client";
+import { AuditAction, Prisma } from "@prisma/client";
 import { verifyUploadedPdf } from "@/lib/storage/r2";
+import {
+  formatIsoDate,
+  resolveExportTimeZone,
+  utcDayStart,
+} from "@/lib/helpers/admin/tableExport";
 import { parseVendorInvoiceQuery } from "./query";
 
 interface CreateVendorInvoiceRequest {
@@ -155,23 +160,41 @@ export async function GET(request: NextRequest) {
 
     const skip = (page - 1) * limit;
 
-    const [vendorInvoices, total] = await Promise.all([
-      prisma.vendorInvoice.findMany({
-        where,
-        include: {
-          createdByUser: {
-            select: { id: true, email: true, name: true },
+    // Stat cards cover the whole filtered set, not just this page. Only
+    // Pending invoices are owed; dueDate is stored at UTC midnight, so it's
+    // overdue once it falls before today's calendar date in the viewer's tz.
+    const tz = resolveExportTimeZone(searchParams.get("tz"));
+    const todayStart = utcDayStart(formatIsoDate(new Date(), tz));
+    const pendingWhere: Prisma.VendorInvoiceWhereInput = {
+      AND: [where, { paymentStatus: "Pending" }],
+    };
+
+    const [vendorInvoices, total, unpaidCount, overdueCount, outstanding] =
+      await Promise.all([
+        prisma.vendorInvoice.findMany({
+          where,
+          include: {
+            createdByUser: {
+              select: { id: true, email: true, name: true },
+            },
+            updatedByUser: {
+              select: { id: true, email: true, name: true },
+            },
           },
-          updatedByUser: {
-            select: { id: true, email: true, name: true },
-          },
-        },
-        orderBy,
-        skip,
-        take: limit,
-      }),
-      prisma.vendorInvoice.count({ where }),
-    ]);
+          orderBy,
+          skip,
+          take: limit,
+        }),
+        prisma.vendorInvoice.count({ where }),
+        prisma.vendorInvoice.count({ where: pendingWhere }),
+        prisma.vendorInvoice.count({
+          where: { AND: [pendingWhere, { dueDate: { lt: todayStart } }] },
+        }),
+        prisma.vendorInvoice.aggregate({
+          where: pendingWhere,
+          _sum: { totalAmount: true },
+        }),
+      ]);
 
     return NextResponse.json(
       {
@@ -181,6 +204,11 @@ export async function GET(request: NextRequest) {
         page,
         limit,
         totalPages: Math.ceil(total / limit),
+        summary: {
+          unpaidCount,
+          overdueCount,
+          totalOutstanding: Number(outstanding._sum.totalAmount ?? 0),
+        },
       },
       { status: 200 },
     );

@@ -10,6 +10,7 @@ import {
   daysUntilDue,
   formatDaysUntilDue,
   formatIsoDate,
+  formatIssuedRange,
   formatTableCurrency,
   formatTableDate,
   resolveExportTimeZone,
@@ -68,7 +69,8 @@ export async function GET(request: NextRequest) {
       );
     }
     const tz = resolveExportTimeZone(searchParams.get("tz"));
-    const { where, orderBy } = parseHardwarePurchaseQuery(searchParams);
+    const { where, orderBy, filters } =
+      parseHardwarePurchaseQuery(searchParams);
 
     const hardwarePurchases = await prisma.hardwarePurchaseInvoice.findMany({
       where,
@@ -134,8 +136,25 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    // Name the active filters on the PDF so a printed copy is unambiguous.
+    const subtitle = [
+      `Vendor: ${
+        filters.vendorName
+          ? VENDOR_NAME_LABELS[filters.vendorName] || filters.vendorName
+          : "All vendors"
+      }`,
+      `Hardware: ${filters.hardware ? `"${filters.hardware}"` : "All hardware"}`,
+      `Status: ${
+        filters.paymentStatus
+          ? INVOICE_STATUS_LABELS[filters.paymentStatus]
+          : "All statuses"
+      }`,
+      `Issued: ${formatIssuedRange(filters.startDate, filters.endDate)}`,
+    ].join(" · ");
+
     const html = buildTablePdfHtml({
       title: "Hardware Purchases — Purchase Invoices",
+      subtitle,
       columns: COLUMNS,
       rows: hardwarePurchases.map((invoice) =>
         toRow(invoice, (d) => formatTableDate(d, tz), formatTableCurrency, "-"),

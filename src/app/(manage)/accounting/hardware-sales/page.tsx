@@ -73,6 +73,8 @@ export default function HardwareSalesDashboard() {
   const [pageSize, setPageSize] = useState(10);
   const [customerFilter, setCustomerFilter] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("");
+  const [startDateFilter, setStartDateFilter] = useState("");
+  const [endDateFilter, setEndDateFilter] = useState("");
   const [sortBy, setSortBy] = useState<SortKey>("dueDate");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
@@ -98,6 +100,12 @@ export default function HardwareSalesDashboard() {
 
   const { customers, loading: customersLoading } = useCustomers();
 
+  const listOptions = {
+    startDate: startDateFilter || undefined,
+    endDate: endDateFilter || undefined,
+    keepPrevious: true,
+  };
+
   const {
     invoices,
     total,
@@ -112,6 +120,7 @@ export default function HardwareSalesDashboard() {
     sortBy,
     sortDirection,
     true,
+    listOptions,
   );
 
   // Fetch the full filtered set (independent of table pagination) so the
@@ -129,6 +138,7 @@ export default function HardwareSalesDashboard() {
     undefined,
     undefined,
     true,
+    listOptions,
   );
 
   const {
@@ -170,6 +180,16 @@ export default function HardwareSalesDashboard() {
     setPage(1);
   };
 
+  // Rows outside the new range leave the table, so drop them from the bulk
+  // selection rather than acting on invoices that are no longer shown.
+  const handleDateFilterChange =
+    (setter: (value: string) => void) =>
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      setter(event.target.value);
+      setSelectedInvoiceIds([]);
+      setPage(1);
+    };
+
   const handleExport = async (format: "csv" | "pdf") => {
     try {
       setExporting(format);
@@ -184,6 +204,8 @@ export default function HardwareSalesDashboard() {
       });
       if (customerFilter) params.set("customerId", customerFilter);
       if (statusFilter) params.set("status", statusFilter);
+      if (startDateFilter) params.set("startDate", startDateFilter);
+      if (endDateFilter) params.set("endDate", endDateFilter);
       await downloadExport(
         `/api/accounting/invoices/export?${params.toString()}`,
         `hardware-sales-${new Date().toLocaleDateString("en-CA")}.${format}`,
@@ -662,6 +684,26 @@ export default function HardwareSalesDashboard() {
               <MenuItem value="CANCELLED">Cancelled</MenuItem>
               <MenuItem value="REFUNDED">Refunded</MenuItem>
             </TextField>
+            <TextField
+              label="Issued from"
+              type="date"
+              size="small"
+              value={startDateFilter}
+              onChange={handleDateFilterChange(setStartDateFilter)}
+              InputLabelProps={{ shrink: true }}
+              inputProps={{ max: endDateFilter || undefined }}
+              sx={{ minWidth: 170 }}
+            />
+            <TextField
+              label="Issued to"
+              type="date"
+              size="small"
+              value={endDateFilter}
+              onChange={handleDateFilterChange(setEndDateFilter)}
+              InputLabelProps={{ shrink: true }}
+              inputProps={{ min: startDateFilter || undefined }}
+              sx={{ minWidth: 170 }}
+            />
             <Button
               variant="outlined"
               size="small"

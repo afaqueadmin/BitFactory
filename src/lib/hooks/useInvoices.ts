@@ -1,4 +1,9 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useQuery,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
 import {
   Invoice,
   InvoiceStatus,
@@ -56,6 +61,17 @@ export interface InvoiceWithDetails extends Invoice {
   } | null;
 }
 
+export interface InvoiceListOptions {
+  /** Issued Date range, as YYYY-MM-DD from a date input. */
+  startDate?: string;
+  endDate?: string;
+  /**
+   * Keep the current rows on screen while a filter change refetches. Opt-in:
+   * pickers like CreateMemoModal must not show the previous customer's rows.
+   */
+  keepPrevious?: boolean;
+}
+
 export function useInvoices(
   page: number = 1,
   limit: number = 10,
@@ -66,6 +82,7 @@ export function useInvoices(
   sortDirection?: "asc" | "desc",
   // Admin pages: keep DRAFT invoices when filtering by customer.
   includeDrafts?: boolean,
+  options?: InvoiceListOptions,
 ) {
   const { data, isLoading, error } = useQuery({
     queryKey: [
@@ -78,6 +95,8 @@ export function useInvoices(
       sortBy,
       sortDirection,
       includeDrafts,
+      options?.startDate,
+      options?.endDate,
     ],
     queryFn: async () => {
       const params = new URLSearchParams();
@@ -89,6 +108,11 @@ export function useInvoices(
       if (sortBy) params.append("sortBy", sortBy);
       if (sortDirection) params.append("sortDirection", sortDirection);
       if (includeDrafts) params.append("includeDrafts", "true");
+      if (options?.startDate || options?.endDate) {
+        if (options.startDate) params.append("startDate", options.startDate);
+        if (options.endDate) params.append("endDate", options.endDate);
+        params.append("tz", Intl.DateTimeFormat().resolvedOptions().timeZone);
+      }
 
       const res = await fetch(`/api/accounting/invoices?${params}`, {
         method: "GET",
@@ -102,6 +126,7 @@ export function useInvoices(
       return res.json();
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
+    placeholderData: options?.keepPrevious ? keepPreviousData : undefined,
   });
 
   return {

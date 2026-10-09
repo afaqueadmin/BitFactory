@@ -2,12 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
 import { Decimal } from "@prisma/client/runtime/library";
-import { AuditAction } from "@prisma/client";
+import { AuditAction, Prisma } from "@prisma/client";
 import { verifyUploadedPdf } from "@/lib/storage/r2";
 import {
   VENDOR_NAME_OPTIONS,
   VendorNameValue,
 } from "@/lib/hooks/useHardwarePurchases";
+import {
+  formatIsoDate,
+  resolveExportTimeZone,
+  utcDayStart,
+} from "@/lib/helpers/admin/tableExport";
 import { parseHardwarePurchaseQuery } from "./query";
 
 const VALID_VENDOR_NAMES = VENDOR_NAME_OPTIONS.map((o) => o.value);
@@ -185,15 +190,33 @@ export async function GET(request: NextRequest) {
 
     const skip = (page - 1) * limit;
 
-    const [hardwarePurchases, total] = await Promise.all([
-      prisma.hardwarePurchaseInvoice.findMany({
-        where,
-        orderBy,
-        skip,
-        take: limit,
-      }),
-      prisma.hardwarePurchaseInvoice.count({ where }),
-    ]);
+    // Stat cards cover the whole filtered set, not just this page. Only
+    // Pending invoices are owed; dueDate is stored at UTC midnight, so it's
+    // overdue once it falls before today's calendar date in the viewer's tz.
+    const tz = resolveExportTimeZone(searchParams.get("tz"));
+    const todayStart = utcDayStart(formatIsoDate(new Date(), tz));
+    const pendingWhere: Prisma.HardwarePurchaseInvoiceWhereInput = {
+      AND: [where, { paymentStatus: "Pending" }],
+    };
+
+    const [hardwarePurchases, total, unpaidCount, overdueCount, outstanding] =
+      await Promise.all([
+        prisma.hardwarePurchaseInvoice.findMany({
+          where,
+          orderBy,
+          skip,
+          take: limit,
+        }),
+        prisma.hardwarePurchaseInvoice.count({ where }),
+        prisma.hardwarePurchaseInvoice.count({ where: pendingWhere }),
+        prisma.hardwarePurchaseInvoice.count({
+          where: { AND: [pendingWhere, { dueDate: { lt: todayStart } }] },
+        }),
+        prisma.hardwarePurchaseInvoice.aggregate({
+          where: pendingWhere,
+          _sum: { totalAmount: true },
+        }),
+      ]);
 
     return NextResponse.json(
       {
@@ -203,6 +226,11 @@ export async function GET(request: NextRequest) {
         page,
         limit,
         totalPages: Math.ceil(total / limit),
+        summary: {
+          unpaidCount,
+          overdueCount,
+          totalOutstanding: Number(outstanding._sum.totalAmount ?? 0),
+        },
       },
       { status: 200 },
     );

@@ -1,4 +1,9 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useQuery,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
 
 export type VendorNameValue = "HASHLABS_PTE_LTD" | "QRB_LABS" | "LUXOR_TECH";
 
@@ -62,6 +67,23 @@ interface HardwarePurchasesResponse {
   page: number;
   limit: number;
   totalPages: number;
+  summary?: HardwarePurchaseSummary;
+}
+
+/** Stat-card totals over every invoice matching the filters (Pending only). */
+export interface HardwarePurchaseSummary {
+  unpaidCount: number;
+  overdueCount: number;
+  totalOutstanding: number;
+}
+
+export interface HardwarePurchaseFilters {
+  vendorName?: VendorNameValue;
+  /** Matches any part of the hardware description, ignoring case. */
+  hardware?: string;
+  /** Issued Date (billingDate) range, as YYYY-MM-DD from a date input. */
+  startDate?: string;
+  endDate?: string;
 }
 
 export const useHardwarePurchases = (
@@ -70,6 +92,7 @@ export const useHardwarePurchases = (
   paymentStatus?: string,
   sortBy?: string,
   sortOrder?: "asc" | "desc",
+  filters?: HardwarePurchaseFilters,
 ) => {
   const { data, isLoading, error, refetch } =
     useQuery<HardwarePurchasesResponse>({
@@ -80,11 +103,16 @@ export const useHardwarePurchases = (
         paymentStatus,
         sortBy,
         sortOrder,
+        filters?.vendorName,
+        filters?.hardware,
+        filters?.startDate,
+        filters?.endDate,
       ],
       queryFn: async () => {
         const params = new URLSearchParams({
           page: page.toString(),
           limit: limit.toString(),
+          tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
         });
         if (paymentStatus) {
           params.append("paymentStatus", paymentStatus);
@@ -93,6 +121,11 @@ export const useHardwarePurchases = (
           params.append("sortBy", sortBy);
           params.append("sortOrder", sortOrder || "asc");
         }
+        if (filters?.vendorName)
+          params.append("vendorName", filters.vendorName);
+        if (filters?.hardware) params.append("hardware", filters.hardware);
+        if (filters?.startDate) params.append("startDate", filters.startDate);
+        if (filters?.endDate) params.append("endDate", filters.endDate);
 
         const response = await fetch(`/api/hardware-purchases?${params}`);
 
@@ -104,11 +137,20 @@ export const useHardwarePurchases = (
       },
       staleTime: 5 * 60 * 1000, // 5 minutes
       retry: 2,
+      // Keep the current rows on screen while a filter change refetches,
+      // instead of dropping back to the page's loading spinner (which would
+      // also unmount the filter inputs mid-typing).
+      placeholderData: keepPreviousData,
     });
 
   return {
     hardwarePurchases: data?.data || [],
     total: data?.total || 0,
+    summary: data?.summary ?? {
+      unpaidCount: 0,
+      overdueCount: 0,
+      totalOutstanding: 0,
+    },
     loading: isLoading,
     error: error instanceof Error ? error.message : null,
     refetch,

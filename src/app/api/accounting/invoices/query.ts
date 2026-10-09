@@ -1,4 +1,37 @@
 import { InvoiceStatus, Prisma } from "@prisma/client";
+import {
+  addDays,
+  parseDateParam,
+  resolveExportTimeZone,
+  zonedDayStart,
+} from "@/lib/helpers/admin/tableExport";
+
+/**
+ * Issued Date range filter (YYYY-MM-DD, either end optional). issuedDate is
+ * a timestamp, so each bound is the viewer's (`tz`) calendar day - the day
+ * <DateDisplay> shows for the row. Rows with no issuedDate (drafts) never
+ * match a range, so they drop out whenever a bound is set.
+ */
+export function parseIssuedDateRange(searchParams: URLSearchParams): {
+  startDate: string | null;
+  endDate: string | null;
+  issuedDate: Prisma.DateTimeNullableFilter | null;
+} {
+  const startDate = parseDateParam(searchParams.get("startDate"));
+  const endDate = parseDateParam(searchParams.get("endDate"));
+  if (!startDate && !endDate) {
+    return { startDate, endDate, issuedDate: null };
+  }
+  const tz = resolveExportTimeZone(searchParams.get("tz"));
+  return {
+    startDate,
+    endDate,
+    issuedDate: {
+      ...(startDate ? { gte: zonedDayStart(startDate, tz) } : {}),
+      ...(endDate ? { lt: zonedDayStart(addDays(endDate, 1), tz) } : {}),
+    },
+  };
+}
 
 /**
  * Shared query-parsing for the invoice list, used by both the JSON route
@@ -34,6 +67,10 @@ export function buildInvoiceListWhere(
   }
   if (invoiceType) {
     where.invoiceType = invoiceType;
+  }
+  const { issuedDate } = parseIssuedDateRange(searchParams);
+  if (issuedDate) {
+    where.issuedDate = issuedDate;
   }
   // Note: CANCELLED invoices are now included in the dashboard table
   // They won't affect calculations (amount, outstanding, etc) as they're already excluded from those queries

@@ -19,9 +19,11 @@ import {
   TableSortLabel,
   IconButton,
   Tooltip,
+  TextField,
+  MenuItem,
 } from "@mui/material";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { StatsCard } from "@/components/accounting/dashboard/StatsCard";
 import { StatusBadge } from "@/components/accounting/common/StatusBadge";
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
@@ -34,6 +36,8 @@ import {
   useHardwarePurchases,
   HardwarePurchaseInvoice,
   VENDOR_NAME_LABELS,
+  VENDOR_NAME_OPTIONS,
+  VendorNameValue,
 } from "@/lib/hooks/useHardwarePurchases";
 import EditHardwarePurchaseModal from "@/components/accounting/EditHardwarePurchaseModal";
 
@@ -50,13 +54,42 @@ export default function HardwarePurchases() {
     useState<HardwarePurchaseInvoice | null>(null);
   const [exporting, setExporting] = useState<"csv" | "pdf" | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [vendorFilter, setVendorFilter] = useState<"" | VendorNameValue>("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [hardwareInput, setHardwareInput] = useState("");
+  const [hardwareFilter, setHardwareFilter] = useState("");
+  const [startDateFilter, setStartDateFilter] = useState("");
+  const [endDateFilter, setEndDateFilter] = useState("");
+
+  // Light debounce on the free-text hardware search so it doesn't fire a
+  // request per keystroke.
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setHardwareFilter(hardwareInput.trim());
+    }, 400);
+    return () => clearTimeout(timeout);
+  }, [hardwareInput]);
+
   const {
     hardwarePurchases,
     total,
+    summary,
     loading: invoicesLoading,
     error: invoicesError,
     refetch,
-  } = useHardwarePurchases(page, pageSize, undefined, sortBy, sortOrder);
+  } = useHardwarePurchases(
+    page,
+    pageSize,
+    statusFilter || undefined,
+    sortBy,
+    sortOrder,
+    {
+      vendorName: vendorFilter || undefined,
+      hardware: hardwareFilter || undefined,
+      startDate: startDateFilter || undefined,
+      endDate: endDateFilter || undefined,
+    },
+  );
 
   const handleSort = (field: string) => {
     if (sortBy === field) {
@@ -78,6 +111,11 @@ export default function HardwarePurchases() {
         sortOrder,
         tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
       });
+      if (vendorFilter) params.set("vendorName", vendorFilter);
+      if (hardwareFilter) params.set("hardware", hardwareFilter);
+      if (statusFilter) params.set("paymentStatus", statusFilter);
+      if (startDateFilter) params.set("startDate", startDateFilter);
+      if (endDateFilter) params.set("endDate", endDateFilter);
       await downloadExport(
         `/api/hardware-purchases/export?${params.toString()}`,
         `hardware-purchases-${new Date().toLocaleDateString("en-CA")}.${format}`,
@@ -149,10 +187,6 @@ export default function HardwarePurchases() {
     );
   }
 
-  const unpaidInvoices = hardwarePurchases.filter(
-    (inv) => inv.paymentStatus !== "Paid",
-  );
-
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
       {/* Header */}
@@ -196,28 +230,21 @@ export default function HardwarePurchases() {
         <Box>
           <StatsCard
             label="Unpaid Invoices"
-            value={unpaidInvoices.length}
+            value={summary.unpaidCount}
             color="warning"
           />
         </Box>
         <Box>
           <StatsCard
             label="Overdue Invoices"
-            value={
-              unpaidInvoices.filter(
-                (inv) => calculateDaysUntilDue(inv.dueDate) < 0,
-              ).length
-            }
+            value={summary.overdueCount}
             color="error"
           />
         </Box>
         <Box>
           <StatsCard
             label="Total Outstanding"
-            value={unpaidInvoices.reduce(
-              (sum, inv) => sum + Number(inv.totalAmount),
-              0,
-            )}
+            value={summary.totalOutstanding}
             isCurrency
             color="primary"
           />
@@ -230,11 +257,84 @@ export default function HardwarePurchases() {
           <Box
             sx={{
               display: "flex",
-              justifyContent: "flex-end",
+              flexWrap: "wrap",
+              alignItems: "center",
               gap: 1,
               p: 2,
             }}
           >
+            <TextField
+              select
+              size="small"
+              label="Filter by vendor"
+              value={vendorFilter}
+              onChange={(e) => {
+                setVendorFilter(e.target.value as "" | VendorNameValue);
+                setPage(1);
+              }}
+              sx={{ minWidth: 180 }}
+            >
+              <MenuItem value="">All vendors</MenuItem>
+              {VENDOR_NAME_OPTIONS.map((option) => (
+                <MenuItem key={option.value} value={option.value}>
+                  {option.label}
+                </MenuItem>
+              ))}
+            </TextField>
+            <TextField
+              size="small"
+              label="Filter by hardware"
+              placeholder="e.g. S21"
+              value={hardwareInput}
+              onChange={(e) => {
+                setHardwareInput(e.target.value);
+                setPage(1);
+              }}
+              sx={{ minWidth: 180 }}
+            />
+            <TextField
+              select
+              size="small"
+              label="Filter by status"
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setPage(1);
+              }}
+              sx={{ minWidth: 160 }}
+            >
+              <MenuItem value="">All statuses</MenuItem>
+              <MenuItem value="Pending">Pending</MenuItem>
+              <MenuItem value="Paid">Paid</MenuItem>
+              <MenuItem value="Cancelled">Cancelled</MenuItem>
+            </TextField>
+            <TextField
+              label="Issued from"
+              type="date"
+              size="small"
+              value={startDateFilter}
+              onChange={(e) => {
+                setStartDateFilter(e.target.value);
+                setPage(1);
+              }}
+              InputLabelProps={{ shrink: true }}
+              inputProps={{ max: endDateFilter || undefined }}
+              sx={{ minWidth: 170 }}
+            />
+            <TextField
+              label="Issued to"
+              type="date"
+              size="small"
+              value={endDateFilter}
+              onChange={(e) => {
+                setEndDateFilter(e.target.value);
+                setPage(1);
+              }}
+              InputLabelProps={{ shrink: true }}
+              inputProps={{ min: startDateFilter || undefined }}
+              sx={{ minWidth: 170 }}
+            />
+            <Box sx={{ flexGrow: 1 }} />
             <Button
               variant="outlined"
               size="small"

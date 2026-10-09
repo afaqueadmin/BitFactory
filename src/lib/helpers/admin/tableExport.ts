@@ -64,6 +64,78 @@ export function daysUntilDue(
   return dayNumber(toDate(due)) - dayNumber(now);
 }
 
+/**
+ * A list filter's YYYY-MM-DD date param (from an <input type="date">), or
+ * null when missing or not a real calendar date.
+ */
+export function parseDateParam(param: string | null): string | null {
+  if (!param || !/^\d{4}-\d{2}-\d{2}$/.test(param)) return null;
+  const d = new Date(`${param}T00:00:00.000Z`);
+  return !isNaN(d.getTime()) && d.toISOString().startsWith(param)
+    ? param
+    : null;
+}
+
+/** UTC midnight of a YYYY-MM-DD date - how @db.Date columns are stored. */
+export function utcDayStart(ymd: string): Date {
+  return new Date(`${ymd}T00:00:00.000Z`);
+}
+
+/** YYYY-MM-DD shifted by `days` calendar days. */
+export function addDays(ymd: string, days: number): string {
+  const d = utcDayStart(ymd);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Offset of `tz` from UTC at instant `d`, in ms (e.g. +4h for Asia/Dubai). */
+function timeZoneOffsetMs(d: Date, tz: string): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz,
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).formatToParts(d);
+  const get = (type: string) =>
+    Number(parts.find((p) => p.type === type)?.value);
+  const asUtc = Date.UTC(
+    get("year"),
+    get("month") - 1,
+    get("day"),
+    get("hour"),
+    get("minute"),
+    get("second"),
+  );
+  return asUtc - Math.floor(d.getTime() / 1000) * 1000;
+}
+
+/**
+ * The instant 00:00 starts on a YYYY-MM-DD calendar day in `tz`, so a
+ * timestamp column can be filtered by the day <DateDisplay> shows for it.
+ */
+export function zonedDayStart(ymd: string, tz: string): Date {
+  const guess = utcDayStart(ymd).getTime();
+  const first = guess - timeZoneOffsetMs(new Date(guess), tz);
+  // Re-read the offset at the result in case a DST change sits in between.
+  return new Date(guess - timeZoneOffsetMs(new Date(first), tz));
+}
+
+/** PDF subtitle text for an issued-date range filter. */
+export function formatIssuedRange(
+  startDate: string | null,
+  endDate: string | null,
+): string {
+  const label = (ymd: string) => formatTableDate(utcDayStart(ymd), "UTC");
+  if (startDate && endDate) return `${label(startDate)} – ${label(endDate)}`;
+  if (startDate) return `from ${label(startDate)}`;
+  if (endDate) return `up to ${label(endDate)}`;
+  return "All dates";
+}
+
 /** The "Days Until Due" cell text used by the dashboard tables. */
 export function formatDaysUntilDue(days: number): string {
   if (days === 0) return "Today";

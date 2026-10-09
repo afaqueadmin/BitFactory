@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { parseDateParam, utcDayStart } from "@/lib/helpers/admin/tableExport";
 
 /**
  * Shared query-parsing for the vendor invoice (Farm Tariffs) list, used by
@@ -19,6 +20,9 @@ const SORTABLE_FIELDS = [
 export interface ParsedVendorInvoiceQuery {
   where: Prisma.VendorInvoiceWhereInput;
   orderBy: Prisma.VendorInvoiceOrderByWithRelationInput[];
+  /** Issued Date (billingDate) range as YYYY-MM-DD, null when unbounded. */
+  startDate: string | null;
+  endDate: string | null;
 }
 
 export function parseVendorInvoiceQuery(
@@ -27,10 +31,20 @@ export function parseVendorInvoiceQuery(
   const paymentStatus = searchParams.get("paymentStatus");
   const sortByParam = searchParams.get("sortBy");
   const sortOrderParam = searchParams.get("sortOrder");
+  const startDate = parseDateParam(searchParams.get("startDate"));
+  const endDate = parseDateParam(searchParams.get("endDate"));
 
   const where: Record<string, unknown> = {};
   if (paymentStatus) {
     where.paymentStatus = paymentStatus;
+  }
+  // billingDate is a @db.Date column (stored at UTC midnight), so the
+  // range is an exact calendar-day match with no timezone involved.
+  if (startDate || endDate) {
+    where.billingDate = {
+      ...(startDate ? { gte: utcDayStart(startDate) } : {}),
+      ...(endDate ? { lte: utcDayStart(endDate) } : {}),
+    };
   }
 
   const sortBy = SORTABLE_FIELDS.includes(sortByParam || "")
@@ -43,5 +57,7 @@ export function parseVendorInvoiceQuery(
     // id breaks ties (e.g. equal amounts) so rows keep a stable order across
     // table pages and match the export.
     orderBy: [{ [sortBy]: sortOrder }, { id: "asc" }],
+    startDate,
+    endDate,
   };
 }

@@ -9,6 +9,7 @@ import {
   daysUntilDue,
   formatDaysUntilDue,
   formatIsoDate,
+  formatIssuedRange,
   formatTableCurrency,
   formatTableDate,
   resolveExportTimeZone,
@@ -20,6 +21,7 @@ import {
   getPaidPastDueDays,
   isInMemoryInvoiceSort,
   parseInvoiceListSort,
+  parseIssuedDateRange,
   sortInvoicesInMemory,
 } from "../query";
 
@@ -205,6 +207,7 @@ export async function GET(request: NextRequest) {
     const customerLabel = customerId
       ? customer?.name || customer?.email || customerId
       : "All customers";
+    const { startDate, endDate } = parseIssuedDateRange(searchParams);
     const statusLabel = status
       ? INVOICE_STATUS_LABELS[status as keyof typeof INVOICE_STATUS_LABELS] ||
         status
@@ -212,7 +215,7 @@ export async function GET(request: NextRequest) {
 
     const html = buildTablePdfHtml({
       title: exportConfig.title,
-      subtitle: `Customer: ${customerLabel} · Status: ${statusLabel}`,
+      subtitle: `Customer: ${customerLabel} · Status: ${statusLabel} · Issued: ${formatIssuedRange(startDate, endDate)}`,
       columns,
       rows: invoices.map((invoice) =>
         toRow(invoice, (d) => formatTableDate(d, tz), formatTableCurrency, "-"),

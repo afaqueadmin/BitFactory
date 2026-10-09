@@ -10,6 +10,7 @@ import {
   formatDaysUntilDue,
   formatIsoDate,
   formatTableCurrency,
+  formatIssuedRange,
   formatTableDate,
   resolveExportTimeZone,
 } from "@/lib/helpers/admin/tableExport";
@@ -64,7 +65,8 @@ export async function GET(request: NextRequest) {
       );
     }
     const tz = resolveExportTimeZone(searchParams.get("tz"));
-    const { where, orderBy } = parseVendorInvoiceQuery(searchParams);
+    const { where, orderBy, startDate, endDate } =
+      parseVendorInvoiceQuery(searchParams);
 
     const vendorInvoices = await prisma.vendorInvoice.findMany({
       where,
@@ -128,6 +130,7 @@ export async function GET(request: NextRequest) {
 
     const html = buildTablePdfHtml({
       title: "Farm Tariffs — Vendor Invoices",
+      subtitle: `Issued: ${formatIssuedRange(startDate, endDate)}`,
       columns: COLUMNS,
       rows: vendorInvoices.map((invoice) =>
         toRow(invoice, (d) => formatTableDate(d, tz), formatTableCurrency, "-"),

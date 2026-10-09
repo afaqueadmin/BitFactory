@@ -1,4 +1,9 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useQuery,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
 
 export interface VendorInvoice {
   id: string;
@@ -45,6 +50,20 @@ interface VendorInvoicesResponse {
   page: number;
   limit: number;
   totalPages: number;
+  summary: VendorInvoiceSummary;
+}
+
+/** Stat-card totals over every invoice matching the filters (Pending only). */
+export interface VendorInvoiceSummary {
+  unpaidCount: number;
+  overdueCount: number;
+  totalOutstanding: number;
+}
+
+/** Issued Date (billingDate) range, as YYYY-MM-DD from a date input. */
+export interface VendorInvoiceFilters {
+  startDate?: string;
+  endDate?: string;
 }
 
 export const useVendorInvoices = (
@@ -53,13 +72,24 @@ export const useVendorInvoices = (
   paymentStatus?: string,
   sortBy?: string,
   sortOrder?: "asc" | "desc",
+  filters?: VendorInvoiceFilters,
 ) => {
   const { data, isLoading, error, refetch } = useQuery<VendorInvoicesResponse>({
-    queryKey: ["vendorInvoices", page, limit, paymentStatus, sortBy, sortOrder],
+    queryKey: [
+      "vendorInvoices",
+      page,
+      limit,
+      paymentStatus,
+      sortBy,
+      sortOrder,
+      filters?.startDate,
+      filters?.endDate,
+    ],
     queryFn: async () => {
       const params = new URLSearchParams({
         page: page.toString(),
         limit: limit.toString(),
+        tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
       });
       if (paymentStatus) {
         params.append("paymentStatus", paymentStatus);
@@ -68,6 +98,8 @@ export const useVendorInvoices = (
         params.append("sortBy", sortBy);
         params.append("sortOrder", sortOrder || "asc");
       }
+      if (filters?.startDate) params.append("startDate", filters.startDate);
+      if (filters?.endDate) params.append("endDate", filters.endDate);
 
       const response = await fetch(`/api/vendor-invoices?${params}`);
 
@@ -79,12 +111,20 @@ export const useVendorInvoices = (
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
     retry: 2,
+    // Keep the current rows on screen while a filter change refetches,
+    // instead of dropping back to the page's loading spinner.
+    placeholderData: keepPreviousData,
   });
   console.log("Vendor Invoices Data:", data);
 
   return {
     vendorInvoices: data?.data || [],
     total: data?.total || 0,
+    summary: data?.summary ?? {
+      unpaidCount: 0,
+      overdueCount: 0,
+      totalOutstanding: 0,
+    },
     loading: isLoading,
     error: error instanceof Error ? error.message : null,
     refetch,
