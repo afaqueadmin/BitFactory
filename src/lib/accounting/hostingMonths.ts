@@ -7,7 +7,7 @@
  * before months existed have none.
  */
 
-export type LineItemKind = "HARDWARE" | "HOSTING_COLOCATION";
+export type LineItemKind = "HARDWARE" | "HOSTING_COLOCATION" | "REPAIR";
 
 type MonthValue = string | Date | null | undefined;
 

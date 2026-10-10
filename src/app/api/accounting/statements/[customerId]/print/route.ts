@@ -106,7 +106,9 @@ export async function GET(
         const invoiceType =
           invoice.invoiceType === "HARDWARE_SALES"
             ? "Hardware"
-            : "Hosting & Electricity";
+            : invoice.invoiceType === "HARDWARE_REPAIR"
+              ? "Hardware Repair"
+              : "Hosting & Electricity";
 
         const statusClass = `status-${invoice.status}`;
 

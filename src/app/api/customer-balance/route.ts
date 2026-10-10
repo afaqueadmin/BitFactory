@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { NON_BALANCE_PAYMENT_TYPES } from "@/lib/accounting/paymentTypes";
 import { verifyJwtToken } from "@/lib/jwt";
 import { franchiseeUserFilter } from "@/lib/franchiseeScope";
 
@@ -35,7 +36,7 @@ export async function GET(request: NextRequest) {
     // Query cost_payments table and aggregate by userId
     const costPayments = await prisma.costPayment.groupBy({
       by: ["userId"],
-      where: { type: { not: "HARDWARE_SALES" }, isDeleted: false },
+      where: { type: { notIn: NON_BALANCE_PAYMENT_TYPES }, isDeleted: false },
       _sum: {
         amount: true,
       },

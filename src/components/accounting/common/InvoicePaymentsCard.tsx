@@ -33,6 +33,8 @@ function typeLabel(type: string, invoiceType?: string | null): string {
   switch (type) {
     case "HARDWARE_SALES":
       return "Hardware Sales";
+    case "HARDWARE_REPAIR":
+      return "Hardware Repair";
     case "PAYMENT":
       // On hardware-sales invoices, PAYMENT rows are the hosting part of a
       // split payment.

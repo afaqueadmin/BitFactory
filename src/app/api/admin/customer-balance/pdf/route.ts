@@ -90,7 +90,7 @@ export async function GET(request: NextRequest) {
     const subtitle =
       startDate || endDate
         ? `Period: ${startDate ? startDate.toLocaleString() : "the beginning"} to ${endDate ? endDate.toLocaleString() : "now"}`
-        : "All-time, every CostPayment row except HARDWARE_SALES";
+        : "All-time, every CostPayment row except HARDWARE_SALES and HARDWARE_REPAIR";
 
     const html = buildCostPaymentTransactionsPdfHtml({
       title: "Total Customer Balance — Transaction Detail",

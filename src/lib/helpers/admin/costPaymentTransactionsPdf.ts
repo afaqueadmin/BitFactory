@@ -1,9 +1,4 @@
-const TYPE_LABELS: Record<string, string> = {
-  PAYMENT: "Payment",
-  ELECTRICITY_CHARGES: "Hosting & electricity charges",
-  ADJUSTMENT: "Adjustment",
-  HARDWARE_SALES: "Hardware sales payment",
-};
+import { paymentTypeLabel } from "@/lib/accounting/paymentTypes";
 
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat("en-US", {
@@ -90,7 +85,7 @@ export function buildCostPaymentTransactionsPdfHtml({
         <tr>
           <td>${escapeHtml(formatDate(t.createdAt))}</td>
           <td>${escapeHtml(t.customerName || t.customerEmail || "—")}</td>
-          <td>${escapeHtml(TYPE_LABELS[t.type] || t.type)}</td>
+          <td>${escapeHtml(paymentTypeLabel(t.type))}</td>
           <td class="amount ${t.amount < 0 ? "negative" : "positive"}">${escapeHtml(formatCurrency(t.amount))}</td>
           <td>${escapeHtml(t.invoiceNumber || "—")}</td>
           <td>${escapeHtml(t.narration || "—")}</td>

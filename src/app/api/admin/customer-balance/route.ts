@@ -5,8 +5,8 @@ import { buildOrderBy, parseCustomerBalanceQuery } from "./query";
 
 /**
  * Drill-down for the adminpanel "Total Customer Balance" card. With no
- * filters applied, the summary matches the card exactly: type !=
- * HARDWARE_SALES, user not soft-deleted, all-time (no createdAt filter). No
+ * filters applied, the summary matches the card exactly: type not in
+ * (HARDWARE_SALES, HARDWARE_REPAIR), user not soft-deleted, all-time (no createdAt filter). No
  * sign flip is applied — this is a net ledger balance, not a revenue
  * figure. When date/customer/type filters are applied, the summary is
  * recomputed over that same filtered subset (via the same `where` used for

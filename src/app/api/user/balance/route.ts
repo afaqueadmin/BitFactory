@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { NON_BALANCE_PAYMENT_TYPES } from "@/lib/accounting/paymentTypes";
 import { verifyJwtToken } from "@/lib/jwt";
 
 export async function GET(request: NextRequest) {
@@ -44,7 +45,11 @@ export async function GET(request: NextRequest) {
 
     // Get sum of all amounts for this user from cost_payments table
     const result = await prisma.costPayment.aggregate({
-      where: { userId, type: { not: "HARDWARE_SALES" }, isDeleted: false },
+      where: {
+        userId,
+        type: { notIn: NON_BALANCE_PAYMENT_TYPES },
+        isDeleted: false,
+      },
       _sum: {
         amount: true,
       },

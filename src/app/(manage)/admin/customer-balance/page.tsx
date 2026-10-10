@@ -124,9 +124,10 @@ export default function CustomerBalanceDetailPage() {
         Total Customer Balance
       </Typography>
       <Typography color="textSecondary" sx={{ mb: 3 }}>
-        All-time net sum of CostPayment rows (every type except HARDWARE_SALES)
-        for hosted customers — a net ledger balance, not a revenue figure, so no
-        sign flip is applied. Excludes customers with segment = SELF_MINING.
+        All-time net sum of CostPayment rows (every type except HARDWARE_SALES
+        and HARDWARE_REPAIR) for hosted customers — a net ledger balance, not a
+        revenue figure, so no sign flip is applied. Excludes customers with
+        segment = SELF_MINING.
       </Typography>
 
       {error && (
@@ -196,7 +197,7 @@ export default function CustomerBalanceDetailPage() {
           >
             {isFiltered
               ? "These 4 numbers are recalculated from the filtered transactions below — they no longer match the dashboard card while a filter is active."
-              : "No filters applied — this covers every CostPayment row ever created (HARDWARE_SALES excluded) and matches the dashboard card exactly."}
+              : "No filters applied — this covers every CostPayment row ever created (HARDWARE_SALES and HARDWARE_REPAIR excluded) and matches the dashboard card exactly."}
           </Typography>
         </CardContent>
       </Card>
@@ -266,10 +267,7 @@ export default function CustomerBalanceDetailPage() {
               onChange={(e) => {
                 setTypeFilter(
                   e.target.value as
-                    | ""
-                    | "PAYMENT"
-                    | "ELECTRICITY_CHARGES"
-                    | "ADJUSTMENT",
+                    "" | "PAYMENT" | "ELECTRICITY_CHARGES" | "ADJUSTMENT",
                 );
                 resetToFirstPage();
               }}

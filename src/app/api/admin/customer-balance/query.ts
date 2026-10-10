@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { NON_BALANCE_PAYMENT_TYPES } from "@/lib/accounting/paymentTypes";
 
 /**
  * Shared query-parsing for the Total Customer Balance drill-down, used by
@@ -83,7 +84,7 @@ export function parseCustomerBalanceQuery(
     typeParam === "ELECTRICITY_CHARGES" ||
     typeParam === "ADJUSTMENT"
       ? typeParam
-      : { not: "HARDWARE_SALES" };
+      : { notIn: NON_BALANCE_PAYMENT_TYPES };
 
   const where: Prisma.CostPaymentWhereInput = {
     type: baseTypeFilter,

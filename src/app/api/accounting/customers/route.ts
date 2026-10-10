@@ -33,8 +33,11 @@ export async function GET(request: NextRequest) {
 
     // ?scope=hosting limits the list to customers who can be billed for
     // hosting (excludes potential customers and customers with no segment).
-    const hostingOnly =
-      new URL(request.url).searchParams.get("scope") === "hosting";
+    // ?scope=withMiners limits it to customers who own at least one
+    // non-deleted miner (Hardware Repair invoices are per miner).
+    const scope = new URL(request.url).searchParams.get("scope");
+    const hostingOnly = scope === "hosting";
+    const withMinersOnly = scope === "withMiners";
 
     // Fetch all customers (users with role CLIENT)
     const customers = await prisma.user.findMany({
@@ -43,6 +46,7 @@ export async function GET(request: NextRequest) {
         isDeleted: false,
         ...franchiseeUserFilter(user),
         ...(hostingOnly ? hostingEligibleUserFilter() : {}),
+        ...(withMinersOnly ? { miners: { some: { isDeleted: false } } } : {}),
       },
       select: {
         id: true,

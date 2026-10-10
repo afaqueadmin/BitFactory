@@ -98,8 +98,8 @@ export async function GET(request: NextRequest) {
     let runningBalance = 0;
 
     for (const payment of allPaymentsForBalance) {
-      // HARDWARE_SALES is shown in the statement for reference only and is
-      // excluded from the running balance.
+      // HARDWARE_SALES / HARDWARE_REPAIR are shown in the statement for
+      // reference only and are excluded from the running balance.
       if (
         payment.type === "PAYMENT" ||
         payment.type === "ELECTRICITY_CHARGES" ||
@@ -125,7 +125,9 @@ export async function GET(request: NextRequest) {
                 ? "Adjustment"
                 : payment.type === "HARDWARE_SALES"
                   ? "Hardware sales payment"
-                  : payment.type,
+                  : payment.type === "HARDWARE_REPAIR"
+                    ? "Hardware repair payment"
+                    : payment.type,
         consumption:
           payment.consumption > 0
             ? `${payment.consumption.toFixed(2)} kWh`
@@ -133,7 +135,8 @@ export async function GET(request: NextRequest) {
         amount:
           (payment.type === "PAYMENT" ||
           payment.type === "ADJUSTMENT" ||
-          payment.type === "HARDWARE_SALES"
+          payment.type === "HARDWARE_SALES" ||
+          payment.type === "HARDWARE_REPAIR"
             ? payment.amount >= 0
               ? "+ "
               : "- "
@@ -228,6 +231,7 @@ export async function POST(request: NextRequest) {
       "ELECTRICITY_CHARGES",
       "ADJUSTMENT",
       "HARDWARE_SALES",
+      "HARDWARE_REPAIR",
     ];
     if (!validPaymentTypes.includes(type)) {
       return NextResponse.json(

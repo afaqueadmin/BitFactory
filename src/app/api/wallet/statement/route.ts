@@ -109,7 +109,8 @@ export async function GET(request: NextRequest) {
         payment.type === "PAYMENT" ||
         payment.type === "ELECTRICITY_CHARGES" ||
         payment.type === "ADJUSTMENT" ||
-        payment.type === "HARDWARE_SALES"
+        payment.type === "HARDWARE_SALES" ||
+        payment.type === "HARDWARE_REPAIR"
       ) {
         runningBalance += Number(payment.amount);
       }
@@ -184,13 +185,16 @@ export async function GET(request: NextRequest) {
                 ? "Adjustment"
                 : payment.type === "HARDWARE_SALES"
                   ? "Hardware sales payment"
-                  : payment.type;
+                  : payment.type === "HARDWARE_REPAIR"
+                    ? "Hardware repair payment"
+                    : payment.type;
 
         // Format amount with sign
         const amountSign =
           payment.type === "PAYMENT" ||
           payment.type === "ADJUSTMENT" ||
-          payment.type === "HARDWARE_SALES"
+          payment.type === "HARDWARE_SALES" ||
+          payment.type === "HARDWARE_REPAIR"
             ? payment.amount >= 0
               ? "+ "
               : "- "

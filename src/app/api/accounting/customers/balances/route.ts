@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { NON_BALANCE_PAYMENT_TYPES } from "@/lib/accounting/paymentTypes";
 import { verifyJwtToken } from "@/lib/jwt";
 
 /**
@@ -31,7 +32,7 @@ export async function GET(request: NextRequest) {
 
     const balancesByCustomer = await prisma.costPayment.groupBy({
       by: ["userId"],
-      where: { isDeleted: false, type: { not: "HARDWARE_SALES" } },
+      where: { isDeleted: false, type: { notIn: NON_BALANCE_PAYMENT_TYPES } },
       _sum: { amount: true },
     });
 

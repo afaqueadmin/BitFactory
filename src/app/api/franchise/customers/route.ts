@@ -9,9 +9,9 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { NON_BALANCE_PAYMENT_TYPES } from "@/lib/accounting/paymentTypes";
 import { verifyJwtToken } from "@/lib/jwt";
 import { franchiseeUserFilter } from "@/lib/franchiseeScope";
-import { PaymentType } from "@prisma/client";
 
 export async function GET(request: NextRequest) {
   try {
@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
         },
         costPayments: {
           where: {
-            type: { not: PaymentType.HARDWARE_SALES },
+            type: { notIn: NON_BALANCE_PAYMENT_TYPES },
             isDeleted: false,
           },
           select: { amount: true },

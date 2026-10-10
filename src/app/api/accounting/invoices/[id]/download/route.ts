@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyJwtToken } from "@/lib/jwt";
 import { prisma } from "@/lib/prisma";
-import { generateInvoicePDF } from "@/lib/email";
+import { REPAIR_MINER_SELECT } from "@/lib/accounting/hardwareRepair";
+import { generateInvoicePDF, repairDetailsFromInvoice } from "@/lib/email";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +31,7 @@ export async function GET(
           },
         },
         lineItems: true,
+        miner: { select: REPAIR_MINER_SELECT },
       },
     });
 
@@ -94,6 +96,7 @@ export async function GET(
       })),
       invoice.invoiceType,
       invoice.machineHostingLocation,
+      repairDetailsFromInvoice(invoice),
     );
 
     // Return PDF as file download

@@ -10,6 +10,11 @@ import { assertFranchiseeOwnsCustomer } from "@/lib/franchiseeScope";
 import { costPaymentAccountOmit } from "@/lib/accounting/costPaymentAccounts";
 import { parseLineItemBillingMonths } from "@/lib/accounting/hostingMonths";
 import {
+  INVOICE_NUMBER_CUSTOMER_SELECT,
+  nextInvoiceNumber,
+} from "./invoiceNumber";
+import { createRepairInvoice } from "./repair";
+import {
   buildInvoiceListWhere,
   buildInvoiceOrderBy,
   DEFAULT_INVOICE_ORDER,
@@ -82,6 +87,8 @@ export async function GET(request: NextRequest) {
         userRole === "ADMIN" || userRole === "SUPER_ADMIN"
           ? true
           : { where: { isDeleted: false }, omit: costPaymentAccountOmit },
+      // Hardware Repair invoices: the repaired miner (null for other types).
+      miner: { select: { id: true, name: true, serialNumber: true } },
     };
 
     // Only include createdByUser when customerId is not passed
@@ -210,6 +217,19 @@ export async function POST(request: NextRequest) {
         { error: "Missing required fields: customerId, dueDate" },
         { status: 400 },
       );
+    }
+
+    // Hardware Repair invoices have their own line items, discount, miner
+    // and repair note.
+    if (invoiceType === "HARDWARE_REPAIR") {
+      return await createRepairInvoice({
+        body,
+        userId,
+        customerId,
+        dueDate,
+        invoiceGeneratedDate,
+        machineHostingLocation: normalizedMachineHostingLocation,
+      });
     }
 
     if (!hasLineItems) {
@@ -342,16 +362,7 @@ export async function POST(request: NextRequest) {
     // no matter how many more they're given later.
     const customer = await prisma.user.findUnique({
       where: { id: customerId },
-      select: {
-        name: true,
-        segment: true,
-        poolAuths: {
-          where: { pool: { name: "Luxor" } },
-          orderBy: { createdAt: "asc" },
-          take: 1,
-          select: { authKey: true },
-        },
-      },
+      select: INVOICE_NUMBER_CUSTOMER_SELECT,
     });
 
     if (!customer) {
@@ -373,37 +384,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Prefer the Luxor subaccount identifier; fall back to the customer's
-    // first name when no subaccount is assigned so invoice numbers stay
-    // human-readable instead of blocking invoice creation.
-    const luxorIdentifier =
-      customer.poolAuths[0]?.authKey ||
-      customer.name?.trim().split(/\s+/)[0] ||
-      "Customer";
-
     // Generate invoice number: luxorIdentifier-YYYYMMDD-sequence
     const timestamp = new Date();
-    const dateStr = `${timestamp.getFullYear()}${String(timestamp.getMonth() + 1).padStart(2, "0")}${String(timestamp.getDate()).padStart(2, "0")}`;
-
-    // Get last invoice for this customer (cumulative counter, not daily)
-    const customerLastInvoice = await prisma.invoice.findFirst({
-      where: {
-        userId: customerId,
-      },
-      select: { invoiceNumber: true },
-      orderBy: { createdAt: "desc" },
-    });
-
-    // Extract sequence number from last invoice and increment
-    // Format: subaccount-YYYYMMDD-XXX where XXX is the sequence
-    const lastSeq = customerLastInvoice
-      ? parseInt(
-          customerLastInvoice.invoiceNumber.split("-").pop() || "0",
-          10,
-        ) || 0
-      : 0;
-    const sequenceNumber = String(lastSeq + 1).padStart(3, "0");
-    const invoiceNumber = `${luxorIdentifier}-${dateStr}-${sequenceNumber}`;
+    const invoiceNumber = await nextInvoiceNumber(
+      customerId,
+      customer,
+      timestamp,
+    );
 
     const numericUnitPrice = hasLineItems
       ? (computedUnitPrice as number)

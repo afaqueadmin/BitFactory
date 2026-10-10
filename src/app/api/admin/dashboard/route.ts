@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { NON_BALANCE_PAYMENT_TYPES } from "@/lib/accounting/paymentTypes";
 import { verifyJwtToken } from "@/lib/jwt";
 import {
   WorkersResponse,
@@ -877,7 +878,7 @@ export async function GET(request: NextRequest) {
     // card is meant to reflect hosted customer balances only)
     const totalCustomerBalance = await prisma.costPayment.aggregate({
       where: {
-        type: { not: "HARDWARE_SALES" },
+        type: { notIn: NON_BALANCE_PAYMENT_TYPES },
         isDeleted: false,
         user: { isDeleted: false, segment: { not: "SELF_MINING" } },
       },

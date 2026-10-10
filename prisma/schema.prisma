@@ -487,6 +487,7 @@ model Miner {
   user               User                     @relation(fields: [userId], references: [id])
   pool               Pool?                    @relation(fields: [poolId], references: [id])
   repairNotes        MinerRepairNote[]        @relation("MinerRepairNotes")
+  repairInvoices     Invoice[]                @relation("minerRepairInvoices")
   tickets            SupportTicket[]
 
   @@unique([name, userId])
@@ -923,6 +924,13 @@ model Invoice {
   btcpayCheckoutUrl      String?
   btcpayCreatedAt        DateTime?
   btcpaySettledAt        DateTime?
+  // HARDWARE_REPAIR invoices: the one miner being repaired, and a flat
+  // discount taken off the line-item subtotal (totalAmount is after it).
+  // Other invoice types leave minerId null and discountAmount 0.
+  minerId                String?
+  discountAmount         Decimal               @default(0) @db.Decimal(12, 2)
+  miner                  Miner?                @relation("minerRepairInvoices", fields: [minerId], references: [id], onDelete: SetNull)
+  repairNote             MinerRepairNote?      @relation("invoiceRepairNote")
   notifications          InvoiceNotification[] @relation("invoiceNotifications")
   costPayments           CostPayment[]         @relation("invoiceCostPayments")
   tickets                SupportTicket[]
@@ -942,6 +950,7 @@ model Invoice {
   @@index([createdAt])
   @@index([invoiceNumber])
   @@index([btcpayInvoiceId])
+  @@index([minerId])
   @@map("invoices")
 }
 
@@ -1364,6 +1373,7 @@ enum PaymentType {
   ELECTRICITY_CHARGES
   ADJUSTMENT
   HARDWARE_SALES
+  HARDWARE_REPAIR
 }
 
 enum BtcpayStatus {
@@ -1387,11 +1397,13 @@ enum InvoiceType {
   ELECTRICITY_CHARGES
   HARDWARE_PURCHASE
   HARDWARE_SALES
+  HARDWARE_REPAIR
 }
 
 enum InvoiceLineItemType {
   HARDWARE
   HOSTING_COLOCATION
+  REPAIR
 }
 
 enum MemoCategory {
@@ -1720,9 +1732,13 @@ model MinerRepairNote {
   createdById String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  // Set when the note was written by a Hardware Repair invoice; the note is
+  // kept in sync with that invoice and deleted with it.
+  invoiceId   String?  @unique
 
-  miner     Miner @relation("MinerRepairNotes", fields: [minerId], references: [id], onDelete: Cascade)
-  createdBy User  @relation("CreatedRepairNotes", fields: [createdById], references: [id])
+  miner     Miner    @relation("MinerRepairNotes", fields: [minerId], references: [id], onDelete: Cascade)
+  createdBy User     @relation("CreatedRepairNotes", fields: [createdById], references: [id])
+  invoice   Invoice? @relation("invoiceRepairNote", fields: [invoiceId], references: [id], onDelete: Cascade)
 
   @@index([minerId])
   @@index([createdById])

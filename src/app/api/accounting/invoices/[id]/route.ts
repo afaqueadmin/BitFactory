@@ -12,6 +12,8 @@ import {
   costPaymentAccountOmit,
 } from "@/lib/accounting/costPaymentAccounts";
 import { parseLineItemBillingMonths } from "@/lib/accounting/hostingMonths";
+import { REPAIR_MINER_SELECT } from "@/lib/accounting/hardwareRepair";
+import { updateRepairInvoice } from "../repair";
 
 function normalizeBillingMonth(billingMonth: string | Date): Date {
   const parsedBillingMonth = new Date(billingMonth);
@@ -70,6 +72,8 @@ export async function GET(
             costPayments: { include: costPaymentAccountInclude },
             notifications: true,
             lineItems: true,
+            miner: { select: REPAIR_MINER_SELECT },
+            repairNote: true,
           },
         })
       : await prisma.invoice.findUnique({
@@ -81,6 +85,9 @@ export async function GET(
               omit: costPaymentAccountOmit,
             },
             lineItems: true,
+            // The repaired miner (theirs); the internal repair note is
+            // admin-only.
+            miner: { select: REPAIR_MINER_SELECT },
           },
         });
 
@@ -168,6 +175,12 @@ export async function PATCH(
         { error: "Only DRAFT invoices can be edited" },
         { status: 400 },
       );
+    }
+
+    // Hardware Repair invoices: line items, discount, miner and the linked
+    // repair note are updated together.
+    if (currentInvoice.invoiceType === "HARDWARE_REPAIR") {
+      return await updateRepairInvoice({ currentInvoice, body, userId });
     }
 
     const hasLineItems = Array.isArray(lineItems) && lineItems.length > 0;
@@ -636,6 +649,7 @@ export async function DELETE(
 
     const invoice = await prisma.invoice.findUnique({
       where: { id },
+      include: { repairNote: { select: { minerId: true } } },
     });
 
     if (!invoice) {
@@ -656,7 +670,8 @@ export async function DELETE(
 
     const invoiceNumber = invoice.invoiceNumber;
 
-    // Delete invoice (cascade deletes payments and notifications)
+    // Delete invoice (cascade deletes payments, notifications and a Hardware
+    // Repair invoice's linked repair note)
     await prisma.invoice.delete({
       where: { id },
     });
@@ -672,6 +687,17 @@ export async function DELETE(
         changes: JSON.stringify({}),
       },
     });
+    if (invoice.repairNote) {
+      await prisma.auditLog.create({
+        data: {
+          action: AuditAction.MINER_REPAIR_NOTE_DELETED,
+          entityType: "Miner",
+          entityId: invoice.repairNote.minerId,
+          userId,
+          description: `Repair note deleted with invoice ${invoiceNumber}`,
+        },
+      });
+    }
 
     return NextResponse.json({ success: true, message: "Invoice deleted" });
   } catch (error) {

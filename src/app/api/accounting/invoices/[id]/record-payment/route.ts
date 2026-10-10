@@ -198,10 +198,13 @@ export async function POST(
           amount: hardwareAmount,
           originalAmount: hardwareOriginal,
           ...accountFields,
+          // Hardware payments are kept out of the hosting balance.
           type:
             invoice.invoiceType === "HARDWARE_SALES"
               ? "HARDWARE_SALES"
-              : "PAYMENT",
+              : invoice.invoiceType === "HARDWARE_REPAIR"
+                ? "HARDWARE_REPAIR"
+                : "PAYMENT",
           consumption: 0,
           narration: notes || null,
         },

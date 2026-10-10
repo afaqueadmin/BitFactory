@@ -38,6 +38,11 @@ const EXPORTS = {
     filenamePrefix: "hardware-sales",
     paidPastDueColumn: false,
   },
+  HARDWARE_REPAIR: {
+    title: "Hardware Repair — Invoices",
+    filenamePrefix: "hardware-repair",
+    paidPastDueColumn: false,
+  },
 } as const;
 
 type ExportInvoiceType = keyof typeof EXPORTS;
@@ -102,7 +107,10 @@ export async function GET(request: NextRequest) {
     const invoiceType = searchParams.get("invoiceType");
     if (!isExportInvoiceType(invoiceType)) {
       return NextResponse.json(
-        { error: "invoiceType must be ELECTRICITY_CHARGES or HARDWARE_SALES" },
+        {
+          error:
+            "invoiceType must be ELECTRICITY_CHARGES, HARDWARE_SALES or HARDWARE_REPAIR",
+        },
         { status: 400 },
       );
     }

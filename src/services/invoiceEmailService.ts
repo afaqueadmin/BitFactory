@@ -1,5 +1,9 @@
 import { prisma } from "@/lib/prisma";
-import { generateInvoicePDF, sendInvoiceEmailWithPDF } from "@/lib/email";
+import {
+  generateInvoicePDF,
+  RepairInvoiceDetails,
+  sendInvoiceEmailWithPDF,
+} from "@/lib/email";
 import { getGroupByUserId } from "@/lib/groupUtils";
 import { ConfirmoPaymentService } from "./confirmoPaymentService";
 import { AuditAction } from "@prisma/client";
@@ -24,12 +28,14 @@ export interface InvoiceEmailPayload {
     quantity: number;
     unitPrice: number;
     totalPrice: number;
-    lineItemType?: "HARDWARE" | "HOSTING_COLOCATION";
+    lineItemType?: "HARDWARE" | "HOSTING_COLOCATION" | "REPAIR";
     hardwareId?: string | null;
     billingMonth?: Date | null;
   }>;
   invoiceType?: string | null;
   machineHostingLocation?: string[] | null;
+  // Hardware Repair invoices: miner block + subtotal / discount.
+  repair?: RepairInvoiceDetails | null;
 }
 
 export interface EmailSendResult {
@@ -161,6 +167,7 @@ export class InvoiceEmailService {
         payload.lineItems,
         payload.invoiceType,
         payload.machineHostingLocation,
+        payload.repair,
       );
 
       console.log(
@@ -188,6 +195,7 @@ export class InvoiceEmailService {
         payload.lineItems,
         payload.invoiceType,
         payload.hardwareModel,
+        payload.repair,
       );
 
       if (!emailResult.success) {

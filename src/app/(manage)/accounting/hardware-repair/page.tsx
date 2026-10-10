@@ -1,0 +1,1033 @@
+/**
+ * Hardware Repair Dashboard
+ *
+ * Main dashboard showing hardware repair invoices overview
+ */
+
+"use client";
+
+import {
+  Box,
+  Container,
+  CircularProgress,
+  Alert,
+  Button,
+  Stack,
+  Typography,
+  Paper,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  TablePagination,
+  TableSortLabel,
+  TextField,
+  MenuItem,
+  Checkbox,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  LinearProgress,
+} from "@mui/material";
+import Link from "next/link";
+import { useState } from "react";
+import {
+  Customer,
+  InvoiceWithDetails,
+  useCustomers,
+  useInvoices,
+  useChangeInvoiceStatus,
+  useDeleteInvoice,
+  useBulkSendInvoiceEmail,
+} from "@/lib/hooks/useInvoices";
+import { useUser } from "@/lib/hooks/useUser";
+import { StatsCard } from "@/components/accounting/dashboard/StatsCard";
+import { StatusBadge } from "@/components/accounting/common/StatusBadge";
+import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
+import { DateDisplay } from "@/components/accounting/common/DateDisplay";
+import AddIcon from "@mui/icons-material/Add";
+import DownloadIcon from "@mui/icons-material/Download";
+import { InvoiceStatus } from "@prisma/client";
+import { downloadExport } from "@/lib/downloadExport";
+
+type SortKey =
+  | "invoiceNumber"
+  | "customer"
+  | "amount"
+  | "status"
+  | "issuedDate"
+  | "paidDate"
+  | "dueDate"
+  | "daysUntilDue";
+
+type BulkStatusType = "ISSUED" | "PAID" | "OVERDUE" | "CANCELLED" | "REFUNDED";
+
+export default function HardwareRepairDashboard() {
+  const { user } = useUser();
+  const isAdmin = user?.role === "ADMIN" || user?.role === "SUPER_ADMIN";
+
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [customerFilter, setCustomerFilter] = useState<string>("");
+  const [statusFilter, setStatusFilter] = useState<string>("");
+  const [startDateFilter, setStartDateFilter] = useState("");
+  const [endDateFilter, setEndDateFilter] = useState("");
+  const [sortBy, setSortBy] = useState<SortKey>("dueDate");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+
+  const [selectedInvoiceIds, setSelectedInvoiceIds] = useState<string[]>([]);
+  const [bulkStatus, setBulkStatus] = useState<"" | BulkStatusType>("");
+  const [bulkError, setBulkError] = useState<string | null>(null);
+  const [bulkEmailDialogOpen, setBulkEmailDialogOpen] =
+    useState<boolean>(false);
+  const [bulkEmailProcessing, setBulkEmailProcessing] =
+    useState<boolean>(false);
+  const [bulkEmailTotal, setBulkEmailTotal] = useState<number>(0);
+  const [bulkEmailProcessed, setBulkEmailProcessed] = useState<number>(0);
+  const [bulkEmailSuccessCount, setBulkEmailSuccessCount] = useState<number>(0);
+  const [bulkEmailFailureCount, setBulkEmailFailureCount] = useState<number>(0);
+  const [bulkEmailError, setBulkEmailError] = useState<string | null>(null);
+  const [bulkEmailRunId, setBulkEmailRunId] = useState<string | null>(null);
+  const [confirmAlreadyPaidOpen, setConfirmAlreadyPaidOpen] = useState(false);
+  const [alreadyPaidInvoices, setAlreadyPaidInvoices] = useState<
+    { invoiceId: string; invoiceNumber: string; customerName: string }[]
+  >([]);
+  const [exporting, setExporting] = useState<"csv" | "pdf" | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
+
+  const { customers, loading: customersLoading } = useCustomers();
+
+  const listOptions = {
+    startDate: startDateFilter || undefined,
+    endDate: endDateFilter || undefined,
+    keepPrevious: true,
+  };
+
+  const {
+    invoices,
+    total,
+    loading: invoicesLoading,
+    error: invoicesError,
+  } = useInvoices(
+    page,
+    pageSize,
+    customerFilter || undefined,
+    statusFilter ? (statusFilter as InvoiceStatus) : undefined,
+    "HARDWARE_REPAIR",
+    sortBy,
+    sortDirection,
+    true,
+    listOptions,
+  );
+
+  // Fetch the full filtered set (independent of table pagination) so the
+  // summary cards reflect the selected filters across all matching invoices.
+  const {
+    invoices: statsInvoices,
+    total: statsTotal,
+    loading: statsLoading,
+  } = useInvoices(
+    1,
+    9999,
+    customerFilter || undefined,
+    statusFilter ? (statusFilter as InvoiceStatus) : undefined,
+    "HARDWARE_REPAIR",
+    undefined,
+    undefined,
+    true,
+    listOptions,
+  );
+
+  const {
+    changeStatus,
+    loading: bulkStatusLoading,
+    error: bulkStatusHookError,
+  } = useChangeInvoiceStatus();
+
+  const {
+    deleteInvoice,
+    loading: bulkDeleteLoading,
+    error: bulkDeleteHookError,
+  } = useDeleteInvoice();
+
+  const { bulkSendEmail } = useBulkSendInvoiceEmail();
+
+  const handleChangePage = (event: unknown, newPage: number) => {
+    setPage(newPage + 1);
+  };
+
+  const handleChangeRowsPerPage = (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    setPageSize(parseInt(event.target.value, 10));
+    setPage(1);
+  };
+
+  const handleCustomerFilterChange = (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    setCustomerFilter(event.target.value);
+    setPage(1);
+  };
+
+  const handleStatusFilterChange = (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    setStatusFilter(event.target.value);
+    setPage(1);
+  };
+
+  // Rows outside the new range leave the table, so drop them from the bulk
+  // selection rather than acting on invoices that are no longer shown.
+  const handleDateFilterChange =
+    (setter: (value: string) => void) =>
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      setter(event.target.value);
+      setSelectedInvoiceIds([]);
+      setPage(1);
+    };
+
+  const handleExport = async (format: "csv" | "pdf") => {
+    try {
+      setExporting(format);
+      setExportError(null);
+      const params = new URLSearchParams({
+        format,
+        invoiceType: "HARDWARE_REPAIR",
+        includeDrafts: "true",
+        sortBy,
+        sortDirection,
+        tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      });
+      if (customerFilter) params.set("customerId", customerFilter);
+      if (statusFilter) params.set("status", statusFilter);
+      if (startDateFilter) params.set("startDate", startDateFilter);
+      if (endDateFilter) params.set("endDate", endDateFilter);
+      await downloadExport(
+        `/api/accounting/invoices/export?${params.toString()}`,
+        `hardware-repair-${new Date().toLocaleDateString("en-CA")}.${format}`,
+      );
+    } catch (err) {
+      setExportError(
+        err instanceof Error ? err.message : "Failed to download export",
+      );
+    } finally {
+      setExporting(null);
+    }
+  };
+
+  const handleRequestSort = (property: SortKey) => {
+    if (sortBy === property) {
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortBy(property);
+      setSortDirection(property === "daysUntilDue" ? "desc" : "asc");
+    }
+    setPage(1);
+  };
+
+  const handleToggleInvoiceSelection = (invoiceId: string) => {
+    setSelectedInvoiceIds((prev) =>
+      prev.includes(invoiceId)
+        ? prev.filter((id) => id !== invoiceId)
+        : [...prev, invoiceId],
+    );
+  };
+
+  const handleToggleAllInvoices = (
+    event: React.ChangeEvent<HTMLInputElement>,
+    visibleInvoices: InvoiceWithDetails[],
+  ) => {
+    if (event.target.checked) {
+      setSelectedInvoiceIds(visibleInvoices.map((inv) => inv.id));
+    } else {
+      setSelectedInvoiceIds([]);
+    }
+  };
+
+  const handleApplyBulkStatus = async () => {
+    if (!bulkStatus || selectedInvoiceIds.length === 0) return;
+    setBulkError(null);
+    try {
+      for (const id of selectedInvoiceIds) {
+        await changeStatus(id, bulkStatus as BulkStatusType);
+      }
+      setSelectedInvoiceIds([]);
+      setBulkStatus("");
+    } catch (error) {
+      setBulkError(
+        error instanceof Error
+          ? error.message
+          : "Failed to update invoice statuses.",
+      );
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedInvoiceIds.length === 0) return;
+    if (
+      !window.confirm(
+        `Are you sure you want to delete ${selectedInvoiceIds.length} invoice(s)? This action cannot be undone.`,
+      )
+    ) {
+      return;
+    }
+    setBulkError(null);
+    try {
+      for (const id of selectedInvoiceIds) {
+        await deleteInvoice(id);
+      }
+      setSelectedInvoiceIds([]);
+    } catch (error) {
+      setBulkError(
+        error instanceof Error
+          ? error.message
+          : "Failed to delete selected invoices.",
+      );
+    }
+  };
+
+  const performIssueAndSend = async (invoiceIds: string[]) => {
+    if (invoiceIds.length === 0) return;
+
+    setBulkEmailError(null);
+    setBulkEmailRunId(null);
+    setBulkEmailTotal(invoiceIds.length);
+    setBulkEmailProcessed(0);
+    setBulkEmailSuccessCount(0);
+    setBulkEmailFailureCount(0);
+    setBulkEmailDialogOpen(true);
+    setBulkEmailProcessing(true);
+
+    try {
+      // First, change status of DRAFT invoices to ISSUED
+      for (const id of invoiceIds) {
+        const invoice = invoices.find(
+          (inv: InvoiceWithDetails) => inv.id === id,
+        );
+        if (invoice && invoice.status === "DRAFT") {
+          await changeStatus(invoice.id, "ISSUED");
+        }
+        setBulkEmailProcessed((prev) => prev + 1);
+      }
+
+      // Then send emails in bulk
+      const response = await bulkSendEmail(invoiceIds);
+
+      if (response.success && response.runId) {
+        setBulkEmailRunId(response.runId);
+        setBulkEmailSuccessCount(response.results.sent.length);
+        setBulkEmailFailureCount(response.results.failed.length);
+      }
+
+      setSelectedInvoiceIds([]);
+      setConfirmAlreadyPaidOpen(false);
+      setAlreadyPaidInvoices([]);
+    } catch (err) {
+      setBulkEmailError(
+        err instanceof Error ? err.message : "Failed to send bulk emails.",
+      );
+    } finally {
+      setBulkEmailProcessing(false);
+    }
+  };
+
+  const handleIssueAndSendSelected = async (
+    options: {
+      bypassPaidCheck?: boolean;
+      excludeInvoiceIds?: string[];
+    } = {},
+  ) => {
+    const { bypassPaidCheck = false, excludeInvoiceIds = [] } = options;
+
+    if (selectedInvoiceIds.length === 0) return;
+
+    const targetInvoiceIds = selectedInvoiceIds.filter(
+      (id) => !excludeInvoiceIds.includes(id),
+    );
+
+    if (targetInvoiceIds.length === 0) return;
+
+    if (!bypassPaidCheck) {
+      const alreadyPaid = targetInvoiceIds
+        .map((id) => invoices.find((inv: InvoiceWithDetails) => inv.id === id))
+        .filter(
+          (inv): inv is InvoiceWithDetails => !!inv && inv.status === "PAID",
+        );
+
+      if (alreadyPaid.length > 0) {
+        setAlreadyPaidInvoices(
+          alreadyPaid.map((inv) => ({
+            invoiceId: inv.id,
+            invoiceNumber: inv.invoiceNumber,
+            customerName: inv.user?.name || inv.user?.email || inv.userId,
+          })),
+        );
+        setConfirmAlreadyPaidOpen(true);
+        return;
+      }
+    }
+
+    await performIssueAndSend(targetInvoiceIds);
+  };
+
+  const calculateDaysUntilDue = (dueDate: Date) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const due = new Date(dueDate);
+    due.setHours(0, 0, 0, 0);
+    const diffTime = due.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays;
+  };
+
+  // Calculate stats from the full filtered set of invoices
+  const totalInvoices = statsTotal;
+  const unpaidInvoices = statsInvoices.filter(
+    (inv: InvoiceWithDetails) => inv.status !== "PAID",
+  ).length;
+  const now = new Date();
+  const overdueInvoices = statsInvoices.filter(
+    (inv: InvoiceWithDetails) =>
+      inv.status !== "PAID" && new Date(inv.dueDate) < now,
+  ).length;
+  const totalOutstanding = statsInvoices
+    .filter(
+      (inv: InvoiceWithDetails) =>
+        inv.status !== "PAID" &&
+        inv.status !== "CANCELLED" &&
+        inv.status !== "REFUNDED",
+    )
+    .reduce(
+      (sum: number, inv: InvoiceWithDetails) => sum + Number(inv.totalAmount),
+      0,
+    );
+
+  const loading = invoicesLoading || statsLoading;
+  const error = invoicesError;
+
+  if (loading) {
+    return (
+      <Container maxWidth="lg">
+        <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
+          <CircularProgress />
+        </Box>
+      </Container>
+    );
+  }
+
+  if (error) {
+    return (
+      <Container maxWidth="lg">
+        <Alert severity="error">{error}</Alert>
+      </Container>
+    );
+  }
+
+  return (
+    <Container maxWidth="lg" sx={{ py: 4 }}>
+      <Dialog
+        open={bulkEmailDialogOpen}
+        onClose={() => {
+          if (!bulkEmailProcessing) {
+            setBulkEmailDialogOpen(false);
+          }
+        }}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Issue and send invoices</DialogTitle>
+        <DialogContent dividers>
+          {!bulkEmailProcessing && bulkEmailRunId ? (
+            <Stack spacing={2}>
+              <Alert severity="success">
+                Emails sent successfully! {bulkEmailSuccessCount} successful,{" "}
+                {bulkEmailFailureCount} failed.
+              </Alert>
+              <Typography variant="body2">
+                View the detailed report and resend failed emails:
+              </Typography>
+              <Button
+                component={Link}
+                href={`/hardware-repair/email-report/${bulkEmailRunId}`}
+                variant="contained"
+                color="primary"
+                fullWidth
+              >
+                View Email Report
+              </Button>
+            </Stack>
+          ) : (
+            <>
+              <Typography gutterBottom>
+                Issuing and sending invoices to {bulkEmailTotal} {"customers"}
+              </Typography>
+              <Typography variant="body2" color="textSecondary" gutterBottom>
+                This may take a moment. You can keep this window open while we
+                process each invoice.
+              </Typography>
+              <Box sx={{ mt: 2 }}>
+                <LinearProgress
+                  variant={bulkEmailTotal > 0 ? "determinate" : "indeterminate"}
+                  value={
+                    bulkEmailTotal > 0
+                      ? (bulkEmailProcessed / Math.max(bulkEmailTotal, 1)) * 100
+                      : 0
+                  }
+                />
+                <Box sx={{ mt: 1 }}>
+                  <Typography variant="body2">
+                    Progress: {bulkEmailProcessed} of {bulkEmailTotal} invoice
+                    {bulkEmailTotal === 1 ? "" : "s"} processed.
+                  </Typography>
+                  <Typography variant="body2">
+                    Status: Sent successfully {bulkEmailSuccessCount},
+                    Unsuccessful {bulkEmailFailureCount}.
+                  </Typography>
+                </Box>
+              </Box>
+              {bulkEmailError && (
+                <Alert severity="error" sx={{ mt: 2 }}>
+                  {bulkEmailError}
+                </Alert>
+              )}
+            </>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => setBulkEmailDialogOpen(false)}
+            disabled={bulkEmailProcessing}
+          >
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={confirmAlreadyPaidOpen}
+        onClose={() => setConfirmAlreadyPaidOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Some invoices are already marked as PAID</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ mb: 1 }}>
+            The following invoices are already marked as PAID:
+          </Typography>
+          <Box component="ul" sx={{ pl: 3, mb: 2 }}>
+            {alreadyPaidInvoices.map(
+              ({ invoiceId, invoiceNumber, customerName }) => (
+                <li key={invoiceId}>
+                  <Typography variant="body2">
+                    {invoiceNumber} — {customerName}
+                  </Typography>
+                </li>
+              ),
+            )}
+          </Box>
+          <Typography variant="body2">
+            Do you still want to issue and send them?
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() =>
+              void handleIssueAndSendSelected({
+                bypassPaidCheck: true,
+                excludeInvoiceIds: alreadyPaidInvoices.map((i) => i.invoiceId),
+              })
+            }
+            disabled={bulkEmailProcessing}
+          >
+            No, skip them
+          </Button>
+          <Button
+            variant="contained"
+            onClick={() =>
+              void handleIssueAndSendSelected({ bypassPaidCheck: true })
+            }
+            disabled={bulkEmailProcessing}
+          >
+            Yes, send anyway
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Header */}
+      <Stack
+        direction="row"
+        justifyContent="space-between"
+        alignItems="center"
+        mb={4}
+      >
+        <div>
+          <Typography variant="h4" sx={{ fontWeight: "bold" }}>
+            Hardware Repair Dashboard
+          </Typography>
+          <Typography color="textSecondary" sx={{ mt: 0.5 }}>
+            Overview of hardware repair invoices and payments
+          </Typography>
+        </div>
+        <Link href="/accounting/hardware-repair/create">
+          <Button variant="contained" startIcon={<AddIcon />}>
+            Create Invoice
+          </Button>
+        </Link>
+      </Stack>
+
+      {/* Stats Row */}
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: {
+            xs: "1fr",
+            sm: "1fr 1fr",
+            md: "1fr 1fr 1fr 1fr",
+          },
+          gap: 3,
+          mb: 4,
+        }}
+      >
+        <Box>
+          <StatsCard
+            label="Total Invoices"
+            value={totalInvoices}
+            color="info"
+          />
+        </Box>
+        <Box>
+          <StatsCard
+            label="Unpaid Invoices"
+            value={unpaidInvoices}
+            color="warning"
+          />
+        </Box>
+        <Box>
+          <StatsCard
+            label="Overdue Invoices"
+            value={overdueInvoices}
+            color="error"
+          />
+        </Box>
+        <Box>
+          <StatsCard
+            label="Total Outstanding"
+            value={totalOutstanding}
+            isCurrency
+            color="primary"
+          />
+        </Box>
+      </Box>
+
+      {/* Tables */}
+      <Box sx={{ display: "grid", gridTemplateColumns: "1fr", gap: 3 }}>
+        <Paper>
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              p: 2,
+            }}
+          >
+            <Typography variant="h6" sx={{ fontWeight: "bold" }}>
+              All Hardware Repair Invoices
+            </Typography>
+            <Link href="/accounting/hardware-repair/create">
+              <Button variant="contained" startIcon={<AddIcon />}>
+                Create Invoice
+              </Button>
+            </Link>
+          </Box>
+          <Box
+            sx={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 2,
+              px: 2,
+              pb: 2,
+            }}
+          >
+            <TextField
+              select
+              size="small"
+              label="Filter by Customer"
+              value={customerFilter}
+              onChange={handleCustomerFilterChange}
+              sx={{ minWidth: 220 }}
+              disabled={customersLoading}
+            >
+              <MenuItem value="">All customers</MenuItem>
+              {customers.map((customer: Customer) => (
+                <MenuItem key={customer.id} value={customer.id}>
+                  {customer.displayName}
+                </MenuItem>
+              ))}
+            </TextField>
+            <TextField
+              select
+              size="small"
+              label="Filter by Status"
+              value={statusFilter}
+              onChange={handleStatusFilterChange}
+              sx={{ minWidth: 180 }}
+            >
+              <MenuItem value="">All statuses</MenuItem>
+              <MenuItem value="DRAFT">Draft</MenuItem>
+              <MenuItem value="ISSUED">Issued</MenuItem>
+              <MenuItem value="OVERDUE">Overdue</MenuItem>
+              <MenuItem value="PAID">Paid</MenuItem>
+              <MenuItem value="CANCELLED">Cancelled</MenuItem>
+              <MenuItem value="REFUNDED">Refunded</MenuItem>
+            </TextField>
+            <TextField
+              label="Issued from"
+              type="date"
+              size="small"
+              value={startDateFilter}
+              onChange={handleDateFilterChange(setStartDateFilter)}
+              InputLabelProps={{ shrink: true }}
+              inputProps={{ max: endDateFilter || undefined }}
+              sx={{ minWidth: 170 }}
+            />
+            <TextField
+              label="Issued to"
+              type="date"
+              size="small"
+              value={endDateFilter}
+              onChange={handleDateFilterChange(setEndDateFilter)}
+              InputLabelProps={{ shrink: true }}
+              inputProps={{ min: startDateFilter || undefined }}
+              sx={{ minWidth: 170 }}
+            />
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={
+                exporting === "csv" ? (
+                  <CircularProgress size={16} />
+                ) : (
+                  <DownloadIcon />
+                )
+              }
+              onClick={() => void handleExport("csv")}
+              disabled={exporting !== null || total === 0}
+            >
+              Download CSV
+            </Button>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={
+                exporting === "pdf" ? (
+                  <CircularProgress size={16} />
+                ) : (
+                  <DownloadIcon />
+                )
+              }
+              onClick={() => void handleExport("pdf")}
+              disabled={exporting !== null || total === 0}
+            >
+              Download PDF
+            </Button>
+            <Box sx={{ flexGrow: 1 }} />
+            {isAdmin && (
+              <>
+                <TextField
+                  select
+                  size="small"
+                  label="Bulk status"
+                  value={bulkStatus}
+                  onChange={(e) =>
+                    setBulkStatus(e.target.value as "" | BulkStatusType)
+                  }
+                  sx={{ minWidth: 180 }}
+                  disabled={selectedInvoiceIds.length === 0}
+                >
+                  <MenuItem value="">Select status</MenuItem>
+                  <MenuItem value="ISSUED">Mark as Issued</MenuItem>
+                  <MenuItem value="PAID">Mark as Paid</MenuItem>
+                  <MenuItem value="OVERDUE">Mark as Overdue</MenuItem>
+                  <MenuItem value="CANCELLED">Cancel</MenuItem>
+                  <MenuItem value="REFUNDED">Mark as Refunded</MenuItem>
+                </TextField>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={handleApplyBulkStatus}
+                  disabled={
+                    !bulkStatus ||
+                    selectedInvoiceIds.length === 0 ||
+                    bulkStatusLoading
+                  }
+                >
+                  Apply Status
+                </Button>
+                <Button
+                  variant="contained"
+                  size="small"
+                  onClick={() => void handleIssueAndSendSelected()}
+                  disabled={
+                    selectedInvoiceIds.length === 0 || bulkEmailProcessing
+                  }
+                >
+                  Issue &amp; Send Emails
+                </Button>
+                <Button
+                  variant="outlined"
+                  color="error"
+                  size="small"
+                  onClick={handleBulkDelete}
+                  disabled={
+                    selectedInvoiceIds.length === 0 || bulkDeleteLoading
+                  }
+                >
+                  Delete Selected
+                </Button>
+              </>
+            )}
+          </Box>
+          {isAdmin &&
+            (bulkError || bulkStatusHookError || bulkDeleteHookError) && (
+              <Box sx={{ px: 2 }}>
+                <Alert severity="error" sx={{ mb: 1 }}>
+                  {bulkError || bulkStatusHookError || bulkDeleteHookError}
+                </Alert>
+              </Box>
+            )}
+          {exportError && (
+            <Box sx={{ px: 2 }}>
+              <Alert severity="error" sx={{ mb: 1 }}>
+                {exportError}
+              </Alert>
+            </Box>
+          )}
+          <TableContainer>
+            <Table>
+              <TableHead sx={{ backgroundColor: "#f5f5f5" }}>
+                <TableRow>
+                  {isAdmin && (
+                    <TableCell padding="checkbox">
+                      <Checkbox
+                        indeterminate={
+                          selectedInvoiceIds.length > 0 &&
+                          selectedInvoiceIds.length < invoices.length
+                        }
+                        checked={
+                          invoices.length > 0 &&
+                          selectedInvoiceIds.length === invoices.length
+                        }
+                        onChange={(e) => handleToggleAllInvoices(e, invoices)}
+                      />
+                    </TableCell>
+                  )}
+                  <TableCell sx={{ fontWeight: "bold" }}>
+                    <TableSortLabel
+                      active={sortBy === "invoiceNumber"}
+                      direction={
+                        sortBy === "invoiceNumber" ? sortDirection : "asc"
+                      }
+                      onClick={() => handleRequestSort("invoiceNumber")}
+                    >
+                      Invoice
+                    </TableSortLabel>
+                  </TableCell>
+                  <TableCell sx={{ fontWeight: "bold" }}>
+                    <TableSortLabel
+                      active={sortBy === "customer"}
+                      direction={sortBy === "customer" ? sortDirection : "asc"}
+                      onClick={() => handleRequestSort("customer")}
+                    >
+                      Customer
+                    </TableSortLabel>
+                  </TableCell>
+                  <TableCell sx={{ fontWeight: "bold" }}>Miner</TableCell>
+                  <TableCell sx={{ fontWeight: "bold" }}>
+                    <TableSortLabel
+                      active={sortBy === "amount"}
+                      direction={sortBy === "amount" ? sortDirection : "asc"}
+                      onClick={() => handleRequestSort("amount")}
+                    >
+                      Amount
+                    </TableSortLabel>
+                  </TableCell>
+                  <TableCell sx={{ fontWeight: "bold" }}>
+                    <TableSortLabel
+                      active={sortBy === "status"}
+                      direction={sortBy === "status" ? sortDirection : "asc"}
+                      onClick={() => handleRequestSort("status")}
+                    >
+                      Status
+                    </TableSortLabel>
+                  </TableCell>
+                  <TableCell sx={{ fontWeight: "bold" }}>
+                    <TableSortLabel
+                      active={sortBy === "issuedDate"}
+                      direction={
+                        sortBy === "issuedDate" ? sortDirection : "asc"
+                      }
+                      onClick={() => handleRequestSort("issuedDate")}
+                    >
+                      Issued Date
+                    </TableSortLabel>
+                  </TableCell>
+                  <TableCell sx={{ fontWeight: "bold" }}>
+                    <TableSortLabel
+                      active={sortBy === "paidDate"}
+                      direction={sortBy === "paidDate" ? sortDirection : "asc"}
+                      onClick={() => handleRequestSort("paidDate")}
+                    >
+                      Paid Date
+                    </TableSortLabel>
+                  </TableCell>
+                  <TableCell sx={{ fontWeight: "bold" }}>
+                    <TableSortLabel
+                      active={sortBy === "dueDate"}
+                      direction={sortBy === "dueDate" ? sortDirection : "asc"}
+                      onClick={() => handleRequestSort("dueDate")}
+                    >
+                      Due Date
+                    </TableSortLabel>
+                  </TableCell>
+                  <TableCell sx={{ fontWeight: "bold" }}>
+                    <TableSortLabel
+                      active={sortBy === "daysUntilDue"}
+                      direction={
+                        sortBy === "daysUntilDue" ? sortDirection : "asc"
+                      }
+                      onClick={() => handleRequestSort("daysUntilDue")}
+                    >
+                      Days Until Due
+                    </TableSortLabel>
+                  </TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {invoices.map((invoice: InvoiceWithDetails) => {
+                  const daysUntilDue = calculateDaysUntilDue(invoice.dueDate);
+                  return (
+                    <TableRow key={invoice.id} hover>
+                      {isAdmin && (
+                        <TableCell padding="checkbox">
+                          <Checkbox
+                            checked={selectedInvoiceIds.includes(invoice.id)}
+                            onChange={() =>
+                              handleToggleInvoiceSelection(invoice.id)
+                            }
+                          />
+                        </TableCell>
+                      )}
+                      <TableCell>
+                        <Link
+                          href={`/accounting/hardware-repair/${invoice.id}`}
+                          style={{ color: "#1976d2", textDecoration: "none" }}
+                        >
+                          {invoice.invoiceNumber}
+                        </Link>
+                      </TableCell>
+                      <TableCell>
+                        {invoice.user?.name ||
+                          `Customer ${invoice.userId.slice(0, 8)}`}
+                      </TableCell>
+                      <TableCell>
+                        {invoice.miner ? (
+                          <>
+                            {invoice.miner.name}
+                            {invoice.miner.serialNumber && (
+                              <Typography
+                                variant="caption"
+                                color="textSecondary"
+                                display="block"
+                              >
+                                {invoice.miner.serialNumber}
+                              </Typography>
+                            )}
+                          </>
+                        ) : (
+                          "-"
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <CurrencyDisplay
+                          value={invoice.totalAmount}
+                          standalone={true}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <StatusBadge status={invoice.status} />
+                      </TableCell>
+                      <TableCell>
+                        {invoice.issuedDate ? (
+                          <DateDisplay
+                            date={invoice.issuedDate}
+                            format="date"
+                          />
+                        ) : (
+                          "-"
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {invoice.status === "PAID" && invoice.paidDate ? (
+                          <DateDisplay date={invoice.paidDate} format="date" />
+                        ) : (
+                          "-"
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <DateDisplay date={invoice.dueDate} format="date" />
+                      </TableCell>
+                      <TableCell>
+                        {invoice.status === "PAID" ? (
+                          "-"
+                        ) : (
+                          <Typography
+                            sx={{
+                              color:
+                                daysUntilDue < 0
+                                  ? "error.main"
+                                  : daysUntilDue < 7
+                                    ? "warning.main"
+                                    : "success.main",
+                              fontWeight: "500",
+                            }}
+                          >
+                            {daysUntilDue === 0
+                              ? "Today"
+                              : daysUntilDue === 1
+                                ? "1 day"
+                                : daysUntilDue < 0
+                                  ? `${Math.abs(daysUntilDue)} ${Math.abs(daysUntilDue) === 1 ? "day" : "days"} overdue`
+                                  : `${daysUntilDue} ${daysUntilDue === 1 ? "day" : "days"}`}
+                          </Typography>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+            <TablePagination
+              rowsPerPageOptions={[
+                5,
+                10,
+                25,
+                50,
+                { value: 9999, label: "Max" },
+              ]}
+              component="div"
+              count={total}
+              rowsPerPage={pageSize}
+              page={page - 1}
+              onPageChange={handleChangePage}
+              onRowsPerPageChange={handleChangeRowsPerPage}
+            />
+          </TableContainer>
+        </Paper>
+      </Box>
+    </Container>
+  );
+}

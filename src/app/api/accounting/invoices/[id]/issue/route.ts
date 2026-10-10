@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { REPAIR_MINER_SELECT } from "@/lib/accounting/hardwareRepair";
 import { verifyJwtToken } from "@/lib/jwt";
 import {
   InvoiceEmailService,
   InvoiceEmailPayload,
 } from "@/services/invoiceEmailService";
+import { repairDetailsFromInvoice } from "@/lib/email";
 import { getGroupByUserId } from "@/lib/groupUtils";
 import { InvoiceStatus, AuditAction } from "@prisma/client";
 import { accrueIncentivesForInvoice } from "@/lib/incentives/accrue";
@@ -64,6 +66,7 @@ export async function POST(
           },
         },
         lineItems: true,
+        miner: { select: REPAIR_MINER_SELECT },
       },
     });
 
@@ -175,6 +178,7 @@ export async function POST(
       paidDate: invoice.paidDate || undefined,
       invoiceType: invoice.invoiceType,
       machineHostingLocation: invoice.machineHostingLocation || undefined,
+      repair: repairDetailsFromInvoice(invoice),
       lineItems: invoice.lineItems.map((li) => ({
         model: li.model,
         quantity: li.quantity,

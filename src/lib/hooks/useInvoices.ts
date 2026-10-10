@@ -55,6 +55,16 @@ export interface InvoiceWithDetails extends Invoice {
   };
   costPayments?: CostPaymentWithAccount[];
   lineItems?: InvoiceLineItem[];
+  // Hardware Repair invoices: the repaired miner and (admins only) the
+  // linked repair note.
+  miner?: {
+    id: string;
+    name: string;
+    serialNumber: string | null;
+    hardware: { model: string } | null;
+    space: { name: string; location: string } | null;
+  } | null;
+  repairNote?: { id: string; note: string; dateOfEntry: string } | null;
   group?: {
     id: string;
     name: string;
@@ -259,14 +269,21 @@ export interface Customer {
 
 // hostingOnly excludes potential customers and customers with no segment -
 // use it on hosting (ELECTRICITY_CHARGES) screens, not hardware sales.
-export function useCustomers(options: { hostingOnly?: boolean } = {}) {
+// withMiners lists only customers who own a non-deleted miner (Hardware
+// Repair invoices are per miner).
+export function useCustomers(
+  options: { hostingOnly?: boolean; withMiners?: boolean } = {},
+) {
   const hostingOnly = !!options.hostingOnly;
+  const withMiners = !!options.withMiners;
   const { data, isLoading, error } = useQuery({
-    queryKey: ["customers", { hostingOnly }],
+    queryKey: ["customers", { hostingOnly, withMiners }],
     queryFn: async () => {
       const url = hostingOnly
         ? "/api/accounting/customers?scope=hosting"
-        : "/api/accounting/customers";
+        : withMiners
+          ? "/api/accounting/customers?scope=withMiners"
+          : "/api/accounting/customers";
       const res = await fetch(url, {
         method: "GET",
         credentials: "include",

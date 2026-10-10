@@ -24,6 +24,7 @@ import {
 } from "@mui/icons-material";
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
 import { DateDisplay } from "@/components/accounting/common/DateDisplay";
+import { paymentTypeLabel } from "@/lib/accounting/paymentTypes";
 
 export interface TransactionRow {
   id: string;
@@ -35,13 +36,6 @@ export interface TransactionRow {
   customer: { id: string; name: string | null; email: string | null } | null;
   invoiceNumber: string | null;
 }
-
-const TYPE_LABELS: Record<string, string> = {
-  PAYMENT: "Payment",
-  ELECTRICITY_CHARGES: "Hosting & electricity charges",
-  ADJUSTMENT: "Adjustment",
-  HARDWARE_SALES: "Hardware sales payment",
-};
 
 type RowsPerPageOption = number | { value: number; label: string };
 
@@ -167,7 +161,7 @@ export default function CostPaymentTransactionsTable({
                     </TableCell>
                     <TableCell>
                       <Typography variant="body2">
-                        {TYPE_LABELS[row.type] || row.type}
+                        {paymentTypeLabel(row.type)}
                       </Typography>
                     </TableCell>
                     <TableCell align="right">

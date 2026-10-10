@@ -999,6 +999,7 @@ export const sendInvoiceEmailWithPDF = async (
   lineItems?: InvoicePdfLineItem[] | null,
   invoiceType?: string | null,
   hardwareModel?: string | null,
+  repair?: RepairInvoiceDetails | null,
 ) => {
   try {
     // Load email template
@@ -1031,6 +1032,7 @@ export const sendInvoiceEmailWithPDF = async (
             hardwareModel,
             lineItems,
             invoiceType,
+            repair,
           )
         : "",
     };
@@ -1133,11 +1135,51 @@ export interface InvoicePdfLineItem {
   quantity: number;
   unitPrice: number | string;
   totalPrice: number | string;
-  lineItemType?: "HARDWARE" | "HOSTING_COLOCATION";
+  lineItemType?: "HARDWARE" | "HOSTING_COLOCATION" | "REPAIR";
   hardwareId?: string | null;
   // HOSTING_COLOCATION rows on Hardware Sales invoices: the month billed.
   billingMonth?: Date | string | null;
 }
+
+/** Extra details shown on Hardware Repair invoice PDFs and emails. */
+export interface RepairInvoiceDetails {
+  miner: {
+    serialNumber: string | null;
+    name: string;
+    model: string | null;
+    location: string | null;
+  };
+  subtotal: number | string;
+  discount: number | string;
+}
+
+/** Repair invoice details from an invoice loaded with REPAIR_MINER_SELECT. */
+export const repairDetailsFromInvoice = (invoice: {
+  invoiceType: string;
+  unitPrice: unknown;
+  discountAmount: unknown;
+  miner: {
+    serialNumber: string | null;
+    name: string;
+    hardware: { model: string } | null;
+    space: { name: string; location: string } | null;
+  } | null;
+}): RepairInvoiceDetails | null =>
+  invoice.invoiceType === "HARDWARE_REPAIR" && invoice.miner
+    ? {
+        miner: {
+          serialNumber: invoice.miner.serialNumber,
+          name: invoice.miner.name,
+          model: invoice.miner.hardware?.model ?? null,
+          location: invoice.miner.space
+            ? `${invoice.miner.space.name} (${invoice.miner.space.location})`
+            : null,
+        },
+        // Repair invoices store the line-item subtotal in unitPrice.
+        subtotal: Number(invoice.unitPrice),
+        discount: Number(invoice.discountAmount),
+      }
+    : null;
 
 // Hardware rows are always listed above Hosting & Colocation rows on the
 // invoice PDF, regardless of the order they were stored/passed in; hosting
@@ -1170,8 +1212,9 @@ const buildProductRowsHtml = (
           },
         ];
 
-  if (invoiceType === "HARDWARE_SALES") {
-    // Hardware Sales: Product Name = the model itself, no Machine Name column
+  if (invoiceType === "HARDWARE_SALES" || invoiceType === "HARDWARE_REPAIR") {
+    // Hardware Sales: Product Name = the model itself, no Machine Name column.
+    // Hardware Repair: the same 4 columns (Description | Qty | Rate | Amount).
     return rows
       .map(
         (row) => `        <tr>
@@ -1208,6 +1251,7 @@ const buildLineItemsTableHtml = (
   hardwareModel: string | null | undefined,
   lineItems: InvoicePdfLineItem[] | null | undefined,
   invoiceType: string | null | undefined,
+  repair?: RepairInvoiceDetails | null,
 ): string => {
   const rows = buildProductRowsHtml(
     totalMiners,
@@ -1217,6 +1261,22 @@ const buildLineItemsTableHtml = (
     lineItems,
     invoiceType,
   );
+
+  if (invoiceType === "HARDWARE_REPAIR" && repair) {
+    return `${buildRepairMinerRowsHtml(repair, "email")}
+    <table class="line-items-table">
+      <thead><tr>
+          <th>Description</th>
+          <th class="text-right">Qty</th>
+          <th class="text-right">Rate</th>
+          <th class="text-right">Amount</th>
+        </tr></thead>
+      <tbody>
+${rows}
+${buildRepairTotalRowsHtml(repair, totalAmount, "email")}
+      </tbody>
+    </table>`;
+  }
 
   const header =
     invoiceType === "HARDWARE_SALES"
@@ -1240,6 +1300,110 @@ const buildLineItemsTableHtml = (
 ${rows}
       </tbody>
     </table>`;
+};
+
+// ---- Hardware Repair layout -------------------------------------------
+// Repair invoices swap the shared products table for their own (Description
+// | Qty | Rate | Amount + Subtotal / Discount / Total) and add a Miner block.
+// This is done in code, leaving the invoice-pdf.html template - and so the
+// Hosting / Hardware Sales output - untouched.
+
+const MINER_FIELDS = (repair: RepairInvoiceDetails) => [
+  ["SERIAL NO.", repair.miner.serialNumber || "—"],
+  ["MINER NAME", repair.miner.name],
+  ["MODEL", repair.miner.model || "—"],
+  ["LOCATION", repair.miner.location || "—"],
+];
+
+const buildRepairMinerRowsHtml = (
+  repair: RepairInvoiceDetails,
+  target: "pdf" | "email",
+): string => {
+  const fields = MINER_FIELDS(repair);
+  if (target === "email") {
+    return `<div style="margin-bottom: 12px;">
+${fields
+  .map(
+    ([label, value]) => `      <div class="row">
+        <span class="label">${label.charAt(0)}${label.slice(1).toLowerCase()}:</span>
+        <span class="value">${escapeHtml(value)}</span>
+      </div>`,
+  )
+  .join("\n")}
+    </div>`;
+  }
+  return `    <div class="invoice-title" style="font-size: 16px; margin: 4px 0;">Miner</div>
+    <div class="info-box">
+${fields
+  .map(
+    ([label, value]) => `      <div class="info-row">
+        <span class="info-label">${label}:</span>
+        <span class="info-value">${escapeHtml(value)}</span>
+      </div>`,
+  )
+  .join("\n")}
+    </div>`;
+};
+
+const buildRepairTotalRowsHtml = (
+  repair: RepairInvoiceDetails,
+  totalAmount: number | string,
+  target: "pdf" | "email",
+): string => {
+  const discount = Number(repair.discount);
+  // Label spans Description | Qty | Rate; the amount sits under Amount.
+  const cell = 'colspan="3"';
+  // The email's own "Total Amount Due" summary follows the table.
+  const totalLabel = target === "pdf" ? "Total Amount" : "Total";
+  const rows = [
+    `        <tr class="subtotal-row">
+          <td ${cell}>Subtotal</td>
+          <td class="text-right">${formatCurrency(Number(repair.subtotal))}</td>
+        </tr>`,
+  ];
+  if (discount > 0) {
+    rows.push(`        <tr class="discount-row">
+          <td ${cell}>Discount</td>
+          <td class="text-right">- ${formatCurrency(discount)}</td>
+        </tr>`);
+  }
+  rows.push(`        <tr class="total-row" style="font-weight: bold;">
+          <td ${cell}>${totalLabel}</td>
+          <td class="text-right">${formatCurrency(Number(totalAmount))}</td>
+        </tr>`);
+  return rows.join("\n");
+};
+
+const PRODUCTS_TABLE_REGEX = /<table class="products-table">[\s\S]*?<\/table>/;
+
+/** Swaps the template's products table for the repair miner block + table. */
+const applyRepairPdfLayout = (
+  template: string,
+  repair: RepairInvoiceDetails,
+  productRowsHtml: string,
+  totalAmount: number | string,
+): string => {
+  if (!PRODUCTS_TABLE_REGEX.test(template)) {
+    throw new Error("invoice-pdf.html: products table not found");
+  }
+  const repairHtml = `${buildRepairMinerRowsHtml(repair, "pdf")}
+
+    <table class="products-table">
+      <thead>
+        <tr>
+          <th>DESCRIPTION</th>
+          <th class="text-right">QTY</th>
+          <th class="text-right">RATE (USD)</th>
+          <th class="text-right">AMOUNT (USD)</th>
+        </tr>
+      </thead>
+      <tbody>
+${productRowsHtml}
+${buildRepairTotalRowsHtml(repair, totalAmount, "pdf")}
+      </tbody>
+    </table>`;
+  // Function replacement so "$" in the HTML is never treated as a pattern.
+  return template.replace(PRODUCTS_TABLE_REGEX, () => repairHtml);
 };
 
 interface FooterSectionData {
@@ -1312,6 +1476,7 @@ export const generateInvoicePDF = async (
   lineItems?: InvoicePdfLineItem[] | null,
   invoiceType?: string | null,
   machineHostingLocationOverride?: string[] | null,
+  repair?: RepairInvoiceDetails | null,
 ): Promise<Buffer> => {
   try {
     // Load PDF template
@@ -1319,7 +1484,23 @@ export const generateInvoicePDF = async (
       process.cwd(),
       "src/lib/email-templates/invoice-pdf.html",
     );
-    const pdfTemplate = readFileSync(pdfTemplatePath, "utf-8");
+    const baseTemplate = readFileSync(pdfTemplatePath, "utf-8");
+    const pdfTemplate =
+      invoiceType === "HARDWARE_REPAIR" && repair
+        ? applyRepairPdfLayout(
+            baseTemplate,
+            repair,
+            buildProductRowsHtml(
+              totalMiners,
+              unitPrice,
+              totalAmount,
+              hardwareModel,
+              lineItems,
+              invoiceType,
+            ),
+            totalAmount,
+          )
+        : baseTemplate;
 
     // Fetch PaymentDetails from database for dynamic configuration
     let paymentDetails = null;
