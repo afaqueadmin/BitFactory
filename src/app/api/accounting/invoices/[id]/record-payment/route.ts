@@ -128,7 +128,7 @@ export async function POST(
       );
     }
 
-    // Hardware-sales invoices that also bill first-month Hosting & Colocation
+    // Hardware-sales invoices that also bill Hosting & Colocation (one or more months)
     // record two separate CostPayment entries (Hardware Sales Payment +
     // Hosting and Colocation Payment). Invoices without a hosting line item
     // (including every invoice created before this feature) keep the
