@@ -218,6 +218,11 @@ const sidebarItems: SidebarItem[] = [
         icon: <DocumentIcon />,
         path: "/accounting/hardware-purchases",
       },
+      {
+        title: "Entities, Banks & Currencies",
+        icon: <PaymentAccountsIcon />,
+        path: "/accounting/payment-accounts",
+      },
       // {
       //   title: "Invoices",
       //   icon: <InvoicesIcon />,
@@ -262,11 +267,6 @@ const sidebarItems: SidebarItem[] = [
         title: "Pricing",
         icon: <HostingPricesIcon />,
         path: "/accounting/pricing",
-      },
-      {
-        title: "Entities, Banks & Currencies",
-        icon: <PaymentAccountsIcon />,
-        path: "/accounting/payment-accounts",
       },
     ],
   },
