@@ -80,12 +80,16 @@ export default function EditInvoicePage() {
             quantity: number;
             unitPrice: number | string;
             lineItemType?: "HARDWARE" | "HOSTING_COLOCATION";
+            billingMonth?: string | null;
           }) => ({
             hardwareId: li.hardwareId || "",
             model: li.model,
             quantity: li.quantity,
             unitPrice: Number(li.unitPrice),
             lineItemType: li.lineItemType || "HARDWARE",
+            // Carried through so saving (which replaces all line items)
+            // keeps each hosting row's month.
+            billingMonth: li.billingMonth ?? null,
           }),
         ),
       );

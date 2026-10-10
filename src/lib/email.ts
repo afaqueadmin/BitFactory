@@ -4,6 +4,11 @@ import { join } from "path";
 import puppeteerCore from "puppeteer-core";
 import puppeteer from "puppeteer";
 import chromium from "@sparticuz/chromium-min";
+import {
+  formatBillingMonthLong,
+  formatBillingMonthRange,
+  sortInvoiceLineItems,
+} from "@/lib/accounting/hostingMonths";
 
 // Utility function to format dates
 const formatDate = (date: Date): string => {
@@ -1129,25 +1134,16 @@ export interface InvoicePdfLineItem {
   unitPrice: number | string;
   totalPrice: number | string;
   lineItemType?: "HARDWARE" | "HOSTING_COLOCATION";
+  hardwareId?: string | null;
+  // HOSTING_COLOCATION rows on Hardware Sales invoices: the month billed.
+  billingMonth?: Date | string | null;
 }
 
 // Hardware rows are always listed above Hosting & Colocation rows on the
-// invoice PDF, regardless of the order they were stored/passed in.
-const LINE_ITEM_TYPE_RANK: Record<"HARDWARE" | "HOSTING_COLOCATION", number> = {
-  HARDWARE: 0,
-  HOSTING_COLOCATION: 1,
-};
-
+// invoice PDF, regardless of the order they were stored/passed in; hosting
+// rows are grouped by model and ordered by month.
 const sortPdfLineItems = (items: InvoicePdfLineItem[]): InvoicePdfLineItem[] =>
-  items
-    .map((item, index) => ({ item, index }))
-    .sort((a, b) => {
-      const rankDiff =
-        LINE_ITEM_TYPE_RANK[a.item.lineItemType || "HARDWARE"] -
-        LINE_ITEM_TYPE_RANK[b.item.lineItemType || "HARDWARE"];
-      return rankDiff !== 0 ? rankDiff : a.index - b.index;
-    })
-    .map(({ item }) => item);
+  sortInvoiceLineItems(items);
 
 const buildProductRowsHtml = (
   totalMiners: number,
@@ -1411,13 +1407,15 @@ export const generateInvoicePDF = async (
       paymentStatusTone,
       paidPastDueLabel,
       paidPastDueTone,
+      // Hosting invoices carry one billing month on the invoice; Hardware
+      // Sales invoices carry them per hosting line item (shown as a range).
       billingMonth: billingMonth
-        ? new Date(billingMonth).toLocaleDateString("en-US", {
-            timeZone: "UTC",
-            year: "numeric",
-            month: "long",
-          })
-        : "N/A",
+        ? formatBillingMonthLong(billingMonth)
+        : formatBillingMonthRange(
+            (lineItems || [])
+              .filter((li) => li.lineItemType === "HOSTING_COLOCATION")
+              .map((li) => li.billingMonth),
+          ) || "N/A",
       // Add PaymentDetails if available - include all fields as-is
       ...(paymentDetails
         ? {

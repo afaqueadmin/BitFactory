@@ -16,6 +16,12 @@ import {
 import { useState } from "react";
 import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
+import {
+  consecutiveBillingMonths,
+  hostingLineItemLabel,
+  sortInvoiceLineItems,
+  startOfBillingMonth,
+} from "@/lib/accounting/hostingMonths";
 
 export type LineItemType = "HARDWARE" | "HOSTING_COLOCATION";
 
@@ -25,6 +31,9 @@ export interface LineItem {
   quantity: number;
   unitPrice: number;
   lineItemType: LineItemType;
+  // HOSTING_COLOCATION rows only: ISO date of the first day of the month
+  // the row bills for. Null/absent on HARDWARE rows and older hosting rows.
+  billingMonth?: string | null;
 }
 
 export interface HardwareOption {
@@ -43,25 +52,34 @@ interface LineItemsEditorProps {
 
 const round2 = (value: number) => Math.round(value * 100) / 100;
 
-// Hardware rows always render/submit above Hosting & Colocation rows,
-// regardless of the order they were added in.
-const LINE_ITEM_TYPE_RANK: Record<LineItemType, number> = {
-  HARDWARE: 0,
-  HOSTING_COLOCATION: 1,
-};
+const MONTH_NAMES = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
 
-export function sortLineItems<T extends { lineItemType: LineItemType }>(
-  items: T[],
-): T[] {
-  return items
-    .map((item, index) => ({ item, index }))
-    .sort((a, b) => {
-      const rankDiff =
-        LINE_ITEM_TYPE_RANK[a.item.lineItemType] -
-        LINE_ITEM_TYPE_RANK[b.item.lineItemType];
-      return rankDiff !== 0 ? rankDiff : a.index - b.index;
-    })
-    .map(({ item }) => item);
+const MAX_HOSTING_MONTHS = 12;
+
+// Hardware rows always render/submit above Hosting & Colocation rows,
+// regardless of the order they were added in; hosting rows are grouped by
+// model and ordered by month.
+export function sortLineItems<
+  T extends {
+    lineItemType: LineItemType;
+    hardwareId?: string | null;
+    billingMonth?: string | Date | null;
+  },
+>(items: T[]): T[] {
+  return sortInvoiceLineItems(items);
 }
 
 export function LineItemsEditor({
@@ -73,6 +91,16 @@ export function LineItemsEditor({
   enableHostingColocation = false,
 }: LineItemsEditorProps) {
   const [newHardwareId, setNewHardwareId] = useState("");
+  const today = new Date();
+  const [hostingStartYear, setHostingStartYear] = useState(today.getFullYear());
+  const [hostingStartMonth, setHostingStartMonth] = useState(today.getMonth());
+  const [hostingMonthCount, setHostingMonthCount] = useState(1);
+  const hostingYearOptions = [
+    today.getFullYear() - 1,
+    today.getFullYear(),
+    today.getFullYear() + 1,
+    today.getFullYear() + 2,
+  ];
 
   const hardwareRows = lineItems.filter(
     (item) => item.lineItemType === "HARDWARE",
@@ -82,13 +110,38 @@ export function LineItemsEditor({
     ? hardwareList.filter((hw) => !usedHardwareIds.has(hw.id))
     : hardwareList;
 
-  const hostingableHardwareRows = hardwareRows.filter(
-    (hw) =>
-      !lineItems.some(
+  // One hosting row per hardware model per selected month, skipping
+  // (model, month) pairs that are already on the invoice.
+  const existingHostingKeys = new Set(
+    lineItems
+      .filter(
         (item) =>
-          item.lineItemType === "HOSTING_COLOCATION" &&
-          item.hardwareId === hw.hardwareId,
+          item.lineItemType === "HOSTING_COLOCATION" && item.billingMonth,
+      )
+      .map(
+        (item) =>
+          `${item.hardwareId}|${startOfBillingMonth(item.billingMonth as string).getTime()}`,
       ),
+  );
+  const selectedHostingMonths = consecutiveBillingMonths(
+    hostingStartYear,
+    hostingStartMonth,
+    hostingMonthCount,
+  );
+  const newHostingRows: LineItem[] = hardwareRows.flatMap((hw) =>
+    selectedHostingMonths
+      .filter(
+        (month) =>
+          !existingHostingKeys.has(`${hw.hardwareId}|${month.getTime()}`),
+      )
+      .map((month) => ({
+        hardwareId: hw.hardwareId,
+        model: hostingLineItemLabel(hw.model, month),
+        quantity: hw.quantity,
+        unitPrice: 0,
+        lineItemType: "HOSTING_COLOCATION" as const,
+        billingMonth: month.toISOString(),
+      })),
   );
 
   const totalMiners = lineItems.reduce(
@@ -143,25 +196,13 @@ export function LineItemsEditor({
   };
 
   const addHostingRows = () => {
-    const newRows: LineItem[] = hostingableHardwareRows.map((hw) => ({
-      hardwareId: hw.hardwareId,
-      model: `Hosting & Colocation (${hw.model})`,
-      quantity: hw.quantity,
-      unitPrice: 0,
-      lineItemType: "HOSTING_COLOCATION",
-    }));
-    if (newRows.length === 0) return;
-    onChange([...lineItems, ...newRows]);
+    if (newHostingRows.length === 0) return;
+    onChange([...lineItems, ...newHostingRows]);
   };
 
-  const displayOrder = lineItems
-    .map((item, index) => ({ item, index }))
-    .sort((a, b) => {
-      const rankDiff =
-        LINE_ITEM_TYPE_RANK[a.item.lineItemType] -
-        LINE_ITEM_TYPE_RANK[b.item.lineItemType];
-      return rankDiff !== 0 ? rankDiff : a.index - b.index;
-    });
+  const displayOrder = sortInvoiceLineItems(
+    lineItems.map((item, index) => ({ ...item, index })),
+  ).map(({ index }) => ({ item: lineItems[index], index }));
 
   return (
     <Box>
@@ -286,11 +327,66 @@ export function LineItemsEditor({
       </Box>
 
       {enableHostingColocation && (
-        <Box sx={{ mt: 1 }}>
+        <Box
+          sx={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 1,
+            alignItems: "center",
+            mt: 2,
+          }}
+        >
+          <TextField
+            select
+            size="small"
+            label="Hosting from"
+            value={hostingStartMonth}
+            onChange={(e) => setHostingStartMonth(Number(e.target.value))}
+            sx={{ minWidth: 140 }}
+            disabled={disabled}
+          >
+            {MONTH_NAMES.map((name, i) => (
+              <MenuItem key={name} value={i}>
+                {name}
+              </MenuItem>
+            ))}
+          </TextField>
+          <TextField
+            select
+            size="small"
+            label="Year"
+            value={hostingStartYear}
+            onChange={(e) => setHostingStartYear(Number(e.target.value))}
+            sx={{ minWidth: 100 }}
+            disabled={disabled}
+          >
+            {hostingYearOptions.map((year) => (
+              <MenuItem key={year} value={year}>
+                {year}
+              </MenuItem>
+            ))}
+          </TextField>
+          <TextField
+            select
+            size="small"
+            label="Months"
+            value={hostingMonthCount}
+            onChange={(e) => setHostingMonthCount(Number(e.target.value))}
+            sx={{ minWidth: 100 }}
+            disabled={disabled}
+          >
+            {Array.from({ length: MAX_HOSTING_MONTHS }, (_, i) => i + 1).map(
+              (count) => (
+                <MenuItem key={count} value={count}>
+                  {count}
+                </MenuItem>
+              ),
+            )}
+          </TextField>
           <Button
             startIcon={<AddIcon />}
             onClick={addHostingRows}
-            disabled={disabled || hostingableHardwareRows.length === 0}
+            disabled={disabled || newHostingRows.length === 0}
           >
             Add Hosting & Colocation
           </Button>

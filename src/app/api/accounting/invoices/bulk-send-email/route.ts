@@ -105,6 +105,8 @@ export async function POST(request: NextRequest) {
         unitPrice: Number(li.unitPrice),
         totalPrice: Number(li.totalPrice),
         lineItemType: li.lineItemType,
+        hardwareId: li.hardwareId,
+        billingMonth: li.billingMonth,
       })),
     }));
 

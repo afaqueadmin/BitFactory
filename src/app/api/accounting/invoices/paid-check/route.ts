@@ -64,7 +64,19 @@ export async function POST(request: NextRequest) {
         userId: { in: customerIds },
         status: InvoiceStatus.PAID,
       },
-      select: { userId: true, billingMonth: true },
+      select: {
+        userId: true,
+        billingMonth: true,
+        // Hardware Sales invoices bill hosting months on their line items
+        // rather than on the invoice itself.
+        lineItems: {
+          where: {
+            lineItemType: "HOSTING_COLOCATION",
+            billingMonth: { not: null },
+          },
+          select: { billingMonth: true },
+        },
+      },
     });
 
     const alreadyPaid = checks.filter((check) => {
@@ -73,8 +85,10 @@ export async function POST(request: NextRequest) {
       return paidInvoices.some(
         (invoice) =>
           invoice.userId === check.customerId &&
-          invoice.billingMonth &&
-          invoice.billingMonth.getTime() >= targetMonth.getTime(),
+          [
+            invoice.billingMonth,
+            ...invoice.lineItems.map((li) => li.billingMonth),
+          ].some((month) => month && month.getTime() >= targetMonth.getTime()),
       );
     });
 

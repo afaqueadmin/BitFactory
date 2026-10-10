@@ -109,9 +109,14 @@ async function accrueHardwareSale(
   const totalAmount = Number(invoice.totalAmount);
 
   if (rate.rateBasis === "FLAT_PER_UNIT" && rate.flatAmount != null) {
+    // Units are miners sold: hosting rows repeat their hardware row's
+    // quantity (once per billed month), so they must not be counted.
+    const hardwareLineItems = invoice.lineItems.filter(
+      (li) => li.lineItemType === "HARDWARE",
+    );
     const units =
-      invoice.lineItems.length > 0
-        ? invoice.lineItems.reduce((sum, li) => sum + li.quantity, 0)
+      hardwareLineItems.length > 0
+        ? hardwareLineItems.reduce((sum, li) => sum + li.quantity, 0)
         : invoice.totalMiners;
     const flatAmount = Number(rate.flatAmount);
     await createEntry(

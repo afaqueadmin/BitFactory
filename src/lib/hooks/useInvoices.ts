@@ -38,6 +38,8 @@ export interface InvoiceLineItemInput {
   quantity: number;
   unitPrice: number;
   lineItemType?: "HARDWARE" | "HOSTING_COLOCATION";
+  // HOSTING_COLOCATION only: ISO date of the month the row bills for.
+  billingMonth?: string | null;
 }
 
 export interface InvoiceWithDetails extends Invoice {

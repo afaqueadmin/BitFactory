@@ -954,6 +954,9 @@ model InvoiceLineItem {
   unitPrice    Decimal             @db.Decimal(10, 2)
   totalPrice   Decimal             @db.Decimal(12, 2)
   lineItemType InvoiceLineItemType @default(HARDWARE)
+  // Month a HOSTING_COLOCATION row bills for (first day of month, UTC).
+  // Null on HARDWARE rows and on hosting rows created before months existed.
+  billingMonth DateTime?
   createdAt    DateTime            @default(now())
   updatedAt    DateTime            @updatedAt
 

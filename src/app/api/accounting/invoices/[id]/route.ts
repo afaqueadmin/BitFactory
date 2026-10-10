@@ -11,6 +11,7 @@ import {
   costPaymentAccountInclude,
   costPaymentAccountOmit,
 } from "@/lib/accounting/costPaymentAccounts";
+import { parseLineItemBillingMonths } from "@/lib/accounting/hostingMonths";
 
 function normalizeBillingMonth(billingMonth: string | Date): Date {
   const parsedBillingMonth = new Date(billingMonth);
@@ -178,6 +179,7 @@ export async function PATCH(
       unitPrice: number;
       totalPrice: number;
       lineItemType: "HARDWARE" | "HOSTING_COLOCATION";
+      billingMonth: Date | null;
     }> = [];
 
     if (hasLineItems) {
@@ -206,14 +208,25 @@ export async function PATCH(
         }
       }
 
+      const parsedMonths = parseLineItemBillingMonths(lineItems);
+      if ("error" in parsedMonths) {
+        return NextResponse.json(
+          { error: parsedMonths.error },
+          { status: 400 },
+        );
+      }
+
       validatedLineItems = lineItems.map(
-        (item: {
-          hardwareId: string;
-          model: string;
-          quantity: number;
-          unitPrice: number;
-          lineItemType?: "HARDWARE" | "HOSTING_COLOCATION";
-        }) => ({
+        (
+          item: {
+            hardwareId: string;
+            model: string;
+            quantity: number;
+            unitPrice: number;
+            lineItemType?: "HARDWARE" | "HOSTING_COLOCATION";
+          },
+          index: number,
+        ) => ({
           hardwareId: item.hardwareId,
           model: item.model,
           quantity: item.quantity,
@@ -222,6 +235,7 @@ export async function PATCH(
             (item.quantity * Number(item.unitPrice)).toFixed(2),
           ),
           lineItemType: item.lineItemType || "HARDWARE",
+          billingMonth: parsedMonths.months[index],
         }),
       );
     }

@@ -89,6 +89,8 @@ export async function GET(
         unitPrice: Number(li.unitPrice),
         totalPrice: Number(li.totalPrice),
         lineItemType: li.lineItemType,
+        hardwareId: li.hardwareId,
+        billingMonth: li.billingMonth,
       })),
       invoice.invoiceType,
       invoice.machineHostingLocation,
