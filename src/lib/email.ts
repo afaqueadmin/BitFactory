@@ -1332,17 +1332,15 @@ ${fields
   .join("\n")}
     </div>`;
   }
-  return `    <div class="invoice-title" style="font-size: 16px; margin: 4px 0;">Miner</div>
-    <div class="info-box">
-${fields
-  .map(
-    ([label, value]) => `      <div class="info-row">
+  // PDF: plain info rows, appended to the invoice's own info box.
+  return fields
+    .map(
+      ([label, value]) => `      <div class="info-row">
         <span class="info-label">${label}:</span>
         <span class="info-value">${escapeHtml(value)}</span>
       </div>`,
-  )
-  .join("\n")}
-    </div>`;
+    )
+    .join("\n");
 };
 
 const buildRepairTotalRowsHtml = (
@@ -1375,20 +1373,36 @@ const buildRepairTotalRowsHtml = (
 };
 
 const PRODUCTS_TABLE_REGEX = /<table class="products-table">[\s\S]*?<\/table>/;
+// The info box's closing tag, right before the products table.
+const INFO_BOX_END_REGEX = /(\s*<\/div>\s*<!-- Products Table -->)/;
+// Payment instructions through the page-1 footer.
+const PAYMENT_TO_FOOTER_REGEX =
+  /<!-- Payment Instructions -->[\s\S]*?\{\{footerSectionPage1\}\}/;
 
-/** Swaps the template's products table for the repair miner block + table. */
+/**
+ * Repair PDF layout: miner fields appended to the invoice info box, the
+ * products table swapped for Description | Qty | Rate | Amount with
+ * Subtotal / Discount / Total, and the payment instructions + footer moved
+ * to page 2 (the template's `terms-page` page break).
+ */
 const applyRepairPdfLayout = (
   template: string,
   repair: RepairInvoiceDetails,
   productRowsHtml: string,
   totalAmount: number | string,
 ): string => {
-  if (!PRODUCTS_TABLE_REGEX.test(template)) {
-    throw new Error("invoice-pdf.html: products table not found");
+  for (const [regex, what] of [
+    [PRODUCTS_TABLE_REGEX, "products table"],
+    [INFO_BOX_END_REGEX, "info box end"],
+    [PAYMENT_TO_FOOTER_REGEX, "payment section"],
+  ] as const) {
+    if (!regex.test(template)) {
+      throw new Error(`invoice-pdf.html: ${what} not found`);
+    }
   }
-  const repairHtml = `${buildRepairMinerRowsHtml(repair, "pdf")}
 
-    <table class="products-table">
+  const minerRows = buildRepairMinerRowsHtml(repair, "pdf");
+  const repairTable = `<table class="products-table">
       <thead>
         <tr>
           <th>DESCRIPTION</th>
@@ -1402,8 +1416,15 @@ ${productRowsHtml}
 ${buildRepairTotalRowsHtml(repair, totalAmount, "pdf")}
       </tbody>
     </table>`;
-  // Function replacement so "$" in the HTML is never treated as a pattern.
-  return template.replace(PRODUCTS_TABLE_REGEX, () => repairHtml);
+
+  // Function replacements so "$" in the HTML is never treated as a pattern.
+  return template
+    .replace(INFO_BOX_END_REGEX, (closing) => `\n${minerRows}${closing}`)
+    .replace(PRODUCTS_TABLE_REGEX, () => repairTable)
+    .replace(
+      PAYMENT_TO_FOOTER_REGEX,
+      (section) => `<div class="terms-page">\n    ${section}\n    </div>`,
+    );
 };
 
 interface FooterSectionData {
