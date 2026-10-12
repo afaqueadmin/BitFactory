@@ -5,6 +5,7 @@ import { AuditAction, InvoiceStatus } from "@prisma/client";
 import { sendInvoiceCancellationEmail } from "@/lib/email";
 import { getGroupByUserId } from "@/lib/groupUtils";
 import { InvoiceEmailService } from "@/services/invoiceEmailService";
+import { recordSingleEmailRun } from "@/lib/accounting/emailRunLog";
 import { accrueIncentivesForInvoice } from "@/lib/incentives/accrue";
 import { reverseIncentivesForInvoice } from "@/lib/incentives/reverse";
 import { assertFranchiseeOwnsCustomer } from "@/lib/franchiseeScope";
@@ -565,6 +566,21 @@ export async function POST(
       invoice.dueDate || new Date(),
       ccEmails,
     );
+
+    await recordSingleEmailRun({
+      invoiceId: invoice.id,
+      invoiceType: invoice.invoiceType,
+      customer: invoice.user,
+      kind: "CANCELLATION",
+      success: emailResult.success,
+      error: emailResult.success
+        ? null
+        : emailResult.error instanceof Error
+          ? emailResult.error.message
+          : String(emailResult.error),
+      ccEmails: emailResult.success ? emailResult.ccEmails : ccEmails,
+      userId,
+    });
 
     if (!emailResult.success) {
       console.error(

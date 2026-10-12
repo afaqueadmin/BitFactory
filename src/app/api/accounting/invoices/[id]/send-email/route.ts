@@ -8,6 +8,7 @@ import {
 } from "@/services/invoiceEmailService";
 import { repairDetailsFromInvoice } from "@/lib/email";
 import { getGroupByUserId } from "@/lib/groupUtils";
+import { recordSingleEmailRun } from "@/lib/accounting/emailRunLog";
 
 export async function POST(
   request: NextRequest,
@@ -123,6 +124,17 @@ export async function POST(
       ccEmails,
       cryptoPaymentUrl,
     );
+
+    await recordSingleEmailRun({
+      invoiceId: invoice.id,
+      invoiceType: invoice.invoiceType,
+      customer: invoice.user,
+      kind: "INVOICE",
+      success: result.success,
+      error: result.error,
+      ccEmails,
+      userId,
+    });
 
     if (!result.success) {
       return NextResponse.json(

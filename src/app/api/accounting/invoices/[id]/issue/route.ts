@@ -10,6 +10,7 @@ import { repairDetailsFromInvoice } from "@/lib/email";
 import { getGroupByUserId } from "@/lib/groupUtils";
 import { InvoiceStatus, AuditAction } from "@prisma/client";
 import { accrueIncentivesForInvoice } from "@/lib/incentives/accrue";
+import { recordSingleEmailRun } from "@/lib/accounting/emailRunLog";
 
 /**
  * POST /api/accounting/invoices/[id]/issue
@@ -197,6 +198,17 @@ export async function POST(
       ccEmails,
       cryptoPaymentUrl,
     );
+
+    await recordSingleEmailRun({
+      invoiceId: invoice.id,
+      invoiceType: invoice.invoiceType,
+      customer: invoice.user,
+      kind: "INVOICE",
+      success: emailResult.success,
+      error: emailResult.error,
+      ccEmails,
+      userId,
+    });
 
     // If email send failed, return error WITHOUT changing status
     if (!emailResult.success) {

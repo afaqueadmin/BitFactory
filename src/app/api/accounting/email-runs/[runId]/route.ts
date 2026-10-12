@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
+import { Prisma } from "@prisma/client";
 
 export async function GET(
   request: NextRequest,
@@ -31,8 +32,12 @@ export async function GET(
 
     const { searchParams } = new URL(request.url);
     const statusFilter = searchParams.get("status");
-    const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
-    const limit = Math.min(50, parseInt(searchParams.get("limit") || "10"));
+    const q = searchParams.get("q")?.trim() || "";
+    const page = Math.max(1, parseInt(searchParams.get("page") || "1") || 1);
+    const limit = Math.min(
+      50,
+      Math.max(1, parseInt(searchParams.get("limit") || "10") || 10),
+    );
     const offset = (page - 1) * limit;
 
     // Get the run details
@@ -57,11 +62,18 @@ export async function GET(
     }
 
     // Build filter for results
-    const resultFilter: { runId: string; success?: boolean } = { runId };
+    const resultFilter: Prisma.EmailSendResultWhereInput = { runId };
     if (statusFilter === "success") {
       resultFilter.success = true;
     } else if (statusFilter === "failed") {
       resultFilter.success = false;
+    }
+    if (q) {
+      resultFilter.OR = [
+        { customerName: { contains: q, mode: "insensitive" } },
+        { customerEmail: { contains: q, mode: "insensitive" } },
+        { invoice: { invoiceNumber: { contains: q, mode: "insensitive" } } },
+      ];
     }
 
     // Get results with pagination
@@ -74,6 +86,8 @@ export async function GET(
             invoiceNumber: true,
             totalAmount: true,
             dueDate: true,
+            invoiceType: true,
+            status: true,
           },
         },
       },
@@ -95,6 +109,7 @@ export async function GET(
       invoice: result.invoice,
       customerName: result.customerName,
       customerEmail: result.customerEmail,
+      ccEmails: result.ccEmails ? result.ccEmails.split(",") : [],
       success: result.success,
       errorMessage: result.errorMessage,
       sentAt: result.sentAt,
@@ -106,6 +121,8 @@ export async function GET(
       run: {
         id: run.id,
         type: run.type,
+        kind: run.kind,
+        source: run.source,
         status: run.status,
         totalInvoices: run.totalInvoices,
         successCount: run.successCount,

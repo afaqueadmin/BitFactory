@@ -56,6 +56,14 @@ export async function POST(
       );
     }
 
+    // Resend sends the invoice PDF, which is wrong for a cancellation notice.
+    if (run.kind === "CANCELLATION") {
+      return NextResponse.json(
+        { error: "Cancellation emails cannot be resent from the report" },
+        { status: 400 },
+      );
+    }
+
     // Get all results to resend
     const results = await prisma.emailSendResult.findMany({
       where: {
@@ -142,10 +150,21 @@ export async function POST(
             success: result.success,
             errorMessage: result.error || null,
             sentAt: result.success ? new Date() : null,
+            ccEmails: result.ccEmails?.join(",") || null,
           },
         });
       }
     }
+
+    // Keep the run summary in step with its rows after the resend.
+    const [successCount, failureCount] = await Promise.all([
+      prisma.emailSendResult.count({ where: { runId, success: true } }),
+      prisma.emailSendResult.count({ where: { runId, success: false } }),
+    ]);
+    await prisma.emailSendRun.update({
+      where: { id: runId },
+      data: { successCount, failureCount },
+    });
 
     const resendResults = {
       resent: bulkResult.results

@@ -7,12 +7,17 @@ import {
   Card,
   CardContent,
   Checkbox,
+  Chip,
   CircularProgress,
   Container,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
+  InputAdornment,
+  LinearProgress,
+  Link as MuiLink,
+  MenuItem,
   Paper,
   Stack,
   Table,
@@ -23,16 +28,24 @@ import {
   TablePagination,
   TableRow,
   TextField,
+  Tooltip,
   Typography,
-  Chip,
 } from "@mui/material";
-import { useEffect, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { DateDisplay } from "@/components/accounting/common/DateDisplay";
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CancelIcon from "@mui/icons-material/Cancel";
+import DownloadIcon from "@mui/icons-material/Download";
+import SearchIcon from "@mui/icons-material/Search";
+import {
+  EMAIL_RUN_KIND_LABELS,
+  EMAIL_RUN_SOURCE_LABELS,
+  emailReportTypeLabel,
+  invoiceDetailHref,
+} from "@/lib/accounting/emailReport";
 
 interface EmailSendResult {
   id: string;
@@ -42,9 +55,12 @@ interface EmailSendResult {
     invoiceNumber: string;
     totalAmount: string | number;
     dueDate: string;
+    invoiceType: string;
+    status: string;
   };
   customerName: string;
   customerEmail: string;
+  ccEmails: string[];
   success: boolean;
   errorMessage: string | null;
   sentAt: string | null;
@@ -54,19 +70,15 @@ interface EmailSendResult {
 interface EmailSendRunDetail {
   id: string;
   type: string;
+  kind: string;
+  source: string;
   status: string;
   totalInvoices: number;
   successCount: number;
   failureCount: number;
-  createdBy: {
-    id: string;
-    name: string;
-    email: string;
-  };
+  createdBy: { id: string; name: string; email: string };
   startedAt: string;
   completedAt: string | null;
-  createdAt: string;
-  updatedAt: string;
 }
 
 interface RunData {
@@ -80,6 +92,27 @@ interface RunData {
   };
 }
 
+function SummaryTile({
+  label,
+  value,
+  color,
+}: {
+  label: string;
+  value: ReactNode;
+  color?: string;
+}) {
+  return (
+    <Box>
+      <Typography variant="caption" color="text.secondary">
+        {label}
+      </Typography>
+      <Typography variant="h6" sx={{ fontWeight: 600, color }}>
+        {value}
+      </Typography>
+    </Box>
+  );
+}
+
 export default function EmailReportDetailPage() {
   const params = useParams();
   const runId = params.runId as string;
@@ -90,15 +123,26 @@ export default function EmailReportDetailPage() {
   const [statusFilter, setStatusFilter] = useState<"" | "success" | "failed">(
     "",
   );
+  const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [rowsPerPage, setRowsPerPage] = useState(25);
   const [selectedResults, setSelectedResults] = useState<Set<string>>(
     new Set(),
   );
   const [resending, setResending] = useState(false);
   const [resendDialog, setResendDialog] = useState(false);
 
-  const fetchRunDetails = async () => {
+  // Debounce the search box so typing doesn't fire a request per key.
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      setSearch(searchInput.trim());
+      setPage(0);
+    }, 300);
+    return () => clearTimeout(handle);
+  }, [searchInput]);
+
+  const fetchRunDetails = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -107,6 +151,7 @@ export default function EmailReportDetailPage() {
         page: (page + 1).toString(),
         limit: rowsPerPage.toString(),
       });
+      if (search) searchParams.set("q", search);
 
       const response = await fetch(
         `/api/accounting/email-runs/${runId}?${searchParams}`,
@@ -116,8 +161,7 @@ export default function EmailReportDetailPage() {
         throw new Error("Failed to fetch email run details");
       }
 
-      const fetchedData = await response.json();
-      setData(fetchedData);
+      setData(await response.json());
       setSelectedResults(new Set());
     } catch (err) {
       console.error("Error fetching email run details:", err);
@@ -129,12 +173,11 @@ export default function EmailReportDetailPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [runId, statusFilter, page, rowsPerPage, search]);
 
   useEffect(() => {
     fetchRunDetails();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statusFilter, page, rowsPerPage, runId]);
+  }, [fetchRunDetails]);
 
   const handleSelectResult = (resultId: string) => {
     const newSelected = new Set(selectedResults);
@@ -168,22 +211,18 @@ export default function EmailReportDetailPage() {
         `/api/accounting/email-runs/${runId}/resend`,
         {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            resultIds: Array.from(selectedResults),
-          }),
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ resultIds: Array.from(selectedResults) }),
         },
       );
 
       if (!response.ok) {
-        throw new Error("Failed to resend emails");
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.error || "Failed to resend emails");
       }
 
       setResendDialog(false);
       setSelectedResults(new Set());
-      // Refresh data
       await fetchRunDetails();
     } catch (err) {
       console.error("Error resending emails:", err);
@@ -195,7 +234,7 @@ export default function EmailReportDetailPage() {
 
   if (loading && !data) {
     return (
-      <Container maxWidth="lg" sx={{ py: 4 }}>
+      <Container maxWidth="xl" sx={{ py: 4 }}>
         <Box
           display="flex"
           justifyContent="center"
@@ -210,7 +249,7 @@ export default function EmailReportDetailPage() {
 
   if (!data) {
     return (
-      <Container maxWidth="lg" sx={{ py: 4 }}>
+      <Container maxWidth="xl" sx={{ py: 4 }}>
         <Alert severity="error">{error || "Run not found"}</Alert>
         <Button component={Link} href="/accounting/email-report" sx={{ mt: 2 }}>
           Back to Reports
@@ -220,51 +259,58 @@ export default function EmailReportDetailPage() {
   }
 
   const { run, results } = data;
+  const canResend = run.kind !== "CANCELLATION";
+  const rate =
+    run.totalInvoices > 0
+      ? Math.round((run.successCount / run.totalInvoices) * 100)
+      : 0;
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
+    <Container maxWidth="xl" sx={{ py: 4 }}>
       <Stack spacing={3}>
         <Box>
           <Button
             component={Link}
-            href="/accounting/email-report"
+            href={`/accounting/email-report?type=${encodeURIComponent(run.type)}`}
             variant="text"
             sx={{ mb: 2 }}
           >
             ← Back to Reports
           </Button>
-          <Typography variant="h4" component="h1" gutterBottom>
-            Email Send Report Details
-          </Typography>
-        </Box>
-
-        {error && (
-          <Alert severity="error">
-            {error}
-            <Button size="small" onClick={fetchRunDetails} sx={{ ml: 2 }}>
-              Retry
-            </Button>
-          </Alert>
-        )}
-
-        {/* Summary Card */}
-        <Card>
-          <CardContent>
-            <Stack spacing={2}>
-              <Box
-                display="flex"
-                justifyContent="space-between"
+          <Box
+            display="flex"
+            justifyContent="space-between"
+            alignItems="flex-start"
+            gap={2}
+            flexWrap="wrap"
+          >
+            <Box>
+              <Typography variant="h4" component="h1" gutterBottom>
+                Email Send Report
+              </Typography>
+              <Stack
+                direction="row"
+                spacing={1}
                 alignItems="center"
+                flexWrap="wrap"
+                useFlexGap
               >
-                <Box>
-                  <Typography variant="h6">Run Summary</Typography>
-                  <Typography variant="caption" color="textSecondary">
-                    {run.type}: Started at{" "}
-                    <DateDisplay date={run.startedAt} format="datetime" />
-                  </Typography>
-                </Box>
+                <Chip size="small" label={emailReportTypeLabel(run.type)} />
                 <Chip
-                  label={run.status}
+                  size="small"
+                  variant="outlined"
+                  color={run.kind === "CANCELLATION" ? "warning" : "primary"}
+                  label={EMAIL_RUN_KIND_LABELS[run.kind] ?? run.kind}
+                />
+                <Chip
+                  size="small"
+                  variant="outlined"
+                  label={EMAIL_RUN_SOURCE_LABELS[run.source] ?? run.source}
+                />
+                <Chip
+                  size="small"
+                  variant="outlined"
+                  label={run.status.replace("_", " ")}
                   color={
                     run.status === "COMPLETED"
                       ? "success"
@@ -272,122 +318,164 @@ export default function EmailReportDetailPage() {
                         ? "warning"
                         : "error"
                   }
-                  variant="outlined"
                 />
-              </Box>
+              </Stack>
+            </Box>
+            <Button
+              variant="outlined"
+              startIcon={<DownloadIcon />}
+              href={`/api/accounting/email-runs/${runId}/export`}
+            >
+              Export CSV
+            </Button>
+          </Box>
+        </Box>
 
-              <Box display="grid" gridTemplateColumns="repeat(4, 1fr)" gap={2}>
-                <Box>
-                  <Typography variant="caption" color="textSecondary">
-                    Total Invoices
-                  </Typography>
-                  <Typography variant="h6">{run.totalInvoices}</Typography>
-                </Box>
-                <Box>
-                  <Typography variant="caption" color="textSecondary">
-                    Success
-                  </Typography>
-                  <Typography
-                    variant="h6"
-                    sx={{ color: "success.main", fontWeight: 600 }}
-                  >
-                    {run.successCount}
-                  </Typography>
-                </Box>
-                <Box>
-                  <Typography variant="caption" color="textSecondary">
-                    Failed
-                  </Typography>
-                  <Typography
-                    variant="h6"
-                    sx={{
-                      color:
-                        run.failureCount > 0 ? "error.main" : "textSecondary",
-                    }}
-                  >
-                    {run.failureCount}
-                  </Typography>
-                </Box>
-                <Box>
-                  <Typography variant="caption" color="textSecondary">
-                    Success Rate
-                  </Typography>
-                  <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                    {run.totalInvoices > 0
-                      ? Math.round((run.successCount / run.totalInvoices) * 100)
-                      : 0}
-                    %
-                  </Typography>
-                </Box>
-              </Box>
+        {error && (
+          <Alert
+            severity="error"
+            onClose={() => setError(null)}
+            action={
+              <Button color="inherit" size="small" onClick={fetchRunDetails}>
+                Retry
+              </Button>
+            }
+          >
+            {error}
+          </Alert>
+        )}
 
-              <Box display="flex" gap={1} flexWrap="wrap">
-                <TextField
-                  select
-                  value={statusFilter}
-                  onChange={(e) => {
-                    setStatusFilter(
-                      e.target.value as "" | "success" | "failed",
-                    );
-                    setPage(0);
-                  }}
-                  size="small"
-                  sx={{ minWidth: 150 }}
-                  SelectProps={{ native: true }}
-                >
-                  <option value="">All Results</option>
-                  <option value="success">Successful Only</option>
-                  <option value="failed">Failed Only</option>
-                </TextField>
-                {selectedResults.size > 0 && (
-                  <Button
-                    variant="contained"
-                    color="primary"
-                    onClick={() => setResendDialog(true)}
-                    disabled={resending}
-                  >
-                    Resend {selectedResults.size} Email(s)
-                  </Button>
-                )}
-              </Box>
-            </Stack>
+        <Card variant="outlined">
+          <CardContent>
+            <Box
+              display="grid"
+              gridTemplateColumns="repeat(auto-fit, minmax(140px, 1fr))"
+              gap={2}
+            >
+              <SummaryTile label="Invoices" value={run.totalInvoices} />
+              <SummaryTile
+                label="Sent"
+                value={run.successCount}
+                color="success.main"
+              />
+              <SummaryTile
+                label="Failed"
+                value={run.failureCount}
+                color={run.failureCount > 0 ? "error.main" : undefined}
+              />
+              <SummaryTile label="Success rate" value={`${rate}%`} />
+              <SummaryTile
+                label="Started"
+                value={<DateDisplay date={run.startedAt} format="datetime" />}
+              />
+              <SummaryTile
+                label="Created by"
+                value={
+                  <Typography variant="body2">
+                    {run.createdBy.name || run.createdBy.email}
+                  </Typography>
+                }
+              />
+            </Box>
+            <LinearProgress
+              variant="determinate"
+              value={rate}
+              color={
+                rate === 100 ? "success" : rate >= 75 ? "warning" : "error"
+              }
+              sx={{ mt: 2, height: 6, borderRadius: 3 }}
+            />
           </CardContent>
         </Card>
 
-        {/* Results Table */}
-        <TableContainer component={Paper}>
-          <Table>
-            <TableHead sx={{ backgroundColor: "#f5f5f5" }}>
-              <TableRow>
-                <TableCell padding="checkbox">
-                  <Checkbox
-                    checked={
-                      results.length > 0 &&
-                      selectedResults.size === results.length
-                    }
-                    indeterminate={
-                      selectedResults.size > 0 &&
-                      selectedResults.size < results.length
-                    }
-                    onChange={handleSelectAll}
-                  />
-                </TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Invoice</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Customer</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Email</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Amount</TableCell>
-                <TableCell sx={{ fontWeight: 600 }} align="center">
-                  Status
-                </TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Error</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Sent At</TableCell>
+        <Box display="flex" gap={2} flexWrap="wrap" alignItems="center">
+          <TextField
+            size="small"
+            placeholder="Search invoice #, customer or email"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            sx={{ minWidth: { xs: "100%", sm: 320 } }}
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon fontSize="small" />
+                  </InputAdornment>
+                ),
+              },
+            }}
+          />
+          <TextField
+            select
+            size="small"
+            label="Result"
+            value={statusFilter}
+            onChange={(e) => {
+              setStatusFilter(e.target.value as "" | "success" | "failed");
+              setPage(0);
+            }}
+            sx={{ minWidth: 160 }}
+          >
+            <MenuItem value="">All results</MenuItem>
+            <MenuItem value="success">Sent only</MenuItem>
+            <MenuItem value="failed">Failed only</MenuItem>
+          </TextField>
+          {canResend && selectedResults.size > 0 && (
+            <Button
+              variant="contained"
+              onClick={() => setResendDialog(true)}
+              disabled={resending}
+            >
+              Resend {selectedResults.size} email(s)
+            </Button>
+          )}
+        </Box>
+
+        <TableContainer component={Paper} variant="outlined">
+          {loading && <LinearProgress />}
+          <Table size="small">
+            <TableHead>
+              <TableRow
+                sx={{
+                  "& th": {
+                    fontWeight: 600,
+                    bgcolor: "action.hover",
+                    whiteSpace: "nowrap",
+                  },
+                }}
+              >
+                {canResend && (
+                  <TableCell padding="checkbox">
+                    <Checkbox
+                      checked={
+                        results.length > 0 &&
+                        selectedResults.size === results.length
+                      }
+                      indeterminate={
+                        selectedResults.size > 0 &&
+                        selectedResults.size < results.length
+                      }
+                      onChange={handleSelectAll}
+                    />
+                  </TableCell>
+                )}
+                <TableCell>Invoice</TableCell>
+                <TableCell>Customer</TableCell>
+                <TableCell>CC</TableCell>
+                <TableCell align="right">Amount</TableCell>
+                <TableCell align="center">Result</TableCell>
+                <TableCell>Error</TableCell>
+                <TableCell>Sent at</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {results.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} sx={{ textAlign: "center", py: 3 }}>
-                    <Typography variant="body2" color="textSecondary">
+                  <TableCell
+                    colSpan={canResend ? 8 : 7}
+                    sx={{ textAlign: "center", py: 4 }}
+                  >
+                    <Typography variant="body2" color="text.secondary">
                       No results match the selected filter
                     </Typography>
                   </TableCell>
@@ -395,55 +483,97 @@ export default function EmailReportDetailPage() {
               ) : (
                 results.map((result) => (
                   <TableRow key={result.id} hover>
-                    <TableCell padding="checkbox">
-                      <Checkbox
-                        checked={selectedResults.has(result.id)}
-                        onChange={() => handleSelectResult(result.id)}
-                      />
+                    {canResend && (
+                      <TableCell padding="checkbox">
+                        <Checkbox
+                          checked={selectedResults.has(result.id)}
+                          onChange={() => handleSelectResult(result.id)}
+                        />
+                      </TableCell>
+                    )}
+                    <TableCell sx={{ whiteSpace: "nowrap" }}>
+                      <MuiLink
+                        component={Link}
+                        href={invoiceDetailHref(
+                          result.invoiceId,
+                          result.invoice.invoiceType,
+                        )}
+                        underline="hover"
+                        sx={{ fontWeight: 500 }}
+                      >
+                        {result.invoice.invoiceNumber}
+                      </MuiLink>
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        display="block"
+                      >
+                        {result.invoice.status}
+                      </Typography>
                     </TableCell>
                     <TableCell>
-                      <Box>
-                        <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                          {result.invoice.invoiceNumber}
-                        </Typography>
-                        <Typography variant="caption" color="textSecondary">
-                          {result.invoiceId}
-                        </Typography>
-                      </Box>
+                      <Typography variant="body2">
+                        {result.customerName}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {result.customerEmail}
+                      </Typography>
                     </TableCell>
-                    <TableCell>{result.customerName}</TableCell>
-                    <TableCell>{result.customerEmail}</TableCell>
                     <TableCell>
+                      {result.ccEmails.length > 0 ? (
+                        result.ccEmails.map((cc) => (
+                          <Typography
+                            key={cc}
+                            variant="caption"
+                            display="block"
+                            color="text.secondary"
+                          >
+                            {cc}
+                          </Typography>
+                        ))
+                      ) : (
+                        <Tooltip title="CC wasn't recorded for emails sent before CC tracking was added">
+                          <Typography variant="caption" color="text.secondary">
+                            —
+                          </Typography>
+                        </Tooltip>
+                      )}
+                    </TableCell>
+                    <TableCell align="right">
                       <CurrencyDisplay value={result.invoice.totalAmount} />
                     </TableCell>
                     <TableCell align="center">
                       {result.success ? (
-                        <CheckCircleIcon
-                          sx={{ color: "success.main", fontSize: 20 }}
-                        />
+                        <Tooltip title="Sent">
+                          <CheckCircleIcon
+                            sx={{ color: "success.main", fontSize: 20 }}
+                          />
+                        </Tooltip>
                       ) : (
-                        <CancelIcon
-                          sx={{ color: "error.main", fontSize: 20 }}
-                        />
+                        <Tooltip title="Failed">
+                          <CancelIcon
+                            sx={{ color: "error.main", fontSize: 20 }}
+                          />
+                        </Tooltip>
                       )}
                     </TableCell>
-                    <TableCell>
+                    <TableCell sx={{ maxWidth: 280 }}>
                       {result.errorMessage ? (
                         <Typography variant="caption" color="error">
                           {result.errorMessage}
                         </Typography>
                       ) : (
-                        <Typography variant="caption" color="textSecondary">
-                          -
+                        <Typography variant="caption" color="text.secondary">
+                          —
                         </Typography>
                       )}
                     </TableCell>
-                    <TableCell>
+                    <TableCell sx={{ whiteSpace: "nowrap" }}>
                       {result.sentAt ? (
                         <DateDisplay date={result.sentAt} format="datetime" />
                       ) : (
-                        <Typography variant="caption" color="textSecondary">
-                          -
+                        <Typography variant="caption" color="text.secondary">
+                          —
                         </Typography>
                       )}
                     </TableCell>
@@ -452,29 +582,28 @@ export default function EmailReportDetailPage() {
               )}
             </TableBody>
           </Table>
-          {results.length > 0 && (
-            <TablePagination
-              rowsPerPageOptions={[10, 25, 50, { value: 9999, label: "Max" }]}
-              component="div"
-              count={data.pagination.total}
-              rowsPerPage={rowsPerPage}
-              page={page}
-              onPageChange={(e, newPage) => setPage(newPage)}
-              onRowsPerPageChange={(e) => {
-                setRowsPerPage(parseInt(e.target.value));
-                setPage(0);
-              }}
-            />
-          )}
+          <TablePagination
+            rowsPerPageOptions={[10, 25, 50]}
+            component="div"
+            count={data.pagination.total}
+            rowsPerPage={rowsPerPage}
+            page={page}
+            onPageChange={(_, newPage) => setPage(newPage)}
+            onRowsPerPageChange={(e) => {
+              setRowsPerPage(parseInt(e.target.value, 10));
+              setPage(0);
+            }}
+          />
         </TableContainer>
       </Stack>
 
-      {/* Resend Confirmation Dialog */}
       <Dialog open={resendDialog} onClose={() => setResendDialog(false)}>
         <DialogTitle>Resend Emails</DialogTitle>
         <DialogContent>
           <Typography>
-            Are you sure you want to resend {selectedResults.size} email(s)?
+            Resend the invoice email (with PDF) for {selectedResults.size}{" "}
+            selected invoice(s)? The customer, their RM and the invoices inbox
+            will receive it again.
           </Typography>
         </DialogContent>
         <DialogActions>
@@ -482,7 +611,6 @@ export default function EmailReportDetailPage() {
           <Button
             onClick={handleResend}
             variant="contained"
-            color="primary"
             disabled={resending}
           >
             {resending ? <CircularProgress size={24} /> : "Resend"}

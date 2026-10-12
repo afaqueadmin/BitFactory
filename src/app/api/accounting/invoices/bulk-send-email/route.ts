@@ -134,6 +134,7 @@ export async function POST(request: NextRequest) {
             "Unknown",
           customerEmail:
             invoices.find((i) => i.id === result.invoiceId)?.user?.email || "",
+          ccEmails: result.ccEmails?.join(",") || null,
           success: result.success,
           errorMessage: result.error || null,
           sentAt: result.success ? new Date() : null,

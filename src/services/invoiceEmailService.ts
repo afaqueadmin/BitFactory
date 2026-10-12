@@ -295,6 +295,7 @@ export class InvoiceEmailService {
       invoiceNumber: string;
       success: boolean;
       error?: string;
+      ccEmails?: string[];
     }>;
     summary: {
       total: number;
@@ -328,6 +329,7 @@ export class InvoiceEmailService {
             invoiceId: invoice.invoiceId,
             invoiceNumber: invoice.invoiceNumber,
             success: true,
+            ccEmails,
           });
         } else {
           failed++;
@@ -336,6 +338,7 @@ export class InvoiceEmailService {
             invoiceNumber: invoice.invoiceNumber,
             success: false,
             error: emailResult.error,
+            ccEmails,
           });
         }
       } catch (error) {

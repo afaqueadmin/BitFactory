@@ -1666,6 +1666,10 @@ model EmailSendRun {
   id            String            @id @default(cuid())
   type          String            @default("INVOICE_BULK_EMAIL")
   status        EmailRunStatus    @default(IN_PROGRESS)
+  // What was emailed (invoice PDF vs cancellation notice) and how it was
+  // triggered (bulk Issue & Send vs a single invoice action).
+  kind          EmailRunKind      @default(INVOICE)
+  source        EmailRunSource    @default(BULK)
   totalInvoices Int
   successCount  Int               @default(0)
   failureCount  Int               @default(0)
@@ -1680,6 +1684,7 @@ model EmailSendRun {
   @@index([status])
   @@index([createdAt])
   @@index([createdBy])
+  @@index([type])
   @@map("email_send_runs")
 }
 
@@ -1690,6 +1695,7 @@ model EmailSendResult {
   customerId    String
   customerName  String
   customerEmail String
+  ccEmails      String?
   success       Boolean
   errorMessage  String?
   sentAt        DateTime?
@@ -1711,6 +1717,16 @@ enum EmailRunStatus {
   IN_PROGRESS
   COMPLETED
   FAILED
+}
+
+enum EmailRunKind {
+  INVOICE
+  CANCELLATION
+}
+
+enum EmailRunSource {
+  BULK
+  SINGLE
 }
 
 model ExternalResource {

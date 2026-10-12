@@ -586,12 +586,20 @@ export function useChangeInvoiceStatus() {
       invoiceId: string;
       status: "ISSUED" | "PAID" | "CANCELLED" | "OVERDUE" | "REFUNDED";
     }) => {
-      const res = await fetch(`/api/accounting/invoices/${invoiceId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ status }),
-      });
+      // Cancel goes through the dedicated POST so it gets the same guard,
+      // CC'd cancellation email, audit and notification as single cancel.
+      const res =
+        status === "CANCELLED"
+          ? await fetch(`/api/accounting/invoices/${invoiceId}`, {
+              method: "POST",
+              credentials: "include",
+            })
+          : await fetch(`/api/accounting/invoices/${invoiceId}`, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              credentials: "include",
+              body: JSON.stringify({ status }),
+            });
 
       if (!res.ok) {
         const errorData = await res.json();
@@ -601,7 +609,14 @@ export function useChangeInvoiceStatus() {
       return await res.json();
     },
     onSuccess: (data, variables) => {
-      queryClient.setQueryData(["invoice", variables.invoiceId], data);
+      if (variables.status === "CANCELLED") {
+        // POST response lacks costPayments; refetch rather than overwrite.
+        queryClient.invalidateQueries({
+          queryKey: ["invoice", variables.invoiceId],
+        });
+      } else {
+        queryClient.setQueryData(["invoice", variables.invoiceId], data);
+      }
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
     },
   });

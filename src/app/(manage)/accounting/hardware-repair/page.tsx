@@ -452,7 +452,7 @@ export default function HardwareRepairDashboard() {
               </Typography>
               <Button
                 component={Link}
-                href={`/hardware-repair/email-report/${bulkEmailRunId}`}
+                href={`/accounting/email-report/${bulkEmailRunId}`}
                 variant="contained"
                 color="primary"
                 fullWidth
