@@ -10,7 +10,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
-import { AuditAction } from "@prisma/client";
 
 async function requireAdmin(request: NextRequest) {
   const token = request.cookies.get("token")?.value;
@@ -72,18 +71,6 @@ export async function POST(
         acknowledgedBy: { select: { id: true, name: true, email: true } },
       },
     });
-
-    if (updated) {
-      await prisma.auditLog.create({
-        data: {
-          action: AuditAction.MINER_HASHRATE_ALERT_ACKNOWLEDGED,
-          entityType: "Miner",
-          entityId: updated.minerId,
-          userId: auth.decoded.userId,
-          description: `Hashrate alert for ${updated.miner.name} on ${updated.date.toISOString().slice(0, 10)} acknowledged`,
-        },
-      });
-    }
 
     return NextResponse.json({ success: true, data: updated });
   } catch (error) {
