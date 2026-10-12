@@ -262,8 +262,9 @@ export async function updateRepairInvoice(params: {
       select: { id: true, invoiceGeneratedDate: true },
     });
 
-    // Keep the invoice's repair note in sync (create it if it was removed
-    // from the Miners page). A miner change moves the note to the new miner.
+    // Keep the invoice's repair note in sync (create it if the invoice has
+    // none, e.g. a legacy invoice). A miner change moves the note to the new
+    // miner.
     let noteAction: AuditAction | null = null;
     if (!existingNote) {
       await tx.minerRepairNote.create({

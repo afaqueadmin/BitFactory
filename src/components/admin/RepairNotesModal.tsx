@@ -6,15 +6,11 @@ import {
   DialogActions,
   Button,
   Typography,
-  TextField,
   Box,
   CircularProgress,
   Alert,
   Divider,
-  IconButton,
 } from "@mui/material";
-import DeleteIcon from "@mui/icons-material/Delete";
-import EditIcon from "@mui/icons-material/Edit";
 
 interface User {
   id: string;
@@ -38,9 +34,12 @@ interface RepairNotesModalProps {
   minerName: string;
   serialNumber?: string | null;
   macAddress?: string | null;
-  readonly?: boolean;
 }
 
+/**
+ * Read-only repair history for a miner. Notes are created, updated and
+ * deleted only through Hardware Repair invoices.
+ */
 export default function RepairNotesModal({
   open,
   onClose,
@@ -48,27 +47,14 @@ export default function RepairNotesModal({
   minerName,
   serialNumber,
   macAddress,
-  readonly = false,
 }: RepairNotesModalProps) {
   const [notes, setNotes] = useState<RepairNote[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Form states
-  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
-  const [newNote, setNewNote] = useState("");
-  const [dateOfEntry, setDateOfEntry] = useState(
-    new Date().toISOString().split("T")[0],
-  );
-  const [submitting, setSubmitting] = useState(false);
-
   useEffect(() => {
     if (open && minerId) {
       fetchNotes();
-      // Reset form on open
-      setEditingNoteId(null);
-      setNewNote("");
-      setDateOfEntry(new Date().toISOString().split("T")[0]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, minerId]);
@@ -87,77 +73,6 @@ export default function RepairNotesModal({
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newNote.trim() || !minerId) return;
-
-    setSubmitting(true);
-    setError(null);
-    try {
-      const url = editingNoteId
-        ? `/api/machine/repair-notes/${editingNoteId}`
-        : `/api/machine/${minerId}/repair-notes`;
-      const method = editingNoteId ? "PUT" : "POST";
-
-      const response = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          note: newNote,
-          dateOfEntry: new Date(dateOfEntry).toISOString(),
-        }),
-      });
-
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to save repair note");
-      }
-
-      if (editingNoteId) {
-        setNotes(notes.map((n) => (n.id === editingNoteId ? data.data : n)));
-        setEditingNoteId(null);
-      } else {
-        setNotes([data.data, ...notes]);
-      }
-      setNewNote("");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleEditNote = (note: RepairNote) => {
-    setEditingNoteId(note.id);
-    setNewNote(note.note);
-    setDateOfEntry(note.dateOfEntry.split("T")[0]);
-  };
-
-  const handleDeleteNote = async (noteId: string) => {
-    // Add confirmation if needed, skipping for quick workflow
-    if (!window.confirm("Are you sure you want to delete this repair note?"))
-      return;
-
-    try {
-      const response = await fetch(`/api/machine/repair-notes/${noteId}`, {
-        method: "DELETE",
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "Failed to delete note");
-      }
-
-      setNotes(notes.filter((n) => n.id !== noteId));
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "An error occurred deleting the note",
-      );
     }
   };
 
@@ -211,79 +126,13 @@ export default function RepairNotesModal({
           </Alert>
         )}
 
-        {/* Add New Note Form */}
-        {!readonly && (
-          <Box
-            component="form"
-            onSubmit={handleSubmit}
-            sx={{
-              display: "flex",
-              flexDirection: "column",
-              gap: 2,
-              mb: 4,
-              p: 2,
-              bgcolor: "action.hover",
-              borderRadius: 1,
-              border: "1px solid",
-              borderColor: "divider",
-            }}
-          >
-            <Typography variant="subtitle2" sx={{ fontWeight: "bold" }}>
-              {editingNoteId ? "Edit Repair Note" : "Add New Repair Note"}
-            </Typography>
-            <TextField
-              label="Date of Entry"
-              type="date"
-              size="small"
-              value={dateOfEntry}
-              onChange={(e) => setDateOfEntry(e.target.value)}
-              InputLabelProps={{ shrink: true }}
-              fullWidth
-              required
-            />
-            <TextField
-              label="Repair Details"
-              multiline
-              rows={3}
-              size="small"
-              value={newNote}
-              onChange={(e) => setNewNote(e.target.value)}
-              placeholder="Describe the repair issue and action taken..."
-              fullWidth
-              required
-            />
-            <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 1 }}>
-              {editingNoteId && (
-                <Button
-                  variant="outlined"
-                  color="inherit"
-                  disabled={submitting}
-                  onClick={() => {
-                    setEditingNoteId(null);
-                    setNewNote("");
-                    setDateOfEntry(new Date().toISOString().split("T")[0]);
-                  }}
-                >
-                  Cancel
-                </Button>
-              )}
-              <Button
-                type="submit"
-                variant="contained"
-                color="primary"
-                disabled={submitting || !newNote.trim()}
-              >
-                {submitting ? (
-                  <CircularProgress size={24} />
-                ) : editingNoteId ? (
-                  "Update Note"
-                ) : (
-                  "Record Note"
-                )}
-              </Button>
-            </Box>
-          </Box>
-        )}
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ display: "block", mb: 1 }}
+        >
+          Repair notes are managed from Hardware Repair invoices.
+        </Typography>
 
         <Divider sx={{ mb: 2 }} />
 
@@ -310,44 +159,13 @@ export default function RepairNotesModal({
                   border: "1px solid",
                   borderColor: "divider",
                   borderRadius: 1,
-                  position: "relative",
                 }}
               >
-                {!readonly && (
-                  <Box
-                    sx={{
-                      position: "absolute",
-                      top: 8,
-                      right: 8,
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 0.5,
-                    }}
-                  >
-                    <IconButton
-                      size="small"
-                      color="error"
-                      onClick={() => handleDeleteNote(note.id)}
-                      title="Delete Note"
-                    >
-                      <DeleteIcon fontSize="small" />
-                    </IconButton>
-                    <IconButton
-                      size="small"
-                      color="primary"
-                      onClick={() => handleEditNote(note)}
-                      title="Edit Note"
-                    >
-                      <EditIcon fontSize="small" />
-                    </IconButton>
-                  </Box>
-                )}
                 <Box
                   sx={{
                     display: "flex",
                     justifyContent: "space-between",
                     mb: 1,
-                    pr: 4,
                   }}
                 >
                   <Typography

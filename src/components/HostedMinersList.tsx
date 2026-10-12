@@ -1159,7 +1159,6 @@ export default function HostedMinersList({
         onClose={() => setRepairNotesOpen(false)}
         minerId={selectedMinerId}
         minerName={selectedMinerName}
-        readonly={true}
       />
 
       <MinerPoolHistoryModal
