@@ -4,6 +4,7 @@ import { verifyJwtToken } from "@/lib/jwt";
 import { AuditAction, InvoiceStatus } from "@prisma/client";
 import { sendInvoiceCancellationEmail } from "@/lib/email";
 import { getGroupByUserId } from "@/lib/groupUtils";
+import { InvoiceEmailService } from "@/services/invoiceEmailService";
 import { accrueIncentivesForInvoice } from "@/lib/incentives/accrue";
 import { reverseIncentivesForInvoice } from "@/lib/incentives/reverse";
 import { assertFranchiseeOwnsCustomer } from "@/lib/franchiseeScope";
@@ -547,7 +548,40 @@ export async function POST(
       );
     }
 
-    // Update invoice status to CANCELLED
+    const ccEmails = await InvoiceEmailService.buildCCList(invoice.user.id);
+
+    if (!invoice.user?.email) {
+      return NextResponse.json(
+        { error: "Customer email not found" },
+        { status: 400 },
+      );
+    }
+
+    const emailResult = await sendInvoiceCancellationEmail(
+      invoice.user.email,
+      invoice.user.name || "Valued Customer",
+      invoice.invoiceNumber,
+      Number(invoice.totalAmount),
+      invoice.dueDate || new Date(),
+      ccEmails,
+    );
+
+    if (!emailResult.success) {
+      console.error(
+        `[Cancel] Email send failed for invoice ${invoice.invoiceNumber}: ${emailResult.error}`,
+      );
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Failed to send cancellation email",
+          details: emailResult.error,
+          message: `Could not cancel invoice - email send failed: ${emailResult.error}`,
+        },
+        { status: 500 },
+      );
+    }
+
+    // Update invoice status to CANCELLED only after email is successfully sent
     const cancelledInvoice = await prisma.invoice.update({
       where: { id },
       data: {
@@ -559,58 +593,54 @@ export async function POST(
       },
     });
 
-    // Log audit - default reason: "Invoice cancelled by admin"
     await prisma.auditLog.create({
       data: {
         action: AuditAction.INVOICE_CANCELLED,
         entityType: "Invoice",
         entityId: invoice.id,
         userId,
-        description: `Invoice ${invoice.invoiceNumber} cancelled by admin`,
+        description: `Invoice ${invoice.invoiceNumber} cancelled and sent to ${invoice.user.email}`,
         changes: JSON.stringify({
           status: { from: InvoiceStatus.ISSUED, to: InvoiceStatus.CANCELLED },
           reason: "Invoice cancelled by admin",
+          sentTo: invoice.user.email,
+          ccEmails: (emailResult.ccEmails || ccEmails).join(","),
+          emailSent: true,
         }),
       },
     });
 
     await reverseIncentivesForInvoice(id, userId, "Invoice cancelled by admin");
 
-    // Send cancellation email to customer (non-blocking)
-    if (invoice.user?.email) {
-      sendInvoiceCancellationEmail(
-        invoice.user.email,
-        invoice.user.name || "Valued Customer",
-        invoice.invoiceNumber,
-        Number(invoice.totalAmount),
-        invoice.dueDate || new Date(),
-      ).catch((err) => {
-        console.error(
-          `Failed to send cancellation email for ${invoice.invoiceNumber}:`,
-          err,
-        );
+    try {
+      await prisma.invoiceNotification.create({
+        data: {
+          invoiceId: invoice.id,
+          notificationType: "INVOICE_CANCELLED",
+          sentTo: invoice.user.email,
+          ccEmails: (emailResult.ccEmails || ccEmails).join(","),
+          sentAt: new Date(),
+          status: "SENT",
+        },
       });
-
-      // Create notification record
-      try {
-        await prisma.invoiceNotification.create({
-          data: {
-            invoiceId: invoice.id,
-            notificationType: "INVOICE_CANCELLED",
-            sentTo: invoice.user.email,
-            sentAt: new Date(),
-            status: "SENT",
-          },
-        });
-      } catch (notificationErr) {
-        console.error(
-          `Failed to create cancellation notification:`,
-          notificationErr,
-        );
-      }
+    } catch (notificationErr) {
+      console.error(
+        `Failed to create cancellation notification:`,
+        notificationErr,
+      );
     }
 
-    return NextResponse.json(cancelledInvoice);
+    return NextResponse.json({
+      ...cancelledInvoice,
+      sentTo: invoice.user.email,
+      ccEmails: emailResult.ccEmails || ccEmails,
+      ccDescription:
+        ccEmails.length > 0
+          ? `CC'd to: ${ccEmails.join(", ")}`
+          : "CC'd to: invoices@bitfactory.ae",
+      emailSent: true,
+      status: "CANCELLED",
+    });
   } catch (error) {
     console.error("Cancel invoice error:", error);
     return NextResponse.json(

@@ -948,6 +948,7 @@ export const sendInvoiceCancellationEmail = async (
   invoiceNumber: string,
   totalAmount: number,
   dueDate: Date,
+  ccEmails?: string[],
 ) => {
   const { generateInvoiceCancellationEmailHTML } =
     await import("./email-templates/cancellation-email");
@@ -959,21 +960,28 @@ export const sendInvoiceCancellationEmail = async (
     dueDate,
   );
 
-  const ccEmail = process.env.CC_INVOICES_EMAIL || "invoices@bitfactory.ae";
+  const normalizedCcEmails = Array.from(
+    new Set(
+      (ccEmails && ccEmails.length > 0
+        ? ccEmails
+        : [process.env.CC_INVOICES_EMAIL || "invoices@bitfactory.ae"]
+      ).filter(Boolean),
+    ),
+  );
 
   const mailOptions = {
     from:
       `BitFactory Admin <${process.env.SMTP_FROM}>` || "noreply@bitfactory.com",
     replyTo: REPLY_TO_EMAILS,
     to: email,
-    cc: ccEmail,
+    cc: normalizedCcEmails.join(","),
     subject: `Invoice ${invoiceNumber} - Cancellation Notice`,
     html: htmlContent,
   };
 
   try {
     await transporter.sendMail(mailOptions);
-    return { success: true };
+    return { success: true, ccEmails: normalizedCcEmails };
   } catch (error) {
     console.error("Error sending invoice cancellation email:", error);
     return { success: false, error };
