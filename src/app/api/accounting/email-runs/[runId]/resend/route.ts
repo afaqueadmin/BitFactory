@@ -101,6 +101,15 @@ export async function POST(
       );
     }
 
+    // Rows whose invoice was deleted can't be resent; report them back.
+    const skipped = results
+      .filter((result) => !result.invoice || !result.invoice.user)
+      .map((result) => ({
+        id: result.id,
+        documentNumber: result.documentNumber,
+        reason: "Invoice no longer exists",
+      }));
+
     // Build email payloads for all results
     const emailPayloads: InvoiceEmailPayload[] = results
       .filter((result) => result.invoice && result.invoice.user)
@@ -153,6 +162,7 @@ export async function POST(
             errorMessage: result.error || null,
             sentAt: result.success ? new Date() : null,
             ccEmails: result.ccEmails?.join(",") || null,
+            documentNumber: result.invoiceNumber,
           },
         });
       }
@@ -178,11 +188,12 @@ export async function POST(
           id: r.invoiceId,
           error: r.error,
         })),
+      skipped,
     };
 
     return NextResponse.json({
       success: true,
-      message: `Resent ${bulkResult.summary.successful} invoice(s), ${bulkResult.summary.failed} failed`,
+      message: `Resent ${bulkResult.summary.successful} invoice(s), ${bulkResult.summary.failed} failed${skipped.length ? `, ${skipped.length} skipped (invoice deleted)` : ""}`,
       resendResults,
       summary: bulkResult.summary,
     });

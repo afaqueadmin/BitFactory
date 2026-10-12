@@ -88,6 +88,8 @@ interface EmailSendRunDetail {
   source: string;
   status: string;
   totalInvoices: number;
+  // Rows actually stored; fewer than totalInvoices when rows were lost.
+  recordedRows: number;
   successCount: number;
   failureCount: number;
   createdBy: { id: string; name: string; email: string };
@@ -157,7 +159,17 @@ function DocumentCell({
   }
 
   if (!result.invoice) {
-    return <>{result.documentNumber ?? "—"}</>;
+    // The invoice was deleted after the email; the row keeps its number.
+    return (
+      <>
+        <Typography variant="body2" sx={{ fontWeight: 500 }}>
+          {result.documentNumber ?? "—"}
+        </Typography>
+        <Typography variant="caption" color="text.secondary" display="block">
+          Deleted
+        </Typography>
+      </>
+    );
   }
   return (
     <>
@@ -254,10 +266,12 @@ export default function EmailReportDetailPage() {
 
   const handleSelectAll = () => {
     if (data?.results) {
-      if (selectedResults.size === data.results.length) {
+      // Rows whose invoice was deleted can't be resent.
+      const resendable = data.results.filter((r) => r.invoice);
+      if (selectedResults.size === resendable.length) {
         setSelectedResults(new Set());
       } else {
-        setSelectedResults(new Set(data.results.map((r) => r.id)));
+        setSelectedResults(new Set(resendable.map((r) => r.id)));
       }
     }
   };
@@ -324,6 +338,7 @@ export default function EmailReportDetailPage() {
   const { run, results } = data;
   const canResend = canResendKind(run.kind);
   const isMemoRun = run.type === "MEMO";
+  const resendableCount = results.filter((r) => r.invoice).length;
   const rate =
     run.totalInvoices > 0
       ? Math.round((run.successCount / run.totalInvoices) * 100)
@@ -394,6 +409,14 @@ export default function EmailReportDetailPage() {
             </Button>
           </Box>
         </Box>
+
+        {run.recordedRows < run.totalInvoices && (
+          <Alert severity="info">
+            {run.totalInvoices - run.recordedRows} of {run.totalInvoices}{" "}
+            {isMemoRun ? "rows" : "invoice rows"} in this run were removed
+            before deleted invoices kept their email history.
+          </Alert>
+        )}
 
         {error && (
           <Alert
@@ -519,13 +542,14 @@ export default function EmailReportDetailPage() {
                   <TableCell padding="checkbox">
                     <Checkbox
                       checked={
-                        results.length > 0 &&
-                        selectedResults.size === results.length
+                        resendableCount > 0 &&
+                        selectedResults.size === resendableCount
                       }
                       indeterminate={
                         selectedResults.size > 0 &&
-                        selectedResults.size < results.length
+                        selectedResults.size < resendableCount
                       }
+                      disabled={resendableCount === 0}
                       onChange={handleSelectAll}
                     />
                   </TableCell>
@@ -559,6 +583,7 @@ export default function EmailReportDetailPage() {
                         <Checkbox
                           checked={selectedResults.has(result.id)}
                           onChange={() => handleSelectResult(result.id)}
+                          disabled={!result.invoice}
                         />
                       </TableCell>
                     )}

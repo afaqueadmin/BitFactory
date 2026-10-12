@@ -127,6 +127,7 @@ export async function POST(request: NextRequest) {
           id: uuidv4(),
           runId,
           invoiceId: result.invoiceId,
+          documentNumber: result.invoiceNumber,
           customerId:
             invoices.find((i) => i.id === result.invoiceId)?.user?.id || "",
           customerName:

@@ -201,6 +201,7 @@ export async function POST(
 
     await recordSingleEmailRun({
       invoiceId: invoice.id,
+      invoiceNumber: invoice.invoiceNumber,
       invoiceType: invoice.invoiceType,
       customer: invoice.user,
       kind: "INVOICE",

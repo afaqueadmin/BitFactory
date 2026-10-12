@@ -1708,8 +1708,8 @@ model EmailSendResult {
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
   run            EmailSendRun @relation(fields: [runId], references: [id], onDelete: Cascade)
-  invoice        Invoice?     @relation("emailSendResults", fields: [invoiceId], references: [id], onDelete: Cascade)
-  memo           Memo?        @relation("emailSendResults", fields: [memoId], references: [id], onDelete: Cascade)
+  invoice        Invoice?     @relation("emailSendResults", fields: [invoiceId], references: [id], onDelete: SetNull)
+  memo           Memo?        @relation("emailSendResults", fields: [memoId], references: [id], onDelete: SetNull)
   customer       User         @relation("emailSendResults", fields: [customerId], references: [id], onDelete: Cascade)
 
   @@index([runId])

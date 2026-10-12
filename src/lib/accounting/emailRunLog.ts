@@ -19,6 +19,8 @@ interface RunOutcome {
 
 export interface SingleEmailRunInput extends RunOutcome {
   invoiceId: string;
+  // Kept on the row so it stays identifiable if the invoice is deleted.
+  invoiceNumber: string;
   invoiceType: string;
   kind: EmailRunKind;
 }
@@ -92,7 +94,7 @@ export async function recordSingleEmailRun(
   await createSingleRun(
     input.invoiceType,
     input.kind,
-    { invoiceId: input.invoiceId },
+    { invoiceId: input.invoiceId, documentNumber: input.invoiceNumber },
     input,
     `invoice ${input.invoiceId}`,
   );

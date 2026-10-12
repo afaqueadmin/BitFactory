@@ -108,10 +108,12 @@ export async function GET(
       },
     });
 
-    // Get total count for pagination
-    const totalResults = await prisma.emailSendResult.count({
-      where: resultFilter,
-    });
+    // Filtered count for pagination; unfiltered count to flag runs whose
+    // rows were lost to invoice deletes before history was kept.
+    const [totalResults, recordedRows] = await Promise.all([
+      prisma.emailSendResult.count({ where: resultFilter }),
+      prisma.emailSendResult.count({ where: { runId } }),
+    ]);
 
     const formattedResults = results.map((result) => ({
       id: result.id,
@@ -142,6 +144,7 @@ export async function GET(
         source: run.source,
         status: run.status,
         totalInvoices: run.totalInvoices,
+        recordedRows,
         successCount: run.successCount,
         failureCount: run.failureCount,
         createdBy: run.creator,
