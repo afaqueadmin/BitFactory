@@ -189,10 +189,12 @@ export default function CreateMemoModal({
         throw new Error(data.error || "Failed to create memo");
       }
 
-      const successText = data.emailWarning
-        ? `Memo created. ${data.emailWarning}`
-        : data.pairedMemo
-          ? "Memo created, with an offsetting entry in the opposite category"
+      // A customer-facing memo only exists once its email went out; a send
+      // failure comes back as an error above and nothing is created.
+      const successText = data.pairedMemo
+        ? "Memo created, with an offsetting entry in the opposite category"
+        : memoType === "CUSTOMER_FACING"
+          ? "Memo created and emailed to the customer"
           : "Memo created successfully";
 
       setSuccess(successText);

@@ -93,6 +93,17 @@ const transporter = nodemailer.createTransport({
 const CC_INVOICE_EMAIL =
   process.env.CC_INVOICES_EMAIL || "invoices@bitfactory.ae";
 
+// Dedupe a caller-built CC list (RM + invoices inbox), falling back to the
+// invoices inbox alone when none is given.
+const normalizeCcEmails = (ccEmails?: string[]): string[] =>
+  Array.from(
+    new Set(
+      (ccEmails && ccEmails.length > 0 ? ccEmails : [CC_INVOICE_EMAIL]).filter(
+        Boolean,
+      ),
+    ),
+  );
+
 // Reply-To email for all invoice communications
 const REPLY_TO_EMAILS =
   `${process.env.CC_INVOICES_EMAIL}, ${process.env.CC_SUPPORT_EMAIL}` ||
@@ -960,14 +971,7 @@ export const sendInvoiceCancellationEmail = async (
     dueDate,
   );
 
-  const normalizedCcEmails = Array.from(
-    new Set(
-      (ccEmails && ccEmails.length > 0
-        ? ccEmails
-        : [process.env.CC_INVOICES_EMAIL || "invoices@bitfactory.ae"]
-      ).filter(Boolean),
-    ),
-  );
+  const normalizedCcEmails = normalizeCcEmails(ccEmails);
 
   const mailOptions = {
     from:
@@ -1697,6 +1701,9 @@ export interface MemoPdfData {
   reason: string;
   issuedDate: Date;
   invoiceNumber?: string | null;
+  // Voided memos get a VOIDED banner and the void reason.
+  voided?: boolean;
+  voidReason?: string | null;
 }
 
 /**
@@ -1743,6 +1750,8 @@ export const generateMemoPDF = async (data: MemoPdfData): Promise<Buffer> => {
       amountLabel,
       amountTone,
       reason: escapeHtml(data.reason),
+      voided: !!data.voided,
+      voidReason: data.voidReason ? escapeHtml(data.voidReason) : "",
       ...(paymentDetails
         ? {
             companyName: paymentDetails.companyName,
@@ -1779,7 +1788,9 @@ export const sendMemoEmail = async (
   reason: string,
   pdfBuffer: Buffer,
   invoiceNumber?: string | null,
+  ccEmails?: string[],
 ) => {
+  const normalizedCcEmails = normalizeCcEmails(ccEmails);
   try {
     const { generateMemoEmailHTML } =
       await import("./email-templates/memo-email");
@@ -1800,7 +1811,7 @@ export const sendMemoEmail = async (
         "noreply@bitfactory.com",
       replyTo: REPLY_TO_EMAILS,
       to: email,
-      cc: CC_INVOICE_EMAIL,
+      cc: normalizedCcEmails.join(","),
       subject: `${memoTitleLabel} ${memoNumber} - BitFactory`,
       html: htmlContent,
       attachments: [
@@ -1813,9 +1824,61 @@ export const sendMemoEmail = async (
     };
 
     await transporter.sendMail(mailOptions);
-    return { success: true };
+    return { success: true as const, ccEmails: normalizedCcEmails };
   } catch (error) {
     console.error("Error sending memo email:", error);
-    return { success: false, error };
+    return { success: false as const, error, ccEmails: normalizedCcEmails };
+  }
+};
+
+/**
+ * Tell the customer a memo was voided, with the VOIDED memo PDF attached.
+ */
+export const sendMemoVoidEmail = async (
+  email: string,
+  customerName: string,
+  memoNumber: string,
+  amount: number,
+  voidReason: string,
+  pdfBuffer: Buffer,
+  invoiceNumber?: string | null,
+  ccEmails?: string[],
+) => {
+  const normalizedCcEmails = normalizeCcEmails(ccEmails);
+  try {
+    const { generateMemoVoidEmailHTML } =
+      await import("./email-templates/memo-email");
+
+    const htmlContent = generateMemoVoidEmailHTML(
+      customerName,
+      memoNumber,
+      amount,
+      voidReason,
+      invoiceNumber,
+    );
+
+    const memoTitleLabel = amount >= 0 ? "Debit Memo" : "Credit Memo";
+
+    await transporter.sendMail({
+      from:
+        `BitFactory Accounts <${process.env.SMTP_FROM}>` ||
+        "noreply@bitfactory.com",
+      replyTo: REPLY_TO_EMAILS,
+      to: email,
+      cc: normalizedCcEmails.join(","),
+      subject: `${memoTitleLabel} ${memoNumber} - Voided - BitFactory`,
+      html: htmlContent,
+      attachments: [
+        {
+          filename: `${memoTitleLabel.replace(" ", "")}_${memoNumber}_VOIDED.pdf`,
+          content: pdfBuffer,
+          contentType: "application/pdf",
+        },
+      ],
+    });
+    return { success: true as const, ccEmails: normalizedCcEmails };
+  } catch (error) {
+    console.error("Error sending memo void email:", error);
+    return { success: false as const, error, ccEmails: normalizedCcEmails };
   }
 };

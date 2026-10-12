@@ -73,6 +73,7 @@ export async function GET(
         { customerName: { contains: q, mode: "insensitive" } },
         { customerEmail: { contains: q, mode: "insensitive" } },
         { invoice: { invoiceNumber: { contains: q, mode: "insensitive" } } },
+        { documentNumber: { contains: q, mode: "insensitive" } },
       ];
     }
 
@@ -87,6 +88,15 @@ export async function GET(
             totalAmount: true,
             dueDate: true,
             invoiceType: true,
+            status: true,
+          },
+        },
+        memo: {
+          select: {
+            id: true,
+            memoNumber: true,
+            amount: true,
+            category: true,
             status: true,
           },
         },
@@ -107,6 +117,13 @@ export async function GET(
       id: result.id,
       invoiceId: result.invoiceId,
       invoice: result.invoice,
+      memo: result.memo,
+      documentNumber:
+        result.documentNumber ??
+        result.memo?.memoNumber ??
+        result.invoice?.invoiceNumber ??
+        null,
+      customerId: result.customerId,
       customerName: result.customerName,
       customerEmail: result.customerEmail,
       ccEmails: result.ccEmails ? result.ccEmails.split(",") : [],

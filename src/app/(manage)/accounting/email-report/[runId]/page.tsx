@@ -43,13 +43,18 @@ import SearchIcon from "@mui/icons-material/Search";
 import {
   EMAIL_RUN_KIND_LABELS,
   EMAIL_RUN_SOURCE_LABELS,
+  MEMO_CATEGORY_LABELS,
+  canResendKind,
   emailReportTypeLabel,
   invoiceDetailHref,
+  memoHref,
 } from "@/lib/accounting/emailReport";
 
 interface EmailSendResult {
   id: string;
-  invoiceId: string;
+  invoiceId: string | null;
+  // Invoice emails carry the invoice; memo emails carry the memo (null when
+  // the memo was rolled back because its create email failed).
   invoice: {
     id: string;
     invoiceNumber: string;
@@ -57,7 +62,16 @@ interface EmailSendResult {
     dueDate: string;
     invoiceType: string;
     status: string;
-  };
+  } | null;
+  memo: {
+    id: string;
+    memoNumber: string;
+    amount: string | number;
+    category: string;
+    status: string;
+  } | null;
+  documentNumber: string | null;
+  customerId: string;
   customerName: string;
   customerEmail: string;
   ccEmails: string[];
@@ -110,6 +124,55 @@ function SummaryTile({
         {value}
       </Typography>
     </Box>
+  );
+}
+
+/** Invoice or memo number, linked, with its current status underneath. */
+function DocumentCell({
+  result,
+  isMemoRun,
+}: {
+  result: EmailSendResult;
+  isMemoRun: boolean;
+}) {
+  if (isMemoRun) {
+    const number = result.documentNumber ?? result.memo?.memoNumber ?? "—";
+    return (
+      <>
+        <MuiLink
+          component={Link}
+          href={memoHref(result.customerId)}
+          underline="hover"
+          sx={{ fontWeight: 500 }}
+        >
+          {number}
+        </MuiLink>
+        <Typography variant="caption" color="text.secondary" display="block">
+          {result.memo
+            ? `${MEMO_CATEGORY_LABELS[result.memo.category] ?? result.memo.category} · ${result.memo.status}`
+            : "Not created"}
+        </Typography>
+      </>
+    );
+  }
+
+  if (!result.invoice) {
+    return <>{result.documentNumber ?? "—"}</>;
+  }
+  return (
+    <>
+      <MuiLink
+        component={Link}
+        href={invoiceDetailHref(result.invoice.id, result.invoice.invoiceType)}
+        underline="hover"
+        sx={{ fontWeight: 500 }}
+      >
+        {result.invoice.invoiceNumber}
+      </MuiLink>
+      <Typography variant="caption" color="text.secondary" display="block">
+        {result.invoice.status}
+      </Typography>
+    </>
   );
 }
 
@@ -259,7 +322,8 @@ export default function EmailReportDetailPage() {
   }
 
   const { run, results } = data;
-  const canResend = run.kind !== "CANCELLATION";
+  const canResend = canResendKind(run.kind);
+  const isMemoRun = run.type === "MEMO";
   const rate =
     run.totalInvoices > 0
       ? Math.round((run.successCount / run.totalInvoices) * 100)
@@ -352,7 +416,10 @@ export default function EmailReportDetailPage() {
               gridTemplateColumns="repeat(auto-fit, minmax(140px, 1fr))"
               gap={2}
             >
-              <SummaryTile label="Invoices" value={run.totalInvoices} />
+              <SummaryTile
+                label={isMemoRun ? "Memos" : "Invoices"}
+                value={run.totalInvoices}
+              />
               <SummaryTile
                 label="Sent"
                 value={run.successCount}
@@ -391,7 +458,11 @@ export default function EmailReportDetailPage() {
         <Box display="flex" gap={2} flexWrap="wrap" alignItems="center">
           <TextField
             size="small"
-            placeholder="Search invoice #, customer or email"
+            placeholder={
+              isMemoRun
+                ? "Search memo #, customer or email"
+                : "Search invoice #, customer or email"
+            }
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             sx={{ minWidth: { xs: "100%", sm: 320 } }}
@@ -459,7 +530,7 @@ export default function EmailReportDetailPage() {
                     />
                   </TableCell>
                 )}
-                <TableCell>Invoice</TableCell>
+                <TableCell>{isMemoRun ? "Memo" : "Invoice"}</TableCell>
                 <TableCell>Customer</TableCell>
                 <TableCell>CC</TableCell>
                 <TableCell align="right">Amount</TableCell>
@@ -492,24 +563,7 @@ export default function EmailReportDetailPage() {
                       </TableCell>
                     )}
                     <TableCell sx={{ whiteSpace: "nowrap" }}>
-                      <MuiLink
-                        component={Link}
-                        href={invoiceDetailHref(
-                          result.invoiceId,
-                          result.invoice.invoiceType,
-                        )}
-                        underline="hover"
-                        sx={{ fontWeight: 500 }}
-                      >
-                        {result.invoice.invoiceNumber}
-                      </MuiLink>
-                      <Typography
-                        variant="caption"
-                        color="text.secondary"
-                        display="block"
-                      >
-                        {result.invoice.status}
-                      </Typography>
+                      <DocumentCell result={result} isMemoRun={isMemoRun} />
                     </TableCell>
                     <TableCell>
                       <Typography variant="body2">
@@ -540,7 +594,17 @@ export default function EmailReportDetailPage() {
                       )}
                     </TableCell>
                     <TableCell align="right">
-                      <CurrencyDisplay value={result.invoice.totalAmount} />
+                      {isMemoRun ? (
+                        result.memo ? (
+                          <CurrencyDisplay value={result.memo.amount} />
+                        ) : (
+                          "—"
+                        )
+                      ) : result.invoice ? (
+                        <CurrencyDisplay value={result.invoice.totalAmount} />
+                      ) : (
+                        "—"
+                      )}
                     </TableCell>
                     <TableCell align="center">
                       {result.success ? (

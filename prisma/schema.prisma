@@ -996,13 +996,14 @@ model Memo {
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
 
-  user          User          @relation("memos", fields: [userId], references: [id])
-  invoice       Invoice?      @relation("invoiceMemos", fields: [invoiceId], references: [id])
-  createdByUser User          @relation("memosCreated", fields: [createdBy], references: [id])
-  voidedByUser  User?         @relation("memosVoided", fields: [voidedBy], references: [id])
-  pairedMemo    Memo?         @relation("MemoPair", fields: [pairedMemoId], references: [id])
-  pairedMemos   Memo[]        @relation("MemoPair")
-  costPayments  CostPayment[]
+  user             User              @relation("memos", fields: [userId], references: [id])
+  invoice          Invoice?          @relation("invoiceMemos", fields: [invoiceId], references: [id])
+  createdByUser    User              @relation("memosCreated", fields: [createdBy], references: [id])
+  voidedByUser     User?             @relation("memosVoided", fields: [voidedBy], references: [id])
+  pairedMemo       Memo?             @relation("MemoPair", fields: [pairedMemoId], references: [id])
+  pairedMemos      Memo[]            @relation("MemoPair")
+  costPayments     CostPayment[]
+  emailSendResults EmailSendResult[] @relation("emailSendResults")
 
   @@index([userId])
   @@index([invoiceId])
@@ -1689,24 +1690,31 @@ model EmailSendRun {
 }
 
 model EmailSendResult {
-  id            String       @id @default(cuid())
-  runId         String
-  invoiceId     String
-  customerId    String
-  customerName  String
-  customerEmail String
-  ccEmails      String?
-  success       Boolean
-  errorMessage  String?
-  sentAt        DateTime?
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
-  run           EmailSendRun @relation(fields: [runId], references: [id], onDelete: Cascade)
-  invoice       Invoice      @relation("emailSendResults", fields: [invoiceId], references: [id], onDelete: Cascade)
-  customer      User         @relation("emailSendResults", fields: [customerId], references: [id], onDelete: Cascade)
+  id             String       @id @default(cuid())
+  runId          String
+  // Exactly one document per result: an invoice, or a memo. A memo whose
+  // create email failed was rolled back, so neither id is set and only
+  // documentNumber identifies it.
+  invoiceId      String?
+  memoId         String?
+  documentNumber String?
+  customerId     String
+  customerName   String
+  customerEmail  String
+  ccEmails       String?
+  success        Boolean
+  errorMessage   String?
+  sentAt         DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  run            EmailSendRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  invoice        Invoice?     @relation("emailSendResults", fields: [invoiceId], references: [id], onDelete: Cascade)
+  memo           Memo?        @relation("emailSendResults", fields: [memoId], references: [id], onDelete: Cascade)
+  customer       User         @relation("emailSendResults", fields: [customerId], references: [id], onDelete: Cascade)
 
   @@index([runId])
   @@index([invoiceId])
+  @@index([memoId])
   @@index([customerId])
   @@index([success])
   @@index([createdAt])
@@ -1722,6 +1730,8 @@ enum EmailRunStatus {
 enum EmailRunKind {
   INVOICE
   CANCELLATION
+  MEMO
+  MEMO_VOID
 }
 
 enum EmailRunSource {

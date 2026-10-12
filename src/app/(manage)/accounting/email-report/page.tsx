@@ -227,8 +227,8 @@ function EmailReportContent() {
               Email Send Reports
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Every invoice and cancellation email sent from Hosting &amp;
-              Colocation, Hardware Sales and Hardware Repair
+              Every invoice, cancellation and customer-facing memo email sent
+              from Hosting &amp; Colocation, Hardware Sales and Hardware Repair
             </Typography>
           </Box>
           <Button

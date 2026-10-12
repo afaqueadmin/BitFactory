@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
 import { generateMemoPDF, sendMemoEmail } from "@/lib/email";
-import { AuditAction, Prisma } from "@prisma/client";
+import { AuditAction, Memo, Prisma } from "@prisma/client";
+import { InvoiceEmailService } from "@/services/invoiceEmailService";
+import { recordMemoEmailRun } from "@/lib/accounting/emailRunLog";
 
 /**
  * List (GET) and create (POST) memos across both the Hosting & Colocation
@@ -10,6 +12,8 @@ import { AuditAction, Prisma } from "@prisma/client";
  * stand alone against a customer, and is either CUSTOMER_FACING (PDF
  * generated + emailed, labeled "Debit Memo"/"Credit Memo" to the customer
  * based on the amount's sign) or INTERNAL (ledger-only, no PDF/email).
+ * A customer-facing memo is only created if its email is sent: the send is
+ * the last step of the create transaction, and a failure rolls it back.
  *
  * GET is also reachable by the CLIENT who owns the memos: their request is
  * force-scoped to their own userId and CUSTOMER_FACING memos only,
@@ -185,6 +189,14 @@ const CATEGORY_TO_INVOICE_TYPE: Record<string, string> = {
   HOSTING: "ELECTRICITY_CHARGES",
   HARDWARE: "HARDWARE_SALES",
 };
+
+// Thrown inside the create transaction when the memo email fails, so the
+// memo, its audit log and its balance adjustment all roll back.
+class MemoEmailError extends Error {}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
 
 const OPPOSITE_CATEGORY: Record<
   "HOSTING" | "HARDWARE",
@@ -386,162 +398,241 @@ export async function POST(request: NextRequest) {
       ? `MEMO-${luxorIdentifier}-${dateStr}-${String(lastSeq + 2).padStart(3, "0")}`
       : null;
 
-    const { memo, pairedMemo } = await prisma.$transaction(async (tx) => {
-      let memo = await tx.memo.create({
-        data: {
+    const isCustomerFacing = memoType === "CUSTOMER_FACING";
+    const customerRef = {
+      id: customer.id,
+      name: customer.name,
+      email: customer.email,
+    };
+
+    // Customer-facing: build the CC list (RM + invoices inbox) and render
+    // the PDF before touching the DB, so a PDF failure writes nothing.
+    let ccEmails: string[] = [];
+    let pdfBuffer: Buffer | null = null;
+    if (isCustomerFacing) {
+      ccEmails = await InvoiceEmailService.buildCCList(targetUserId);
+      try {
+        pdfBuffer = await generateMemoPDF({
           memoNumber: primaryMemoNumber,
-          userId: targetUserId,
-          invoiceId: linkedInvoice?.id,
+          customerName: customer.name || "Valued Customer",
+          customerEmail: customer.email,
           category: category as "HOSTING" | "HARDWARE",
-          memoType: memoType as "CUSTOMER_FACING" | "INTERNAL",
           amount,
           reason: reason.trim(),
-          createdBy: adminUserId,
-        },
-      });
-
-      await tx.auditLog.create({
-        data: {
-          action: AuditAction.MEMO_CREATED,
-          entityType: "Memo",
-          entityId: memo.id,
+          issuedDate: timestamp,
+          invoiceNumber: linkedInvoice?.invoiceNumber || null,
+        });
+      } catch (pdfError) {
+        console.error(
+          `[Memos] PDF generation failed for ${primaryMemoNumber}:`,
+          pdfError,
+        );
+        await recordMemoEmailRun({
+          memoId: null,
+          memoNumber: primaryMemoNumber,
+          invoiceId: linkedInvoice?.id,
+          kind: "MEMO",
+          customer: customerRef,
+          success: false,
+          error: `PDF generation failed: ${errorMessage(pdfError)}`,
+          ccEmails,
           userId: adminUserId,
-          description: `Memo ${primaryMemoNumber} created for ${customer.name || customer.email} (${category}, ${memoType})`,
-          changes: JSON.stringify({
-            amount,
-            category,
-            memoType,
-            reason: reason.trim(),
-            invoiceId: linkedInvoice?.id || null,
-            invoiceNumber: linkedInvoice?.invoiceNumber || null,
-          }),
-        },
-      });
-
-      // Customer-facing memos actually move the customer's balance
-      // (statement, wallet, dashboard balance card), which are all computed
-      // from CostPayment rows - so mirror the memo as a linked ADJUSTMENT
-      // payment. Internal memos stay a revenue-reporting-only correction.
-      if (memoType === "CUSTOMER_FACING") {
-        await tx.costPayment.create({
-          data: {
-            userId: targetUserId,
-            invoiceId: linkedInvoice?.id,
-            memoId: memo.id,
-            amount,
-            consumption: 0,
-            type: "ADJUSTMENT",
-            narration: `Memo ${primaryMemoNumber}: ${reason.trim()}`.slice(
-              0,
-              500,
-            ),
-          },
         });
+        return NextResponse.json(
+          {
+            error: `Memo not created - the PDF could not be generated: ${errorMessage(pdfError)}`,
+          },
+          { status: 502 },
+        );
       }
+    }
 
-      let pairedMemo = null;
-      if (isTransfer) {
-        const oppositeCategory =
-          OPPOSITE_CATEGORY[category as "HOSTING" | "HARDWARE"];
-        pairedMemo = await tx.memo.create({
-          data: {
-            memoNumber: pairedMemoNumber!,
-            userId: targetUserId,
-            invoiceId: null,
-            category: oppositeCategory,
-            memoType: "INTERNAL",
-            amount: -amount,
-            reason: reason.trim(),
-            createdBy: adminUserId,
-            pairedMemoId: memo.id,
-          },
-        });
-
-        memo = await tx.memo.update({
-          where: { id: memo.id },
-          data: { pairedMemoId: pairedMemo.id },
-        });
-
-        await tx.auditLog.create({
-          data: {
-            action: AuditAction.MEMO_CREATED,
-            entityType: "Memo",
-            entityId: pairedMemo.id,
-            userId: adminUserId,
-            description: `Memo ${pairedMemoNumber} created for ${customer.name || customer.email} (${oppositeCategory}, INTERNAL) - paired transfer offset of ${primaryMemoNumber}`,
-            changes: JSON.stringify({
-              amount: -amount,
-              category: oppositeCategory,
-              memoType: "INTERNAL",
+    let created: { memo: Memo; pairedMemo: Memo | null };
+    try {
+      created = await prisma.$transaction(
+        async (tx) => {
+          let memo = await tx.memo.create({
+            data: {
+              memoNumber: primaryMemoNumber,
+              userId: targetUserId,
+              invoiceId: linkedInvoice?.id,
+              category: category as "HOSTING" | "HARDWARE",
+              memoType: memoType as "CUSTOMER_FACING" | "INTERNAL",
+              amount,
               reason: reason.trim(),
-              pairedMemoId: memo.id,
-              pairedMemoNumber: primaryMemoNumber,
-            }),
-          },
-        });
-      }
-
-      return { memo, pairedMemo };
-    });
-
-    let emailWarning: string | null = null;
-
-    if (memoType === "CUSTOMER_FACING") {
-      if (!customer.email) {
-        emailWarning =
-          "Memo created, but the customer has no email on file so no notice was sent.";
-      } else {
-        try {
-          const pdfBuffer = await generateMemoPDF({
-            memoNumber: primaryMemoNumber,
-            customerName: customer.name || "Valued Customer",
-            customerEmail: customer.email,
-            category: category as "HOSTING" | "HARDWARE",
-            amount,
-            reason: reason.trim(),
-            issuedDate: memo.issuedDate,
-            invoiceNumber: linkedInvoice?.invoiceNumber || null,
+              issuedDate: timestamp,
+              createdBy: adminUserId,
+            },
           });
 
-          const sendResult = await sendMemoEmail(
-            customer.email,
-            customer.name || "Valued Customer",
-            primaryMemoNumber,
-            amount,
-            reason.trim(),
-            pdfBuffer,
-            linkedInvoice?.invoiceNumber || null,
-          );
-
-          if (!sendResult.success) {
-            throw sendResult.error || new Error("Unknown email failure");
-          }
-
-          await prisma.auditLog.create({
+          await tx.auditLog.create({
             data: {
-              action: AuditAction.MEMO_SENT,
+              action: AuditAction.MEMO_CREATED,
               entityType: "Memo",
               entityId: memo.id,
               userId: adminUserId,
-              description: `Memo ${primaryMemoNumber} emailed to ${customer.email}`,
+              description: `Memo ${primaryMemoNumber} created for ${customer.name || customer.email} (${category}, ${memoType})`,
+              changes: JSON.stringify({
+                amount,
+                category,
+                memoType,
+                reason: reason.trim(),
+                invoiceId: linkedInvoice?.id || null,
+                invoiceNumber: linkedInvoice?.invoiceNumber || null,
+              }),
             },
           });
-        } catch (emailError) {
-          console.error(
-            `Failed to generate/send memo email for ${primaryMemoNumber}:`,
-            emailError,
-          );
-          emailWarning =
-            "Memo created, but the PDF/email could not be sent. You can retry from the memo list.";
-        }
+
+          // Customer-facing memos actually move the customer's balance
+          // (statement, wallet, dashboard balance card), which are all computed
+          // from CostPayment rows - so mirror the memo as a linked ADJUSTMENT
+          // payment. Internal memos stay a revenue-reporting-only correction.
+          if (isCustomerFacing) {
+            await tx.costPayment.create({
+              data: {
+                userId: targetUserId,
+                invoiceId: linkedInvoice?.id,
+                memoId: memo.id,
+                amount,
+                consumption: 0,
+                type: "ADJUSTMENT",
+                narration: `Memo ${primaryMemoNumber}: ${reason.trim()}`.slice(
+                  0,
+                  500,
+                ),
+              },
+            });
+          }
+
+          let pairedMemo = null;
+          if (isTransfer) {
+            const oppositeCategory =
+              OPPOSITE_CATEGORY[category as "HOSTING" | "HARDWARE"];
+            pairedMemo = await tx.memo.create({
+              data: {
+                memoNumber: pairedMemoNumber!,
+                userId: targetUserId,
+                invoiceId: null,
+                category: oppositeCategory,
+                memoType: "INTERNAL",
+                amount: -amount,
+                reason: reason.trim(),
+                createdBy: adminUserId,
+                pairedMemoId: memo.id,
+              },
+            });
+
+            memo = await tx.memo.update({
+              where: { id: memo.id },
+              data: { pairedMemoId: pairedMemo.id },
+            });
+
+            await tx.auditLog.create({
+              data: {
+                action: AuditAction.MEMO_CREATED,
+                entityType: "Memo",
+                entityId: pairedMemo.id,
+                userId: adminUserId,
+                description: `Memo ${pairedMemoNumber} created for ${customer.name || customer.email} (${oppositeCategory}, INTERNAL) - paired transfer offset of ${primaryMemoNumber}`,
+                changes: JSON.stringify({
+                  amount: -amount,
+                  category: oppositeCategory,
+                  memoType: "INTERNAL",
+                  reason: reason.trim(),
+                  pairedMemoId: memo.id,
+                  pairedMemoNumber: primaryMemoNumber,
+                }),
+              },
+            });
+          }
+
+          // Customer-facing: email last, so any earlier failure (e.g. a memo
+          // number clash) aborts before the customer is contacted, and an email
+          // failure rolls the whole memo back.
+          if (isCustomerFacing && pdfBuffer) {
+            const sendResult = await sendMemoEmail(
+              customer.email,
+              customer.name || "Valued Customer",
+              primaryMemoNumber,
+              amount,
+              reason.trim(),
+              pdfBuffer,
+              linkedInvoice?.invoiceNumber || null,
+              ccEmails,
+            );
+
+            if (!sendResult.success) {
+              throw new MemoEmailError(errorMessage(sendResult.error));
+            }
+            ccEmails = sendResult.ccEmails;
+
+            await tx.auditLog.create({
+              data: {
+                action: AuditAction.MEMO_SENT,
+                entityType: "Memo",
+                entityId: memo.id,
+                userId: adminUserId,
+                description: `Memo ${primaryMemoNumber} emailed to ${customer.email}`,
+                changes: JSON.stringify({
+                  sentTo: customer.email,
+                  ccEmails: ccEmails.join(","),
+                  pdfAttached: true,
+                }),
+              },
+            });
+          }
+
+          return { memo, pairedMemo };
+        },
+        // PDF is pre-rendered; this only has to cover the SMTP send.
+        { maxWait: 10_000, timeout: 30_000 },
+      );
+    } catch (txError) {
+      if (txError instanceof MemoEmailError) {
+        console.error(
+          `[Memos] Email failed for ${primaryMemoNumber}, memo rolled back:`,
+          txError.message,
+        );
+        await recordMemoEmailRun({
+          memoId: null,
+          memoNumber: primaryMemoNumber,
+          invoiceId: linkedInvoice?.id,
+          kind: "MEMO",
+          customer: customerRef,
+          success: false,
+          error: txError.message,
+          ccEmails,
+          userId: adminUserId,
+        });
+        return NextResponse.json(
+          {
+            error: `Memo not created - the email could not be sent: ${txError.message}`,
+          },
+          { status: 502 },
+        );
       }
+      throw txError;
+    }
+
+    const { memo, pairedMemo } = created;
+
+    if (isCustomerFacing) {
+      await recordMemoEmailRun({
+        memoId: memo.id,
+        memoNumber: primaryMemoNumber,
+        invoiceId: linkedInvoice?.id,
+        kind: "MEMO",
+        customer: customerRef,
+        success: true,
+        ccEmails,
+        userId: adminUserId,
+      });
     }
 
     return NextResponse.json({
       success: true,
       memo,
       pairedMemo,
-      emailWarning,
     });
   } catch (error) {
     console.error("[Memos] POST error:", error);

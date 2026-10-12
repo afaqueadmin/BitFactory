@@ -82,9 +82,7 @@ function MemosContent() {
     customerId: customerId || undefined,
     category: (category || undefined) as "HOSTING" | "HARDWARE" | undefined,
     memoType: (memoType || undefined) as
-      | "CUSTOMER_FACING"
-      | "INTERNAL"
-      | undefined,
+      "CUSTOMER_FACING" | "INTERNAL" | undefined,
     status: (status || undefined) as "ISSUED" | "VOIDED" | undefined,
     startDate: startDateFilter || undefined,
     endDate: endDateFilter || undefined,
@@ -389,6 +387,9 @@ function MemosContent() {
               will be excluded from revenue totals going forward.
               {voidingMemo?.pairedMemoId
                 ? " Its paired offsetting memo will be voided at the same time."
+                : ""}
+              {voidingMemo?.memoType === "CUSTOMER_FACING"
+                ? " The customer, their RM and the invoices inbox will be emailed a void notice with the voided PDF; if that email fails, the memo is not voided."
                 : ""}
             </Typography>
             <TextField

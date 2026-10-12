@@ -60,6 +60,8 @@ export async function GET(
       reason: memo.reason,
       issuedDate: memo.issuedDate,
       invoiceNumber: memo.invoice?.invoiceNumber || null,
+      voided: memo.status === "VOIDED",
+      voidReason: memo.status === "VOIDED" ? memo.voidReason : null,
     });
 
     return new NextResponse(pdfBuffer as unknown as ArrayBuffer, {

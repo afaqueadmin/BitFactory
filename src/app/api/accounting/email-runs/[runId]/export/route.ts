@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAccountingAdmin } from "@/lib/accounting/adminAuth";
 import {
   EMAIL_RUN_KIND_LABELS,
+  MEMO_CATEGORY_LABELS,
   emailReportTypeLabel,
 } from "@/lib/accounting/emailReport";
 
@@ -43,13 +44,14 @@ export async function GET(
         invoice: {
           select: { invoiceNumber: true, invoiceType: true, totalAmount: true },
         },
+        memo: { select: { memoNumber: true, amount: true, category: true } },
       },
       orderBy: { createdAt: "asc" },
     });
 
     const header = [
-      "Invoice #",
-      "Invoice Type",
+      "Document #",
+      "Type",
       "Email",
       "Customer",
       "Customer Email",
@@ -59,14 +61,27 @@ export async function GET(
       "Error",
       "Sent At (UTC)",
     ];
+    // Memo runs may link an invoice too, and a memo whose create email
+    // failed was rolled back, so go by the run type, not which id is set.
+    const isMemoRun = run.type === "MEMO";
     const rows = results.map((r) => [
-      r.invoice.invoiceNumber,
-      emailReportTypeLabel(r.invoice.invoiceType),
+      r.documentNumber ?? r.memo?.memoNumber ?? r.invoice?.invoiceNumber ?? "",
+      isMemoRun
+        ? r.memo
+          ? `Memo - ${MEMO_CATEGORY_LABELS[r.memo.category] ?? r.memo.category}`
+          : "Memo"
+        : emailReportTypeLabel(r.invoice?.invoiceType ?? run.type),
       EMAIL_RUN_KIND_LABELS[run.kind] ?? run.kind,
       r.customerName,
       r.customerEmail,
       (r.ccEmails || "").split(",").filter(Boolean).join("; "),
-      Number(r.invoice.totalAmount).toFixed(2),
+      isMemoRun
+        ? r.memo
+          ? Number(r.memo.amount).toFixed(2)
+          : ""
+        : r.invoice
+          ? Number(r.invoice.totalAmount).toFixed(2)
+          : "",
       r.success ? "Sent" : "Failed",
       r.errorMessage || "",
       r.sentAt ? r.sentAt.toISOString() : "",

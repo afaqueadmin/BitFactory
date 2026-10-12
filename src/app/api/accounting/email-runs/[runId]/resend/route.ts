@@ -7,6 +7,7 @@ import {
   InvoiceEmailPayload,
 } from "@/services/invoiceEmailService";
 import { repairDetailsFromInvoice } from "@/lib/email";
+import { canResendKind } from "@/lib/accounting/emailReport";
 
 export async function POST(
   request: NextRequest,
@@ -56,10 +57,11 @@ export async function POST(
       );
     }
 
-    // Resend sends the invoice PDF, which is wrong for a cancellation notice.
-    if (run.kind === "CANCELLATION") {
+    // Resend sends the invoice PDF, which is wrong for cancellation notices
+    // and memo emails.
+    if (!canResendKind(run.kind)) {
       return NextResponse.json(
-        { error: "Cancellation emails cannot be resent from the report" },
+        { error: "Only invoice emails can be resent from the report" },
         { status: 400 },
       );
     }
