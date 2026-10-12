@@ -83,6 +83,7 @@ export async function POST(request: NextRequest) {
     const {
       name,
       email: rawEmail,
+      phoneNumber,
       role,
       sendEmail,
       initialDeposit,
@@ -238,6 +239,10 @@ export async function POST(request: NextRequest) {
         data: {
           name,
           email,
+          phoneNumber:
+            typeof phoneNumber === "string" && phoneNumber.trim()
+              ? phoneNumber.trim()
+              : null,
           password: hashedPassword,
           role,
           invoicedAmount: defaultInvoicedAmount,

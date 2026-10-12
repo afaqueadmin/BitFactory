@@ -55,6 +55,7 @@ export default function CreateUserModal({
   const [formData, setFormData] = useState({
     name: "",
     email: "",
+    phoneNumber: "",
     role: "CLIENT",
     sendEmail: true,
     luxorSubaccountNames: [] as string[],
@@ -260,6 +261,7 @@ export default function CreateUserModal({
       setFormData({
         name: "",
         email: "",
+        phoneNumber: "",
         role: "CLIENT",
         sendEmail: true,
         luxorSubaccountNames: [] as string[],
@@ -367,6 +369,18 @@ export default function CreateUserModal({
                 </Typography>
               )}
             </Box>
+            <TextField
+              fullWidth
+              label="Phone Number (Optional)"
+              type="tel"
+              value={formData.phoneNumber}
+              onChange={(e) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  phoneNumber: e.target.value,
+                }))
+              }
+            />
             <FormControl fullWidth>
               <InputLabel>Role</InputLabel>
               <Select
