@@ -16,6 +16,7 @@ import PasskeySettings from "@/components/PasskeySettings";
 interface UserData {
   id?: string;
   twoFactorEnabled: boolean;
+  twoFactorMandatory?: boolean;
 }
 
 export default function SecuritySettingsPage() {
@@ -53,6 +54,7 @@ export default function SecuritySettingsPage() {
       setUserData({
         id: data.user.id,
         twoFactorEnabled: data.user.twoFactorEnabled,
+        twoFactorMandatory: data.user.twoFactorMandatory === true,
       });
     } catch (err) {
       console.error("Error fetching user data:", err);
@@ -184,7 +186,10 @@ export default function SecuritySettingsPage() {
 
       {/* Two Factor Authentication Section */}
       <Box sx={{ mt: 4 }}>
-        <TwoFactorSettings twoFactorEnabled={userData.twoFactorEnabled} />
+        <TwoFactorSettings
+          twoFactorEnabled={userData.twoFactorEnabled}
+          twoFactorMandatory={userData.twoFactorMandatory}
+        />
       </Box>
 
       {/* Passkey Settings Section */}

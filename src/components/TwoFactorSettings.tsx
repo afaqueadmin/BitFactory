@@ -20,9 +20,12 @@ import { RADIUS_CARD, useDaylight } from "@/lib/daylight";
 
 export default function TwoFactorSettings({
   twoFactorEnabled,
+  twoFactorMandatory = false,
   daylight = false,
 }: {
   twoFactorEnabled: boolean;
+  /** M-1: 2FA is enforced for this account - no disable, only replace. */
+  twoFactorMandatory?: boolean;
   daylight?: boolean;
 }) {
   const { d, fonts } = useDaylight();
@@ -271,15 +274,37 @@ export default function TwoFactorSettings({
                 You&apos;ll need to enter a verification code from your
                 authenticator app when signing in.
               </Typography>
-              <Box sx={{ mt: 2 }}>
-                <Button
-                  variant="contained"
-                  color="primary"
-                  onClick={() => setDisableDialogOpen(true)}
+              {twoFactorMandatory && (
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ mt: 1 }}
                 >
-                  Disable 2FA
-                </Button>
-              </Box>
+                  Two-factor authentication is required for your account and
+                  can&apos;t be turned off. You can move it to a new
+                  authenticator app, which also issues new backup codes.
+                </Typography>
+              )}
+              {!setupMode && (
+                <Box sx={{ mt: 2, display: "flex", gap: 2, flexWrap: "wrap" }}>
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    onClick={startSetup}
+                  >
+                    Replace authenticator
+                  </Button>
+                  {!twoFactorMandatory && (
+                    <Button
+                      variant="outlined"
+                      color="primary"
+                      onClick={() => setDisableDialogOpen(true)}
+                    >
+                      Disable 2FA
+                    </Button>
+                  )}
+                </Box>
+              )}
             </Box>
           ) : (
             <>
@@ -443,15 +468,48 @@ export default function TwoFactorSettings({
             need to enter a verification code from your authenticator app when
             signing in.
           </Typography>
-          <Box sx={{ mt: 2 }}>
-            <Button
-              variant="contained"
-              onClick={() => setDisableDialogOpen(true)}
-              sx={primaryBtnSx}
+          {twoFactorMandatory && (
+            <Typography
+              sx={{
+                fontFamily: fonts.body,
+                fontSize: 13,
+                color: d.muted,
+                mt: 1,
+              }}
             >
-              Disable 2FA
-            </Button>
-          </Box>
+              Two-factor authentication is required for your account and
+              can&apos;t be turned off. You can move it to a new authenticator
+              app, which also issues new backup codes.
+            </Typography>
+          )}
+          {!setupMode && (
+            <Box sx={{ mt: 2, display: "flex", gap: 2, flexWrap: "wrap" }}>
+              <Button
+                variant="contained"
+                onClick={startSetup}
+                sx={primaryBtnSx}
+              >
+                Replace authenticator
+              </Button>
+              {!twoFactorMandatory && (
+                <Button
+                  variant="outlined"
+                  onClick={() => setDisableDialogOpen(true)}
+                  sx={{
+                    textTransform: "none",
+                    fontFamily: fonts.body,
+                    fontWeight: 650,
+                    borderRadius: "8px",
+                    minHeight: 40,
+                    color: d.action,
+                    borderColor: d.border,
+                  }}
+                >
+                  Disable 2FA
+                </Button>
+              )}
+            </Box>
+          )}
         </Box>
       ) : (
         <>

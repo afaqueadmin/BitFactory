@@ -39,6 +39,7 @@ const Grid = MuiGrid as React.ComponentType<any>;
 interface UserData {
   id?: string;
   twoFactorEnabled: boolean;
+  twoFactorMandatory?: boolean;
 }
 
 interface Activity {
@@ -116,6 +117,7 @@ export default function SecuritySettingsPage() {
       setUserData({
         id: data.user.id,
         twoFactorEnabled: data.user.twoFactorEnabled,
+        twoFactorMandatory: data.user.twoFactorMandatory === true,
       });
       setActivities(data.recentActivities || []);
     } catch (err) {
@@ -477,6 +479,7 @@ export default function SecuritySettingsPage() {
       <Box sx={{ mt: 3 }}>
         <TwoFactorSettings
           twoFactorEnabled={userData.twoFactorEnabled}
+          twoFactorMandatory={userData.twoFactorMandatory}
           daylight
         />
       </Box>

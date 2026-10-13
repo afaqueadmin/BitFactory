@@ -148,6 +148,10 @@ export async function GET(request: NextRequest) {
             "satisfied"
               ? null
               : twoFactorEnforceFrom().toISOString(),
+          // M-1: 2FA is enforced for this role, so it can't be turned off
+          // (the disable route refuses); settings offers replacing it instead.
+          twoFactorMandatory:
+            twoFactorRequirement(userFields.role, false) === "enforced",
         },
         subaccounts: luxorSubaccounts,
         recentActivities,
