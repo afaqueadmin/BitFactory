@@ -72,6 +72,15 @@ export async function completeTwoFactorSetup(
     twoFactorAuth?.pendingSecret ??
     (twoFactorAuth && !twoFactorAuth.enabled ? twoFactorAuth.secret : null);
   if (!newSecret) {
+    // Usually a retry whose first attempt saved but lost its response.
+    if (twoFactorAuth?.enabled) {
+      return {
+        ok: false,
+        status: 400,
+        error:
+          "Two-factor authentication is already set up. Please log in with your authenticator code.",
+      };
+    }
     return { ok: false, status: 400, error: "2FA has not been set up" };
   }
 

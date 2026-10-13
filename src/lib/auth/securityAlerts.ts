@@ -1,9 +1,13 @@
+import { after } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendSecurityAlertEmail } from "@/lib/email";
 
 /**
  * M-5: security-change notifications. Sent after the change is saved; a failed
- * send is logged and never blocks the action itself.
+ * send is logged and never blocks the action itself. The send runs after the
+ * response (after()), so a slow SMTP server can't stall the request - a hung
+ * send once timed out the forced 2FA setup after it had already saved.
+ * Must be called inside a request.
  */
 
 type SecurityEvent =
@@ -57,15 +61,18 @@ export async function notifySecurityChangeForUser(
   event: SecurityEvent,
   headers: Headers,
 ): Promise<void> {
-  try {
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { email: true },
-    });
-    if (user) await notifySecurityChange(user.email, event, headers);
-  } catch (error) {
-    console.error(`[securityAlerts] ${event.type} lookup failed:`, error);
-  }
+  const meta = requestMeta(headers);
+  after(async () => {
+    try {
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { email: true },
+      });
+      if (user) await sendAlert(user.email, event, meta);
+    } catch (error) {
+      console.error(`[securityAlerts] ${event.type} lookup failed:`, error);
+    }
+  });
 }
 
 export async function notifySecurityChange(
@@ -73,12 +80,28 @@ export async function notifySecurityChange(
   event: SecurityEvent,
   headers: Headers,
 ): Promise<void> {
+  const meta = requestMeta(headers);
+  after(() => sendAlert(email, event, meta));
+}
+
+// Read while the request is live, not inside the after() callback.
+function requestMeta(headers: Headers) {
+  return {
+    ipAddress:
+      headers.get("x-forwarded-for") || headers.get("x-real-ip") || "unknown",
+    userAgent: headers.get("user-agent") || "unknown",
+  };
+}
+
+async function sendAlert(
+  email: string,
+  event: SecurityEvent,
+  meta: { ipAddress: string; userAgent: string },
+): Promise<void> {
   try {
     const result = await sendSecurityAlertEmail(email, {
       ...describe(event),
-      ipAddress:
-        headers.get("x-forwarded-for") || headers.get("x-real-ip") || "unknown",
-      userAgent: headers.get("user-agent") || "unknown",
+      ...meta,
     });
     if (!result.success) {
       console.error(`[securityAlerts] ${event.type} email failed`);

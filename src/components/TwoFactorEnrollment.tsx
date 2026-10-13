@@ -34,6 +34,9 @@ export default function TwoFactorEnrollment({
   const [submitting, setSubmitting] = useState(false);
   const [backupCodes, setBackupCodes] = useState<string[] | null>(null);
   const [redirectUrl, setRedirectUrl] = useState("");
+  // Set when retrying here can't help (setup already saved, session expired,
+  // or the reply was lost) - logging in again is the way forward.
+  const [offerLogin, setOfferLogin] = useState(false);
   const started = useRef(false);
 
   useEffect(() => {
@@ -74,12 +77,19 @@ export default function TwoFactorEnrollment({
       const data = await res.json();
       if (!res.ok) {
         setError(data.error || "Invalid code");
+        if (res.status === 401 || /already set up/i.test(data.error || "")) {
+          setOfferLogin(true);
+        }
         return;
       }
       setBackupCodes(data.backupCodes);
       setRedirectUrl(data.redirectUrl);
     } catch {
-      setError("Couldn't verify the code");
+      // The code may have been accepted and only the reply lost.
+      setError(
+        "Connection problem. Your setup may already be complete - go back to login and sign in with your authenticator code.",
+      );
+      setOfferLogin(true);
     } finally {
       setSubmitting(false);
     }
@@ -232,6 +242,15 @@ export default function TwoFactorEnrollment({
               {submitting ? "Checking..." : "Verify"}
             </Button>
           </Box>
+          {offerLogin && (
+            <Button
+              fullWidth
+              onClick={() => window.location.reload()}
+              sx={{ ...buttonSx, mt: 2 }}
+            >
+              Back to login
+            </Button>
+          )}
         </>
       ) : (
         <Button
