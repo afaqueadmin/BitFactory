@@ -6,6 +6,7 @@ import {
   Box,
   Button,
   CircularProgress,
+  Fade,
   MenuItem,
   Paper,
   Stack,
@@ -85,6 +86,13 @@ export function RepairInvoiceForm({
   // The note follows the line items until the admin edits it themselves.
   const [noteEdited, setNoteEdited] = useState(isEdit);
   const [error, setError] = useState<string | null>(null);
+  // Bumped on every failed submit so a repeated message still flashes.
+  const [errorTick, setErrorTick] = useState(0);
+
+  const showError = (message: string) => {
+    setError(message);
+    setErrorTick((t) => t + 1);
+  };
 
   // Create: every miner, and picking one fills in its owner as the customer.
   // Edit: the customer is fixed, so only their miners.
@@ -126,10 +134,10 @@ export function RepairInvoiceForm({
     setError(null);
 
     const { subtotal, total } = computeRepairTotals(lineItems, discount);
-    if (!customerId) return setError("Customer is required");
-    if (!minerId) return setError("Miner is required");
+    if (!customerId) return showError("Customer is required");
+    if (!minerId) return showError("Miner is required");
     if (lineItems.some((li) => !li.description.trim())) {
-      return setError("Every line item needs a description");
+      return showError("Every line item needs a description");
     }
     if (
       lineItems.some(
@@ -139,16 +147,16 @@ export function RepairInvoiceForm({
           li.unitPrice <= 0,
       )
     ) {
-      return setError(
+      return showError(
         "Every line item needs a whole-number QTY and a RATE greater than 0",
       );
     }
     if (discount > subtotal) {
-      return setError("Discount can't be more than the subtotal");
+      return showError("Discount can't be more than the subtotal");
     }
     if (total <= 0)
-      return setError("Total after discount must be greater than 0");
-    if (!repairNote.trim()) return setError("Repair note is required");
+      return showError("Total after discount must be greater than 0");
+    if (!repairNote.trim()) return showError("Repair note is required");
 
     try {
       await onSubmit({
@@ -165,17 +173,12 @@ export function RepairInvoiceForm({
         machineHostingLocation,
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save invoice");
+      showError(err instanceof Error ? err.message : "Failed to save invoice");
     }
   };
 
   return (
     <Paper sx={{ p: 4 }}>
-      {error && (
-        <Alert severity="error" sx={{ mb: 3 }}>
-          {error}
-        </Alert>
-      )}
       <form onSubmit={handleSubmit}>
         <Stack spacing={4}>
           {/* Customer & Miner */}
@@ -364,6 +367,16 @@ export function RepairInvoiceForm({
               />
             </Stack>
           </Box>
+
+          {/* Shown next to the submit button, where the admin is looking -
+              the top of this long form is usually scrolled out of view. */}
+          {error && (
+            <Fade in key={errorTick}>
+              <Alert severity="error" onClose={() => setError(null)}>
+                {error}
+              </Alert>
+            </Fade>
+          )}
 
           <Stack direction="row" spacing={2}>
             <Button variant="outlined" onClick={onCancel} disabled={submitting}>
