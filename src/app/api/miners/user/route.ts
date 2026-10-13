@@ -50,6 +50,7 @@ export async function GET(request: NextRequest) {
         status: true,
         serialNumber: true,
         macAddress: true,
+        warrantyExpiresAt: true,
         poolId: true,
         poolAuth: true,
         createdAt: true,

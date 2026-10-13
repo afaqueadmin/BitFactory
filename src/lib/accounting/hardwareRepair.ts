@@ -13,6 +13,7 @@ export const REPAIR_MINER_SELECT = {
   id: true,
   name: true,
   serialNumber: true,
+  warrantyExpiresAt: true,
   userId: true,
   isDeleted: true,
   hardware: { select: { model: true } },

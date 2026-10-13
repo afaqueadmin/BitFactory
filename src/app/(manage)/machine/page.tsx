@@ -21,6 +21,7 @@ import MinerFormModal from "@/components/admin/MinerFormModal";
 import MinersTable from "@/components/admin/MinersTable";
 import { BulkEditModal } from "@/components/admin/BulkEditModal";
 import { BulkDeleteModal } from "@/components/admin/BulkDeleteModal";
+import { getWarrantyStatus, WARRANTY_EXPIRING_DAYS } from "@/lib/minerWarranty";
 
 /**
  * User object from API
@@ -85,6 +86,7 @@ interface Miner {
   benchmarkHashrate?: number;
   serialNumber?: string | null;
   macAddress?: string | null;
+  warrantyExpiresAt?: string | null;
   isDeleted: boolean;
   user?: User;
   space?: Space;
@@ -145,6 +147,8 @@ export default function MachinePage() {
     useState<string>("");
   const [selectedPoolFilter, setSelectedPoolFilter] = useState<string>("");
   const [selectedSegmentFilter, setSelectedSegmentFilter] =
+    useState<string>("");
+  const [selectedWarrantyFilter, setSelectedWarrantyFilter] =
     useState<string>("");
   const [showBulkEditModal, setShowBulkEditModal] = useState(false);
   const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
@@ -454,6 +458,13 @@ export default function MachinePage() {
   };
 
   /**
+   * Handle warranty filter change
+   */
+  const handleWarrantyFilterChange = (event: SelectChangeEvent) => {
+    setSelectedWarrantyFilter(event.target.value);
+  };
+
+  /**
    * Get unique models from miners
    */
   const getUniqueModels = () => {
@@ -595,6 +606,14 @@ export default function MachinePage() {
     if (selectedSegmentFilter) {
       filtered = filtered.filter(
         (m) => m.user?.segment === selectedSegmentFilter,
+      );
+    }
+
+    // Filter by warranty status (ACTIVE / EXPIRING / EXPIRED / NONE)
+    if (selectedWarrantyFilter) {
+      filtered = filtered.filter(
+        (m) =>
+          getWarrantyStatus(m.warrantyExpiresAt) === selectedWarrantyFilter,
       );
     }
 
@@ -862,6 +881,25 @@ export default function MachinePage() {
                     <MenuItem value="SELF_MINING">Self Mining</MenuItem>
                     <MenuItem value="FRANCHISEE">Franchisee</MenuItem>
                     <MenuItem value="RETAIL">Retail</MenuItem>
+                  </Select>
+                </FormControl>
+
+                <FormControl sx={{ minWidth: 250 }}>
+                  <InputLabel>Filter by Warranty</InputLabel>
+                  <Select
+                    value={selectedWarrantyFilter}
+                    onChange={handleWarrantyFilterChange}
+                    label="Filter by Warranty"
+                  >
+                    <MenuItem value="">
+                      <em>All Warranties</em>
+                    </MenuItem>
+                    <MenuItem value="ACTIVE">In warranty</MenuItem>
+                    <MenuItem value="EXPIRING">
+                      Expiring soon (≤ {WARRANTY_EXPIRING_DAYS} days)
+                    </MenuItem>
+                    <MenuItem value="EXPIRED">Expired</MenuItem>
+                    <MenuItem value="NONE">Not recorded</MenuItem>
                   </Select>
                 </FormControl>
               </Stack>

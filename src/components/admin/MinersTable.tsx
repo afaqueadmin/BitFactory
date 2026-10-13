@@ -54,6 +54,12 @@ import {
   type SortConfig,
   type MinerSortField,
 } from "@/lib/utils/sortMiners";
+import {
+  formatWarrantyDate,
+  getWarrantyStatus,
+  WARRANTY_STATUS_LABEL,
+  WarrantyStatus,
+} from "@/lib/minerWarranty";
 
 /**
  * User object from API
@@ -116,6 +122,7 @@ interface Miner {
   benchmarkHashrate?: number;
   serialNumber?: string | null;
   macAddress?: string | null;
+  warrantyExpiresAt?: string | null;
   user?: User;
   space?: Space;
   hardware?: Hardware;
@@ -319,6 +326,18 @@ export default function MinersTable({
   ): "success" | "default" | "warning" => {
     if (status === "AUTO") return "success";
     if (status === "UNDER_MAINTENANCE") return "warning";
+    return "default";
+  };
+
+  /**
+   * Chip color for a warranty status
+   */
+  const getWarrantyColor = (
+    status: WarrantyStatus,
+  ): "success" | "warning" | "error" | "default" => {
+    if (status === "ACTIVE") return "success";
+    if (status === "EXPIRING") return "warning";
+    if (status === "EXPIRED") return "error";
     return "default";
   };
 
@@ -663,6 +682,30 @@ export default function MinersTable({
                   "&:hover": { backgroundColor: "action.selected" },
                   whiteSpace: "nowrap",
                 }}
+                onClick={() => handleHeaderClick("warrantyExpiresAt")}
+              >
+                Warranty{" "}
+                {sortConfig.field === "warrantyExpiresAt" &&
+                  (sortConfig.direction === "asc" ? (
+                    <ArrowUpwardIcon
+                      fontSize="small"
+                      sx={{ verticalAlign: "middle", ml: 0.5 }}
+                    />
+                  ) : (
+                    <ArrowDownwardIcon
+                      fontSize="small"
+                      sx={{ verticalAlign: "middle", ml: 0.5 }}
+                    />
+                  ))}
+              </TableCell>
+              <TableCell
+                sx={{
+                  fontWeight: "bold",
+                  cursor: "pointer",
+                  userSelect: "none",
+                  "&:hover": { backgroundColor: "action.selected" },
+                  whiteSpace: "nowrap",
+                }}
                 align="center"
                 onClick={() => handleHeaderClick("status")}
               >
@@ -712,13 +755,13 @@ export default function MinersTable({
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={13} align="center" sx={{ py: 4 }}>
+                <TableCell colSpan={14} align="center" sx={{ py: 4 }}>
                   <CircularProgress />
                 </TableCell>
               </TableRow>
             ) : memoizedRows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={13} align="center" sx={{ py: 4 }}>
+                <TableCell colSpan={14} align="center" sx={{ py: 4 }}>
                   <Typography color="text.secondary">
                     No miners found. Create one to get started.
                   </Typography>
@@ -734,7 +777,9 @@ export default function MinersTable({
                   <TableCell sx={{ fontWeight: "500", maxWidth: "200px" }}>
                     <Tooltip
                       title={
-                        miner.serialNumber || miner.macAddress ? (
+                        miner.serialNumber ||
+                        miner.macAddress ||
+                        miner.warrantyExpiresAt ? (
                           <Box sx={{ p: 0.5 }}>
                             {miner.serialNumber && (
                               <Typography variant="caption" display="block">
@@ -744,6 +789,12 @@ export default function MinersTable({
                             {miner.macAddress && (
                               <Typography variant="caption" display="block">
                                 MAC: {miner.macAddress}
+                              </Typography>
+                            )}
+                            {miner.warrantyExpiresAt && (
+                              <Typography variant="caption" display="block">
+                                Warranty until:{" "}
+                                {formatWarrantyDate(miner.warrantyExpiresAt)}
                               </Typography>
                             )}
                           </Box>
@@ -758,7 +809,9 @@ export default function MinersTable({
                         component="span"
                         sx={{
                           cursor:
-                            miner.serialNumber || miner.macAddress
+                            miner.serialNumber ||
+                            miner.macAddress ||
+                            miner.warrantyExpiresAt
                               ? "help"
                               : "auto",
                           color: "info.main", // Info is usually a light/sky blue in MUI
@@ -833,6 +886,34 @@ export default function MinersTable({
                         —
                       </Typography>
                     )}
+                  </TableCell>
+                  <TableCell sx={{ whiteSpace: "nowrap" }}>
+                    {(() => {
+                      const warrantyStatus = getWarrantyStatus(
+                        miner.warrantyExpiresAt,
+                      );
+                      if (warrantyStatus === "NONE") {
+                        return (
+                          <Typography variant="body2" color="text.secondary">
+                            —
+                          </Typography>
+                        );
+                      }
+                      return (
+                        <Box>
+                          <Typography variant="body2">
+                            {formatWarrantyDate(miner.warrantyExpiresAt)}
+                          </Typography>
+                          <Chip
+                            label={WARRANTY_STATUS_LABEL[warrantyStatus]}
+                            color={getWarrantyColor(warrantyStatus)}
+                            size="small"
+                            variant="outlined"
+                            sx={{ mt: 0.5, height: 20, fontSize: "0.7rem" }}
+                          />
+                        </Box>
+                      );
+                    })()}
                   </TableCell>
                   <TableCell align="center">
                     <Chip
@@ -953,7 +1034,10 @@ export default function MinersTable({
               const restartHistory = miner?.restarts || [];
 
               // Show miner hardware info at top of modal
-              const hasSNorMAC = miner?.serialNumber || miner?.macAddress;
+              const hasSNorMAC =
+                miner?.serialNumber ||
+                miner?.macAddress ||
+                miner?.warrantyExpiresAt;
 
               // Combine all histories
               const combinedHistory = [
@@ -1015,6 +1099,22 @@ export default function MinersTable({
                             sx={{ fontFamily: "monospace", fontWeight: 600 }}
                           >
                             {miner.macAddress}
+                          </Typography>
+                        </Box>
+                      )}
+                      {miner?.warrantyExpiresAt && (
+                        <Box>
+                          <Typography variant="caption" color="text.secondary">
+                            Warranty Until
+                          </Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                            {formatWarrantyDate(miner.warrantyExpiresAt)} (
+                            {
+                              WARRANTY_STATUS_LABEL[
+                                getWarrantyStatus(miner.warrantyExpiresAt)
+                              ]
+                            }
+                            )
                           </Typography>
                         </Box>
                       )}

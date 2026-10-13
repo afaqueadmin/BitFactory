@@ -13,6 +13,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
 import { AuditAction } from "@prisma/client";
+import {
+  parseWarrantyDateInput,
+  WARRANTY_DATE_ERROR,
+} from "@/lib/minerWarranty";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -83,6 +87,7 @@ async function verifyAdminAuth(request: NextRequest) {
  *   poolId?: string (ID of the mining pool, or null to unassign)
  *   serialNumber?: string
  *   macAddress?: string
+ *   warrantyExpiresAt?: string (YYYY-MM-DD, or "" / null to clear)
  * }
  *
  * Response: Updated miner object
@@ -156,6 +161,7 @@ export async function PUT(
       poolId,
       serialNumber,
       macAddress,
+      warrantyExpiresAt,
     } = body;
 
     // Validate rate_per_kwh if provided
@@ -387,6 +393,17 @@ export async function PUT(
 
     if (macAddress !== undefined) {
       updateData.macAddress = macAddress ? macAddress.trim() : null;
+    }
+
+    if (warrantyExpiresAt !== undefined) {
+      const parsedWarranty = parseWarrantyDateInput(warrantyExpiresAt);
+      if (parsedWarranty === "invalid") {
+        return NextResponse.json<ApiResponse>(
+          { success: false, error: WARRANTY_DATE_ERROR },
+          { status: 400 },
+        );
+      }
+      updateData.warrantyExpiresAt = parsedWarranty;
     }
 
     if (poolId !== undefined) {

@@ -66,6 +66,7 @@ interface Miner {
   benchmarkHashrate?: number;
   serialNumber?: string | null;
   macAddress?: string | null;
+  warrantyExpiresAt?: string | null;
   isDeleted: boolean;
   user?: MinerUser;
   space?: Space;

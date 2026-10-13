@@ -19,6 +19,7 @@ export type MinerSortField =
   | "status"
   | "ratePerKwh"
   | "benchmarkHashrate"
+  | "warrantyExpiresAt"
   | "createdAt";
 
 /**
@@ -82,6 +83,7 @@ interface Miner {
   benchmarkHashrate?: number;
   serialNumber?: string | null;
   macAddress?: string | null;
+  warrantyExpiresAt?: string | null;
   user?: User;
   space?: Space;
   hardware?: Hardware;
@@ -161,6 +163,12 @@ function getSortValue(miner: Miner, field: MinerSortField): string | number {
     case "benchmarkHashrate":
       return Number(miner.benchmarkHashrate || 0);
 
+    case "warrantyExpiresAt":
+      // Not recorded sorts after every real date when ascending
+      return miner.warrantyExpiresAt
+        ? new Date(miner.warrantyExpiresAt).getTime()
+        : Infinity;
+
     case "createdAt":
       return new Date(miner.createdAt).getTime();
 
@@ -236,6 +244,7 @@ export function getSortFieldLabel(field: MinerSortField): string {
     status: "Status",
     ratePerKwh: "Rate per kWh",
     benchmarkHashrate: "Benchmark Hashrate",
+    warrantyExpiresAt: "Warranty Expiry",
     createdAt: "Created Date",
   };
 
@@ -259,6 +268,7 @@ export function getAllSortFields(): MinerSortField[] {
     "status",
     "ratePerKwh",
     "benchmarkHashrate",
+    "warrantyExpiresAt",
     "createdAt",
   ];
 }

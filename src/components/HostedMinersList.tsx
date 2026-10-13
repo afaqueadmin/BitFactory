@@ -23,6 +23,11 @@ import RepairNotesModal from "./admin/RepairNotesModal";
 import MinerPoolHistoryModal from "./admin/MinerPoolHistoryModal";
 import HashrateHistoryChart from "./HashrateHistoryChart";
 import { RADIUS_CARD, useDaylight } from "@/lib/daylight";
+import {
+  formatWarrantyDate,
+  getWarrantyStatus,
+  WARRANTY_STATUS_LABEL,
+} from "@/lib/minerWarranty";
 
 // Types
 interface Hardware {
@@ -52,6 +57,7 @@ interface MinerData {
   firmware: string;
   serialNumber?: string;
   macAddress?: string;
+  warrantyExpiresAt?: string | null;
   hardware?: Hardware;
 }
 
@@ -404,6 +410,7 @@ export default function HostedMinersList({
             status: string;
             serialNumber?: string | null;
             macAddress?: string | null;
+            warrantyExpiresAt?: string | null;
             hashRate?: number;
             hardware?: { model: string; hashRate: number | string };
             space?: { location: string; name: string };
@@ -444,6 +451,7 @@ export default function HostedMinersList({
                 firmware: "N/A",
                 serialNumber: miner.serialNumber || "—",
                 macAddress: miner.macAddress || "—",
+                warrantyExpiresAt: miner.warrantyExpiresAt ?? null,
               };
             }
 
@@ -459,6 +467,7 @@ export default function HostedMinersList({
                 firmware: "N/A",
                 serialNumber: miner.serialNumber || "—",
                 macAddress: miner.macAddress || "—",
+                warrantyExpiresAt: miner.warrantyExpiresAt ?? null,
               };
             }
 
@@ -495,6 +504,7 @@ export default function HostedMinersList({
               firmware: apiFirmware,
               serialNumber: miner.serialNumber || "—",
               macAddress: miner.macAddress || "—",
+              warrantyExpiresAt: miner.warrantyExpiresAt ?? null,
             };
           },
         );
@@ -622,6 +632,48 @@ export default function HostedMinersList({
           color: textColor,
           fontWeight: 500,
           minWidth: "70px",
+        }}
+      />
+    );
+  };
+
+  const getWarrantyChip = (expiresAt: string | null | undefined) => {
+    const status = getWarrantyStatus(expiresAt);
+    if (status === "NONE") return null;
+
+    const tone = daylight
+      ? status === "ACTIVE"
+        ? { bg: d.mint, text: d.success }
+        : status === "EXPIRING"
+          ? { bg: d.amber, text: d.warning }
+          : { bg: d.dangerSoft, text: d.danger }
+      : status === "ACTIVE"
+        ? {
+            bg: alpha(theme.palette.success.main, 0.1),
+            text: theme.palette.success.main,
+          }
+        : status === "EXPIRING"
+          ? {
+              bg: alpha(theme.palette.warning.main, 0.1),
+              text: theme.palette.warning.main,
+            }
+          : {
+              bg: alpha(theme.palette.error.main, 0.1),
+              text: theme.palette.error.main,
+            };
+
+    return (
+      <Chip
+        label={WARRANTY_STATUS_LABEL[status]}
+        size="small"
+        sx={{
+          mt: 0.5,
+          height: 20,
+          fontSize: "0.68rem",
+          backgroundColor: tone.bg,
+          color: tone.text,
+          fontWeight: daylight ? 550 : 500,
+          ...(daylight && { fontFamily: fonts.body, borderRadius: "20px" }),
         }}
       />
     );
@@ -891,7 +943,7 @@ export default function HostedMinersList({
                       gridTemplateColumns: {
                         xs: "1fr 1fr",
                         sm: "repeat(3, 1fr)",
-                        md: "repeat(6, 1fr)",
+                        md: "repeat(7, 1fr)",
                       },
                       gap: { xs: 1.5, sm: 2.5 },
                     }}
@@ -985,6 +1037,40 @@ export default function HostedMinersList({
                       >
                         {miner.macAddress || "—"}
                       </Typography>
+                    </Box>
+
+                    <Box>
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{
+                          mb: 0.25,
+                          display: "block",
+                          fontSize: "0.72rem",
+                          ...(daylight && {
+                            fontFamily: fonts.body,
+                            color: d.muted,
+                          }),
+                        }}
+                      >
+                        Warranty Until
+                      </Typography>
+                      <Typography
+                        variant="body2"
+                        fontWeight="600"
+                        sx={{
+                          fontSize: { xs: "0.8rem", sm: "0.875rem" },
+                          ...(daylight && {
+                            fontFamily: fonts.body,
+                            color: d.text,
+                          }),
+                        }}
+                      >
+                        {miner.warrantyExpiresAt
+                          ? formatWarrantyDate(miner.warrantyExpiresAt)
+                          : WARRANTY_STATUS_LABEL.NONE}
+                      </Typography>
+                      {getWarrantyChip(miner.warrantyExpiresAt)}
                     </Box>
 
                     <Box>

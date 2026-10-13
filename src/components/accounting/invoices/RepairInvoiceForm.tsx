@@ -217,7 +217,9 @@ export function RepairInvoiceForm({
                   ))}
                 </TextField>
 
-                {selectedMiner && <RepairMinerDetails miner={selectedMiner} />}
+                {selectedMiner && (
+                  <RepairMinerDetails miner={selectedMiner} showWarranty />
+                )}
               </Stack>
             </Box>
           ) : (
@@ -283,7 +285,9 @@ export function RepairInvoiceForm({
                   InputLabelProps={{ shrink: !!selectedCustomerName }}
                 />
 
-                {selectedMiner && <RepairMinerDetails miner={selectedMiner} />}
+                {selectedMiner && (
+                  <RepairMinerDetails miner={selectedMiner} showWarranty />
+                )}
               </Stack>
             </Box>
           )}

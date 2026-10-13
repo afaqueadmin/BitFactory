@@ -5,6 +5,7 @@ export interface RepairMiner {
   id: string;
   name: string;
   serialNumber: string | null;
+  warrantyExpiresAt?: string | null;
   status?: string;
   hardware: { model: string } | null;
   space: { name: string; location: string } | null;

@@ -27,6 +27,7 @@ interface BulkEditModalProps {
     benchmarkHashrate?: number;
     status?: "AUTO" | "DEPLOYMENT_IN_PROGRESS" | "UNDER_MAINTENANCE";
     poolId?: string | null;
+    warrantyExpiresAt?: string;
   }) => Promise<void>;
 }
 
@@ -42,6 +43,7 @@ export function BulkEditModal({
   const [rate, setRate] = useState<string>("");
   const [benchmark, setBenchmark] = useState<string>("");
   const [poolId, setPoolId] = useState<string>("");
+  const [warrantyExpiresAt, setWarrantyExpiresAt] = useState<string>("");
   const [status, setStatus] = useState<
     "AUTO" | "DEPLOYMENT_IN_PROGRESS" | "UNDER_MAINTENANCE" | ""
   >();
@@ -53,7 +55,14 @@ export function BulkEditModal({
     setError("");
 
     // Validate that at least one field is filled
-    if (!spaceId && !rate && !benchmark && !status && !poolId) {
+    if (
+      !spaceId &&
+      !rate &&
+      !benchmark &&
+      !status &&
+      !poolId &&
+      !warrantyExpiresAt
+    ) {
       setError("Please select at least one field to update");
       return;
     }
@@ -85,6 +94,7 @@ export function BulkEditModal({
       if (benchmark) updates.benchmarkHashrate = Number(benchmark);
       if (status) updates.status = status;
       if (poolId) updates.poolId = poolId;
+      if (warrantyExpiresAt) updates.warrantyExpiresAt = warrantyExpiresAt;
 
       await onSubmit(updates);
 
@@ -94,6 +104,7 @@ export function BulkEditModal({
       setBenchmark("");
       setStatus("");
       setPoolId("");
+      setWarrantyExpiresAt("");
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update miners");
@@ -106,7 +117,7 @@ export function BulkEditModal({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
+      <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
         <h2 className="text-xl font-bold mb-4">Bulk Edit Miners</h2>
 
         <p className="text-gray-600 mb-6 text-sm">
@@ -219,6 +230,23 @@ export function BulkEditModal({
                 </option>
               ))}
             </select>
+          </div>
+
+          {/* Warranty Expiry Field */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Warranty Expiry Date (Optional)
+            </label>
+            <input
+              type="date"
+              value={warrantyExpiresAt}
+              onChange={(e) => setWarrantyExpiresAt(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <p className="mt-1 text-xs text-gray-500">
+              Leave empty for no change. Clear a single miner&apos;s date from
+              its Edit form.
+            </p>
           </div>
 
           {/* Error Message */}

@@ -3,6 +3,10 @@ import { prisma } from "@/lib/prisma";
 import { Decimal } from "@prisma/client/runtime/library";
 import { verifyJwtToken } from "@/lib/jwt";
 import { AuditAction } from "@prisma/client";
+import {
+  parseWarrantyDateInput,
+  WARRANTY_DATE_ERROR,
+} from "@/lib/minerWarranty";
 
 interface BulkEditRequest {
   minerIds: string[];
@@ -12,6 +16,7 @@ interface BulkEditRequest {
     benchmarkHashrate?: number | string;
     status?: "AUTO" | "DEPLOYMENT_IN_PROGRESS" | "UNDER_MAINTENANCE";
     poolId?: string | null;
+    warrantyExpiresAt?: string | null;
   };
 }
 
@@ -140,6 +145,19 @@ export async function POST(
       }
     }
 
+    // Validate warrantyExpiresAt if provided
+    let warrantyExpiresAtValue: Date | null | undefined;
+    if (updates.warrantyExpiresAt !== undefined) {
+      const parsedWarranty = parseWarrantyDateInput(updates.warrantyExpiresAt);
+      if (parsedWarranty === "invalid") {
+        return NextResponse.json(
+          { success: false, error: WARRANTY_DATE_ERROR },
+          { status: 400 },
+        );
+      }
+      warrantyExpiresAtValue = parsedWarranty;
+    }
+
     // Validate poolId if provided
     if (updates.poolId !== undefined && updates.poolId !== null) {
       if (typeof updates.poolId !== "string") {
@@ -172,7 +190,7 @@ export async function POST(
       where: {
         id: { in: minerIds },
       },
-      select: { id: true, spaceId: true, poolId: true },
+      select: { id: true, spaceId: true, poolId: true, isDeleted: true },
     });
 
     if (existingMiners.length !== minerIds.length) {
@@ -182,6 +200,22 @@ export async function POST(
           error: "One or more miners not found",
         },
         { status: 404 },
+      );
+    }
+
+    // Deleted miners (e.g. included with "Show Deleted" on) are skipped, the
+    // same as bulk delete - a single-miner PUT refuses to edit them too.
+    const liveMiners = existingMiners.filter((miner) => !miner.isDeleted);
+    const liveMinerIds = liveMiners.map((miner) => miner.id);
+    const skippedCount = existingMiners.length - liveMiners.length;
+
+    if (liveMiners.length === 0) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "All selected miners are deleted",
+        },
+        { status: 400 },
       );
     }
 
@@ -215,12 +249,15 @@ export async function POST(
     if (updates.poolId !== undefined) {
       updateData.poolId = updates.poolId;
     }
+    if (warrantyExpiresAtValue !== undefined) {
+      updateData.warrantyExpiresAt = warrantyExpiresAtValue;
+    }
 
     // Miners actually moving to a different (non-null) pool get a pool
     // history entry, same as a single-miner PUT
     const newPoolId = updates.poolId ?? null;
     const poolChangedMinerIds = newPoolId
-      ? existingMiners
+      ? liveMiners
           .filter((miner) => miner.poolId !== newPoolId)
           .map((miner) => miner.id)
       : [];
@@ -229,13 +266,13 @@ export async function POST(
     const hasDirectFieldChanges = Object.keys(updateData).length > 0;
     await prisma.$transaction([
       prisma.miner.updateMany({
-        where: { id: { in: minerIds } },
+        where: { id: { in: liveMinerIds }, isDeleted: false },
         data: { ...updateData, updatedById: userId },
       }),
       ...(hasDirectFieldChanges
         ? [
             prisma.auditLog.createMany({
-              data: minerIds.map((minerId) => ({
+              data: liveMinerIds.map((minerId) => ({
                 action: AuditAction.MINER_UPDATED,
                 entityType: "Miner",
                 entityId: minerId,
@@ -272,7 +309,7 @@ export async function POST(
     if (updates.rate_per_kwh !== undefined) {
       const rateDecimal = new Decimal(Number(updates.rate_per_kwh).toFixed(6));
 
-      for (const minerId of minerIds) {
+      for (const minerId of liveMinerIds) {
         // Get latest rate for this miner
         const latestRate = await prisma.minerRateHistory.findFirst({
           where: { minerId },
@@ -308,7 +345,7 @@ export async function POST(
         Number(updates.benchmarkHashrate).toFixed(2),
       );
 
-      for (const minerId of minerIds) {
+      for (const minerId of liveMinerIds) {
         // Get latest benchmark for this miner
         const latestBenchmark = await prisma.minerHashrateBenchmark.findFirst({
           where: { minerId },
@@ -343,7 +380,7 @@ export async function POST(
 
     // Fetch updated miners
     const updatedMiners = await prisma.miner.findMany({
-      where: { id: { in: minerIds } },
+      where: { id: { in: liveMinerIds } },
       include: {
         hardware: { select: { model: true } },
         space: { select: { name: true } },
@@ -381,6 +418,7 @@ export async function POST(
       success: true,
       data: {
         updatedCount: updatedMiners.length,
+        skippedCount,
         miners: transformedMiners,
       },
     });

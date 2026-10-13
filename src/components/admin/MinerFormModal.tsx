@@ -26,6 +26,7 @@ import {
   SelectChangeEvent,
 } from "@mui/material";
 import { Close as CloseIcon } from "@mui/icons-material";
+import { toDateInputValue } from "@/lib/minerWarranty";
 
 /**
  * Hardware object from API
@@ -54,6 +55,7 @@ interface MinerFormData {
   benchmarkHashrate: string | number;
   serialNumber: string;
   macAddress: string;
+  warrantyExpiresAt: string;
 }
 
 /**
@@ -100,6 +102,7 @@ interface Miner {
   benchmarkHashrate?: number;
   serialNumber?: string | null;
   macAddress?: string | null;
+  warrantyExpiresAt?: string | null;
   createdAt: string;
   updatedAt: string;
   user?: User;
@@ -147,6 +150,7 @@ export default function MinerFormModal({
     benchmarkHashrate: "",
     serialNumber: "",
     macAddress: "",
+    warrantyExpiresAt: "",
   });
 
   /**
@@ -189,6 +193,7 @@ export default function MinerFormModal({
         benchmarkHashrate: miner.benchmarkHashrate ?? "",
         serialNumber: miner.serialNumber || "",
         macAddress: miner.macAddress || "",
+        warrantyExpiresAt: toDateInputValue(miner.warrantyExpiresAt),
       });
       if (miner.hardware) {
         setSelectedHardware(miner.hardware);
@@ -205,6 +210,7 @@ export default function MinerFormModal({
         benchmarkHashrate: "",
         serialNumber: "",
         macAddress: "",
+        warrantyExpiresAt: "",
       });
       setSelectedHardware(null);
     }
@@ -317,14 +323,24 @@ export default function MinerFormModal({
         benchmarkHashrate?: number;
         serialNumber?: string;
         macAddress?: string;
+        warrantyExpiresAt?: string;
       } = {
         name: formData.name,
         hardwareId: formData.hardwareId,
         userId: formData.userId,
         spaceId: formData.spaceId,
         status: formData.status,
-        serialNumber: formData.serialNumber || undefined,
-        macAddress: formData.macAddress || undefined,
+        // On edit, send blanks as "" so the API clears the field - undefined
+        // would mean "no change" and the old value would silently stay.
+        serialNumber: miner
+          ? formData.serialNumber
+          : formData.serialNumber || undefined,
+        macAddress: miner
+          ? formData.macAddress
+          : formData.macAddress || undefined,
+        warrantyExpiresAt: miner
+          ? formData.warrantyExpiresAt
+          : formData.warrantyExpiresAt || undefined,
       };
 
       // Include poolId if provided
@@ -610,6 +626,19 @@ export default function MinerFormModal({
             placeholder="e.g., AA:BB:CC:DD:EE:FF"
             margin="normal"
             disabled={loading || isLoading}
+          />
+
+          <TextField
+            fullWidth
+            label="Warranty Expiry Date"
+            name="warrantyExpiresAt"
+            type="date"
+            value={formData.warrantyExpiresAt}
+            onChange={handleChange}
+            margin="normal"
+            disabled={loading || isLoading}
+            InputLabelProps={{ shrink: true }}
+            helperText="Optional: manufacturer warranty end date"
           />
         </Box>
       </DialogContent>

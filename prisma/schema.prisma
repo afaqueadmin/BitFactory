@@ -469,6 +469,9 @@ model Miner {
   poolAuth           String?
   serialNumber       String?
   macAddress         String?
+  // Manufacturer warranty end date, entered by an admin (not derivable:
+  // miners aren't linked to purchase invoices). Null = not recorded.
+  warrantyExpiresAt  DateTime?                @db.Date
   createdById        String?
   updatedById        String?
   deletedById        String?

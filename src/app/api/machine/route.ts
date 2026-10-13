@@ -17,6 +17,10 @@ import { verifyJwtToken } from "@/lib/jwt";
 import { AuditAction } from "@prisma/client";
 import { franchiseeMinerFilter } from "@/lib/franchiseeScope";
 import { WorkersResponse } from "@/lib/luxor";
+import {
+  parseWarrantyDateInput,
+  WARRANTY_DATE_ERROR,
+} from "@/lib/minerWarranty";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -444,6 +448,7 @@ export async function GET(
  *   poolId: string (optional) - ID of the mining pool
  *   serialNumber: string (optional) - Hardware serial number
  *   macAddress: string (optional) - Miner MAC address
+ *   warrantyExpiresAt: string (optional) - Manufacturer warranty end date (YYYY-MM-DD)
  * }
  *
  * Response: Created miner object
@@ -491,6 +496,7 @@ export async function POST(
       poolId,
       serialNumber,
       macAddress,
+      warrantyExpiresAt,
     } = body;
 
     // Validate required fields
@@ -573,6 +579,20 @@ export async function POST(
           { status: 400 },
         );
       }
+    }
+
+    // Validate warrantyExpiresAt, if provided (optional)
+    let warrantyExpiresAtValue: Date | null = null;
+    if (warrantyExpiresAt !== undefined) {
+      const parsedWarranty = parseWarrantyDateInput(warrantyExpiresAt);
+      if (parsedWarranty === "invalid") {
+        console.error("[Miners API] POST: Invalid warrantyExpiresAt");
+        return NextResponse.json<ApiResponse>(
+          { success: false, error: WARRANTY_DATE_ERROR },
+          { status: 400 },
+        );
+      }
+      warrantyExpiresAtValue = parsedWarranty;
     }
 
     // Verify user exists
@@ -697,6 +717,9 @@ export async function POST(
           ...(poolId && { poolId }),
           ...(serialNumber && { serialNumber: serialNumber.trim() }),
           ...(macAddress && { macAddress: macAddress.trim() }),
+          ...(warrantyExpiresAtValue && {
+            warrantyExpiresAt: warrantyExpiresAtValue,
+          }),
           createdById: authenticatedUserId,
         },
         include: {
