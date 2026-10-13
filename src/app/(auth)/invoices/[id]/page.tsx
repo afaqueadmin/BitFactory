@@ -30,6 +30,15 @@ import { DateDisplay } from "@/components/accounting/common/DateDisplay";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import DownloadIcon from "@mui/icons-material/Download";
 import PayWithBitcoinButton from "@/components/PayWithBitcoinButton";
+import { RepairMinerDetails } from "@/components/accounting/invoices/RepairMinerDetails";
+
+type RepairLineRow = {
+  id: string;
+  model: string;
+  quantity: number;
+  unitPrice: number | string;
+  totalPrice: number | string;
+};
 
 export default function CustomerInvoiceDetailPage() {
   const params = useParams();
@@ -129,6 +138,10 @@ export default function CustomerInvoiceDetailPage() {
     );
   }
 
+  // Hardware Repair invoices: one miner, free-text line items and a flat
+  // discount; unitPrice holds the line-item subtotal.
+  const isRepair = invoice.invoiceType === "HARDWARE_REPAIR";
+
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
       <Box
@@ -218,25 +231,52 @@ export default function CustomerInvoiceDetailPage() {
                 </Box>
               </Box>
 
-              {/* Total Miners */}
-              <Box>
-                <Typography color="textSecondary" variant="body2">
-                  Total Miners
-                </Typography>
-                <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
-                  {invoice.totalMiners || 0} units
-                </Typography>
-              </Box>
+              {isRepair ? (
+                <>
+                  {/* Subtotal */}
+                  <Box>
+                    <Typography color="textSecondary" variant="body2">
+                      Subtotal
+                    </Typography>
+                    <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
+                      <CurrencyDisplay value={invoice.unitPrice} />
+                    </Typography>
+                  </Box>
 
-              {/* Unit Price */}
-              <Box>
-                <Typography color="textSecondary" variant="body2">
-                  Unit Price
-                </Typography>
-                <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
-                  <CurrencyDisplay value={invoice.unitPrice} />
-                </Typography>
-              </Box>
+                  {/* Discount */}
+                  <Box>
+                    <Typography color="textSecondary" variant="body2">
+                      Discount
+                    </Typography>
+                    <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
+                      {Number(invoice.discountAmount) > 0 ? "- " : ""}
+                      <CurrencyDisplay value={invoice.discountAmount} />
+                    </Typography>
+                  </Box>
+                </>
+              ) : (
+                <>
+                  {/* Total Miners */}
+                  <Box>
+                    <Typography color="textSecondary" variant="body2">
+                      Total Miners
+                    </Typography>
+                    <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
+                      {invoice.totalMiners || 0} units
+                    </Typography>
+                  </Box>
+
+                  {/* Unit Price */}
+                  <Box>
+                    <Typography color="textSecondary" variant="body2">
+                      Unit Price
+                    </Typography>
+                    <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
+                      <CurrencyDisplay value={invoice.unitPrice} />
+                    </Typography>
+                  </Box>
+                </>
+              )}
 
               {/* Total Amount */}
               <Box>
@@ -326,6 +366,78 @@ export default function CustomerInvoiceDetailPage() {
           </CardContent>
         </Card>
       </Box>
+
+      {isRepair && (
+        <>
+          {/* Repaired Miner */}
+          <Box sx={{ mb: 3 }}>
+            <Card>
+              <CardHeader title="Miner" />
+              <Divider />
+              <CardContent>
+                {invoice.miner ? (
+                  <RepairMinerDetails miner={invoice.miner} />
+                ) : (
+                  <Typography color="textSecondary">
+                    The miner on this invoice is no longer available.
+                  </Typography>
+                )}
+              </CardContent>
+            </Card>
+          </Box>
+
+          {/* Repair Line Items (description is stored in `model`) */}
+          {invoice.lineItems && invoice.lineItems.length > 0 && (
+            <Box sx={{ mb: 3 }}>
+              <Card>
+                <CardHeader title="Line Items" />
+                <Divider />
+                <CardContent>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Description</TableCell>
+                        <TableCell align="right">Qty</TableCell>
+                        <TableCell align="right">Rate (USD)</TableCell>
+                        <TableCell align="right">Amount (USD)</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {invoice.lineItems.map((item: RepairLineRow) => (
+                        <TableRow key={item.id}>
+                          <TableCell>{item.model}</TableCell>
+                          <TableCell align="right">{item.quantity}</TableCell>
+                          <TableCell align="right">
+                            <CurrencyDisplay value={item.unitPrice} />
+                          </TableCell>
+                          <TableCell align="right">
+                            <CurrencyDisplay value={item.totalPrice} />
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </Box>
+          )}
+
+          {/* Repair Note (written to the miner's repair history) */}
+          {invoice.repairNote?.note && (
+            <Box sx={{ mb: 3 }}>
+              <Card>
+                <CardHeader title="Repair Note" />
+                <Divider />
+                <CardContent>
+                  <Typography sx={{ whiteSpace: "pre-wrap" }}>
+                    {invoice.repairNote.note}
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Box>
+          )}
+        </>
+      )}
 
       {/* Invoice Narration */}
       {invoice.costPayments && invoice.costPayments.length > 0 && (

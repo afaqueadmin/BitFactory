@@ -7,6 +7,7 @@
 
 import {
   InvoiceStatus,
+  InvoiceType,
   NotificationType,
   AuditAction,
   VendorPaymentStatus,
@@ -93,6 +94,14 @@ export const INVOICE_STATUS_LABELS: Record<
   [VendorPaymentStatus.Paid]: "Paid",
   [VendorPaymentStatus.Pending]: "Pending",
   [VendorPaymentStatus.Cancelled]: "Cancelled",
+};
+
+// Customer-facing invoice type labels (match the customer statement PDF)
+export const INVOICE_TYPE_LABELS: Record<InvoiceType, string> = {
+  [InvoiceType.ELECTRICITY_CHARGES]: "Hosting & Electricity",
+  [InvoiceType.HARDWARE_PURCHASE]: "Hardware",
+  [InvoiceType.HARDWARE_SALES]: "Hardware",
+  [InvoiceType.HARDWARE_REPAIR]: "Hardware Repair",
 };
 
 // MUI color variants for each status

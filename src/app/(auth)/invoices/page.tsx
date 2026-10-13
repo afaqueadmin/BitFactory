@@ -32,7 +32,10 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { useUser } from "@/lib/hooks/useUser";
 import { InvoiceStatus, Invoice } from "@prisma/client";
-import { INVOICE_STATUS_LABELS } from "@/lib/constants/accounting";
+import {
+  INVOICE_STATUS_LABELS,
+  INVOICE_TYPE_LABELS,
+} from "@/lib/constants/accounting";
 import { useRouter } from "next/navigation";
 import { calculateDaysUntilDue } from "@/lib/mocks/invoiceMocks";
 import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
@@ -181,6 +184,7 @@ export default function InvoicesPage() {
     { label: "Invoice", hideBelow: undefined },
     { label: "Amount", hideBelow: undefined, align: "right" as const },
     { label: "Status", hideBelow: undefined },
+    { label: "Type", hideBelow: "sm" as const },
     { label: "Issued Date", hideBelow: "sm" as const },
     { label: "Due Date", hideBelow: "sm" as const },
     { label: "Paid Date", hideBelow: "md" as const },
@@ -290,13 +294,13 @@ export default function InvoicesPage() {
             <TableBody>
               {invoicesLoading ? (
                 <TableRow>
-                  <TableCell colSpan={8} sx={{ textAlign: "center", py: 4 }}>
+                  <TableCell colSpan={9} sx={{ textAlign: "center", py: 4 }}>
                     <CircularProgress size={24} sx={{ color: d.action }} />
                   </TableCell>
                 </TableRow>
               ) : invoicesError ? (
                 <TableRow>
-                  <TableCell colSpan={8} sx={{ textAlign: "center", py: 4 }}>
+                  <TableCell colSpan={9} sx={{ textAlign: "center", py: 4 }}>
                     <Typography
                       sx={{
                         fontSize: 13,
@@ -393,6 +397,18 @@ export default function InvoicesPage() {
                             color: tone.text,
                           }}
                         />
+                      </TableCell>
+                      <TableCell
+                        sx={{
+                          py: { xs: 1, sm: 1.5 },
+                          px: { xs: 1.5, sm: 2 },
+                          display: { xs: "none", sm: "table-cell" },
+                          fontSize: 12,
+                          color: d.text,
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {INVOICE_TYPE_LABELS[invoice.invoiceType]}
                       </TableCell>
                       <TableCell
                         sx={{
@@ -505,7 +521,7 @@ export default function InvoicesPage() {
                 })
               ) : (
                 <TableRow>
-                  <TableCell colSpan={8} sx={{ textAlign: "center", py: 4 }}>
+                  <TableCell colSpan={9} sx={{ textAlign: "center", py: 4 }}>
                     <Typography
                       sx={{
                         fontSize: 13,

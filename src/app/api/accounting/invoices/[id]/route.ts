@@ -87,9 +87,12 @@ export async function GET(
               omit: costPaymentAccountOmit,
             },
             lineItems: true,
-            // The repaired miner (theirs); the internal repair note is
-            // admin-only.
+            // The repaired miner (theirs) and its repair note - customers
+            // already see their miners' repair notes on the miners page.
             miner: { select: REPAIR_MINER_SELECT },
+            repairNote: {
+              select: { id: true, note: true, dateOfEntry: true },
+            },
           },
         });
 

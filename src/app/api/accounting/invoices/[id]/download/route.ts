@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyJwtToken } from "@/lib/jwt";
 import { prisma } from "@/lib/prisma";
+import { InvoiceStatus } from "@prisma/client";
 import { REPAIR_MINER_SELECT } from "@/lib/accounting/hardwareRepair";
 import { generateInvoicePDF, repairDetailsFromInvoice } from "@/lib/email";
 
@@ -56,6 +57,12 @@ export async function GET(
 
     if (!isAdmin && !isOwnInvoice) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    // Customers never see drafts (list/detail hide them too); answer as not
+    // found so the draft's existence isn't revealed.
+    if (!isAdmin && invoice.status === InvoiceStatus.DRAFT) {
+      return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
     }
 
     // Fetch hardware model if invoice has hardware
