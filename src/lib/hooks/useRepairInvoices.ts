@@ -8,6 +8,8 @@ export interface RepairMiner {
   status?: string;
   hardware: { model: string } | null;
   space: { name: string; location: string } | null;
+  userId?: string;
+  user?: { id: string; name: string | null };
 }
 
 export interface RepairLineItemDraft {
@@ -39,13 +41,23 @@ async function readError(res: Response, fallback: string): Promise<string> {
   }
 }
 
-/** All non-deleted miners of a customer, any status. */
-export function useRepairMiners(customerId?: string) {
+/**
+ * All non-deleted miners of a customer, any status. With `all`, every
+ * invoiceable miner of every customer instead (each with its owner).
+ */
+export function useRepairMiners(
+  customerId?: string,
+  options: { all?: boolean } = {},
+) {
+  const all = !!options.all;
+  const enabled = all || !!customerId;
   const { data, isLoading, error } = useQuery({
-    queryKey: ["repairMiners", customerId],
+    queryKey: ["repairMiners", all ? "all" : customerId],
     queryFn: async () => {
       const res = await fetch(
-        `/api/accounting/repair-miners?customerId=${encodeURIComponent(customerId as string)}`,
+        all
+          ? "/api/accounting/repair-miners"
+          : `/api/accounting/repair-miners?customerId=${encodeURIComponent(customerId as string)}`,
         { credentials: "include" },
       );
       if (!res.ok) {
@@ -53,13 +65,13 @@ export function useRepairMiners(customerId?: string) {
       }
       return res.json();
     },
-    enabled: !!customerId,
+    enabled,
     staleTime: 60 * 1000,
   });
 
   return {
     miners: (data?.miners || []) as RepairMiner[],
-    loading: isLoading && !!customerId,
+    loading: isLoading && enabled,
     error: error instanceof Error ? error.message : null,
   };
 }

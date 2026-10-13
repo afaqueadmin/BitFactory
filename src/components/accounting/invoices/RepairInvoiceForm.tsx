@@ -2,6 +2,7 @@
 
 import {
   Alert,
+  Autocomplete,
   Box,
   Button,
   CircularProgress,
@@ -17,6 +18,7 @@ import { Customer, useCustomers } from "@/lib/hooks/useInvoices";
 import {
   RepairInvoiceInput,
   RepairLineItemDraft,
+  RepairMiner,
   useRepairMiners,
 } from "@/lib/hooks/useRepairInvoices";
 import { useSpaceLocations } from "@/lib/hooks/useSpaceLocations";
@@ -60,7 +62,7 @@ export function RepairInvoiceForm({
   onCancel,
 }: RepairInvoiceFormProps) {
   const isEdit = mode === "edit";
-  const { customers, loading: customersLoading } = useCustomers({
+  const { customers } = useCustomers({
     withMiners: true,
   });
   const { locations: spaceLocations, loading: spaceLocationsLoading } =
@@ -84,10 +86,17 @@ export function RepairInvoiceForm({
   const [noteEdited, setNoteEdited] = useState(isEdit);
   const [error, setError] = useState<string | null>(null);
 
+  // Create: every miner, and picking one fills in its owner as the customer.
+  // Edit: the customer is fixed, so only their miners.
   const { miners, loading: minersLoading } = useRepairMiners(
-    customerId || undefined,
+    isEdit ? customerId || undefined : undefined,
+    { all: !isEdit },
   );
   const selectedMiner = miners.find((m) => m.id === minerId);
+  const selectedCustomerName =
+    customers.find((c: Customer) => c.id === customerId)?.displayName ??
+    selectedMiner?.user?.name ??
+    "";
 
   useEffect(() => {
     if (!noteEdited) {
@@ -97,17 +106,20 @@ export function RepairInvoiceForm({
     }
   }, [lineItems, noteEdited, initial?.invoiceNumber]);
 
-  const handleCustomerChange = (value: string) => {
-    setCustomerId(value);
-    setMinerId("");
-  };
-
   const handleMinerChange = (value: string) => {
     setMinerId(value);
+    const miner = miners.find((m) => m.id === value);
+    // Create: the customer is whoever owns the miner.
+    if (!isEdit) setCustomerId(miner?.userId ?? "");
     // Pre-fill "Machine Hosting Location" from the miner's space.
-    const location = miners.find((m) => m.id === value)?.space?.location;
+    const location = miner?.space?.location;
     if (location) setMachineHostingLocation([location]);
   };
+
+  const minerOptionLabel = (miner: RepairMiner) =>
+    `${miner.name}${miner.serialNumber ? ` — ${miner.serialNumber}` : ""}${
+      miner.hardware?.model ? ` (${miner.hardware.model})` : ""
+    }`;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -167,65 +179,111 @@ export function RepairInvoiceForm({
       <form onSubmit={handleSubmit}>
         <Stack spacing={4}>
           {/* Customer & Miner */}
-          <Box>
-            <h3 style={{ marginTop: 0, marginBottom: 16 }}>Customer & Miner</h3>
-            <Stack spacing={2}>
-              {isEdit ? (
+          {isEdit ? (
+            <Box>
+              <h3 style={{ marginTop: 0, marginBottom: 16 }}>
+                Customer & Miner
+              </h3>
+              <Stack spacing={2}>
                 <TextField
                   label="Customer"
                   value={initial?.customerName ?? ""}
                   fullWidth
                   disabled
                 />
-              ) : (
+
                 <TextField
                   select
-                  label="Select Customer"
-                  value={customerId}
-                  onChange={(e) => handleCustomerChange(e.target.value)}
+                  label="Select Miner"
+                  value={minersLoading ? "" : minerId}
+                  onChange={(e) => handleMinerChange(e.target.value)}
                   fullWidth
-                  helperText="Only customers who own at least one miner are listed"
-                  disabled={customersLoading}
+                  disabled={!customerId || minersLoading}
+                  helperText={
+                    minersLoading
+                      ? "Loading miners..."
+                      : `${miners.length} miner${miners.length === 1 ? "" : "s"}`
+                  }
                   required
                 >
-                  <MenuItem value="">-- Select a Customer --</MenuItem>
-                  {customers.map((customer: Customer) => (
-                    <MenuItem key={customer.id} value={customer.id}>
-                      {customer.displayName}
+                  <MenuItem value="">-- Select a Miner --</MenuItem>
+                  {miners.map((miner) => (
+                    <MenuItem key={miner.id} value={miner.id}>
+                      {minerOptionLabel(miner)}
                     </MenuItem>
                   ))}
                 </TextField>
-              )}
 
-              <TextField
-                select
-                label="Select Miner"
-                value={minersLoading ? "" : minerId}
-                onChange={(e) => handleMinerChange(e.target.value)}
-                fullWidth
-                disabled={!customerId || minersLoading}
-                helperText={
-                  !customerId
-                    ? "Select a customer first"
-                    : minersLoading
-                      ? "Loading miners..."
-                      : `${miners.length} miner${miners.length === 1 ? "" : "s"}`
-                }
-                required
-              >
-                <MenuItem value="">-- Select a Miner --</MenuItem>
-                {miners.map((miner) => (
-                  <MenuItem key={miner.id} value={miner.id}>
-                    {miner.name}
-                    {miner.serialNumber ? ` — ${miner.serialNumber}` : ""}
-                    {miner.hardware?.model ? ` (${miner.hardware.model})` : ""}
-                  </MenuItem>
-                ))}
-              </TextField>
+                {selectedMiner && <RepairMinerDetails miner={selectedMiner} />}
+              </Stack>
+            </Box>
+          ) : (
+            <Box>
+              <h3 style={{ marginTop: 0, marginBottom: 16 }}>
+                Miner & Customer
+              </h3>
+              <Stack spacing={2}>
+                <Autocomplete
+                  options={miners}
+                  value={selectedMiner ?? null}
+                  onChange={(_e, miner) => handleMinerChange(miner?.id ?? "")}
+                  getOptionLabel={minerOptionLabel}
+                  isOptionEqualToValue={(a, b) => a.id === b.id}
+                  // Search by name, serial, model or owner.
+                  filterOptions={(options, { inputValue }) => {
+                    const q = inputValue.trim().toLowerCase();
+                    if (!q) return options;
+                    return options.filter((m) =>
+                      `${minerOptionLabel(m)} ${m.user?.name ?? ""}`
+                        .toLowerCase()
+                        .includes(q),
+                    );
+                  }}
+                  renderOption={(props, miner) => (
+                    <li {...props} key={miner.id}>
+                      <Box>
+                        <Typography variant="body2">
+                          {minerOptionLabel(miner)}
+                        </Typography>
+                        <Typography variant="caption" color="textSecondary">
+                          {miner.user?.name || "Unnamed Customer"}
+                        </Typography>
+                      </Box>
+                    </li>
+                  )}
+                  loading={minersLoading}
+                  disabled={minersLoading}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="Select Miner"
+                      required
+                      helperText={
+                        minersLoading
+                          ? "Loading miners..."
+                          : `${miners.length} miner${miners.length === 1 ? "" : "s"} - search by name, serial, model or customer`
+                      }
+                    />
+                  )}
+                />
 
-              {selectedMiner && <RepairMinerDetails miner={selectedMiner} />}
-            </Stack>
-          </Box>
+                <TextField
+                  label="Customer"
+                  value={selectedCustomerName}
+                  fullWidth
+                  disabled
+                  helperText={
+                    customerId
+                      ? "The customer who owns the selected miner"
+                      : "Filled in when you select a miner"
+                  }
+                  InputLabelProps={{ shrink: !!selectedCustomerName }}
+                />
+
+                {selectedMiner && <RepairMinerDetails miner={selectedMiner} />}
+              </Stack>
+            </Box>
+          )}
 
           {/* Line Items */}
           <Box>

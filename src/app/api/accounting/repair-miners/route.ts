@@ -4,7 +4,7 @@ import { verifyJwtToken } from "@/lib/jwt";
 import { REPAIR_MINER_SELECT } from "@/lib/accounting/hardwareRepair";
 
 /**
- * GET /api/accounting/repair-miners?customerId=...
+ * GET /api/accounting/repair-miners[?customerId=...]
  *
  * Miners that can go on a Hardware Repair invoice for this customer: every
  * non-deleted miner they own, whatever its status (a miner in for repair is
@@ -35,17 +35,20 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Without customerId: every miner that can be invoiced, with its owner -
+    // the create form picks the miner first and fills in the customer. Same
+    // customers as /api/accounting/customers?scope=withMiners.
     const customerId = new URL(request.url).searchParams.get("customerId");
-    if (!customerId) {
-      return NextResponse.json(
-        { error: "Missing required parameter: customerId" },
-        { status: 400 },
-      );
-    }
 
     const miners = await prisma.miner.findMany({
-      where: { userId: customerId, isDeleted: false },
-      select: { ...REPAIR_MINER_SELECT, status: true },
+      where: customerId
+        ? { userId: customerId, isDeleted: false }
+        : { isDeleted: false, user: { role: "CLIENT", isDeleted: false } },
+      select: {
+        ...REPAIR_MINER_SELECT,
+        status: true,
+        user: { select: { id: true, name: true } },
+      },
       orderBy: { name: "asc" },
     });
 
