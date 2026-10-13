@@ -50,6 +50,28 @@ export function parseExchangeRate(value: PaymentAccountValue): number | null {
     : null;
 }
 
+/**
+ * The rate when amounts should also be shown in the payment currency: a
+ * non-USD currency with a valid rate. Null otherwise (USD needs no
+ * conversion).
+ */
+export function conversionRate(value: PaymentAccountValue): number | null {
+  return value.currencyCode && value.currencyCode !== BASE_CURRENCY
+    ? parseExchangeRate(value)
+    : null;
+}
+
+/** A USD amount in the payment currency (1 USD = rate), rounded to cents. */
+export const usdToCurrency = (usd: number, rate: number) =>
+  Math.round(usd * rate * 100) / 100;
+
+/** "1,234.50 AED" */
+export const formatCurrencyAmount = (value: number | string, code: string) =>
+  `${Number(value).toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })} ${code}`;
+
 export function isPaymentAccountComplete(value: PaymentAccountValue): boolean {
   return (
     !!value.entityId &&

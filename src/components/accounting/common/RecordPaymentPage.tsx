@@ -28,9 +28,13 @@ import {
   EMPTY_PAYMENT_ACCOUNT,
   PaymentAccountFields,
   PaymentAccountValue,
+  conversionRate,
+  formatCurrencyAmount,
   isPaymentAccountComplete,
   parseExchangeRate,
+  usdToCurrency,
 } from "@/components/accounting/common/PaymentAccountFields";
+import { AmountDueInCurrency } from "@/components/accounting/common/AmountDueInCurrency";
 import { CostPayment } from "@prisma/client";
 
 interface RecordPaymentPageProps {
@@ -154,6 +158,12 @@ export default function RecordPaymentPage({
   const usdHint = (value: number) =>
     rate && value > 0 && currencyCode !== "USD"
       ? ` ≈ $${(value / rate).toFixed(2)} USD`
+      : "";
+  // " (20.00 AED settles it)" - the outstanding in the payment currency.
+  const convRate = conversionRate(account);
+  const settleHint = (outstandingUsd: number) =>
+    convRate && outstandingUsd > 0
+      ? ` (${formatCurrencyAmount(usdToCurrency(outstandingUsd, convRate), currencyCode)} settles it)`
       : "";
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -326,7 +336,7 @@ export default function RecordPaymentPage({
                         onChange={handleInputChange}
                         fullWidth
                         inputProps={{ min: 0, step: 0.01 }}
-                        helperText={`Enter the hardware sales payment amount${usdHint(enteredAmount)}`}
+                        helperText={`Enter the hardware sales payment amount${settleHint(hardwareOutstanding)}${usdHint(enteredAmount)}`}
                         disabled={formData.markAsPaid || !rate}
                       />
                       <TextField
@@ -355,7 +365,7 @@ export default function RecordPaymentPage({
                         onChange={handleInputChange}
                         fullWidth
                         inputProps={{ min: 0, step: 0.01 }}
-                        helperText={`Enter the hosting and colocation payment amount${usdHint(enteredHosting)}`}
+                        helperText={`Enter the hosting and colocation payment amount${settleHint(hostingOutstanding)}${usdHint(enteredHosting)}`}
                         disabled={formData.markAsPaid || !rate}
                       />
                       <TextField
@@ -417,7 +427,7 @@ export default function RecordPaymentPage({
                           inputProps={{ min: 0, step: 0.01 }}
                           helperText={
                             rate
-                              ? `Enter the payment amount${usdHint(enteredAmount)}`
+                              ? `Enter the payment amount${settleHint(outstandingAmount)}${usdHint(enteredAmount)}`
                               : "Choose the currency and rate first"
                           }
                           required={!formData.markAsPaid}
@@ -531,6 +541,11 @@ export default function RecordPaymentPage({
                       </Typography>
                       <CurrencyDisplay value={hardwareOutstanding} />
                     </Stack>
+                    <AmountDueInCurrency
+                      usd={hardwareOutstanding}
+                      account={account}
+                      compact
+                    />
                   </Box>
                   <Box>
                     <Typography sx={{ fontWeight: 600, mb: 0.5 }}>
@@ -548,6 +563,11 @@ export default function RecordPaymentPage({
                       </Typography>
                       <CurrencyDisplay value={hostingOutstanding} />
                     </Stack>
+                    <AmountDueInCurrency
+                      usd={hostingOutstanding}
+                      account={account}
+                      compact
+                    />
                   </Box>
                 </>
               )}
@@ -565,12 +585,16 @@ export default function RecordPaymentPage({
 
               <Box>
                 <Typography sx={{ fontWeight: 600, fontSize: "1.1rem" }}>
-                  Outstanding
+                  Outstanding (USD)
                 </Typography>
                 <CurrencyDisplay
                   value={outstandingAmount}
                   variant="h6"
                   fontWeight="bold"
+                />
+                <AmountDueInCurrency
+                  usd={outstandingAmount}
+                  account={account}
                 />
               </Box>
 

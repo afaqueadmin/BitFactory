@@ -28,9 +28,12 @@ import {
   EMPTY_PAYMENT_ACCOUNT,
   PaymentAccountFields,
   PaymentAccountValue,
+  formatCurrencyAmount,
   isPaymentAccountComplete,
   parseExchangeRate,
+  usdToCurrency,
 } from "@/components/accounting/common/PaymentAccountFields";
+import { AmountDueInCurrency } from "@/components/accounting/common/AmountDueInCurrency";
 import {
   PdfUploadField,
   PdfUploadPurpose,
@@ -54,12 +57,6 @@ export interface VendorSideInvoice {
   paymentBank?: { id: string; name: string } | null;
   paymentCurrency?: { id: string; code: string; name: string } | null;
 }
-
-const formatAmount = (value: Amount, code: string) =>
-  `${Number(value).toLocaleString("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })} ${code}`;
 
 /** D8, mirrored from the server: converted amount within $0.01 of the total. */
 const TOLERANCE_USD = 0.01;
@@ -122,7 +119,7 @@ function PaidSummary({
           </SummaryRow>
           <SummaryRow label="Amount Paid">
             {invoice.paymentAmount != null
-              ? formatAmount(invoice.paymentAmount, code!)
+              ? formatCurrencyAmount(invoice.paymentAmount, code!)
               : "—"}
           </SummaryRow>
           <SummaryRow label="Exchange Rate">
@@ -139,7 +136,7 @@ function PaidSummary({
           </SummaryRow>
           <SummaryRow label="Transaction Fee">
             {invoice.transactionFee != null
-              ? formatAmount(invoice.transactionFee, code!)
+              ? formatCurrencyAmount(invoice.transactionFee, code!)
               : "—"}
           </SummaryRow>
           <SummaryRow label="Payment Receipt">
@@ -207,7 +204,7 @@ export function VendorPaymentSection({
   const amount = paymentAmount.trim() === "" ? null : Number(paymentAmount);
   const fee = transactionFee.trim() === "" ? null : Number(transactionFee);
   const amountUsd = rate && amount != null ? amount / rate : null;
-  const neededAmount = rate ? Math.round(totalUsd * rate * 100) / 100 : null;
+  const neededAmount = rate ? usdToCurrency(totalUsd, rate) : null;
   const amountValid = amount != null && Number.isFinite(amount) && amount > 0;
   const feeValid = fee != null && Number.isFinite(fee) && fee >= 0;
   // Small epsilon so float division can't flip an exact match.
@@ -295,8 +292,8 @@ export function VendorPaymentSection({
           disabled={saving || !rate}
           error={amount != null && amountValid && !matchesTotal}
           helperText={
-            neededAmount != null
-              ? `Invoice total: ${formatAmount(neededAmount, code)} at this rate`
+            rate
+              ? `Enter the amount paid in ${code}`
               : "Choose the currency and rate first"
           }
           slotProps={{
@@ -342,15 +339,16 @@ export function VendorPaymentSection({
         </Stack>
         <Divider sx={{ my: 1 }} />
         <Stack direction="row" justifyContent="space-between">
-          <Typography color="textSecondary">Invoice total</Typography>
+          <Typography color="textSecondary">Invoice total (USD)</Typography>
           <Typography sx={{ fontWeight: 600 }}>
             <CurrencyDisplay value={totalUsd} />
           </Typography>
         </Stack>
+        <AmountDueInCurrency usd={totalUsd} account={account} compact />
         {amountValid && rate && !matchesTotal && (
           <Alert severity="warning" sx={{ mt: 1.5 }}>
             The amount paid must match the invoice total within $0.01. At this
-            rate that&apos;s {formatAmount(neededAmount!, code)}.
+            rate that&apos;s {formatCurrencyAmount(neededAmount!, code)}.
           </Alert>
         )}
       </Box>
