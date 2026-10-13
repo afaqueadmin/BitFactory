@@ -212,9 +212,6 @@ export default function CreateInvoicePage() {
   const handleDueDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { value } = e.target;
     setFormData((prev) => ({ ...prev, dueDate: value }));
-    if (isPastDate(value)) {
-      setPastDueDateWarningOpen(true);
-    }
   };
 
   const handleReselectDueDate = () => {
@@ -222,9 +219,17 @@ export default function CreateInvoicePage() {
     setPastDueDateWarningOpen(false);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // A past due date is confirmed once, when the admin submits.
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isPastDate(formData.dueDate)) {
+      setPastDueDateWarningOpen(true);
+      return;
+    }
+    void submitInvoice();
+  };
 
+  const submitInvoice = async () => {
     try {
       setLoading(true);
       setError(null);
@@ -580,7 +585,10 @@ export default function CreateInvoicePage() {
           <Button onClick={handleReselectDueDate}>Reselect Due Date</Button>
           <Button
             variant="contained"
-            onClick={() => setPastDueDateWarningOpen(false)}
+            onClick={() => {
+              setPastDueDateWarningOpen(false);
+              void submitInvoice();
+            }}
           >
             Continue
           </Button>

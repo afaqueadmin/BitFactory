@@ -157,9 +157,6 @@ export default function InvoiceDetailPage() {
   const handleIssuedDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { value } = e.target;
     setIssuedDateInput(value);
-    if (isPastDate(value)) {
-      setPastIssueDateWarningOpen(true);
-    }
   };
 
   const handleReselectIssuedDate = () => {
@@ -167,7 +164,16 @@ export default function InvoiceDetailPage() {
     setPastIssueDateWarningOpen(false);
   };
 
-  const handleIssueInvoice = async () => {
+  // A past issue date is confirmed once, when the admin clicks Issue Invoice.
+  const handleIssueInvoice = () => {
+    if (isPastDate(issuedDateInput)) {
+      setPastIssueDateWarningOpen(true);
+      return;
+    }
+    void issueInvoiceNow();
+  };
+
+  const issueInvoiceNow = async () => {
     try {
       setStatusDialogError(null);
       setIssueSuccess(null);
@@ -1038,7 +1044,10 @@ export default function InvoiceDetailPage() {
           <Button onClick={handleReselectIssuedDate}>Reselect Date</Button>
           <Button
             variant="contained"
-            onClick={() => setPastIssueDateWarningOpen(false)}
+            onClick={() => {
+              setPastIssueDateWarningOpen(false);
+              void issueInvoiceNow();
+            }}
           >
             Continue
           </Button>

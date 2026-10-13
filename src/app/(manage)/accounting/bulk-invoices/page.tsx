@@ -251,9 +251,6 @@ export default function BulkInvoicesPage() {
   const handleDueDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { value } = e.target;
     setDueDate(value);
-    if (isPastDate(value)) {
-      setPastDueDateWarningOpen(true);
-    }
   };
 
   const handleReselectDueDate = () => {
@@ -428,9 +425,15 @@ export default function BulkInvoicesPage() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // A past due date is confirmed once, when the admin submits; the follow-up
+  // confirm dialogs below call submitBulkInvoices directly.
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    await submitBulkInvoices();
+    if (isPastDate(dueDate)) {
+      setPastDueDateWarningOpen(true);
+      return;
+    }
+    void submitBulkInvoices();
   };
 
   return (
@@ -837,7 +840,10 @@ export default function BulkInvoicesPage() {
           <Button onClick={handleReselectDueDate}>Reselect Due Date</Button>
           <Button
             variant="contained"
-            onClick={() => setPastDueDateWarningOpen(false)}
+            onClick={() => {
+              setPastDueDateWarningOpen(false);
+              void submitBulkInvoices();
+            }}
           >
             Continue
           </Button>
