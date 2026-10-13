@@ -84,7 +84,21 @@ export function RepairInvoiceForm({
   >(initial?.machineHostingLocation ?? []);
   const [repairNote, setRepairNote] = useState(initial?.repairNote ?? "");
   // The note follows the line items until the admin edits it themselves.
-  const [noteEdited, setNoteEdited] = useState(isEdit);
+  // Edit: it keeps following them while the saved note is still the
+  // generated text - written without a number at create time, or with it.
+  const [noteInvoiceNumber] = useState<string | null>(() => {
+    if (!isEdit || !initial?.invoiceNumber) return null;
+    const lines = initial.lineItems ?? [];
+    return initial.repairNote === defaultRepairNote(null, lines)
+      ? null
+      : initial.invoiceNumber;
+  });
+  const [noteEdited, setNoteEdited] = useState(
+    () =>
+      isEdit &&
+      initial?.repairNote !==
+        defaultRepairNote(noteInvoiceNumber, initial?.lineItems ?? []),
+  );
   const [error, setError] = useState<string | null>(null);
   // Bumped on every failed submit so a repeated message still flashes.
   const [errorTick, setErrorTick] = useState(0);
@@ -108,11 +122,9 @@ export function RepairInvoiceForm({
 
   useEffect(() => {
     if (!noteEdited) {
-      setRepairNote(
-        defaultRepairNote(initial?.invoiceNumber ?? null, lineItems),
-      );
+      setRepairNote(defaultRepairNote(noteInvoiceNumber, lineItems));
     }
-  }, [lineItems, noteEdited, initial?.invoiceNumber]);
+  }, [lineItems, noteEdited, noteInvoiceNumber]);
 
   const handleMinerChange = (value: string) => {
     setMinerId(value);
@@ -324,7 +336,7 @@ export function RepairInvoiceForm({
               required
               disabled={submitting}
             />
-            {noteEdited && !isEdit && (
+            {noteEdited && (
               <Button
                 size="small"
                 sx={{ mt: 1 }}
