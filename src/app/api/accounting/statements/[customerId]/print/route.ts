@@ -47,11 +47,11 @@ export async function GET(
       );
     }
 
-    // Get all invoices for the customer (excluding CANCELLED)
+    // Get all invoices for the customer (excluding DRAFT and CANCELLED)
     const invoices = await prisma.invoice.findMany({
       where: {
         userId: customerId,
-        status: { not: "CANCELLED" },
+        status: { notIn: ["CANCELLED", "DRAFT"] },
       },
       include: {
         // Voided payments (e.g. reversed memo adjustments) aren't paid.

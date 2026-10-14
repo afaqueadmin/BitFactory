@@ -9,6 +9,7 @@ import {
   validatePaymentAccount,
 } from "@/lib/accounting/paymentAccount";
 import { costPaymentAccountInclude } from "@/lib/accounting/costPaymentAccounts";
+import { paymentTypeForInvoice } from "@/lib/accounting/paymentTypes";
 
 /** An entered amount: 0 or more, at most 2 decimal places (0 when blank). */
 function parseEnteredAmount(value: unknown): Decimal | null {
@@ -199,12 +200,7 @@ export async function POST(
           originalAmount: hardwareOriginal,
           ...accountFields,
           // Hardware payments are kept out of the hosting balance.
-          type:
-            invoice.invoiceType === "HARDWARE_SALES"
-              ? "HARDWARE_SALES"
-              : invoice.invoiceType === "HARDWARE_REPAIR"
-                ? "HARDWARE_REPAIR"
-                : "PAYMENT",
+          type: paymentTypeForInvoice(invoice.invoiceType),
           consumption: 0,
           narration: notes || null,
         },

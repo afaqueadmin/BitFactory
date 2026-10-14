@@ -48,7 +48,10 @@ export async function GET(request: NextRequest) {
         name: true,
         email: true,
         companyName: true,
+        // Match the per-customer statement: drafts and cancelled
+        // invoices don't count.
         invoices: {
+          where: { status: { notIn: ["DRAFT", "CANCELLED"] } },
           select: {
             id: true,
             totalAmount: true,

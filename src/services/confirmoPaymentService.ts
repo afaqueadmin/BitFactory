@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { ConfirmoClient } from "@/lib/confirmo/client";
 import { Prisma, ConfirmoPaymentStatus } from "@prisma/client";
+import { paymentTypeForInvoice } from "@/lib/accounting/paymentTypes";
 
 export class ConfirmoPaymentService {
   private client: ConfirmoClient;
@@ -238,7 +239,7 @@ export class ConfirmoPaymentService {
             invoiceId: updatedPayment.invoiceId,
             amount: parseFloat(updatedPayment.amount.toString()),
             consumption: 0, // Consumption tracked separately
-            type: "PAYMENT",
+            type: paymentTypeForInvoice(updatedPayment.invoice.invoiceType),
             narration: `Crypto payment - ${typeof paid_currency === "string" ? paid_currency : "Crypto"} - ${updatedPayment.invoice.totalMiners} miners @ $${updatedPayment.invoice.unitPrice}/miner${typeof tx_hash === "string" ? ` (Tx: ${tx_hash.slice(0, 16)}...)` : ""}`,
           },
         }),

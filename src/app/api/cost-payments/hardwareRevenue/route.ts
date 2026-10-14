@@ -30,7 +30,8 @@ export async function GET(request: NextRequest) {
     const [costPayments, credits] = await Promise.all([
       prisma.costPayment.aggregate({
         where: {
-          type: "HARDWARE_SALES",
+          // Hardware revenue covers both sales and repair payments.
+          type: { in: ["HARDWARE_SALES", "HARDWARE_REPAIR"] },
           isDeleted: false,
         },
         _sum: {

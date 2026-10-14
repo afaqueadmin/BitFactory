@@ -243,7 +243,17 @@ export default function AdminDashboard() {
     undefined,
     "HARDWARE_SALES",
   );
-  const hardwareRevenuePending = hardwareSalesInvoices
+  const { invoices: hardwareRepairInvoices } = useInvoices(
+    1,
+    100000,
+    undefined,
+    undefined,
+    "HARDWARE_REPAIR",
+  );
+  const hardwareRevenuePending = [
+    ...hardwareSalesInvoices,
+    ...hardwareRepairInvoices,
+  ]
     .filter((invoice: InvoiceWithDetails) =>
       ["DRAFT", "ISSUED", "OVERDUE"].includes(invoice.status),
     )
@@ -805,20 +815,22 @@ export default function AdminDashboard() {
             infoText="Hosting and Colocation (Invoice) minus Hosting Cost (Invoice) — what customers were invoiced for hosting minus what the vendor invoiced Bitfactory for the same, regardless of whether either invoice has actually been paid yet."
           />
 
-          {/* Hardware Revenue - From Cost Payments (HARDWARE_SALES payments) */}
+          {/* Hardware Revenue - From Cost Payments (HARDWARE_SALES + HARDWARE_REPAIR payments) */}
           <AdminValueCard
             title="Hardware Revenue"
             borderColor="#757575"
             value={hardwareRevenueData?.hardwareRevenue ?? 0}
             type="currency"
+            infoText="Sum of all payments recorded against Hardware Sales and Hardware Repair invoices, minus issued Hardware credit memos."
           />
 
-          {/* Hardware Revenue Pending - HARDWARE_SALES invoices not yet paid (DRAFT/ISSUED/OVERDUE) */}
+          {/* Hardware Revenue Pending - HARDWARE_SALES + HARDWARE_REPAIR invoices not yet paid (DRAFT/ISSUED/OVERDUE) */}
           <AdminValueCard
             title="Hardware Revenue Pending"
             borderColor="#757575"
             value={hardwareRevenuePending}
             type="currency"
+            infoText="Sum of the total amount on all Hardware Sales and Hardware Repair invoices with status Draft, Issued, or Overdue."
           />
 
           {/* Hardware Cost - From Hardware Purchase Invoices */}
