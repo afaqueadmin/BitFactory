@@ -38,15 +38,21 @@ interface LoginEntry {
 
 interface LoginEmailsSectionProps {
   customerId: string;
+  /** Compact heading and copy, for use inside a dialog (Edit Customer). */
+  dense?: boolean;
 }
 
 /**
  * The emails a customer's account can be signed into with. A client account
  * can have a second one for another person (e.g. their accountant), with its
  * own password and 2FA. Adding one emails it a link to choose a password.
+ *
+ * Every action here is saved straight away through /api/user/[id]/logins -
+ * it never relies on an enclosing form's submit, so it can sit inside one.
  */
 export default function LoginEmailsSection({
   customerId,
+  dense = false,
 }: LoginEmailsSectionProps) {
   const [logins, setLogins] = useState<LoginEntry[]>([]);
   const [canManage, setCanManage] = useState(false);
@@ -159,7 +165,7 @@ export default function LoginEmailsSection({
         alignItems="center"
         sx={{ mb: 1 }}
       >
-        <Typography variant="h6" fontWeight="600">
+        <Typography variant={dense ? "subtitle1" : "h6"} fontWeight="600">
           Sign-in Emails
         </Typography>
         {canAdd && (
@@ -177,9 +183,9 @@ export default function LoginEmailsSection({
         )}
       </Stack>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        Each email signs in separately, with its own password and two-factor
-        authentication, and has full access to this account. Invoices go to the
-        primary email; a second email is CC&apos;d.
+        {dense
+          ? "A second email signs in separately with its own password and 2FA, and is CC'd on invoices. Changes here are saved immediately, not with Update."
+          : "Each email signs in separately, with its own password and two-factor authentication, and has full access to this account. Invoices go to the primary email; a second email is CC'd."}
       </Typography>
 
       {error && (
@@ -201,11 +207,21 @@ export default function LoginEmailsSection({
         <Paper variant="outlined" sx={{ p: 2, mb: 2, borderRadius: 2 }}>
           <Stack spacing={2}>
             {formError && <Alert severity="error">{formError}</Alert>}
+            {/* Not type="email": inside the Edit Customer form, the browser
+                would block that form's Update over a half-typed address.
+                The server validates the format. */}
             <TextField
               label="Email"
-              type="email"
+              inputMode="email"
               value={formEmail}
               onChange={(e) => setFormEmail(e.target.value)}
+              onKeyDown={(e) => {
+                // Enter adds the email; it must not submit an enclosing form.
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  if (!submitting && formEmail.trim()) handleAdd();
+                }
+              }}
               helperText="We'll email this address a link to choose its password. It sets up two-factor authentication at its first sign-in."
               fullWidth
               autoFocus

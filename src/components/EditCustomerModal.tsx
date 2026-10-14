@@ -20,6 +20,7 @@ import {
 import { Close as CloseIcon } from "@mui/icons-material";
 import { useUser } from "@/lib/hooks/useUser";
 import LuxorSubaccountMultiSelect from "@/components/LuxorSubaccountMultiSelect";
+import LoginEmailsSection from "@/components/LoginEmailsSection";
 
 // Placeholder Group value shown when the client's subaccounts are split
 // across several groups.
@@ -410,6 +411,19 @@ export default function EditCustomerModal({
               required
               disabled={user ? user.role !== "SUPER_ADMIN" : true}
             />
+            {/* The account's sign-in emails: the primary above, plus an
+                optional second one. Saved on its own, not by Update. */}
+            {customerId && (
+              <Box
+                sx={{
+                  p: 2,
+                  border: (theme) => `1px solid ${theme.palette.divider}`,
+                  borderRadius: 2,
+                }}
+              >
+                <LoginEmailsSection customerId={customerId} dense />
+              </Box>
+            )}
             <TextField
               fullWidth
               label="Phone Number"
