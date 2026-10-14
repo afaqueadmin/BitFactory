@@ -1,13 +1,16 @@
 /**
- * Signing an account out of every device (N-2).
+ * Signing an account, or one login on it, out of every device (N-2).
  *
- * Each user has a `sessionsValidAfter` cutoff; verifyJwtToken rejects any
- * token issued before it - access, refresh and half-finished login tokens
- * alike. Moving the cutoff to "now" therefore ends every session at once,
- * without having to know which tokens exist.
+ * Each user, and each login, has a `sessionsValidAfter` cutoff;
+ * verifyJwtToken rejects any token issued before either - access, refresh
+ * and half-finished login tokens alike. Moving a cutoff to "now" therefore
+ * ends every session it covers at once, without having to know which tokens
+ * exist.
  *
- * Used when a credential changes (password, 2FA, passkeys, email), when an
- * account is deleted, and by the admin "Sign out all devices" action.
+ * Account-wide (User): an account is deleted, or the admin "Sign out all
+ * devices" action. Per login (UserLogin): that login's own credential changes
+ * (password, 2FA, passkeys, email) - so a second person on the account isn't
+ * signed out when the first changes their password.
  * Logout is different: it only revokes that one device's tokens (see
  * /api/auth/signout).
  *
@@ -28,11 +31,11 @@ export function sessionCutoffNow(): Date {
 }
 
 /**
- * Ends every session of `userId`, on every device. Use when someone else
- * made the change (an admin reset, a deletion) or nobody is signed in (a
- * forgotten-password reset). When the update to the user row is already
- * being written, put `sessionsValidAfter: sessionCutoffNow()` in that same
- * update instead, so both happen together.
+ * Ends every session of `userId`, on every device, for every login on the
+ * account. Use when someone else made the change (an admin action, a
+ * deletion). When the update to the user row is already being written, put
+ * `sessionsValidAfter: sessionCutoffNow()` in that same update instead, so
+ * both happen together.
  */
 export async function revokeAllSessions(userId: string): Promise<void> {
   await prisma.user.update({
@@ -42,9 +45,23 @@ export async function revokeAllSessions(userId: string): Promise<void> {
 }
 
 /**
- * For a change the signed-in user just made to their own account: ends every
- * other session, and keeps the current device signed in by putting fresh
- * session cookies on `response`.
+ * Ends every session of one login, on every device; other logins on the
+ * account stay signed in. Use when that login's credentials were changed by
+ * someone else (an admin reset) or nobody is signed in (a forgotten-password
+ * reset).
+ */
+export async function revokeLoginSessions(loginId: string): Promise<void> {
+  await prisma.userLogin.update({
+    where: { id: loginId },
+    data: { sessionsValidAfter: sessionCutoffNow() },
+  });
+}
+
+/**
+ * For a change the signed-in person just made to their own login: ends every
+ * other session of that login, and keeps the current device signed in by
+ * putting fresh session cookies on `response`. Other logins on the account
+ * are not affected.
  *
  * Call it after the change is saved and before returning. It reads the
  * current session from `request`, so it must run before anything else has
@@ -54,31 +71,30 @@ export async function revokeAllSessions(userId: string): Promise<void> {
 export async function signOutOtherDevices(
   request: NextRequest,
   response: NextResponse,
-  userId: string,
+  loginId: string,
   { mfa = false }: { mfa?: boolean } = {},
 ): Promise<void> {
-  // Only a valid session of this same user is carried over.
+  // Only a valid session of this same login is carried over.
   let current: { mfa: boolean } | null = null;
   const token = request.cookies.get("token")?.value;
   if (token) {
     try {
       const payload = await verifyJwtToken(token);
-      if (payload.userId === userId) current = { mfa: payload.mfa === true };
+      if (payload.loginId === loginId) current = { mfa: payload.mfa === true };
     } catch {
       // No usable session - just sign everything out below.
     }
   }
 
-  const user = await prisma.user.update({
-    where: { id: userId },
+  const login = await prisma.userLogin.update({
+    where: { id: loginId },
     data: { sessionsValidAfter: sessionCutoffNow() },
-    select: { role: true },
+    select: { userId: true, user: { select: { role: true } } },
   });
 
   if (!current) return;
   const { accessToken, refreshToken } = await generateTokens(
-    userId,
-    user.role,
+    { userId: login.userId, loginId, role: login.user.role },
     { mfa: mfa || current.mfa },
   );
   setSessionCookies(response, accessToken, refreshToken);

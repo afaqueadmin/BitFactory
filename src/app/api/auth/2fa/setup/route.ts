@@ -10,8 +10,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { userId } = await getUserInfoFromToken(token);
-    if (!userId) {
+    const { loginId } = await getUserInfoFromToken(token);
+    if (!loginId) {
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
 
@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
       .json()
       .catch(() => ({}));
     const stepUp = await verifyStepUp(
-      userId,
+      { loginId },
       { currentPassword, twoFactorToken },
       "set up two-factor authentication",
     );
@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    return NextResponse.json(await beginTwoFactorSetup(userId));
+    return NextResponse.json(await beginTwoFactorSetup(loginId));
   } catch (error) {
     console.error("2FA setup error:", error);
     return NextResponse.json(

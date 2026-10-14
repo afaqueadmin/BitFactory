@@ -35,10 +35,12 @@ export async function POST(request: NextRequest) {
     }
 
     let userId: string;
+    let loginId: string;
     let role: string;
     try {
       const decoded = await verifyJwtToken(token);
       userId = decoded.userId;
+      loginId = decoded.loginId;
       role = decoded.role;
     } catch (tokenError) {
       console.error(
@@ -51,9 +53,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get user
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
+    // The signed-in login: the passkey is registered to it, under its own
+    // email, not to the account's other login.
+    const user = await prisma.userLogin.findUnique({
+      where: { id: loginId },
       select: { id: true, email: true },
     });
 
@@ -68,7 +71,7 @@ export async function POST(request: NextRequest) {
       .json()
       .catch(() => ({}));
     const stepUp = await verifyStepUp(
-      userId,
+      { loginId },
       { currentPassword, twoFactorToken },
       "add a passkey",
     );
@@ -87,18 +90,18 @@ export async function POST(request: NextRequest) {
     );
 
     console.log("WebAuthn registration options generated successfully", {
-      userId: user.id,
+      userId,
+      loginId,
       rpId: webAuthnConfig.rpId,
       origin: webAuthnConfig.origin,
     });
 
     const response = NextResponse.json(options, { status: 200 });
 
-    // Bound to this user, so /register/verify can't finish it under another
-    // account's session.
+    // Bound to this login, so /register/verify can't finish it under another
+    // login's session.
     const boundChallenge = await signRegistrationChallenge(
-      user.id,
-      role,
+      { userId, loginId, role },
       options.challenge,
     );
     response.cookies.set("webauthn_reg_challenge", boundChallenge, {

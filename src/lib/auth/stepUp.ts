@@ -10,12 +10,15 @@ import {
 /**
  * Step-up re-authentication for sensitive actions where a live session cookie
  * alone shouldn't be enough. Which factor is required is decided from the
- * user's own record, never from what the caller sends, so 2FA can't be dodged
- * by supplying a password instead.
+ * signed-in login's own record, never from what the caller sends, so 2FA
+ * can't be dodged by supplying a password instead.
  *
- * Wrong passwords/codes are limited per user (N-1), with one budget shared by
- * every caller - otherwise a stolen session could keep guessing, or move to
- * another route for a fresh budget. A request with no credential (the
+ * Per login, not per account: on an account with two logins, each person
+ * re-verifies with their own password or authenticator.
+ *
+ * Wrong passwords/codes are limited per login (N-1), with one budget shared
+ * by every caller - otherwise a stolen session could keep guessing, or move
+ * to another route for a fresh budget. A request with no credential (the
  * client asking which factor is needed) isn't counted.
  *
  * Node runtime only (Prisma + bcrypt).
@@ -39,16 +42,18 @@ export type StepUpResult =
     };
 
 /**
- * `actionLabel` completes the sentence "... is required to <actionLabel>",
- * e.g. "add a passkey".
+ * `session` is the verified session token's payload (its loginId is who
+ * re-verifies). `actionLabel` completes the sentence "... is required to
+ * <actionLabel>", e.g. "add a passkey".
  */
 export async function verifyStepUp(
-  userId: string,
+  session: { loginId: string },
   credentials: StepUpCredentials,
   actionLabel: string,
 ): Promise<StepUpResult> {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
+  const { loginId } = session;
+  const login = await prisma.userLogin.findUnique({
+    where: { id: loginId },
     select: {
       password: true,
       twoFactorAuth: {
@@ -56,11 +61,11 @@ export async function verifyStepUp(
       },
     },
   });
-  if (!user) {
+  if (!login) {
     return { ok: false, status: 404, error: "User not found" };
   }
 
-  const twoFactorAuth = user.twoFactorAuth;
+  const twoFactorAuth = login.twoFactorAuth;
 
   if (twoFactorAuth?.enabled) {
     const { twoFactorToken } = credentials;
@@ -73,24 +78,28 @@ export async function verifyStepUp(
       };
     }
 
-    const limited = await limitAttempt(userId);
+    const limited = await limitAttempt(loginId);
     if (limited) return limited;
 
     // Authenticator code first (cheap); backup codes cost a bcrypt compare each.
     if (verifyTotpCode(twoFactorAuth.secret, twoFactorToken)) {
       await prisma.twoFactorAuth.update({
-        where: { userId },
+        where: { loginId },
         data: { lastUsedAt: new Date() },
       });
-      await clearUserFactorAttempts(STEP_UP_SCOPE, userId);
+      await clearUserFactorAttempts(STEP_UP_SCOPE, loginId);
       return { ok: true, method: "2FA" };
     }
 
     // consumeBackupCode stamps lastUsedAt itself when it removes the code.
     if (
-      await consumeBackupCode(userId, twoFactorAuth.backupCodes, twoFactorToken)
+      await consumeBackupCode(
+        loginId,
+        twoFactorAuth.backupCodes,
+        twoFactorToken,
+      )
     ) {
-      await clearUserFactorAttempts(STEP_UP_SCOPE, userId);
+      await clearUserFactorAttempts(STEP_UP_SCOPE, loginId);
       return { ok: true, method: "2FA" };
     }
 
@@ -107,18 +116,18 @@ export async function verifyStepUp(
     };
   }
 
-  const limited = await limitAttempt(userId);
+  const limited = await limitAttempt(loginId);
   if (limited) return limited;
 
-  if (!(await compare(currentPassword, user.password))) {
+  if (!(await compare(currentPassword, login.password))) {
     return { ok: false, status: 400, error: "Current password is incorrect" };
   }
-  await clearUserFactorAttempts(STEP_UP_SCOPE, userId);
+  await clearUserFactorAttempts(STEP_UP_SCOPE, loginId);
   return { ok: true, method: "PASSWORD" };
 }
 
-async function limitAttempt(userId: string): Promise<StepUpResult | null> {
-  const attempt = await recordUserFactorAttempt(STEP_UP_SCOPE, userId);
+async function limitAttempt(loginId: string): Promise<StepUpResult | null> {
+  const attempt = await recordUserFactorAttempt(STEP_UP_SCOPE, loginId);
   if (attempt.allowed) return null;
   return { ok: false, status: attempt.status, error: attempt.error };
 }

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { canonicalEmail } from "@/lib/auth/emailIdentity";
+import { findLoginByEmail, recordLogin } from "@/lib/auth/loginIdentity";
 import { verifyWebAuthnAuthentication } from "@/lib/webauthn/server";
 import { WebAuthnAssertionResponse } from "@/types/webauthn";
 import { Prisma } from "@prisma/client";
@@ -87,7 +87,8 @@ export async function POST(request: NextRequest) {
     const challengeToken = request.cookies.get(
       "webauthn_auth_challenge",
     )?.value;
-    let bound: { userId: string; challenge: string } | null = null;
+    let bound: { userId: string; loginId: string; challenge: string } | null =
+      null;
     if (challengeToken) {
       try {
         bound = await verifyAuthenticationChallenge(challengeToken);
@@ -102,27 +103,16 @@ export async function POST(request: NextRequest) {
       return authenticationFailed();
     }
 
-    // Same account rule as password login: a deleted account can't sign in,
+    // Same login rule as password login: a deleted account can't sign in,
     // even with a passkey it registered before it was deleted (N-3).
-    const user = await prisma.user.findFirst({
-      where: { email: canonicalEmail(email), isDeleted: false },
-      select: {
-        id: true,
-        email: true,
-        role: true,
-        webauthnCredentials: {
-          select: { id: true, credentialId: true },
-        },
-      },
-    });
+    const login = await findLoginByEmail(email);
+    const passkeyCount = login
+      ? await prisma.webAuthnCredential.count({ where: { loginId: login.id } })
+      : 0;
 
-    // The challenge must have been issued for this same account. A decoy
+    // The challenge must have been issued for this same login. A decoy
     // challenge (email without an account or passkeys) never matches.
-    if (
-      !user ||
-      user.webauthnCredentials.length === 0 ||
-      bound.userId !== user.id
-    ) {
+    if (!login || passkeyCount === 0 || bound.loginId !== login.id) {
       console.warn(
         "WebAuthn authenticate verify: No matching account/passkey",
         {
@@ -132,16 +122,18 @@ export async function POST(request: NextRequest) {
       return authenticationFailed();
     }
     const expectedChallenge = bound.challenge;
+    const user = login.user;
 
     // Verify the assertion
     let verified;
     try {
       console.log("WebAuthn authenticate verify: Starting verification", {
         userId: user.id,
+        loginId: login.id,
         credentialId: response.id,
       });
       verified = await verifyWebAuthnAuthentication(
-        user.id,
+        login.id,
         response as AuthenticationResponseJSON,
         expectedChallenge,
         getWebAuthnConfig(request),
@@ -218,14 +210,10 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Log activity
-    await prisma.userActivity.create({
-      data: {
-        userId: user.id,
-        type: "LOGIN_WEBAUTHN",
-        ipAddress: request.headers.get("x-forwarded-for") || "unknown",
-        userAgent: request.headers.get("user-agent") || "unknown",
-      },
+    // Log activity and create session
+    const sessionId = await recordLogin(login.id, user.id, "LOGIN_WEBAUTHN", {
+      ipAddress: request.headers.get("x-forwarded-for") || "unknown",
+      userAgent: request.headers.get("user-agent") || "unknown",
     });
 
     // NOTE: Passkey (WebAuthn) logins are considered a strong authentication
@@ -235,19 +223,9 @@ export async function POST(request: NextRequest) {
     // Generate tokens
     // A verified passkey is itself a second factor (see NOTE above).
     const { accessToken, refreshToken } = await generateTokens(
-      user.id,
-      user.role,
+      { userId: user.id, loginId: login.id, role: user.role },
       { mfa: true },
     );
-
-    // Create session
-    const userSession = await prisma.userSession.create({
-      data: {
-        userId: user.id,
-        ipAddress: request.headers.get("x-forwarded-for") || "unknown",
-        userAgent: request.headers.get("user-agent") || "unknown",
-      },
-    });
 
     // N-9: same cookies and redirect as every other login route. This used
     // to set "refreshToken" (the app reads "refresh_token"), so passkey
@@ -259,10 +237,11 @@ export async function POST(request: NextRequest) {
         user: {
           id: user.id,
           email: user.email,
+          loginEmail: login.email,
           role: user.role,
         },
         redirectUrl: redirectPathForRole(user.role),
-        sessionId: userSession.id,
+        sessionId,
       },
       { status: 200 },
     );

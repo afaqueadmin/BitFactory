@@ -76,10 +76,7 @@ export async function GET(request: NextRequest) {
       ...(statusParam && STATUSES.has(statusParam)
         ? {
             status: statusParam as
-              | "PENDING"
-              | "CONFIRMED"
-              | "APPROVED"
-              | "REJECTED",
+              "PENDING" | "CONFIRMED" | "APPROVED" | "REJECTED",
           }
         : {}),
     };
@@ -223,7 +220,7 @@ export async function POST(request: NextRequest) {
     // from what the client claims - so a caller can't dodge 2FA just by
     // sending currentPassword instead of twoFactorToken.
     const stepUp = await verifyStepUp(
-      auth.decoded.userId,
+      auth.decoded,
       { currentPassword, twoFactorToken },
       "request a wallet change",
     );

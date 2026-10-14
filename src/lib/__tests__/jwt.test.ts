@@ -31,8 +31,19 @@ import { getUserInfoFromToken } from "@/lib/helpers/getUserInfoFromToken";
 const TEST_SECRET = "test-secret-".padEnd(64, "x");
 const OLD_FALLBACK_SECRET = "your-secret-key";
 
+/** A token subject: account `userId`, its login `<userId>-login`. */
+function subject(userId: string, role: string) {
+  return { userId, loginId: `${userId}-login`, role };
+}
+
+const NO_USER = { userId: null, loginId: null };
+
 async function forgeTokenWith(secret: string) {
-  return new SignJWT({ userId: "attacker", role: "SUPER_ADMIN" })
+  return new SignJWT({
+    userId: "attacker",
+    loginId: "attacker-login",
+    role: "SUPER_ADMIN",
+  })
     .setProtectedHeader({ alg: "HS256" })
     .setExpirationTime("1h")
     .sign(new TextEncoder().encode(secret));
@@ -57,16 +68,30 @@ describe("JWT secret handling", () => {
 
     it("round-trips access and refresh tokens", async () => {
       const { accessToken, refreshToken } = await generateTokens(
-        "user-1",
-        "CLIENT",
+        subject("user-1", "CLIENT"),
       );
 
       const access = await verifyJwtToken(accessToken);
       expect(access.userId).toBe("user-1");
+      expect(access.loginId).toBe("user-1-login");
       expect(access.role).toBe("CLIENT");
 
       const refresh = await verifyJwtToken(refreshToken);
       expect(refresh.type).toBe("refresh");
+      expect(refresh.loginId).toBe("user-1-login");
+    });
+
+    it("rejects a token without a loginId (issued before multi-login)", async () => {
+      const legacy = await new SignJWT({ userId: "user-1", role: "CLIENT" })
+        .setProtectedHeader({ alg: "HS256" })
+        .setIssuedAt()
+        .setExpirationTime("1h")
+        .sign(new TextEncoder().encode(TEST_SECRET));
+
+      await expect(verifyJwtToken(legacy)).rejects.toThrow(
+        "Invalid or expired token",
+      );
+      expect(await getUserInfoFromToken(legacy)).toEqual(NO_USER);
     });
 
     it("rejects a token forged with the old hardcoded fallback secret", async () => {
@@ -75,25 +100,26 @@ describe("JWT secret handling", () => {
       await expect(verifyJwtToken(forged)).rejects.toThrow(
         "Invalid or expired token",
       );
-      expect(await getUserInfoFromToken(forged)).toEqual({ userId: null });
+      expect(await getUserInfoFromToken(forged)).toEqual(NO_USER);
     });
 
-    it("getUserInfoFromToken returns the userId for a valid token", async () => {
-      const { accessToken } = await generateTokens("user-2", "FRANCHISEE");
+    it("getUserInfoFromToken returns the userId and loginId for a valid token", async () => {
+      const { accessToken } = await generateTokens(
+        subject("user-2", "FRANCHISEE"),
+      );
 
       expect(await getUserInfoFromToken(accessToken)).toEqual({
         userId: "user-2",
+        loginId: "user-2-login",
       });
     });
 
-    it("getUserInfoFromToken returns a null userId for garbage input", async () => {
-      expect(await getUserInfoFromToken("not-a-jwt")).toEqual({
-        userId: null,
-      });
+    it("getUserInfoFromToken returns nulls for garbage input", async () => {
+      expect(await getUserInfoFromToken("not-a-jwt")).toEqual(NO_USER);
     });
 
     it("rejects a signature-valid token that has been blacklisted (logged out)", async () => {
-      const { accessToken } = await generateTokens("user-3", "CLIENT");
+      const { accessToken } = await generateTokens(subject("user-3", "CLIENT"));
       isTokenBlacklisted.mockResolvedValue(true);
 
       await expect(verifyJwtToken(accessToken)).rejects.toThrow(
@@ -103,10 +129,12 @@ describe("JWT secret handling", () => {
     });
 
     it("carries the mfa claim on both tokens only when asked", async () => {
-      const plain = await generateTokens("user-5", "ADMIN");
+      const plain = await generateTokens(subject("user-5", "ADMIN"));
       expect((await verifyJwtToken(plain.accessToken)).mfa).toBeUndefined();
 
-      const withMfa = await generateTokens("user-5", "ADMIN", { mfa: true });
+      const withMfa = await generateTokens(subject("user-5", "ADMIN"), {
+        mfa: true,
+      });
       expect((await verifyJwtToken(withMfa.accessToken)).mfa).toBe(true);
       const refresh = await verifyJwtToken(withMfa.refreshToken);
       expect(refresh.mfa).toBe(true);
@@ -114,31 +142,37 @@ describe("JWT secret handling", () => {
     });
 
     it("never accepts a 2FA-enrollment token as a session", async () => {
-      const enroll = await signEnrollmentToken("user-6", "ADMIN");
+      const enroll = await signEnrollmentToken(subject("user-6", "ADMIN"));
 
       await expect(verifyJwtToken(enroll)).rejects.toThrow(
         "Invalid or expired token",
       );
-      expect(await getUserInfoFromToken(enroll)).toEqual({ userId: null });
-      expect((await verifyEnrollmentToken(enroll)).userId).toBe("user-6");
+      expect(await getUserInfoFromToken(enroll)).toEqual(NO_USER);
+      const verified = await verifyEnrollmentToken(enroll);
+      expect(verified.userId).toBe("user-6");
+      expect(verified.loginId).toBe("user-6-login");
     });
 
     it("never accepts a pending-2FA token as a session", async () => {
-      const pending = await signPendingTwoFactorToken("user-8", "CLIENT");
+      const pending = await signPendingTwoFactorToken(
+        subject("user-8", "CLIENT"),
+      );
 
       await expect(verifyJwtToken(pending)).rejects.toThrow(
         "Invalid or expired token",
       );
-      expect(await getUserInfoFromToken(pending)).toEqual({ userId: null });
-      expect((await verifyPendingTwoFactorToken(pending)).userId).toBe(
-        "user-8",
-      );
+      expect(await getUserInfoFromToken(pending)).toEqual(NO_USER);
+      const verified = await verifyPendingTwoFactorToken(pending);
+      expect(verified.userId).toBe("user-8");
+      expect(verified.loginId).toBe("user-8-login");
     });
 
     it("keeps the two login-step tokens distinct", async () => {
-      const pending = await signPendingTwoFactorToken("user-9", "CLIENT");
-      const enroll = await signEnrollmentToken("user-9", "CLIENT");
-      const { accessToken } = await generateTokens("user-9", "CLIENT");
+      const pending = await signPendingTwoFactorToken(
+        subject("user-9", "CLIENT"),
+      );
+      const enroll = await signEnrollmentToken(subject("user-9", "CLIENT"));
+      const { accessToken } = await generateTokens(subject("user-9", "CLIENT"));
 
       await expect(verifyEnrollmentToken(pending)).rejects.toThrow(
         "Invalid or expired enrollment token",
@@ -151,31 +185,37 @@ describe("JWT secret handling", () => {
       );
     });
 
-    it("binds a passkey-registration challenge to its user and never treats it as a session", async () => {
+    it("binds a passkey-registration challenge to its login and never treats it as a session", async () => {
       const token = await signRegistrationChallenge(
-        "user-10",
-        "CLIENT",
+        subject("user-10", "CLIENT"),
         "chal-abc",
       );
 
       expect(await verifyRegistrationChallenge(token)).toEqual({
         userId: "user-10",
+        loginId: "user-10-login",
         challenge: "chal-abc",
       });
       await expect(verifyJwtToken(token)).rejects.toThrow(
         "Invalid or expired token",
       );
-      const { accessToken } = await generateTokens("user-10", "CLIENT");
+      const { accessToken } = await generateTokens(
+        subject("user-10", "CLIENT"),
+      );
       await expect(verifyRegistrationChallenge(accessToken)).rejects.toThrow(
         "Invalid or expired passkey registration token",
       );
     });
 
-    it("binds a passkey sign-in challenge to its user, apart from registration and sessions (N-5)", async () => {
-      const token = await signAuthenticationChallenge("user-11", "chal-xyz");
+    it("binds a passkey sign-in challenge to its login, apart from registration and sessions (N-5)", async () => {
+      const token = await signAuthenticationChallenge(
+        { userId: "user-11", loginId: "user-11-login" },
+        "chal-xyz",
+      );
 
       expect(await verifyAuthenticationChallenge(token)).toMatchObject({
         userId: "user-11",
+        loginId: "user-11-login",
         challenge: "chal-xyz",
       });
       await expect(verifyJwtToken(token)).rejects.toThrow(
@@ -184,14 +224,20 @@ describe("JWT secret handling", () => {
       await expect(verifyRegistrationChallenge(token)).rejects.toThrow(
         "Invalid or expired passkey registration token",
       );
-      const reg = await signRegistrationChallenge("user-11", "CLIENT", "c");
+      const reg = await signRegistrationChallenge(
+        subject("user-11", "CLIENT"),
+        "c",
+      );
       await expect(verifyAuthenticationChallenge(reg)).rejects.toThrow(
         "Invalid or expired passkey sign-in token",
       );
     });
 
     it("rejects a passkey sign-in challenge that was already used (N-5)", async () => {
-      const token = await signAuthenticationChallenge("user-12", "c");
+      const token = await signAuthenticationChallenge(
+        { userId: "user-12", loginId: "user-12-login" },
+        "c",
+      );
       isTokenBlacklisted.mockResolvedValue(true);
 
       await expect(verifyAuthenticationChallenge(token)).rejects.toThrow(
@@ -201,8 +247,7 @@ describe("JWT secret handling", () => {
 
     it("never accepts a session token as an enrollment token", async () => {
       const { accessToken, refreshToken } = await generateTokens(
-        "user-7",
-        "CLIENT",
+        subject("user-7", "CLIENT"),
       );
 
       await expect(verifyEnrollmentToken(accessToken)).rejects.toThrow(
@@ -215,7 +260,7 @@ describe("JWT secret handling", () => {
 
     it("skips the blacklist check on the Edge runtime (middleware) instead of failing to bundle it", async () => {
       vi.stubEnv("NEXT_RUNTIME", "edge");
-      const { accessToken } = await generateTokens("user-4", "CLIENT");
+      const { accessToken } = await generateTokens(subject("user-4", "CLIENT"));
       // If this ran, the token would be rejected - proving the skip, not
       // just that the check happened to return false.
       isTokenBlacklisted.mockResolvedValue(true);
@@ -226,10 +271,9 @@ describe("JWT secret handling", () => {
       expect(isTokenBlacklisted).not.toHaveBeenCalled();
     });
 
-    it("rejects a session issued before the account was signed out everywhere (N-2)", async () => {
+    it("rejects a session issued before the account or login was signed out everywhere (N-2)", async () => {
       const { accessToken, refreshToken } = await generateTokens(
-        "user-6",
-        "CLIENT",
+        subject("user-6", "CLIENT"),
       );
       isTokenRevokedForUser.mockResolvedValue(true);
 
@@ -241,13 +285,16 @@ describe("JWT secret handling", () => {
       );
       expect(isTokenRevokedForUser).toHaveBeenCalledWith(
         "user-6",
+        "user-6-login",
         expect.any(Number),
       );
     });
 
     it("also rejects a half-finished login once the account is signed out everywhere", async () => {
-      const pending = await signPendingTwoFactorToken("user-7", "CLIENT");
-      const enroll = await signEnrollmentToken("user-7", "CLIENT");
+      const pending = await signPendingTwoFactorToken(
+        subject("user-7", "CLIENT"),
+      );
+      const enroll = await signEnrollmentToken(subject("user-7", "CLIENT"));
       isTokenRevokedForUser.mockResolvedValue(true);
 
       await expect(verifyPendingTwoFactorToken(pending)).rejects.toThrow(
@@ -266,7 +313,7 @@ describe("JWT secret handling", () => {
 
     it("refuses to sign tokens", async () => {
       await expect(
-        signJwtToken({ userId: "user-1", role: "CLIENT" }),
+        signJwtToken({ userId: "user-1", loginId: "l-1", role: "CLIENT" }),
       ).rejects.toThrow("JWT_SECRET environment variable is not set");
     });
 
@@ -276,7 +323,7 @@ describe("JWT secret handling", () => {
       await expect(verifyJwtToken(forged)).rejects.toThrow(
         "Invalid or expired token",
       );
-      expect(await getUserInfoFromToken(forged)).toEqual({ userId: null });
+      expect(await getUserInfoFromToken(forged)).toEqual(NO_USER);
     });
   });
 });

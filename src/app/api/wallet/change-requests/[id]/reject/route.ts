@@ -91,7 +91,7 @@ export async function POST(
     }
 
     const stepUp = await verifyStepUp(
-      auth.decoded.userId,
+      auth.decoded,
       { currentPassword, twoFactorToken },
       "reject a wallet change request",
     );

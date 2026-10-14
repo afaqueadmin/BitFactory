@@ -40,6 +40,9 @@ interface UserData {
   id?: string;
   twoFactorEnabled: boolean;
   twoFactorMandatory?: boolean;
+  /** The email this session signed in with - each sign-in email on an
+   *  account has its own password, 2FA and passkeys. */
+  loginEmail?: string;
 }
 
 interface Activity {
@@ -118,6 +121,7 @@ export default function SecuritySettingsPage() {
         id: data.user.id,
         twoFactorEnabled: data.user.twoFactorEnabled,
         twoFactorMandatory: data.user.twoFactorMandatory === true,
+        loginEmail: data.user.loginEmail,
       });
       setActivities(data.recentActivities || []);
     } catch (err) {
@@ -327,6 +331,22 @@ export default function SecuritySettingsPage() {
         >
           Manage your password, two-factor authentication and passkeys.
         </Typography>
+        {userData.loginEmail && (
+          <Typography
+            sx={{
+              fontSize: { xs: 12, md: 13 },
+              lineHeight: { xs: 1.7, md: 1.5 },
+              color: d.muted,
+              mt: "4px",
+            }}
+          >
+            These settings are for{" "}
+            <Box component="strong" sx={{ color: d.text }}>
+              {userData.loginEmail}
+            </Box>
+            , the email you signed in with.
+          </Typography>
+        )}
       </Box>
 
       {error && <Box sx={alertSx("error")}>{error}</Box>}

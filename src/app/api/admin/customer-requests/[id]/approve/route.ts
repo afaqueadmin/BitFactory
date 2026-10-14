@@ -204,6 +204,10 @@ export async function POST(
           segment: "RETAIL",
           franchiseeId: customerRequest.franchiseId,
           invoicedAmount: defaultInvoicedAmount,
+          // Sign-in goes through the login, not users.email/password.
+          logins: {
+            create: { email, password: hashedPassword, isPrimary: true },
+          },
         },
       });
 

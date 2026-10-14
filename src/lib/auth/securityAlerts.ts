@@ -15,7 +15,9 @@ type SecurityEvent =
   | { type: "2FA_DISABLED" }
   | { type: "2FA_LOCKED" }
   | { type: "PASSKEY_ADDED"; name: string }
-  | { type: "PASSKEY_REMOVED"; name: string };
+  | { type: "PASSKEY_REMOVED"; name: string }
+  | { type: "LOGIN_ADDED"; email: string }
+  | { type: "LOGIN_REMOVED"; email: string };
 
 function describe(event: SecurityEvent) {
   switch (event.type) {
@@ -52,23 +54,39 @@ function describe(event: SecurityEvent) {
         heading: "A passkey was removed",
         message: `The passkey "${event.name}" was removed from your BitFactory account.`,
       };
+    case "LOGIN_ADDED":
+      return {
+        subject: "New Sign-In Email Added To Your Account",
+        heading: "A second sign-in email was added",
+        message: `${event.email} was added to your BitFactory account by our team as a separate sign-in, with its own password and two-factor authentication. It has full access to the account. If you didn't ask for this, contact support right away.`,
+      };
+    case "LOGIN_REMOVED":
+      return {
+        subject: "Sign-In Email Removed From Your Account",
+        heading: "A sign-in email was removed",
+        message: `${event.email} can no longer sign in to your BitFactory account.`,
+      };
   }
 }
 
-/** Same as notifySecurityChange, looking up the account's email first. */
-export async function notifySecurityChangeForUser(
-  userId: string,
+/**
+ * Same as notifySecurityChange, looking up the login's email first - the
+ * alert goes to the person whose credentials changed, not to every email on
+ * the account.
+ */
+export async function notifySecurityChangeForLogin(
+  loginId: string,
   event: SecurityEvent,
   headers: Headers,
 ): Promise<void> {
   const meta = requestMeta(headers);
   after(async () => {
     try {
-      const user = await prisma.user.findUnique({
-        where: { id: userId },
+      const login = await prisma.userLogin.findUnique({
+        where: { id: loginId },
         select: { email: true },
       });
-      if (user) await sendAlert(user.email, event, meta);
+      if (login) await sendAlert(login.email, event, meta);
     } catch (error) {
       console.error(`[securityAlerts] ${event.type} lookup failed:`, error);
     }

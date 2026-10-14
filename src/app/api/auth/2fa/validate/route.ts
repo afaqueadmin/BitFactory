@@ -13,8 +13,8 @@ import {
   getClientIp,
   recordTwoFactorLoginAttempt,
 } from "@/lib/rateLimit";
-import { notifySecurityChangeForUser } from "@/lib/auth/securityAlerts";
-import { canonicalEmail } from "@/lib/auth/emailIdentity";
+import { notifySecurityChangeForLogin } from "@/lib/auth/securityAlerts";
+import { findLoginByEmail, recordLogin } from "@/lib/auth/loginIdentity";
 import { consumeBackupCode } from "@/lib/auth/backupCodes";
 import { verifyTotpCode } from "@/lib/auth/totpSecret";
 import { isTokenBlacklisted } from "@/lib/auth/tokenBlacklist";
@@ -42,55 +42,48 @@ export async function POST(req: NextRequest) {
     // C-3: a 2FA/backup code only counts as the *second* factor. Require the
     // pending token /api/login set after a correct password, for this user.
     const pendingToken = req.cookies.get(PENDING_2FA_COOKIE)?.value;
-    let pendingUserId: string | null = null;
+    let pendingLoginId: string | null = null;
     if (pendingToken && !(await isTokenBlacklisted(pendingToken))) {
       try {
-        pendingUserId = (await verifyPendingTwoFactorToken(pendingToken))
-          .userId;
+        pendingLoginId = (await verifyPendingTwoFactorToken(pendingToken))
+          .loginId;
       } catch {
-        pendingUserId = null;
+        pendingLoginId = null;
       }
     }
-    if (!pendingUserId) {
+    if (!pendingLoginId) {
       return NextResponse.json(
         { error: "Your sign-in has expired. Please log in again." },
         { status: 401 },
       );
     }
 
-    // isDeleted: the account may have been deleted after the password step.
-    const user = await prisma.user.findFirst({
-      where: { email: canonicalEmail(email), isDeleted: false },
-      select: {
-        id: true,
-        role: true,
-        twoFactorAuth: {
-          select: { secret: true, enabled: true, backupCodes: true },
-        },
-      },
-    });
+    // Excludes deleted accounts: the account may have been deleted after the
+    // password step.
+    const login = await findLoginByEmail(email);
 
-    // The password was verified for a different account than this email.
-    if (!user || user.id !== pendingUserId) {
+    // The password was verified for a different login than this email - on
+    // another account, or the other login of this same account.
+    if (!login || login.id !== pendingLoginId) {
       return NextResponse.json(
         { error: "Your sign-in has expired. Please log in again." },
         { status: 401 },
       );
     }
 
-    if (!user.twoFactorAuth?.enabled) {
+    if (!login.twoFactorAuth?.enabled) {
       return NextResponse.json(
         { error: "2FA is not enabled for this user" },
         { status: 400 },
       );
     }
 
-    const twoFactorAuth = user.twoFactorAuth;
+    const user = login.user;
+    const twoFactorAuth = login.twoFactorAuth;
 
     // Generate tokens with role
     const { accessToken, refreshToken } = await generateTokens(
-      user.id,
-      user.role,
+      { userId: user.id, loginId: login.id, role: user.role },
       { mfa: true },
     );
 
@@ -118,11 +111,11 @@ export async function POST(req: NextRequest) {
     }
 
     // N-13: 30 wrong codes in 24 hours locks this step for the account.
-    const daily = await recordTwoFactorLoginAttempt(user.id);
+    const daily = await recordTwoFactorLoginAttempt(login.id);
     if (!daily.allowed) {
       if (daily.justLocked) {
-        await notifySecurityChangeForUser(
-          user.id,
+        await notifySecurityChangeForLogin(
+          login.id,
           { type: "2FA_LOCKED" },
           req.headers,
         );
@@ -147,7 +140,7 @@ export async function POST(req: NextRequest) {
     const totpVerified = verifyTotpCode(twoFactorAuth.secret, token);
     const usedBackupCode =
       !totpVerified &&
-      (await consumeBackupCode(user.id, twoFactorAuth.backupCodes, token));
+      (await consumeBackupCode(login.id, twoFactorAuth.backupCodes, token));
 
     if (!totpVerified && !usedBackupCode) {
       return NextResponse.json({ error: "Invalid token" }, { status: 400 });
@@ -180,24 +173,23 @@ export async function POST(req: NextRequest) {
     // consumeBackupCode already stamped lastUsedAt when it removed the code.
     if (totpVerified) {
       await prisma.twoFactorAuth.update({
-        where: { userId: user.id },
+        where: { loginId: login.id },
         data: { lastUsedAt: new Date() },
       });
     }
 
-    await prisma.userActivity.create({
-      data: {
-        userId: user.id,
-        type: usedBackupCode
-          ? "2FA_BACKUP_CODE_USED"
-          : "2FA_VERIFICATION_SUCCESS",
+    await recordLogin(
+      login.id,
+      user.id,
+      usedBackupCode ? "2FA_BACKUP_CODE_USED" : "2FA_VERIFICATION_SUCCESS",
+      {
         ipAddress: req.headers.get("x-forwarded-for") || "unknown",
         userAgent: req.headers.get("user-agent") || "unknown",
       },
-    });
+    );
 
     await clearAuthRateLimitForEmail("2fa_validate", email);
-    await clearTwoFactorLoginAttempts(user.id);
+    await clearTwoFactorLoginAttempts(login.id);
 
     // Verified, now set cookies
     response.cookies.set("token", accessToken, {

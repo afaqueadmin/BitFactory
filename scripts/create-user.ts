@@ -30,6 +30,13 @@ async function createUser() {
         name: userName,
         password: hashedPassword,
         invoicedAmount: 4250,
+        logins: {
+          create: {
+            email: userEmail,
+            password: hashedPassword,
+            isPrimary: true,
+          },
+        },
       },
     });
 

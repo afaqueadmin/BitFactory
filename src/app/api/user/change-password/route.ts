@@ -28,9 +28,11 @@ export async function POST(request: NextRequest) {
     }
 
     let userId: string;
+    let loginId: string;
     try {
       const decoded = await verifyJwtToken(token);
       userId = decoded.userId;
+      loginId = decoded.loginId;
       console.log("ChangePassword API [GET]: Token verified, userId:", userId);
     } catch (error) {
       console.error(
@@ -65,9 +67,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get user from database
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
+    // The signed-in login - its own password, not the account's other login's.
+    const user = await prisma.userLogin.findUnique({
+      where: { id: loginId },
       select: { email: true, password: true },
     });
 
@@ -77,7 +79,7 @@ export async function POST(request: NextRequest) {
 
     // N-1: shares the step-up budget, since the current-password check here
     // is the same guess a stolen session would make there.
-    const attempt = await recordUserFactorAttempt(STEP_UP_SCOPE, userId);
+    const attempt = await recordUserFactorAttempt(STEP_UP_SCOPE, loginId);
     if (!attempt.allowed) {
       return NextResponse.json(
         { error: attempt.error },
@@ -93,7 +95,7 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       );
     }
-    await clearUserFactorAttempts(STEP_UP_SCOPE, userId);
+    await clearUserFactorAttempts(STEP_UP_SCOPE, loginId);
 
     // Hash new password
     const hashedPassword = await hash(newPassword, 12);
@@ -122,8 +124,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Update password in database
-    await prisma.user.update({
-      where: { id: userId },
+    await prisma.userLogin.update({
+      where: { id: loginId },
       data: { password: hashedPassword },
     });
 
@@ -131,6 +133,7 @@ export async function POST(request: NextRequest) {
     await prisma.userActivity.create({
       data: {
         userId: userId,
+        loginId,
         type: "PASSWORD_CHANGE",
         ipAddress,
         userAgent,
@@ -142,7 +145,7 @@ export async function POST(request: NextRequest) {
       { message: "Password changed successfully" },
       { status: 200 },
     );
-    await signOutOtherDevices(request, response, userId);
+    await signOutOtherDevices(request, response, loginId);
     return response;
   } catch (error) {
     console.error("Password change error:", error);

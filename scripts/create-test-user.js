@@ -45,6 +45,13 @@ async function createTestUsers() {
           password: hashedPassword,
           role: userData.role,
           invoicedAmount: 4250,
+          logins: {
+            create: {
+              email: userData.email,
+              password: hashedPassword,
+              isPrimary: true,
+            },
+          },
         },
       });
 

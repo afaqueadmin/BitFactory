@@ -84,7 +84,7 @@ async function main() {
   if (ONLY_USER) console.log(`limited to user ${ONLY_USER}`);
   const rows = await prisma.twoFactorAuth.findMany({
     where,
-    select: { userId: true, secret: true, pendingSecret: true },
+    select: { id: true, userId: true, secret: true, pendingSecret: true },
   });
 
   // The key must open every secret that's already encrypted - otherwise it's
@@ -128,7 +128,7 @@ async function main() {
       }
       const { count } = await prisma.twoFactorAuth.updateMany({
         where: {
-          userId: r.userId,
+          id: r.id,
           secret: r.secret,
           pendingSecret: r.pendingSecret,
         },

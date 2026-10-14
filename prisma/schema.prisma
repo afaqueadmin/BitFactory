@@ -12,8 +12,11 @@ model User {
   /// Stored canonical (trimmed, lowercased) - see src/lib/auth/emailIdentity.ts.
   /// Also unique on lower(email) via "users_email_lower_key", an expression
   /// index Prisma can't model (migration 20260929120000_users_email_lower_unique).
+  /// Always the primary UserLogin's email - kept here for display, invoices
+  /// and PDFs. Sign-in goes through UserLogin, never this column.
   email                                   String                          @unique
   name                                    String?
+  /// Legacy: passwords live on UserLogin now. Left in place, not read.
   password                                String
   createdAt                               DateTime                        @default(now())
   updatedAt                               DateTime                        @updatedAt
@@ -80,7 +83,9 @@ model User {
   poolAuths                               PoolAuth[]
   poolSubaccounts                         PoolSubaccount[]
   webauthnCredentials                     WebAuthnCredential[]
-  twoFactorAuth                           TwoFactorAuth?
+  twoFactorAuths                          TwoFactorAuth[]
+  logins                                  UserLogin[]                     @relation("userLogins")
+  loginsCreated                           UserLogin[]                     @relation("userLoginsCreated")
   invoicedAmount                          Decimal                         @db.Decimal(12, 2)
   createdRepairNotes                      MinerRepairNote[]               @relation("CreatedRepairNotes")
   createdMinerPoolHistory                 MinerPoolHistory[]              @relation("MinerPoolHistoryCreatedBy")
@@ -295,10 +300,45 @@ model AuthAttempt {
   @@map("auth_attempts")
 }
 
+// One way into an account: an email with its own password, 2FA and passkeys.
+// Every account has exactly one primary login (its email mirrors User.email);
+// a CLIENT account may also have one secondary login, added by an admin, so
+// a second person (e.g. an accountant) can sign in separately to the same
+// account. Account data stays on User; only credentials live here.
+// Raw-SQL indexes Prisma can't model (migration 20261014090000_user_logins):
+//   "user_logins_email_lower_key"   unique on lower(email)
+//   "user_logins_one_primary_key"   unique on userId WHERE "isPrimary"
+model UserLogin {
+  id                  String               @id @default(cuid())
+  userId              String
+  user                User                 @relation("userLogins", fields: [userId], references: [id], onDelete: Cascade)
+  /// Canonical (trimmed, lowercased) - see src/lib/auth/emailIdentity.ts.
+  email               String               @unique
+  password            String
+  isPrimary           Boolean              @default(false)
+  /// Tokens of this login issued before this moment are rejected - signs this
+  /// one person out everywhere (User.sessionsValidAfter does the whole account).
+  sessionsValidAfter  DateTime?
+  lastLoginAt         DateTime?
+  createdById         String?
+  createdBy           User?                @relation("userLoginsCreated", fields: [createdById], references: [id])
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  twoFactorAuth       TwoFactorAuth?
+  webauthnCredentials WebAuthnCredential[]
+  activities          UserActivity[]
+  sessions            UserSession[]
+
+  @@index([userId])
+  @@map("user_logins")
+}
+
 model WebAuthnCredential {
-  id     String @id @default(cuid())
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id      String    @id @default(cuid())
+  userId  String
+  user    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  loginId String
+  login   UserLogin @relation(fields: [loginId], references: [id], onDelete: Cascade)
 
   credentialId Bytes @unique
   publicKey    Bytes
@@ -312,17 +352,21 @@ model WebAuthnCredential {
   lastUsedAt     DateTime?
 
   @@index([userId])
+  @@index([loginId])
   @@map("webauthn_credentials")
 }
 
-// One row per user who has ever engaged with 2FA (created lazily on first
+// One row per login that has ever engaged with 2FA (created lazily on first
 // /api/auth/2fa/setup call, or backfilled from the legacy users.twoFactor*
 // columns for pre-existing accounts). Those legacy columns on User are left
-// in place as a fallback and are not written to going forward.
+// in place as a fallback and are not written to going forward. Keyed by
+// login, so each person on an account has their own authenticator.
 model TwoFactorAuth {
   id            String    @id @default(cuid())
-  userId        String    @unique
+  userId        String
   user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  loginId       String    @unique
+  login         UserLogin @relation(fields: [loginId], references: [id], onDelete: Cascade)
   enabled       Boolean   @default(false)
   secret        String?
   /// New secret from a setup in progress. Becomes `secret` only once a code
@@ -334,19 +378,25 @@ model TwoFactorAuth {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
+  @@index([userId])
   @@map("two_factor_auth")
 }
 
 model UserActivity {
-  id        String   @id @default(cuid())
+  id        String     @id @default(cuid())
   userId    String
+  /// Which login (person) did it. Null on rows from before multi-login, or
+  /// when the login has since been removed.
+  loginId   String?
+  login     UserLogin? @relation(fields: [loginId], references: [id], onDelete: SetNull)
   type      String
   ipAddress String
   userAgent String
-  createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime   @default(now())
+  user      User       @relation(fields: [userId], references: [id])
 
   @@index([userId])
+  @@index([loginId])
   @@map("user_activities")
 }
 
@@ -354,6 +404,8 @@ model UserSession {
   id        String     @id @default(cuid())
   userId    String
   user      User       @relation(fields: [userId], references: [id])
+  loginId   String?
+  login     UserLogin? @relation(fields: [loginId], references: [id], onDelete: SetNull)
   loginAt   DateTime   @default(now())
   logoutAt  DateTime?
   duration  Int?
@@ -1487,6 +1539,8 @@ enum AuditAction {
   PAYMENT_FREQUENCY_CHANGE_REJECTED
   USER_PASSWORD_RESET
   USER_SESSIONS_REVOKED
+  USER_LOGIN_ADDED
+  USER_LOGIN_REMOVED
   TWO_FACTOR_ENABLED
   TWO_FACTOR_DISABLED
   VENDOR_INVOICE_CREATED

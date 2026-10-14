@@ -33,9 +33,11 @@ export async function POST(request: NextRequest) {
     }
 
     let userId: string;
+    let loginId: string;
     try {
       const decoded = await verifyJwtToken(token);
       userId = decoded.userId;
+      loginId = decoded.loginId;
     } catch (tokenError) {
       console.error(
         "WebAuthn register verify: Token verification failed",
@@ -67,9 +69,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get user for verification
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
+    // The signed-in login, which the passkey will belong to
+    const user = await prisma.userLogin.findUnique({
+      where: { id: loginId },
       select: { id: true, email: true },
     });
 
@@ -78,14 +80,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    // C-2: the challenge cookie is a signed token naming the user who passed
-    // step-up at /register/options - it must be this session's user.
+    // C-2: the challenge cookie is a signed token naming the login that
+    // passed step-up at /register/options - it must be this session's login.
     const challengeToken = request.cookies.get("webauthn_reg_challenge")?.value;
     let expectedChallenge: string | null = null;
     if (challengeToken) {
       try {
         const bound = await verifyRegistrationChallenge(challengeToken);
-        if (bound.userId === userId) expectedChallenge = bound.challenge;
+        if (bound.loginId === loginId && bound.userId === userId) {
+          expectedChallenge = bound.challenge;
+        }
       } catch {
         expectedChallenge = null;
       }
@@ -155,6 +159,7 @@ export async function POST(request: NextRequest) {
       credential = await prisma.webAuthnCredential.create({
         data: {
           userId,
+          loginId,
           credentialId: Buffer.from(verified.credentialID),
           publicKey: Buffer.from(verified.credentialPublicKey),
           counter: verified.counter,
@@ -172,6 +177,7 @@ export async function POST(request: NextRequest) {
       await prisma.userActivity.create({
         data: {
           userId,
+          loginId,
           type: "WEBAUTHN_REGISTERED",
           ipAddress: request.headers.get("x-forwarded-for") || "unknown",
           userAgent: request.headers.get("user-agent") || "unknown",
@@ -202,7 +208,7 @@ export async function POST(request: NextRequest) {
         path: "/",
       });
       // N-2: other devices are signed out; this one gets fresh tokens.
-      await signOutOtherDevices(request, successResponse, userId);
+      await signOutOtherDevices(request, successResponse, loginId);
       return successResponse;
     } catch (dbError: unknown) {
       const errorMsg =

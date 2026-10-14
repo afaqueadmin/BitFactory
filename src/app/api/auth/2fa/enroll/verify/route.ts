@@ -16,7 +16,8 @@ import {
 } from "@/lib/auth/sessionCookies";
 import { completeTwoFactorSetup } from "@/lib/auth/twoFactorEnrollment";
 import { notifySecurityChange } from "@/lib/auth/securityAlerts";
-import { revokeAllSessions } from "@/lib/auth/sessionRevocation";
+import { revokeLoginSessions } from "@/lib/auth/sessionRevocation";
+import { findLoginById, recordLogin } from "@/lib/auth/loginIdentity";
 
 export const runtime = "nodejs";
 
@@ -35,19 +36,17 @@ export async function POST(request: NextRequest) {
     }
 
     // Role from the database, not the token, in case it changed meanwhile.
-    const user = await prisma.user.findFirst({
-      where: { id: decoded.userId, isDeleted: false },
-      select: { id: true, email: true, name: true, role: true },
-    });
-    if (!user) {
+    const login = await findLoginById(decoded.loginId);
+    if (!login || login.userId !== decoded.userId) {
       return NextResponse.json(
         { error: "Your setup session has expired. Please log in again." },
         { status: 401 },
       );
     }
+    const user = login.user;
 
     const { token } = await request.json();
-    const result = await completeTwoFactorSetup(user.id, token);
+    const result = await completeTwoFactorSetup(login.id, token);
     if (!result.ok) {
       return NextResponse.json(
         { error: result.error },
@@ -61,34 +60,30 @@ export async function POST(request: NextRequest) {
       "unknown";
     const userAgent = request.headers.get("user-agent") || "unknown";
 
-    await prisma.userActivity.createMany({
-      data: [
-        { userId: user.id, type: "2FA_ENABLED", ipAddress, userAgent },
-        { userId: user.id, type: "LOGIN", ipAddress, userAgent },
-      ],
+    await prisma.userActivity.create({
+      data: {
+        userId: user.id,
+        loginId: login.id,
+        type: "2FA_ENABLED",
+        ipAddress,
+        userAgent,
+      },
     });
-    try {
-      await prisma.userSession.create({
-        data: { userId: user.id, ipAddress, userAgent },
-      });
-    } catch (e) {
-      console.error("Failed to create user session:", e);
-    }
+    await recordLogin(login.id, user.id, "LOGIN", { ipAddress, userAgent });
 
     await notifySecurityChange(
-      user.email,
+      login.email,
       { type: "2FA_ENABLED" },
       request.headers,
     );
 
-    // N-2: 2FA changed, so any older session ends; the one issued below is
-    // newer than the cutoff and stays valid.
-    await revokeAllSessions(user.id);
+    // N-2: 2FA changed, so any older session of this login ends; the one
+    // issued below is newer than the cutoff and stays valid.
+    await revokeLoginSessions(login.id);
 
     // The code just entered is the second factor for this login.
     const { accessToken, refreshToken } = await generateTokens(
-      user.id,
-      user.role,
+      { userId: user.id, loginId: login.id, role: user.role },
       { mfa: true },
     );
 

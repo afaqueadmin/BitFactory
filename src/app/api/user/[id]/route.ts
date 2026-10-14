@@ -205,12 +205,9 @@ export async function PUT(
       email: emailUpdate,
       franchiseeId: franchiseeIdUpdate,
       segment: segmentUpdate,
-      // N-2: a new login email signs the account out everywhere.
-      sessionsValidAfter:
-        emailUpdate && emailUpdate !== currentUser?.email
-          ? sessionCutoffNow()
-          : undefined,
     };
+    const primaryEmailChanged =
+      !!emailUpdate && emailUpdate !== currentUser?.email;
 
     // Subaccounts and group are CLIENT-only here (franchisees are managed
     // through /api/franchisees). Everything below is one transaction, so a
@@ -224,6 +221,19 @@ export async function PUT(
           data: updateData,
           select: { id: true, name: true, email: true, role: true },
         });
+
+        // User.email mirrors the primary login's email - sign-in uses the
+        // login, so it moves too. N-2: a new login email signs that login
+        // out everywhere (a secondary login on the account is unaffected).
+        if (primaryEmailChanged) {
+          await tx.userLogin.updateMany({
+            where: { userId: id, isPrimary: true },
+            data: {
+              email: emailUpdate,
+              sessionsValidAfter: sessionCutoffNow(),
+            },
+          });
+        }
 
         const changedFields = Object.fromEntries(
           Object.entries(updateData).filter(([, value]) => value !== undefined),

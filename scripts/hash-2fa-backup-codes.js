@@ -42,7 +42,7 @@ async function main() {
   );
 
   const rows = await prisma.twoFactorAuth.findMany({
-    select: { userId: true, backupCodes: true },
+    select: { id: true, userId: true, backupCodes: true },
   });
   const pending = rows.filter((r) => r.backupCodes.some((c) => !isHashed(c)));
   const plaintextCount = pending.reduce(
@@ -62,7 +62,7 @@ async function main() {
       // Only write if the codes haven't changed since we read them (a code
       // used or regenerated meanwhile) - otherwise skip; a re-run picks it up.
       const { count } = await prisma.twoFactorAuth.updateMany({
-        where: { userId: row.userId, backupCodes: { equals: row.backupCodes } },
+        where: { id: row.id, backupCodes: { equals: row.backupCodes } },
         data: { backupCodes: { set: next } },
       });
       if (count === 1) hashedRows++;

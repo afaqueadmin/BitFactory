@@ -249,6 +249,11 @@ export type UserFactorAttempt =
   | { allowed: false; status: 503; error: string };
 
 /**
+ * Per-person limits below are keyed by login id (UserLogin.id): two people
+ * signing in to the same account each have their own budget, so one can't
+ * lock the other out. The parameter keeps the name `userId` for the "user"
+ * key axis.
+ *
  * Records one password/code submission for `userId` under `scope` and says
  * whether it may be checked. Call it only when a credential was actually
  * sent, and call clearUserFactorAttempts after it verifies, so only failures

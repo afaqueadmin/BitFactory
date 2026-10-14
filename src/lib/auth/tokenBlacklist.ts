@@ -26,23 +26,30 @@ export async function isTokenBlacklisted(token: string): Promise<boolean> {
 }
 
 /**
- * True if the account was signed out everywhere after this token was issued
- * (User.sessionsValidAfter, see sessionRevocation.ts), or no longer exists.
- * `iat` is in whole seconds and the cutoff is stored rounded down to a whole
- * second, so tokens issued right after a revoke, in the same second, pass.
+ * True if the account (User.sessionsValidAfter) or this login on it
+ * (UserLogin.sessionsValidAfter) was signed out everywhere after this token
+ * was issued - see sessionRevocation.ts - or if either no longer exists, or
+ * the login has been moved off this account. `iat` is in whole seconds and
+ * the cutoffs are stored rounded down to a whole second, so tokens issued
+ * right after a revoke, in the same second, pass.
  */
 export async function isTokenRevokedForUser(
   userId: string,
+  loginId: string,
   issuedAt: number | undefined,
 ): Promise<boolean> {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { sessionsValidAfter: true },
+  const login = await prisma.userLogin.findUnique({
+    where: { id: loginId },
+    select: {
+      userId: true,
+      sessionsValidAfter: true,
+      user: { select: { sessionsValidAfter: true } },
+    },
   });
-  if (!user) return true;
-  if (!user.sessionsValidAfter) return false;
-  return (
-    typeof issuedAt !== "number" ||
-    issuedAt * 1000 < user.sessionsValidAfter.getTime()
+  if (!login || login.userId !== userId) return true;
+  return [login.user.sessionsValidAfter, login.sessionsValidAfter].some(
+    (cutoff) =>
+      cutoff !== null &&
+      (typeof issuedAt !== "number" || issuedAt * 1000 < cutoff.getTime()),
   );
 }

@@ -76,7 +76,10 @@ export async function GET(request: NextRequest) {
         country: true,
         phoneNumber: true,
         companyName: true,
-        twoFactorAuth: { select: { enabled: true } },
+        twoFactorAuths: {
+          where: { login: { isPrimary: true } },
+          select: { enabled: true },
+        },
         streetAddress: true,
         createdAt: true,
         isDeleted: true,
@@ -138,7 +141,8 @@ export async function GET(request: NextRequest) {
         pools: Array.from(new Set(user.poolAuths.map((pa) => pa.pool.name)))
           .sort()
           .join(", "),
-        twoFactorEnabled: user.twoFactorAuth?.enabled ?? false,
+        // The primary login's 2FA (a secondary login has its own).
+        twoFactorEnabled: user.twoFactorAuths[0]?.enabled ?? false,
         joinDate: user.createdAt.toISOString().split("T")[0],
         miners: user.miners.length,
         status: user.isDeleted ? "deleted" : "active",

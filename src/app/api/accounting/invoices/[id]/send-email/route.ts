@@ -156,9 +156,13 @@ export async function POST(
       sentTo: invoice.user.email,
       ccEmails: ccEmails,
       ccDescription:
-        rmInfo.email && rmInfo.name
-          ? `CC'd to: ${rmInfo.name} (${rmInfo.email}), invoices@bitfactory.ae`
-          : "CC'd to: invoices@bitfactory.ae",
+        // Everyone actually CC'd: the RM, the customer's secondary sign-in
+        // email(s) and invoices@.
+        `CC'd to: ${ccEmails
+          .map((cc) =>
+            cc === rmInfo.email && rmInfo.name ? `${rmInfo.name} (${cc})` : cc,
+          )
+          .join(", ")}`,
       pdfAttached: true,
       details: {
         invoiceNumber: invoice.invoiceNumber,

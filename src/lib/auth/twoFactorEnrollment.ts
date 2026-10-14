@@ -18,26 +18,29 @@ import {
  * login (/api/auth/2fa/enroll/*, enrollment token). Node runtime only.
  */
 
-/** Creates a new secret for the user and returns it with its QR code. */
-export async function beginTwoFactorSetup(userId: string) {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { email: true },
+/** Creates a new secret for the login and returns it with its QR code. */
+export async function beginTwoFactorSetup(loginId: string) {
+  const login = await prisma.userLogin.findUnique({
+    where: { id: loginId },
+    select: { email: true, userId: true },
   });
+  if (!login) throw new Error("Login not found");
 
   const secret = speakeasy.generateSecret({
-    name: `BitFactory: ${user?.email}`,
+    // The login's own email, so two people on one account can tell their
+    // authenticator entries apart.
+    name: `BitFactory: ${login.email}`,
   });
   const qrCode = await QRCode.toDataURL(secret.otpauth_url!);
 
   // Stored as pending: any existing 2FA keeps working (secret/enabled are
   // untouched) until a code from the new secret is confirmed (C-2). Row may
-  // not exist yet for a user's first-ever setup - upsert covers that too.
+  // not exist yet for a login's first-ever setup - upsert covers that too.
   // Encrypted at rest; only the user sees it in plain, once, right here.
   const pendingSecret = encryptTotpSecret(secret.base32);
   await prisma.twoFactorAuth.upsert({
-    where: { userId },
-    create: { userId, pendingSecret, enabled: false },
+    where: { loginId },
+    create: { userId: login.userId, loginId, pendingSecret, enabled: false },
     update: { pendingSecret },
   });
 
@@ -55,7 +58,7 @@ const CONFIRM_SCOPE = "2fa_confirm";
  * fresh backup codes (plaintext, shown once; stored hashed).
  */
 export async function completeTwoFactorSetup(
-  userId: string,
+  loginId: string,
   code: unknown,
 ): Promise<CompleteSetupResult> {
   if (!code || typeof code !== "string") {
@@ -63,7 +66,7 @@ export async function completeTwoFactorSetup(
   }
 
   const twoFactorAuth = await prisma.twoFactorAuth.findUnique({
-    where: { userId },
+    where: { loginId },
     select: { secret: true, pendingSecret: true, enabled: true },
   });
   // The setup in progress; setups started before pendingSecret existed left
@@ -85,7 +88,7 @@ export async function completeTwoFactorSetup(
   }
 
   // N-1: limited like every other code check made inside a session.
-  const attempt = await recordUserFactorAttempt(CONFIRM_SCOPE, userId);
+  const attempt = await recordUserFactorAttempt(CONFIRM_SCOPE, loginId);
   if (!attempt.allowed) {
     return { ok: false, status: attempt.status, error: attempt.error };
   }
@@ -93,13 +96,13 @@ export async function completeTwoFactorSetup(
   if (!verifyTotpCode(newSecret, code)) {
     return { ok: false, status: 400, error: "Invalid token" };
   }
-  await clearUserFactorAttempts(CONFIRM_SCOPE, userId);
+  await clearUserFactorAttempts(CONFIRM_SCOPE, loginId);
 
   // The new authenticator replaces any previous one, with fresh backup codes.
   // A setup started before encryption existed is encrypted on the way in.
   const backupCodes = generateBackupCodes();
   await prisma.twoFactorAuth.update({
-    where: { userId },
+    where: { loginId },
     data: {
       enabled: true,
       secret: isEncryptedTotpSecret(newSecret)

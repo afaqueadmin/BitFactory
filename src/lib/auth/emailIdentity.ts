@@ -19,20 +19,33 @@ export function canonicalEmail(email: string): string {
 /**
  * True if any account - soft-deleted ones included, since a deleted account
  * keeps its email and the unique index still covers it - already has this
- * email. `excludeUserId` skips the account being edited.
+ * email, as its primary email or as a secondary login. `excludeUserId` skips
+ * the account being edited.
  */
 export async function isEmailTaken(
   email: string,
   excludeUserId?: string,
 ): Promise<boolean> {
-  const existing = await prisma.user.findFirst({
-    where: {
-      email: canonicalEmail(email),
-      ...(excludeUserId ? { NOT: { id: excludeUserId } } : {}),
-    },
-    select: { id: true },
-  });
-  return !!existing;
+  const canonical = canonicalEmail(email);
+  const notThisAccount = excludeUserId ? { NOT: { id: excludeUserId } } : {};
+  const [account, login] = await Promise.all([
+    prisma.user.findFirst({
+      where: { email: canonical, ...notThisAccount },
+      select: { id: true },
+    }),
+    prisma.userLogin.findFirst({
+      where: {
+        email: canonical,
+        // Only that account's primary - moving its primary email onto its
+        // own secondary login's address is still a clash.
+        ...(excludeUserId
+          ? { NOT: { userId: excludeUserId, isPrimary: true } }
+          : {}),
+      },
+      select: { id: true },
+    }),
+  ]);
+  return !!account || !!login;
 }
 
 /**

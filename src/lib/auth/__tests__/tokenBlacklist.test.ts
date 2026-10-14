@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     tokenBlacklist: { findUnique: vi.fn() },
-    user: { findUnique: vi.fn() },
+    userLogin: { findUnique: vi.fn() },
   },
 }));
 
@@ -14,7 +14,7 @@ import {
 } from "@/lib/auth/tokenBlacklist";
 
 const findEntry = vi.mocked(prisma.tokenBlacklist.findUnique);
-const findUser = vi.mocked(prisma.user.findUnique);
+const findLogin = vi.mocked(prisma.userLogin.findUnique);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -43,29 +43,80 @@ describe("isTokenRevokedForUser (N-2)", () => {
   const cutoff = new Date("2026-09-30T10:00:00.000Z");
   const cutoffSeconds = cutoff.getTime() / 1000;
 
-  it("is false when the account was never signed out everywhere", async () => {
-    findUser.mockResolvedValue({ sessionsValidAfter: null } as never);
-    expect(await isTokenRevokedForUser("u1", 1)).toBe(false);
+  /** The login row as isTokenRevokedForUser reads it. */
+  function login({
+    userId = "u1",
+    accountCutoff = null,
+    loginCutoff = null,
+  }: {
+    userId?: string;
+    accountCutoff?: Date | null;
+    loginCutoff?: Date | null;
+  } = {}) {
+    return {
+      userId,
+      sessionsValidAfter: loginCutoff,
+      user: { sessionsValidAfter: accountCutoff },
+    } as never;
+  }
+
+  it("is false when neither the account nor the login was signed out everywhere", async () => {
+    findLogin.mockResolvedValue(login());
+    expect(await isTokenRevokedForUser("u1", "l1", 1)).toBe(false);
+    expect(findLogin).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: "l1" } }),
+    );
   });
 
-  it("is true for a token issued before the cutoff", async () => {
-    findUser.mockResolvedValue({ sessionsValidAfter: cutoff } as never);
-    expect(await isTokenRevokedForUser("u1", cutoffSeconds - 1)).toBe(true);
-  });
+  it.each([
+    ["account", { accountCutoff: cutoff }],
+    ["login", { loginCutoff: cutoff }],
+  ])(
+    "is true for a token issued before the %s cutoff",
+    async (_label, cutoffs) => {
+      findLogin.mockResolvedValue(login(cutoffs));
+      expect(await isTokenRevokedForUser("u1", "l1", cutoffSeconds - 1)).toBe(
+        true,
+      );
+    },
+  );
 
   it("is false for a token issued in the cutoff second or later", async () => {
-    findUser.mockResolvedValue({ sessionsValidAfter: cutoff } as never);
-    expect(await isTokenRevokedForUser("u1", cutoffSeconds)).toBe(false);
-    expect(await isTokenRevokedForUser("u1", cutoffSeconds + 60)).toBe(false);
+    findLogin.mockResolvedValue(
+      login({ accountCutoff: cutoff, loginCutoff: cutoff }),
+    );
+    expect(await isTokenRevokedForUser("u1", "l1", cutoffSeconds)).toBe(false);
+    expect(await isTokenRevokedForUser("u1", "l1", cutoffSeconds + 60)).toBe(
+      false,
+    );
+  });
+
+  it("uses the later of the two cutoffs", async () => {
+    const later = new Date(cutoff.getTime() + 3600_000);
+    findLogin.mockResolvedValue(
+      login({ accountCutoff: cutoff, loginCutoff: later }),
+    );
+    expect(await isTokenRevokedForUser("u1", "l1", cutoffSeconds + 60)).toBe(
+      true,
+    );
   });
 
   it("is true for a token without iat once a cutoff exists", async () => {
-    findUser.mockResolvedValue({ sessionsValidAfter: cutoff } as never);
-    expect(await isTokenRevokedForUser("u1", undefined)).toBe(true);
+    findLogin.mockResolvedValue(login({ loginCutoff: cutoff }));
+    expect(await isTokenRevokedForUser("u1", "l1", undefined)).toBe(true);
   });
 
-  it("is true when the user no longer exists", async () => {
-    findUser.mockResolvedValue(null);
-    expect(await isTokenRevokedForUser("gone", cutoffSeconds + 60)).toBe(true);
+  it("is true when the login no longer exists (removed, or account gone)", async () => {
+    findLogin.mockResolvedValue(null);
+    expect(await isTokenRevokedForUser("u1", "gone", cutoffSeconds + 60)).toBe(
+      true,
+    );
+  });
+
+  it("is true when the login belongs to a different account than the token says", async () => {
+    findLogin.mockResolvedValue(login({ userId: "u2" }));
+    expect(await isTokenRevokedForUser("u1", "l1", cutoffSeconds + 60)).toBe(
+      true,
+    );
   });
 });

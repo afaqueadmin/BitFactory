@@ -19,6 +19,7 @@ import type {
 import { createHmac } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { canonicalEmail } from "@/lib/auth/emailIdentity";
+import { findLoginByEmail } from "@/lib/auth/loginIdentity";
 import { base64urlToBytes, bufferToBase64url } from "./utils";
 
 function toUint8Array(value: string | Uint8Array | ArrayBuffer): Uint8Array {
@@ -306,15 +307,11 @@ export async function verifyWebAuthnRegistration(
 
     const normalizedCredentialID = toUint8Array(
       (credentialData.credentialID || credentialData.id) as
-        | string
-        | ArrayBuffer
-        | Uint8Array,
+        string | ArrayBuffer | Uint8Array,
     );
     const normalizedPublicKey = toUint8Array(
       (credentialData.credentialPublicKey || credentialData.publicKey) as
-        | string
-        | ArrayBuffer
-        | Uint8Array,
+        string | ArrayBuffer | Uint8Array,
     );
 
     return {
@@ -351,32 +348,40 @@ export async function generatePasskeySignInOptions(
   config: WebAuthnRuntimeConfig = {},
 ): Promise<{
   options: PublicKeyCredentialRequestOptionsJSON;
-  bindTo: string;
+  bindTo: { userId: string; loginId: string };
 }> {
-  const user = await prisma.user.findFirst({
-    where: { email: canonicalEmail(email), isDeleted: false },
-    select: {
-      id: true,
-      webauthnCredentials: { select: { credentialId: true, transports: true } },
-    },
-  });
+  // Passkeys belong to a login: only this email's own are offered, not
+  // those of another login on the same account.
+  const found = await findLoginByEmail(email);
+  const login = found
+    ? await prisma.userLogin.findUnique({
+        where: { id: found.id },
+        select: {
+          id: true,
+          userId: true,
+          webauthnCredentials: {
+            select: { credentialId: true, transports: true },
+          },
+        },
+      })
+    : null;
 
-  let bindTo: string;
+  let bindTo: { userId: string; loginId: string };
   let allowCredentials: {
     type: "public-key";
     id: string;
     transports: Transport[];
   }[];
-  if (user && user.webauthnCredentials.length > 0) {
-    bindTo = user.id;
-    allowCredentials = user.webauthnCredentials.map((cred) => ({
+  if (login && login.webauthnCredentials.length > 0) {
+    bindTo = { userId: login.userId, loginId: login.id };
+    allowCredentials = login.webauthnCredentials.map((cred) => ({
       type: "public-key" as const,
       id: bufferToBase64url(cred.credentialId),
       transports: cred.transports as Transport[],
     }));
   } else {
     const decoy = decoyFor(email);
-    bindTo = decoy.userId;
+    bindTo = { userId: decoy.userId, loginId: decoy.loginId };
     allowCredentials = [
       {
         type: "public-key",
@@ -399,15 +404,23 @@ export async function generatePasskeySignInOptions(
 }
 
 /** Stable per-email decoy values, keyed with the JWT secret. */
-function decoyFor(email: string): { userId: string; credentialId: string } {
+function decoyFor(email: string): {
+  userId: string;
+  loginId: string;
+  credentialId: string;
+} {
   const secret = process.env.JWT_SECRET;
   if (!secret) throw new Error("JWT_SECRET environment variable is not set");
   const digest = createHmac("sha256", secret)
     .update(`passkey-decoy:${canonicalEmail(email)}`)
     .digest();
+  const loginDigest = createHmac("sha256", secret)
+    .update(`passkey-decoy-login:${canonicalEmail(email)}`)
+    .digest();
   return {
     // Same length and alphabet as a Prisma cuid() ("c" + 24 chars).
     userId: "c" + digest.subarray(0, 12).toString("hex"),
+    loginId: "c" + loginDigest.subarray(0, 12).toString("hex"),
     credentialId: bufferToBase64url(digest.subarray(16, 32)),
   };
 }
@@ -416,7 +429,7 @@ function decoyFor(email: string): { userId: string; credentialId: string } {
  * Verify WebAuthn authentication response
  */
 export async function verifyWebAuthnAuthentication(
-  userId: string,
+  loginId: string,
   credential: AuthenticationResponseJSON,
   expectedChallenge?: string,
   config: WebAuthnRuntimeConfig = {},
@@ -425,14 +438,14 @@ export async function verifyWebAuthnAuthentication(
   credentialID: string;
   newCounter: number;
 }> {
-  const challenge = expectedChallenge ?? getStoredChallenge(userId, false);
+  const challenge = expectedChallenge ?? getStoredChallenge(loginId, false);
   if (!challenge) {
     throw new Error("Challenge not found or expired");
   }
 
-  // Get user's credential to verify against
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
+  // Get the login's credentials to verify against
+  const user = await prisma.userLogin.findUnique({
+    where: { id: loginId },
     select: {
       id: true,
       webauthnCredentials: {
@@ -455,7 +468,7 @@ export async function verifyWebAuthnAuthentication(
   }
 
   console.log("WebAuthn auth verify: Looking up credential", {
-    userId,
+    loginId,
     credentialIdFromResponse: credential.id.substring(0, 20) + "...",
     credentialCount: user.webauthnCredentials.length,
   });
@@ -467,7 +480,7 @@ export async function verifyWebAuthnAuthentication(
 
   if (!matchingCredentialData) {
     console.error("WebAuthn auth verify: Credential not found", {
-      userId,
+      loginId,
       responseId: credential.id.substring(0, 20) + "...",
       storedIds: user.webauthnCredentials.map(
         (c) => bufferToBase64url(c.credentialId).substring(0, 20) + "...",
@@ -477,7 +490,7 @@ export async function verifyWebAuthnAuthentication(
   }
 
   console.log("WebAuthn auth verify: Found matching credential", {
-    userId,
+    loginId,
     credentialDbId: matchingCredentialData.id,
   });
 
@@ -500,7 +513,7 @@ export async function verifyWebAuthnAuthentication(
     }
 
     console.log("WebAuthn auth verify: Verification successful", {
-      userId,
+      loginId,
       oldCounter: matchingCredentialData.counter,
       newCounter: verified.authenticationInfo.newCounter,
     });
@@ -516,7 +529,7 @@ export async function verifyWebAuthnAuthentication(
         console.error(
           "WebAuthn auth verify: Counter decreased - possible cloning attack",
           {
-            userId,
+            loginId,
             oldCounter: matchingCredentialData.counter,
             newCounter: verified.authenticationInfo.newCounter,
           },
@@ -527,7 +540,7 @@ export async function verifyWebAuthnAuthentication(
       }
       // Counter stayed the same - unusual but not necessarily an attack
       console.warn("WebAuthn auth verify: Counter unchanged", {
-        userId,
+        loginId,
         counter: matchingCredentialData.counter,
       });
     }
@@ -539,7 +552,7 @@ export async function verifyWebAuthnAuthentication(
     };
   } catch (error) {
     console.error("WebAuthn auth verify: Error during verification", {
-      userId,
+      loginId,
       error: error instanceof Error ? error.message : "Unknown error",
     });
     throw new Error(

@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     user: { findFirst: vi.fn() },
+    userLogin: { findFirst: vi.fn() },
   },
 }));
 
@@ -15,6 +16,7 @@ import {
 } from "@/lib/auth/emailIdentity";
 
 const findFirst = vi.mocked(prisma.user.findFirst);
+const findLogin = vi.mocked(prisma.userLogin.findFirst);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -39,20 +41,31 @@ describe("canonicalEmail", () => {
 });
 
 describe("isEmailTaken", () => {
-  it("looks up the canonical email exactly, including soft-deleted accounts", async () => {
+  beforeEach(() => {
     findFirst.mockResolvedValue(null);
+    findLogin.mockResolvedValue(null);
+  });
+
+  it("looks up the canonical email exactly, including soft-deleted accounts", async () => {
     await isEmailTaken(" John@X.com ");
     expect(findFirst).toHaveBeenCalledWith({
       where: { email: "john@x.com" },
       select: { id: true },
     });
+    expect(findLogin).toHaveBeenCalledWith({
+      where: { email: "john@x.com" },
+      select: { id: true },
+    });
   });
 
-  it("excludes the account being edited", async () => {
-    findFirst.mockResolvedValue(null);
+  it("excludes the account being edited, but not its secondary login", async () => {
     await isEmailTaken("john@x.com", "u1");
     expect(findFirst).toHaveBeenCalledWith({
       where: { email: "john@x.com", NOT: { id: "u1" } },
+      select: { id: true },
+    });
+    expect(findLogin).toHaveBeenCalledWith({
+      where: { email: "john@x.com", NOT: { userId: "u1", isPrimary: true } },
       select: { id: true },
     });
   });
@@ -62,8 +75,12 @@ describe("isEmailTaken", () => {
     expect(await isEmailTaken("john@x.com")).toBe(true);
   });
 
+  it("returns true when it's another account's secondary sign-in email", async () => {
+    findLogin.mockResolvedValue({ id: "l2" } as never);
+    expect(await isEmailTaken("john@x.com")).toBe(true);
+  });
+
   it("returns false when none exists", async () => {
-    findFirst.mockResolvedValue(null);
     expect(await isEmailTaken("john@x.com")).toBe(false);
   });
 });

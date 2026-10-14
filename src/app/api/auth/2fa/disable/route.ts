@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { verifyTotpCode } from "@/lib/auth/totpSecret";
 import { getUserInfoFromToken } from "@/lib/helpers/getUserInfoFromToken";
 import { twoFactorRequirement } from "@/lib/auth/twoFactorPolicy";
-import { notifySecurityChangeForUser } from "@/lib/auth/securityAlerts";
+import { notifySecurityChangeForLogin } from "@/lib/auth/securityAlerts";
 import { signOutOtherDevices } from "@/lib/auth/sessionRevocation";
 import {
   clearUserFactorAttempts,
@@ -17,9 +17,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { userId } = await getUserInfoFromToken(jwt);
+    const { userId, loginId } = await getUserInfoFromToken(jwt);
 
-    if (!userId) {
+    if (!userId || !loginId) {
       return NextResponse.json(
         { error: "Invalid token", userId },
         { status: 401 },
@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
     }
 
     const twoFactorAuth = await prisma.twoFactorAuth.findUnique({
-      where: { userId },
+      where: { loginId },
       select: { secret: true },
     });
 
@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
     }
 
     // N-1: a stolen session mustn't be able to guess its way to turning 2FA off.
-    const attempt = await recordUserFactorAttempt("2fa_disable", userId);
+    const attempt = await recordUserFactorAttempt("2fa_disable", loginId);
     if (!attempt.allowed) {
       return NextResponse.json(
         { error: attempt.error },
@@ -75,13 +75,13 @@ export async function POST(req: NextRequest) {
         { status: 400 },
       );
     }
-    await clearUserFactorAttempts("2fa_disable", userId);
+    await clearUserFactorAttempts("2fa_disable", loginId);
 
     // Disable 2FA by clearing the secret and backup codes - the row itself
     // is kept (not deleted), so enrolledAt/lastUsedAt history survives a
     // disable/re-enable cycle.
     await prisma.twoFactorAuth.update({
-      where: { userId },
+      where: { loginId },
       data: {
         secret: null,
         pendingSecret: null,
@@ -93,21 +93,22 @@ export async function POST(req: NextRequest) {
     await prisma.userActivity.create({
       data: {
         userId,
+        loginId,
         type: "2FA_DISABLED",
         ipAddress: req.headers.get("x-forwarded-for") || "unknown",
         userAgent: req.headers.get("user-agent") || "unknown",
       },
     });
 
-    await notifySecurityChangeForUser(
-      userId,
+    await notifySecurityChangeForLogin(
+      loginId,
       { type: "2FA_DISABLED" },
       req.headers,
     );
 
     // N-2: other devices are signed out; this one gets fresh tokens.
     const response = NextResponse.json({ success: true });
-    await signOutOtherDevices(req, response, userId);
+    await signOutOtherDevices(req, response, loginId);
     return response;
   } catch (error) {
     console.error("Error disabling 2FA:", error);

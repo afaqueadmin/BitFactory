@@ -8,7 +8,7 @@ export const runtime = "nodejs";
 
 /**
  * GET /api/auth/webauthn/credentials
- * List all credentials for authenticated user
+ * List the passkeys of the signed-in login (not the account's other login)
  */
 export async function GET(request: NextRequest) {
   try {
@@ -18,16 +18,16 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    let userId: string;
+    let loginId: string;
     try {
       const decoded = await verifyJwtToken(token);
-      userId = decoded.userId;
+      loginId = decoded.loginId;
     } catch {
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
 
     const credentials = await prisma.webAuthnCredential.findMany({
-      where: { userId },
+      where: { loginId },
       select: {
         id: true,
         credentialName: true,
@@ -62,9 +62,11 @@ export async function DELETE(request: NextRequest) {
     }
 
     let userId: string;
+    let loginId: string;
     try {
       const decoded = await verifyJwtToken(token);
       userId = decoded.userId;
+      loginId = decoded.loginId;
     } catch {
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
@@ -83,13 +85,13 @@ export async function DELETE(request: NextRequest) {
     const credential = await prisma.webAuthnCredential.findUnique({
       where: { id: credentialId },
       select: {
-        userId: true,
+        loginId: true,
         credentialName: true,
-        user: { select: { email: true } },
+        login: { select: { email: true } },
       },
     });
 
-    if (!credential || credential.userId !== userId) {
+    if (!credential || credential.loginId !== loginId) {
       return NextResponse.json(
         { error: "Credential not found or unauthorized" },
         { status: 403 },
@@ -98,13 +100,13 @@ export async function DELETE(request: NextRequest) {
 
     // Ensure user has at least one other auth method
     const credentialCount = await prisma.webAuthnCredential.count({
-      where: { userId },
+      where: { loginId },
     });
 
     if (credentialCount === 1) {
       // Check if user has password auth enabled
-      const hasPassword = await prisma.user.findUnique({
-        where: { id: userId },
+      const hasPassword = await prisma.userLogin.findUnique({
+        where: { id: loginId },
         select: { password: true },
       });
 
@@ -125,6 +127,7 @@ export async function DELETE(request: NextRequest) {
     await prisma.userActivity.create({
       data: {
         userId,
+        loginId,
         type: "WEBAUTHN_DELETED",
         ipAddress: request.headers.get("x-forwarded-for") || "unknown",
         userAgent: request.headers.get("user-agent") || "unknown",
@@ -132,14 +135,14 @@ export async function DELETE(request: NextRequest) {
     });
 
     await notifySecurityChange(
-      credential.user.email,
+      credential.login.email,
       { type: "PASSKEY_REMOVED", name: credential.credentialName ?? "Passkey" },
       request.headers,
     );
 
     // N-2: other devices are signed out; this one gets fresh tokens.
     const response = NextResponse.json({ success: true }, { status: 200 });
-    await signOutOtherDevices(request, response, userId);
+    await signOutOtherDevices(request, response, loginId);
     return response;
   } catch (error) {
     console.error("WebAuthn credential delete error:", error);
@@ -162,10 +165,10 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    let userId: string;
+    let loginId: string;
     try {
       const decoded = await verifyJwtToken(token);
-      userId = decoded.userId;
+      loginId = decoded.loginId;
     } catch {
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
@@ -186,10 +189,10 @@ export async function PATCH(request: NextRequest) {
     // Verify ownership
     const credential = await prisma.webAuthnCredential.findUnique({
       where: { id: credentialId },
-      select: { userId: true },
+      select: { loginId: true },
     });
 
-    if (!credential || credential.userId !== userId) {
+    if (!credential || credential.loginId !== loginId) {
       return NextResponse.json(
         { error: "Credential not found or unauthorized" },
         { status: 403 },

@@ -76,7 +76,7 @@ export async function PUT(
     }
 
     const stepUp = await verifyStepUp(
-      decoded.userId,
+      decoded,
       { currentPassword, twoFactorToken },
       "reset a customer's password",
     );
@@ -87,9 +87,11 @@ export async function PUT(
       );
     }
 
-    const customer = await prisma.user.findUniqueOrThrow({
-      where: { id },
-      select: { email: true },
+    // The customer's primary login - a franchisee resets only that one; a
+    // secondary login on the account belongs to another person.
+    const customer = await prisma.userLogin.findFirstOrThrow({
+      where: { userId: id, isPrimary: true },
+      select: { id: true, email: true },
     });
 
     // The customer is always told - a franchisee can't silently take over a
@@ -115,8 +117,8 @@ export async function PUT(
     }
 
     const hashedPassword = await hash(newPassword, 12);
-    await prisma.user.update({
-      where: { id },
+    await prisma.userLogin.update({
+      where: { id: customer.id },
       // N-2: the customer didn't make this change - sign them out everywhere.
       data: {
         password: hashedPassword,

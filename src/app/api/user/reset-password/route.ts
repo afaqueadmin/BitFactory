@@ -7,7 +7,7 @@ import { resolveResetLink } from "@/lib/auth/passwordReset";
 import { sessionCutoffNow } from "@/lib/auth/sessionRevocation";
 import { consumeBackupCode } from "@/lib/auth/backupCodes";
 import { verifyTotpCode } from "@/lib/auth/totpSecret";
-import { notifySecurityChangeForUser } from "@/lib/auth/securityAlerts";
+import { notifySecurityChangeForLogin } from "@/lib/auth/securityAlerts";
 import {
   clearAuthRateLimitForEmail,
   clearTwoFactorLoginAttempts,
@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
       // reset page doesn't add a second budget for guessing codes.
       const attempt = await recordUserFactorAttempt(
         RESET_2FA_SCOPE,
-        target.userId,
+        target.loginId,
       );
       if (!attempt.allowed) {
         return NextResponse.json(
@@ -82,11 +82,11 @@ export async function POST(request: NextRequest) {
           { status: attempt.status },
         );
       }
-      const daily = await recordTwoFactorLoginAttempt(target.userId);
+      const daily = await recordTwoFactorLoginAttempt(target.loginId);
       if (!daily.allowed) {
         if (daily.justLocked) {
-          await notifySecurityChangeForUser(
-            target.userId,
+          await notifySecurityChangeForLogin(
+            target.loginId,
             { type: "2FA_LOCKED" },
             request.headers,
           );
@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
       usedBackupCode =
         !totpVerified &&
         (await consumeBackupCode(
-          target.userId,
+          target.loginId,
           target.twoFactor.backupCodes,
           code,
         ));
@@ -123,8 +123,8 @@ export async function POST(request: NextRequest) {
           { status: 400 },
         );
       }
-      await clearUserFactorAttempts(RESET_2FA_SCOPE, target.userId);
-      await clearTwoFactorLoginAttempts(target.userId);
+      await clearUserFactorAttempts(RESET_2FA_SCOPE, target.loginId);
+      await clearTwoFactorLoginAttempts(target.loginId);
     }
 
     const hashedPassword = await hash(newPassword, 12);
@@ -141,13 +141,16 @@ export async function POST(request: NextRequest) {
             expiresAt: target.expiresAt,
           },
         });
-        const updated = await tx.user.updateMany({
+        // Only this login's password - another login on the same account
+        // keeps its own password and stays signed in.
+        const updated = await tx.userLogin.updateMany({
           where: {
-            id: target.userId,
-            isDeleted: false,
+            id: target.loginId,
+            userId: target.userId,
+            user: { isDeleted: false },
             password: target.passwordHash,
           },
-          // N-2: a reset ends every existing session.
+          // N-2: a reset ends every existing session of this login.
           data: {
             password: hashedPassword,
             sessionsValidAfter: sessionCutoffNow(),
@@ -175,6 +178,7 @@ export async function POST(request: NextRequest) {
     await prisma.userActivity.create({
       data: {
         userId: target.userId,
+        loginId: target.loginId,
         type: usedBackupCode ? "PASSWORD_RESET_BACKUP_CODE" : "PASSWORD_RESET",
         ipAddress,
         userAgent,

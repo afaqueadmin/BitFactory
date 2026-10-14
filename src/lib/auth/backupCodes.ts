@@ -55,10 +55,10 @@ async function storedMatches(stored: string, code: string): Promise<boolean> {
  * true. The removal is a single conditional UPDATE, so two concurrent requests
  * presenting the same code can't both succeed.
  *
- * `storedCodes` is the user's current TwoFactorAuth.backupCodes.
+ * `storedCodes` is the login's current TwoFactorAuth.backupCodes.
  */
 export async function consumeBackupCode(
-  userId: string,
+  loginId: string,
   storedCodes: string[] | null | undefined,
   input: string,
 ): Promise<boolean> {
@@ -80,6 +80,6 @@ export async function consumeBackupCode(
     SET "backupCodes" = array_remove("backupCodes", ${match}),
         "lastUsedAt" = now(),
         "updatedAt" = now()
-    WHERE "userId" = ${userId} AND ${match} = ANY("backupCodes")`;
+    WHERE "loginId" = ${loginId} AND ${match} = ANY("backupCodes")`;
   return removed === 1;
 }

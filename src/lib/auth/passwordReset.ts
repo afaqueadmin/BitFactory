@@ -11,8 +11,8 @@
  * Node runtime only (Prisma).
  */
 import { createHash } from "crypto";
-import { prisma } from "@/lib/prisma";
 import { verifyPasswordResetToken } from "@/lib/jwt";
+import { findLoginById } from "@/lib/auth/loginIdentity";
 import { isTokenBlacklisted } from "@/lib/auth/tokenBlacklist";
 
 export const RESET_LINK_MINUTES = 30;
@@ -51,6 +51,8 @@ export function passwordFingerprint(passwordHash: string): string {
 
 export type ResetTarget = {
   userId: string;
+  /** The login whose password the link resets - only that one. */
+  loginId: string;
   email: string;
   /** The hash the link was issued against - the reset only applies while
    *  it's still the current one. */
@@ -72,7 +74,7 @@ export async function resolveResetLink(
   token: unknown,
 ): Promise<ResetTarget | null> {
   if (typeof token !== "string" || !token || token.length > 2048) return null;
-  let claims: { userId: string; pwd: string; exp?: number };
+  let claims: { userId: string; loginId: string; pwd: string; exp?: number };
   try {
     claims = await verifyPasswordResetToken(token);
   } catch {
@@ -80,32 +82,29 @@ export async function resolveResetLink(
   }
   if (await isTokenBlacklisted(token)) return null;
 
-  const user = await prisma.user.findFirst({
-    where: { id: claims.userId, isDeleted: false },
-    select: {
-      id: true,
-      email: true,
-      password: true,
-      twoFactorAuth: {
-        select: { enabled: true, secret: true, backupCodes: true },
-      },
-    },
-  });
-  if (!user || passwordFingerprint(user.password) !== claims.pwd) return null;
+  const login = await findLoginById(claims.loginId);
+  if (
+    !login ||
+    login.userId !== claims.userId ||
+    passwordFingerprint(login.password) !== claims.pwd
+  ) {
+    return null;
+  }
 
   return {
-    userId: user.id,
-    email: user.email,
-    passwordHash: user.password,
+    userId: login.userId,
+    loginId: login.id,
+    email: login.email,
+    passwordHash: login.password,
     token,
     expiresAt: new Date(
       (claims.exp ?? Math.floor(Date.now() / 1000) + RESET_LINK_MINUTES * 60) *
         1000,
     ),
-    twoFactor: user.twoFactorAuth?.enabled
+    twoFactor: login.twoFactorAuth?.enabled
       ? {
-          secret: user.twoFactorAuth.secret,
-          backupCodes: user.twoFactorAuth.backupCodes,
+          secret: login.twoFactorAuth.secret,
+          backupCodes: login.twoFactorAuth.backupCodes,
         }
       : null,
   };

@@ -50,6 +50,8 @@ interface UserSession {
   ipAddress: string | null;
   user: SessionUser;
   tabVisits: TabVisit[];
+  /** The sign-in email used, if known (an account can have two). */
+  login: { email: string; isPrimary: boolean } | null;
 }
 
 interface ActivityLogResponse {
@@ -299,6 +301,15 @@ export default function ActivityLogPage() {
                         <Typography variant="caption" color="text.secondary">
                           {session.user.email}
                         </Typography>
+                        {session.login && !session.login.isPrimary && (
+                          <Typography
+                            variant="caption"
+                            color="text.secondary"
+                            display="block"
+                          >
+                            Signed in as {session.login.email} (second email)
+                          </Typography>
+                        )}
                       </TableCell>
                       <TableCell>
                         <Typography variant="body2">

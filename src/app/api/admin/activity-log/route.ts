@@ -54,6 +54,9 @@ export async function GET(request: NextRequest) {
             },
           },
           tabVisits: { orderBy: { visitedAt: "asc" } },
+          // Which of the account's sign-in emails was used (null on sessions
+          // from before multi-login, or if that login was removed).
+          login: { select: { email: true, isPrimary: true } },
         },
         orderBy: { loginAt: "desc" },
         skip: (page - 1) * limit,

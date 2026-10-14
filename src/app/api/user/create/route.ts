@@ -248,6 +248,10 @@ export async function POST(request: NextRequest) {
           invoicedAmount: defaultInvoicedAmount,
           franchiseeId: role === "CLIENT" ? franchiseeId || null : null,
           segment: resolvedSegment,
+          // Sign-in goes through the login, not users.email/password.
+          logins: {
+            create: { email, password: hashedPassword, isPrimary: true },
+          },
         },
       });
       console.log(`[User Create API] User created in DB: ${newUser.id}`);

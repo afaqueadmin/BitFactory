@@ -240,6 +240,8 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
     "Payment Frequency Change Rejected",
   [AuditAction.USER_PASSWORD_RESET]: "User Password Reset",
   [AuditAction.USER_SESSIONS_REVOKED]: "User Signed Out Everywhere",
+  [AuditAction.USER_LOGIN_ADDED]: "Sign-In Email Added",
+  [AuditAction.USER_LOGIN_REMOVED]: "Sign-In Email Removed",
   [AuditAction.TWO_FACTOR_ENABLED]: "Two-Factor Authentication Enabled",
   [AuditAction.TWO_FACTOR_DISABLED]: "Two-Factor Authentication Disabled",
   [AuditAction.VENDOR_INVOICE_CREATED]: "Vendor Invoice Created",

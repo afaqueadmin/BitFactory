@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse, after } from "next/server";
-import { prisma } from "@/lib/prisma";
 import { signPasswordResetToken } from "@/lib/jwt";
 import { sendPasswordResetLinkEmail } from "@/lib/email";
-import { canonicalEmail } from "@/lib/auth/emailIdentity";
+import { findLoginByEmail } from "@/lib/auth/loginIdentity";
 import {
   RESET_LINK_MINUTES,
   passwordFingerprint,
@@ -46,17 +45,15 @@ export async function POST(request: NextRequest) {
     );
     if (limited) return limited;
 
-    // Same account rule as login (M-4): exact match on the canonical email.
+    // Same login rule as sign-in (M-4): exact match on the canonical email.
     // Soft-deleted accounts can't log in, so they don't get resets either.
-    const user = await prisma.user.findFirst({
-      where: { email: canonicalEmail(email), isDeleted: false },
-      select: { id: true, email: true, role: true, password: true },
-    });
+    // Resets only this email's login - another login on the same account
+    // keeps its own password.
+    const user = await findLoginByEmail(email);
 
     if (user) {
       const token = await signPasswordResetToken(
-        user.id,
-        user.role,
+        { userId: user.userId, loginId: user.id, role: user.user.role },
         passwordFingerprint(user.password),
       );
       // Sent after the reply, so a known email doesn't answer slower than an

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken, generateTokens } from "@/lib/jwt";
 import { twoFactorRequirement } from "@/lib/auth/twoFactorPolicy";
+import { findLoginById } from "@/lib/auth/loginIdentity";
 
 // Runtime config
 export const runtime = "nodejs";
@@ -19,21 +20,22 @@ export async function GET(request: NextRequest) {
     if (accessToken) {
       try {
         const decoded = await verifyJwtToken(accessToken);
-        // Get user data
-        const user = await prisma.user.findUnique({
-          where: { id: decoded.userId },
+        // Get user data. `email` is the account's (primary) email;
+        // `loginEmail` is the one this session signed in with.
+        const login = await prisma.userLogin.findUnique({
+          where: { id: decoded.loginId },
           select: {
-            id: true,
             email: true,
-            name: true,
-            role: true,
+            user: {
+              select: { id: true, email: true, name: true, role: true },
+            },
           },
         });
 
-        if (user) {
+        if (login) {
           return NextResponse.json({
             isAuthenticated: true,
-            user,
+            user: { ...login.user, loginEmail: login.email },
           });
         }
       } catch (error) {
@@ -51,40 +53,36 @@ export async function GET(request: NextRequest) {
         if (decoded && decoded.type === "refresh") {
           // Get user data - excludes soft-deleted accounts so a deleted
           // user can't keep refreshing into new token pairs indefinitely.
-          const found = await prisma.user.findFirst({
-            where: { id: decoded.userId, isDeleted: false },
-            select: {
-              id: true,
-              email: true,
-              name: true,
-              role: true,
-              twoFactorAuth: { select: { enabled: true } },
-            },
-          });
+          // A secondary login stops refreshing too if the account stops
+          // being a CLIENT one (findLoginById).
+          const login = await findLoginById(decoded.loginId);
+          const found = login && login.userId === decoded.userId ? login : null;
 
-          // M-1: once 2FA is enforced, a password-only session of an account
+          // M-1: once 2FA is enforced, a password-only session of a login
           // still without 2FA isn't extended - the next login goes through
           // forced setup. Sessions from a 2FA code or passkey (mfa) are fine.
           const blockedByTwoFactorPolicy =
             !!found &&
             decoded.mfa !== true &&
             twoFactorRequirement(
-              found.role,
+              found.user.role,
               found.twoFactorAuth?.enabled ?? false,
             ) === "enforced";
 
           if (found && !blockedByTwoFactorPolicy) {
             const user = {
-              id: found.id,
-              email: found.email,
-              name: found.name,
-              role: found.role,
+              id: found.user.id,
+              email: found.user.email,
+              name: found.user.name,
+              role: found.user.role,
+              loginEmail: found.email,
             };
             // Generate new tokens, keeping how the session was established.
             const { accessToken, refreshToken: newRefreshToken } =
-              await generateTokens(user.id, user.role, {
-                mfa: decoded.mfa === true,
-              });
+              await generateTokens(
+                { userId: user.id, loginId: found.id, role: user.role },
+                { mfa: decoded.mfa === true },
+              );
 
             // Create response with new tokens
             const response = NextResponse.json({

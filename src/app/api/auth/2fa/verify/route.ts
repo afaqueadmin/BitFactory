@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getUserInfoFromToken } from "@/lib/helpers/getUserInfoFromToken";
 import { completeTwoFactorSetup } from "@/lib/auth/twoFactorEnrollment";
-import { notifySecurityChangeForUser } from "@/lib/auth/securityAlerts";
+import { notifySecurityChangeForLogin } from "@/lib/auth/securityAlerts";
 import { signOutOtherDevices } from "@/lib/auth/sessionRevocation";
 
 export async function POST(req: NextRequest) {
@@ -12,9 +12,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { userId } = await getUserInfoFromToken(jwt);
+    const { userId, loginId } = await getUserInfoFromToken(jwt);
 
-    if (!userId) {
+    if (!userId || !loginId) {
       return NextResponse.json(
         { error: "Invalid token", userId },
         { status: 401 },
@@ -23,7 +23,8 @@ export async function POST(req: NextRequest) {
 
     const { token } = await req.json();
 
-    const result = await completeTwoFactorSetup(userId, token);
+    // The signed-in login's own authenticator - not the account's other login.
+    const result = await completeTwoFactorSetup(loginId, token);
     if (!result.ok) {
       return NextResponse.json(
         { error: result.error },
@@ -37,14 +38,15 @@ export async function POST(req: NextRequest) {
     await prisma.userActivity.create({
       data: {
         userId,
+        loginId,
         type: "2FA_ENABLED",
         ipAddress: req.headers.get("x-forwarded-for") || "unknown",
         userAgent: req.headers.get("user-agent") || "unknown",
       },
     });
 
-    await notifySecurityChangeForUser(
-      userId,
+    await notifySecurityChangeForLogin(
+      loginId,
       { type: "2FA_ENABLED" },
       req.headers,
     );
@@ -55,7 +57,7 @@ export async function POST(req: NextRequest) {
       success: true,
       backupCodes,
     });
-    await signOutOtherDevices(req, response, userId, { mfa: true });
+    await signOutOtherDevices(req, response, loginId, { mfa: true });
     return response;
   } catch (error) {
     console.error("2FA verification error:", error);

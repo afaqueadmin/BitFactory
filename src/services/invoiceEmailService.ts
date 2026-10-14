@@ -5,6 +5,7 @@ import {
   sendInvoiceEmailWithPDF,
 } from "@/lib/email";
 import { getGroupByUserId } from "@/lib/groupUtils";
+import { secondaryLoginEmails } from "@/lib/auth/loginIdentity";
 import { ConfirmoPaymentService } from "./confirmoPaymentService";
 import { AuditAction } from "@prisma/client";
 
@@ -57,6 +58,22 @@ export class InvoiceEmailService {
    */
   static async buildCCList(userId?: string | null): Promise<string[]> {
     const ccEmails: string[] = [];
+
+    // The customer's secondary sign-in email(s) - e.g. their accountant.
+    // The primary email is the To address, so it's not repeated here.
+    if (userId) {
+      try {
+        for (const email of await secondaryLoginEmails(userId)) {
+          if (!ccEmails.includes(email)) ccEmails.push(email);
+        }
+      } catch (error) {
+        console.error(
+          "[InvoiceEmailService] Error fetching secondary logins for CC:",
+          error,
+        );
+        // Continue without them
+      }
+    }
 
     // Fetch group/RM if available
     if (userId) {

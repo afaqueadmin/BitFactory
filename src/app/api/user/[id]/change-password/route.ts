@@ -22,9 +22,11 @@ export async function PUT(
 
     // Verify token
     let userId: string;
+    let loginId: string;
     try {
       const decoded = await verifyJwtToken(token);
       userId = decoded.userId;
+      loginId = decoded.loginId;
     } catch (error) {
       console.error("Token verification failed:", error);
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
@@ -63,8 +65,24 @@ export async function PUT(
       );
     }
 
-    const { newPassword, currentPassword, twoFactorToken } =
-      await request.json();
+    const {
+      newPassword,
+      currentPassword,
+      twoFactorToken,
+      loginId: targetLoginIdInput,
+    } = await request.json();
+
+    // Which of the target's logins to reset: the one named, else the primary.
+    const targetLogin = await prisma.userLogin.findFirst({
+      where:
+        typeof targetLoginIdInput === "string" && targetLoginIdInput
+          ? { id: targetLoginIdInput, userId: id }
+          : { userId: id, isPrimary: true },
+      select: { id: true, email: true },
+    });
+    if (!targetLogin) {
+      return NextResponse.json({ error: "Login not found" }, { status: 404 });
+    }
 
     if (
       !newPassword ||
@@ -78,7 +96,7 @@ export async function PUT(
     }
 
     const stepUp = await verifyStepUp(
-      userId,
+      { loginId },
       { currentPassword, twoFactorToken },
       "reset a user's password",
     );
@@ -92,7 +110,7 @@ export async function PUT(
     // The target is always told. Sending is a precondition for the change
     // being persisted, same as the self-service change-password route.
     const emailResult = await sendPasswordResetEmail(
-      targetUser.email,
+      targetLogin.email,
       newPassword,
     );
     if (!emailResult.success) {
@@ -106,9 +124,10 @@ export async function PUT(
     }
 
     const hashedPassword = await hash(newPassword, 12);
-    await prisma.user.update({
-      where: { id },
-      // N-2: the user didn't make this change - sign them out everywhere.
+    await prisma.userLogin.update({
+      where: { id: targetLogin.id },
+      // N-2: the user didn't make this change - sign that login out
+      // everywhere (the account's other login is unaffected).
       data: {
         password: hashedPassword,
         sessionsValidAfter: sessionCutoffNow(),
@@ -122,7 +141,7 @@ export async function PUT(
         entityType: "User",
         entityId: id,
         userId,
-        description: `Password reset for ${targetUser.email} by ${
+        description: `Password reset for ${targetLogin.email} by ${
           user.role === "SUPER_ADMIN" ? "super admin" : "admin"
         } ${user.email}`,
         ipAddress: request.headers.get("x-forwarded-for") || "unknown",

@@ -2,11 +2,21 @@ import { SignJWT, jwtVerify, JWTPayload } from "jose";
 
 export interface JwtPayload extends JWTPayload {
   userId: string;
+  /** The UserLogin (email + credentials) the token was issued to. An account
+   *  can have more than one login; userId is the account they all open. */
+  loginId: string;
   role: string;
   type?: string;
   /** Set when the session was established with a second factor (2FA code,
    *  backup code or passkey), and carried across refreshes. */
   mfa?: boolean;
+}
+
+/** Who a token is issued to: the account, the login on it, and its role. */
+export interface TokenSubject {
+  userId: string;
+  loginId: string;
+  role: string;
 }
 
 // Short-lived tokens that prove one step of a login, never a session. Each
@@ -44,7 +54,13 @@ async function decodeJwt(token: string): Promise<JwtPayload> {
   const { payload } = await jwtVerify(token, getJwtSecretKey(), {
     algorithms: ["HS256"], // Explicitly expect HS256
   });
-  if (typeof payload.userId !== "string" || typeof payload.role !== "string") {
+  // loginId: tokens from before multi-login don't carry one and are refused,
+  // which means one fresh sign-in for everyone after that release.
+  if (
+    typeof payload.userId !== "string" ||
+    typeof payload.loginId !== "string" ||
+    typeof payload.role !== "string"
+  ) {
     throw new Error("Invalid token payload structure");
   }
   return payload as JwtPayload;
@@ -52,7 +68,7 @@ async function decodeJwt(token: string): Promise<JwtPayload> {
 
 /**
  * Rejects a token that was logged out (blacklisted) or issued before the
- * account was signed out everywhere (N-2).
+ * account, or this login on it, was signed out everywhere (N-2).
  *
  * Skipped on Edge (the proxy) - Prisma can't run there. Sensitive server
  * actions all go through Node-runtime API routes, which do reach this check,
@@ -69,7 +85,7 @@ async function assertNotRevoked(
     await import("@/lib/auth/tokenBlacklist");
   const [blacklisted, revoked] = await Promise.all([
     isTokenBlacklisted(token),
-    isTokenRevokedForUser(payload.userId, payload.iat),
+    isTokenRevokedForUser(payload.userId, payload.loginId, payload.iat),
   ]);
   if (blacklisted || revoked) {
     throw new Error("Token has been revoked");
@@ -96,7 +112,7 @@ export async function verifyJwtToken(token: string): Promise<JwtPayload> {
 
 export async function signJwtToken(
   payload: Omit<JwtPayload, "exp">,
-  expiresIn: "1h" | "7d" | "30m" | "15m" | "10m" | "5m" | "2m" = "1h",
+  expiresIn: "24h" | "1h" | "7d" | "30m" | "15m" | "10m" | "5m" | "2m" = "1h",
 ): Promise<string> {
   return await new SignJWT(payload)
     .setProtectedHeader({ alg: "HS256" })
@@ -106,19 +122,23 @@ export async function signJwtToken(
 }
 
 export async function generateTokens(
-  userId: string,
-  role: string,
+  { userId, loginId, role }: TokenSubject,
   { mfa = false }: { mfa?: boolean } = {},
 ) {
-  const claims = mfa ? { userId, role, mfa: true } : { userId, role };
+  const claims = mfa
+    ? { userId, loginId, role, mfa: true }
+    : { userId, loginId, role };
   const accessToken = await signJwtToken(claims);
   const refreshToken = await signJwtToken({ ...claims, type: "refresh" }, "7d");
   return { accessToken, refreshToken };
 }
 
 /** 15-minute token for the forced 2FA setup step after a correct password. */
-export function signEnrollmentToken(userId: string, role: string) {
-  return signJwtToken({ userId, role, type: ENROLLMENT_TOKEN_TYPE }, "15m");
+export function signEnrollmentToken({ userId, loginId, role }: TokenSubject) {
+  return signJwtToken(
+    { userId, loginId, role, type: ENROLLMENT_TOKEN_TYPE },
+    "15m",
+  );
 }
 
 /** Verifies a token from signEnrollmentToken; rejects any other token. */
@@ -127,12 +147,19 @@ export function verifyEnrollmentToken(token: string): Promise<JwtPayload> {
 }
 
 /**
- * 5-minute token issued by /api/login after a correct password for an
- * account with 2FA; /api/auth/2fa/validate requires it, so a 2FA or backup
- * code alone can never log anyone in (C-3).
+ * 5-minute token issued by /api/login after a correct password for a login
+ * with 2FA; /api/auth/2fa/validate requires it, so a 2FA or backup code
+ * alone can never log anyone in (C-3).
  */
-export function signPendingTwoFactorToken(userId: string, role: string) {
-  return signJwtToken({ userId, role, type: PENDING_2FA_TOKEN_TYPE }, "5m");
+export function signPendingTwoFactorToken({
+  userId,
+  loginId,
+  role,
+}: TokenSubject) {
+  return signJwtToken(
+    { userId, loginId, role, type: PENDING_2FA_TOKEN_TYPE },
+    "5m",
+  );
 }
 
 /** Verifies a token from signPendingTwoFactorToken; rejects any other token. */
@@ -143,24 +170,23 @@ export function verifyPendingTwoFactorToken(
 }
 
 /**
- * Wraps a passkey-registration challenge with the user it was issued to, so
- * /register/verify can't complete a ceremony started under another account
- * (and only a user who passed step-up at /register/options gets one).
+ * Wraps a passkey-registration challenge with the login it was issued to, so
+ * /register/verify can't complete a ceremony started under another login
+ * (and only a login that passed step-up at /register/options gets one).
  */
 export function signRegistrationChallenge(
-  userId: string,
-  role: string,
+  { userId, loginId, role }: TokenSubject,
   challenge: string,
 ) {
   return signJwtToken(
-    { userId, role, type: WEBAUTHN_REG_TOKEN_TYPE, challenge },
+    { userId, loginId, role, type: WEBAUTHN_REG_TOKEN_TYPE, challenge },
     "10m",
   );
 }
 
 export async function verifyRegistrationChallenge(
   token: string,
-): Promise<{ userId: string; challenge: string }> {
+): Promise<{ userId: string; loginId: string; challenge: string }> {
   const payload = await verifyLoginStepToken(
     token,
     WEBAUTHN_REG_TOKEN_TYPE,
@@ -169,27 +195,43 @@ export async function verifyRegistrationChallenge(
   if (typeof payload.challenge !== "string") {
     throw new Error("Invalid or expired passkey registration token");
   }
-  return { userId: payload.userId, challenge: payload.challenge };
+  return {
+    userId: payload.userId,
+    loginId: payload.loginId,
+    challenge: payload.challenge,
+  };
 }
 
 /**
- * Wraps a passkey sign-in challenge with the user it was issued for (N-5).
+ * Wraps a passkey sign-in challenge with the login it was issued for (N-5).
  * The server, not the browser, decides the challenge: /authenticate/verify
- * only accepts a challenge it signed, for that same user, and spends the
+ * only accepts a challenge it signed, for that same login, and spends the
  * token on success so a captured sign-in can't be replayed.
  */
-export function signAuthenticationChallenge(userId: string, challenge: string) {
+export function signAuthenticationChallenge(
+  { userId, loginId }: { userId: string; loginId: string },
+  challenge: string,
+) {
   // Fixed role: the token is issued for any email (N-4 decoys included), so
   // it must not vary with what kind of account, if any, the email has.
   return signJwtToken(
-    { userId, role: "PASSKEY", type: WEBAUTHN_AUTH_TOKEN_TYPE, challenge },
+    {
+      userId,
+      loginId,
+      role: "PASSKEY",
+      type: WEBAUTHN_AUTH_TOKEN_TYPE,
+      challenge,
+    },
     "5m",
   );
 }
 
-export async function verifyAuthenticationChallenge(
-  token: string,
-): Promise<{ userId: string; challenge: string; exp?: number }> {
+export async function verifyAuthenticationChallenge(token: string): Promise<{
+  userId: string;
+  loginId: string;
+  challenge: string;
+  exp?: number;
+}> {
   const payload = await verifyLoginStepToken(
     token,
     WEBAUTHN_AUTH_TOKEN_TYPE,
@@ -200,30 +242,36 @@ export async function verifyAuthenticationChallenge(
   }
   return {
     userId: payload.userId,
+    loginId: payload.loginId,
     challenge: payload.challenge,
     exp: payload.exp,
   };
 }
 
 /**
- * 30-minute token for the forgotten-password link (C-1). `pwd` is a
- * fingerprint of the password hash at the time it was sent, so the link dies
- * as soon as the password changes - after it's used, or any other reset.
+ * Token for the forgotten-password link (C-1), 30 minutes by default; the
+ * set-password invite for a newly added login uses 24h. `pwd` is a
+ * fingerprint of that login's password hash at the time it was sent, so the
+ * link dies as soon as the password changes - after it's used, or any other
+ * reset.
  */
 export function signPasswordResetToken(
-  userId: string,
-  role: string,
+  { userId, loginId, role }: TokenSubject,
   pwd: string,
+  expiresIn: "30m" | "24h" = "30m",
 ) {
   return signJwtToken(
-    { userId, role, type: PASSWORD_RESET_TOKEN_TYPE, pwd },
-    "30m",
+    { userId, loginId, role, type: PASSWORD_RESET_TOKEN_TYPE, pwd },
+    expiresIn,
   );
 }
 
-export async function verifyPasswordResetToken(
-  token: string,
-): Promise<{ userId: string; pwd: string; exp?: number }> {
+export async function verifyPasswordResetToken(token: string): Promise<{
+  userId: string;
+  loginId: string;
+  pwd: string;
+  exp?: number;
+}> {
   const payload = await verifyLoginStepToken(
     token,
     PASSWORD_RESET_TOKEN_TYPE,
@@ -232,7 +280,12 @@ export async function verifyPasswordResetToken(
   if (typeof payload.pwd !== "string") {
     throw new Error("Invalid or expired password reset token");
   }
-  return { userId: payload.userId, pwd: payload.pwd, exp: payload.exp };
+  return {
+    userId: payload.userId,
+    loginId: payload.loginId,
+    pwd: payload.pwd,
+    exp: payload.exp,
+  };
 }
 
 async function verifyLoginStepToken(

@@ -121,7 +121,7 @@ export async function POST(
     }
 
     const stepUp = await verifyStepUp(
-      auth.decoded.userId,
+      auth.decoded,
       { currentPassword, twoFactorToken },
       "confirm a payment frequency change request with the client",
     );

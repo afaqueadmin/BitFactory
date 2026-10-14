@@ -237,7 +237,7 @@ export async function POST(request: NextRequest) {
     // Which method is required is decided from the user's own record, never
     // from what the client claims.
     const stepUp = await verifyStepUp(
-      auth.decoded.userId,
+      auth.decoded,
       { currentPassword, twoFactorToken },
       "request a payment frequency change",
     );

@@ -210,6 +210,42 @@ export const sendPasswordResetLinkEmail = async (
 };
 
 /**
+ * Sent when an admin adds a secondary sign-in email to an account: a link to
+ * choose its own password (the same /reset-password page and token as a
+ * forgotten-password reset, valid longer). Two-factor setup follows at the
+ * first sign-in.
+ */
+export const sendLoginInviteEmail = async (
+  email: string,
+  details: { setPasswordUrl: string; validHours: number; accountName: string },
+) => {
+  const mailOptions = {
+    from:
+      `BitFactory Admin <${process.env.SMTP_FROM}>` || "noreply@bitfactory.com",
+    to: email,
+    subject: "You've Been Given Access To A BitFactory Account",
+    html: `
+      <h1>Set up your BitFactory sign-in</h1>
+      <p>Our team has given ${escapeHtml(email)} its own sign-in to the BitFactory account of ${escapeHtml(details.accountName)}. To choose your password, use this link:</p>
+      <p><a href="${escapeHtml(details.setPasswordUrl)}" target="_blank" rel="noopener noreferrer"><strong>Choose my password</strong></a></p>
+      <p>The link works once and expires in ${details.validHours} hours. After choosing a password, sign in at <a href="https://my.bitfactory.ae" target="_blank">my.bitfactory.ae</a> with this email; you'll be asked to set up two-factor authentication with an authenticator app.</p>
+      <p>If you weren't expecting this, please contact our support team.</p>
+      <br>
+      <p>Best regards,</p>
+      <p>The BitFactory Team</p>
+    `,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    return { success: true };
+  } catch (error) {
+    console.error("Error sending login invite email:", error);
+    return { success: false, error };
+  }
+};
+
+/**
  * Sent whenever a user changes their own password via the self-service flow
  * (src/app/api/user/change-password/route.ts). Unlike sendPasswordResetEmail
  * (admin/franchisee sets a new password for someone else, so the recipient

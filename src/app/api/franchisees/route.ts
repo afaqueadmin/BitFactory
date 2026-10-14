@@ -299,6 +299,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           role: "FRANCHISEE",
           invoicedAmount: defaultInvoicedAmount,
           segment: "FRANCHISEE",
+          // Sign-in goes through the login, not users.email/password.
+          logins: {
+            create: {
+              email: loginEmail,
+              password: hashedPassword,
+              isPrimary: true,
+            },
+          },
         },
       });
 

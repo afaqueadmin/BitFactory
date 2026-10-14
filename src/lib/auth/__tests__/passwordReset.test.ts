@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/prisma", () => ({
-  prisma: { user: { findFirst: vi.fn() } },
+  prisma: { userLogin: { findFirst: vi.fn() } },
 }));
 
 vi.mock("@/lib/auth/tokenBlacklist", () => ({
@@ -26,16 +26,19 @@ import {
   resolveResetLink,
 } from "@/lib/auth/passwordReset";
 
-const findUser = vi.mocked(prisma.user.findFirst);
+const findUser = vi.mocked(prisma.userLogin.findFirst);
 const blacklisted = vi.mocked(isTokenBlacklisted);
 const revoked = vi.mocked(isTokenRevokedForUser);
 
+// The account (u1) and the login on it (l1) the reset link is for.
+const SUBJECT = { userId: "u1", loginId: "l1", role: "CLIENT" };
 const HASH = "$2b$12$abcdefghijklmnopqrstuvABCDEFGHIJKLMNOPQRSTUVWXYZ01234";
 const ORIGINAL_APP_URL = process.env.NEXT_PUBLIC_APP_URL;
 
 function storedUser(overrides: Record<string, unknown> = {}) {
   return {
-    id: "u1",
+    id: "l1",
+    userId: "u1",
     email: "owner@example.com",
     password: HASH,
     twoFactorAuth: null,
@@ -85,19 +88,24 @@ describe("resolveResetLink", () => {
   it("accepts a fresh link for the current password", async () => {
     findUser.mockResolvedValue(storedUser());
     const token = await signPasswordResetToken(
-      "u1",
-      "CLIENT",
+      SUBJECT,
       passwordFingerprint(HASH),
     );
     const target = await resolveResetLink(token);
     expect(target).toMatchObject({
       userId: "u1",
+      loginId: "l1",
       email: "owner@example.com",
       passwordHash: HASH,
       twoFactor: null,
     });
     expect(findUser).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: "u1", isDeleted: false } }),
+      expect.objectContaining({
+        where: expect.objectContaining({
+          id: "l1",
+          user: { isDeleted: false },
+        }),
+      }),
     );
   });
 
@@ -108,8 +116,7 @@ describe("resolveResetLink", () => {
       }),
     );
     const token = await signPasswordResetToken(
-      "u1",
-      "CLIENT",
+      SUBJECT,
       passwordFingerprint(HASH),
     );
     expect((await resolveResetLink(token))?.twoFactor).toEqual({
@@ -121,8 +128,7 @@ describe("resolveResetLink", () => {
   it("rejects a link once the password has changed", async () => {
     findUser.mockResolvedValue(storedUser({ password: HASH + "new" }));
     const token = await signPasswordResetToken(
-      "u1",
-      "CLIENT",
+      SUBJECT,
       passwordFingerprint(HASH),
     );
     expect(await resolveResetLink(token)).toBeNull();
@@ -132,8 +138,7 @@ describe("resolveResetLink", () => {
     blacklisted.mockResolvedValue(true);
     findUser.mockResolvedValue(storedUser());
     const token = await signPasswordResetToken(
-      "u1",
-      "CLIENT",
+      SUBJECT,
       passwordFingerprint(HASH),
     );
     expect(await resolveResetLink(token)).toBeNull();
@@ -143,8 +148,7 @@ describe("resolveResetLink", () => {
     revoked.mockResolvedValue(true);
     findUser.mockResolvedValue(storedUser());
     const token = await signPasswordResetToken(
-      "u1",
-      "CLIENT",
+      SUBJECT,
       passwordFingerprint(HASH),
     );
     expect(await resolveResetLink(token)).toBeNull();
@@ -153,8 +157,7 @@ describe("resolveResetLink", () => {
   it("rejects a deleted or missing account", async () => {
     findUser.mockResolvedValue(null);
     const token = await signPasswordResetToken(
-      "u1",
-      "CLIENT",
+      SUBJECT,
       passwordFingerprint(HASH),
     );
     expect(await resolveResetLink(token)).toBeNull();
@@ -162,17 +165,38 @@ describe("resolveResetLink", () => {
 
   it("rejects session tokens, garbage and non-strings", async () => {
     findUser.mockResolvedValue(storedUser());
-    const { accessToken } = await generateTokens("u1", "CLIENT");
+    const { accessToken } = await generateTokens(SUBJECT);
     expect(await resolveResetLink(accessToken)).toBeNull();
     expect(await resolveResetLink("not-a-jwt")).toBeNull();
     expect(await resolveResetLink(42)).toBeNull();
     expect(await resolveResetLink("x".repeat(5000))).toBeNull();
   });
 
+  it("rejects a link whose login is now on a different account", async () => {
+    findUser.mockResolvedValue(storedUser({ userId: "u2" }));
+    const token = await signPasswordResetToken(
+      SUBJECT,
+      passwordFingerprint(HASH),
+    );
+    expect(await resolveResetLink(token)).toBeNull();
+  });
+
+  it("gives a set-password invite (24h) a later expiry than a reset (30m)", async () => {
+    findUser.mockResolvedValue(storedUser());
+    const reset = await resolveResetLink(
+      await signPasswordResetToken(SUBJECT, passwordFingerprint(HASH)),
+    );
+    const invite = await resolveResetLink(
+      await signPasswordResetToken(SUBJECT, passwordFingerprint(HASH), "24h"),
+    );
+    const hours = (d?: Date) => ((d?.getTime() ?? 0) - Date.now()) / 3600_000;
+    expect(hours(reset?.expiresAt)).toBeLessThanOrEqual(0.5);
+    expect(hours(invite?.expiresAt)).toBeGreaterThan(23);
+  });
+
   it("is never accepted as a session", async () => {
     const token = await signPasswordResetToken(
-      "u1",
-      "CLIENT",
+      SUBJECT,
       passwordFingerprint(HASH),
     );
     await expect(verifyJwtToken(token)).rejects.toThrow();

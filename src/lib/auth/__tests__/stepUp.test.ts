@@ -4,7 +4,7 @@ import { hash } from "bcrypt";
 
 vi.mock("@/lib/prisma", () => ({
   prisma: {
-    user: { findUnique: vi.fn() },
+    userLogin: { findUnique: vi.fn() },
     twoFactorAuth: { update: vi.fn() },
     $executeRaw: vi.fn(),
   },
@@ -22,7 +22,7 @@ import {
 } from "@/lib/rateLimit";
 import { verifyStepUp } from "@/lib/auth/stepUp";
 
-const findUser = vi.mocked(prisma.user.findUnique);
+const findUser = vi.mocked(prisma.userLogin.findUnique);
 const updateTwoFactor = vi.mocked(prisma.twoFactorAuth.update);
 const executeRaw = vi.mocked(prisma.$executeRaw);
 const recordAttempt = vi.mocked(recordUserFactorAttempt);
@@ -30,6 +30,8 @@ const clearAttempts = vi.mocked(clearUserFactorAttempts);
 
 const PASSWORD = "correct-horse-battery";
 const ACTION = "add a passkey";
+// The signed-in session: step-up checks this login's own credentials.
+const SESSION = { loginId: "l1" };
 
 let passwordHash: string;
 
@@ -50,11 +52,11 @@ beforeEach(async () => {
   passwordHash = await hash(PASSWORD, 4);
 });
 
-describe("verifyStepUp - account without 2FA", () => {
-  it("returns 404 when the user does not exist", async () => {
+describe("verifyStepUp - login without 2FA", () => {
+  it("returns 404 when the login does not exist", async () => {
     findUser.mockResolvedValue(null);
 
-    expect(await verifyStepUp("u1", {}, ACTION)).toEqual({
+    expect(await verifyStepUp(SESSION, {}, ACTION)).toEqual({
       ok: false,
       status: 404,
       error: "User not found",
@@ -64,7 +66,7 @@ describe("verifyStepUp - account without 2FA", () => {
   it("asks for the password when none is supplied", async () => {
     findUser.mockResolvedValue(userWithout2FA());
 
-    expect(await verifyStepUp("u1", {}, ACTION)).toEqual({
+    expect(await verifyStepUp(SESSION, {}, ACTION)).toEqual({
       ok: false,
       status: 400,
       error: "Your current password is required to add a passkey",
@@ -75,7 +77,11 @@ describe("verifyStepUp - account without 2FA", () => {
   it("treats a non-string password as missing", async () => {
     findUser.mockResolvedValue(userWithout2FA());
 
-    const result = await verifyStepUp("u1", { currentPassword: 12345 }, ACTION);
+    const result = await verifyStepUp(
+      SESSION,
+      { currentPassword: 12345 },
+      ACTION,
+    );
 
     expect(result).toMatchObject({ ok: false, code: "PASSWORD_REQUIRED" });
   });
@@ -84,7 +90,7 @@ describe("verifyStepUp - account without 2FA", () => {
     findUser.mockResolvedValue(userWithout2FA());
 
     expect(
-      await verifyStepUp("u1", { currentPassword: "nope" }, ACTION),
+      await verifyStepUp(SESSION, { currentPassword: "nope" }, ACTION),
     ).toEqual({
       ok: false,
       status: 400,
@@ -96,7 +102,7 @@ describe("verifyStepUp - account without 2FA", () => {
     findUser.mockResolvedValue(userWithout2FA());
 
     expect(
-      await verifyStepUp("u1", { currentPassword: PASSWORD }, ACTION),
+      await verifyStepUp(SESSION, { currentPassword: PASSWORD }, ACTION),
     ).toEqual({ ok: true, method: "PASSWORD" });
   });
 
@@ -107,19 +113,19 @@ describe("verifyStepUp - account without 2FA", () => {
     } as never);
 
     expect(
-      await verifyStepUp("u1", { currentPassword: PASSWORD }, ACTION),
+      await verifyStepUp(SESSION, { currentPassword: PASSWORD }, ACTION),
     ).toEqual({ ok: true, method: "PASSWORD" });
   });
 });
 
-describe("verifyStepUp - account with 2FA enabled", () => {
+describe("verifyStepUp - login with 2FA enabled", () => {
   const secret = speakeasy.generateSecret().base32;
 
   it("does not accept the correct password in place of a 2FA code", async () => {
     findUser.mockResolvedValue(userWith2FA(secret));
 
     expect(
-      await verifyStepUp("u1", { currentPassword: PASSWORD }, ACTION),
+      await verifyStepUp(SESSION, { currentPassword: PASSWORD }, ACTION),
     ).toEqual({
       ok: false,
       status: 400,
@@ -133,11 +139,11 @@ describe("verifyStepUp - account with 2FA enabled", () => {
     findUser.mockResolvedValue(userWith2FA(secret));
     const token = speakeasy.totp({ secret, encoding: "base32" });
 
-    expect(await verifyStepUp("u1", { twoFactorToken: token }, ACTION)).toEqual(
-      { ok: true, method: "2FA" },
-    );
+    expect(
+      await verifyStepUp(SESSION, { twoFactorToken: token }, ACTION),
+    ).toEqual({ ok: true, method: "2FA" });
     expect(updateTwoFactor).toHaveBeenCalledWith({
-      where: { userId: "u1" },
+      where: { loginId: "l1" },
       data: { lastUsedAt: expect.any(Date) },
     });
   });
@@ -146,7 +152,7 @@ describe("verifyStepUp - account with 2FA enabled", () => {
     findUser.mockResolvedValue(userWith2FA(secret));
 
     expect(
-      await verifyStepUp("u1", { twoFactorToken: "000000x" }, ACTION),
+      await verifyStepUp(SESSION, { twoFactorToken: "000000x" }, ACTION),
     ).toEqual({
       ok: false,
       status: 400,
@@ -161,7 +167,7 @@ describe("verifyStepUp - account with 2FA enabled", () => {
     executeRaw.mockResolvedValue(1 as never);
 
     expect(
-      await verifyStepUp("u1", { twoFactorToken: "aaaaa-aaaaa" }, ACTION),
+      await verifyStepUp(SESSION, { twoFactorToken: "aaaaa-aaaaa" }, ACTION),
     ).toEqual({ ok: true, method: "2FA" });
     expect(executeRaw).toHaveBeenCalledTimes(1);
     // Removal is the atomic array_remove, not a read-modify-write update.
@@ -173,7 +179,7 @@ describe("verifyStepUp - account with 2FA enabled", () => {
     executeRaw.mockResolvedValue(1 as never);
 
     expect(
-      await verifyStepUp("u1", { twoFactorToken: "AAAAAA" }, ACTION),
+      await verifyStepUp(SESSION, { twoFactorToken: "AAAAAA" }, ACTION),
     ).toEqual({ ok: true, method: "2FA" });
   });
 
@@ -184,7 +190,7 @@ describe("verifyStepUp - account with 2FA enabled", () => {
     executeRaw.mockResolvedValue(0 as never);
 
     expect(
-      await verifyStepUp("u1", { twoFactorToken: "AAAAAAAAAA" }, ACTION),
+      await verifyStepUp(SESSION, { twoFactorToken: "AAAAAAAAAA" }, ACTION),
     ).toEqual({ ok: false, status: 400, error: "Invalid authentication code" });
   });
 });
@@ -194,22 +200,22 @@ describe("verifyStepUp - attempt limit (N-1)", () => {
 
   it("doesn't count a request that sends no credential", async () => {
     findUser.mockResolvedValue(userWithout2FA());
-    await verifyStepUp("u1", {}, ACTION);
+    await verifyStepUp(SESSION, {}, ACTION);
     findUser.mockResolvedValue(userWith2FA(secret));
-    await verifyStepUp("u1", {}, ACTION);
+    await verifyStepUp(SESSION, {}, ACTION);
 
     expect(recordAttempt).not.toHaveBeenCalled();
   });
 
   it("counts every submitted password or code under one shared scope", async () => {
     findUser.mockResolvedValue(userWithout2FA());
-    await verifyStepUp("u1", { currentPassword: "nope" }, ACTION);
+    await verifyStepUp(SESSION, { currentPassword: "nope" }, ACTION);
     findUser.mockResolvedValue(userWith2FA(secret));
-    await verifyStepUp("u1", { twoFactorToken: "000000" }, "approve");
+    await verifyStepUp(SESSION, { twoFactorToken: "000000" }, "approve");
 
     expect(recordAttempt.mock.calls).toEqual([
-      ["step_up", "u1"],
-      ["step_up", "u1"],
+      ["step_up", "l1"],
+      ["step_up", "l1"],
     ]);
   });
 
@@ -224,7 +230,7 @@ describe("verifyStepUp - attempt limit (N-1)", () => {
     });
 
     expect(
-      await verifyStepUp("u1", { currentPassword: PASSWORD }, ACTION),
+      await verifyStepUp(SESSION, { currentPassword: PASSWORD }, ACTION),
     ).toEqual({
       ok: false,
       status: 429,
@@ -244,17 +250,17 @@ describe("verifyStepUp - attempt limit (N-1)", () => {
     const token = speakeasy.totp({ secret, encoding: "base32" });
 
     expect(
-      await verifyStepUp("u1", { twoFactorToken: token }, ACTION),
+      await verifyStepUp(SESSION, { twoFactorToken: token }, ACTION),
     ).toMatchObject({ ok: false, status: 503 });
     expect(updateTwoFactor).not.toHaveBeenCalled();
   });
 
   it("clears the count after a success, not after a failure", async () => {
     findUser.mockResolvedValue(userWithout2FA());
-    await verifyStepUp("u1", { currentPassword: "nope" }, ACTION);
+    await verifyStepUp(SESSION, { currentPassword: "nope" }, ACTION);
     expect(clearAttempts).not.toHaveBeenCalled();
 
-    await verifyStepUp("u1", { currentPassword: PASSWORD }, ACTION);
-    expect(clearAttempts).toHaveBeenCalledWith("step_up", "u1");
+    await verifyStepUp(SESSION, { currentPassword: PASSWORD }, ACTION);
+    expect(clearAttempts).toHaveBeenCalledWith("step_up", "l1");
   });
 });

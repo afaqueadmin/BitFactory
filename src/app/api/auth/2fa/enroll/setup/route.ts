@@ -23,9 +23,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    let userId: string;
+    let loginId: string;
     try {
-      ({ userId } = await verifyEnrollmentToken(token));
+      ({ loginId } = await verifyEnrollmentToken(token));
     } catch {
       return NextResponse.json(
         { error: "Your setup session has expired. Please log in again." },
@@ -33,10 +33,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Enrollment is only for accounts without 2FA - it must not become a way
+    // Enrollment is only for logins without 2FA - it must not become a way
     // to replace an existing authenticator.
     const existing = await prisma.twoFactorAuth.findUnique({
-      where: { userId },
+      where: { loginId },
       select: { enabled: true },
     });
     if (existing?.enabled) {
@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    return NextResponse.json(await beginTwoFactorSetup(userId));
+    return NextResponse.json(await beginTwoFactorSetup(loginId));
   } catch (error) {
     console.error("2FA enroll setup error:", error);
     return NextResponse.json(

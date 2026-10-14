@@ -24,6 +24,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import ElectricityCostTable from "@/components/ElectricityCostTable";
 import HostedMinersList from "@/components/HostedMinersList";
 import PoolAuthSection from "@/components/PoolAuthSection";
+import LoginEmailsSection from "@/components/LoginEmailsSection";
 import HashrateHistoryChart from "@/components/HashrateHistoryChart";
 import TransactionHistorySection from "@/components/TransactionHistorySection";
 import CustomerInvoicesTable from "@/components/CustomerInvoicesTable";
@@ -873,6 +874,25 @@ export default function CustomerDetailPage() {
               customerId={customerId}
               onChange={refreshSubaccountData}
             />
+          </Paper>
+
+          {/* Sign-in emails: the primary, plus an optional second one for
+              another person on the account. */}
+          <Paper
+            elevation={3}
+            sx={{
+              p: 3,
+              mb: 4,
+              borderRadius: 2,
+              background: (theme) =>
+                theme.palette.mode === "dark"
+                  ? "linear-gradient(145deg, rgba(40,40,40,0.9), rgba(30,30,30,0.9))"
+                  : "linear-gradient(145deg, rgba(255,255,255,0.9), rgba(250,250,250,0.9))",
+              backdropFilter: "blur(10px)",
+              border: (theme) => `1px solid ${theme.palette.divider}`,
+            }}
+          >
+            <LoginEmailsSection customerId={customerId} />
           </Paper>
 
           {/* Hashrate & Shares Efficiency history for this customer. The API

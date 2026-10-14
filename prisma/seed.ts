@@ -12,28 +12,44 @@ async function main() {
   await prisma.user.deleteMany();
 
   // Create regular user
+  const userPassword = await hash("123456", 12);
   const user = await prisma.user.create({
     data: {
       email: "admin@example.com",
-      password: await hash("123456", 12),
+      password: userPassword,
       name: "Regular User",
       role: "CLIENT",
       city: "Dubai",
       country: "UAE",
       invoicedAmount: 4250,
+      logins: {
+        create: {
+          email: "admin@example.com",
+          password: userPassword,
+          isPrimary: true,
+        },
+      },
     },
   });
 
   // Create admin user
+  const adminPassword = await hash("AdminAhmedHiggs2025!", 12);
   const adminUser = await prisma.user.create({
     data: {
       email: "afaque@higgs.ae",
-      password: await hash("AdminAhmedHiggs2025!", 12),
+      password: adminPassword,
       name: "Afaque Ahmed",
       role: "ADMIN",
       city: "Dubai",
       country: "UAE",
       invoicedAmount: 4250,
+      logins: {
+        create: {
+          email: "afaque@higgs.ae",
+          password: adminPassword,
+          isPrimary: true,
+        },
+      },
     },
   });
 

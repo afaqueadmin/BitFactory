@@ -26,7 +26,6 @@ const PROFILE_SELECT = {
   idNumber: true,
   companyUrl: true,
   role: true,
-  twoFactorAuth: { select: { enabled: true } },
   isDeleted: true,
 } satisfies Prisma.UserSelect;
 
@@ -60,10 +59,14 @@ export async function GET(request: NextRequest) {
     }
 
     let userId: string;
+    // Whose security settings to report: the signed-in login, or (when
+    // looking at a customer) that customer's primary login.
+    let loginId: string | null;
     let userRole: string;
     try {
       const decoded = await verifyJwtToken(token);
       userId = decoded.userId;
+      loginId = decoded.loginId;
       userRole = decoded.role;
       console.log("Profile API [GET]: Token verified, userId:", userId);
     } catch (error) {
@@ -97,12 +100,22 @@ export async function GET(request: NextRequest) {
         );
       }
       userId = customerId;
+      loginId = null;
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: PROFILE_SELECT,
-    });
+    const [user, login] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: PROFILE_SELECT,
+      }),
+      prisma.userLogin.findFirst({
+        where: loginId ? { id: loginId, userId } : { userId, isPrimary: true },
+        select: {
+          email: true,
+          twoFactorAuth: { select: { enabled: true } },
+        },
+      }),
+    ]);
 
     if (!user) {
       console.error("Profile API [GET]: User not found for id:", userId);
@@ -132,26 +145,27 @@ export async function GET(request: NextRequest) {
     console.log("Profile API [GET]: Successfully fetched data");
 
     // Keep the response shape flat (twoFactorEnabled as a top-level boolean)
-    // for existing consumers, even though it now lives in its own table.
-    const { twoFactorAuth, ...userFields } = user;
-    const twoFactorEnabled = twoFactorAuth?.enabled ?? false;
+    // for existing consumers, even though it now lives on the login. `email`
+    // stays the account's (primary) email; `loginEmail` is the one whose
+    // 2FA this reports - the signed-in one.
+    const twoFactorEnabled = login?.twoFactorAuth?.enabled ?? false;
 
     return Response.json(
       {
         user: {
-          ...userFields,
+          ...user,
+          loginEmail: login?.email ?? user.email,
           twoFactorEnabled,
           // M-1: when set, the account must enable 2FA by this date (shown
           // as a reminder in the app); null once it's enabled.
           twoFactorRequiredBy:
-            twoFactorRequirement(userFields.role, twoFactorEnabled) ===
-            "satisfied"
+            twoFactorRequirement(user.role, twoFactorEnabled) === "satisfied"
               ? null
               : twoFactorEnforceFrom().toISOString(),
           // M-1: 2FA is enforced for this role, so it can't be turned off
           // (the disable route refuses); settings offers replacing it instead.
           twoFactorMandatory:
-            twoFactorRequirement(userFields.role, false) === "enforced",
+            twoFactorRequirement(user.role, false) === "enforced",
         },
         subaccounts: luxorSubaccounts,
         recentActivities,
