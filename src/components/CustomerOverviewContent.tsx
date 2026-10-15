@@ -56,6 +56,7 @@ import CreateUserModal from "@/components/CreateUserModal";
 import EditCustomerModal from "@/components/EditCustomerModal";
 import EditFranchiseeModal from "@/components/EditFranchiseeModal";
 import ChangePasswordModal from "@/components/ChangePasswordModal";
+import ChangeAccountTypeModal from "@/components/ChangeAccountTypeModal";
 import { canManageAccount } from "@/lib/auth/accountTiers";
 
 interface FetchedUser {
@@ -126,6 +127,7 @@ export default function CustomerOverviewContent() {
     useState<FranchiseData | null>(null);
   const [franchiseeLookupError, setFranchiseeLookupError] = useState("");
   const [changePasswordModalOpen, setChangePasswordModalOpen] = useState(false);
+  const [accountTypeModalOpen, setAccountTypeModalOpen] = useState(false);
   const [showDeleted, setShowDeleted] = useState(false);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<FetchedUser | null>(
@@ -498,9 +500,45 @@ export default function CustomerOverviewContent() {
     }
   };
 
+  const handleRestoreCustomer = async () => {
+    if (!selectedCustomer) return;
+    const target = selectedCustomer;
+    handleMenuClose();
+
+    if (!window.confirm(`Restore customer "${target.name}"?`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/user/${target.id}/restore`, {
+        method: "POST",
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to restore customer");
+      }
+      setResponseNotification("Customer restored successfully");
+      await refetchUsers();
+    } catch (err) {
+      setResponseNotification(
+        `Failed to restore customer: ${
+          err instanceof Error ? err.message : "unknown error"
+        }`,
+      );
+    }
+  };
+
+  const handleChangeAccountType = () => {
+    if (selectedCustomer) {
+      setAccountTypeModalOpen(true);
+    }
+    handleMenuClose();
+  };
+
   const handleModalClose = () => {
     setEditModalOpen(false);
     setChangePasswordModalOpen(false);
+    setAccountTypeModalOpen(false);
     setSelectedCustomer(null);
   };
 
@@ -602,6 +640,14 @@ export default function CustomerOverviewContent() {
           customerId={selectedCustomer.id}
         />
       )}
+
+      {/* Change Account Type Modal - franchisee <-> regular customer */}
+      <ChangeAccountTypeModal
+        open={accountTypeModalOpen}
+        onClose={handleModalClose}
+        onSuccess={handleUserCreated}
+        customer={selectedCustomer}
+      />
 
       <Snackbar
         open={Boolean(responseNotification)}
@@ -1061,17 +1107,36 @@ export default function CustomerOverviewContent() {
         >
           Sign Out All Devices
         </MenuItem>
-        <MenuItem
-          onClick={handleDeleteCustomer}
-          sx={{ color: "error.main" }}
-          disabled={
-            !selectedCustomer ||
-            selectedCustomer.isDeleted ||
-            !canManage(selectedCustomer)
-          }
-        >
-          Delete Customer
-        </MenuItem>
+        {(selectedCustomer?.role === "CLIENT" ||
+          selectedCustomer?.role === "FRANCHISEE") && (
+          <MenuItem
+            onClick={handleChangeAccountType}
+            disabled={
+              selectedCustomer.isDeleted || !canManage(selectedCustomer)
+            }
+          >
+            {selectedCustomer.role === "FRANCHISEE"
+              ? "Change to Regular Customer"
+              : "Change to Franchisee"}
+          </MenuItem>
+        )}
+        {selectedCustomer?.isDeleted ? (
+          <MenuItem
+            onClick={handleRestoreCustomer}
+            sx={{ color: "success.main" }}
+            disabled={!canManage(selectedCustomer)}
+          >
+            Restore Customer
+          </MenuItem>
+        ) : (
+          <MenuItem
+            onClick={handleDeleteCustomer}
+            sx={{ color: "error.main" }}
+            disabled={!selectedCustomer || !canManage(selectedCustomer)}
+          >
+            Delete Customer
+          </MenuItem>
+        )}
       </Menu>
 
       {/* Activity Chart Section */}
