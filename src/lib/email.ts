@@ -1467,7 +1467,7 @@ ${fields
   return fields
     .map(
       ([label, value]) => `      <div class="info-row">
-        <span class="info-label">${label}:</span>
+        <span class="info-label">${label}</span>
         <span class="info-value">${escapeHtml(value)}</span>
       </div>`,
     )
@@ -1506,15 +1506,12 @@ const buildRepairTotalRowsHtml = (
 const PRODUCTS_TABLE_REGEX = /<table class="products-table">[\s\S]*?<\/table>/;
 // The info box's closing tag, right before the products table.
 const INFO_BOX_END_REGEX = /(\s*<\/div>\s*<!-- Products Table -->)/;
-// Payment instructions through the page-1 footer.
-const PAYMENT_TO_FOOTER_REGEX =
-  /<!-- Payment Instructions -->[\s\S]*?\{\{footerSectionPage1\}\}/;
 
 /**
- * Repair PDF layout: miner fields appended to the invoice info box, the
+ * Repair PDF layout: miner fields appended to the invoice info box, and the
  * products table swapped for Description | Qty | Rate | Amount with
- * Subtotal / Discount / Total, and the payment instructions + footer moved
- * to page 2 (the template's `terms-page` page break).
+ * Subtotal / Discount / Total. Payment instructions and contacts are on
+ * page 2 of the template for every invoice type.
  */
 const applyRepairPdfLayout = (
   template: string,
@@ -1525,7 +1522,6 @@ const applyRepairPdfLayout = (
   for (const [regex, what] of [
     [PRODUCTS_TABLE_REGEX, "products table"],
     [INFO_BOX_END_REGEX, "info box end"],
-    [PAYMENT_TO_FOOTER_REGEX, "payment section"],
   ] as const) {
     if (!regex.test(template)) {
       throw new Error(`invoice-pdf.html: ${what} not found`);
@@ -1551,11 +1547,7 @@ ${buildRepairTotalRowsHtml(repair, totalAmount, "pdf")}
   // Function replacements so "$" in the HTML is never treated as a pattern.
   return template
     .replace(INFO_BOX_END_REGEX, (closing) => `\n${minerRows}${closing}`)
-    .replace(PRODUCTS_TABLE_REGEX, () => repairTable)
-    .replace(
-      PAYMENT_TO_FOOTER_REGEX,
-      (section) => `<div class="terms-page">\n    ${section}\n    </div>`,
-    );
+    .replace(PRODUCTS_TABLE_REGEX, () => repairTable);
 };
 
 interface FooterSectionData {
@@ -1569,10 +1561,9 @@ interface FooterSectionData {
 }
 
 // Pre-rendered as a single HTML fragment (rather than left as template
-// {{#if}} tags) so it can be dropped into either page of the PDF via a
-// plain {{footerSectionPageN}} variable - the template's regex-based
-// {{#if}} engine doesn't support nested conditionals, and this block has
-// four of its own.
+// {{#if}} tags) and dropped in via a plain {{footerSection}} variable - the
+// template's regex-based {{#if}} engine doesn't support nested
+// conditionals, and this block has four of its own.
 const buildFooterSectionHtml = (footer: FooterSectionData): string => {
   const billingEmailRow = footer.billingInquiriesEmail
     ? `<div class="footer-contact-item">Email: <a href="mailto:${escapeHtml(footer.billingInquiriesEmail)}">${escapeHtml(footer.billingInquiriesEmail)}</a></div>`
@@ -1691,9 +1682,8 @@ export const generateInvoicePDF = async (
       }
     }
 
-    // Invoice PDFs get a second page (Terms & Conditions) only for
-    // Hardware Sales invoices - the footer moves to the bottom of that
-    // second page for those, and stays on the single page otherwise.
+    // Every invoice PDF has a second page with the payment instructions and
+    // contact details; Hardware Sales invoices add Terms & Conditions there.
     const isHardwareSales = invoiceType === "HARDWARE_SALES";
     const footerSectionHtml = buildFooterSectionHtml({
       companyName: paymentDetails?.companyName,
@@ -1730,8 +1720,7 @@ export const generateInvoicePDF = async (
       ),
       discountSummaryRows: buildDiscountSummaryRowsHtml(lineItems, invoiceType),
       isHardwareSales,
-      footerSectionPage1: isHardwareSales ? "" : footerSectionHtml,
-      footerSectionPage2: isHardwareSales ? footerSectionHtml : "",
+      footerSection: footerSectionHtml,
       invoiceId,
       generatedDate: formatDate(generatedDate),
       cryptoPaymentUrl: cryptoPaymentUrl || "",
