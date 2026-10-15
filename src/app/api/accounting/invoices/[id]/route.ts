@@ -13,7 +13,10 @@ import {
   costPaymentAccountInclude,
   costPaymentAccountOmit,
 } from "@/lib/accounting/costPaymentAccounts";
-import { parseLineItemBillingMonths } from "@/lib/accounting/hostingMonths";
+import {
+  validateStandardLineItems,
+  type ValidatedLineItems,
+} from "@/lib/accounting/invoiceLineItems";
 import { REPAIR_MINER_SELECT } from "@/lib/accounting/hardwareRepair";
 import { updateRepairInvoice } from "../repair";
 
@@ -190,72 +193,13 @@ export async function PATCH(
 
     const hasLineItems = Array.isArray(lineItems) && lineItems.length > 0;
 
-    let validatedLineItems: Array<{
-      hardwareId: string;
-      model: string;
-      quantity: number;
-      unitPrice: number;
-      totalPrice: number;
-      lineItemType: "HARDWARE" | "HOSTING_COLOCATION";
-      billingMonth: Date | null;
-    }> = [];
-
+    let validated: ValidatedLineItems | null = null;
     if (hasLineItems) {
-      for (const item of lineItems) {
-        if (
-          !item ||
-          typeof item.hardwareId !== "string" ||
-          !item.hardwareId ||
-          typeof item.model !== "string" ||
-          !item.model ||
-          typeof item.quantity !== "number" ||
-          item.quantity <= 0 ||
-          typeof item.unitPrice !== "number" ||
-          item.unitPrice <= 0 ||
-          (item.lineItemType !== undefined &&
-            item.lineItemType !== "HARDWARE" &&
-            item.lineItemType !== "HOSTING_COLOCATION")
-        ) {
-          return NextResponse.json(
-            {
-              error:
-                "Each line item requires hardwareId, model, quantity > 0, unitPrice > 0, and a valid lineItemType",
-            },
-            { status: 400 },
-          );
-        }
+      const result = validateStandardLineItems(lineItems);
+      if ("error" in result) {
+        return NextResponse.json({ error: result.error }, { status: 400 });
       }
-
-      const parsedMonths = parseLineItemBillingMonths(lineItems);
-      if ("error" in parsedMonths) {
-        return NextResponse.json(
-          { error: parsedMonths.error },
-          { status: 400 },
-        );
-      }
-
-      validatedLineItems = lineItems.map(
-        (
-          item: {
-            hardwareId: string;
-            model: string;
-            quantity: number;
-            unitPrice: number;
-            lineItemType?: "HARDWARE" | "HOSTING_COLOCATION";
-          },
-          index: number,
-        ) => ({
-          hardwareId: item.hardwareId,
-          model: item.model,
-          quantity: item.quantity,
-          unitPrice: Number(item.unitPrice),
-          totalPrice: parseFloat(
-            (item.quantity * Number(item.unitPrice)).toFixed(2),
-          ),
-          lineItemType: item.lineItemType || "HARDWARE",
-          billingMonth: parsedMonths.months[index],
-        }),
-      );
+      validated = result;
     }
 
     const updateData: Record<string, unknown> = { updatedBy: userId };
@@ -265,39 +209,18 @@ export async function PATCH(
     let newUnitPrice = unitPrice;
     let newTotalAmount: number;
 
-    if (hasLineItems) {
-      // totalAmount is the full invoice total (hardware + hosting &
-      // colocation, if any). totalMiners/unitPrice are the "miners sold"
-      // summary and must only reflect HARDWARE line items - hosting rows
-      // share the same quantity as their hardware counterpart, so folding
-      // them in double-counts miners and skews the unit price.
-      const hardwareLineItems = validatedLineItems.filter(
-        (item) => item.lineItemType === "HARDWARE",
-      );
-      newTotalMiners = hardwareLineItems.reduce(
-        (sum, item) => sum + item.quantity,
-        0,
-      );
-      const hardwareTotalAmount = hardwareLineItems.reduce(
-        (sum, item) => sum + item.totalPrice,
-        0,
-      );
-      newTotalAmount = parseFloat(
-        validatedLineItems
-          .reduce((sum, item) => sum + item.totalPrice, 0)
-          .toFixed(2),
-      );
-      newUnitPrice =
-        newTotalMiners > 0
-          ? parseFloat((hardwareTotalAmount / newTotalMiners).toFixed(2))
-          : 0;
+    if (validated) {
+      newTotalMiners = validated.totalMiners;
+      newUnitPrice = validated.unitPrice;
+      newTotalAmount = validated.totalAmount;
 
       updateData.totalMiners = newTotalMiners;
       updateData.unitPrice = newUnitPrice;
       updateData.totalAmount = newTotalAmount;
+      // Every row is replaced; discounts are added once their rows exist.
       updateData.lineItems = {
         deleteMany: {},
-        create: validatedLineItems,
+        create: validated.parentRows,
       };
       changes.lineItems = {
         from: currentInvoice.lineItems.map((li) => ({
@@ -305,7 +228,7 @@ export async function PATCH(
           quantity: li.quantity,
           unitPrice: li.unitPrice,
         })),
-        to: validatedLineItems.map((li) => ({
+        to: [...validated.parentRows, ...validated.discountRows].map((li) => ({
           model: li.model,
           quantity: li.quantity,
           unitPrice: li.unitPrice,
@@ -352,18 +275,28 @@ export async function PATCH(
       };
     }
 
-    const invoice = await prisma.invoice.update({
-      where: { id },
-      data: updateData,
-      include: {
-        user: { select: { id: true, email: true, name: true } },
-        createdByUser: { select: { id: true, email: true, name: true } },
-        updatedByUser: { select: { id: true, email: true, name: true } },
-        // Keep the payment accounts: this response replaces the cached
-        // invoice, and the Payments card would otherwise show "—".
-        costPayments: { include: costPaymentAccountInclude },
-        lineItems: true,
-      },
+    const invoice = await prisma.$transaction(async (tx) => {
+      await tx.invoice.update({ where: { id }, data: updateData });
+      if (validated && validated.discountRows.length > 0) {
+        await tx.invoiceLineItem.createMany({
+          data: validated.discountRows.map((row) => ({
+            ...row,
+            invoiceId: id,
+          })),
+        });
+      }
+      return tx.invoice.findUniqueOrThrow({
+        where: { id },
+        include: {
+          user: { select: { id: true, email: true, name: true } },
+          createdByUser: { select: { id: true, email: true, name: true } },
+          updatedByUser: { select: { id: true, email: true, name: true } },
+          // Keep the payment accounts: this response replaces the cached
+          // invoice, and the Payments card would otherwise show "—".
+          costPayments: { include: costPaymentAccountInclude },
+          lineItems: true,
+        },
+      });
     });
 
     // Log audit

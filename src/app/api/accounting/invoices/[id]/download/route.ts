@@ -100,6 +100,8 @@ export async function GET(
         lineItemType: li.lineItemType,
         hardwareId: li.hardwareId,
         billingMonth: li.billingMonth,
+        id: li.id,
+        parentLineItemId: li.parentLineItemId,
       })),
       invoice.invoiceType,
       invoice.machineHostingLocation,

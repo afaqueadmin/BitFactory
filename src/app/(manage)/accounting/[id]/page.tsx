@@ -44,6 +44,7 @@ import {
 import { useUser } from "@/lib/hooks/useUser";
 import { StatusBadge } from "@/components/accounting/common/StatusBadge";
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
+import { InvoiceLineItemsTable } from "@/components/accounting/invoices/InvoiceLineItemsTable";
 import { InvoicePaymentsCard } from "@/components/accounting/common/InvoicePaymentsCard";
 import { DateDisplay } from "@/components/accounting/common/DateDisplay";
 import EditIcon from "@mui/icons-material/Edit";
@@ -605,38 +606,10 @@ export default function InvoiceDetailPage() {
               <CardHeader title="Line Items" />
               <Divider />
               <CardContent>
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Model</TableCell>
-                      <TableCell align="right">Number of Miners</TableCell>
-                      <TableCell align="right">Unit Price (USD)</TableCell>
-                      <TableCell align="right">Total Price (USD)</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {invoice.lineItems.map(
-                      (item: {
-                        id: string;
-                        model: string;
-                        quantity: number;
-                        unitPrice: number | string;
-                        totalPrice: number | string;
-                      }) => (
-                        <TableRow key={item.id}>
-                          <TableCell>{item.model}</TableCell>
-                          <TableCell align="right">{item.quantity}</TableCell>
-                          <TableCell align="right">
-                            <CurrencyDisplay value={item.unitPrice} />
-                          </TableCell>
-                          <TableCell align="right">
-                            <CurrencyDisplay value={item.totalPrice} />
-                          </TableCell>
-                        </TableRow>
-                      ),
-                    )}
-                  </TableBody>
-                </Table>
+                <InvoiceLineItemsTable
+                  lineItems={invoice.lineItems}
+                  quantityLabel="Number of Miners"
+                />
               </CardContent>
             </Card>
           )}

@@ -27,13 +27,8 @@ import {
   TextField,
   Checkbox,
   FormControlLabel,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
 } from "@mui/material";
-import { sortLineItems } from "@/components/accounting/invoices/LineItemsEditor";
+import { InvoiceLineItemsTable } from "@/components/accounting/invoices/InvoiceLineItemsTable";
 import {
   useInvoice,
   useDeleteInvoice,
@@ -530,39 +525,10 @@ export default function InvoiceDetailPage() {
               <CardHeader title="Line Items" />
               <Divider />
               <CardContent>
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Model</TableCell>
-                      <TableCell align="right">Quantity</TableCell>
-                      <TableCell align="right">Unit Price (USD)</TableCell>
-                      <TableCell align="right">Total Price (USD)</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {sortLineItems(
-                      invoice.lineItems as Array<{
-                        id: string;
-                        model: string;
-                        quantity: number;
-                        unitPrice: number | string;
-                        totalPrice: number | string;
-                        lineItemType: "HARDWARE" | "HOSTING_COLOCATION";
-                      }>,
-                    ).map((item) => (
-                      <TableRow key={item.id}>
-                        <TableCell>{item.model}</TableCell>
-                        <TableCell align="right">{item.quantity}</TableCell>
-                        <TableCell align="right">
-                          <CurrencyDisplay value={item.unitPrice} />
-                        </TableCell>
-                        <TableCell align="right">
-                          <CurrencyDisplay value={item.totalPrice} />
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                <InvoiceLineItemsTable
+                  lineItems={invoice.lineItems}
+                  quantityLabel="Quantity"
+                />
               </CardContent>
             </Card>
           )}

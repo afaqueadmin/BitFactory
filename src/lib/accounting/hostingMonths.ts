@@ -7,7 +7,8 @@
  * before months existed have none.
  */
 
-export type LineItemKind = "HARDWARE" | "HOSTING_COLOCATION" | "REPAIR";
+export type LineItemKind =
+  "HARDWARE" | "HOSTING_COLOCATION" | "REPAIR" | "DISCOUNT";
 
 type MonthValue = string | Date | null | undefined;
 
@@ -74,24 +75,46 @@ export function hostingLineItemLabel(
 const monthTime = (value: MonthValue): number =>
   value ? new Date(value).getTime() : -Infinity;
 
+type SortableLineItem = {
+  lineItemType?: LineItemKind | null;
+  hardwareId?: string | null;
+  billingMonth?: MonthValue;
+};
+
+/**
+ * How a row is identified, and which row a DISCOUNT sits under. Stored rows
+ * use id/parentLineItemId; the line-items editor uses its own client keys.
+ */
+export interface LineItemLinks<T> {
+  idOf: (item: T) => string | null | undefined;
+  parentOf: (item: T) => string | null | undefined;
+}
+
+const storedLinks = <T>(): LineItemLinks<T> => ({
+  idOf: (item) => (item as { id?: string | null }).id,
+  parentOf: (item) =>
+    (item as { parentLineItemId?: string | null }).parentLineItemId,
+});
+
 /**
  * Display order for invoice line items: all HARDWARE rows first (in their
  * original order), then HOSTING_COLOCATION rows grouped by hardware model -
  * following the order of the hardware rows - and by month within a model.
  * Rows without a month (pre-existing data) sort before dated ones in their
- * group. Ties keep their original order.
+ * group. Ties keep their original order. Each DISCOUNT row follows the row
+ * it belongs to; one whose row is missing goes last.
  */
-export function sortInvoiceLineItems<
-  T extends {
-    lineItemType?: LineItemKind | null;
-    hardwareId?: string | null;
-    billingMonth?: MonthValue;
-  },
->(items: T[]): T[] {
+export function sortInvoiceLineItems<T extends SortableLineItem>(
+  items: T[],
+  links: LineItemLinks<T> = storedLinks<T>(),
+): T[] {
   const typeOf = (item: T): LineItemKind => item.lineItemType || "HARDWARE";
 
+  const rows = items.filter((item) => typeOf(item) !== "DISCOUNT");
+  const discounts = items.filter((item) => typeOf(item) === "DISCOUNT");
+
   const hardwareOrder = new Map<string, number>();
-  items.forEach((item) => {
+  rows.forEach((item) => {
     const id = item.hardwareId || "";
     if (typeOf(item) === "HARDWARE" && !hardwareOrder.has(id)) {
       hardwareOrder.set(id, hardwareOrder.size);
@@ -100,7 +123,7 @@ export function sortInvoiceLineItems<
   const groupOf = (item: T) =>
     hardwareOrder.get(item.hardwareId || "") ?? Number.MAX_SAFE_INTEGER;
 
-  return items
+  const sortedRows = rows
     .map((item, index) => ({ item, index }))
     .sort((a, b) => {
       const aHosting = typeOf(a.item) === "HOSTING_COLOCATION" ? 1 : 0;
@@ -116,6 +139,43 @@ export function sortInvoiceLineItems<
       return a.index - b.index;
     })
     .map(({ item }) => item);
+
+  if (discounts.length === 0) return sortedRows;
+
+  const placed = new Set<T>();
+  const result: T[] = [];
+  for (const row of sortedRows) {
+    result.push(row);
+    const id = links.idOf(row);
+    if (!id) continue;
+    for (const discount of discounts) {
+      if (!placed.has(discount) && links.parentOf(discount) === id) {
+        result.push(discount);
+        placed.add(discount);
+      }
+    }
+  }
+  return [...result, ...discounts.filter((d) => !placed.has(d))];
+}
+
+export type LineItemBucket = "HARDWARE" | "HOSTING";
+
+/**
+ * Which payment bucket a row counts towards on a split Hardware Sales
+ * payment: hosting rows are HOSTING, everything else HARDWARE, and a
+ * DISCOUNT takes the bucket of the row it sits under.
+ */
+export function lineItemBucket<T extends SortableLineItem>(
+  item: T,
+  all: T[],
+  links: LineItemLinks<T> = storedLinks<T>(),
+): LineItemBucket {
+  let row: T | undefined = item;
+  if (item.lineItemType === "DISCOUNT") {
+    const parentId = links.parentOf(item);
+    row = all.find((other) => links.idOf(other) === parentId);
+  }
+  return row?.lineItemType === "HOSTING_COLOCATION" ? "HOSTING" : "HARDWARE";
 }
 
 /**

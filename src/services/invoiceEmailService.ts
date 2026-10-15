@@ -29,9 +29,11 @@ export interface InvoiceEmailPayload {
     quantity: number;
     unitPrice: number;
     totalPrice: number;
-    lineItemType?: "HARDWARE" | "HOSTING_COLOCATION" | "REPAIR";
+    lineItemType?: "HARDWARE" | "HOSTING_COLOCATION" | "REPAIR" | "DISCOUNT";
     hardwareId?: string | null;
     billingMonth?: Date | null;
+    id?: string;
+    parentLineItemId?: string | null;
   }>;
   invoiceType?: string | null;
   machineHostingLocation?: string[] | null;

@@ -139,6 +139,31 @@
     .total-row {
       font-weight: bold;
     }
+    /* Discount line items: sit under the row they come off, in green. */
+    .products-table tr.discount-row td {
+      color: #2e7d32;
+      background-color: #f1f8f4;
+      padding-top: 7px;
+      padding-bottom: 7px;
+      border-bottom: 1px solid #e3efe6;
+    }
+    .products-table td.discount-label {
+      padding-left: 28px;
+      font-style: italic;
+      word-break: break-word;
+    }
+    .products-table tr.summary-row td {
+      padding-top: 7px;
+      padding-bottom: 7px;
+      color: #555;
+    }
+    .products-table tr.summary-row td.text-right {
+      color: #212121;
+    }
+    .products-table tr.summary-discount td,
+    .products-table tr.summary-discount td.text-right {
+      color: #2e7d32;
+    }
     .payment-section {
       background-color: #e8e8e8;
       padding: 12px;
@@ -357,6 +382,7 @@
       </thead>
       <tbody>
         {{productRows}}
+        {{discountSummaryRows}}
 {{#if isHardwareSales}}
         <tr class="total-row">
           <td colspan="3">Total Amount</td>

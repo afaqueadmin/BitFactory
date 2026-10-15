@@ -37,9 +37,13 @@ export interface InvoiceLineItemInput {
   model: string;
   quantity: number;
   unitPrice: number;
-  lineItemType?: "HARDWARE" | "HOSTING_COLOCATION";
+  lineItemType?: "HARDWARE" | "HOSTING_COLOCATION" | "DISCOUNT";
   // HOSTING_COLOCATION only: ISO date of the month the row bills for.
   billingMonth?: string | null;
+  // Row key; a DISCOUNT names the row it sits under via parentKey and sends
+  // its amount as a positive unitPrice.
+  key?: string;
+  parentKey?: string | null;
 }
 
 export interface InvoiceWithDetails extends Invoice {

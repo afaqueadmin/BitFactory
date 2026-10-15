@@ -8,7 +8,10 @@ import {
 import { InvoiceStatus, AuditAction } from "@prisma/client";
 import { assertFranchiseeOwnsCustomer } from "@/lib/franchiseeScope";
 import { costPaymentAccountOmit } from "@/lib/accounting/costPaymentAccounts";
-import { parseLineItemBillingMonths } from "@/lib/accounting/hostingMonths";
+import {
+  validateStandardLineItems,
+  type ValidatedLineItems,
+} from "@/lib/accounting/invoiceLineItems";
 import {
   INVOICE_NUMBER_CUSTOMER_SELECT,
   nextInvoiceNumber,
@@ -263,98 +266,17 @@ export async function POST(request: NextRequest) {
     let computedTotalMiners = totalMiners;
     let computedUnitPrice = unitPrice;
     let computedTotalAmount: number | undefined;
-    let validatedLineItems: Array<{
-      hardwareId: string;
-      model: string;
-      quantity: number;
-      unitPrice: number;
-      totalPrice: number;
-      lineItemType: "HARDWARE" | "HOSTING_COLOCATION";
-      billingMonth: Date | null;
-    }> = [];
+    let validated: ValidatedLineItems | null = null;
 
     if (hasLineItems) {
-      for (const item of lineItems) {
-        if (
-          !item ||
-          typeof item.hardwareId !== "string" ||
-          !item.hardwareId ||
-          typeof item.model !== "string" ||
-          !item.model ||
-          typeof item.quantity !== "number" ||
-          item.quantity <= 0 ||
-          typeof item.unitPrice !== "number" ||
-          item.unitPrice <= 0 ||
-          (item.lineItemType !== undefined &&
-            item.lineItemType !== "HARDWARE" &&
-            item.lineItemType !== "HOSTING_COLOCATION")
-        ) {
-          return NextResponse.json(
-            {
-              error:
-                "Each line item requires hardwareId, model, quantity > 0, unitPrice > 0, and a valid lineItemType",
-            },
-            { status: 400 },
-          );
-        }
+      const result = validateStandardLineItems(lineItems);
+      if ("error" in result) {
+        return NextResponse.json({ error: result.error }, { status: 400 });
       }
-
-      const parsedMonths = parseLineItemBillingMonths(lineItems);
-      if ("error" in parsedMonths) {
-        return NextResponse.json(
-          { error: parsedMonths.error },
-          { status: 400 },
-        );
-      }
-
-      validatedLineItems = lineItems.map(
-        (
-          item: {
-            hardwareId: string;
-            model: string;
-            quantity: number;
-            unitPrice: number;
-            lineItemType?: "HARDWARE" | "HOSTING_COLOCATION";
-          },
-          index: number,
-        ) => ({
-          hardwareId: item.hardwareId,
-          model: item.model,
-          quantity: item.quantity,
-          unitPrice: Number(item.unitPrice),
-          totalPrice: parseFloat(
-            (item.quantity * Number(item.unitPrice)).toFixed(2),
-          ),
-          lineItemType: item.lineItemType || "HARDWARE",
-          billingMonth: parsedMonths.months[index],
-        }),
-      );
-
-      // totalAmount is the full invoice total (hardware + hosting &
-      // colocation, if any). totalMiners/unitPrice are the "miners sold"
-      // summary and must only reflect HARDWARE line items - hosting rows
-      // share the same quantity as their hardware counterpart, so folding
-      // them in double-counts miners and skews the unit price.
-      const hardwareLineItems = validatedLineItems.filter(
-        (item) => item.lineItemType === "HARDWARE",
-      );
-      computedTotalMiners = hardwareLineItems.reduce(
-        (sum, item) => sum + item.quantity,
-        0,
-      );
-      const hardwareTotalAmount = hardwareLineItems.reduce(
-        (sum, item) => sum + item.totalPrice,
-        0,
-      );
-      computedTotalAmount = parseFloat(
-        validatedLineItems
-          .reduce((sum, item) => sum + item.totalPrice, 0)
-          .toFixed(2),
-      );
-      computedUnitPrice =
-        computedTotalMiners > 0
-          ? parseFloat((hardwareTotalAmount / computedTotalMiners).toFixed(2))
-          : 0;
+      validated = result;
+      computedTotalMiners = result.totalMiners;
+      computedUnitPrice = result.unitPrice;
+      computedTotalAmount = result.totalAmount;
     }
 
     // Fetch customer to get their Luxor identifier for the invoice number
@@ -400,32 +322,47 @@ export async function POST(request: NextRequest) {
       ? (computedTotalAmount as number)
       : parseFloat((totalMiners * numericUnitPrice).toFixed(2));
 
-    const invoice = await prisma.invoice.create({
-      data: {
-        invoiceNumber,
-        userId: customerId,
-        hardwareId: hasLineItems ? undefined : hardwareId || undefined,
-        totalMiners: hasLineItems ? computedTotalMiners : totalMiners,
-        unitPrice: numericUnitPrice,
-        totalAmount,
-        status: status || InvoiceStatus.DRAFT,
-        invoiceType: invoiceType || "ELECTRICITY_CHARGES",
-        invoiceGeneratedDate: invoiceGeneratedDate
-          ? new Date(invoiceGeneratedDate)
-          : timestamp,
-        dueDate: new Date(dueDate),
-        billingMonth: billingMonth
-          ? normalizeBillingMonth(billingMonth)
-          : undefined,
-        machineHostingLocation: normalizedMachineHostingLocation,
-        createdBy: userId,
-        lineItems: hasLineItems ? { create: validatedLineItems } : undefined,
-      },
-      include: {
-        user: { select: { id: true, email: true, name: true } },
-        createdByUser: { select: { id: true, email: true, name: true } },
-        lineItems: true,
-      },
+    // Discount rows reference their row's id, so they go in after the
+    // invoice and its other rows exist.
+    const invoice = await prisma.$transaction(async (tx) => {
+      const created = await tx.invoice.create({
+        data: {
+          invoiceNumber,
+          userId: customerId,
+          hardwareId: hasLineItems ? undefined : hardwareId || undefined,
+          totalMiners: hasLineItems ? computedTotalMiners : totalMiners,
+          unitPrice: numericUnitPrice,
+          totalAmount,
+          status: status || InvoiceStatus.DRAFT,
+          invoiceType: invoiceType || "ELECTRICITY_CHARGES",
+          invoiceGeneratedDate: invoiceGeneratedDate
+            ? new Date(invoiceGeneratedDate)
+            : timestamp,
+          dueDate: new Date(dueDate),
+          billingMonth: billingMonth
+            ? normalizeBillingMonth(billingMonth)
+            : undefined,
+          machineHostingLocation: normalizedMachineHostingLocation,
+          createdBy: userId,
+          lineItems: validated ? { create: validated.parentRows } : undefined,
+        },
+      });
+      if (validated && validated.discountRows.length > 0) {
+        await tx.invoiceLineItem.createMany({
+          data: validated.discountRows.map((row) => ({
+            ...row,
+            invoiceId: created.id,
+          })),
+        });
+      }
+      return tx.invoice.findUniqueOrThrow({
+        where: { id: created.id },
+        include: {
+          user: { select: { id: true, email: true, name: true } },
+          createdByUser: { select: { id: true, email: true, name: true } },
+          lineItems: true,
+        },
+      });
     });
 
     // Log audit

@@ -3,9 +3,28 @@ import {
   consecutiveBillingMonths,
   formatBillingMonthRange,
   hostingLineItemLabel,
+  lineItemBucket,
   parseLineItemBillingMonths,
   sortInvoiceLineItems,
 } from "../hostingMonths";
+
+describe("lineItemBucket", () => {
+  const items = [
+    { id: "hw", lineItemType: "HARDWARE" as const, hardwareId: "A" },
+    { id: "h", lineItemType: "HOSTING_COLOCATION" as const, hardwareId: "A" },
+    { id: "d1", lineItemType: "DISCOUNT" as const, parentLineItemId: "hw" },
+    { id: "d2", lineItemType: "DISCOUNT" as const, parentLineItemId: "h" },
+  ];
+
+  it("gives a discount its row's bucket", () => {
+    expect(items.map((i) => lineItemBucket(i, items))).toEqual([
+      "HARDWARE",
+      "HOSTING",
+      "HARDWARE",
+      "HOSTING",
+    ]);
+  });
+});
 
 describe("consecutiveBillingMonths", () => {
   it("rolls over into the next year", () => {
@@ -86,6 +105,51 @@ describe("sortInvoiceLineItems", () => {
       "hA-oct",
       "hA-nov",
     ]);
+  });
+
+  it("puts each discount right after its row, orphans last", () => {
+    const items = [
+      {
+        id: "d-host",
+        lineItemType: "DISCOUNT" as const,
+        parentLineItemId: "hA-oct",
+      },
+      {
+        id: "hA-oct",
+        lineItemType: "HOSTING_COLOCATION" as const,
+        hardwareId: "A",
+        billingMonth: "2026-10-01T00:00:00.000Z",
+      },
+      {
+        id: "d-orphan",
+        lineItemType: "DISCOUNT" as const,
+        parentLineItemId: "x",
+      },
+      { id: "A", lineItemType: "HARDWARE" as const, hardwareId: "A" },
+      { id: "d-A", lineItemType: "DISCOUNT" as const, parentLineItemId: "A" },
+      { id: "B", lineItemType: "HARDWARE" as const, hardwareId: "B" },
+    ];
+    expect(sortInvoiceLineItems(items).map((i) => i.id)).toEqual([
+      "A",
+      "d-A",
+      "B",
+      "hA-oct",
+      "d-host",
+      "d-orphan",
+    ]);
+  });
+
+  it("links discounts by custom keys", () => {
+    const items = [
+      { key: "d", parentKey: "a", lineItemType: "DISCOUNT" as const },
+      { key: "a", lineItemType: "HARDWARE" as const, hardwareId: "A" },
+    ];
+    expect(
+      sortInvoiceLineItems(items, {
+        idOf: (i) => i.key,
+        parentOf: (i) => i.parentKey,
+      }).map((i) => i.key),
+    ).toEqual(["a", "d"]);
   });
 
   it("treats a missing lineItemType as HARDWARE", () => {

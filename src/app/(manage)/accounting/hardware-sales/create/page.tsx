@@ -29,6 +29,9 @@ import { getMinerLocations } from "@/lib/utils/minerLocation";
 import {
   LineItemsEditor,
   LineItem,
+  chargeLineItems,
+  discountLineItemsError,
+  lineItemTotals,
 } from "@/components/accounting/invoices/LineItemsEditor";
 import { LocationsMultiSelect } from "@/components/accounting/invoices/LocationsMultiSelect";
 
@@ -154,23 +157,22 @@ export default function CreateHardwareSalesInvoicePage() {
       if (!formData.customerId) {
         throw new Error("Customer is required");
       }
-      if (lineItems.length === 0) {
+      const charges = chargeLineItems(lineItems);
+      if (charges.length === 0) {
         throw new Error("Add at least one line item");
       }
-      if (lineItems.some((item) => item.quantity <= 0 || item.unitPrice <= 0)) {
+      if (charges.some((item) => item.quantity <= 0 || item.unitPrice <= 0)) {
         throw new Error(
           "Every line item must have a quantity and unit price greater than 0",
         );
       }
+      const discountError = discountLineItemsError(lineItems);
+      if (discountError) {
+        throw new Error(discountError);
+      }
 
-      const totalMiners = lineItems.reduce(
-        (sum, item) => sum + item.quantity,
-        0,
-      );
-      const totalAmount = lineItems.reduce(
-        (sum, item) => sum + item.quantity * item.unitPrice,
-        0,
-      );
+      const totalMiners = charges.reduce((sum, item) => sum + item.quantity, 0);
+      const totalAmount = lineItemTotals(lineItems).total;
 
       // Call API to create invoice
       await createInvoice({
@@ -313,7 +315,8 @@ export default function CreateHardwareSalesInvoicePage() {
                   Add each hardware model being sold, with its quantity and unit
                   price. Optionally add Hosting & Colocation charges for the
                   added models - pick a start month and how many months to bill,
-                  and each month gets its own row per model.
+                  and each month gets its own row per model. Use the tag icon to
+                  add a discount under any line.
                 </Typography>
                 <LineItemsEditor
                   lineItems={lineItems}
@@ -322,6 +325,7 @@ export default function CreateHardwareSalesInvoicePage() {
                   disabled={hardwareLoading}
                   excludeUsedModels
                   enableHostingColocation
+                  enableDiscounts
                 />
               </Stack>
             </Box>

@@ -1021,14 +1021,21 @@ model InvoiceLineItem {
   // Month a HOSTING_COLOCATION row bills for (first day of month, UTC).
   // Null on HARDWARE rows and on hosting rows created before months existed.
   billingMonth DateTime?
-  createdAt    DateTime            @default(now())
-  updatedAt    DateTime            @updatedAt
+  // DISCOUNT rows: the row this discount sits under and comes off. A
+  // discount's unitPrice/totalPrice are stored negative, so summing
+  // totalPrice gives the net total.
+  parentLineItemId String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
 
-  invoice  Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  hardware Hardware? @relation(fields: [hardwareId], references: [id])
+  invoice   Invoice           @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  hardware  Hardware?         @relation(fields: [hardwareId], references: [id])
+  parent    InvoiceLineItem?  @relation("LineItemDiscounts", fields: [parentLineItemId], references: [id], onDelete: Cascade)
+  discounts InvoiceLineItem[] @relation("LineItemDiscounts")
 
   @@index([invoiceId])
   @@index([hardwareId])
+  @@index([parentLineItemId])
   @@map("invoice_line_items")
 }
 
@@ -1460,6 +1467,7 @@ enum InvoiceLineItemType {
   HARDWARE
   HOSTING_COLOCATION
   REPAIR
+  DISCOUNT
 }
 
 enum MemoCategory {

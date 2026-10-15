@@ -1188,10 +1188,14 @@ export interface InvoicePdfLineItem {
   quantity: number;
   unitPrice: number | string;
   totalPrice: number | string;
-  lineItemType?: "HARDWARE" | "HOSTING_COLOCATION" | "REPAIR";
+  lineItemType?: "HARDWARE" | "HOSTING_COLOCATION" | "REPAIR" | "DISCOUNT";
   hardwareId?: string | null;
   // HOSTING_COLOCATION rows on Hardware Sales invoices: the month billed.
   billingMonth?: Date | string | null;
+  // DISCOUNT rows sit under the row whose id they reference; their prices
+  // are stored negative.
+  id?: string;
+  parentLineItemId?: string | null;
 }
 
 /** Extra details shown on Hardware Repair invoice PDFs and emails. */
@@ -1240,6 +1244,19 @@ export const repairDetailsFromInvoice = (invoice: {
 const sortPdfLineItems = (items: InvoicePdfLineItem[]): InvoicePdfLineItem[] =>
   sortInvoiceLineItems(items);
 
+// Discount rows and the Subtotal / Discounts summary. PDF styling comes from
+// invoice-pdf.html classes; the email gets inline styles, since mail clients
+// apply <style> rules unevenly.
+const DISCOUNT_GREEN = "#2e7d32";
+const DISCOUNT_ROW_STYLE = `color: ${DISCOUNT_GREEN}; background-color: #f1f8f4;`;
+const DISCOUNT_LABEL_STYLE = "padding-left: 28px; font-style: italic;";
+
+const isDiscountItem = (item: InvoicePdfLineItem) =>
+  item.lineItemType === "DISCOUNT";
+
+const discountAmount = (item: InvoicePdfLineItem) =>
+  Math.abs(Number(item.totalPrice));
+
 const buildProductRowsHtml = (
   totalMiners: number,
   unitPrice: number | string,
@@ -1247,15 +1264,11 @@ const buildProductRowsHtml = (
   hardwareModel?: string | null,
   lineItems?: InvoicePdfLineItem[] | null,
   invoiceType?: string | null,
+  target: "pdf" | "email" = "pdf",
 ): string => {
-  const rows =
+  const rows: InvoicePdfLineItem[] =
     lineItems && lineItems.length > 0
-      ? sortPdfLineItems(lineItems).map((item) => ({
-          model: item.model,
-          quantity: item.quantity,
-          unitPrice: Number(item.unitPrice),
-          totalPrice: Number(item.totalPrice),
-        }))
+      ? sortPdfLineItems(lineItems)
       : [
           {
             model: hardwareModel || "",
@@ -1265,32 +1278,80 @@ const buildProductRowsHtml = (
           },
         ];
 
-  if (invoiceType === "HARDWARE_SALES" || invoiceType === "HARDWARE_REPAIR") {
-    // Hardware Sales: Product Name = the model itself, no Machine Name column.
-    // Hardware Repair: the same 4 columns (Description | Qty | Rate | Amount).
-    return rows
-      .map(
-        (row) => `        <tr>
-          <td>${escapeHtml(row.model)}</td>
-          <td class="text-right">${row.quantity}</td>
-          <td class="text-right">${formatCurrency(row.unitPrice)}</td>
-          <td class="text-right">${formatCurrency(row.totalPrice)}</td>
-        </tr>`,
-      )
-      .join("\n");
-  }
+  // Hardware Sales: Product Name = the model itself, no Machine Name column.
+  // Hardware Repair: the same 4 columns (Description | Qty | Rate | Amount).
+  const fourColumns =
+    invoiceType === "HARDWARE_SALES" || invoiceType === "HARDWARE_REPAIR";
+
+  const discountRowHtml = (row: InvoicePdfLineItem) => {
+    const rowAttrs =
+      target === "pdf"
+        ? 'class="discount-row"'
+        : `class="discount-row" style="${DISCOUNT_ROW_STYLE}"`;
+    const labelAttrs =
+      target === "pdf"
+        ? 'class="discount-label"'
+        : `class="discount-label" style="${DISCOUNT_LABEL_STYLE}"`;
+    // On the hosting layout the label spans Product + Model.
+    const span = fourColumns ? "" : ' colspan="2"';
+    return `        <tr ${rowAttrs}>
+          <td${span} ${labelAttrs}>&#8627; ${escapeHtml(row.model)}</td>
+          <td class="text-right"></td>
+          <td class="text-right"></td>
+          <td class="text-right">&minus; ${formatCurrency(discountAmount(row))}</td>
+        </tr>`;
+  };
 
   return rows
-    .map(
-      (row) => `        <tr>
-          <td>${PRODUCT_NAME_LABEL}</td>
+    .map((row) => {
+      if (isDiscountItem(row)) return discountRowHtml(row);
+      const productCell = fourColumns
+        ? ""
+        : `
+          <td>${PRODUCT_NAME_LABEL}</td>`;
+      return `        <tr>${productCell}
           <td>${escapeHtml(row.model)}</td>
           <td class="text-right">${row.quantity}</td>
-          <td class="text-right">${formatCurrency(row.unitPrice)}</td>
-          <td class="text-right">${formatCurrency(row.totalPrice)}</td>
-        </tr>`,
-    )
+          <td class="text-right">${formatCurrency(Number(row.unitPrice))}</td>
+          <td class="text-right">${formatCurrency(Number(row.totalPrice))}</td>
+        </tr>`;
+    })
     .join("\n");
+};
+
+/**
+ * Subtotal and Discounts rows shown above the total when an invoice has
+ * discount line items; empty otherwise. Built in code because the template
+ * engine can't nest {{#if}} inside the per-layout total rows.
+ */
+const buildDiscountSummaryRowsHtml = (
+  lineItems: InvoicePdfLineItem[] | null | undefined,
+  invoiceType: string | null | undefined,
+  target: "pdf" | "email" = "pdf",
+): string => {
+  const items = lineItems || [];
+  const discounts = items.filter(isDiscountItem);
+  if (discounts.length === 0) return "";
+
+  const subtotal = items
+    .filter((item) => !isDiscountItem(item))
+    .reduce((sum, item) => sum + Number(item.totalPrice), 0);
+  const discountTotal = discounts.reduce(
+    (sum, item) => sum + discountAmount(item),
+    0,
+  );
+  const span = invoiceType === "HARDWARE_SALES" ? 3 : 4;
+  const discountStyle =
+    target === "email" ? ` style="color: ${DISCOUNT_GREEN};"` : "";
+
+  return `        <tr class="summary-row">
+          <td colspan="${span}">Subtotal</td>
+          <td class="text-right">${formatCurrency(subtotal)}</td>
+        </tr>
+        <tr class="summary-row summary-discount"${discountStyle}>
+          <td colspan="${span}">Discounts</td>
+          <td class="text-right">&minus; ${formatCurrency(discountTotal)}</td>
+        </tr>`;
 };
 
 // Full line-items breakdown table for the invoice notification email body -
@@ -1313,6 +1374,7 @@ const buildLineItemsTableHtml = (
     hardwareModel,
     lineItems,
     invoiceType,
+    "email",
   );
 
   if (invoiceType === "HARDWARE_REPAIR" && repair) {
@@ -1347,10 +1409,26 @@ ${buildRepairTotalRowsHtml(repair, totalAmount, "email")}
           <th class="text-right">Total</th>
         </tr>`;
 
+  // With discounts, close the table with Subtotal / Discounts / Total so the
+  // net figure is next to the rows it comes from.
+  const summaryRows = buildDiscountSummaryRowsHtml(
+    lineItems,
+    invoiceType,
+    "email",
+  );
+  const totalRow = summaryRows
+    ? `
+        <tr class="total-row" style="font-weight: bold;">
+          <td colspan="${invoiceType === "HARDWARE_SALES" ? 3 : 4}">Total</td>
+          <td class="text-right">${formatCurrency(Number(totalAmount))}</td>
+        </tr>`
+    : "";
+
   return `<table class="line-items-table">
       <thead>${header}</thead>
       <tbody>
 ${rows}
+${summaryRows}${totalRow}
       </tbody>
     </table>`;
 };
@@ -1650,6 +1728,7 @@ export const generateInvoicePDF = async (
         lineItems,
         invoiceType,
       ),
+      discountSummaryRows: buildDiscountSummaryRowsHtml(lineItems, invoiceType),
       isHardwareSales,
       footerSectionPage1: isHardwareSales ? "" : footerSectionHtml,
       footerSectionPage2: isHardwareSales ? footerSectionHtml : "",

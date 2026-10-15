@@ -111,6 +111,8 @@ export async function POST(request: NextRequest) {
         lineItemType: li.lineItemType,
         hardwareId: li.hardwareId,
         billingMonth: li.billingMonth,
+        id: li.id,
+        parentLineItemId: li.parentLineItemId,
       })),
     }));
 

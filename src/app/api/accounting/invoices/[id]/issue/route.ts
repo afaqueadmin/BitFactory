@@ -188,6 +188,8 @@ export async function POST(
         lineItemType: li.lineItemType,
         hardwareId: li.hardwareId,
         billingMonth: li.billingMonth,
+        id: li.id,
+        parentLineItemId: li.parentLineItemId,
       })),
     };
 

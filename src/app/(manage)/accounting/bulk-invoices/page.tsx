@@ -36,6 +36,7 @@ import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay"
 import {
   LineItemsEditor,
   LineItem,
+  newLineItemKey,
 } from "@/components/accounting/invoices/LineItemsEditor";
 import { LocationsMultiSelect } from "@/components/accounting/invoices/LocationsMultiSelect";
 import { getMinerLocations } from "@/lib/utils/minerLocation";
@@ -177,6 +178,7 @@ export default function BulkInvoicesPage() {
             quantity: number;
             suggestedUnitPrice: number;
           }) => ({
+            key: newLineItemKey(),
             hardwareId: li.hardwareId,
             model: li.model,
             quantity: li.quantity,

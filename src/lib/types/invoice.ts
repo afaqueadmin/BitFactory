@@ -94,7 +94,9 @@ export interface InvoiceLineItem {
   quantity: number;
   unitPrice: number;
   totalPrice: number;
-  lineItemType: "HARDWARE" | "HOSTING_COLOCATION";
+  lineItemType: "HARDWARE" | "HOSTING_COLOCATION" | "REPAIR" | "DISCOUNT";
+  // DISCOUNT rows: the row they sit under. Their prices are negative.
+  parentLineItemId: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -192,7 +194,9 @@ export interface CreateInvoiceRequest {
     model: string;
     quantity: number;
     unitPrice: number;
-    lineItemType?: "HARDWARE" | "HOSTING_COLOCATION";
+    lineItemType?: "HARDWARE" | "HOSTING_COLOCATION" | "DISCOUNT";
+    key?: string;
+    parentKey?: string | null;
   }>;
 }
 
@@ -208,7 +212,9 @@ export interface UpdateInvoiceRequest {
     model: string;
     quantity: number;
     unitPrice: number;
-    lineItemType?: "HARDWARE" | "HOSTING_COLOCATION";
+    lineItemType?: "HARDWARE" | "HOSTING_COLOCATION" | "DISCOUNT";
+    key?: string;
+    parentKey?: string | null;
   }>;
 }
 

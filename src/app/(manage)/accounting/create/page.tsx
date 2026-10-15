@@ -34,6 +34,10 @@ import { getMinerLocations } from "@/lib/utils/minerLocation";
 import {
   LineItemsEditor,
   LineItem,
+  chargeLineItems,
+  discountLineItemsError,
+  lineItemTotals,
+  newLineItemKey,
 } from "@/components/accounting/invoices/LineItemsEditor";
 import { LocationsMultiSelect } from "@/components/accounting/invoices/LocationsMultiSelect";
 
@@ -145,6 +149,7 @@ export default function CreateInvoicePage() {
     if (!minersLoading) {
       setLineItems(
         suggestedLineItems.map((li) => ({
+          key: newLineItemKey(),
           hardwareId: li.hardwareId,
           model: li.model,
           quantity: li.quantity,
@@ -238,15 +243,20 @@ export default function CreateInvoicePage() {
       if (!formData.customerId) {
         throw new Error("Customer is required");
       }
-      if (lineItems.length === 0) {
+      const charges = chargeLineItems(lineItems);
+      if (charges.length === 0) {
         throw new Error(
           "Add at least one line item (auto-loaded from the customer's miners, or added manually)",
         );
       }
-      if (lineItems.some((item) => item.quantity <= 0 || item.unitPrice <= 0)) {
+      if (charges.some((item) => item.quantity <= 0 || item.unitPrice <= 0)) {
         throw new Error(
           "Every line item must have a miner count and unit price greater than 0",
         );
+      }
+      const discountError = discountLineItemsError(lineItems);
+      if (discountError) {
+        throw new Error(discountError);
       }
       if (!formData.dueDate) {
         throw new Error("Due date is required");
@@ -257,14 +267,8 @@ export default function CreateInvoicePage() {
         Date.UTC(formData.billingYear, formData.billingMonth, 1),
       );
 
-      const totalMiners = lineItems.reduce(
-        (sum, item) => sum + item.quantity,
-        0,
-      );
-      const totalAmount = lineItems.reduce(
-        (sum, item) => sum + item.quantity * item.unitPrice,
-        0,
-      );
+      const totalMiners = charges.reduce((sum, item) => sum + item.quantity, 0);
+      const totalAmount = lineItemTotals(lineItems).total;
 
       // Call API to create invoice
       await createInvoice({
@@ -408,13 +412,14 @@ export default function CreateInvoicePage() {
                     ? "Select a customer first to auto-load their miners, grouped by model and priced from the hosting rate formula."
                     : minersLoading
                       ? "Loading miners (status=AUTO) for selected customer..."
-                      : "Auto-loaded from this customer's AUTO miners. Adjust quantities/prices or add/remove lines as needed."}
+                      : "Auto-loaded from this customer's AUTO miners. Adjust quantities/prices or add/remove lines as needed. Use the tag icon to add a discount under a line."}
                 </Typography>
                 <LineItemsEditor
                   lineItems={lineItems}
                   onChange={setLineItems}
                   hardwareList={hardwareList}
                   disabled={minersLoading}
+                  enableDiscounts
                 />
 
                 <Box

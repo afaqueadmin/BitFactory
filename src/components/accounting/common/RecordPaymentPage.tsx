@@ -36,6 +36,11 @@ import {
 } from "@/components/accounting/common/PaymentAccountFields";
 import { AmountDueInCurrency } from "@/components/accounting/common/AmountDueInCurrency";
 import { CostPayment } from "@prisma/client";
+import {
+  lineItemBucket,
+  type LineItemBucket,
+} from "@/lib/accounting/hostingMonths";
+import type { SavedLineItem } from "@/components/accounting/invoices/InvoiceLineItemsTable";
 
 interface RecordPaymentPageProps {
   basePath: string;
@@ -108,32 +113,16 @@ export default function RecordPaymentPage({
     ? Number(invoice.totalAmount) - paidAmount
     : 0;
 
-  const hardwareSubtotal =
-    invoice && Array.isArray(invoice.lineItems)
-      ? invoice.lineItems
-          .filter(
-            (li: { lineItemType?: string }) =>
-              li.lineItemType !== "HOSTING_COLOCATION",
-          )
-          .reduce(
-            (sum: number, li: { totalPrice: number | string }) =>
-              sum + Number(li.totalPrice),
-            0,
-          )
-      : 0;
-  const hostingSubtotal =
-    invoice && Array.isArray(invoice.lineItems)
-      ? invoice.lineItems
-          .filter(
-            (li: { lineItemType?: string }) =>
-              li.lineItemType === "HOSTING_COLOCATION",
-          )
-          .reduce(
-            (sum: number, li: { totalPrice: number | string }) =>
-              sum + Number(li.totalPrice),
-            0,
-          )
-      : 0;
+  // A discount (stored negative) counts towards the bucket of the row it
+  // sits under.
+  const savedLineItems: SavedLineItem[] =
+    invoice && Array.isArray(invoice.lineItems) ? invoice.lineItems : [];
+  const bucketSubtotal = (bucket: LineItemBucket) =>
+    savedLineItems
+      .filter((li) => lineItemBucket(li, savedLineItems) === bucket)
+      .reduce((sum, li) => sum + Number(li.totalPrice), 0);
+  const hardwareSubtotal = bucketSubtotal("HARDWARE");
+  const hostingSubtotal = bucketSubtotal("HOSTING");
   const hardwarePaid = activePayments
     .filter((p: CostPayment) => p.type === "HARDWARE_SALES")
     .reduce((sum: number, p: CostPayment) => sum + p.amount, 0);

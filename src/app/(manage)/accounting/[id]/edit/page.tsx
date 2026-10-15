@@ -25,6 +25,9 @@ import { useInvoice, useUpdateInvoice } from "@/lib/hooks/useInvoices";
 import {
   LineItemsEditor,
   LineItem,
+  chargeLineItems,
+  discountLineItemsError,
+  lineItemsFromSaved,
 } from "@/components/accounting/invoices/LineItemsEditor";
 
 export default function EditInvoicePage() {
@@ -86,23 +89,7 @@ export default function EditInvoicePage() {
         billingMonth: billingDate.getMonth(),
         billingYear: billingDate.getFullYear(),
       });
-      setLineItems(
-        (invoice.lineItems || []).map(
-          (li: {
-            hardwareId: string | null;
-            model: string;
-            quantity: number;
-            unitPrice: number | string;
-            lineItemType?: "HARDWARE" | "HOSTING_COLOCATION";
-          }) => ({
-            hardwareId: li.hardwareId || "",
-            model: li.model,
-            quantity: li.quantity,
-            unitPrice: Number(li.unitPrice),
-            lineItemType: li.lineItemType || "HARDWARE",
-          }),
-        ),
-      );
+      setLineItems(lineItemsFromSaved(invoice.lineItems || []));
     }
   }, [invoice]);
 
@@ -169,15 +156,18 @@ export default function EditInvoicePage() {
 
       // Validate
       if (hasLineItems) {
-        if (lineItems.length === 0) {
+        const charges = chargeLineItems(lineItems);
+        if (charges.length === 0) {
           throw new Error("Add at least one line item");
         }
-        if (
-          lineItems.some((item) => item.quantity <= 0 || item.unitPrice <= 0)
-        ) {
+        if (charges.some((item) => item.quantity <= 0 || item.unitPrice <= 0)) {
           throw new Error(
             "Every line item must have a miner count and unit price greater than 0",
           );
+        }
+        const discountError = discountLineItemsError(lineItems);
+        if (discountError) {
+          throw new Error(discountError);
         }
       } else if (formData.totalMiners <= 0 || formData.unitPrice <= 0) {
         throw new Error("Miners count and unit price must be greater than 0");
@@ -268,6 +258,7 @@ export default function EditInvoicePage() {
                     lineItems={lineItems}
                     onChange={setLineItems}
                     hardwareList={hardwareList}
+                    enableDiscounts
                   />
                 ) : (
                   <>
