@@ -28,6 +28,11 @@ export {
   useReviewPaymentFrequencyChangeRequest,
 } from "./usePaymentFrequencyChangeRequests";
 export {
+  useSecondaryLoginRequests,
+  useCreateSecondaryLoginRequest,
+  useReviewSecondaryLoginRequest,
+} from "./useSecondaryLoginRequests";
+export {
   useHashrateAlerts,
   useAcknowledgeHashrateAlert,
 } from "./useHashrateAlerts";

@@ -30,6 +30,9 @@ import {
 import { CheckCircleOutline, Close, ErrorOutline } from "@mui/icons-material";
 import { PhotoCamera } from "@mui/icons-material";
 import { RADIUS_CARD, useDaylight } from "@/lib/daylight";
+import { useUser } from "@/lib/hooks/useUser";
+import { useSecondaryLoginRequests } from "@/lib/hooks/useSecondaryLoginRequests";
+import RequestSecondaryLoginModal from "@/components/RequestSecondaryLoginModal";
 
 // Create a Grid component that includes the 'item' prop
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -70,6 +73,19 @@ export default function AccountSettings() {
   });
   // The account's second sign-in email(s) - read-only, admins manage them.
   const [secondaryEmails, setSecondaryEmails] = useState<string[]>([]);
+  const [secondaryRequestOpen, setSecondaryRequestOpen] = useState(false);
+  // A CLIENT without a second sign-in email can ask an admin for one.
+  const { user } = useUser();
+  const isClient = user?.role === "CLIENT";
+  const { requests: secondaryRequests } = useSecondaryLoginRequests(undefined, {
+    enabled: isClient,
+  });
+  const pendingSecondaryRequest = secondaryRequests.find(
+    (r) => r.status === "PENDING",
+  );
+  const latestSecondaryRequest = secondaryRequests[0];
+  const canRequestSecondary =
+    !loading && isClient && secondaryEmails.length === 0;
 
   // Safely handle null values in form data
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -617,6 +633,50 @@ export default function AccountSettings() {
                     />
                   </Grid>
                 ))}
+                {canRequestSecondary && (
+                  <Grid item xs={12} sm={6}>
+                    <Box
+                      sx={{
+                        height: "100%",
+                        display: "flex",
+                        flexDirection: "column",
+                        justifyContent: "center",
+                        gap: 0.5,
+                      }}
+                    >
+                      {pendingSecondaryRequest ? (
+                        <Typography sx={{ fontSize: 13, color: d.muted }}>
+                          Your request to add{" "}
+                          <Box component="strong" sx={{ color: d.text }}>
+                            {pendingSecondaryRequest.requestedEmail}
+                          </Box>{" "}
+                          as a second sign-in email is awaiting review.
+                        </Typography>
+                      ) : (
+                        <>
+                          {latestSecondaryRequest?.status === "REJECTED" && (
+                            <Typography sx={{ fontSize: 13, color: d.muted }}>
+                              Your request for{" "}
+                              {latestSecondaryRequest.requestedEmail} was
+                              rejected
+                              {latestSecondaryRequest.rejectionReason
+                                ? `: ${latestSecondaryRequest.rejectionReason}`
+                                : "."}
+                            </Typography>
+                          )}
+                          <Button
+                            type="button"
+                            variant="outlined"
+                            onClick={() => setSecondaryRequestOpen(true)}
+                            sx={{ alignSelf: "flex-start" }}
+                          >
+                            Request a second sign-in email
+                          </Button>
+                        </>
+                      )}
+                    </Box>
+                  </Grid>
+                )}
                 <Grid item xs={12} sm={6}>
                   <TextField
                     fullWidth
@@ -737,6 +797,10 @@ export default function AccountSettings() {
           </Grid>
         </Grid>
       </Box>
+      <RequestSecondaryLoginModal
+        open={secondaryRequestOpen}
+        onClose={() => setSecondaryRequestOpen(false)}
+      />
     </Box>
   );
 }

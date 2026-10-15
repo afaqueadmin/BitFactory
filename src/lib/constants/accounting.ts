@@ -242,6 +242,9 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   [AuditAction.USER_SESSIONS_REVOKED]: "User Signed Out Everywhere",
   [AuditAction.USER_LOGIN_ADDED]: "Sign-In Email Added",
   [AuditAction.USER_LOGIN_REMOVED]: "Sign-In Email Removed",
+  [AuditAction.SECONDARY_LOGIN_REQUESTED]: "Sign-In Email Requested",
+  [AuditAction.SECONDARY_LOGIN_REQUEST_REJECTED]:
+    "Sign-In Email Request Rejected",
   [AuditAction.TWO_FACTOR_ENABLED]: "Two-Factor Authentication Enabled",
   [AuditAction.TWO_FACTOR_DISABLED]: "Two-Factor Authentication Disabled",
   [AuditAction.VENDOR_INVOICE_CREATED]: "Vendor Invoice Created",

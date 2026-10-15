@@ -578,6 +578,66 @@ export const sendWalletChangeRequestRejectedEmail = async (
   }
 };
 
+export const sendSecondaryLoginRequestSubmittedEmail = async (
+  email: string,
+  requestedEmail: string,
+) => {
+  const mailOptions = {
+    from:
+      `BitFactory Admin <${process.env.SMTP_FROM}>` || "noreply@bitfactory.com",
+    to: email,
+    subject: "Second Sign-in Email Request Received - BitFactory",
+    html: `
+      <h1>Second Sign-in Email Request Received</h1>
+      <p>We've received a request to let this email sign in to your BitFactory account too:</p>
+      <p><strong>${escapeHtml(requestedEmail)}</strong></p>
+      <p>Nothing changes until an administrator reviews and approves it. Once approved, that address gets a link to choose its own password.</p>
+      <p>If you did not request this, please contact our support team immediately.</p>
+      <br>
+      <p>Best regards,</p>
+      <p>The BitFactory Team</p>
+    `,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    return { success: true };
+  } catch (error) {
+    console.error("Error sending second sign-in request email:", error);
+    return { success: false, error };
+  }
+};
+
+export const sendSecondaryLoginRequestRejectedEmail = async (
+  email: string,
+  requestedEmail: string,
+  rejectionReason: string,
+) => {
+  const mailOptions = {
+    from:
+      `BitFactory Admin <${process.env.SMTP_FROM}>` || "noreply@bitfactory.com",
+    to: email,
+    subject: "Second Sign-in Email Request Rejected - BitFactory",
+    html: `
+      <h1>Second Sign-in Email Request Rejected</h1>
+      <p>Your request to add <strong>${escapeHtml(requestedEmail)}</strong> as a second sign-in email was reviewed and rejected by an administrator.</p>
+      <p><strong>Reason:</strong> ${escapeHtml(rejectionReason)}</p>
+      <p>No sign-in email was added to your account. If you have questions, please contact our support team.</p>
+      <br>
+      <p>Best regards,</p>
+      <p>The BitFactory Team</p>
+    `,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    return { success: true };
+  } catch (error) {
+    console.error("Error sending second sign-in rejected email:", error);
+    return { success: false, error };
+  }
+};
+
 // Schedules are passed pre-formatted (formatPaymentSchedule), e.g.
 // "Weekly (Monday)".
 export const sendPaymentFrequencyChangeRequestSubmittedEmail = async (

@@ -111,6 +111,8 @@ model User {
   paymentFrequencyChangeRequests          PaymentFrequencyChangeRequest[] @relation("paymentFrequencyChangeRequests")
   paymentFrequencyChangeRequestsConfirmed PaymentFrequencyChangeRequest[] @relation("paymentFrequencyChangeRequestsConfirmed")
   paymentFrequencyChangeRequestsReviewed  PaymentFrequencyChangeRequest[] @relation("paymentFrequencyChangeRequestsReviewed")
+  secondaryLoginRequests                  SecondaryLoginRequest[]         @relation("secondaryLoginRequests")
+  secondaryLoginRequestsReviewed          SecondaryLoginRequest[]         @relation("secondaryLoginRequestsReviewed")
   accountingEntitiesCreated               AccountingEntity[]              @relation("accountingEntitiesCreated")
   accountingBanksCreated                  AccountingBank[]                @relation("accountingBanksCreated")
 
@@ -280,6 +282,34 @@ model PaymentFrequencyChangeRequest {
   @@index([status])
   @@index([subaccountName])
   @@map("payment_frequency_change_requests")
+}
+
+// A client's request for a second sign-in email (a UserLogin) on their
+// account. An admin approves it in one step, which adds the login exactly
+// like Edit Customer does (src/lib/auth/addSecondaryLogin.ts), or rejects it
+// with a reason.
+model SecondaryLoginRequest {
+  id               String        @id @default(cuid())
+  userId           String
+  user             User          @relation("secondaryLoginRequests", fields: [userId], references: [id])
+  requestedEmail   String
+  reason           String?       @db.Text
+  /// The sign-in email that submitted it.
+  requestedByEmail String?
+  status           RequestStatus @default(PENDING)
+  rejectionReason  String?
+  reviewedById     String?
+  reviewedBy       User?         @relation("secondaryLoginRequestsReviewed", fields: [reviewedById], references: [id])
+  reviewedAt       DateTime?
+  /// The login created on approval - a snapshot, not a live FK, since the
+  /// login can be removed later.
+  createdLoginId   String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@map("secondary_login_requests")
 }
 
 model TokenBlacklist {
@@ -1611,6 +1641,8 @@ enum AuditAction {
   SPACE_UPDATED
   SPACE_DELETED
   MINER_RESTARTED
+  SECONDARY_LOGIN_REQUESTED
+  SECONDARY_LOGIN_REQUEST_REJECTED
 }
 
 enum NotificationType {

@@ -14,35 +14,26 @@
  * accountant, a partner): same account and access, its own password, 2FA and
  * passkeys. Clients can't add one themselves - like changing an account's
  * email (N-6), nothing would prove the new address is theirs - so only an
- * admin can (LOGIN_MANAGER_ROLES). The primary login can't be removed here;
+ * admin can (LOGIN_MANAGER_ROLES), here or by approving the client's request
+ * (/api/secondary-login-requests). The primary login can't be removed here;
  * its email is changed with the account's email (PUT /api/user/[id]).
  */
-import { randomBytes } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { AuditAction } from "@prisma/client";
-import { hash } from "bcrypt";
 import { prisma } from "@/lib/prisma";
-import { signPasswordResetToken, verifyJwtToken } from "@/lib/jwt";
-import {
-  canonicalEmail,
-  findDeletedHolder,
-  isEmailTaken,
-  isEmailUniqueViolation,
-  releaseEmailFromDeletedAccount,
-} from "@/lib/auth/emailIdentity";
+import { verifyJwtToken } from "@/lib/jwt";
 import {
   LOGIN_MANAGER_ROLES,
   MAX_LOGINS_PER_ACCOUNT,
   MULTI_LOGIN_ROLES,
 } from "@/lib/auth/loginIdentity";
-import { passwordFingerprint, resetLinkUrl } from "@/lib/auth/passwordReset";
 import { notifySecurityChange } from "@/lib/auth/securityAlerts";
-import { sendLoginInviteEmail } from "@/lib/email";
+import {
+  addSecondaryLogin,
+  sendLoginInvite,
+} from "@/lib/auth/addSecondaryLogin";
 
 export const runtime = "nodejs";
-
-const INVITE_VALID_HOURS = 24;
-const EMAIL_FORMAT = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 type Actor = { id: string; role: string; email: string };
 
@@ -81,23 +72,6 @@ function requestMeta(request: NextRequest) {
     ipAddress: request.headers.get("x-forwarded-for") || "unknown",
     userAgent: request.headers.get("user-agent") || "unknown",
   };
-}
-
-/** Emails a secondary login a link to choose its password. */
-async function sendInvite(
-  login: { id: string; email: string; password: string },
-  account: { id: string; role: string; name: string | null; email: string },
-) {
-  const token = await signPasswordResetToken(
-    { userId: account.id, loginId: login.id, role: account.role },
-    passwordFingerprint(login.password),
-    "24h",
-  );
-  return sendLoginInviteEmail(login.email, {
-    setPasswordUrl: resetLinkUrl(token),
-    validHours: INVITE_VALID_HOURS,
-    accountName: account.name || account.email,
-  });
 }
 
 export async function GET(
@@ -165,141 +139,21 @@ export async function POST(
     const actor = await getActor(request, LOGIN_MANAGER_ROLES);
     if (actor instanceof NextResponse) return actor;
 
-    const account = await prisma.user.findFirst({
-      where: { id, isDeleted: false },
-      select: { id: true, role: true, name: true, email: true },
-    });
-    if (!account) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
-    if (!MULTI_LOGIN_ROLES.has(account.role)) {
-      return NextResponse.json(
-        { error: "Only client accounts can have a second sign-in email" },
-        { status: 400 },
-      );
-    }
-
     const body = await request.json().catch(() => ({}));
-    if (typeof body.email !== "string" || !body.email.trim()) {
-      return NextResponse.json({ error: "Email is required" }, { status: 400 });
-    }
-    const email = canonicalEmail(body.email);
-    if (!EMAIL_FORMAT.test(email)) {
-      return NextResponse.json(
-        { error: "Invalid email format" },
-        { status: 400 },
-      );
-    }
-
-    const loginCount = await prisma.userLogin.count({ where: { userId: id } });
-    if (loginCount >= MAX_LOGINS_PER_ACCOUNT) {
-      return NextResponse.json(
-        {
-          error:
-            "This account already has a second sign-in email. Remove it first to add another.",
-        },
-        { status: 400 },
-      );
-    }
-
-    // An email a deleted account still holds can be taken over here (and
-    // only here), once the admin has confirmed it.
-    const deletedHolder = await findDeletedHolder(email);
-    if (deletedHolder && body.releaseFromDeleted !== true) {
-      const holderName = deletedHolder.name || "without a name";
-      return NextResponse.json(
-        {
-          code: "HELD_BY_DELETED_ACCOUNT",
-          deletedAccountName: holderName,
-          error: `This email belongs to deleted account ${holderName}.`,
-        },
-        { status: 409 },
-      );
-    }
-    if (!deletedHolder && (await isEmailTaken(email))) {
-      return NextResponse.json(
-        { error: "Email is already in use" },
-        { status: 409 },
-      );
-    }
-
-    // No usable password until the invitee chooses one from the emailed
-    // link: a hash of random bytes nobody ever sees.
-    const placeholderPassword = await hash(randomBytes(32).toString("hex"), 12);
-
-    let login;
-    try {
-      // If the invite below fails only the new login is removed again - the
-      // deleted account doesn't get its email back.
-      login = await prisma.$transaction(async (tx) => {
-        if (deletedHolder) {
-          await releaseEmailFromDeletedAccount(tx, deletedHolder, email, {
-            actorId: actor.id,
-            toUserId: id,
-          });
-        }
-        return tx.userLogin.create({
-          data: {
-            userId: id,
-            email,
-            password: placeholderPassword,
-            isPrimary: false,
-            createdById: actor.id,
-          },
-          select: { id: true, email: true, password: true },
-        });
-      });
-    } catch (error) {
-      if (isEmailUniqueViolation(error)) {
-        return NextResponse.json(
-          { error: "Email is already in use" },
-          { status: 409 },
-        );
-      }
-      throw error;
-    }
-
-    // The invite is the only way in, so a login whose invite couldn't be
-    // sent is removed again rather than left unusable.
-    const sent = await sendInvite(login, account);
-    if (!sent.success) {
-      await prisma.userLogin.delete({ where: { id: login.id } });
-      return NextResponse.json(
-        {
-          error:
-            "Could not email the new address, so it was not added. Please try again.",
-        },
-        { status: 502 },
-      );
-    }
-
-    const meta = requestMeta(request);
-    await prisma.auditLog.create({
-      data: {
-        action: AuditAction.USER_LOGIN_ADDED,
-        entityType: "User",
-        entityId: id,
-        userId: actor.id,
-        changes: { loginId: login.id, email },
-        description: `Sign-in email ${email} added to ${account.email} by ${
-          actor.role === "SUPER_ADMIN" ? "super admin" : "admin"
-        } ${actor.email}`,
-        ...meta,
-      },
+    const result = await addSecondaryLogin({
+      accountId: id,
+      email: body.email,
+      actor,
+      releaseFromDeleted: body.releaseFromDeleted === true,
+      headers: request.headers,
+      meta: requestMeta(request),
     });
-
-    // The account owner hears about it.
-    await notifySecurityChange(
-      account.email,
-      { type: "LOGIN_ADDED", email },
-      request.headers,
-    );
-
+    if (!result.ok) {
+      const { status, error, code, deletedAccountName } = result;
+      return NextResponse.json({ error, code, deletedAccountName }, { status });
+    }
     return NextResponse.json(
-      {
-        message: `${email} was added. A link to choose a password was sent to it.`,
-        login: { id: login.id, email },
-      },
+      { message: result.message, login: result.login },
       { status: 201 },
     );
   } catch (error) {
@@ -346,7 +200,7 @@ export async function PATCH(
       return NextResponse.json({ error: "Login not found" }, { status: 404 });
     }
 
-    const sent = await sendInvite(login, login.user);
+    const sent = await sendLoginInvite(login, login.user);
     if (!sent.success) {
       return NextResponse.json(
         { error: "Could not send the email. Please try again." },
