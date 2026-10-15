@@ -23,6 +23,8 @@ export interface PaymentFrequencyChangeRequestItem {
   user: { id: string; name: string | null; email: string };
   reviewedBy: { id: string; name: string | null; email: string } | null;
   // Admin-only - stripped from the response for CLIENT/FRANCHISEE callers.
+  requestedByEmail?: string | null;
+  requestedBySecondary?: boolean;
   confirmedById?: string | null;
   confirmedAt?: string | null;
   confirmationMethod?: "CALL" | "EMAIL" | null;

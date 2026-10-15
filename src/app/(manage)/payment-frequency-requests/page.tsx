@@ -277,6 +277,15 @@ export default function PaymentFrequencyRequestsPage() {
                     >
                       {req.user.email}
                     </Typography>
+                    {req.requestedBySecondary && req.requestedByEmail && (
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        display="block"
+                      >
+                        Requested by {req.requestedByEmail} (secondary sign-in)
+                      </Typography>
+                    )}
                   </TableCell>
                   <TableCell>
                     {new Date(req.createdAt).toLocaleString()}

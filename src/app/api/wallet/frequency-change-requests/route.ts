@@ -253,6 +253,12 @@ export async function POST(request: NextRequest) {
       where: { id: auth.decoded.userId },
       select: { email: true },
     });
+    // Which of the account's sign-in emails is asking (it can have a second).
+    const requester = await prisma.userLogin.findUnique({
+      where: { id: auth.decoded.loginId },
+      select: { email: true, isPrimary: true },
+    });
+    const requestedBySecondary = requester ? !requester.isPrimary : false;
 
     const existingActive = await prisma.paymentFrequencyChangeRequest.findFirst(
       {
@@ -303,6 +309,8 @@ export async function POST(request: NextRequest) {
         data: {
           userId: auth.decoded.userId,
           subaccountName,
+          requestedByEmail: requester?.email ?? null,
+          requestedBySecondary,
           currentFrequency: current?.frequency ?? null,
           currentDayOfWeek: current?.dayOfWeek ?? null,
           requestedFrequency,
@@ -327,6 +335,8 @@ export async function POST(request: NextRequest) {
             },
             dayOfWeek: { from: current?.dayOfWeek ?? null, to: dayOfWeek },
             verifiedVia,
+            requestedBy: requester?.email ?? null,
+            requestedBySecondary,
           }),
         },
       });
@@ -340,6 +350,18 @@ export async function POST(request: NextRequest) {
         subaccountName,
         requestedSchedule,
       );
+      // A second sign-in email that submitted it hears about it too.
+      if (
+        requestedBySecondary &&
+        requester &&
+        requester.email !== authUser.email
+      ) {
+        await sendPaymentFrequencyChangeRequestSubmittedEmail(
+          requester.email,
+          subaccountName,
+          requestedSchedule,
+        );
+      }
     } catch (emailError) {
       console.error(
         "[Payment Frequency Change Requests API] Failed to send submitted email:",
