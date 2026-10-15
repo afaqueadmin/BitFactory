@@ -68,6 +68,8 @@ export default function AccountSettings() {
     profileImage: "",
     profileImageId: "",
   });
+  // The account's second sign-in email(s) - read-only, admins manage them.
+  const [secondaryEmails, setSecondaryEmails] = useState<string[]>([]);
 
   // Safely handle null values in form data
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -111,8 +113,11 @@ export default function AccountSettings() {
         if (!response.ok) {
           throw new Error(data.error || "Failed to fetch profile");
         }
+        // Kept out of formData so it isn't sent back on save.
+        const { secondaryEmails: secondaries, ...profile } = data.user;
+        setSecondaryEmails(Array.isArray(secondaries) ? secondaries : []);
         setFormData({
-          ...data.user,
+          ...profile,
           dateOfBirth: data.user.dateOfBirth
             ? new Date(data.user.dateOfBirth).toISOString().split("T")[0]
             : "",
@@ -573,7 +578,7 @@ export default function AccountSettings() {
                   <TextField
                     fullWidth
                     required
-                    label="Email"
+                    label="Primary Email"
                     name="email"
                     type="email"
                     value={getFormValue(formData.email)}
@@ -590,6 +595,28 @@ export default function AccountSettings() {
                     }}
                   />
                 </Grid>
+                {secondaryEmails.map((secondaryEmail) => (
+                  <Grid item xs={12} sm={6} key={secondaryEmail}>
+                    <TextField
+                      fullWidth
+                      label="Secondary Email"
+                      type="email"
+                      value={secondaryEmail}
+                      InputProps={{
+                        readOnly: true,
+                      }}
+                      helperText="Can also sign in to this account. Contact support to change it."
+                      variant="outlined"
+                      sx={{
+                        ...inputSx,
+                        "& .MuiInputBase-input.Mui-readOnly": {
+                          cursor: "not-allowed",
+                          bgcolor: d.hover,
+                        },
+                      }}
+                    />
+                  </Grid>
+                ))}
                 <Grid item xs={12} sm={6}>
                   <TextField
                     fullWidth

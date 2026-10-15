@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
 import { resolveLuxorSubaccounts } from "@/lib/luxorSubaccounts";
 import { canonicalEmail } from "@/lib/auth/emailIdentity";
+import { secondaryLoginEmails } from "@/lib/auth/loginIdentity";
 import { Prisma } from "@prisma/client";
 import {
   twoFactorEnforceFrom,
@@ -142,6 +143,10 @@ export async function GET(request: NextRequest) {
     // casing by role.
     const luxorSubaccounts = await resolveLuxorSubaccounts(userId);
 
+    // The account's second sign-in email(s), shown read-only in Account
+    // Settings. Empty unless it's a CLIENT account.
+    const secondaryEmails = await secondaryLoginEmails(userId);
+
     console.log("Profile API [GET]: Successfully fetched data");
 
     // Keep the response shape flat (twoFactorEnabled as a top-level boolean)
@@ -155,6 +160,7 @@ export async function GET(request: NextRequest) {
         user: {
           ...user,
           loginEmail: login?.email ?? user.email,
+          secondaryEmails,
           twoFactorEnabled,
           // M-1: when set, the account must enable 2FA by this date (shown
           // as a reminder in the app); null once it's enabled.
