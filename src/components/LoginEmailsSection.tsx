@@ -97,12 +97,26 @@ export default function LoginEmailsSection({
     setSubmitting(true);
     setFormError(null);
     try {
-      const res = await fetch(`/api/user/${customerId}/logins`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: formEmail }),
-      });
-      const data = await res.json();
+      const post = (releaseFromDeleted: boolean) =>
+        fetch(`/api/user/${customerId}/logins`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: formEmail, releaseFromDeleted }),
+        });
+      let res = await post(false);
+      let data = await res.json();
+      // The email belongs to a deleted account - it can be taken from it.
+      if (res.status === 409 && data.code === "HELD_BY_DELETED_ACCOUNT") {
+        if (
+          !window.confirm(
+            `This email belongs to deleted account "${data.deletedAccountName}". Use it here anyway? The deleted account will lose it.`,
+          )
+        ) {
+          return;
+        }
+        res = await post(true);
+        data = await res.json();
+      }
       if (!res.ok) throw new Error(data.error || "Failed to add email");
       setNotice(data.message);
       setFormOpen(false);

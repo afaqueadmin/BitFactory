@@ -3,7 +3,10 @@
  *
  *   GET                       list them (any admin)
  *   POST   { email }          add a secondary login and email it a link to
- *                             choose its password
+ *                             choose its password. An email a deleted
+ *                             account holds gets a 409 HELD_BY_DELETED_ACCOUNT;
+ *                             resent with releaseFromDeleted: true it is taken
+ *                             from that account.
  *   PATCH  { loginId }        send a secondary login a fresh set-password link
  *   DELETE ?loginId=...       remove a secondary login
  *
@@ -22,8 +25,10 @@ import { prisma } from "@/lib/prisma";
 import { signPasswordResetToken, verifyJwtToken } from "@/lib/jwt";
 import {
   canonicalEmail,
+  findDeletedHolder,
   isEmailTaken,
   isEmailUniqueViolation,
+  releaseEmailFromDeletedAccount,
 } from "@/lib/auth/emailIdentity";
 import {
   LOGIN_MANAGER_ROLES,
@@ -197,7 +202,21 @@ export async function POST(
       );
     }
 
-    if (await isEmailTaken(email)) {
+    // An email a deleted account still holds can be taken over here (and
+    // only here), once the admin has confirmed it.
+    const deletedHolder = await findDeletedHolder(email);
+    if (deletedHolder && body.releaseFromDeleted !== true) {
+      const holderName = deletedHolder.name || "without a name";
+      return NextResponse.json(
+        {
+          code: "HELD_BY_DELETED_ACCOUNT",
+          deletedAccountName: holderName,
+          error: `This email belongs to deleted account ${holderName}.`,
+        },
+        { status: 409 },
+      );
+    }
+    if (!deletedHolder && (await isEmailTaken(email))) {
       return NextResponse.json(
         { error: "Email is already in use" },
         { status: 409 },
@@ -210,15 +229,25 @@ export async function POST(
 
     let login;
     try {
-      login = await prisma.userLogin.create({
-        data: {
-          userId: id,
-          email,
-          password: placeholderPassword,
-          isPrimary: false,
-          createdById: actor.id,
-        },
-        select: { id: true, email: true, password: true },
+      // If the invite below fails only the new login is removed again - the
+      // deleted account doesn't get its email back.
+      login = await prisma.$transaction(async (tx) => {
+        if (deletedHolder) {
+          await releaseEmailFromDeletedAccount(tx, deletedHolder, email, {
+            actorId: actor.id,
+            toUserId: id,
+          });
+        }
+        return tx.userLogin.create({
+          data: {
+            userId: id,
+            email,
+            password: placeholderPassword,
+            isPrimary: false,
+            createdById: actor.id,
+          },
+          select: { id: true, email: true, password: true },
+        });
       });
     } catch (error) {
       if (isEmailUniqueViolation(error)) {

@@ -11,8 +11,11 @@ vi.mock("@/lib/prisma", () => ({
 import { prisma } from "@/lib/prisma";
 import {
   canonicalEmail,
+  findDeletedHolder,
   isEmailTaken,
   isEmailUniqueViolation,
+  isReleasedEmail,
+  releasedEmail,
 } from "@/lib/auth/emailIdentity";
 
 const findFirst = vi.mocked(prisma.user.findFirst);
@@ -82,6 +85,71 @@ describe("isEmailTaken", () => {
 
   it("returns false when none exists", async () => {
     expect(await isEmailTaken("john@x.com")).toBe(false);
+  });
+});
+
+describe("findDeletedHolder", () => {
+  const deletedUser = { id: "u9", name: "Old Co", isDeleted: true };
+
+  beforeEach(() => {
+    findFirst.mockResolvedValue(null);
+    findLogin.mockResolvedValue(null);
+  });
+
+  it("returns null when nobody holds the email", async () => {
+    expect(await findDeletedHolder("john@x.com")).toBeNull();
+  });
+
+  it("returns the deleted account holding it as its primary email", async () => {
+    findFirst.mockResolvedValue(deletedUser as never);
+    findLogin.mockResolvedValue({
+      id: "l9",
+      isPrimary: true,
+      user: deletedUser,
+    } as never);
+    expect(await findDeletedHolder(" John@X.com ")).toEqual({
+      userId: "u9",
+      name: "Old Co",
+      loginId: "l9",
+      isPrimary: true,
+    });
+  });
+
+  it("returns the deleted account holding it as a second sign-in email", async () => {
+    findLogin.mockResolvedValue({
+      id: "l8",
+      isPrimary: false,
+      user: deletedUser,
+    } as never);
+    expect(await findDeletedHolder("john@x.com")).toEqual({
+      userId: "u9",
+      name: "Old Co",
+      loginId: "l8",
+      isPrimary: false,
+    });
+  });
+
+  it("returns null when a live account holds it", async () => {
+    findFirst.mockResolvedValue({ ...deletedUser, isDeleted: false } as never);
+    expect(await findDeletedHolder("john@x.com")).toBeNull();
+  });
+
+  it("returns null when a live account's login holds it", async () => {
+    findLogin.mockResolvedValue({
+      id: "l8",
+      isPrimary: false,
+      user: { ...deletedUser, isDeleted: false },
+    } as never);
+    expect(await findDeletedHolder("john@x.com")).toBeNull();
+  });
+});
+
+describe("releasedEmail / isReleasedEmail", () => {
+  it("marks the email and is recognised", () => {
+    const placeholder = releasedEmail("john@x.com", "cmabc123456");
+    expect(placeholder).toBe("john@x.com#released-123456");
+    expect(isReleasedEmail(placeholder)).toBe(true);
+    expect(isReleasedEmail("john@x.com")).toBe(false);
   });
 });
 

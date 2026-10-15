@@ -49,6 +49,114 @@ export async function isEmailTaken(
 }
 
 /**
+ * A soft-deleted account keeps its email (and the unique indexes keep
+ * covering it). It can be given up so the address can be added as another
+ * account's second sign-in email - the only place that's allowed. Its primary
+ * email then becomes `<email>#released-<id>`, which also blocks a restore
+ * until a super admin sets a new email.
+ */
+const RELEASED_MARKER = "#released-";
+
+export function releasedEmail(email: string, userId: string): string {
+  return `${email}${RELEASED_MARKER}${userId.slice(-6)}`;
+}
+
+export function isReleasedEmail(email: string): boolean {
+  return email.includes(RELEASED_MARKER);
+}
+
+export interface DeletedEmailHolder {
+  userId: string;
+  name: string | null;
+  /** Null when the email is only on users.email with no login row. */
+  loginId: string | null;
+  isPrimary: boolean;
+}
+
+/**
+ * The deleted account holding this email, or null when the email is free or
+ * any live account holds it (then the normal "already in use" rule applies).
+ */
+export async function findDeletedHolder(
+  email: string,
+): Promise<DeletedEmailHolder | null> {
+  const canonical = canonicalEmail(email);
+  const [account, login] = await Promise.all([
+    prisma.user.findFirst({
+      where: { email: canonical },
+      select: { id: true, name: true, isDeleted: true },
+    }),
+    prisma.userLogin.findFirst({
+      where: { email: canonical },
+      select: {
+        id: true,
+        isPrimary: true,
+        user: { select: { id: true, name: true, isDeleted: true } },
+      },
+    }),
+  ]);
+
+  if (!account && !login) return null;
+  if (account && !account.isDeleted) return null;
+  if (login && !login.user.isDeleted) return null;
+  // Both rows are the same deleted account's primary email in practice; if
+  // they somehow belong to two accounts, leave it to the "in use" rule.
+  if (account && login && account.id !== login.user.id) return null;
+
+  const owner = login?.user ?? account!;
+  return {
+    userId: owner.id,
+    name: owner.name,
+    loginId: login?.id ?? null,
+    isPrimary: login ? login.isPrimary : true,
+  };
+}
+
+/**
+ * Frees the email of a deleted account (see findDeletedHolder): a primary
+ * email is renamed to its released form, a second sign-in email is removed
+ * (its 2FA and passkeys go with it).
+ */
+export async function releaseEmailFromDeletedAccount(
+  tx: Prisma.TransactionClient,
+  holder: DeletedEmailHolder,
+  email: string,
+  { actorId, toUserId }: { actorId: string; toUserId: string },
+): Promise<void> {
+  const canonical = canonicalEmail(email);
+  if (holder.isPrimary) {
+    const placeholder = releasedEmail(canonical, holder.userId);
+    await tx.user.update({
+      where: { id: holder.userId },
+      data: { email: placeholder },
+    });
+    await tx.userLogin.updateMany({
+      where: { userId: holder.userId, isPrimary: true },
+      data: { email: placeholder },
+    });
+  } else if (holder.loginId) {
+    await tx.userLogin.delete({ where: { id: holder.loginId } });
+  }
+
+  await tx.auditLog.create({
+    data: {
+      action: "USER_UPDATED",
+      entityType: "User",
+      entityId: holder.userId,
+      userId: actorId,
+      description: `Email ${canonical} released from deleted account ${
+        holder.name || holder.userId
+      }`,
+      changes: JSON.stringify({
+        emailReleased: canonical,
+        wasPrimary: holder.isPrimary,
+        releasedTo: toUserId,
+      }),
+    },
+  });
+}
+
+/**
  * True if `error` is a unique-constraint violation on the email column -
  * the race the isEmailTaken pre-check can't close on its own (two requests
  * both pass the check, then both write).

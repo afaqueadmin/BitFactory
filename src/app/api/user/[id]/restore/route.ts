@@ -13,6 +13,7 @@ import { AuditAction } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
 import { canManageAccount } from "@/lib/auth/accountTiers";
+import { isReleasedEmail } from "@/lib/auth/emailIdentity";
 
 export const runtime = "nodejs";
 
@@ -64,6 +65,17 @@ export async function POST(
     if (!target.isDeleted) {
       return NextResponse.json(
         { error: "This user is not deleted" },
+        { status: 400 },
+      );
+    }
+
+    // Its email was taken over as another account's sign-in email.
+    if (isReleasedEmail(target.email)) {
+      return NextResponse.json(
+        {
+          error:
+            "This account's email is now used by another account. A super admin must set a new email in Edit Customer before restoring.",
+        },
         { status: 400 },
       );
     }
