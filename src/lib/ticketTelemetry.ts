@@ -25,6 +25,8 @@ import { joinSubaccountNames } from "@/lib/luxorSubaccounts";
 export interface MinerTelemetrySnapshot {
   poolName: "Luxor" | "Braiins";
   workerName: string;
+  /** Luxor only: which subaccount the worker was found on. */
+  subaccountName?: string;
   status: string;
   hashrateThs: number | null;
   efficiency: number | null;
@@ -62,6 +64,7 @@ async function fetchLiveLuxorSnapshot(
   return {
     poolName: "Luxor",
     workerName: worker.name,
+    subaccountName: worker.subaccount_name,
     status: worker.status,
     hashrateThs: worker.hashrate / 1_000_000_000_000,
     // Luxor reports efficiency as a 0-1 ratio, not a percentage - same

@@ -238,6 +238,14 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
     "Payment Frequency Change Approved",
   [AuditAction.PAYMENT_FREQUENCY_CHANGE_REJECTED]:
     "Payment Frequency Change Rejected",
+  [AuditAction.FIRMWARE_CHANGE_REQUESTED]: "Firmware Change Requested",
+  [AuditAction.FIRMWARE_CHANGE_CONFIRMED]:
+    "Firmware Change Confirmed With Client",
+  [AuditAction.FIRMWARE_CHANGE_APPROVED]: "Firmware Change Approved",
+  [AuditAction.FIRMWARE_CHANGE_REJECTED]: "Firmware Change Rejected",
+  [AuditAction.FIRMWARE_OPTION_CREATED]: "Firmware Option Added",
+  [AuditAction.FIRMWARE_OPTION_UPDATED]: "Firmware Option Updated",
+  [AuditAction.FIRMWARE_OPTION_DELETED]: "Firmware Option Deleted",
   [AuditAction.USER_PASSWORD_RESET]: "User Password Reset",
   [AuditAction.USER_SESSIONS_REVOKED]: "User Signed Out Everywhere",
   [AuditAction.USER_LOGIN_ADDED]: "Sign-In Email Added",

@@ -22,6 +22,8 @@ import {
 import RepairNotesModal from "./admin/RepairNotesModal";
 import MinerPoolHistoryModal from "./admin/MinerPoolHistoryModal";
 import HashrateHistoryChart from "./HashrateHistoryChart";
+import RequestFirmwareChangeModal from "./miners/RequestFirmwareChangeModal";
+import { useFirmwareChangeRequests } from "@/lib/hooks/useFirmwareChangeRequests";
 import { RADIUS_CARD, useDaylight } from "@/lib/daylight";
 import {
   formatWarrantyDate,
@@ -126,6 +128,27 @@ export default function HostedMinersList({
     setSelectedMinerName(name);
     setRepairNotesOpen(true);
   };
+
+  // Firmware change requests are client-only - the admin customer view
+  // doesn't fetch them or show the request button.
+  const [firmwareChangeMiner, setFirmwareChangeMiner] =
+    useState<MinerData | null>(null);
+  const { requests: firmwareChangeRequests } = useFirmwareChangeRequests(
+    undefined,
+    { enabled: !isAdminView },
+  );
+  // A miner's open (PENDING/CONFIRMED) request - at most one per miner.
+  const activeFirmwareChangeFor = (minerId: string) =>
+    firmwareChangeRequests.find(
+      (req) =>
+        req.minerId === minerId &&
+        (req.status === "PENDING" || req.status === "CONFIRMED"),
+    );
+  // Same eligibility the API enforces: live Luxor miners only.
+  const canRequestFirmwareChange = (miner: MinerData) =>
+    !isAdminView &&
+    miner.connectedPool === "Luxor" &&
+    (miner.status === "Active" || miner.status === "Inactive");
 
   const handleOpenPoolHistory = (id: string, name: string) => {
     setSelectedMinerId(id);
@@ -977,6 +1000,67 @@ export default function HostedMinersList({
                       >
                         {miner.firmware || "N/A"}
                       </Typography>
+                      {canRequestFirmwareChange(miner) &&
+                        (() => {
+                          const active = activeFirmwareChangeFor(miner.id);
+                          if (active) {
+                            return (
+                              <Chip
+                                label={`Change to ${active.requestedFirmwareName} ${active.status === "CONFIRMED" ? "confirmed" : "pending"}`}
+                                size="small"
+                                sx={{
+                                  mt: 0.5,
+                                  height: "auto",
+                                  minHeight: 20,
+                                  fontSize: "0.68rem",
+                                  "& .MuiChip-label": {
+                                    whiteSpace: "normal",
+                                    py: 0.25,
+                                  },
+                                  backgroundColor: daylight
+                                    ? d.amber
+                                    : alpha(theme.palette.warning.main, 0.1),
+                                  color: daylight
+                                    ? d.warning
+                                    : theme.palette.warning.main,
+                                  fontWeight: daylight ? 550 : 500,
+                                  ...(daylight && {
+                                    fontFamily: fonts.body,
+                                    borderRadius: "20px",
+                                  }),
+                                }}
+                              />
+                            );
+                          }
+                          return (
+                            <Button
+                              variant="outlined"
+                              size="small"
+                              onClick={() => setFirmwareChangeMiner(miner)}
+                              sx={{
+                                mt: 0.5,
+                                textTransform: "none",
+                                borderRadius: daylight ? "8px" : 2,
+                                py: 0.2,
+                                px: 1,
+                                minWidth: 0,
+                                fontSize: "0.7rem",
+                                fontWeight: 600,
+                                ...(daylight && {
+                                  fontFamily: fonts.body,
+                                  color: d.action,
+                                  borderColor: d.action,
+                                  "&:hover": {
+                                    borderColor: d.actionHover,
+                                    backgroundColor: d.hover,
+                                  },
+                                }),
+                              }}
+                            >
+                              Request change
+                            </Button>
+                          );
+                        })()}
                     </Box>
 
                     <Box>
@@ -1253,6 +1337,16 @@ export default function HostedMinersList({
         minerId={selectedMinerId}
         minerName={selectedMinerName}
       />
+
+      {firmwareChangeMiner && (
+        <RequestFirmwareChangeModal
+          open={!!firmwareChangeMiner}
+          onClose={() => setFirmwareChangeMiner(null)}
+          minerId={firmwareChangeMiner.id}
+          minerName={firmwareChangeMiner.workerName}
+          currentFirmware={firmwareChangeMiner.firmware}
+        />
+      )}
     </Box>
   );
 }

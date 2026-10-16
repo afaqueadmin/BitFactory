@@ -28,6 +28,15 @@ export {
   useReviewPaymentFrequencyChangeRequest,
 } from "./usePaymentFrequencyChangeRequests";
 export {
+  useFirmwareChangeRequests,
+  useCreateFirmwareChangeRequest,
+  useReviewFirmwareChangeRequest,
+} from "./useFirmwareChangeRequests";
+export {
+  useFirmwareOptions,
+  useManageFirmwareOptions,
+} from "./useFirmwareOptions";
+export {
   useSecondaryLoginRequests,
   useCreateSecondaryLoginRequest,
   useReviewSecondaryLoginRequest,

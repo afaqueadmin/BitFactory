@@ -742,6 +742,100 @@ export const sendPaymentFrequencyChangeRequestRejectedEmail = async (
   }
 };
 
+export const sendFirmwareChangeRequestSubmittedEmail = async (
+  email: string,
+  minerName: string,
+  requestedFirmware: string,
+) => {
+  const mailOptions = {
+    from:
+      `BitFactory Admin <${process.env.SMTP_FROM}>` || "noreply@bitfactory.com",
+    to: email,
+    subject: "Firmware Change Request Received - BitFactory",
+    html: `
+      <h1>Firmware Change Request Received</h1>
+      <p>We've received a request to change the firmware on your miner <strong>${escapeHtml(minerName)}</strong> to:</p>
+      <p><strong>${escapeHtml(requestedFirmware)}</strong></p>
+      <p>This change will not take effect until an administrator reviews and approves it.</p>
+      <p>If you did not request this, please contact our support team immediately.</p>
+      <br>
+      <p>Best regards,</p>
+      <p>The BitFactory Team</p>
+    `,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    return { success: true };
+  } catch (error) {
+    console.error("Error sending firmware change submitted email:", error);
+    return { success: false, error };
+  }
+};
+
+export const sendFirmwareChangeRequestApprovedEmail = async (
+  email: string,
+  minerName: string,
+  previousFirmware: string,
+  newFirmware: string,
+) => {
+  const mailOptions = {
+    from:
+      `BitFactory Admin <${process.env.SMTP_FROM}>` || "noreply@bitfactory.com",
+    to: email,
+    subject: "Firmware Change Approved - BitFactory",
+    html: `
+      <h1>Firmware Change Approved</h1>
+      <p>Your firmware change request for miner <strong>${escapeHtml(minerName)}</strong> has been approved by an administrator:</p>
+      <p><strong>Previous:</strong> ${escapeHtml(previousFirmware)}</p>
+      <p><strong>New:</strong> ${escapeHtml(newFirmware)}</p>
+      <p>Our team updates the firmware on your behalf; the miner may be briefly offline while this happens, and it may take a short while before the new firmware shows on your miners page.</p>
+      <p><strong>If you did not request this, please contact our support team immediately.</strong></p>
+      <br>
+      <p>Best regards,</p>
+      <p>The BitFactory Team</p>
+    `,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    return { success: true };
+  } catch (error) {
+    console.error("Error sending firmware change approved email:", error);
+    return { success: false, error };
+  }
+};
+
+export const sendFirmwareChangeRequestRejectedEmail = async (
+  email: string,
+  minerName: string,
+  rejectionReason: string,
+) => {
+  const mailOptions = {
+    from:
+      `BitFactory Admin <${process.env.SMTP_FROM}>` || "noreply@bitfactory.com",
+    to: email,
+    subject: "Firmware Change Request Rejected - BitFactory",
+    html: `
+      <h1>Firmware Change Request Rejected</h1>
+      <p>Your firmware change request for miner <strong>${escapeHtml(minerName)}</strong> was reviewed and rejected by an administrator.</p>
+      <p><strong>Reason:</strong> ${escapeHtml(rejectionReason)}</p>
+      <p>Your miner's firmware has not been changed. If you have questions, please contact our support team.</p>
+      <br>
+      <p>Best regards,</p>
+      <p>The BitFactory Team</p>
+    `,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    return { success: true };
+  } catch (error) {
+    console.error("Error sending firmware change rejected email:", error);
+    return { success: false, error };
+  }
+};
+
 export const sendInvoiceEmail = async (
   email: string,
   customerName: string,

@@ -111,6 +111,10 @@ model User {
   paymentFrequencyChangeRequests          PaymentFrequencyChangeRequest[] @relation("paymentFrequencyChangeRequests")
   paymentFrequencyChangeRequestsConfirmed PaymentFrequencyChangeRequest[] @relation("paymentFrequencyChangeRequestsConfirmed")
   paymentFrequencyChangeRequestsReviewed  PaymentFrequencyChangeRequest[] @relation("paymentFrequencyChangeRequestsReviewed")
+  firmwareChangeRequests                  FirmwareChangeRequest[]         @relation("firmwareChangeRequests")
+  firmwareChangeRequestsConfirmed         FirmwareChangeRequest[]         @relation("firmwareChangeRequestsConfirmed")
+  firmwareChangeRequestsReviewed          FirmwareChangeRequest[]         @relation("firmwareChangeRequestsReviewed")
+  firmwareOptionsCreated                  FirmwareOption[]                @relation("firmwareOptionsCreated")
   secondaryLoginRequests                  SecondaryLoginRequest[]         @relation("secondaryLoginRequests")
   secondaryLoginRequestsReviewed          SecondaryLoginRequest[]         @relation("secondaryLoginRequestsReviewed")
   accountingEntitiesCreated               AccountingEntity[]              @relation("accountingEntitiesCreated")
@@ -282,6 +286,71 @@ model PaymentFrequencyChangeRequest {
   @@index([status])
   @@index([subaccountName])
   @@map("payment_frequency_change_requests")
+}
+
+// Admin-managed list of firmware a client can ask to have flashed onto one of
+// their miners (see FirmwareChangeRequest). An option a request has used
+// can't be deleted - the FK below is Restrict - only deactivated, which hides
+// it from clients.
+model FirmwareOption {
+  id          String                  @id @default(cuid())
+  name        String                  @unique
+  isActive    Boolean                 @default(true)
+  createdById String
+  createdBy   User                    @relation("firmwareOptionsCreated", fields: [createdById], references: [id])
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+  requests    FirmwareChangeRequest[]
+
+  @@map("firmware_options")
+}
+
+// A client-submitted request to change the firmware on one of their Luxor
+// miners. Same two-step review as PaymentFrequencyChangeRequest - an admin
+// confirms the change with the client, then approves it. Nothing is changed
+// by this app at any step - the admin flashes the firmware on the miner
+// manually. currentFirmware snapshots Luxor's live worker.firmware at request
+// time (null if Luxor couldn't be reached), and requestedFirmwareName
+// snapshots the option's name, so the row stays a permanent before/after
+// record even if the option is renamed later. At most one PENDING/CONFIRMED
+// request per miner at a time.
+model FirmwareChangeRequest {
+  id                    String         @id @default(cuid())
+  userId                String
+  user                  User           @relation("firmwareChangeRequests", fields: [userId], references: [id])
+  minerId               String
+  miner                 Miner          @relation(fields: [minerId], references: [id], onDelete: Restrict)
+  /// Snapshot of Miner.name (the Luxor worker name) at request time.
+  minerName             String
+  /// Luxor subaccount the worker was found on - a snapshot, not a live FK.
+  subaccountName        String?
+  /// Who submitted it - see WalletChangeRequest.requestedByEmail.
+  requestedByEmail      String?
+  requestedBySecondary  Boolean        @default(false)
+  currentFirmware       String?
+  requestedFirmwareId   String
+  requestedFirmware     FirmwareOption @relation(fields: [requestedFirmwareId], references: [id], onDelete: Restrict)
+  requestedFirmwareName String
+  reason                String?        @db.Text
+  status                RequestStatus  @default(PENDING)
+  rejectionReason       String?
+  confirmedById         String?
+  confirmedBy           User?          @relation("firmwareChangeRequestsConfirmed", fields: [confirmedById], references: [id])
+  confirmedAt           DateTime?
+  confirmationMethod    String?
+  confirmationContact   String?
+  confirmationNote      String?        @db.Text
+  reviewedById          String?
+  reviewedBy            User?          @relation("firmwareChangeRequestsReviewed", fields: [reviewedById], references: [id])
+  reviewedAt            DateTime?
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([minerId])
+  @@index([requestedFirmwareId])
+  @@map("firmware_change_requests")
 }
 
 // A client's request for a second sign-in email (a UserLogin) on their
@@ -545,42 +614,43 @@ model Hardware {
 }
 
 model Miner {
-  id                 String                   @id @default(cuid())
-  name               String
-  status             String                   @default("DEPLOYMENT_IN_PROGRESS")
-  userId             String
-  spaceId            String
-  createdAt          DateTime                 @default(now())
-  updatedAt          DateTime                 @updatedAt
-  hardwareId         String
-  isDeleted          Boolean                  @default(false)
-  poolId             String?
-  poolAuth           String?
-  serialNumber       String?
-  macAddress         String?
+  id                     String                   @id @default(cuid())
+  name                   String
+  status                 String                   @default("DEPLOYMENT_IN_PROGRESS")
+  userId                 String
+  spaceId                String
+  createdAt              DateTime                 @default(now())
+  updatedAt              DateTime                 @updatedAt
+  hardwareId             String
+  isDeleted              Boolean                  @default(false)
+  poolId                 String?
+  poolAuth               String?
+  serialNumber           String?
+  macAddress             String?
   // Manufacturer warranty end date, entered by an admin (not derivable:
   // miners aren't linked to purchase invoices). Null = not recorded.
-  warrantyExpiresAt  DateTime?                @db.Date
-  createdById        String?
-  updatedById        String?
-  deletedById        String?
-  deletedAt          DateTime?
-  createdBy          User?                    @relation("MinerCreatedBy", fields: [createdById], references: [id])
-  updatedBy          User?                    @relation("MinerUpdatedBy", fields: [updatedById], references: [id])
-  deletedBy          User?                    @relation("MinerDeletedBy", fields: [deletedById], references: [id])
-  ownershipHistory   MinerOwnershipHistory[]
-  rateHistory        MinerRateHistory[]
-  poolHistory        MinerPoolHistory[]
-  hashrateBenchmarks MinerHashrateBenchmark[]
-  hashrateAlertLogs  MinerHashrateAlertLog[]
-  restarts           MinerRestart[]
-  hardware           Hardware                 @relation(fields: [hardwareId], references: [id])
-  space              Space                    @relation(fields: [spaceId], references: [id])
-  user               User                     @relation(fields: [userId], references: [id])
-  pool               Pool?                    @relation(fields: [poolId], references: [id])
-  repairNotes        MinerRepairNote[]        @relation("MinerRepairNotes")
-  repairInvoices     Invoice[]                @relation("minerRepairInvoices")
-  tickets            SupportTicket[]
+  warrantyExpiresAt      DateTime?                @db.Date
+  createdById            String?
+  updatedById            String?
+  deletedById            String?
+  deletedAt              DateTime?
+  createdBy              User?                    @relation("MinerCreatedBy", fields: [createdById], references: [id])
+  updatedBy              User?                    @relation("MinerUpdatedBy", fields: [updatedById], references: [id])
+  deletedBy              User?                    @relation("MinerDeletedBy", fields: [deletedById], references: [id])
+  ownershipHistory       MinerOwnershipHistory[]
+  rateHistory            MinerRateHistory[]
+  poolHistory            MinerPoolHistory[]
+  hashrateBenchmarks     MinerHashrateBenchmark[]
+  hashrateAlertLogs      MinerHashrateAlertLog[]
+  restarts               MinerRestart[]
+  hardware               Hardware                 @relation(fields: [hardwareId], references: [id])
+  space                  Space                    @relation(fields: [spaceId], references: [id])
+  user                   User                     @relation(fields: [userId], references: [id])
+  pool                   Pool?                    @relation(fields: [poolId], references: [id])
+  repairNotes            MinerRepairNote[]        @relation("MinerRepairNotes")
+  repairInvoices         Invoice[]                @relation("minerRepairInvoices")
+  tickets                SupportTicket[]
+  firmwareChangeRequests FirmwareChangeRequest[]
 
   @@unique([name, userId])
   @@index([hardwareId])
@@ -1582,6 +1652,13 @@ enum AuditAction {
   PAYMENT_FREQUENCY_CHANGE_CONFIRMED
   PAYMENT_FREQUENCY_CHANGE_APPROVED
   PAYMENT_FREQUENCY_CHANGE_REJECTED
+  FIRMWARE_CHANGE_REQUESTED
+  FIRMWARE_CHANGE_CONFIRMED
+  FIRMWARE_CHANGE_APPROVED
+  FIRMWARE_CHANGE_REJECTED
+  FIRMWARE_OPTION_CREATED
+  FIRMWARE_OPTION_UPDATED
+  FIRMWARE_OPTION_DELETED
   USER_PASSWORD_RESET
   USER_SESSIONS_REVOKED
   USER_LOGIN_ADDED

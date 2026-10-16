@@ -9,6 +9,7 @@
  * - HashrateHistoryChart (Daylight variant)
  * - Pool comparison cards (only in Total mode, with more than one pool)
  * - Miner filter PillTabs + HostedMinersList (Daylight variant)
+ * - Firmware Change Requests (Daylight FirmwareChangeRequestHistory)
  *
  * Layout mirrors the dashboard page: max content width 1600px (page padding
  * comes from the (auth) layout), KPI row 4 columns / 2 below 960px.
@@ -16,6 +17,7 @@
 
 import { Box, Typography } from "@mui/material";
 import HostedMinersList from "@/components/HostedMinersList";
+import FirmwareChangeRequestHistory from "@/components/miners/FirmwareChangeRequestHistory";
 import React, { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import SsidChartOutlinedIcon from "@mui/icons-material/SsidChartOutlined";
@@ -384,6 +386,24 @@ export default function Miners() {
         repairButtonLabel="Repair history"
         subaccountsParam={subaccountsParam}
       />
+
+      {/* Firmware Change Requests - submitted from each miner's accordion */}
+      <Box sx={{ width: "100%", mt: { xs: "20px", md: "26px" } }}>
+        <Typography
+          component="h2"
+          sx={{
+            fontFamily: fonts.heading,
+            fontWeight: 750,
+            fontSize: 18,
+            letterSpacing: "-.035em",
+            color: d.text,
+            mb: "14px",
+          }}
+        >
+          Firmware Change Requests
+        </Typography>
+        <FirmwareChangeRequestHistory daylight />
+      </Box>
     </Box>
   );
 }

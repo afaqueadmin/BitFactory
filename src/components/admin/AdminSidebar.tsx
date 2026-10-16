@@ -22,6 +22,7 @@ import {
   TrendingDown as HashrateAlertsIcon,
   AccountBalanceWallet as WalletRequestsIcon,
   EventRepeat as PaymentFrequencyRequestsIcon,
+  SystemUpdateAlt as FirmwareRequestsIcon,
   ContactMail as SecondaryLoginRequestsIcon,
   Group as CustomersIcon,
   Workspaces as CustomerGroupsIcon,
@@ -78,12 +79,14 @@ import {
   useTickets,
   useWalletChangeRequests,
   usePaymentFrequencyChangeRequests,
+  useFirmwareChangeRequests,
   useSecondaryLoginRequests,
   useHashrateAlerts,
 } from "@/lib/hooks";
 import { useAdminNav } from "@/lib/contexts/admin-nav-context";
 
-type BadgeKey = "tickets" | "wallet" | "frequency" | "logins" | "alerts";
+type BadgeKey =
+  "tickets" | "wallet" | "frequency" | "firmware" | "logins" | "alerts";
 
 interface SidebarItem {
   title: string;
@@ -139,6 +142,12 @@ const sidebarSections: SidebarSection[] = [
         icon: <PaymentFrequencyRequestsIcon />,
         path: "/payment-frequency-requests",
         badgeKey: "frequency",
+      },
+      {
+        title: "Firmware Change Requests",
+        icon: <FirmwareRequestsIcon />,
+        path: "/firmware-change-requests",
+        badgeKey: "firmware",
       },
       {
         title: "Sign-in Email Requests",
@@ -420,6 +429,9 @@ export default function AdminSidebar() {
   });
   const { requests: pendingFrequencyRequests } =
     usePaymentFrequencyChangeRequests({ status: "PENDING" });
+  const { requests: pendingFirmwareRequests } = useFirmwareChangeRequests({
+    status: "PENDING",
+  });
   const { requests: pendingLoginRequests } = useSecondaryLoginRequests({
     status: "PENDING",
   });
@@ -431,6 +443,7 @@ export default function AdminSidebar() {
     tickets: openTickets.length,
     wallet: pendingWalletRequests.length,
     frequency: pendingFrequencyRequests.length,
+    firmware: pendingFirmwareRequests.length,
     logins: pendingLoginRequests.length,
     alerts: pendingHashrateAlerts.length,
   };
