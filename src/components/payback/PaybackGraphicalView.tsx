@@ -390,7 +390,7 @@ export default function PaybackGraphicalView({
   const machineLifeMonths = MACHINE_LIFE_YEARS * 12;
   const paybackReached =
     Number.isFinite(paybackMonths) && paybackMonths <= machineLifeMonths;
-  const holdsBtc = strategy !== "STRATEGY_1";
+  const holdsBtc = strategy === "STRATEGY_2" || strategy === "STRATEGY_3";
   const totalCashIn =
     machineCost + monthlyHosting * machineLifeMonths + loanInterest;
   const headroomPct =

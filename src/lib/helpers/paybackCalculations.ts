@@ -83,6 +83,38 @@ export const calculateBreakevenBtcPrice = (
 // life and the whole thing is evaluated as a lump-sum return at the end.
 export const MACHINE_LIFE_YEARS = 5;
 
+export interface MonthlyDepreciationValues {
+  monthlyDepreciation: number;
+  netProfitStock: number;
+  netProfitLux: number;
+  roiPerYearStock: number;
+  roiPerYearLux: number;
+}
+
+// Optional "include machine depreciation" view: the machine cost is written
+// off evenly over its life, and ROI is the annualised net profit against the
+// machine cost.
+export const calculateMonthlyDepreciationValues = (
+  netRevenueStock: number,
+  netRevenueLux: number,
+  machineCost: number,
+  machineLifeYears: number = MACHINE_LIFE_YEARS,
+): MonthlyDepreciationValues => {
+  const monthlyDepreciation = machineCost / (machineLifeYears * 12);
+  const netProfitStock = netRevenueStock - monthlyDepreciation;
+  const netProfitLux = netRevenueLux - monthlyDepreciation;
+  const roi = (netProfit: number) =>
+    machineCost > 0 ? ((netProfit * 12) / machineCost) * 100 : 0;
+
+  return {
+    monthlyDepreciation,
+    netProfitStock,
+    netProfitLux,
+    roiPerYearStock: roi(netProfitStock),
+    roiPerYearLux: roi(netProfitLux),
+  };
+};
+
 // Strategy 3: same lump-sum-at-end-of-life model as Strategy 2, except the
 // bills are funded via a loan collateralized by the accumulating BTC rather
 // than an outside funding source. That borrowing is not free, so Strategy 3

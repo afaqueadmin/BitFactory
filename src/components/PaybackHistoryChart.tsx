@@ -24,7 +24,11 @@ import {
   Chip,
 } from "@mui/material";
 import { formatValue } from "@/lib/helpers/formatValue";
-import { MinerModel, MINER_LABELS } from "@/lib/helpers/paybackCalculations";
+import {
+  calculateBreakevenBtcPrice,
+  MinerModel,
+  MINER_LABELS,
+} from "@/lib/helpers/paybackCalculations";
 import {
   usePaybackHistory,
   PaybackHistoryProfile,
@@ -33,7 +37,10 @@ import {
   PAYBACK_HISTORY_RANGES,
   PaybackHistoryRange,
 } from "@/lib/helpers/paybackHistoryRange";
-import { mapSnapshotsToChartSeries } from "@/lib/helpers/paybackChartMapping";
+import {
+  mapSnapshotsToChartSeries,
+  PaybackChartSeriesPoint,
+} from "@/lib/helpers/paybackChartMapping";
 import {
   buildPaybackChartHeading,
   PaybackOsFilter,
@@ -50,6 +57,7 @@ const RANGE_LABELS: Record<PaybackHistoryRange, string> = {
 const COLOR_STOCK_OS = "#1976D2"; // blue
 const COLOR_CUSTOM_OS = "#2E7D32"; // green
 const COLOR_BTC_PRICE = "#F59E0B"; // amber / gold
+const COLOR_DEPRECIATION = "#AD4840"; // muted red
 
 const BASE_TITLE = "Buy BTC vs Mine BTC";
 
@@ -62,6 +70,14 @@ interface PaybackHistoryChartProps {
    * tokens. The Stock OS / Custom OS / BTC price line colours are left
    * untouched - they're matched 1:1 to PaybackGraphicalView's legend. */
   daylight?: boolean;
+  /** When set, adds a "Cost incl. Depreciation" line: the selected OS's
+   * breakeven plus the monthly depreciation spread over that day's BTC
+   * output. Hashrate and pool commission are for the selected OS. */
+  depreciation?: {
+    monthlyDepreciation: number;
+    hashrateTh: number;
+    poolCommission: number;
+  };
 }
 
 interface TooltipEntry {
@@ -77,6 +93,7 @@ export default function PaybackHistoryChart({
   os,
   height = 320,
   daylight = false,
+  depreciation,
 }: PaybackHistoryChartProps) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
@@ -94,10 +111,38 @@ export default function PaybackHistoryChart({
     range,
   );
 
-  const chartData = useMemo(
-    () => mapSnapshotsToChartSeries(historyData),
-    [historyData],
-  );
+  const chartData = useMemo((): Array<
+    PaybackChartSeriesPoint & { costWithDepreciation?: number }
+  > => {
+    const series = mapSnapshotsToChartSeries(historyData);
+    if (!depreciation) return series;
+
+    const hashpriceByDate = new Map(
+      historyData.map((row) => [row.date, row.hashpriceBtcPerPhDay]),
+    );
+
+    return series.map((point) => {
+      const hashprice = Number(hashpriceByDate.get(point.date));
+      const breakeven =
+        os === "STOCK" ? point.stockOsBreakeven : point.customOsBreakeven;
+      // Breakeven is linear in monthly cost, so depreciation's share adds on.
+      const depreciationAddon = calculateBreakevenBtcPrice(
+        depreciation.monthlyDepreciation,
+        hashprice,
+        depreciation.hashrateTh,
+        depreciation.poolCommission,
+        NaN,
+      );
+
+      return {
+        ...point,
+        costWithDepreciation:
+          hashprice > 0 && Number.isFinite(depreciationAddon)
+            ? breakeven + depreciationAddon
+            : undefined,
+      };
+    });
+  }, [historyData, depreciation, os]);
 
   const { yMin, yMax } = useMemo(() => {
     if (chartData.length === 0) return { yMin: 0, yMax: 1 };
@@ -106,6 +151,7 @@ export default function PaybackHistoryChart({
       const list = [point.btcPriceUsd];
       if (os === "STOCK") list.push(point.stockOsBreakeven);
       if (os === "CUSTOM") list.push(point.customOsBreakeven);
+      if (point.costWithDepreciation) list.push(point.costWithDepreciation);
       return list;
     });
 
@@ -534,6 +580,26 @@ export default function PaybackHistoryChart({
                     stroke: "#FFFFFF",
                     strokeWidth: 2,
                     fill: COLOR_CUSTOM_OS,
+                  }}
+                />
+              )}
+
+              {/* Breakeven incl. machine depreciation (opt-in) */}
+              {depreciation && (
+                <Line
+                  type="monotone"
+                  dataKey="costWithDepreciation"
+                  name="Cost incl. Depreciation"
+                  stroke={COLOR_DEPRECIATION}
+                  strokeWidth={2.5}
+                  strokeDasharray="6 4"
+                  dot={false}
+                  connectNulls
+                  activeDot={{
+                    r: 6,
+                    stroke: "#FFFFFF",
+                    strokeWidth: 2,
+                    fill: COLOR_DEPRECIATION,
                   }}
                 />
               )}

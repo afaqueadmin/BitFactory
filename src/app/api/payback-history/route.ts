@@ -83,6 +83,7 @@ export async function GET(request: NextRequest) {
         btcPriceUsd: Number(snapshot.btcCloseUsd),
         stockOsBreakeven: Number(stockOsBreakeven),
         customOsBreakeven: Number(customOsBreakeven),
+        hashpriceBtcPerPhDay: Number(snapshot.hashpriceBtcPerPhDay),
       };
     });
 

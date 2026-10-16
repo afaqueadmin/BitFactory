@@ -66,6 +66,7 @@ export async function GET(request: NextRequest) {
           ? snapshot.companyS21XpCustomBreakeven
           : snapshot.companyS21ProCustomBreakeven,
       ),
+      hashpriceBtcPerPhDay: Number(snapshot.hashpriceBtcPerPhDay),
     }));
 
     return NextResponse.json({ success: true, range, miner, data });

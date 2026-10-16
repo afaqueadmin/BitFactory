@@ -3,6 +3,7 @@ import {
   BORROWING_RATE_APR,
   calculateLifetimeBtc,
   calculateLoanInterest,
+  calculateMonthlyDepreciationValues,
   calculateStrategy2Values,
   calculateStrategy3Values,
   FIXED_SCENARIO_PRICES,
@@ -210,5 +211,24 @@ describe("FIXED_SCENARIO_PRICES", () => {
     for (let i = 1; i < months.length; i++) {
       expect(months[i]).toBeLessThan(months[i - 1]);
     }
+  });
+});
+
+describe("calculateMonthlyDepreciationValues", () => {
+  it("writes the machine cost off over 60 months and annualises ROI on it", () => {
+    const result = calculateMonthlyDepreciationValues(500, 300, 6000);
+
+    expect(result.monthlyDepreciation).toBeCloseTo(100, 8);
+    expect(result.netProfitStock).toBeCloseTo(400, 8);
+    expect(result.netProfitLux).toBeCloseTo(200, 8);
+    expect(result.roiPerYearStock).toBeCloseTo(80, 8);
+    expect(result.roiPerYearLux).toBeCloseTo(40, 8);
+  });
+
+  it("returns zero ROI when the machine cost is zero", () => {
+    const result = calculateMonthlyDepreciationValues(500, 300, 0);
+
+    expect(result.monthlyDepreciation).toBe(0);
+    expect(result.roiPerYearStock).toBe(0);
   });
 });

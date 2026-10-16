@@ -26,7 +26,7 @@ import {
   InputAdornment,
   useMediaQuery,
 } from "@mui/material";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { formatValue } from "@/lib/helpers/formatValue";
 import PaybackHistoryChart from "@/components/PaybackHistoryChart";
 import PaybackGraphicalView, {
@@ -49,10 +49,12 @@ import {
   Strategy2Values,
   calculateBreakevenBtcPrice,
   calculateLoanInterest,
+  calculateMonthlyDepreciationValues,
   calculateStrategy2Values,
   calculateStrategy3Values,
 } from "@/lib/helpers/paybackCalculations";
 import Segmented, { SegmentedOption } from "@/components/daylight/Segmented";
+import ToggleChip from "@/components/daylight/ToggleChip";
 import { RADIUS_CARD, useDaylight } from "@/lib/daylight";
 
 type PaybackStrategy = PaybackStrategyKey;
@@ -70,6 +72,7 @@ const VIEW_OPTIONS: SegmentedOption<ViewMode>[] = [
 ];
 
 const STRATEGY_OPTIONS: SegmentedOption<PaybackStrategy>[] = [
+  { id: "STRATEGY_0", label: "Strategy 0" },
   { id: "STRATEGY_1", label: "Strategy 1" },
   { id: "STRATEGY_2", label: "Strategy 2" },
   { id: "STRATEGY_3", label: "Strategy 3" },
@@ -86,12 +89,14 @@ const OS_OPTIONS: SegmentedOption<OsSelection>[] = [
 ];
 
 // CURRENT (live price), one column per fixed scenario price, then BREAKEVEN.
-const columns = [
+// With machine depreciation on, a second breakeven column is appended.
+const BASE_COLUMNS = [
   "CURRENT",
   ...FIXED_SCENARIO_PRICES.map((_, i) => `Scenario: ${i + 1}`),
   "BREAKEVEN\n(Hosting Charges)",
 ];
-const BREAKEVEN_COLUMN = columns.length - 1;
+const BREAKEVEN_COLUMN = BASE_COLUMNS.length - 1;
+const DEPRECIATION_BREAKEVEN_COLUMN = BASE_COLUMNS.length;
 
 // Data Sources:
 // - BTC Price: CoinGecko API (live market price)
@@ -192,6 +197,11 @@ export default function PaybackAnalysisPage() {
   const [selectedStrategy, setSelectedStrategy] =
     useState<PaybackStrategy>("STRATEGY_1");
 
+  // Adds monthly depreciation, net profit and ROI rows (Strategy 0, 1 & 2)
+  const [includeDepreciation, setIncludeDepreciation] = useState(false);
+  const supportsDepreciation = selectedStrategy !== "STRATEGY_3";
+  const showDepreciationRows = supportsDepreciation && includeDepreciation;
+
   // OS selector state
   const [selectedOS, setSelectedOS] = useState<OsSelection>("STOCK");
 
@@ -200,11 +210,6 @@ export default function PaybackAnalysisPage() {
 
   // Which half of the analysis is on screen: the scenario grid, or the charts.
   const [viewMode, setViewMode] = useState<ViewMode>("TABLE");
-
-  // Calculated values for all scenarios
-  const [calculatedValues, setCalculatedValues] = useState<Strategy2Values[]>(
-    [],
-  );
 
   // Fetch config from API
   const fetchConfig = useCallback(async () => {
@@ -519,6 +524,24 @@ export default function PaybackAnalysisPage() {
   const machineCost = activeSpec.capital;
   const activeHashrateStockOs = activeSpec.hashrateStock;
   const activeHashrateLuxos = activeSpec.hashrateLux;
+
+  // Strategy 0 & 1 add a "cost incl. depreciation" line to the history chart.
+  const chartDepreciation =
+    includeDepreciation &&
+    config &&
+    (selectedStrategy === "STRATEGY_0" || selectedStrategy === "STRATEGY_1")
+      ? {
+          monthlyDepreciation: machineCost / (MACHINE_LIFE_YEARS * 12),
+          hashrateTh:
+            selectedOS === "STOCK"
+              ? activeHashrateStockOs
+              : activeHashrateLuxos,
+          poolCommission:
+            selectedOS === "STOCK"
+              ? config.poolCommissionStockOs
+              : config.poolCommissionLuxos,
+        }
+      : undefined;
   const activeHostingCharges = activeSpec.hostingRate;
   const activePowerConsumption = activeSpec.powerKw;
 
@@ -561,26 +584,45 @@ export default function PaybackAnalysisPage() {
   const selectedBreakevenPrice =
     selectedOS === "CUSTOM" ? breakevenBtcPriceCustom : breakevenBtcPriceStock;
 
-  // Recalculate values when BTC price, reward, or config changes
-  useEffect(() => {
-    // Index 0 is CURRENT (live BTC price), then one column per scenario price:
-    // the fixed steps, then the calculated breakeven.
+  // Breakeven once the machine cost (written off over its life) is added to
+  // the monthly bill — the price at which monthly net profit is zero.
+  const depreciationBreakevenPrice = config
+    ? calculateBreakevenBtcPrice(
+        monthlyElectricityHosting + machineCost / (MACHINE_LIFE_YEARS * 12),
+        resolvedRewardBtcPerPhDay,
+        selectedOS === "CUSTOM" ? activeHashrateLuxos : activeHashrateStockOs,
+        selectedOS === "CUSTOM"
+          ? config.poolCommissionLuxos
+          : config.poolCommissionStockOs,
+        config.breakevenBtcPrice,
+      )
+    : 0;
+
+  const columns = showDepreciationRows
+    ? [...BASE_COLUMNS, "BREAKEVEN\n(incl. Depreciation)"]
+    : BASE_COLUMNS;
+
+  // Index 0 is CURRENT (live BTC price), then one column per scenario price:
+  // the fixed steps, the calculated breakeven, and (optionally) the breakeven
+  // incl. depreciation. Derived in render so it always matches `columns`.
+  const calculatedValues = useMemo(() => {
     const prices = [
       resolvedBtcPriceValue,
       ...FIXED_SCENARIO_PRICES,
       selectedBreakevenPrice,
+      ...(showDepreciationRows ? [depreciationBreakevenPrice] : []),
     ];
 
-    setCalculatedValues(
-      prices
-        .map((price) => calculateAtPrice(selectedMiner, price))
-        .filter((values): values is Strategy2Values => values !== null),
-    );
+    return prices
+      .map((price) => calculateAtPrice(selectedMiner, price))
+      .filter((values): values is Strategy2Values => values !== null);
   }, [
     calculateAtPrice,
     selectedMiner,
     resolvedBtcPriceValue,
     selectedBreakevenPrice,
+    showDepreciationRows,
+    depreciationBreakevenPrice,
   ]);
 
   // Fetch config on mount
@@ -606,6 +648,9 @@ export default function PaybackAnalysisPage() {
         (price) => `$${price.toLocaleString("en-US")}`,
       ),
       formatValue(selectedBreakevenPrice, "currency"),
+      ...(showDepreciationRows
+        ? [formatValue(depreciationBreakevenPrice, "currency")]
+        : []),
     ],
   };
 
@@ -702,6 +747,47 @@ export default function PaybackAnalysisPage() {
         formatValue(calc.netRevenueLux, "currency"),
       ),
     });
+    if (showDepreciationRows) {
+      const depreciation = calculatedValues.map((calc) =>
+        calculateMonthlyDepreciationValues(
+          calc.netRevenueStock,
+          calc.netRevenueLux,
+          machineCost,
+        ),
+      );
+      allDynamicRows.push({
+        label: "Monthly Machine Depreciation",
+        values: depreciation.map((dep) =>
+          formatValue(dep.monthlyDepreciation, "currency"),
+        ),
+      });
+      allDynamicRows.push({
+        label: "Monthly Net Profit (Stock OS)",
+        values: depreciation.map((dep) =>
+          formatValue(dep.netProfitStock, "currency"),
+        ),
+      });
+      allDynamicRows.push({
+        label: "Monthly Net Profit (Custom OS)",
+        values: depreciation.map((dep) =>
+          formatValue(dep.netProfitLux, "currency"),
+        ),
+      });
+      allDynamicRows.push({
+        label: "Annual ROI (Stock OS)",
+        values: depreciation.map(
+          (dep) =>
+            `${formatValue(dep.roiPerYearStock, "number", { maximumFractionDigits: 0 })}%`,
+        ),
+      });
+      allDynamicRows.push({
+        label: "Annual ROI (Custom OS)",
+        values: depreciation.map(
+          (dep) =>
+            `${formatValue(dep.roiPerYearLux, "number", { maximumFractionDigits: 0 })}%`,
+        ),
+      });
+    }
     allDynamicRows.push({
       label: "Payback Months (Stock OS)",
       values: calculatedValues.map((calc, index) =>
@@ -877,6 +963,7 @@ export default function PaybackAnalysisPage() {
       if (
         row.label === "Electricity & Hosting Charges" ||
         row.label === "Machine Depreciation" ||
+        row.label === "Monthly Machine Depreciation" ||
         row.label === "Lifetime Electricity & Hosting Charges" ||
         row.label.startsWith("Loan ")
       )
@@ -1296,6 +1383,7 @@ export default function PaybackAnalysisPage() {
               profile="CLIENT"
               miner={selectedMiner}
               os={selectedOS}
+              depreciation={chartDepreciation}
             />
           }
         />
@@ -1308,6 +1396,7 @@ export default function PaybackAnalysisPage() {
             profile="CLIENT"
             miner={selectedMiner}
             os={selectedOS}
+            depreciation={chartDepreciation}
           />
 
           {/* Data table — horizontally scrollable on mobile */}
@@ -1320,6 +1409,33 @@ export default function PaybackAnalysisPage() {
               overflow: "hidden",
             }}
           >
+            {supportsDepreciation && (
+              <Box
+                sx={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: "10px",
+                  px: { xs: "12px", sm: "16px" },
+                  py: "10px",
+                  borderBottom: `1px solid ${d.border}`,
+                }}
+              >
+                <Typography
+                  sx={{ fontFamily: fonts.body, fontSize: 12, color: d.muted }}
+                >
+                  {includeDepreciation
+                    ? `Machine cost written off over ${MACHINE_LIFE_YEARS * 12} months`
+                    : "Add depreciation, net profit and ROI to the table"}
+                </Typography>
+                <ToggleChip
+                  checked={includeDepreciation}
+                  onChange={setIncludeDepreciation}
+                  label="Include Machine Depreciation"
+                />
+              </Box>
+            )}
             <TableContainer
               sx={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}
             >
@@ -1416,6 +1532,10 @@ export default function PaybackAnalysisPage() {
                             index === BREAKEVEN_COLUMN &&
                             selectedOS === "STOCK"
                               ? { backgroundColor: d.skySoft } // Stock OS
+                              : {}),
+                            ...(row.label === "BTC Price (USD)" &&
+                            index === DEPRECIATION_BREAKEVEN_COLUMN
+                              ? { backgroundColor: d.dangerSoft } // chart's depreciation line
                               : {}),
                           }}
                         >

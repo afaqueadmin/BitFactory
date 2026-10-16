@@ -1,6 +1,7 @@
 import { BORROWING_RATE_APR } from "./paybackCalculations";
 
-export type PaybackStrategyKey = "STRATEGY_1" | "STRATEGY_2" | "STRATEGY_3";
+export type PaybackStrategyKey =
+  "STRATEGY_0" | "STRATEGY_1" | "STRATEGY_2" | "STRATEGY_3";
 
 export interface PaybackStrategyCopy {
   /** One-line statement of what the strategy actually does. */
@@ -14,6 +15,11 @@ export interface PaybackStrategyCopy {
  * analysis pages so the scenario table and the charts narrate the same thing.
  */
 export const STRATEGY_COPY: Record<PaybackStrategyKey, PaybackStrategyCopy> = {
+  STRATEGY_0: {
+    headline: "Mining costs are auto-deducted from rewards",
+    detail:
+      "Hosting and power are deducted from the mined Bitcoin before it is sent to your wallet. Only the net rewards reach you.",
+  },
   STRATEGY_1: {
     headline: "The miner pays its own bills",
     detail:

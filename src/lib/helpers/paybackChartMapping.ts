@@ -3,6 +3,9 @@ export interface PaybackHistoryPoint {
   btcPriceUsd: number;
   stockOsBreakeven: number;
   customOsBreakeven: number;
+  /** That day's reward (BTC/PH/day); lets the chart add costs on top of the
+   * stored breakevens. Optional so older payloads still parse. */
+  hashpriceBtcPerPhDay?: number;
 }
 
 export interface PaybackChartSeriesPoint {
