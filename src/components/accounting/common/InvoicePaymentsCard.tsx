@@ -32,7 +32,7 @@ const DASH = "—";
 function typeLabel(type: string, invoiceType?: string | null): string {
   switch (type) {
     case "HARDWARE_SALES":
-      return "Hardware Sales";
+      return "Hardware Procurement";
     case "HARDWARE_REPAIR":
       return "Hardware Repair";
     case "PAYMENT":
@@ -44,7 +44,7 @@ function typeLabel(type: string, invoiceType?: string | null): string {
     case "ADJUSTMENT":
       return "Adjustment";
     case "ELECTRICITY_CHARGES":
-      return "Electricity Charges";
+      return "Hosting & Colocation";
     default:
       return type;
   }

@@ -98,9 +98,9 @@ export const INVOICE_STATUS_LABELS: Record<
 
 // Customer-facing invoice type labels (match the customer statement PDF)
 export const INVOICE_TYPE_LABELS: Record<InvoiceType, string> = {
-  [InvoiceType.ELECTRICITY_CHARGES]: "Hosting & Electricity",
-  [InvoiceType.HARDWARE_PURCHASE]: "Hardware",
-  [InvoiceType.HARDWARE_SALES]: "Hardware",
+  [InvoiceType.ELECTRICITY_CHARGES]: "Hosting & Colocation",
+  [InvoiceType.HARDWARE_PURCHASE]: "Hardware Procurement",
+  [InvoiceType.HARDWARE_SALES]: "Hardware Procurement",
   [InvoiceType.HARDWARE_REPAIR]: "Hardware Repair",
 };
 

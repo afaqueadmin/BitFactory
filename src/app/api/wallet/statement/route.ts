@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyJwtToken } from "@/lib/jwt";
 import { prisma } from "@/lib/prisma";
 import { generatePDFFromHTML } from "@/lib/email";
+import { paymentTypeLabel } from "@/lib/accounting/paymentTypes";
 import { readFileSync } from "fs";
 import { join } from "path";
 
@@ -176,18 +177,7 @@ export async function GET(request: NextRequest) {
     const transactionRows = paymentsWithBalance
       .map((payment) => {
         // Format type to match API output
-        const formattedType =
-          payment.type === "PAYMENT"
-            ? "Payment"
-            : payment.type === "ELECTRICITY_CHARGES"
-              ? "Hosting & electricity charges"
-              : payment.type === "ADJUSTMENT"
-                ? "Adjustment"
-                : payment.type === "HARDWARE_SALES"
-                  ? "Hardware sales payment"
-                  : payment.type === "HARDWARE_REPAIR"
-                    ? "Hardware repair payment"
-                    : payment.type;
+        const formattedType = paymentTypeLabel(payment.type);
 
         // Format amount with sign
         const amountSign =

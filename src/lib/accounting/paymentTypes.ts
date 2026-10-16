@@ -32,10 +32,10 @@ export const paymentTypeForInvoice = (
 /** Statement / transaction-table labels for CostPayment types. */
 export const PAYMENT_TYPE_LABELS: Record<string, string> = {
   PAYMENT: "Payment",
-  ELECTRICITY_CHARGES: "Hosting & electricity charges",
+  ELECTRICITY_CHARGES: "Hosting & Colocation",
   ADJUSTMENT: "Adjustment",
-  HARDWARE_SALES: "Hardware sales payment",
-  HARDWARE_REPAIR: "Hardware repair payment",
+  HARDWARE_SALES: "Hardware Procurement",
+  HARDWARE_REPAIR: "Hardware Repair",
 };
 
 export const paymentTypeLabel = (type: string): string =>

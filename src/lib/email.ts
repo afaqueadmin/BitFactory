@@ -1898,7 +1898,9 @@ export const generateMemoPDF = async (data: MemoPdfData): Promise<Buffer> => {
   }
 
   const categoryLabel =
-    data.category === "HOSTING" ? "Hosting & Colocation" : "Hardware Sales";
+    data.category === "HOSTING"
+      ? "Hosting & Colocation"
+      : "Hardware Procurement";
   const absAmount = Math.abs(data.amount);
   const isDebit = data.amount >= 0;
   const amountTone = isDebit ? "debit" : "credit";

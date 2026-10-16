@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
 import { AuditAction } from "@prisma/client";
+import { paymentTypeLabel } from "@/lib/accounting/paymentTypes";
 
 export async function GET(request: NextRequest) {
   try {
@@ -116,18 +117,7 @@ export async function GET(request: NextRequest) {
       return {
         id: payment.id,
         date: new Date(payment.createdAt).toLocaleDateString("en-GB"),
-        type:
-          payment.type === "PAYMENT"
-            ? "Payment"
-            : payment.type === "ELECTRICITY_CHARGES"
-              ? "Hosting & electricity charges"
-              : payment.type === "ADJUSTMENT"
-                ? "Adjustment"
-                : payment.type === "HARDWARE_SALES"
-                  ? "Hardware sales payment"
-                  : payment.type === "HARDWARE_REPAIR"
-                    ? "Hardware repair payment"
-                    : payment.type,
+        type: paymentTypeLabel(payment.type),
         consumption:
           payment.consumption > 0
             ? `${payment.consumption.toFixed(2)} kWh`

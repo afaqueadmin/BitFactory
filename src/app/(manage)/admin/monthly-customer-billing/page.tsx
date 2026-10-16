@@ -156,7 +156,7 @@ export default function MonthlyCustomerBillingDetailPage() {
           >
             <Box>
               <Typography color="textSecondary" variant="body2">
-                Electricity Charges (sum)
+                Hosting & Colocation (sum)
               </Typography>
               <Typography sx={{ fontWeight: 600 }}>
                 <CurrencyDisplay value={summary?.sumElectricityCharges ?? 0} />
@@ -286,7 +286,7 @@ export default function MonthlyCustomerBillingDetailPage() {
             >
               <MenuItem value="">All</MenuItem>
               <MenuItem value="ELECTRICITY_CHARGES">
-                Hosting & electricity charges
+                Hosting & Colocation
               </MenuItem>
               <MenuItem value="ADJUSTMENT">Adjustment</MenuItem>
             </TextField>

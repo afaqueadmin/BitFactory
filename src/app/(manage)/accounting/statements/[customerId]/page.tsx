@@ -40,6 +40,8 @@ import PrintIcon from "@mui/icons-material/Print";
 import SendIcon from "@mui/icons-material/Send";
 import Link from "next/link";
 import { calculateDaysUntilDue } from "@/lib/mocks/invoiceMocks";
+import { INVOICE_TYPE_LABELS } from "@/lib/constants/accounting";
+import type { InvoiceType } from "@prisma/client";
 
 // Email templates for different tones
 const EMAIL_TEMPLATES = {
@@ -508,9 +510,8 @@ export default function CustomerStatementPage() {
                     <DateDisplay date={invoice.dueDate} format="date" />
                   </TableCell>
                   <TableCell>
-                    {invoice.invoiceType === "HARDWARE_SALES"
-                      ? "Hardware"
-                      : "Hosting & Electricity"}
+                    {INVOICE_TYPE_LABELS[invoice.invoiceType as InvoiceType] ??
+                      invoice.invoiceType}
                   </TableCell>
                   <TableCell>
                     <CurrencyDisplay value={invoice.totalAmount} />

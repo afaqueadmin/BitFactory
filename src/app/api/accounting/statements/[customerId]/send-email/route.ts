@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
 import { generatePDFFromHTML, renderInvoiceTemplate } from "@/lib/email";
+import { INVOICE_TYPE_LABELS } from "@/lib/constants/accounting";
 import { readFileSync } from "fs";
 import { join } from "path";
 import nodemailer from "nodemailer";
@@ -131,12 +132,7 @@ export async function POST(
             ? Math.max(0, totalAmount - paidAmount)
             : 0;
 
-        const invoiceType =
-          invoice.invoiceType === "HARDWARE_SALES"
-            ? "Hardware"
-            : invoice.invoiceType === "HARDWARE_REPAIR"
-              ? "Hardware Repair"
-              : "Hosting & Electricity";
+        const invoiceType = INVOICE_TYPE_LABELS[invoice.invoiceType];
 
         const statusClass = `status-${invoice.status}`;
 

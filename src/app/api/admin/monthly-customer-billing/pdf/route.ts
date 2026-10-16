@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
       subtitle: `Period: ${effectiveStart.toLocaleString()} to ${effectiveEnd.toLocaleString()}`,
       summaryRows: [
         {
-          label: "Electricity Charges (sum)",
+          label: "Hosting & Colocation (sum)",
           value: formatCurrency(sumElectricityCharges),
         },
         { label: "Adjustments (sum)", value: formatCurrency(sumAdjustment) },
