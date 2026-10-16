@@ -747,6 +747,26 @@ export default function PaybackAnalysisPage() {
         formatValue(calc.netRevenueLux, "currency"),
       ),
     });
+    allDynamicRows.push({
+      label: "Payback Months (Stock OS)",
+      values: calculatedValues.map((calc, index) =>
+        index === BREAKEVEN_COLUMN
+          ? "--"
+          : calc.paybackMonthsStock === Infinity
+            ? "∞"
+            : Math.round(calc.paybackMonthsStock).toLocaleString("en-US"),
+      ),
+    });
+    allDynamicRows.push({
+      label: "Payback Months (Custom OS)",
+      values: calculatedValues.map((calc, index) =>
+        index === BREAKEVEN_COLUMN
+          ? "--"
+          : calc.paybackMonthsLux === Infinity
+            ? "∞"
+            : Math.round(calc.paybackMonthsLux).toLocaleString("en-US"),
+      ),
+    });
     if (showDepreciationRows) {
       const depreciation = calculatedValues.map((calc) =>
         calculateMonthlyDepreciationValues(
@@ -788,26 +808,6 @@ export default function PaybackAnalysisPage() {
         ),
       });
     }
-    allDynamicRows.push({
-      label: "Payback Months (Stock OS)",
-      values: calculatedValues.map((calc, index) =>
-        index === BREAKEVEN_COLUMN
-          ? "--"
-          : calc.paybackMonthsStock === Infinity
-            ? "∞"
-            : Math.round(calc.paybackMonthsStock).toLocaleString("en-US"),
-      ),
-    });
-    allDynamicRows.push({
-      label: "Payback Months (Custom OS)",
-      values: calculatedValues.map((calc, index) =>
-        index === BREAKEVEN_COLUMN
-          ? "--"
-          : calc.paybackMonthsLux === Infinity
-            ? "∞"
-            : Math.round(calc.paybackMonthsLux).toLocaleString("en-US"),
-      ),
-    });
 
     if (
       selectedStrategy === "STRATEGY_2" ||

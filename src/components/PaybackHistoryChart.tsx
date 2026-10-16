@@ -70,7 +70,7 @@ interface PaybackHistoryChartProps {
    * tokens. The Stock OS / Custom OS / BTC price line colours are left
    * untouched - they're matched 1:1 to PaybackGraphicalView's legend. */
   daylight?: boolean;
-  /** When set, adds a "Cost incl. Depreciation" line: the selected OS's
+  /** When set, adds a "Breakeven incl. Depreciation" line: the selected OS's
    * breakeven plus the monthly depreciation spread over that day's BTC
    * output. Hashrate and pool commission are for the selected OS. */
   depreciation?: {
@@ -112,7 +112,7 @@ export default function PaybackHistoryChart({
   );
 
   const chartData = useMemo((): Array<
-    PaybackChartSeriesPoint & { costWithDepreciation?: number }
+    PaybackChartSeriesPoint & { breakevenWithDepreciation?: number }
   > => {
     const series = mapSnapshotsToChartSeries(historyData);
     if (!depreciation) return series;
@@ -136,7 +136,7 @@ export default function PaybackHistoryChart({
 
       return {
         ...point,
-        costWithDepreciation:
+        breakevenWithDepreciation:
           hashprice > 0 && Number.isFinite(depreciationAddon)
             ? breakeven + depreciationAddon
             : undefined,
@@ -151,7 +151,8 @@ export default function PaybackHistoryChart({
       const list = [point.btcPriceUsd];
       if (os === "STOCK") list.push(point.stockOsBreakeven);
       if (os === "CUSTOM") list.push(point.customOsBreakeven);
-      if (point.costWithDepreciation) list.push(point.costWithDepreciation);
+      if (point.breakevenWithDepreciation)
+        list.push(point.breakevenWithDepreciation);
       return list;
     });
 
@@ -386,11 +387,13 @@ export default function PaybackHistoryChart({
                       e.dataKey === "btcPriceUsd" ||
                       e.name.toLowerCase().includes("btc"),
                   );
+                  // Mining Advantage stays against the bills-only breakeven.
                   const breakevenEntry = entries.find(
                     (e) =>
                       e.dataKey === "stockOsBreakeven" ||
                       e.dataKey === "customOsBreakeven" ||
-                      e.name.toLowerCase().includes("breakeven"),
+                      (e.dataKey !== "breakevenWithDepreciation" &&
+                        e.name.toLowerCase().includes("breakeven")),
                   );
 
                   let spreadText = null;
@@ -588,8 +591,8 @@ export default function PaybackHistoryChart({
               {depreciation && (
                 <Line
                   type="monotone"
-                  dataKey="costWithDepreciation"
-                  name="Cost incl. Depreciation"
+                  dataKey="breakevenWithDepreciation"
+                  name="Breakeven incl. Depreciation"
                   stroke={COLOR_DEPRECIATION}
                   strokeWidth={2.5}
                   strokeDasharray="6 4"
