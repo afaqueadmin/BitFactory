@@ -26,6 +26,7 @@ import {
   InputAdornment,
   useMediaQuery,
 } from "@mui/material";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { formatValue } from "@/lib/helpers/formatValue";
 import PaybackHistoryChart from "@/components/PaybackHistoryChart";
@@ -53,6 +54,8 @@ import {
   calculateStrategy2Values,
   calculateStrategy3Values,
 } from "@/lib/helpers/paybackCalculations";
+import { usePaybackHistory } from "@/hooks/usePaybackHistory";
+import { buildPaybackBaseCase } from "@/lib/helpers/paybackBaseCase";
 import Segmented, { SegmentedOption } from "@/components/daylight/Segmented";
 import ToggleChip from "@/components/daylight/ToggleChip";
 import { RADIUS_CARD, useDaylight } from "@/lib/daylight";
@@ -197,9 +200,10 @@ export default function PaybackAnalysisPage() {
   const [selectedStrategy, setSelectedStrategy] =
     useState<PaybackStrategy>("STRATEGY_1");
 
-  // Adds monthly depreciation, net profit and ROI rows (Strategy 0, 1 & 2)
+  // Adds monthly depreciation, net profit and ROI rows (Strategy 0 & 1 only)
   const [includeDepreciation, setIncludeDepreciation] = useState(false);
-  const supportsDepreciation = selectedStrategy !== "STRATEGY_3";
+  const supportsDepreciation =
+    selectedStrategy === "STRATEGY_0" || selectedStrategy === "STRATEGY_1";
   const showDepreciationRows = supportsDepreciation && includeDepreciation;
 
   // OS selector state
@@ -598,9 +602,48 @@ export default function PaybackAnalysisPage() {
       )
     : 0;
 
-  const columns = showDepreciationRows
-    ? [...BASE_COLUMNS, "BREAKEVEN\n(incl. Depreciation)"]
-    : BASE_COLUMNS;
+  // Strategy 2 & 3 run over the machine's life, mostly after the 2028
+  // halving, so they highlight the post-halving base-case column: today's
+  // mining cost doubled, plus the past year's average mining advantage from
+  // the Buy vs Mine history. Recomputed from live data on every load.
+  const showBaseCase =
+    selectedStrategy === "STRATEGY_2" || selectedStrategy === "STRATEGY_3";
+  const { historyData: baseCaseHistory } = usePaybackHistory(
+    "CLIENT",
+    selectedMiner,
+    "1Y",
+  );
+  const baseCase = useMemo(
+    () =>
+      showBaseCase
+        ? buildPaybackBaseCase(
+            selectedBreakevenPrice,
+            baseCaseHistory,
+            selectedOS,
+          )
+        : null,
+    [showBaseCase, selectedBreakevenPrice, baseCaseHistory, selectedOS],
+  );
+  // Column 0 is CURRENT, so scenario i sits at column i + 1.
+  const baseCaseColumn = baseCase ? baseCase.scenarioIndex + 1 : null;
+  const formatWholeUsd = (value: number) =>
+    formatValue(value, "currency", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    });
+  const baseCaseCellSx = {
+    backgroundColor: d.skySoft,
+    borderLeft: `2px solid ${d.action}`,
+    borderRight: `2px solid ${d.action}`,
+  };
+
+  const columns = (
+    showDepreciationRows
+      ? [...BASE_COLUMNS, "BREAKEVEN\n(incl. Depreciation)"]
+      : BASE_COLUMNS
+  ).map((column, index) =>
+    index === baseCaseColumn ? `${column}\nBase Case` : column,
+  );
 
   // Index 0 is CURRENT (live BTC price), then one column per scenario price:
   // the fixed steps, the calculated breakeven, and (optionally) the breakeven
@@ -1415,20 +1458,13 @@ export default function PaybackAnalysisPage() {
                   display: "flex",
                   flexWrap: "wrap",
                   alignItems: "center",
-                  justifyContent: "space-between",
+                  justifyContent: "flex-end",
                   gap: "10px",
                   px: { xs: "12px", sm: "16px" },
                   py: "10px",
                   borderBottom: `1px solid ${d.border}`,
                 }}
               >
-                <Typography
-                  sx={{ fontFamily: fonts.body, fontSize: 12, color: d.muted }}
-                >
-                  {includeDepreciation
-                    ? `Machine cost written off over ${MACHINE_LIFE_YEARS * 12} months`
-                    : "Add depreciation, net profit and ROI to the table"}
-                </Typography>
                 <ToggleChip
                   checked={includeDepreciation}
                   onChange={setIncludeDepreciation}
@@ -1459,7 +1495,7 @@ export default function PaybackAnalysisPage() {
                     >
                       Metric
                     </TableCell>
-                    {columns.map((column) => (
+                    {columns.map((column, index) => (
                       <TableCell
                         key={column}
                         sx={{
@@ -1475,6 +1511,11 @@ export default function PaybackAnalysisPage() {
                           borderLeft: `1px solid ${d.border}`,
                           borderBottomColor: d.border,
                           whiteSpace: "pre-line",
+                          ...(index === baseCaseColumn && baseCaseCellSx),
+                          ...(index === baseCaseColumn && {
+                            color: d.action,
+                            borderTop: `2px solid ${d.action}`,
+                          }),
                         }}
                         align="right"
                       >
@@ -1537,6 +1578,7 @@ export default function PaybackAnalysisPage() {
                             index === DEPRECIATION_BREAKEVEN_COLUMN
                               ? { backgroundColor: d.dangerSoft } // chart's depreciation line
                               : {}),
+                            ...(index === baseCaseColumn && baseCaseCellSx),
                           }}
                         >
                           {value}
@@ -1547,6 +1589,77 @@ export default function PaybackAnalysisPage() {
                 </TableBody>
               </Table>
             </TableContainer>
+            {showBaseCase && (
+              <Box
+                sx={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  alignItems: "center",
+                  columnGap: "24px",
+                  rowGap: "6px",
+                  px: { xs: "14px", sm: "16px" },
+                  py: "10px",
+                  borderTop: `1px solid ${d.border}`,
+                  bgcolor: d.tableHead,
+                  fontFamily: fonts.body,
+                  fontSize: 12,
+                  lineHeight: 1.5,
+                }}
+              >
+                {baseCase && (
+                  <Box
+                    sx={{ display: "flex", alignItems: "center", gap: "8px" }}
+                  >
+                    <Box
+                      aria-hidden
+                      sx={{
+                        flexShrink: 0,
+                        width: 12,
+                        height: 12,
+                        borderRadius: "3px",
+                        bgcolor: d.skySoft,
+                        border: `2px solid ${d.action}`,
+                      }}
+                    />
+                    <Typography
+                      component="span"
+                      sx={{ fontFamily: "inherit", fontSize: "inherit" }}
+                    >
+                      <Box
+                        component="span"
+                        sx={{ fontWeight: 650, color: d.action }}
+                      >
+                        Base case {formatWholeUsd(baseCase.scenarioPrice)}
+                      </Box>
+                      <Box component="span" sx={{ color: d.muted }}>
+                        {" "}
+                        · production cost doubled for the 2028 halving, plus
+                        Bitcoin&apos;s 12-month average premium
+                      </Box>
+                    </Typography>
+                  </Box>
+                )}
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    color: d.muted,
+                  }}
+                >
+                  <InfoOutlinedIcon
+                    aria-hidden
+                    sx={{ fontSize: 14, flexShrink: 0 }}
+                  />
+                  <Typography
+                    component="span"
+                    sx={{ fontFamily: "inherit", fontSize: "inherit" }}
+                  >
+                    Lifetime BTC reflects halved block rewards from April 2028
+                  </Typography>
+                </Box>
+              </Box>
+            )}
           </Box>
         </>
       )}

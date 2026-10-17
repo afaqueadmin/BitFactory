@@ -25,6 +25,7 @@ import {
 import {
   TableChart as TableChartIcon,
   InsightsOutlined as InsightsIcon,
+  InfoOutlined as InfoOutlinedIcon,
 } from "@mui/icons-material";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { formatValue } from "@/lib/helpers/formatValue";
@@ -52,6 +53,8 @@ import {
   calculateStrategy2Values,
   calculateStrategy3Values,
 } from "@/lib/helpers/paybackCalculations";
+import { usePaybackHistory } from "@/hooks/usePaybackHistory";
+import { buildPaybackBaseCase } from "@/lib/helpers/paybackBaseCase";
 
 type PaybackStrategy = PaybackStrategyKey;
 
@@ -68,6 +71,7 @@ const BASE_COLUMNS = [
   "BREAKEVEN\n(Hosting Charges)",
 ];
 const BREAKEVEN_COLUMN = BASE_COLUMNS.length - 1;
+const DEPRECIATION_BREAKEVEN_COLUMN = BASE_COLUMNS.length;
 
 // Data Sources:
 // - BTC Price: CoinGecko API (live market price)
@@ -131,9 +135,10 @@ export default function PaybackAnalysisCompanyPage() {
   const [selectedStrategy, setSelectedStrategy] =
     useState<PaybackStrategy>("STRATEGY_1");
 
-  // Adds monthly depreciation, net profit and ROI rows (Strategy 0, 1 & 2)
+  // Adds monthly depreciation, net profit and ROI rows (Strategy 0 & 1 only)
   const [includeDepreciation, setIncludeDepreciation] = useState(false);
-  const supportsDepreciation = selectedStrategy !== "STRATEGY_3";
+  const supportsDepreciation =
+    selectedStrategy === "STRATEGY_0" || selectedStrategy === "STRATEGY_1";
   const showDepreciationRows = supportsDepreciation && includeDepreciation;
 
   // OS selector state
@@ -452,7 +457,11 @@ export default function PaybackAnalysisCompanyPage() {
   const loanInterest = calculateLoanInterest(monthlyElectricityHosting);
 
   // Hashrate for whichever miner/OS the selectors are on.
-  const formatHashrate = (th: number) => `${th.toFixed(2)} TH/s`;
+  const formatHashrate = (th: number) =>
+    `${formatValue(th, "number", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })} TH/s`;
   const activeHashrateSummary = formatHashrate(
     selectedOS === "CUSTOM" ? activeHashrateLuxos : activeHashrateStockOs,
   );
@@ -496,9 +505,50 @@ export default function PaybackAnalysisCompanyPage() {
       )
     : 0;
 
-  const columns = showDepreciationRows
-    ? [...BASE_COLUMNS, "BREAKEVEN\n(incl. Depreciation)"]
-    : BASE_COLUMNS;
+  // Strategy 2 & 3 run over the machine's life, mostly after the 2028
+  // halving, so they highlight the post-halving base-case column: today's
+  // mining cost doubled, plus the past year's average mining advantage from
+  // the Buy vs Mine history. Recomputed from live data on every load.
+  const showBaseCase =
+    selectedStrategy === "STRATEGY_2" || selectedStrategy === "STRATEGY_3";
+  const { historyData: baseCaseHistory } = usePaybackHistory(
+    "COMPANY",
+    selectedMiner,
+    "1Y",
+  );
+  const baseCase = useMemo(
+    () =>
+      showBaseCase
+        ? buildPaybackBaseCase(
+            selectedBreakevenPrice,
+            baseCaseHistory,
+            selectedOS,
+          )
+        : null,
+    [showBaseCase, selectedBreakevenPrice, baseCaseHistory, selectedOS],
+  );
+  // Column 0 is CURRENT, so scenario i sits at column i + 1.
+  const baseCaseColumn = baseCase ? baseCase.scenarioIndex + 1 : null;
+  const baseCaseColor = theme.palette.mode === "dark" ? "#5CB8E8" : "#1675A9";
+  const baseCaseCellSx = {
+    backgroundColor:
+      theme.palette.mode === "dark" ? "rgba(56,182,255,0.14)" : "#EAF6FE",
+    borderLeft: `2px solid ${baseCaseColor}`,
+    borderRight: `2px solid ${baseCaseColor}`,
+  };
+  const formatWholeUsd = (value: number) =>
+    formatValue(value, "currency", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    });
+
+  const columns = (
+    showDepreciationRows
+      ? [...BASE_COLUMNS, "BREAKEVEN\n(incl. Depreciation)"]
+      : BASE_COLUMNS
+  ).map((column, index) =>
+    index === baseCaseColumn ? `${column}\nBase Case` : column,
+  );
 
   // Index 0 is CURRENT (live BTC price), then one column per scenario price:
   // the fixed steps, the calculated breakeven, and (optionally) the breakeven
@@ -582,13 +632,19 @@ export default function PaybackAnalysisCompanyPage() {
         {
           label: `${MINER_LABELS[selectedMiner]} Hashrate (TH) (Stock OS)`,
           values: Array.from({ length: columns.length }, () =>
-            activeHashrateStockOs.toFixed(2),
+            formatValue(activeHashrateStockOs, "number", {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            }),
           ),
         },
         {
           label: `${MINER_LABELS[selectedMiner]} Hashrate (TH) (Custom OS)`,
           values: Array.from({ length: columns.length }, () =>
-            activeHashrateLuxos.toFixed(2),
+            formatValue(activeHashrateLuxos, "number", {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            }),
           ),
         },
       ]
@@ -611,33 +667,32 @@ export default function PaybackAnalysisCompanyPage() {
     });
     allDynamicRows.push({
       label: "Monthly Revenue (Stock OS)",
-      values: calculatedValues.map(
-        (calc) => `$${calc.monthlyRevenueStock.toFixed(2)}`,
+      values: calculatedValues.map((calc) =>
+        formatValue(calc.monthlyRevenueStock, "currency"),
       ),
     });
     allDynamicRows.push({
       label: "Monthly Revenue (Custom OS)",
-      values: calculatedValues.map(
-        (calc) => `$${calc.monthlyRevenueLux.toFixed(2)}`,
+      values: calculatedValues.map((calc) =>
+        formatValue(calc.monthlyRevenueLux, "currency"),
       ),
     });
     allDynamicRows.push({
       label: "Electricity & Hosting Charges",
-      values: Array.from(
-        { length: columns.length },
-        () => `$${monthlyElectricityHosting.toFixed(2)}`,
+      values: Array.from({ length: columns.length }, () =>
+        formatValue(monthlyElectricityHosting, "currency"),
       ),
     });
     allDynamicRows.push({
       label: "Net Revenue (Stock OS)",
-      values: calculatedValues.map(
-        (calc) => `$${calc.netRevenueStock.toFixed(2)}`,
+      values: calculatedValues.map((calc) =>
+        formatValue(calc.netRevenueStock, "currency"),
       ),
     });
     allDynamicRows.push({
       label: "Net Revenue (Custom OS)",
-      values: calculatedValues.map(
-        (calc) => `$${calc.netRevenueLux.toFixed(2)}`,
+      values: calculatedValues.map((calc) =>
+        formatValue(calc.netRevenueLux, "currency"),
       ),
     });
     allDynamicRows.push({
@@ -647,7 +702,7 @@ export default function PaybackAnalysisCompanyPage() {
           ? "--"
           : calc.paybackMonthsStock === Infinity
             ? "∞"
-            : Math.round(calc.paybackMonthsStock),
+            : Math.round(calc.paybackMonthsStock).toLocaleString("en-US"),
       ),
     });
     allDynamicRows.push({
@@ -657,7 +712,7 @@ export default function PaybackAnalysisCompanyPage() {
           ? "--"
           : calc.paybackMonthsLux === Infinity
             ? "∞"
-            : Math.round(calc.paybackMonthsLux),
+            : Math.round(calc.paybackMonthsLux).toLocaleString("en-US"),
       ),
     });
     if (showDepreciationRows) {
@@ -718,46 +773,44 @@ export default function PaybackAnalysisCompanyPage() {
       });
       allDynamicRows.push({
         label: "Lifetime Machine Revenue (Stock OS)",
-        values: calculatedValues.map(
-          (calc) => `$${calc.lifetimeRevenueStock.toFixed(2)}`,
+        values: calculatedValues.map((calc) =>
+          formatValue(calc.lifetimeRevenueStock, "currency"),
         ),
       });
       allDynamicRows.push({
         label: "Lifetime Machine Revenue (Custom OS)",
-        values: calculatedValues.map(
-          (calc) => `$${calc.lifetimeRevenueLux.toFixed(2)}`,
+        values: calculatedValues.map((calc) =>
+          formatValue(calc.lifetimeRevenueLux, "currency"),
         ),
       });
       allDynamicRows.push({
         label: "Machine Depreciation",
-        values: calculatedValues.map(
-          (calc) => `$${calc.machineDepreciation.toFixed(2)}`,
+        values: calculatedValues.map((calc) =>
+          formatValue(calc.machineDepreciation, "currency"),
         ),
       });
       allDynamicRows.push({
         label: "Lifetime Electricity & Hosting Charges",
-        values: calculatedValues.map(
-          (calc) => `$${calc.lifetimeElectricityHostingCharges.toFixed(2)}`,
+        values: calculatedValues.map((calc) =>
+          formatValue(calc.lifetimeElectricityHostingCharges, "currency"),
         ),
       });
       if (selectedStrategy === "STRATEGY_3") {
         // Price-independent: the loan funds the same bills in every scenario.
         allDynamicRows.push({
           label: `Loan Interest (${BORROWING_RATE_APR.toFixed(2)}% APR)`,
-          values: Array.from(
-            { length: columns.length },
-            () => `$${loanInterest.toFixed(2)}`,
+          values: Array.from({ length: columns.length }, () =>
+            formatValue(loanInterest, "currency"),
           ),
         });
         allDynamicRows.push({
           label: "Loan Balance at End of Life",
-          values: Array.from(
-            { length: columns.length },
-            () =>
-              `$${(
-                monthlyElectricityHosting * MACHINE_LIFE_YEARS * 12 +
-                loanInterest
-              ).toFixed(2)}`,
+          values: Array.from({ length: columns.length }, () =>
+            formatValue(
+              monthlyElectricityHosting * MACHINE_LIFE_YEARS * 12 +
+                loanInterest,
+              "currency",
+            ),
           ),
         });
       }
@@ -766,7 +819,7 @@ export default function PaybackAnalysisCompanyPage() {
         values: calculatedValues.map((calc, index) =>
           index === BREAKEVEN_COLUMN
             ? "--"
-            : `$${calc.netProfitLifetimeStock.toFixed(2)}`,
+            : formatValue(calc.netProfitLifetimeStock, "currency"),
         ),
       });
       allDynamicRows.push({
@@ -774,7 +827,7 @@ export default function PaybackAnalysisCompanyPage() {
         values: calculatedValues.map((calc, index) =>
           index === BREAKEVEN_COLUMN
             ? "--"
-            : `$${calc.netProfitLifetimeLux.toFixed(2)}`,
+            : formatValue(calc.netProfitLifetimeLux, "currency"),
         ),
       });
       allDynamicRows.push({
@@ -782,13 +835,21 @@ export default function PaybackAnalysisCompanyPage() {
         values: calculatedValues.map((calc, index) =>
           index === BREAKEVEN_COLUMN
             ? "--"
-            : calc.returnMultipleStock.toFixed(2),
+            : formatValue(calc.returnMultipleStock, "number", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              }),
         ),
       });
       allDynamicRows.push({
         label: "Return Multiple (X) (Custom OS)",
         values: calculatedValues.map((calc, index) =>
-          index === BREAKEVEN_COLUMN ? "--" : calc.returnMultipleLux.toFixed(2),
+          index === BREAKEVEN_COLUMN
+            ? "--"
+            : formatValue(calc.returnMultipleLux, "number", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              }),
         ),
       });
       allDynamicRows.push({
@@ -796,7 +857,7 @@ export default function PaybackAnalysisCompanyPage() {
         values: calculatedValues.map((calc, index) =>
           index === BREAKEVEN_COLUMN
             ? "--"
-            : `${calc.roiLifetimeStock.toFixed(0)}%`,
+            : `${formatValue(calc.roiLifetimeStock, "number", { maximumFractionDigits: 0 })}%`,
         ),
       });
       allDynamicRows.push({
@@ -804,7 +865,7 @@ export default function PaybackAnalysisCompanyPage() {
         values: calculatedValues.map((calc, index) =>
           index === BREAKEVEN_COLUMN
             ? "--"
-            : `${calc.roiLifetimeLux.toFixed(0)}%`,
+            : `${formatValue(calc.roiLifetimeLux, "number", { maximumFractionDigits: 0 })}%`,
         ),
       });
       allDynamicRows.push({
@@ -812,7 +873,7 @@ export default function PaybackAnalysisCompanyPage() {
         values: calculatedValues.map((calc, index) =>
           index === BREAKEVEN_COLUMN
             ? "--"
-            : `${calc.roiPerYearStock.toFixed(0)}%`,
+            : `${formatValue(calc.roiPerYearStock, "number", { maximumFractionDigits: 0 })}%`,
         ),
       });
       allDynamicRows.push({
@@ -820,7 +881,7 @@ export default function PaybackAnalysisCompanyPage() {
         values: calculatedValues.map((calc, index) =>
           index === BREAKEVEN_COLUMN
             ? "--"
-            : `${calc.roiPerYearLux.toFixed(0)}%`,
+            : `${formatValue(calc.roiPerYearLux, "number", { maximumFractionDigits: 0 })}%`,
         ),
       });
     }
@@ -1323,7 +1384,7 @@ export default function PaybackAnalysisCompanyPage() {
                   >
                     Metric
                   </TableCell>
-                  {columns.map((column) => (
+                  {columns.map((column, index) => (
                     <TableCell
                       key={column}
                       sx={{
@@ -1334,6 +1395,11 @@ export default function PaybackAnalysisCompanyPage() {
                         py: { xs: "9px", sm: "11px" },
                         borderLeft: `1px solid ${theme.palette.divider}`,
                         whiteSpace: "pre-line",
+                        ...(index === baseCaseColumn && baseCaseCellSx),
+                        ...(index === baseCaseColumn && {
+                          color: baseCaseColor,
+                          borderTop: `2px solid ${baseCaseColor}`,
+                        }),
                       }}
                       align="right"
                     >
@@ -1378,6 +1444,17 @@ export default function PaybackAnalysisCompanyPage() {
                           ...(row.label === "BTC Price (USD)" && index === 0
                             ? { backgroundColor: "rgba(103, 177, 42, 0.35)" }
                             : {}),
+                          ...(row.label === "BTC Price (USD)" &&
+                          index === DEPRECIATION_BREAKEVEN_COLUMN
+                            ? {
+                                // chart's depreciation line
+                                backgroundColor:
+                                  theme.palette.mode === "dark"
+                                    ? "rgba(240,138,130,0.14)"
+                                    : "rgba(173,72,64,0.12)",
+                              }
+                            : {}),
+                          ...(index === baseCaseColumn && baseCaseCellSx),
                         }}
                       >
                         {value}
@@ -1388,6 +1465,64 @@ export default function PaybackAnalysisCompanyPage() {
               </TableBody>
             </Table>
           </TableContainer>
+
+          {showBaseCase && (
+            <Paper
+              variant="outlined"
+              sx={{
+                mt: 1.5,
+                px: 2,
+                py: 1.25,
+                display: "flex",
+                flexWrap: "wrap",
+                alignItems: "center",
+                columnGap: 3,
+                rowGap: 0.75,
+              }}
+            >
+              {baseCase && (
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <Box
+                    aria-hidden
+                    sx={{
+                      flexShrink: 0,
+                      width: 12,
+                      height: 12,
+                      borderRadius: "3px",
+                      backgroundColor: baseCaseCellSx.backgroundColor,
+                      border: `2px solid ${baseCaseColor}`,
+                    }}
+                  />
+                  <Typography variant="body2" component="span">
+                    <Box
+                      component="span"
+                      sx={{ fontWeight: 700, color: baseCaseColor }}
+                    >
+                      Base case {formatWholeUsd(baseCase.scenarioPrice)}
+                    </Box>
+                    <Box component="span" sx={{ color: "text.secondary" }}>
+                      {" "}
+                      · production cost doubled for the 2028 halving, plus
+                      Bitcoin&apos;s 12-month average premium
+                    </Box>
+                  </Typography>
+                </Box>
+              )}
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 0.75,
+                  color: "text.secondary",
+                }}
+              >
+                <InfoOutlinedIcon aria-hidden sx={{ fontSize: 14 }} />
+                <Typography variant="body2" component="span">
+                  Lifetime BTC reflects halved block rewards from April 2028
+                </Typography>
+              </Box>
+            </Paper>
+          )}
         </>
       )}
     </Box>
