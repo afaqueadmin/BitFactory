@@ -32,7 +32,7 @@ export const BASE_CASE_HALVINGS = [
   {
     year: 2028,
     costMultiplier: 2,
-    shortLabel: "Base Case",
+    shortLabel: "2028 Halving",
     label: "Cost-based Base case",
     description:
       "Production cost is assumed to be doubled after the 2028 halving, plus Bitcoin's trailing 12-month average mining premium.",
@@ -40,7 +40,7 @@ export const BASE_CASE_HALVINGS = [
   {
     year: 2032,
     costMultiplier: 4,
-    shortLabel: "Prediction Case",
+    shortLabel: "2032 Halving",
     label: "Cost-based Prediction case",
     description:
       "Production cost is assumed to be doubled AGAIN after the 2032 halving, plus Bitcoin's trailing 12-month average mining premium.",

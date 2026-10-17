@@ -33,6 +33,6 @@ export const STRATEGY_COPY: Record<PaybackStrategyKey, PaybackStrategyCopy> = {
     headline:
       "Accumulation strategy (professional) - keep the Bitcoin, borrow at 3.75% - 5.50% APR",
     detail:
-      "The miner receives the full BTC mining rewards directly from their machines into their wallet. Nothing mined is sold by the miner. The monthly bill is drawn on a loan secured against the accumulating Bitcoin, to be repaid at the end. Please note - the loan is NOT provided by a hosting platform, rather by an external/third-party.",
+      "The miner receives the full BTC mining rewards directly from their machines into their wallet. Nothing mined is sold by the miner. The monthly bill is drawn on a loan secured against the accumulating Bitcoin, to be repaid at the end. Please note - the loan is NOT provided by the hosting platform, rather by an external/third-party.",
   },
 };
