@@ -1,5 +1,3 @@
-import { BORROWING_RATE_APR } from "./paybackCalculations";
-
 export type PaybackStrategyKey =
   "STRATEGY_0" | "STRATEGY_1" | "STRATEGY_2" | "STRATEGY_3";
 
@@ -16,22 +14,25 @@ export interface PaybackStrategyCopy {
  */
 export const STRATEGY_COPY: Record<PaybackStrategyKey, PaybackStrategyCopy> = {
   STRATEGY_0: {
-    headline: "Mining costs are auto-deducted from rewards",
+    headline: "Auto-deduction",
     detail:
-      "Hosting and power are deducted from the mined Bitcoin before it is sent to your wallet. Only the net rewards reach you.",
+      "Hosting and co-location charges are auto-deducted from your BTC mining rewards earned by your machines. Hence, only net rewards are transferred to your wallet automatically.",
   },
   STRATEGY_1: {
-    headline: "The miner pays its own bills",
+    headline: "The machines pay for its own bills",
     detail:
-      "Each month a portion of the mined Bitcoin is sold to cover hosting and power. Everything left over is yours.",
+      "The miner receives the full BTC mining rewards directly from their machines into their wallet. Thereafter, the miner pays for the hosting and co-location charges in USD each month, by selling a portion of their mined Bitcoin.",
   },
   STRATEGY_2: {
-    headline: "Keep the Bitcoin, fund the bills separately",
+    headline:
+      "Accumulation strategy - keep the Bitcoin, fund the bills separately",
     detail:
-      "Nothing mined is ever sold. The monthly bill is settled from another source and the full Bitcoin stack is held for the machine's life.",
+      "The miner receives the full BTC mining rewards directly from their machines into their wallet. Nothing mined is ever sold by the miner. The monthly bill is settled from another source and the full Bitcoin stack is held for the machine's life.",
   },
   STRATEGY_3: {
-    headline: `Keep the Bitcoin, borrow at ${BORROWING_RATE_APR.toFixed(2)}% APR`,
-    detail: `Nothing mined is sold. The monthly bill is drawn on a loan secured against the accumulating Bitcoin, repaid at the end. Interest is charged at ${BORROWING_RATE_APR.toFixed(2)}% APR.`,
+    headline:
+      "Accumulation strategy (professional) - keep the Bitcoin, borrow at 3.75% - 5.50% APR",
+    detail:
+      "The miner receives the full BTC mining rewards directly from their machines into their wallet. Nothing mined is sold by the miner. The monthly bill is drawn on a loan secured against the accumulating Bitcoin, to be repaid at the end. Please note - the loan is NOT provided by a hosting platform, rather by an external/third-party.",
   },
 };
