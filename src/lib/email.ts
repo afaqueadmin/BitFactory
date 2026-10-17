@@ -836,6 +836,36 @@ export const sendFirmwareChangeRequestRejectedEmail = async (
   }
 };
 
+export const sendInvoicePaymentReceivedEmail = async (
+  email: string,
+  invoiceNumber: string,
+  amountUsdt: number,
+  paymentSource: string,
+) => {
+  const mailOptions = {
+    from:
+      `BitFactory Admin <${process.env.SMTP_FROM}>` || "noreply@bitfactory.com",
+    to: email,
+    subject: `Payment Received - Invoice ${invoiceNumber} - BitFactory`,
+    html: `
+      <h1>Payment Received</h1>
+      <p>We've received your payment of <strong>${escapeHtml(amountUsdt.toFixed(2))} USDT</strong> (${escapeHtml(paymentSource)}) for invoice <strong>${escapeHtml(invoiceNumber)}</strong>.</p>
+      <p>The invoice is now marked as paid. Thank you!</p>
+      <br>
+      <p>Best regards,</p>
+      <p>The BitFactory Team</p>
+    `,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    return { success: true };
+  } catch (error) {
+    console.error("Error sending payment received email:", error);
+    return { success: false, error };
+  }
+};
+
 export const sendInvoiceEmail = async (
   email: string,
   customerName: string,

@@ -28,6 +28,7 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1146.0",
     "@aws-sdk/s3-request-presigner": "^3.1146.0",
+    "@binance/pay": "^7.0.5",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
     "@faker-js/faker": "^10.2.0",
@@ -45,6 +46,7 @@
     "@upstash/redis": "^1.35.5",
     "axios": "^1.16.0",
     "bitcoin-address-validation": "^3.0.0",
+    "canvas-confetti": "^1.9.3",
     "cloudinary": "^2.8.0",
     "date-fns": "^4.1.0",
     "html-to-pdf": "^0.1.11",
@@ -68,6 +70,7 @@
     "@eslint/eslintrc": "^3",
     "@tailwindcss/postcss": "^4",
     "@types/bcrypt": "^6.0.0",
+    "@types/canvas-confetti": "^1.9.0",
     "@types/next-auth": "^3.13.0",
     "@types/node": "^20",
     "@types/pg": "^8.15.5",

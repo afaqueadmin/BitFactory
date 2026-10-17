@@ -1062,49 +1062,54 @@ model GroupSubaccount {
 }
 
 model Invoice {
-  id                     String                @id @default(cuid())
-  invoiceNumber          String                @unique
-  userId                 String
-  hardwareId             String?
-  totalMiners            Int
-  unitPrice              Decimal               @db.Decimal(10, 2)
-  totalAmount            Decimal               @db.Decimal(12, 2)
-  status                 InvoiceStatus
-  invoiceType            InvoiceType           @default(ELECTRICITY_CHARGES)
-  invoiceGeneratedDate   DateTime
-  issuedDate             DateTime?
-  dueDate                DateTime
-  billingMonth           DateTime? // Format: First day of month (e.g., 2026-04-01 for April 2026)
-  machineHostingLocation String[]              @default([])
-  paidDate               DateTime?
-  createdBy              String
-  updatedBy              String?
-  createdAt              DateTime              @default(now())
-  updatedAt              DateTime              @updatedAt
-  btcpayInvoiceId        String?               @unique
-  btcpayStatus           BtcpayStatus?
-  btcpayCheckoutUrl      String?
-  btcpayCreatedAt        DateTime?
-  btcpaySettledAt        DateTime?
+  id                       String                @id @default(cuid())
+  invoiceNumber            String                @unique
+  userId                   String
+  hardwareId               String?
+  totalMiners              Int
+  unitPrice                Decimal               @db.Decimal(10, 2)
+  totalAmount              Decimal               @db.Decimal(12, 2)
+  status                   InvoiceStatus
+  invoiceType              InvoiceType           @default(ELECTRICITY_CHARGES)
+  invoiceGeneratedDate     DateTime
+  issuedDate               DateTime?
+  dueDate                  DateTime
+  billingMonth             DateTime? // Format: First day of month (e.g., 2026-04-01 for April 2026)
+  machineHostingLocation   String[]              @default([])
+  paidDate                 DateTime?
+  createdBy                String
+  updatedBy                String?
+  createdAt                DateTime              @default(now())
+  updatedAt                DateTime              @updatedAt
+  btcpayInvoiceId          String?               @unique
+  btcpayStatus             BtcpayStatus?
+  btcpayCheckoutUrl        String?
+  btcpayCreatedAt          DateTime?
+  btcpaySettledAt          DateTime?
+  // Binance USDT payment: the deposit id / Pay transactionId that paid this
+  // invoice (unique, so one transfer can't pay two invoices), and when the
+  // customer opened the pay modal (only transfers after it can match).
+  binanceTxId              String?               @unique
+  binanceCheckoutStartedAt DateTime?
   // HARDWARE_REPAIR invoices: the one miner being repaired, and a flat
   // discount taken off the line-item subtotal (totalAmount is after it).
   // Other invoice types leave minerId null and discountAmount 0.
-  minerId                String?
-  discountAmount         Decimal               @default(0) @db.Decimal(12, 2)
-  miner                  Miner?                @relation("minerRepairInvoices", fields: [minerId], references: [id], onDelete: SetNull)
-  repairNote             MinerRepairNote?      @relation("invoiceRepairNote")
-  notifications          InvoiceNotification[] @relation("invoiceNotifications")
-  costPayments           CostPayment[]         @relation("invoiceCostPayments")
-  tickets                SupportTicket[]
-  confirmoPayment        ConfirmoPayment?
-  emailSendResults       EmailSendResult[]     @relation("emailSendResults")
-  lineItems              InvoiceLineItem[]
-  memos                  Memo[]                @relation("invoiceMemos")
-  createdByUser          User                  @relation("invoicesCreated", fields: [createdBy], references: [id])
-  updatedByUser          User?                 @relation("invoicesUpdated", fields: [updatedBy], references: [id])
-  user                   User                  @relation("invoices", fields: [userId], references: [id])
-  hardware               Hardware?             @relation(fields: [hardwareId], references: [id])
-  incentiveEntries       IncentiveEntry[]      @relation("invoiceIncentiveEntries")
+  minerId                  String?
+  discountAmount           Decimal               @default(0) @db.Decimal(12, 2)
+  miner                    Miner?                @relation("minerRepairInvoices", fields: [minerId], references: [id], onDelete: SetNull)
+  repairNote               MinerRepairNote?      @relation("invoiceRepairNote")
+  notifications            InvoiceNotification[] @relation("invoiceNotifications")
+  costPayments             CostPayment[]         @relation("invoiceCostPayments")
+  tickets                  SupportTicket[]
+  confirmoPayment          ConfirmoPayment?
+  emailSendResults         EmailSendResult[]     @relation("emailSendResults")
+  lineItems                InvoiceLineItem[]
+  memos                    Memo[]                @relation("invoiceMemos")
+  createdByUser            User                  @relation("invoicesCreated", fields: [createdBy], references: [id])
+  updatedByUser            User?                 @relation("invoicesUpdated", fields: [updatedBy], references: [id])
+  user                     User                  @relation("invoices", fields: [userId], references: [id])
+  hardware                 Hardware?             @relation(fields: [hardwareId], references: [id])
+  incentiveEntries         IncentiveEntry[]      @relation("invoiceIncentiveEntries")
 
   @@index([userId])
   @@index([status])

@@ -30,6 +30,7 @@ import { DateDisplay } from "@/components/accounting/common/DateDisplay";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import DownloadIcon from "@mui/icons-material/Download";
 import PayWithBitcoinButton from "@/components/PayWithBitcoinButton";
+import PayWithBinanceButton from "@/components/PayWithBinanceButton";
 import { RepairMinerDetails } from "@/components/accounting/invoices/RepairMinerDetails";
 
 type RepairLineRow = {
@@ -194,6 +195,12 @@ export default function CustomerInvoiceDetailPage() {
                   disabled={invoice.status === "PAID"}
                 />
               )}
+            <PayWithBinanceButton
+              invoiceId={invoice.id}
+              disabled={
+                invoice.status === "PAID" || invoice.status === "CANCELLED"
+              }
+            />
           </Box>
         </Box>
         <Typography variant="h4" sx={{ fontWeight: 700 }}>
