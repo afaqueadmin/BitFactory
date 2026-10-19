@@ -84,10 +84,17 @@ import {
   useSecondaryLoginRequests,
   useHashrateAlerts,
 } from "@/lib/hooks";
+import { useSimulationRequestCount } from "@/lib/hooks/useSimulationRequestCount";
 import { useAdminNav } from "@/lib/contexts/admin-nav-context";
 
 type BadgeKey =
-  "tickets" | "wallet" | "frequency" | "firmware" | "logins" | "alerts";
+  | "tickets"
+  | "wallet"
+  | "frequency"
+  | "firmware"
+  | "logins"
+  | "alerts"
+  | "simulation";
 
 interface SidebarItem {
   title: string;
@@ -178,6 +185,7 @@ const sidebarSections: SidebarSection[] = [
         title: "Simulated Accounts",
         icon: <SimulatedAccountsIcon />,
         path: "/simulated-accounts",
+        badgeKey: "simulation",
       },
     ],
   },
@@ -444,6 +452,7 @@ export default function AdminSidebar() {
   const { alerts: pendingHashrateAlerts } = useHashrateAlerts({
     acknowledged: false,
   });
+  const pendingSimulationRequests = useSimulationRequestCount();
 
   const badgeCounts: Record<BadgeKey, number> = {
     tickets: openTickets.length,
@@ -452,6 +461,7 @@ export default function AdminSidebar() {
     firmware: pendingFirmwareRequests.length,
     logins: pendingLoginRequests.length,
     alerts: pendingHashrateAlerts.length,
+    simulation: pendingSimulationRequests,
   };
 
   // A group shows the total of its children so counts aren't hidden when

@@ -19,6 +19,7 @@ import {
   ToggleButtonGroup,
   Typography,
 } from "@mui/material";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface SimulatedAccount {
   id: string;
@@ -28,6 +29,14 @@ interface SimulatedAccount {
   createdAt: string;
   lastLoginAt: string | null;
   active: boolean;
+}
+
+interface SimulationRequest {
+  id: string;
+  name: string | null;
+  email: string;
+  phoneNumber: string | null;
+  requestedAt: string;
 }
 
 type StatusFilter = "all" | "active" | "inactive";
@@ -50,10 +59,13 @@ const csvCell = (value: string | null) =>
  * Simulated (SIMULATED) accounts: the people who signed up to try the app, with
  * their contact details for sales and marketing. Accounts are deactivated
  * rather than deleted, so every lead stays listed; an active one can also be
- * turned into a real customer.
+ * turned into a real customer. Potential Customers' requests for a simulated
+ * account are reviewed here too.
  */
 export default function SimulatedAccountsPage() {
   const [accounts, setAccounts] = useState<SimulatedAccount[]>([]);
+  const [requests, setRequests] = useState<SimulationRequest[]>([]);
+  const queryClient = useQueryClient();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -74,6 +86,7 @@ export default function SimulatedAccountsPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to load");
       setAccounts(data.data);
+      setRequests(data.requests ?? []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load");
     } finally {
@@ -86,6 +99,43 @@ export default function SimulatedAccountsPage() {
   }, [load]);
 
   const label = (a: SimulatedAccount) => a.name || a.email;
+
+  const handleRequest = async (
+    req: SimulationRequest,
+    action: "approve" | "decline",
+  ) => {
+    const who = req.name || req.email;
+    if (
+      !window.confirm(
+        action === "approve"
+          ? `Turn ${who}'s account into a simulated account? They keep the same login, are signed out once and get an email that it's ready.`
+          : `Decline ${who}'s request? They can ask again later.`,
+      )
+    ) {
+      return;
+    }
+    setBusyId(req.id);
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await fetch(`/api/simulated-accounts/requests/${req.id}`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Failed to review request");
+      setNotice(data.message);
+      await load();
+      // Refresh the sidebar's request badge.
+      queryClient.invalidateQueries({ queryKey: ["simulation-request-count"] });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to review request");
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   const handleConvert = async (account: SimulatedAccount) => {
     if (
@@ -228,6 +278,59 @@ export default function SimulatedAccountsPage() {
         <Alert severity="success" sx={{ mb: 2 }}>
           {notice}
         </Alert>
+      )}
+
+      {!loading && requests.length > 0 && (
+        <Box sx={{ mb: 3 }}>
+          <Typography variant="h6" fontWeight={700} mb={1}>
+            Requests ({requests.length})
+          </Typography>
+          <Typography variant="body2" color="text.secondary" mb={1.5}>
+            Potential Customers asking to try a simulated account. Approving
+            turns their existing account into one.
+          </Typography>
+          <TableContainer component={Paper} variant="outlined">
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Name</TableCell>
+                  <TableCell>Email</TableCell>
+                  <TableCell>Phone</TableCell>
+                  <TableCell>Requested</TableCell>
+                  <TableCell align="right">Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {requests.map((r) => (
+                  <TableRow key={r.id} hover>
+                    <TableCell>{r.name || "-"}</TableCell>
+                    <TableCell>{r.email}</TableCell>
+                    <TableCell>{r.phoneNumber || "-"}</TableCell>
+                    <TableCell>{formatDateTime(r.requestedAt)}</TableCell>
+                    <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
+                      <Button
+                        size="small"
+                        color="success"
+                        onClick={() => handleRequest(r, "approve")}
+                        disabled={busyId === r.id}
+                      >
+                        Approve
+                      </Button>
+                      <Button
+                        size="small"
+                        color="error"
+                        onClick={() => handleRequest(r, "decline")}
+                        disabled={busyId === r.id}
+                      >
+                        Decline
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Box>
       )}
 
       {loading ? (

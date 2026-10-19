@@ -32,7 +32,10 @@ import { sessionCutoffNow } from "@/lib/auth/sessionRevocation";
 import { canManageAccount } from "@/lib/auth/accountTiers";
 import { resolveLuxorSubaccounts } from "@/lib/luxorSubaccounts";
 import { generateFranchiseCode } from "@/lib/franchiseCode";
-import { SIM_CONVERSION_NOTE } from "@/lib/simulation/config";
+import {
+  SimConversionError,
+  convertToSimulated,
+} from "@/lib/simulation/convert";
 
 export const runtime = "nodejs";
 
@@ -331,82 +334,17 @@ export async function POST(
     }
 
     if (body.role === "SIMULATED") {
-      if (target.role !== "CLIENT") {
-        return NextResponse.json(
-          {
-            error:
-              "Only a regular customer can be changed to a simulated account",
-          },
-          { status: 400 },
-        );
-      }
-      if (target.franchiseeId) {
-        return NextResponse.json(
-          {
-            error:
-              "This customer is assigned to a franchise. Change them to a Direct BitFactory Customer first.",
-          },
-          { status: 400 },
-        );
-      }
-
-      // A simulated account is never billed and drops out of every customer
-      // list, so only an account with nothing real on it can become one.
-      const [miners, poolAuths, invoices, payments] = await Promise.all([
-        prisma.miner.count({ where: { userId: id, isDeleted: false } }),
-        prisma.poolAuth.count({ where: { userId: id } }),
-        prisma.invoice.count({ where: { userId: id } }),
-        prisma.costPayment.count({ where: { userId: id, isDeleted: false } }),
-      ]);
-      const blockers = [
-        miners && `${miners} miner(s)`,
-        poolAuths && `${poolAuths} pool subaccount(s)`,
-        invoices && `${invoices} invoice(s)`,
-        payments && `${payments} payment/ledger entr(ies)`,
-      ].filter(Boolean);
-      if (blockers.length > 0) {
-        return NextResponse.json(
-          {
-            error: `Only a customer with no miners, subaccounts, invoices or payments can become a simulated account. This one has ${blockers.join(", ")}.`,
-          },
-          { status: 400 },
-        );
-      }
-
-      const now = new Date();
-      await prisma.$transaction(async (tx) => {
-        await tx.user.update({
-          where: { id },
-          data: {
-            role: "SIMULATED",
-            segment: null,
-            sessionsValidAfter: sessionCutoffNow(),
-          },
+      try {
+        const { label: converted } = await convertToSimulated(id, actorId);
+        return NextResponse.json({
+          message: `${converted} is now a simulated account. Their simulated data starts today.`,
         });
-        await tx.userSession.updateMany({
-          where: { userId: id, logoutAt: null },
-          data: { logoutAt: now },
-        });
-        // The simulation starts at this entry (see getSimContext), not at
-        // the account's original registration.
-        await tx.auditLog.create({
-          data: {
-            action: AuditAction.USER_UPDATED,
-            entityType: "User",
-            entityId: id,
-            userId: actorId,
-            description: `User ${label} ${SIM_CONVERSION_NOTE}`,
-            changes: JSON.stringify({
-              role: { from: "CLIENT", to: "SIMULATED" },
-              segment: { from: target.segment, to: null },
-            }),
-          },
-        });
-      });
-
-      return NextResponse.json({
-        message: `${label} is now a simulated account. Their simulated data starts today.`,
-      });
+      } catch (error) {
+        if (error instanceof SimConversionError) {
+          return NextResponse.json({ error: error.message }, { status: 400 });
+        }
+        throw error;
+      }
     }
 
     return NextResponse.json(

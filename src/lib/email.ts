@@ -177,6 +177,36 @@ export const sendSimulatedWelcomeEmail = async (
   }
 };
 
+/** A customer's own request for a simulated account was approved. */
+export const sendSimulatedAccountReadyEmail = async (
+  email: string,
+  name: string | null,
+) => {
+  const mailOptions = {
+    from:
+      `BitFactory Admin <${process.env.SMTP_FROM}>` || "noreply@bitfactory.com",
+    to: email,
+    subject: "Your BitFactory Simulated Account Is Ready",
+    html: `
+      <h1>Your simulated account is ready${name ? `, ${escapeHtml(name)}` : ""}!</h1>
+      <p>Your account now shows how a real BitFactory miner performs and earns, starting from today, with a simulated starting balance - no money involved.</p>
+      <p>Log in as usual at <a href="https://my.bitfactory.ae" target="_blank">my.bitfactory.ae</a> with your existing email and password.</p>
+      <p>If you have any questions, please don't hesitate to contact our support team.</p>
+      <br>
+      <p>Best regards,</p>
+      <p>The BitFactory Team</p>
+    `,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    return { success: true };
+  } catch (error) {
+    console.error("Error sending simulated account ready email:", error);
+    return { success: false, error };
+  }
+};
+
 export const sendPasswordResetEmail = async (
   email: string,
   tempPassword: string,

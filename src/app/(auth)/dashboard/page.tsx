@@ -31,6 +31,7 @@ import HourglassBottomOutlinedIcon from "@mui/icons-material/HourglassBottomOutl
 import CalendarMonthOutlinedIcon from "@mui/icons-material/CalendarMonthOutlined";
 import MonetizationOnOutlinedIcon from "@mui/icons-material/MonetizationOnOutlined";
 import DashboardHeader from "@/components/DashboardHeader";
+import SimulationRequestCard from "@/components/daylight/SimulationRequestCard";
 import FactoryStatusCard from "@/components/daylight/FactoryStatusCard";
 import StatCard from "@/components/daylight/StatCard";
 import Segmented from "@/components/daylight/Segmented";
@@ -444,6 +445,9 @@ export default function DashboardPage() {
     >
       {/* Page heading */}
       <DashboardHeader daylight />
+
+      {/* Potential Customers only: request a simulated account. */}
+      <SimulationRequestCard />
 
       {/* Total Earning hero (guide §5 gradient area, mirrors the Wallet
           page's Total Earnings hero: big USD headline, BTC underneath). */}

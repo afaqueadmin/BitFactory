@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
+import { pendingSimulationRequests } from "@/lib/simulation/convert";
 
 export const runtime = "nodejs";
 
@@ -9,7 +10,8 @@ export const runtime = "nodejs";
  *
  * Every simulated (SIMULATED) account - active and inactive - with the
  * contact details given at signup and its last login: the marketing lead
- * list. Inactive = soft-deleted (see ./[id]/status).
+ * list. Inactive = soft-deleted (see ./[id]/status). Also returns the open
+ * requests from Potential Customers who asked for one (see ./request).
  */
 export async function GET(request: NextRequest) {
   try {
@@ -50,6 +52,8 @@ export async function GET(request: NextRequest) {
       },
     });
 
+    const requests = await pendingSimulationRequests();
+
     const lastLogins = users.length
       ? await prisma.userSession.groupBy({
           by: ["userId"],
@@ -68,6 +72,7 @@ export async function GET(request: NextRequest) {
         active: !isDeleted,
         lastLoginAt: lastLoginById.get(u.id) ?? null,
       })),
+      requests,
     });
   } catch (error) {
     console.error("[Simulated Accounts API] Error:", error);
