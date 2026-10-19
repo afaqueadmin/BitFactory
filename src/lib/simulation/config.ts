@@ -17,6 +17,12 @@ export const SIM_CONVERSION_NOTE = "converted to a simulated account";
 /** The same note as written before the "demo" -> "simulated" rename. */
 export const SIM_CONVERSION_NOTE_LEGACY = "converted to a demo account";
 
+/**
+ * Ends the audit-log description written when someone signs up again with
+ * an inactive simulated account's email; the simulation restarts from it.
+ */
+export const SIM_REREGISTER_NOTE = "re-registered as a simulated account";
+
 /** Shown wherever a real subaccount name would appear. */
 export const SIM_SUBACCOUNT_NAME = "Simulation";
 

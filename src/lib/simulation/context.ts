@@ -11,6 +11,7 @@ import type { WorkerSubaccount } from "@/lib/hashrateHistory";
 import {
   SIM_CONVERSION_NOTE,
   SIM_CONVERSION_NOTE_LEGACY,
+  SIM_REREGISTER_NOTE,
   isSimulatedRole,
   simDemoMinerId,
   simDemoMinerName,
@@ -145,8 +146,9 @@ export async function getSimContext(decoded: {
       where: { id: decoded.userId },
       select: { createdAt: true },
     }),
-    // An existing customer an admin turned into a simulated account starts from
-    // that moment, not from when the account was first created.
+    // An existing customer an admin turned into a simulated account, or an
+    // inactive one re-registered, starts from that moment, not from when the
+    // account was first created.
     prisma.auditLog.findFirst({
       where: {
         entityType: "User",
@@ -155,6 +157,7 @@ export async function getSimContext(decoded: {
         OR: [
           { description: { endsWith: SIM_CONVERSION_NOTE } },
           { description: { endsWith: SIM_CONVERSION_NOTE_LEGACY } },
+          { description: { endsWith: SIM_REREGISTER_NOTE } },
         ],
       },
       orderBy: { createdAt: "desc" },

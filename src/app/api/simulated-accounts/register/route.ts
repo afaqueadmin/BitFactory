@@ -10,6 +10,8 @@ import {
 import { generateTempPassword } from "@/lib/helpers/generateTempPassword";
 import { getOrCreatePaybackConfig } from "@/lib/paybackConfigHelpers";
 import { enforceAuthRateLimit, getClientIp } from "@/lib/rateLimit";
+import { sessionCutoffNow } from "@/lib/auth/sessionRevocation";
+import { SIM_REREGISTER_NOTE } from "@/lib/simulation/config";
 
 /**
  * POST /api/simulated-accounts/register  (public, no auth)
@@ -19,6 +21,12 @@ import { enforceAuthRateLimit, getClientIp } from "@/lib/rateLimit";
  * as for clients: the temporary password is only ever sent there, and the
  * account is created only once that email has gone out. 2FA setup follows
  * at first sign-in (twoFactorPolicy).
+ *
+ * Signing up again with the email of an INACTIVE simulated account (one an
+ * admin deactivated) reactivates it as a fresh start: new name/phone and
+ * password, 2FA and passkeys cleared, and its simulated data restarts from
+ * now (SIM_REREGISTER_NOTE). Any other account holding the email - active,
+ * or a real customer - is never touched.
  *
  * The reply is identical whether or not the email already has an account,
  * and the work happens after it is sent, so the form can't be used to find
@@ -46,6 +54,24 @@ async function createSimulatedAccount(
   ipAddress: string | null,
   userAgent: string,
 ): Promise<void> {
+  const inactive = await prisma.user.findFirst({
+    where: { email, role: "SIMULATED", isDeleted: true },
+    select: { id: true },
+  });
+  if (inactive) {
+    // Only when nothing else (another account or login) holds the email.
+    if (await isEmailTaken(email, inactive.id)) return;
+    await reactivateSimulatedAccount(
+      inactive.id,
+      name,
+      email,
+      phoneNumber,
+      ipAddress,
+      userAgent,
+    );
+    return;
+  }
+
   if (await isEmailTaken(email)) return;
 
   const tempPassword = generateTempPassword();
@@ -87,6 +113,64 @@ async function createSimulatedAccount(
     if (isEmailUniqueViolation(error)) return;
     throw error;
   }
+}
+
+async function reactivateSimulatedAccount(
+  userId: string,
+  name: string,
+  email: string,
+  phoneNumber: string,
+  ipAddress: string | null,
+  userAgent: string,
+): Promise<void> {
+  const tempPassword = generateTempPassword();
+  const hashedPassword = await hash(tempPassword, 12);
+
+  // Email first, as for a new account.
+  const sent = await sendSimulatedWelcomeEmail(email, name, tempPassword);
+  if (!sent.success) {
+    console.error("[Simulated Signup] Welcome email failed:", sent.error);
+    return;
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.user.update({
+      where: { id: userId },
+      data: {
+        isDeleted: false,
+        name,
+        phoneNumber,
+        password: hashedPassword,
+        sessionsValidAfter: sessionCutoffNow(),
+      },
+    });
+    await tx.userLogin.updateMany({
+      where: { userId, isPrimary: true },
+      data: { password: hashedPassword },
+    });
+    // A clean start: they set up 2FA (and any passkey) again.
+    await tx.twoFactorAuth.deleteMany({ where: { userId } });
+    await tx.webAuthnCredential.deleteMany({ where: { userId } });
+    // Restarts the simulation from now (see getSimContext).
+    await tx.auditLog.create({
+      data: {
+        action: "USER_UPDATED",
+        entityType: "User",
+        entityId: userId,
+        userId,
+        description: `Simulated account ${email} ${SIM_REREGISTER_NOTE}`,
+        changes: JSON.stringify({ active: { from: false, to: true } }),
+      },
+    });
+    await tx.userActivity.create({
+      data: {
+        userId,
+        type: "SIMULATED_SIGNUP",
+        ipAddress: ipAddress || "unknown",
+        userAgent,
+      },
+    });
+  });
 }
 
 export async function POST(request: NextRequest) {

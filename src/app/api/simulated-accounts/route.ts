@@ -7,8 +7,9 @@ export const runtime = "nodejs";
 /**
  * GET /api/simulated-accounts  (ADMIN / SUPER_ADMIN)
  *
- * Every simulated (SIMULATED) account with the contact details given at signup
- * and its last login - the marketing lead list.
+ * Every simulated (SIMULATED) account - active and inactive - with the
+ * contact details given at signup and its last login: the marketing lead
+ * list. Inactive = soft-deleted (see ./[id]/status).
  */
 export async function GET(request: NextRequest) {
   try {
@@ -37,7 +38,7 @@ export async function GET(request: NextRequest) {
     }
 
     const users = await prisma.user.findMany({
-      where: { role: "SIMULATED", isDeleted: false },
+      where: { role: "SIMULATED" },
       orderBy: { createdAt: "desc" },
       select: {
         id: true,
@@ -45,6 +46,7 @@ export async function GET(request: NextRequest) {
         email: true,
         phoneNumber: true,
         createdAt: true,
+        isDeleted: true,
       },
     });
 
@@ -61,8 +63,9 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      data: users.map((u) => ({
+      data: users.map(({ isDeleted, ...u }) => ({
         ...u,
+        active: !isDeleted,
         lastLoginAt: lastLoginById.get(u.id) ?? null,
       })),
     });
