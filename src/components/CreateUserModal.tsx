@@ -391,6 +391,7 @@ export default function CreateUserModal({
                 }
               >
                 <MenuItem value="CLIENT">Client</MenuItem>
+                <MenuItem value="SIMULATED">Simulated (demo)</MenuItem>
                 {user && user.role === "SUPER_ADMIN" && (
                   <MenuItem value="ADMIN">Admin</MenuItem>
                 )}

@@ -310,6 +310,19 @@ export default function Login() {
                 >
                   Forgot password?
                 </Button>
+                <Button
+                  size="small"
+                  href="/try-demo"
+                  sx={{
+                    ml: "auto",
+                    textTransform: "none",
+                    fontFamily: fonts.body,
+                    color: d.action,
+                    "&:hover": { bgcolor: d.hover },
+                  }}
+                >
+                  Try a demo account
+                </Button>
               </Box>
 
               {webAuthnSupported && (

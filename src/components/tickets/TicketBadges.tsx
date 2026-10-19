@@ -112,3 +112,27 @@ export function TicketPriorityBadge({
 export function TicketCategoryLabel({ category }: { category: string }) {
   return <>{TICKET_CATEGORY_LABELS[category] || category}</>;
 }
+
+/**
+ * Marks a ticket raised from a demo (SIMULATED) account, so staff know it's
+ * a prospect trying the app rather than a paying customer.
+ */
+export function DemoAccountTag({ role }: { role?: string | null }) {
+  const { d } = useDaylight();
+  if (role !== "SIMULATED") return null;
+  return (
+    <Chip
+      label="Demo account"
+      size="small"
+      sx={{
+        ml: 0.75,
+        height: 18,
+        fontSize: 10,
+        fontWeight: 600,
+        bgcolor: d.amber,
+        color: d.warning,
+        verticalAlign: "middle",
+      }}
+    />
+  );
+}

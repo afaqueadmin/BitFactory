@@ -17,6 +17,8 @@ import {
   selectRequestedSubaccounts,
   joinSubaccountNames,
 } from "@/lib/luxorSubaccounts";
+import { simRoute } from "@/lib/simulation/context";
+import { simHashrateHistoryPayload } from "@/lib/simulation/views";
 
 /**
  * GET /api/miners/hashrate-history
@@ -47,8 +49,9 @@ export async function GET(request: NextRequest) {
 
     let callerId: string;
     let callerRole: string;
+    let decoded;
     try {
-      const decoded = await verifyJwtToken(token);
+      decoded = await verifyJwtToken(token);
       callerId = decoded.userId;
       callerRole = decoded.role;
     } catch (error) {
@@ -112,6 +115,13 @@ export async function GET(request: NextRequest) {
     }
 
     const window = { start, end };
+
+    // Demo accounts: the demo worker's series, never the caller's own.
+    const sim = await simRoute(decoded, async (ctx) =>
+      NextResponse.json(await simHashrateHistoryPayload(ctx, window, period)),
+    );
+    if (sim) return sim;
+
     const { tick, downgradedFrom } = pickTick(window, period, now);
 
     // ── Resolve whose data is being requested ────────────────────────────

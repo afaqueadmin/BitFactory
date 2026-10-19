@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyJwtToken } from "@/lib/jwt";
 import { prisma } from "@/lib/prisma";
+import { simRoute } from "@/lib/simulation/context";
+import { loadSimLedger } from "@/lib/simulation/data";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +27,24 @@ export async function GET(request: NextRequest) {
     } catch {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    // Demo accounts have no invoices; their cost is the simulated charges.
+    const sim = await simRoute(decoded, async (ctx) => {
+      const charges = (await loadSimLedger(ctx))
+        .filter((r) => r.type === "ELECTRICITY_CHARGES")
+        .reduce((sum, r) => sum - r.amount, 0);
+      return NextResponse.json(
+        {
+          totals: {
+            electricityCostTotal: parseFloat(charges.toFixed(2)),
+            hardwareCostTotal: 0,
+            totalCosts: parseFloat(charges.toFixed(2)),
+          },
+        },
+        { headers: { "Cache-Control": "no-store" } },
+      );
+    });
+    if (sim) return sim;
 
     const userId = decoded.userId;
 

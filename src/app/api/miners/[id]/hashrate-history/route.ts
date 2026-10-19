@@ -16,6 +16,12 @@ import {
   fetchWorkerLuxorSeriesAcrossSubaccounts,
   resolveWorkerSubaccounts,
 } from "@/lib/hashrateHistory";
+import {
+  SimNotConfiguredError,
+  getSimContext,
+  type SimContext,
+} from "@/lib/simulation/context";
+import { simHashrateHistoryPayload } from "@/lib/simulation/views";
 
 /**
  * GET /api/miners/[id]/hashrate-history
@@ -44,8 +50,9 @@ export async function GET(
 
     let callerId: string;
     let callerRole: string;
+    let decoded;
     try {
-      const decoded = await verifyJwtToken(token);
+      decoded = await verifyJwtToken(token);
       callerId = decoded.userId;
       callerRole = decoded.role;
     } catch (error) {
@@ -57,6 +64,24 @@ export async function GET(
     }
 
     const { id: minerId } = await context.params;
+
+    // Demo accounts may only chart the demo miner.
+    let simCtx: SimContext | null;
+    try {
+      simCtx = await getSimContext(decoded);
+    } catch (error) {
+      if (!(error instanceof SimNotConfiguredError)) throw error;
+      return NextResponse.json(
+        { success: false, error: "Demo data is not available right now" },
+        { status: 503 },
+      );
+    }
+    if (simCtx && minerId !== simCtx.demoMiner.id) {
+      return NextResponse.json(
+        { success: false, error: "Miner not found" },
+        { status: 404 },
+      );
+    }
 
     const miner = await prisma.miner.findUnique({
       where: { id: minerId },
@@ -75,7 +100,7 @@ export async function GET(
       );
     }
 
-    if (miner.userId !== callerId) {
+    if (!simCtx && miner.userId !== callerId) {
       if (callerRole === "FRANCHISEE") {
         const owned = await assertFranchiseeOwnsCustomer(
           callerId,
@@ -148,6 +173,11 @@ export async function GET(
     }
 
     const window = { start, end };
+    if (simCtx) {
+      return NextResponse.json(
+        await simHashrateHistoryPayload(simCtx, window, period),
+      );
+    }
     const { tick, downgradedFrom } = pickWorkerTick(window, period, now);
 
     const emptySeries = (): PoolSeries => ({

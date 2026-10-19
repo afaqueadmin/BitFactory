@@ -51,7 +51,15 @@ export async function GET(request: NextRequest) {
     const decoded = await verifyJwtToken(token);
     const userRole = decoded.role;
 
-    if (customerId && userRole === "CLIENT" && customerId != decoded.userId) {
+    // Anyone who isn't staff or a franchisee (clients, demo accounts, any
+    // future role) may only ask for their own invoices.
+    if (
+      customerId &&
+      userRole !== "ADMIN" &&
+      userRole !== "SUPER_ADMIN" &&
+      userRole !== "FRANCHISEE" &&
+      customerId !== decoded.userId
+    ) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

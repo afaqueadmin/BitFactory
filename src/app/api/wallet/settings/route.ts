@@ -8,6 +8,9 @@ import {
   resolveLuxorSubaccounts,
   selectRequestedSubaccounts,
 } from "@/lib/luxorSubaccounts";
+import { simRoute } from "@/lib/simulation/context";
+import { loadSimPoolLedger } from "@/lib/simulation/data";
+import { simWalletSettings } from "@/lib/simulation/views";
 
 // Route segment config
 export const runtime = "nodejs";
@@ -76,8 +79,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     let userId: string;
     let userRole: string;
+    let decoded;
     try {
-      const decoded = await verifyJwtToken(token);
+      decoded = await verifyJwtToken(token);
       userId = decoded.userId;
       userRole = decoded.role;
     } catch (error) {
@@ -97,6 +101,19 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         },
       );
     }
+
+    // 2.4. Demo accounts: monthly payouts, no wallet address configured.
+    const sim = await simRoute(decoded, async (ctx) => {
+      const { pendingBtc } = await loadSimPoolLedger(ctx);
+      return NextResponse.json(
+        {
+          ...simWalletSettings(ctx, pendingBtc),
+          timestamp: new Date().toISOString(),
+        },
+        { headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } },
+      );
+    });
+    if (sim) return sim as NextResponse;
 
     // 2.5. Handle customerId parameter (admin, or franchisee for their own customer)
     if (customerId) {

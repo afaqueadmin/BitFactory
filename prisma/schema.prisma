@@ -1532,6 +1532,9 @@ enum Role {
   CLIENT
   SUPER_ADMIN
   FRANCHISEE
+  /// Demo account: sees one company miner's data, simulated in code
+  /// (src/lib/simulation). Never billed, never in customer lists.
+  SIMULATED
 }
 
 enum Segment {

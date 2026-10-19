@@ -31,6 +31,7 @@ import { CheckCircleOutline, Close, ErrorOutline } from "@mui/icons-material";
 import { PhotoCamera } from "@mui/icons-material";
 import { RADIUS_CARD, useDaylight } from "@/lib/daylight";
 import { useUser } from "@/lib/hooks/useUser";
+import { isCustomerRole } from "@/lib/customerRoles";
 import { useSecondaryLoginRequests } from "@/lib/hooks/useSecondaryLoginRequests";
 import RequestSecondaryLoginModal from "@/components/RequestSecondaryLoginModal";
 
@@ -76,7 +77,8 @@ export default function AccountSettings() {
   const [secondaryRequestOpen, setSecondaryRequestOpen] = useState(false);
   // A CLIENT without a second sign-in email can ask an admin for one.
   const { user } = useUser();
-  const isClient = user?.role === "CLIENT";
+  // Demo accounts see the same section; its request form is disabled.
+  const isClient = isCustomerRole(user?.role);
   const { requests: secondaryRequests } = useSecondaryLoginRequests(undefined, {
     enabled: isClient,
   });

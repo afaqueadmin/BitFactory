@@ -3,10 +3,22 @@ import { verifyJwtToken } from "@/lib/jwt";
 import { prisma } from "@/lib/prisma";
 import { generatePDFFromHTML } from "@/lib/email";
 import { paymentTypeLabel } from "@/lib/accounting/paymentTypes";
+import { getSimContext } from "@/lib/simulation/context";
+import { loadSimLedger } from "@/lib/simulation/data";
 import { readFileSync } from "fs";
 import { join } from "path";
 
 export const dynamic = "force-dynamic";
+
+/** What the statement reads from a cost_payments row or a simulated one. */
+type StatementRow = {
+  id: string;
+  amount: number;
+  consumption: number;
+  type: string;
+  narration: string | null;
+  createdAt: Date;
+};
 
 const renderStatementTemplate = (
   template: string,
@@ -90,16 +102,26 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "User not found" }, { status: 401 });
     }
 
+    // Demo accounts get their simulated ledger; nothing is in cost_payments.
+    const simCtx = await getSimContext(jwtPayload);
+    const simLedger = simCtx
+      ? [...(await loadSimLedger(simCtx))].sort(
+          (a, b) => a.createdAt.getTime() - b.createdAt.getTime(),
+        )
+      : null;
+
     // Fetch ALL cost payments for the user (to calculate correct running balance)
-    const allPayments = await prisma.costPayment.findMany({
-      where: {
-        userId: userId,
-        isDeleted: false,
-      },
-      orderBy: {
-        createdAt: "asc",
-      },
-    });
+    const allPayments: StatementRow[] =
+      simLedger ??
+      (await prisma.costPayment.findMany({
+        where: {
+          userId: userId,
+          isDeleted: false,
+        },
+        orderBy: {
+          createdAt: "asc",
+        },
+      }));
 
     // Calculate running balance for all payments
     const balanceMap = new Map<string, number>();
@@ -119,19 +141,21 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch cost payments for the user within the date range
-    const costPayments = await prisma.costPayment.findMany({
-      where: {
-        userId: userId,
-        isDeleted: false,
-        createdAt: {
-          gte: start,
-          lte: end,
-        },
-      },
-      orderBy: {
-        createdAt: "asc",
-      },
-    });
+    const costPayments: StatementRow[] = simLedger
+      ? simLedger.filter((r) => r.createdAt >= start && r.createdAt <= end)
+      : await prisma.costPayment.findMany({
+          where: {
+            userId: userId,
+            isDeleted: false,
+            createdAt: {
+              gte: start,
+              lte: end,
+            },
+          },
+          orderBy: {
+            createdAt: "asc",
+          },
+        });
 
     // Calculate totals and get balance from balanceMap
     const paymentsWithBalance = costPayments.map((payment) => {

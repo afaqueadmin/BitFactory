@@ -21,6 +21,7 @@ const singleSegmentPattern = (base: string): PathMatcher => ({
 const publicPaths = new Set([
   "/",
   "/login",
+  "/try-demo", // public demo-account signup
   "/reset-password", // C-1: forgotten-password link
   "/api/auth/2fa/validate", // Adding 2FA validation endpoint
   "/manifest.json",
@@ -99,6 +100,7 @@ const securePaths = {
     "/firmware-change-requests",
     "/secondary-login-requests",
     "/hashrate-alerts",
+    "/simulated-accounts",
     // Add admin-specific public paths if any
   ]),
   // Franchisee: their own dashboard/account/customers/miners pages under
@@ -116,6 +118,8 @@ const securePaths = {
     "/franchise/support",
     ...clientPaths,
   ]),
+  // Demo accounts see the full client app (with simulated data).
+  SIMULATED: new Set<string>(clientPaths),
 }; // Add admin-specific public paths if any
 
 const dynamicPatternsPaths = {
@@ -133,6 +137,7 @@ const dynamicPatternsPaths = {
     prefixPattern("/tickets"),
   ],
   FRANCHISEE: [...clientDynamicPatterns, prefixPattern("/franchise/support")],
+  SIMULATED: clientDynamicPatterns,
 };
 
 // Role-based default redirects
@@ -142,6 +147,7 @@ const getDefaultPathForRole = (role: string) => {
     case "SUPER_ADMIN":
       return "/adminpanel";
     case "CLIENT":
+    case "SIMULATED":
       return "/dashboard";
     case "FRANCHISEE":
       return "/franchise/dashboard";
@@ -153,7 +159,7 @@ const getDefaultPathForRole = (role: string) => {
 // Check if a path is inside a route group folder like (auth) or (manage)
 const isInRouteGroup = (
   pathname: string,
-  role: "CLIENT" | "ADMIN" | "FRANCHISEE",
+  role: "CLIENT" | "ADMIN" | "FRANCHISEE" | "SIMULATED",
 ) => {
   return (
     securePaths[role].has(pathname) ||
@@ -230,6 +236,12 @@ export async function proxy(request: NextRequest) {
 
     if (userRole === "CLIENT") {
       // Prevent client from accessing admin routes
+      if (!isInRouteGroup(pathname, userRole)) {
+        return NextResponse.redirect(new URL("/dashboard", request.url));
+      }
+    }
+
+    if (userRole === "SIMULATED") {
       if (!isInRouteGroup(pathname, userRole)) {
         return NextResponse.redirect(new URL("/dashboard", request.url));
       }

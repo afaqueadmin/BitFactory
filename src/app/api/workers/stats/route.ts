@@ -8,6 +8,8 @@ import {
   joinSubaccountNames,
   countDistinctWorkers,
 } from "@/lib/luxorSubaccounts";
+import { simRoute } from "@/lib/simulation/context";
+import { loadSimLiveWorker } from "@/lib/simulation/data";
 
 interface WorkersStats {
   activeWorkers: number;
@@ -36,13 +38,39 @@ export async function GET(request: NextRequest) {
 
     // Verify token and extract user ID
     let userId: string;
+    let decoded;
     try {
-      const decoded = await verifyJwtToken(token);
+      decoded = await verifyJwtToken(token);
       userId = decoded.userId;
     } catch (error) {
       console.error("[Workers Stats API] Token verification failed:", error);
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
+
+    const sim = await simRoute(decoded, async (ctx) => {
+      const live = await loadSimLiveWorker(ctx).catch((error) => {
+        console.error("[Workers Stats API] Demo worker fetch failed:", error);
+        return null;
+      });
+      const active = live?.status === "ACTIVE" ? 1 : 0;
+      const inactive = 1 - active;
+      const stats: WorkersStats = {
+        activeWorkers: active,
+        inactiveWorkers: inactive,
+        totalWorkers: 1,
+        activePoolNames: ["Luxor"],
+        poolBreakdown: {
+          luxor: { activeWorkers: active, inactiveWorkers: inactive },
+          braiins: { activeWorkers: 0, inactiveWorkers: 0 },
+        },
+      };
+      return NextResponse.json({
+        success: true,
+        data: stats,
+        timestamp: new Date().toISOString(),
+      });
+    });
+    if (sim) return sim;
 
     console.log(`[Workers Stats API] Fetching workers for user: ${userId}`);
 

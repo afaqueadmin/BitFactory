@@ -143,6 +143,40 @@ export const sendWelcomeEmail = async (email: string, tempPassword: string) => {
   }
 };
 
+/** Sign-in details for a self-registered demo (SIMULATED) account. */
+export const sendDemoWelcomeEmail = async (
+  email: string,
+  name: string,
+  tempPassword: string,
+) => {
+  const mailOptions = {
+    from:
+      `BitFactory Admin <${process.env.SMTP_FROM}>` || "noreply@bitfactory.com",
+    to: email,
+    subject: "Your BitFactory Demo Account",
+    html: `
+      <h1>Welcome to BitFactory, ${escapeHtml(name)}!</h1>
+      <p>Your demo account is ready. It shows how a real BitFactory miner performs and earns, starting from today, with a simulated starting balance - no money involved.</p>
+      <p><strong>URL:</strong><a href="https://my.bitfactory.ae" target="_blank"> my.bitfactory.ae</a></p>
+      <p><strong>Username:</strong> ${escapeHtml(email)}</p>
+      <p><strong>Temporary Password:</strong> ${tempPassword}</p>
+      <p>For security reasons, please change your password after logging in. You'll also be asked to set up two-factor authentication.</p>
+      <p>If you didn't sign up for a demo account, you can ignore this email.</p>
+      <br>
+      <p>Best regards,</p>
+      <p>The BitFactory Team</p>
+    `,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    return { success: true };
+  } catch (error) {
+    console.error("Error sending demo welcome email:", error);
+    return { success: false, error };
+  }
+};
+
 export const sendPasswordResetEmail = async (
   email: string,
   tempPassword: string,

@@ -7,6 +7,8 @@ import {
   selectRequestedSubaccounts,
   joinSubaccountNames,
 } from "@/lib/luxorSubaccounts";
+import { simRoute } from "@/lib/simulation/context";
+import { loadSimPoolLedger } from "@/lib/simulation/data";
 
 /**
  * GET /api/wallet/earnings-summary
@@ -42,6 +44,31 @@ export async function GET(request: NextRequest) {
       console.log("[Earnings Summary API] Invalid token:", error);
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    // Demo accounts: earned since registration; pending since the last
+    // simulated monthly payout.
+    const sim = await simRoute(decoded, async (ctx) => {
+      const ledger = await loadSimPoolLedger(ctx);
+      return NextResponse.json(
+        {
+          totalEarnings: { btc: ledger.totalEarnedBtc },
+          pendingPayouts: { btc: ledger.pendingBtc },
+          currency: "BTC",
+          dataSource: "luxor",
+          timestamp: new Date().toISOString(),
+          activePoolNames: ["Luxor"],
+          poolBreakdown: {
+            luxor: {
+              totalEarnings: ledger.totalEarnedBtc,
+              pendingPayouts: ledger.pendingBtc,
+            },
+            braiins: { totalEarnings: 0, pendingPayouts: 0 },
+          },
+        },
+        { headers: { "Cache-Control": "no-store" } },
+      );
+    });
+    if (sim) return sim;
 
     let userId = decoded.userId;
     const userRole = decoded.role;

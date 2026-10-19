@@ -25,6 +25,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyJwtToken } from "@/lib/jwt";
 import { createLuxorClient, LuxorError } from "@/lib/luxor";
 import { prisma } from "@/lib/prisma";
+import { isSimulatedRole } from "@/lib/simulation/config";
+import { simRoute } from "@/lib/simulation/context";
+import { loadSimLiveWorker, simWorkerForDisplay } from "@/lib/simulation/data";
 import {
   joinSubaccountNames,
   selectRequestedSubaccounts,
@@ -406,6 +409,42 @@ export async function GET(
     if (endpointConfig.adminOnly) {
       const denied = checkAdminAccess(user.role);
       if (denied) return denied;
+    }
+
+    // ✅ STEP 2.4: Demo accounts see the demo worker and the pool-wide stats
+    // (no customer data) and nothing else.
+    if (isSimulatedRole(user.role)) {
+      if (endpoint === "workers") {
+        const sim = await simRoute(user, async (ctx) => {
+          const live = await loadSimLiveWorker(ctx);
+          const workers = live ? [simWorkerForDisplay(ctx, live)] : [];
+          const active = workers.filter((w) => w.status === "ACTIVE").length;
+          return NextResponse.json({
+            success: true,
+            data: {
+              currency_type: "BTC",
+              subaccounts: [],
+              total_active: active,
+              total_inactive: workers.length - active,
+              workers,
+              pagination: {
+                page_number: 1,
+                page_size: workers.length,
+                item_count: workers.length,
+                previous_page_url: null,
+                next_page_url: null,
+              },
+            },
+            timestamp: new Date().toISOString(),
+          });
+        });
+        if (sim) return sim as NextResponse<ProxyResponse>;
+      } else if (endpoint !== "pool-hashrate" && endpoint !== "pool-stats") {
+        return NextResponse.json<ProxyResponse>(
+          { success: false, error: "Not available on demo accounts" },
+          { status: 403 },
+        );
+      }
     }
 
     // ✅ STEP 2.5: Scope subaccounts for non-admins. Names come from the DB,

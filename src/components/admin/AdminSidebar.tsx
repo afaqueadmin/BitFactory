@@ -28,6 +28,7 @@ import {
   Workspaces as CustomerGroupsIcon,
   AccountTree as SubaccountsIcon,
   Storefront as FranchiseesIcon,
+  Science as DemoAccountsIcon,
   Dns as MinersIcon,
   Hub as PoolWorkersIcon,
   Lan as LuxorWorkersIcon,
@@ -173,6 +174,11 @@ const sidebarSections: SidebarSection[] = [
       },
       { title: "Subaccounts", icon: <SubaccountsIcon />, path: "/subaccounts" },
       { title: "Franchisees", icon: <FranchiseesIcon />, path: "/franchisees" },
+      {
+        title: "Demo Accounts",
+        icon: <DemoAccountsIcon />,
+        path: "/simulated-accounts",
+      },
     ],
   },
   {
