@@ -8,6 +8,13 @@
  *                        can identify its owner)
  */
 
+/**
+ * Ends the audit-log description written when an admin turns a customer
+ * into a demo account; getSimContext looks for it to start the simulation
+ * at the conversion instead of the original registration.
+ */
+export const SIM_CONVERSION_NOTE = "converted to a demo account";
+
 /** Shown wherever a real subaccount name would appear. */
 export const SIM_SUBACCOUNT_NAME = "Demo";
 

@@ -8,7 +8,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import type { WorkerSubaccount } from "@/lib/hashrateHistory";
-import { isSimulatedRole, simDemoMinerId, simDemoMinerName } from "./config";
+import {
+  SIM_CONVERSION_NOTE,
+  isSimulatedRole,
+  simDemoMinerId,
+  simDemoMinerName,
+} from "./config";
 import type { RatePoint } from "./ledger";
 
 export class SimNotConfiguredError extends Error {
@@ -134,18 +139,35 @@ export async function getSimContext(decoded: {
 }): Promise<SimContext | null> {
   if (!isSimulatedRole(decoded.role)) return null;
 
-  const [user, demoMiner] = await Promise.all([
+  const [user, conversion, demoMiner] = await Promise.all([
     prisma.user.findUnique({
       where: { id: decoded.userId },
+      select: { createdAt: true },
+    }),
+    // An existing customer an admin turned into a demo account starts from
+    // that moment, not from when the account was first created.
+    prisma.auditLog.findFirst({
+      where: {
+        entityType: "User",
+        entityId: decoded.userId,
+        action: "USER_UPDATED",
+        description: { endsWith: SIM_CONVERSION_NOTE },
+      },
+      orderBy: { createdAt: "desc" },
       select: { createdAt: true },
     }),
     loadDemoMiner(),
   ]);
   if (!user) throw new SimNotConfiguredError("Demo account not found");
 
+  const since =
+    conversion && conversion.createdAt > user.createdAt
+      ? conversion.createdAt
+      : user.createdAt;
+
   return {
     userId: decoded.userId,
-    since: user.createdAt,
+    since,
     now: new Date(),
     demoMiner,
     displayName: simDemoMinerName(),

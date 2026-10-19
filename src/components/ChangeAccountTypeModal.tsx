@@ -31,6 +31,9 @@ interface ChangeAccountTypeModalProps {
     streetAddress?: string;
     city?: string;
   } | null;
+  /** What to change a regular customer into; a franchisee always becomes a
+   * regular customer. */
+  target?: "FRANCHISEE" | "SIMULATED";
 }
 
 const emptyFranchise = {
@@ -54,14 +57,15 @@ const franchiseFields: Array<[keyof typeof emptyFranchise, string]> = [
 ];
 
 /**
- * Switches an account between franchisee and regular customer
- * (POST /api/user/[id]/account-type).
+ * Switches an account between franchisee and regular customer, or turns a
+ * regular customer into a demo account (POST /api/user/[id]/account-type).
  */
 export default function ChangeAccountTypeModal({
   open,
   onClose,
   onSuccess,
   customer,
+  target = "FRANCHISEE",
 }: ChangeAccountTypeModalProps) {
   const [segment, setSegment] = useState("");
   const [franchise, setFranchise] = useState(emptyFranchise);
@@ -69,6 +73,7 @@ export default function ChangeAccountTypeModal({
   const [error, setError] = useState("");
 
   const toClient = customer?.role === "FRANCHISEE";
+  const toDemo = !toClient && target === "SIMULATED";
 
   useEffect(() => {
     if (open && customer) {
@@ -99,7 +104,9 @@ export default function ChangeAccountTypeModal({
         body: JSON.stringify(
           toClient
             ? { role: "CLIENT", segment }
-            : { role: "FRANCHISEE", franchise },
+            : toDemo
+              ? { role: "SIMULATED" }
+              : { role: "FRANCHISEE", franchise },
         ),
       });
       const data = await response.json().catch(() => ({}));
@@ -120,7 +127,11 @@ export default function ChangeAccountTypeModal({
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle>
-        {toClient ? "Change to Regular Customer" : "Change to Franchisee"}
+        {toClient
+          ? "Change to Regular Customer"
+          : toDemo
+            ? "Change to Demo Account"
+            : "Change to Franchisee"}
       </DialogTitle>
       <form onSubmit={handleSubmit}>
         <DialogContent dividers>
@@ -151,6 +162,15 @@ export default function ChangeAccountTypeModal({
                   </Select>
                 </FormControl>
               </>
+            ) : toDemo ? (
+              <Typography variant="body2" color="text.secondary">
+                {customer?.name} will become a demo account: they keep their
+                login and see the demo miner&apos;s simulated data starting
+                today, with the welcome bonus as their balance. They drop out of
+                the customer list and billing (find them under Demo Accounts),
+                and will be signed out on all devices. Only a customer with no
+                miners, subaccounts, invoices or payments can be changed.
+              </Typography>
             ) : (
               <>
                 <Typography variant="body2" color="text.secondary">
