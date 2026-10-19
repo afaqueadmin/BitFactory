@@ -7,7 +7,7 @@ export const runtime = "nodejs";
 /**
  * GET /api/simulated-accounts  (ADMIN / SUPER_ADMIN)
  *
- * Every demo (SIMULATED) account with the contact details given at signup
+ * Every simulated (SIMULATED) account with the contact details given at signup
  * and its last login - the marketing lead list.
  */
 export async function GET(request: NextRequest) {
@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
     });
     if (actor?.role !== "ADMIN" && actor?.role !== "SUPER_ADMIN") {
       return NextResponse.json(
-        { error: "Only administrators can view demo accounts" },
+        { error: "Only administrators can view simulated accounts" },
         { status: 403 },
       );
     }
@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error("[Simulated Accounts API] Error:", error);
     return NextResponse.json(
-      { error: "Failed to load demo accounts" },
+      { error: "Failed to load simulated accounts" },
       { status: 500 },
     );
   }

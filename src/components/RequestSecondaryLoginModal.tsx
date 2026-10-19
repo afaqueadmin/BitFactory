@@ -30,8 +30,8 @@ export default function RequestSecondaryLoginModal({
 }: RequestSecondaryLoginModalProps) {
   const createRequest = useCreateSecondaryLoginRequest();
   const { user } = useUser();
-  // Demo accounts see the form but can't submit it.
-  const isDemo = user?.role === "SIMULATED";
+  // Simulated accounts see the form but can't submit it.
+  const isSimulated = user?.role === "SIMULATED";
   const requires2fa = !!user?.twoFactorEnabled;
 
   const [requestedEmail, setRequestedEmail] = useState("");
@@ -85,9 +85,9 @@ export default function RequestSecondaryLoginModal({
     <Dialog open={open} onClose={resetAndClose} maxWidth="sm" fullWidth>
       <DialogTitle>Request a Second Sign-in Email</DialogTitle>
       <DialogContent>
-        {isDemo && (
+        {isSimulated && (
           <Alert severity="info" sx={{ mb: 2 }}>
-            Not available on demo accounts.
+            Not available on simulated accounts.
           </Alert>
         )}
         <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 1 }}>
@@ -150,7 +150,7 @@ export default function RequestSecondaryLoginModal({
         <Button
           onClick={handleSubmit}
           variant="contained"
-          disabled={createRequest.isPending || isDemo}
+          disabled={createRequest.isPending || isSimulated}
           startIcon={
             createRequest.isPending ? <CircularProgress size={16} /> : undefined
           }

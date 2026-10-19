@@ -39,8 +39,8 @@ export default function RequestFirmwareChangeModal({
     enabled: open,
   });
   const { user } = useUser();
-  // Demo accounts see the form but can't submit it.
-  const isDemo = user?.role === "SIMULATED";
+  // Simulated accounts see the form but can't submit it.
+  const isSimulated = user?.role === "SIMULATED";
   const requires2fa = !!user?.twoFactorEnabled;
 
   const [firmwareId, setFirmwareId] = useState("");
@@ -98,9 +98,9 @@ export default function RequestFirmwareChangeModal({
     <Dialog open={open} onClose={resetAndClose} maxWidth="sm" fullWidth>
       <DialogTitle>Request Firmware Change</DialogTitle>
       <DialogContent>
-        {isDemo && (
+        {isSimulated && (
           <Alert severity="info" sx={{ mb: 2 }}>
-            Not available on demo accounts.
+            Not available on simulated accounts.
           </Alert>
         )}
         <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 1 }}>
@@ -183,7 +183,7 @@ export default function RequestFirmwareChangeModal({
         <Button
           onClick={handleSubmit}
           variant="contained"
-          disabled={createRequest.isPending || noOptions || isDemo}
+          disabled={createRequest.isPending || noOptions || isSimulated}
           startIcon={
             createRequest.isPending ? <CircularProgress size={16} /> : undefined
           }

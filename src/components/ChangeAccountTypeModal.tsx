@@ -58,7 +58,7 @@ const franchiseFields: Array<[keyof typeof emptyFranchise, string]> = [
 
 /**
  * Switches an account between franchisee and regular customer, or turns a
- * regular customer into a demo account (POST /api/user/[id]/account-type).
+ * regular customer into a simulated account (POST /api/user/[id]/account-type).
  */
 export default function ChangeAccountTypeModal({
   open,
@@ -73,7 +73,7 @@ export default function ChangeAccountTypeModal({
   const [error, setError] = useState("");
 
   const toClient = customer?.role === "FRANCHISEE";
-  const toDemo = !toClient && target === "SIMULATED";
+  const toSimulated = !toClient && target === "SIMULATED";
 
   useEffect(() => {
     if (open && customer) {
@@ -104,7 +104,7 @@ export default function ChangeAccountTypeModal({
         body: JSON.stringify(
           toClient
             ? { role: "CLIENT", segment }
-            : toDemo
+            : toSimulated
               ? { role: "SIMULATED" }
               : { role: "FRANCHISEE", franchise },
         ),
@@ -129,8 +129,8 @@ export default function ChangeAccountTypeModal({
       <DialogTitle>
         {toClient
           ? "Change to Regular Customer"
-          : toDemo
-            ? "Change to Demo Account"
+          : toSimulated
+            ? "Change to Simulated Account"
             : "Change to Franchisee"}
       </DialogTitle>
       <form onSubmit={handleSubmit}>
@@ -162,14 +162,15 @@ export default function ChangeAccountTypeModal({
                   </Select>
                 </FormControl>
               </>
-            ) : toDemo ? (
+            ) : toSimulated ? (
               <Typography variant="body2" color="text.secondary">
-                {customer?.name} will become a demo account: they keep their
-                login and see the demo miner&apos;s simulated data starting
-                today, with the welcome bonus as their balance. They drop out of
-                the customer list and billing (find them under Demo Accounts),
-                and will be signed out on all devices. Only a customer with no
-                miners, subaccounts, invoices or payments can be changed.
+                {customer?.name} will become a simulated account: they keep
+                their login and see the simulated miner&apos;s simulated data
+                starting today, with the welcome bonus as their balance. They
+                drop out of the customer list and billing (find them under
+                Simulated Accounts), and will be signed out on all devices. Only
+                a customer with no miners, subaccounts, invoices or payments can
+                be changed.
               </Typography>
             ) : (
               <>

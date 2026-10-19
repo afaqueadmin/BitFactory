@@ -21,7 +21,7 @@ const singleSegmentPattern = (base: string): PathMatcher => ({
 const publicPaths = new Set([
   "/",
   "/login",
-  "/try-demo", // public demo-account signup
+  "/try-simulation", // public simulated-account signup
   "/reset-password", // C-1: forgotten-password link
   "/api/auth/2fa/validate", // Adding 2FA validation endpoint
   "/manifest.json",
@@ -118,7 +118,7 @@ const securePaths = {
     "/franchise/support",
     ...clientPaths,
   ]),
-  // Demo accounts see the full client app (with simulated data).
+  // Simulated accounts see the full client app (with simulated data).
   SIMULATED: new Set<string>(clientPaths),
 }; // Add admin-specific public paths if any
 

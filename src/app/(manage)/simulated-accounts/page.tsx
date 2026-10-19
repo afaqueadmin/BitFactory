@@ -17,7 +17,7 @@ import {
   Typography,
 } from "@mui/material";
 
-interface DemoAccount {
+interface SimulatedAccount {
   id: string;
   name: string | null;
   email: string;
@@ -41,12 +41,12 @@ const csvCell = (value: string | null) =>
   `"${(value ?? "").replace(/"/g, '""')}"`;
 
 /**
- * Demo (SIMULATED) accounts: the people who signed up to try the app, with
+ * Simulated (SIMULATED) accounts: the people who signed up to try the app, with
  * their contact details for sales and marketing. An account can be turned
  * into a real customer or deleted from here.
  */
 export default function SimulatedAccountsPage() {
-  const [accounts, setAccounts] = useState<DemoAccount[]>([]);
+  const [accounts, setAccounts] = useState<SimulatedAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -73,9 +73,9 @@ export default function SimulatedAccountsPage() {
     load();
   }, [load]);
 
-  const label = (a: DemoAccount) => a.name || a.email;
+  const label = (a: SimulatedAccount) => a.name || a.email;
 
-  const handleConvert = async (account: DemoAccount) => {
+  const handleConvert = async (account: SimulatedAccount) => {
     if (
       !window.confirm(
         `Convert ${label(account)} into a real customer? They keep the same login and will be signed out once.`,
@@ -102,8 +102,8 @@ export default function SimulatedAccountsPage() {
     }
   };
 
-  const handleDelete = async (account: DemoAccount) => {
-    if (!window.confirm(`Delete the demo account of ${label(account)}?`)) {
+  const handleDelete = async (account: SimulatedAccount) => {
+    if (!window.confirm(`Delete the simulated account of ${label(account)}?`)) {
       return;
     }
     setBusyId(account.id);
@@ -116,7 +116,7 @@ export default function SimulatedAccountsPage() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Failed to delete");
-      setNotice(`Deleted the demo account of ${label(account)}.`);
+      setNotice(`Deleted the simulated account of ${label(account)}.`);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete");
@@ -144,7 +144,7 @@ export default function SimulatedAccountsPage() {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `demo-accounts-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `simulated-accounts-${new Date().toISOString().slice(0, 10)}.csv`;
     document.body.appendChild(a);
     a.click();
     window.URL.revokeObjectURL(url);
@@ -162,10 +162,11 @@ export default function SimulatedAccountsPage() {
       >
         <Box>
           <Typography variant="h5" fontWeight={700}>
-            Demo Accounts
+            Simulated Accounts
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            People trying the app with simulated data from the demo miner.
+            People trying the app with simulated data from a real BitFactory
+            miner.
           </Typography>
         </Box>
         <Button
@@ -209,7 +210,7 @@ export default function SimulatedAccountsPage() {
               {accounts.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
-                    No demo accounts yet.
+                    No simulated accounts yet.
                   </TableCell>
                 </TableRow>
               ) : (

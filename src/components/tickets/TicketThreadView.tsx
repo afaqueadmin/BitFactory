@@ -21,7 +21,7 @@ import {
   TicketStatusBadge,
   TicketPriorityBadge,
   TicketCategoryLabel,
-  DemoAccountTag,
+  SimulatedAccountTag,
 } from "./TicketBadges";
 import {
   TICKET_STATUSES,
@@ -153,7 +153,7 @@ export default function TicketThreadView({
                 {ticket.onBehalfOf
                   ? ` for ${ticket.onBehalfOf.name || ticket.onBehalfOf.email}`
                   : ""}
-                <DemoAccountTag role={ticket.raisedBy.role} />
+                <SimulatedAccountTag role={ticket.raisedBy.role} />
                 {ticket.franchise ? ` · ${ticket.franchise.businessName}` : ""}
                 {ticket.miner ? ` · Miner: ${ticket.miner.name}` : ""}
                 {ticket.invoice
@@ -421,7 +421,7 @@ export default function TicketThreadView({
               {ticket.onBehalfOf
                 ? ` for ${ticket.onBehalfOf.name || ticket.onBehalfOf.email}`
                 : ""}
-              <DemoAccountTag role={ticket.raisedBy.role} />
+              <SimulatedAccountTag role={ticket.raisedBy.role} />
               {ticket.franchise ? ` · ${ticket.franchise.businessName}` : ""}
               {ticket.miner ? ` · Miner: ${ticket.miner.name}` : ""}
               {ticket.invoice

@@ -29,7 +29,7 @@ describe("simPoolLedger", () => {
       currency_type: "BTC",
       date_time: "2026-09-30T00:00:00.000Z",
       address_name: "",
-      subaccount_name: "Demo",
+      subaccount_name: "Simulation",
       transaction_category: "Miner Revenue",
       currency_amount: 0.0002,
       usd_equivalent: 20,

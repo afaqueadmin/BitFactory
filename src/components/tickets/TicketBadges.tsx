@@ -114,15 +114,15 @@ export function TicketCategoryLabel({ category }: { category: string }) {
 }
 
 /**
- * Marks a ticket raised from a demo (SIMULATED) account, so staff know it's
+ * Marks a ticket raised from a simulated (SIMULATED) account, so staff know it's
  * a prospect trying the app rather than a paying customer.
  */
-export function DemoAccountTag({ role }: { role?: string | null }) {
+export function SimulatedAccountTag({ role }: { role?: string | null }) {
   const { d } = useDaylight();
   if (role !== "SIMULATED") return null;
   return (
     <Chip
-      label="Demo account"
+      label="Simulated account"
       size="small"
       sx={{
         ml: 0.75,

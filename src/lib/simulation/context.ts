@@ -1,7 +1,7 @@
 /**
- * Entry point for simulated (demo) accounts. Client routes call simRoute()
+ * Entry point for simulated accounts. Client routes call simRoute()
  * right after verifying the token; for a SIMULATED caller it answers with
- * the demo miner's data instead of the caller's (they have none), for
+ * the simulated miner's data instead of the caller's (they have none), for
  * everyone else it returns null and the route carries on as before.
  */
 
@@ -10,6 +10,7 @@ import { prisma } from "@/lib/prisma";
 import type { WorkerSubaccount } from "@/lib/hashrateHistory";
 import {
   SIM_CONVERSION_NOTE,
+  SIM_CONVERSION_NOTE_LEGACY,
   isSimulatedRole,
   simDemoMinerId,
   simDemoMinerName,
@@ -25,7 +26,7 @@ export class SimNotConfiguredError extends Error {
 
 export interface DemoMiner {
   id: string;
-  /** The real name - also its Luxor worker name. Never sent to a demo user. */
+  /** The real name - also its Luxor worker name. Never sent to a simulated user. */
   workerName: string;
   status: string;
   createdAt: Date;
@@ -52,7 +53,7 @@ export interface SimContext {
   since: Date;
   now: Date;
   demoMiner: DemoMiner;
-  /** What the demo miner and its worker are shown as. */
+  /** What the simulated miner and its worker are shown as. */
   displayName: string;
   /** The owner's Luxor subaccounts - the miner can sit in any of them. */
   ownerSubaccounts: WorkerSubaccount[];
@@ -87,7 +88,7 @@ async function loadDemoMiner(): Promise<DemoMiner> {
     },
   });
   if (!miner) {
-    throw new SimNotConfiguredError(`Demo miner ${id} not found`);
+    throw new SimNotConfiguredError(`Simulated miner ${id} not found`);
   }
 
   return {
@@ -132,7 +133,7 @@ async function loadOwnerSubaccounts(
     }));
 }
 
-/** Null for any caller that isn't a demo account. */
+/** Null for any caller that isn't a simulated account. */
 export async function getSimContext(decoded: {
   userId: string;
   role: string;
@@ -144,21 +145,24 @@ export async function getSimContext(decoded: {
       where: { id: decoded.userId },
       select: { createdAt: true },
     }),
-    // An existing customer an admin turned into a demo account starts from
+    // An existing customer an admin turned into a simulated account starts from
     // that moment, not from when the account was first created.
     prisma.auditLog.findFirst({
       where: {
         entityType: "User",
         entityId: decoded.userId,
         action: "USER_UPDATED",
-        description: { endsWith: SIM_CONVERSION_NOTE },
+        OR: [
+          { description: { endsWith: SIM_CONVERSION_NOTE } },
+          { description: { endsWith: SIM_CONVERSION_NOTE_LEGACY } },
+        ],
       },
       orderBy: { createdAt: "desc" },
       select: { createdAt: true },
     }),
     loadDemoMiner(),
   ]);
-  if (!user) throw new SimNotConfiguredError("Demo account not found");
+  if (!user) throw new SimNotConfiguredError("Simulated account not found");
 
   const since =
     conversion && conversion.createdAt > user.createdAt
@@ -176,8 +180,8 @@ export async function getSimContext(decoded: {
 }
 
 /**
- * Runs `handler` for a demo account and returns its response, or null for
- * anyone else. A missing demo-miner setup answers 503 rather than leaking
+ * Runs `handler` for a simulated account and returns its response, or null for
+ * anyone else. A missing simulated-miner setup answers 503 rather than leaking
  * into the route's normal path.
  */
 export async function simRoute(
@@ -193,7 +197,7 @@ export async function simRoute(
     if (error instanceof SimNotConfiguredError) {
       console.error(`[Simulation] ${error.message}`);
       return NextResponse.json(
-        { success: false, error: "Demo data is not available right now" },
+        { success: false, error: "Simulation data is not available right now" },
         { status: 503 },
       );
     }
@@ -201,11 +205,11 @@ export async function simRoute(
   }
 }
 
-/** Blocks an action for demo accounts; null when the caller may proceed. */
+/** Blocks an action for simulated accounts; null when the caller may proceed. */
 export function rejectIfSimulated(role: string): NextResponse | null {
   if (!isSimulatedRole(role)) return null;
   return NextResponse.json(
-    { success: false, error: "Not available on demo accounts" },
+    { success: false, error: "Not available on simulated accounts" },
     { status: 403 },
   );
 }

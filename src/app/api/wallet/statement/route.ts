@@ -102,7 +102,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "User not found" }, { status: 401 });
     }
 
-    // Demo accounts get their simulated ledger; nothing is in cost_payments.
+    // Simulated accounts get their simulated ledger; nothing is in cost_payments.
     const simCtx = await getSimContext(jwtPayload);
     const simLedger = simCtx
       ? [...(await loadSimLedger(simCtx))].sort(

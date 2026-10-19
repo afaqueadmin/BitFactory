@@ -1,5 +1,5 @@
 /**
- * Builds demo-account responses in the exact shapes the client pages
+ * Builds simulated-account responses in the exact shapes the client pages
  * already read, so the pages need no simulation-specific code. Nothing that
  * identifies the real miner or its owner leaves through here: no serial,
  * MAC, pool credential, owner id, real name, wallet address or tx id.
@@ -17,7 +17,7 @@ import { SIM_SUBACCOUNT_NAME } from "./config";
 import { nextMonthStart, utcDayStart } from "./dates";
 import type { SimLedgerRow } from "./ledger";
 
-/** The demo miner as /api/miners/user returns a miner. */
+/** The simulated miner as /api/miners/user returns a miner. */
 export function simMinerView(ctx: SimContext) {
   const m = ctx.demoMiner;
   return {
@@ -88,7 +88,7 @@ export function simCostPaymentsPage(
   };
 }
 
-/** /api/wallet/settings for a demo account: no address, monthly payouts. */
+/** /api/wallet/settings for a simulated account: no address, monthly payouts. */
 export function simWalletSettings(ctx: SimContext, pendingBtc: number) {
   const settings = {
     currency_type: "BTC",
@@ -108,7 +108,7 @@ export function simWalletSettings(ctx: SimContext, pendingBtc: number) {
 
 /**
  * /api/miners/hashrate-history and /api/miners/[id]/hashrate-history for a
- * demo account: the demo worker's own series, never before registration.
+ * simulated account: the simulated worker's own series, never before registration.
  */
 export async function simHashrateHistoryPayload(
   ctx: SimContext,

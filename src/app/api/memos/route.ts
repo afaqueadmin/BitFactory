@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
     }
 
     const isAdmin = userRole === "ADMIN" || userRole === "SUPER_ADMIN";
-    // Demo accounts are self-scoped like clients (and simply have no memos).
+    // Simulated accounts are self-scoped like clients (and simply have no memos).
     const isClient = isCustomerRole(userRole);
 
     if (!isAdmin && !isClient) {

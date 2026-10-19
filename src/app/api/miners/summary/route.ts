@@ -44,16 +44,19 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
 
-    // Demo accounts: the demo worker's live hashrate; efficiency, uptime and
+    // Simulated accounts: the simulated worker's live hashrate; efficiency, uptime and
     // hashprice from its subaccount (Luxor has no per-worker equivalent).
     const sim = await simRoute(decoded, async (ctx) => {
       const [live, pool, days] = await Promise.all([
         loadSimLiveWorker(ctx).catch((error) => {
-          console.error("[Miners Summary API] Demo worker failed:", error);
+          console.error("[Miners Summary API] Simulated worker failed:", error);
           return null;
         }),
         loadSimPoolSummary(ctx).catch((error) => {
-          console.error("[Miners Summary API] Demo summary failed:", error);
+          console.error(
+            "[Miners Summary API] Simulated summary failed:",
+            error,
+          );
           return null;
         }),
         loadSimDays(ctx),

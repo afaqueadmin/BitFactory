@@ -411,7 +411,7 @@ export async function GET(
       if (denied) return denied;
     }
 
-    // ✅ STEP 2.4: Demo accounts see the demo worker and the pool-wide stats
+    // ✅ STEP 2.4: Simulated accounts see the simulated worker and the pool-wide stats
     // (no customer data) and nothing else.
     if (isSimulatedRole(user.role)) {
       if (endpoint === "workers") {
@@ -441,7 +441,7 @@ export async function GET(
         if (sim) return sim as NextResponse<ProxyResponse>;
       } else if (endpoint !== "pool-hashrate" && endpoint !== "pool-stats") {
         return NextResponse.json<ProxyResponse>(
-          { success: false, error: "Not available on demo accounts" },
+          { success: false, error: "Not available on simulated accounts" },
           { status: 403 },
         );
       }

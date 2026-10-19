@@ -1,5 +1,5 @@
 /**
- * Reads the demo miner's real data for the simulation. Read-only: nothing
+ * Reads the simulated miner's real data for the simulation. Read-only: nothing
  * here writes to the database.
  */
 
@@ -20,7 +20,7 @@ import {
 } from "./payouts";
 
 /**
- * The demo worker's completed days since registration: daily hashrate and
+ * The simulated worker's completed days since registration: daily hashrate and
  * Luxor's per-worker est. revenue (PoolWorkerDailyMetric, written by
  * cron_pool_worker_transactions). A miner only hashes in one subaccount at a
  * time, so rows from several subaccounts are summed per day.
@@ -184,7 +184,7 @@ export interface SimLiveWorker {
 }
 
 /**
- * The demo worker as Luxor reports it right now. Shared by every demo
+ * The simulated worker as Luxor reports it right now. Shared by every simulated
  * account, so it's cached for a minute to stay clear of Luxor's rate limit.
  */
 export async function loadSimLiveWorker(

@@ -312,7 +312,7 @@ export default function Login() {
                 </Button>
                 <Button
                   size="small"
-                  href="/try-demo"
+                  href="/try-simulation"
                   sx={{
                     ml: "auto",
                     textTransform: "none",
@@ -321,7 +321,7 @@ export default function Login() {
                     "&:hover": { bgcolor: d.hover },
                   }}
                 >
-                  Try a demo account
+                  Try a simulated account
                 </Button>
               </Box>
 

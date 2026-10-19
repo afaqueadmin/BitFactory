@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Demo accounts: the simulated ledger, never cost_payments.
+    // Simulated accounts: the simulated ledger, never cost_payments.
     const sim = await simRoute(decoded, async (ctx) =>
       NextResponse.json(
         simCostPaymentsPage(await loadSimLedger(ctx), page, pageSize),

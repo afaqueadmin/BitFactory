@@ -5,10 +5,10 @@ import { Alert, Button } from "@mui/material";
 import { useUser } from "@/lib/hooks/useUser";
 
 /**
- * Shown to demo (SIMULATED) accounts on every client page, so it's always
+ * Shown to simulated (SIMULATED) accounts on every client page, so it's always
  * clear the figures are simulated and nothing is billed.
  */
-export default function DemoAccountBanner() {
+export default function SimulatedAccountBanner() {
   const { user } = useUser();
   if (user?.role !== "SIMULATED") return null;
 
@@ -28,9 +28,9 @@ export default function DemoAccountBanner() {
         </Button>
       }
     >
-      <strong>Demo account.</strong> These figures come from a real Bitfactory
-      miner since you signed up; the balance and charges are simulated and
-      nothing is billed.
+      <strong>Simulated account.</strong> These figures come from a real
+      Bitfactory miner since you signed up; the balance and charges are
+      simulated and nothing is billed.
     </Alert>
   );
 }

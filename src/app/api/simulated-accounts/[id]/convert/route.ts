@@ -10,9 +10,9 @@ export const runtime = "nodejs";
 /**
  * POST /api/simulated-accounts/[id]/convert  (ADMIN / SUPER_ADMIN)
  *
- * Turns a demo account into a real client: role CLIENT, segment Potential
+ * Turns a simulated account into a real client: role CLIENT, segment Potential
  * Customer, same login. Its sessions are ended so no token issued under the
- * demo role keeps working. Subaccounts, miners and billing are then set up
+ * simulated role keeps working. Subaccounts, miners and billing are then set up
  * through the normal Edit Customer flow.
  */
 export async function POST(
@@ -40,7 +40,7 @@ export async function POST(
     });
     if (actor?.role !== "ADMIN" && actor?.role !== "SUPER_ADMIN") {
       return NextResponse.json(
-        { error: "Only administrators can convert demo accounts" },
+        { error: "Only administrators can convert simulated accounts" },
         { status: 403 },
       );
     }
@@ -51,7 +51,7 @@ export async function POST(
     });
     if (!target || target.isDeleted || target.role !== "SIMULATED") {
       return NextResponse.json(
-        { error: "Demo account not found" },
+        { error: "Simulated account not found" },
         { status: 404 },
       );
     }
@@ -78,7 +78,7 @@ export async function POST(
           entityType: "User",
           entityId: id,
           userId: actorId,
-          description: `Demo account ${label} converted to a customer`,
+          description: `Simulated account ${label} converted to a customer`,
           changes: JSON.stringify({
             role: { from: "SIMULATED", to: "CLIENT" },
             segment: { from: null, to: "POTENTIAL_CUSTOMER" },
@@ -93,7 +93,7 @@ export async function POST(
   } catch (error) {
     console.error("[Simulated Accounts Convert API] Error:", error);
     return NextResponse.json(
-      { error: "Failed to convert demo account" },
+      { error: "Failed to convert simulated account" },
       { status: 500 },
     );
   }

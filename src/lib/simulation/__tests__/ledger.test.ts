@@ -71,7 +71,7 @@ describe("simCostLedger", () => {
     expect(rows.some((r) => r.id === "sim-charge-2026-10-14")).toBe(false);
   });
 
-  it("skips days the demo worker didn't hash", () => {
+  it("skips days the simulated worker didn't hash", () => {
     const rows = simCostLedger({
       ...base,
       hashrateByDay: new Map([

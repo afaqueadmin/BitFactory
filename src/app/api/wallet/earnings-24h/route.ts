@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Demo accounts: simulated credits in the same date window as below.
+    // Simulated accounts: simulated credits in the same date window as below.
     const sim = await simRoute(decoded, async (ctx) => {
       const { transactions } = await loadSimPoolLedger(ctx);
       const from = new Date(ctx.now.getTime() - 24 * 60 * 60 * 1000)

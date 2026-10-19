@@ -223,7 +223,7 @@ export async function GET(request: NextRequest) {
     const userStartDate = searchParams.get("start_date");
     const userEndDate = searchParams.get("end_date");
 
-    // Demo accounts: the simulated ledger (daily revenue credits, monthly
+    // Simulated accounts: the simulated ledger (daily revenue credits, monthly
     // payout debits), filtered and paged the same way as real history.
     const sim = await simRoute(decoded, async (ctx) => {
       const now = ctx.now;

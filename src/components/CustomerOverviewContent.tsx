@@ -1134,7 +1134,7 @@ export default function CustomerOverviewContent() {
               selectedCustomer.isDeleted || !canManage(selectedCustomer)
             }
           >
-            Change to Demo Account
+            Change to Simulated Account
           </MenuItem>
         )}
         {selectedCustomer?.isDeleted ? (

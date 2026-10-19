@@ -77,7 +77,7 @@ export default function AccountSettings() {
   const [secondaryRequestOpen, setSecondaryRequestOpen] = useState(false);
   // A CLIENT without a second sign-in email can ask an admin for one.
   const { user } = useUser();
-  // Demo accounts see the same section; its request form is disabled.
+  // Simulated accounts see the same section; its request form is disabled.
   const isClient = isCustomerRole(user?.role);
   const { requests: secondaryRequests } = useSecondaryLoginRequests(undefined, {
     enabled: isClient,

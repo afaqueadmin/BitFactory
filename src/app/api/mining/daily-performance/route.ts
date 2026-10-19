@@ -5,7 +5,7 @@ import { toUtcDateOnly } from "@/lib/services/paybackSnapshotService";
 import { SimNotConfiguredError, getSimContext } from "@/lib/simulation/context";
 import { loadSimDays } from "@/lib/simulation/data";
 
-/** Stand-in subaccount id for a demo account's simulated snapshots. */
+/** Stand-in subaccount id for a simulated account's simulated snapshots. */
 const SIM_SNAPSHOT_ID = "simulated";
 
 interface DailyPerformanceData {
@@ -94,7 +94,7 @@ export async function GET(request: NextRequest) {
         : `[Mining Performance API] Reading monthly DB revenue data for user ${userId}`,
     );
 
-    // Demo accounts: the demo worker's own daily earnings since
+    // Simulated accounts: the simulated worker's own daily earnings since
     // registration, bucketed below exactly like a client's snapshots.
     const simContext = await getSimContext(decoded).catch((error) => {
       if (error instanceof SimNotConfiguredError) return "unavailable" as const;
@@ -102,7 +102,7 @@ export async function GET(request: NextRequest) {
     });
     if (simContext === "unavailable") {
       return NextResponse.json(
-        { success: false, error: "Demo data is not available right now" },
+        { success: false, error: "Simulation data is not available right now" },
         { status: 503 },
       );
     }

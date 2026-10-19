@@ -33,8 +33,8 @@ export default function RequestWalletChangeModal({
 }: RequestWalletChangeModalProps) {
   const createRequest = useCreateWalletChangeRequest();
   const { user } = useUser();
-  // Demo accounts see the form but can't submit it.
-  const isDemo = user?.role === "SIMULATED";
+  // Simulated accounts see the form but can't submit it.
+  const isSimulated = user?.role === "SIMULATED";
   const requires2fa = !!user?.twoFactorEnabled;
 
   const [requestedAddress, setRequestedAddress] = useState("");
@@ -89,9 +89,9 @@ export default function RequestWalletChangeModal({
     <Dialog open={open} onClose={resetAndClose} maxWidth="sm" fullWidth>
       <DialogTitle>Request Wallet Address Change</DialogTitle>
       <DialogContent>
-        {isDemo && (
+        {isSimulated && (
           <Alert severity="info" sx={{ mb: 2 }}>
-            Not available on demo accounts.
+            Not available on simulated accounts.
           </Alert>
         )}
         <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 1 }}>
@@ -164,7 +164,7 @@ export default function RequestWalletChangeModal({
         <Button
           onClick={handleSubmit}
           variant="contained"
-          disabled={createRequest.isPending || isDemo}
+          disabled={createRequest.isPending || isSimulated}
           startIcon={
             createRequest.isPending ? <CircularProgress size={16} /> : undefined
           }

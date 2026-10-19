@@ -116,7 +116,7 @@ export async function GET(request: NextRequest) {
 
     const window = { start, end };
 
-    // Demo accounts: the demo worker's series, never the caller's own.
+    // Simulated accounts: the simulated worker's series, never the caller's own.
     const sim = await simRoute(decoded, async (ctx) =>
       NextResponse.json(await simHashrateHistoryPayload(ctx, window, period)),
     );

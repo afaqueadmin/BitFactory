@@ -1,12 +1,12 @@
 /**
- * A demo account's cost ledger: the welcome bonus plus one electricity
+ * A simulated account's cost ledger: the welcome bonus plus one electricity
  * charge per day, in the same shape as CostPayment rows. Pure - computed on
- * every request from the demo miner's data, never written to cost_payments.
+ * every request from the simulated miner's data, never written to cost_payments.
  *
  * The charge is the cron_deduct_daily_cost formula (powerUsage kW x rate x
  * 24), posted at 00:00 UTC after the day like the cron. There is no miner
  * status history to replay the cron's "AUTO only" rule, so a day is charged
- * when the demo worker actually hashed that day (hashrate > 0) - which keeps
+ * when the simulated worker actually hashed that day (hashrate > 0) - which keeps
  * past days fixed whatever happens to the miner later.
  */
 

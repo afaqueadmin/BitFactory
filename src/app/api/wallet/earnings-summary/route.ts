@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Demo accounts: earned since registration; pending since the last
+    // Simulated accounts: earned since registration; pending since the last
     // simulated monthly payout.
     const sim = await simRoute(decoded, async (ctx) => {
       const ledger = await loadSimPoolLedger(ctx);

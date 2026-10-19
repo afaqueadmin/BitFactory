@@ -1,6 +1,6 @@
 /**
- * A demo account's pool ledger in the WalletTransaction shape the wallet
- * routes return: a daily mining-revenue credit per day the demo worker
+ * A simulated account's pool ledger in the WalletTransaction shape the wallet
+ * routes return: a daily mining-revenue credit per day the simulated worker
  * earned, and on each 1st of the month (UTC) a payment debit plus a
  * transaction-fee debit that empty the pending balance - a monthly payout,
  * like a real client's. Pure; addresses and transaction ids are always blank.
@@ -14,7 +14,7 @@ export interface SimDay {
   date: string;
   /** H/s, daily average. */
   hashrate: number;
-  /** BTC the demo worker earned that day. */
+  /** BTC the simulated worker earned that day. */
   btc: number;
 }
 

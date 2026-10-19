@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
     const decoded = await verifyJwtToken(token);
     const userRole = decoded.role;
 
-    // Anyone who isn't staff or a franchisee (clients, demo accounts, any
+    // Anyone who isn't staff or a franchisee (clients, simulated accounts, any
     // future role) may only ask for their own invoices.
     if (
       customerId &&

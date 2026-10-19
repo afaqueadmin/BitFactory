@@ -14,11 +14,11 @@ import {
 import { RADIUS_CARD, logoFilter, useDaylight } from "@/lib/daylight";
 
 /**
- * Public demo-account signup. The account mirrors one real BitFactory miner
+ * Public simulated-account signup. The account mirrors one real BitFactory miner
  * from the day it's created, with a simulated balance; sign-in details are
  * emailed, which is also how the email address is verified.
  */
-export default function TryDemo() {
+export default function TrySimulation() {
   const { d, darkMode, fonts } = useDaylight();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -45,10 +45,10 @@ export default function TryDemo() {
       if (res.ok) {
         setDone(data.message);
       } else {
-        setError(data.error || "Couldn't create your demo account.");
+        setError(data.error || "Couldn't create your simulated account.");
       }
     } catch {
-      setError("Couldn't create your demo account. Please try again.");
+      setError("Couldn't create your simulated account. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -127,7 +127,7 @@ export default function TryDemo() {
             fontFamily: fonts.heading,
           }}
         >
-          Try a demo account
+          Try a simulated account
         </Typography>
 
         {done ? (
@@ -215,7 +215,7 @@ export default function TryDemo() {
               {submitting ? (
                 <CircularProgress size={20} sx={{ color: "#fff" }} />
               ) : (
-                "Create demo account"
+                "Create simulated account"
               )}
             </Button>
 

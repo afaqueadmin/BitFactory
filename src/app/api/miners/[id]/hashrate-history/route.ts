@@ -65,14 +65,14 @@ export async function GET(
 
     const { id: minerId } = await context.params;
 
-    // Demo accounts may only chart the demo miner.
+    // Simulated accounts may only chart the simulated miner.
     let simCtx: SimContext | null;
     try {
       simCtx = await getSimContext(decoded);
     } catch (error) {
       if (!(error instanceof SimNotConfiguredError)) throw error;
       return NextResponse.json(
-        { success: false, error: "Demo data is not available right now" },
+        { success: false, error: "Simulation data is not available right now" },
         { status: 503 },
       );
     }

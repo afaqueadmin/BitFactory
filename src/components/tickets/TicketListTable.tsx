@@ -17,7 +17,7 @@ import {
 } from "@mui/material";
 import { TicketListItem } from "@/lib/hooks/useTickets";
 import { TicketStatusBadge, TicketPriorityBadge } from "./TicketBadges";
-import { DemoAccountTag, TicketCategoryLabel } from "./TicketBadges";
+import { SimulatedAccountTag, TicketCategoryLabel } from "./TicketBadges";
 import { RADIUS_CARD, useDaylight } from "@/lib/daylight";
 
 interface TicketListTableProps {
@@ -163,7 +163,7 @@ export default function TicketListTable({
                 {showRaisedBy && (
                   <TableCell>
                     {ticket.raisedBy.name || ticket.raisedBy.email}
-                    <DemoAccountTag role={ticket.raisedBy.role} />
+                    <SimulatedAccountTag role={ticket.raisedBy.role} />
                     {ticket.onBehalfOf && (
                       <Typography
                         variant="caption"
@@ -303,7 +303,7 @@ export default function TicketListTable({
                 {showRaisedBy && (
                   <TableCell sx={{ ...cellSx, fontSize: 12, color: d.text }}>
                     {ticket.raisedBy.name || ticket.raisedBy.email}
-                    <DemoAccountTag role={ticket.raisedBy.role} />
+                    <SimulatedAccountTag role={ticket.raisedBy.role} />
                     {ticket.onBehalfOf && (
                       <Typography
                         sx={{

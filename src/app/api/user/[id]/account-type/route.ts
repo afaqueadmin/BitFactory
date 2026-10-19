@@ -16,9 +16,9 @@
  *   new details, so it keeps its code and history; otherwise one is created.
  *
  * CLIENT -> SIMULATED    { role: "SIMULATED" }
- *   Demo account (src/lib/simulation). Only for a direct customer with no
+ *   Simulated account (src/lib/simulation). Only for a direct customer with no
  *   miners, pool subaccounts, invoices or payments - e.g. a Potential
- *   Customer - since demo accounts are never billed. Their simulated data
+ *   Customer - since simulated accounts are never billed. Their simulated data
  *   starts at the conversion, not at registration.
  *
  * The account is signed out everywhere, since its role is part of the token.
@@ -333,7 +333,10 @@ export async function POST(
     if (body.role === "SIMULATED") {
       if (target.role !== "CLIENT") {
         return NextResponse.json(
-          { error: "Only a regular customer can be changed to a demo account" },
+          {
+            error:
+              "Only a regular customer can be changed to a simulated account",
+          },
           { status: 400 },
         );
       }
@@ -347,7 +350,7 @@ export async function POST(
         );
       }
 
-      // A demo account is never billed and drops out of every customer
+      // A simulated account is never billed and drops out of every customer
       // list, so only an account with nothing real on it can become one.
       const [miners, poolAuths, invoices, payments] = await Promise.all([
         prisma.miner.count({ where: { userId: id, isDeleted: false } }),
@@ -364,7 +367,7 @@ export async function POST(
       if (blockers.length > 0) {
         return NextResponse.json(
           {
-            error: `Only a customer with no miners, subaccounts, invoices or payments can become a demo account. This one has ${blockers.join(", ")}.`,
+            error: `Only a customer with no miners, subaccounts, invoices or payments can become a simulated account. This one has ${blockers.join(", ")}.`,
           },
           { status: 400 },
         );
@@ -402,7 +405,7 @@ export async function POST(
       });
 
       return NextResponse.json({
-        message: `${label} is now a demo account. Their simulated data starts today.`,
+        message: `${label} is now a simulated account. Their simulated data starts today.`,
       });
     }
 

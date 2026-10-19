@@ -102,7 +102,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    // 2.4. Demo accounts: monthly payouts, no wallet address configured.
+    // 2.4. Simulated accounts: monthly payouts, no wallet address configured.
     const sim = await simRoute(decoded, async (ctx) => {
       const { pendingBtc } = await loadSimPoolLedger(ctx);
       return NextResponse.json(

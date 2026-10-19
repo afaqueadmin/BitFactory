@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse, after } from "next/server";
 import { hash } from "bcrypt";
 import { prisma } from "@/lib/prisma";
-import { sendDemoWelcomeEmail } from "@/lib/email";
+import { sendSimulatedWelcomeEmail } from "@/lib/email";
 import {
   canonicalEmail,
   isEmailTaken,
@@ -15,7 +15,7 @@ import { enforceAuthRateLimit, getClientIp } from "@/lib/rateLimit";
  * POST /api/simulated-accounts/register  (public, no auth)
  * Body: { name, email, phoneNumber }
  *
- * Self-service demo (SIMULATED) account. The email is proven the same way
+ * Self-service simulated (SIMULATED) account. The email is proven the same way
  * as for clients: the temporary password is only ever sent there, and the
  * account is created only once that email has gone out. 2FA setup follows
  * at first sign-in (twoFactorPolicy).
@@ -33,13 +33,13 @@ const SIGNUP_LIMITS = {
 const GENERIC_REPLY = {
   success: true,
   message:
-    "Thanks! If this email can be used for a demo account, your sign-in details are on their way.",
+    "Thanks! If this email can be used for a simulated account, your sign-in details are on their way.",
 };
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_PATTERN = /^\+?[0-9][0-9\s\-()]{5,19}$/;
 
-async function createDemoAccount(
+async function createSimulatedAccount(
   name: string,
   email: string,
   phoneNumber: string,
@@ -52,9 +52,9 @@ async function createDemoAccount(
   const hashedPassword = await hash(tempPassword, 12);
 
   // Email first: an account whose password never arrived would be unusable.
-  const sent = await sendDemoWelcomeEmail(email, name, tempPassword);
+  const sent = await sendSimulatedWelcomeEmail(email, name, tempPassword);
   if (!sent.success) {
-    console.error("[Demo Signup] Welcome email failed:", sent.error);
+    console.error("[Simulated Signup] Welcome email failed:", sent.error);
     return;
   }
 
@@ -77,7 +77,7 @@ async function createDemoAccount(
     await prisma.userActivity.create({
       data: {
         userId: user.id,
-        type: "DEMO_SIGNUP",
+        type: "SIMULATED_SIGNUP",
         ipAddress: ipAddress || "unknown",
         userAgent,
       },
@@ -128,15 +128,24 @@ export async function POST(request: NextRequest) {
     const userAgent = request.headers.get("user-agent") || "unknown";
     after(async () => {
       try {
-        await createDemoAccount(name, email, phoneNumber, ipAddress, userAgent);
+        await createSimulatedAccount(
+          name,
+          email,
+          phoneNumber,
+          ipAddress,
+          userAgent,
+        );
       } catch (error) {
-        console.error("[Demo Signup] Failed to create demo account:", error);
+        console.error(
+          "[Simulated Signup] Failed to create simulated account:",
+          error,
+        );
       }
     });
 
     return NextResponse.json(GENERIC_REPLY);
   } catch (error) {
-    console.error("[Demo Signup] Error:", error);
+    console.error("[Simulated Signup] Error:", error);
     return NextResponse.json(
       { error: "Something went wrong. Please try again." },
       { status: 500 },

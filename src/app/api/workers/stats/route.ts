@@ -49,7 +49,10 @@ export async function GET(request: NextRequest) {
 
     const sim = await simRoute(decoded, async (ctx) => {
       const live = await loadSimLiveWorker(ctx).catch((error) => {
-        console.error("[Workers Stats API] Demo worker fetch failed:", error);
+        console.error(
+          "[Workers Stats API] Simulated worker fetch failed:",
+          error,
+        );
         return null;
       });
       const active = live?.status === "ACTIVE" ? 1 : 0;

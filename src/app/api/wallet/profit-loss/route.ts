@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Demo accounts have no invoices; their cost is the simulated charges.
+    // Simulated accounts have no invoices; their cost is the simulated charges.
     const sim = await simRoute(decoded, async (ctx) => {
       const charges = (await loadSimLedger(ctx))
         .filter((r) => r.type === "ELECTRICITY_CHARGES")
