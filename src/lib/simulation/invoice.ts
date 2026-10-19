@@ -4,13 +4,15 @@
  * Colocation for the first month - built in code on every request and never
  * written to the invoices table. Issued at registration, unpaid, view only.
  *
- * Priced from the CLIENT payback config, the same numbers Payback Analysis
- * uses: hosting = the model's monthly invoicing amount, hardware = the
- * default invoiced amount minus that hosting (Payback's "capital").
+ * Laid out exactly like a real Hardware Sales invoice (same row labels, so
+ * the same PDF). Priced from the CLIENT payback config: hardware = the
+ * default invoiced amount, plus Hosting & Colocation at the model's monthly
+ * invoicing amount.
  */
 
 import { prisma } from "@/lib/prisma";
 import { getOrCreatePaybackConfig } from "@/lib/paybackConfigHelpers";
+import { hostingLineItemLabel } from "@/lib/accounting/hostingMonths";
 import type { SimContext } from "./context";
 import { addDays } from "./dates";
 
@@ -52,8 +54,8 @@ export function buildSimInvoice(input: {
       ? pricing.s21xpMonthlyInvoicingAmount
       : pricing.s21proMonthlyInvoicingAmount,
   );
-  const total = round2(pricing.defaultInvoicedAmount);
-  const hardware = round2(Math.max(0, total - hosting));
+  const hardware = round2(pricing.defaultInvoicedAmount);
+  const total = round2(hardware + hosting);
   const issued = ctx.since;
   const billingMonth = monthStart(issued);
 
@@ -66,7 +68,9 @@ export function buildSimInvoice(input: {
     id: `${SIM_INVOICE_ID}-${suffix}`,
     invoiceId: SIM_INVOICE_ID,
     hardwareId: hw.id,
-    model: hw.model,
+    // Real hosting rows store their full label (see LineItemsEditor), and
+    // the PDF prints this field as the product name.
+    model: month ? hostingLineItemLabel(hw.model, month) : hw.model,
     quantity: 1,
     unitPrice,
     totalPrice: unitPrice,

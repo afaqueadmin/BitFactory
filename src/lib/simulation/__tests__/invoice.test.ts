@@ -24,7 +24,7 @@ const ctxFor = (model: string) => ({
 });
 
 describe("buildSimInvoice", () => {
-  it("bills hardware plus the first month's hosting, totalling the invoiced amount", () => {
+  it("bills hardware at the invoiced amount plus the first month's hosting, like a real Hardware Sales invoice", () => {
     const inv = buildSimInvoice({
       ctx: ctxFor("Bitmain S21XP"),
       user: { name: "Jane Doe", email: "jane@example.com" },
@@ -34,13 +34,17 @@ describe("buildSimInvoice", () => {
     expect(inv.invoiceType).toBe("HARDWARE_SALES");
     expect(inv.status).toBe("ISSUED");
     expect(inv.paidDate).toBeNull();
-    expect(inv.totalAmount).toBe(4250);
-    expect(inv.unitPrice).toBe(3824.5);
+    expect(inv.totalAmount).toBe(4675.5);
+    expect(inv.unitPrice).toBe(4250);
     expect(
       inv.lineItems.map((li) => [li.lineItemType, li.model, li.totalPrice]),
     ).toEqual([
-      ["HARDWARE", "Bitmain S21XP", 3824.5],
-      ["HOSTING_COLOCATION", "Bitmain S21XP", 425.5],
+      ["HARDWARE", "Bitmain S21XP", 4250],
+      [
+        "HOSTING_COLOCATION",
+        "Hosting & Colocation (Bitmain S21XP) – Oct 2026",
+        425.5,
+      ],
     ]);
     expect(inv.lineItems[1].billingMonth?.toISOString()).toBe(
       "2026-10-01T00:00:00.000Z",
@@ -54,7 +58,8 @@ describe("buildSimInvoice", () => {
       user: { name: null, email: "x@example.com" },
       pricing,
     });
-    expect(inv.lineItems.map((li) => li.totalPrice)).toEqual([3950, 300]);
+    expect(inv.lineItems.map((li) => li.totalPrice)).toEqual([4250, 300]);
+    expect(inv.totalAmount).toBe(4550);
   });
 
   it("is issued at registration and due a week later", () => {
@@ -82,14 +87,5 @@ describe("buildSimInvoice", () => {
       pricing,
     });
     expect(unnamed.invoiceNumber).toMatch(/^Customer-\d{8}-1$/);
-  });
-
-  it("never prices hardware below zero", () => {
-    const inv = buildSimInvoice({
-      ctx: ctxFor("Bitmain S21XP"),
-      user: { name: "A", email: "a@example.com" },
-      pricing: { ...pricing, defaultInvoicedAmount: 100 },
-    });
-    expect(inv.unitPrice).toBe(0);
   });
 });
