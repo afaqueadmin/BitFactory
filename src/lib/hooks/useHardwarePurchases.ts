@@ -1,3 +1,4 @@
+import type { VendorPaymentPart } from "@/lib/hooks/useVendorInvoices";
 import {
   keepPreviousData,
   useQuery,
@@ -35,7 +36,9 @@ export interface HardwarePurchaseInvoice {
   paymentStatus: "Paid" | "Pending" | "Cancelled";
   notes: string | null;
   invoicePdfKey: string | null;
-  // Set when the payment is recorded; amounts arrive as decimal strings.
+  // DEPRECATED (2026-10-20): single-currency payment columns, no longer
+  // written or read (the payment lives in paymentParts). TODO: remove
+  // with the columns after 2026-11-19.
   paymentEntityId: string | null;
   paymentBankId: string | null;
   paymentCurrencyId: string | null;
@@ -44,6 +47,8 @@ export interface HardwarePurchaseInvoice {
   paymentAmountUsd: string | null;
   transactionFee: string | null;
   paymentReceiptKey: string | null;
+  /** The payment's currency parts (detail responses only). */
+  paymentParts?: VendorPaymentPart[];
   createdBy: string;
   updatedBy: string | null;
   createdAt: Date;

@@ -8,7 +8,9 @@ import { Decimal } from "@prisma/client/runtime/library";
 import { prisma } from "@/lib/prisma";
 import {
   matchesInvoiceTotal,
+  MAX_PAYMENT_PARTS,
   parseDecimal,
+  parsePaymentParts,
   toUsd,
   validatePaymentAccount,
 } from "../paymentAccount";
@@ -42,17 +44,59 @@ describe("toUsd", () => {
 
 describe("matchesInvoiceTotal (D8)", () => {
   it("passes the plan's example: 360 AED at 3.6 on a 100 USD invoice", () => {
-    expect(matchesInvoiceTotal(d("360"), d("3.6"), d("100"))).toBe(true);
+    expect(
+      matchesInvoiceTotal([{ amount: d("360"), rate: d("3.6") }], d("100")),
+    ).toBe(true);
   });
 
   it("blocks 350 AED at 3.6 on a 100 USD invoice", () => {
-    expect(matchesInvoiceTotal(d("350"), d("3.6"), d("100"))).toBe(false);
+    expect(
+      matchesInvoiceTotal([{ amount: d("350"), rate: d("3.6") }], d("100")),
+    ).toBe(false);
   });
 
   it("allows up to $0.01 either way", () => {
-    expect(matchesInvoiceTotal(d("100.01"), d("1"), d("100"))).toBe(true);
-    expect(matchesInvoiceTotal(d("99.99"), d("1"), d("100"))).toBe(true);
-    expect(matchesInvoiceTotal(d("100.02"), d("1"), d("100"))).toBe(false);
+    expect(
+      matchesInvoiceTotal([{ amount: d("100.01"), rate: d("1") }], d("100")),
+    ).toBe(true);
+    expect(
+      matchesInvoiceTotal([{ amount: d("99.99"), rate: d("1") }], d("100")),
+    ).toBe(true);
+    expect(
+      matchesInvoiceTotal([{ amount: d("100.02"), rate: d("1") }], d("100")),
+    ).toBe(false);
+  });
+});
+
+describe("matchesInvoiceTotal with several currency parts", () => {
+  it("passes 5 USD + 10 AED at 2 on a 10 USD invoice", () => {
+    expect(
+      matchesInvoiceTotal(
+        [
+          { amount: d("5"), rate: d("1") },
+          { amount: d("10"), rate: d("2") },
+        ],
+        d("10"),
+      ),
+    ).toBe(true);
+  });
+
+  it("blocks parts that are off by $0.02", () => {
+    expect(
+      matchesInvoiceTotal(
+        [
+          { amount: d("5"), rate: d("1") },
+          { amount: d("9.96"), rate: d("2") },
+        ],
+        d("10"),
+      ),
+    ).toBe(false);
+  });
+
+  it("sums unrounded conversions so per-part rounding can't hide a gap", () => {
+    // 1 / 3 = 0.333.. each; three parts are 1.00 USD, not 3 x 0.33.
+    const third = { amount: d("1"), rate: d("3") };
+    expect(matchesInvoiceTotal([third, third, third], d("1"))).toBe(true);
   });
 });
 
@@ -107,5 +151,85 @@ describe("validatePaymentAccount", () => {
       }) as never,
     );
     expect(await validatePaymentAccount(ids)).toHaveProperty("error");
+  });
+});
+
+describe("parsePaymentParts", () => {
+  const findUnique = vi.mocked(prisma.accountingBank.findUnique);
+  const bankFor = (code: string) => ({
+    id: "b1",
+    name: "Ruya",
+    entityId: "e1",
+    isActive: true,
+    entity: { id: "e1", name: "Higgs Ltd", isActive: true },
+    currencies: [{ currency: { code, isActive: true } }],
+  });
+  const part = (overrides: Record<string, unknown> = {}) => ({
+    entityId: "e1",
+    bankId: "b1",
+    currencyId: "c1",
+    exchangeRate: "1",
+    amount: "5",
+    ...overrides,
+  });
+
+  it("requires at least one part and at most MAX_PAYMENT_PARTS", async () => {
+    expect(await parsePaymentParts([])).toHaveProperty("error");
+    expect(await parsePaymentParts(undefined)).toHaveProperty("error");
+    expect(
+      await parsePaymentParts(
+        Array.from({ length: MAX_PAYMENT_PARTS + 1 }, () => part()),
+      ),
+    ).toHaveProperty("error");
+  });
+
+  it("parses 5 USD + 10 AED at 2 into USD values", async () => {
+    findUnique.mockResolvedValueOnce(bankFor("USD") as never);
+    findUnique.mockResolvedValueOnce(bankFor("AED") as never);
+    const result = await parsePaymentParts([
+      part(),
+      part({ currencyId: "c2", exchangeRate: "2", amount: "10" }),
+    ]);
+    if ("error" in result) throw new Error(result.error);
+    expect(result.parts.map((p) => p.currencyCode)).toEqual(["USD", "AED"]);
+    expect(result.parts.map((p) => p.usd.toString())).toEqual(["5", "5"]);
+  });
+
+  it("allows the same currency twice", async () => {
+    findUnique.mockResolvedValue(bankFor("AED") as never);
+    const result = await parsePaymentParts([
+      part({ exchangeRate: "3.67", amount: "5" }),
+      part({ exchangeRate: "3.7", amount: "10" }),
+    ]);
+    findUnique.mockReset();
+    expect(result).toHaveProperty("parts");
+  });
+
+  it("names the failing part when there are several", async () => {
+    findUnique.mockResolvedValueOnce(bankFor("USD") as never);
+    findUnique.mockResolvedValueOnce(bankFor("USD") as never);
+    expect(
+      await parsePaymentParts([part(), part({ exchangeRate: "3.67" })]),
+    ).toEqual({ error: "Part 2: USD payments must use an exchange rate of 1" });
+  });
+
+  it("rejects a zero amount unless allowed (Mark as Paid)", async () => {
+    findUnique.mockResolvedValueOnce(bankFor("USD") as never);
+    expect(await parsePaymentParts([part({ amount: "0" })])).toHaveProperty(
+      "error",
+    );
+    findUnique.mockResolvedValueOnce(bankFor("USD") as never);
+    const result = await parsePaymentParts([part({ amount: "" })], {
+      allowZeroAmount: true,
+    });
+    if ("error" in result) throw new Error(result.error);
+    expect(result.parts[0].amount.toString()).toBe("0");
+  });
+
+  it("rejects more than 2 decimal places on the amount", async () => {
+    findUnique.mockResolvedValueOnce(bankFor("USD") as never);
+    expect(await parsePaymentParts([part({ amount: "1.234" })])).toHaveProperty(
+      "error",
+    );
   });
 });

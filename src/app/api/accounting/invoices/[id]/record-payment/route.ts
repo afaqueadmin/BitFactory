@@ -1,24 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Decimal } from "@prisma/client/runtime/library";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
-import { AuditAction } from "@prisma/client";
+import { AuditAction, PaymentType } from "@prisma/client";
 import {
-  parseDecimal,
-  toUsd,
-  validatePaymentAccount,
+  auditPart,
+  ParsedPaymentPart,
+  parsePaymentParts,
 } from "@/lib/accounting/paymentAccount";
 import { costPaymentAccountInclude } from "@/lib/accounting/costPaymentAccounts";
 import { paymentTypeForInvoice } from "@/lib/accounting/paymentTypes";
 
-/** An entered amount: 0 or more, at most 2 decimal places (0 when blank). */
-function parseEnteredAmount(value: unknown): Decimal | null {
-  if (value === undefined || value === null || value === "") {
-    return new Decimal(0);
-  }
-  const parsed = parseDecimal(value, { allowZero: true });
-  return parsed && parsed.decimalPlaces() <= 2 ? parsed : null;
-}
+const hasParts = (value: unknown) => Array.isArray(value) && value.length > 0;
+
+const sumUsd = (parts: ParsedPaymentPart[]) =>
+  parts.reduce((sum, p) => sum + p.usd.toNumber(), 0);
 
 export async function POST(
   request: NextRequest,
@@ -47,18 +42,16 @@ export async function POST(
       );
     }
 
+    // parts / hostingParts: the currency parts of each section, each with
+    // its own receiving account, rate and amount (see RecordPaymentInput).
     const body = await request.json();
     const {
-      amountPaid,
       paymentDate,
       notes,
-      hostingAmountPaid,
       hostingNotes,
       markAsPaid,
-      entityId,
-      bankId,
-      currencyId,
-      exchangeRate,
+      parts,
+      hostingParts,
     } = body;
 
     const receivedOn =
@@ -68,33 +61,6 @@ export async function POST(
     if (!receivedOn || Number.isNaN(receivedOn.getTime())) {
       return NextResponse.json(
         { error: "Payment date is required" },
-        { status: 400 },
-      );
-    }
-
-    // Receiving account and currency are required on every payment,
-    // including a zero-amount "Mark as Paid".
-    const account = await validatePaymentAccount({
-      entityId,
-      bankId,
-      currencyId,
-    });
-    if ("error" in account) {
-      return NextResponse.json({ error: account.error }, { status: 400 });
-    }
-    const rate = parseDecimal(exchangeRate);
-    if (!rate || rate.decimalPlaces() > 8) {
-      return NextResponse.json(
-        {
-          error:
-            "Exchange rate must be greater than 0 (up to 8 decimal places)",
-        },
-        { status: 400 },
-      );
-    }
-    if (account.currencyCode === "USD" && !rate.equals(1)) {
-      return NextResponse.json(
-        { error: "USD payments must use an exchange rate of 1" },
         { status: 400 },
       );
     }
@@ -130,48 +96,62 @@ export async function POST(
     }
 
     // Hardware-sales invoices that also bill Hosting & Colocation (one or more months)
-    // record two separate CostPayment entries (Hardware Sales Payment +
-    // Hosting and Colocation Payment). Invoices without a hosting line item
-    // (including every invoice created before this feature) keep the
-    // original single "Amount Paid" behavior untouched.
+    // record separate CostPayment entries for the Hardware Sales Payment and
+    // the Hosting and Colocation Payment sections. Invoices without a
+    // hosting line item (including every invoice created before this
+    // feature) have one section.
     const hasHosting = invoice.lineItems.some(
       (li) => li.lineItemType === "HOSTING_COLOCATION",
     );
 
-    // Amounts are entered in the selected currency; balances stay in USD.
-    const hardwareOriginal = parseEnteredAmount(amountPaid);
-    const hostingOriginal = hasHosting
-      ? parseEnteredAmount(hostingAmountPaid)
-      : new Decimal(0);
-    if (!hardwareOriginal || !hostingOriginal) {
+    // Which sections this payment covers. A one-section invoice always has
+    // its section; on the split form an empty list leaves that section out,
+    // except with Mark as Paid, which records both (as zero-amount rows).
+    const sendHardware = !hasHosting || !!markAsPaid || hasParts(parts);
+    const sendHosting = hasHosting && (!!markAsPaid || hasParts(hostingParts));
+    if (!sendHardware && !sendHosting) {
       return NextResponse.json(
-        { error: "Amounts must be 0 or more, with up to 2 decimal places" },
+        {
+          error:
+            "Enter a Hardware Sales Payment amount and/or a Hosting and Colocation Payment amount greater than 0",
+        },
         { status: 400 },
       );
     }
-    const hardwareAmount = toUsd(hardwareOriginal, rate).toNumber();
-    const hostingAmount = toUsd(hostingOriginal, rate).toNumber();
 
-    if (hasHosting) {
-      if (
-        !markAsPaid &&
-        hardwareOriginal.lessThanOrEqualTo(0) &&
-        hostingOriginal.lessThanOrEqualTo(0)
-      ) {
-        return NextResponse.json(
-          {
-            error:
-              "Enter a Hardware Sales Payment amount and/or a Hosting and Colocation Payment amount greater than 0",
-          },
-          { status: 400 },
-        );
+    // Every part needs a valid Entity -> Bank -> Currency and rate, including
+    // the zero-amount part of a "Mark as Paid". Amounts are entered in each
+    // part's currency; balances stay in USD.
+    const parseSection = async (raw: unknown, label: string) => {
+      const result = await parsePaymentParts(raw, {
+        allowZeroAmount: !!markAsPaid,
+      });
+      return "error" in result && hasHosting
+        ? { error: `${label}: ${result.error}` }
+        : result;
+    };
+    let hardwareParts: ParsedPaymentPart[] = [];
+    if (sendHardware) {
+      const result = await parseSection(parts, "Hardware Sales Payment");
+      if ("error" in result) {
+        return NextResponse.json({ error: result.error }, { status: 400 });
       }
-    } else if (!markAsPaid && hardwareOriginal.lessThanOrEqualTo(0)) {
-      return NextResponse.json(
-        { error: "Amount paid must be greater than 0" },
-        { status: 400 },
-      );
+      hardwareParts = result.parts;
     }
+    let hostingPartsParsed: ParsedPaymentPart[] = [];
+    if (sendHosting) {
+      const result = await parseSection(
+        hostingParts,
+        "Hosting and Colocation Payment",
+      );
+      if ("error" in result) {
+        return NextResponse.json({ error: result.error }, { status: 400 });
+      }
+      hostingPartsParsed = result.parts;
+    }
+
+    const hardwareAmount = sumUsd(hardwareParts);
+    const hostingAmount = sumUsd(hostingPartsParsed);
 
     // Calculate outstanding balance (allow overpayment for admins). Voided
     // payments (e.g. reversed memo adjustments) don't count.
@@ -179,66 +159,68 @@ export async function POST(
       .filter((p) => !p.isDeleted)
       .reduce((sum, p) => sum + p.amount, 0);
 
-    // Fields shared by every payment row created by this request.
-    const accountFields = {
-      entityId: entityId as string,
-      bankId: bankId as string,
-      currencyId: currencyId as string,
-      exchangeRate: rate,
-      paymentDate: receivedOn,
-    };
-
-    // Create cost payment entries with invoiceId (this replaces the old InvoicePayment table)
-    const costPaymentIds: string[] = [];
-
-    if (!hasHosting || hardwareOriginal.greaterThan(0) || markAsPaid) {
-      const hardwarePayment = await prisma.costPayment.create({
-        data: {
-          userId: invoice.userId,
-          invoiceId: id,
-          amount: hardwareAmount,
-          originalAmount: hardwareOriginal,
-          ...accountFields,
-          // Hardware payments are kept out of the hosting balance.
-          type: paymentTypeForInvoice(invoice.invoiceType),
-          consumption: 0,
-          narration: notes || null,
-        },
-      });
-      costPaymentIds.push(hardwarePayment.id);
-    }
-
-    if (hasHosting && (hostingOriginal.greaterThan(0) || markAsPaid)) {
-      const hostingPayment = await prisma.costPayment.create({
-        data: {
-          userId: invoice.userId,
-          invoiceId: id,
-          amount: hostingAmount,
-          originalAmount: hostingOriginal,
-          ...accountFields,
-          type: "PAYMENT",
-          consumption: 0,
-          narration: hostingNotes || null,
-        },
-      });
-      costPaymentIds.push(hostingPayment.id);
-    }
-
     // Calculate new total paid amount
     const newTotalPaid = totalPaid + hardwareAmount + hostingAmount;
     const remainingBalance = Number(invoice.totalAmount) - newTotalPaid;
 
-    // Update invoice status if fully paid
-    if (markAsPaid || remainingBalance <= 0.0) {
-      // Fully paid (accounting for floating point)
-      await prisma.invoice.update({
-        where: { id },
-        data: {
-          status: "PAID",
-          paidDate: receivedOn,
-        },
-      });
-    }
+    // One CostPayment per part with an amount. A section paid only through
+    // "Mark as Paid" (nothing entered) keeps one zero-amount row, as before,
+    // so its receiving account is still on record.
+    const rowsFor = (
+      sectionParts: ParsedPaymentPart[],
+      type: PaymentType,
+      narration: string | null,
+    ) => {
+      const withAmount = sectionParts.filter((p) => p.amount.greaterThan(0));
+      const rows =
+        withAmount.length > 0 ? withAmount : sectionParts.slice(0, 1);
+      return rows.map((p) => ({
+        userId: invoice.userId,
+        invoiceId: id,
+        amount: p.usd.toNumber(),
+        originalAmount: p.amount,
+        entityId: p.entityId,
+        bankId: p.bankId,
+        currencyId: p.currencyId,
+        exchangeRate: p.rate,
+        paymentDate: receivedOn,
+        type,
+        consumption: 0,
+        narration,
+      }));
+    };
+    const rows = [
+      // Hardware payments are kept out of the hosting balance.
+      ...rowsFor(
+        hardwareParts,
+        paymentTypeForInvoice(invoice.invoiceType),
+        notes || null,
+      ),
+      ...rowsFor(hostingPartsParsed, "PAYMENT", hostingNotes || null),
+    ];
+
+    // Create cost payment entries with invoiceId (this replaces the old
+    // InvoicePayment table) and update the status together, so a failure
+    // can't leave some parts recorded and others not.
+    const costPaymentIds = await prisma.$transaction(async (tx) => {
+      const ids: string[] = [];
+      for (const data of rows) {
+        const payment = await tx.costPayment.create({ data });
+        ids.push(payment.id);
+      }
+
+      // Update invoice status if fully paid
+      if (markAsPaid || remainingBalance <= 0.0) {
+        await tx.invoice.update({
+          where: { id },
+          data: {
+            status: "PAID",
+            paidDate: receivedOn,
+          },
+        });
+      }
+      return ids;
+    });
 
     // Log audit entry
     const totalAmountPaidNow = hardwareAmount + hostingAmount;
@@ -253,13 +235,9 @@ export async function POST(
           amountPaid: hardwareAmount,
           ...(hasHosting ? { hostingAmountPaid: hostingAmount } : {}),
           paymentDate,
-          entity: account.entityName,
-          bank: account.bankName,
-          currency: account.currencyCode,
-          exchangeRate: rate.toString(),
-          originalAmountPaid: hardwareOriginal.toString(),
+          parts: hardwareParts.map(auditPart),
           ...(hasHosting
-            ? { originalHostingAmountPaid: hostingOriginal.toString() }
+            ? { hostingParts: hostingPartsParsed.map(auditPart) }
             : {}),
           costPaymentIds,
           isPaid: Math.abs(remainingBalance) < 0.01,

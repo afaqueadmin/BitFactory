@@ -520,21 +520,31 @@ export function useSendInvoiceEmail() {
   };
 }
 /**
- * Body of POST /api/accounting/invoices/[id]/record-payment. Amounts are in
- * the selected currency (sent as typed text so no float rounding creeps in);
- * exchangeRate is 1 USD = X currency.
+ * One currency part of a payment: where it was received, the rate
+ * (1 USD = X currency) and the amount in that currency, sent as typed text
+ * so no float rounding creeps in.
  */
-export interface RecordPaymentInput {
-  amountPaid: string;
-  paymentDate: string;
-  notes?: string;
-  hostingAmountPaid?: string;
-  hostingNotes?: string;
-  markAsPaid?: boolean;
+export interface RecordPaymentPart {
   entityId: string;
   bankId: string;
   currencyId: string;
   exchangeRate: string;
+  amount: string;
+}
+
+/**
+ * Body of POST /api/accounting/invoices/[id]/record-payment. Each part
+ * becomes its own payment row. On a Hardware Sales invoice that also bills
+ * Hosting & Colocation, `parts` is the hardware section and `hostingParts`
+ * the hosting section; an empty list leaves that section out.
+ */
+export interface RecordPaymentInput {
+  paymentDate: string;
+  notes?: string;
+  markAsPaid?: boolean;
+  parts: RecordPaymentPart[];
+  hostingParts?: RecordPaymentPart[];
+  hostingNotes?: string;
 }
 
 export function useRecordPayment() {

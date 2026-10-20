@@ -91,18 +91,145 @@ export function toUsd(amount: Decimal, rate: Decimal): Decimal {
   return amount.dividedBy(rate).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
 }
 
+/** Σ amount ÷ rate over the parts, unrounded. */
+export function partsUsdUnrounded(
+  parts: { amount: Decimal; rate: Decimal }[],
+): Decimal {
+  return parts.reduce(
+    (sum, p) => sum.plus(p.amount.dividedBy(p.rate)),
+    new Decimal(0),
+  );
+}
+
 /**
  * D8: the payment, converted to USD, must equal the invoice total within
- * $0.01. Compares the unrounded conversion so rounding can't hide a gap.
+ * $0.01. A multi-currency payment is checked on the sum of its parts.
+ * Compares the unrounded conversion so rounding can't hide a gap.
  */
 export function matchesInvoiceTotal(
-  amount: Decimal,
-  rate: Decimal,
+  parts: { amount: Decimal; rate: Decimal }[],
   totalUsd: Decimal,
 ): boolean {
-  return amount
-    .dividedBy(rate)
+  return partsUsdUnrounded(parts)
     .minus(totalUsd)
     .abs()
     .lessThanOrEqualTo(PAYMENT_MATCH_TOLERANCE_USD);
 }
+
+/** Most currency parts one payment (or one section of it) may have. */
+export const MAX_PAYMENT_PARTS = 10;
+
+/**
+ * One currency part of a payment as sent by the record-payment forms:
+ * where it was received, the rate (1 USD = X currency) and the amount in
+ * that currency, all as typed text.
+ */
+export interface PaymentPartRequest {
+  entityId?: unknown;
+  bankId?: unknown;
+  currencyId?: unknown;
+  exchangeRate?: unknown;
+  amount?: unknown;
+}
+
+/** A validated payment part. */
+export interface ParsedPaymentPart {
+  entityId: string;
+  bankId: string;
+  currencyId: string;
+  currencyCode: string;
+  entityName: string;
+  bankName: string;
+  rate: Decimal;
+  /** In the part's currency. */
+  amount: Decimal;
+  /** amount ÷ rate, rounded to cents. */
+  usd: Decimal;
+}
+
+/**
+ * Validates the currency parts of a payment: 1 to MAX_PAYMENT_PARTS parts,
+ * each with a valid Entity -> Bank -> Currency, a rate > 0 (1 for USD, up
+ * to 8 decimal places) and an amount with up to 2 decimal places (> 0, or
+ * >= 0 with allowZeroAmount). The same currency may appear more than once.
+ * Errors name the part ("Part 2: ...") when there is more than one.
+ */
+export async function parsePaymentParts(
+  raw: unknown,
+  { allowZeroAmount = false }: { allowZeroAmount?: boolean } = {},
+): Promise<{ parts: ParsedPaymentPart[] } | { error: string }> {
+  if (!Array.isArray(raw) || raw.length === 0) {
+    return { error: "Add at least one currency part to the payment" };
+  }
+  if (raw.length > MAX_PAYMENT_PARTS) {
+    return {
+      error: `A payment can have at most ${MAX_PAYMENT_PARTS} currency parts`,
+    };
+  }
+
+  const parts: ParsedPaymentPart[] = [];
+  for (const [i, item] of raw.entries()) {
+    const prefix = raw.length > 1 ? `Part ${i + 1}: ` : "";
+    const part = (item ?? {}) as PaymentPartRequest;
+
+    const account = await validatePaymentAccount({
+      entityId: part.entityId,
+      bankId: part.bankId,
+      currencyId: part.currencyId,
+    });
+    if ("error" in account) return { error: prefix + account.error };
+
+    const rate = parseDecimal(part.exchangeRate);
+    if (!rate || rate.decimalPlaces() > 8) {
+      return {
+        error:
+          prefix +
+          "Exchange rate must be greater than 0 (up to 8 decimal places)",
+      };
+    }
+    if (account.currencyCode === "USD" && !rate.equals(1)) {
+      return { error: prefix + "USD payments must use an exchange rate of 1" };
+    }
+
+    // A blank amount counts as 0 where zero is allowed (Mark as Paid).
+    const amount =
+      allowZeroAmount &&
+      (part.amount === undefined || part.amount === null || part.amount === "")
+        ? new Decimal(0)
+        : parseDecimal(part.amount, { allowZero: allowZeroAmount });
+    if (!amount || amount.decimalPlaces() > 2) {
+      return {
+        error:
+          prefix +
+          (allowZeroAmount
+            ? "Amount must be 0 or more, with up to 2 decimal places"
+            : "Amount paid must be greater than 0 (up to 2 decimal places)"),
+      };
+    }
+
+    parts.push({
+      // validatePaymentAccount has checked these are non-empty strings.
+      entityId: part.entityId as string,
+      bankId: part.bankId as string,
+      currencyId: part.currencyId as string,
+      currencyCode: account.currencyCode,
+      entityName: account.entityName,
+      bankName: account.bankName,
+      rate,
+      amount,
+      usd: toUsd(amount, rate),
+    });
+  }
+
+  return { parts };
+}
+
+/** A part as written to an audit log entry. */
+export const auditPart = (p: ParsedPaymentPart) => ({
+  entity: p.entityName,
+  bank: p.bankName,
+  currency: p.currencyCode,
+  exchangeRate: p.rate.toString(),
+  originalAmount: p.amount.toString(),
+  usd: p.usd.toString(),
+});

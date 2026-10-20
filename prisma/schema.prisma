@@ -1261,8 +1261,15 @@ model VendorInvoice {
   // R2 object key of the vendor's invoice PDF. Null on invoices recorded
   // before PDF uploads existed.
   invoicePdfKey        String?
-  // Payment details, set together by POST /api/vendor-invoices/[id]/record-payment.
-  // paymentAmount and transactionFee are in the payment currency;
+  // DEPRECATED (2026-10-20): the single-currency payment columns below
+  // (paymentEntityId .. transactionFee) are no longer written or read. A
+  // payment is now one or more VendorPaymentPart rows (paymentParts), and
+  // migration 20261020130000_vendor_payment_parts backfilled every payment
+  // recorded in them into one part. Only paymentReceiptKey is still live.
+  // TODO: drop these 7 columns (with their indexes, FKs and the
+  // back-relations on AccountingEntity/Bank/Currency) after 2026-11-19
+  // (30 days) if nothing breaks.
+  // Old meaning: paymentAmount and transactionFee in the payment currency;
   // paymentExchangeRate is 1 USD = X currency.
   paymentEntityId      String?
   paymentBankId        String?
@@ -1271,7 +1278,9 @@ model VendorInvoice {
   paymentExchangeRate  Decimal?            @db.Decimal(18, 8)
   paymentAmountUsd     Decimal?            @db.Decimal(12, 2)
   transactionFee       Decimal?            @db.Decimal(18, 2)
+  // Receipt PDF covering every part of the payment.
   paymentReceiptKey    String?
+  paymentParts         VendorPaymentPart[]
   createdByUser        User                @relation("vendorInvoicesCreated", fields: [createdBy], references: [id])
   updatedByUser        User?               @relation("vendorInvoicesUpdated", fields: [updatedBy], references: [id])
   paymentEntity        AccountingEntity?   @relation("vendorInvoicePaymentEntity", fields: [paymentEntityId], references: [id], onDelete: Restrict)
@@ -1309,6 +1318,10 @@ model HardwarePurchaseInvoice {
   // Same PDF and payment columns as VendorInvoice; set by
   // POST /api/hardware-purchases/[id]/record-payment.
   invoicePdfKey        String?
+  // DEPRECATED (2026-10-20): same as on VendorInvoice - paymentEntityId ..
+  // transactionFee are no longer written or read; the payment lives in
+  // paymentParts (backfilled by 20261020130000_vendor_payment_parts).
+  // TODO: drop these 7 columns after 2026-11-19 (30 days) if nothing breaks.
   paymentEntityId      String?
   paymentBankId        String?
   paymentCurrencyId    String?
@@ -1316,7 +1329,9 @@ model HardwarePurchaseInvoice {
   paymentExchangeRate  Decimal?            @db.Decimal(18, 8)
   paymentAmountUsd     Decimal?            @db.Decimal(12, 2)
   transactionFee       Decimal?            @db.Decimal(18, 2)
+  // Receipt PDF covering every part of the payment.
   paymentReceiptKey    String?
+  paymentParts         VendorPaymentPart[]
   createdByUser        User                @relation("hardwarePurchasesCreated", fields: [createdBy], references: [id])
   updatedByUser        User?               @relation("hardwarePurchasesUpdated", fields: [updatedBy], references: [id])
   paymentEntity        AccountingEntity?   @relation("hardwarePurchasePaymentEntity", fields: [paymentEntityId], references: [id], onDelete: Restrict)
@@ -1331,6 +1346,47 @@ model HardwarePurchaseInvoice {
   @@index([paymentBankId])
   @@index([paymentCurrencyId])
   @@map("hardware_purchase_invoices")
+}
+
+/// One currency part of a Farm Tariff (VendorInvoice) or Hardware Purchase
+/// payment. A payment can be split across currencies, each with its own
+/// entity, bank, rate and fee, e.g. 5 USD + 10 AED at 2 for a 10 USD
+/// invoice; together the parts' USD values must match the invoice total
+/// (D8). Exactly one of vendorInvoiceId / hardwarePurchaseId is set (CHECK
+/// constraint in the migration). Payments recorded before multi-currency
+/// were backfilled into one part each (sortOrder 0) from the invoice's
+/// deprecated payment columns.
+model VendorPaymentPart {
+  id                 String   @id @default(cuid())
+  vendorInvoiceId    String?
+  hardwarePurchaseId String?
+  entityId           String
+  bankId             String
+  currencyId         String
+  /// In the part's currency.
+  amount             Decimal  @db.Decimal(18, 2)
+  /// 1 USD = exchangeRate currency.
+  exchangeRate       Decimal  @db.Decimal(18, 8)
+  /// amount / exchangeRate, rounded to cents.
+  amountUsd          Decimal  @db.Decimal(12, 2)
+  /// In the part's currency; for reference only, not part of the D8 check.
+  transactionFee     Decimal  @db.Decimal(18, 2)
+  /// Order the parts were entered in.
+  sortOrder          Int      @default(0)
+  createdAt          DateTime @default(now())
+
+  vendorInvoice    VendorInvoice?           @relation(fields: [vendorInvoiceId], references: [id], onDelete: Cascade)
+  hardwarePurchase HardwarePurchaseInvoice? @relation(fields: [hardwarePurchaseId], references: [id], onDelete: Cascade)
+  entity           AccountingEntity         @relation(fields: [entityId], references: [id], onDelete: Restrict)
+  bank             AccountingBank           @relation(fields: [bankId], references: [id], onDelete: Restrict)
+  currency         AccountingCurrency       @relation(fields: [currencyId], references: [id], onDelete: Restrict)
+
+  @@index([vendorInvoiceId])
+  @@index([hardwarePurchaseId])
+  @@index([entityId])
+  @@index([bankId])
+  @@index([currencyId])
+  @@map("vendor_payment_parts")
 }
 
 // Accounting master data: the entities that pay or receive money, their
@@ -1348,6 +1404,7 @@ model AccountingEntity {
   vendorInvoicePayments    VendorInvoice[]           @relation("vendorInvoicePaymentEntity")
   hardwarePurchasePayments HardwarePurchaseInvoice[] @relation("hardwarePurchasePaymentEntity")
   costPayments             CostPayment[]
+  vendorPaymentParts       VendorPaymentPart[]
 
   @@index([createdBy])
   @@map("accounting_entities")
@@ -1367,6 +1424,7 @@ model AccountingBank {
   vendorInvoicePayments    VendorInvoice[]           @relation("vendorInvoicePaymentBank")
   hardwarePurchasePayments HardwarePurchaseInvoice[] @relation("hardwarePurchasePaymentBank")
   costPayments             CostPayment[]
+  vendorPaymentParts       VendorPaymentPart[]
 
   @@unique([entityId, name])
   @@index([createdBy])
@@ -1384,6 +1442,7 @@ model AccountingCurrency {
   vendorInvoicePayments    VendorInvoice[]           @relation("vendorInvoicePaymentCurrency")
   hardwarePurchasePayments HardwarePurchaseInvoice[] @relation("hardwarePurchasePaymentCurrency")
   costPayments             CostPayment[]
+  vendorPaymentParts       VendorPaymentPart[]
 
   @@map("accounting_currencies")
 }

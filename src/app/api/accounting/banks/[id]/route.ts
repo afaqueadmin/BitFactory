@@ -12,13 +12,16 @@ import {
 } from "@/lib/accounting/masterData";
 
 async function paymentReferenceCount(bankId: string): Promise<number> {
-  // Farm Tariff, Hardware Purchase, and Hosting / Hardware Sales payments.
-  const [vendor, hardware, received] = await Promise.all([
+  // Farm Tariff / Hardware Purchase payment parts, and Hosting / Hardware
+  // Sales payments. The two invoice-column counts cover the deprecated
+  // single-currency columns; remove them when those columns are dropped.
+  const [parts, vendor, hardware, received] = await Promise.all([
+    prisma.vendorPaymentPart.count({ where: { bankId } }),
     prisma.vendorInvoice.count({ where: { paymentBankId: bankId } }),
     prisma.hardwarePurchaseInvoice.count({ where: { paymentBankId: bankId } }),
     prisma.costPayment.count({ where: { bankId } }),
   ]);
-  return vendor + hardware + received;
+  return parts + vendor + hardware + received;
 }
 
 export async function PUT(

@@ -7,11 +7,20 @@ import { deleteObject } from "@/lib/storage/r2";
  * (HardwarePurchaseInvoice) invoices, whose payment flows are the same.
  */
 
-/** Payment account relations returned with a vendor-side invoice. */
+/**
+ * The payment's currency parts, in entry order, with their accounts. The
+ * invoice's own single-currency payment columns are deprecated and not
+ * returned as relations any more (see the schema note).
+ */
 export const vendorPaymentInclude = {
-  paymentEntity: { select: { id: true, name: true } },
-  paymentBank: { select: { id: true, name: true } },
-  paymentCurrency: { select: { id: true, code: true, name: true } },
+  paymentParts: {
+    orderBy: { sortOrder: "asc" },
+    include: {
+      entity: { select: { id: true, name: true } },
+      bank: { select: { id: true, name: true } },
+      currency: { select: { id: true, code: true, name: true } },
+    },
+  },
 } satisfies Prisma.VendorInvoiceInclude & Prisma.HardwarePurchaseInvoiceInclude;
 
 // Compared at the columns' 2-decimal scale: the edit modals recompute the

@@ -2,9 +2,10 @@
 
 /**
  * "Payment Information" box shared by the Farm Tariff and Hardware Purchase
- * invoice pages. Pending: the payment form (date, Entity/Bank/Currency, rate,
- * amount, fee, receipt PDF) posting to `<apiBase>/<id>/record-payment`.
- * Paid: a read-only summary with a link to the receipt.
+ * invoice pages. Pending: the payment form (date, one or more currency
+ * parts - each with its own Entity/Bank/Currency, rate, amount and fee -
+ * and the receipt PDF) posting to `<apiBase>/<id>/record-payment`.
+ * Paid: a read-only summary of the parts with a link to the receipt.
  */
 
 import {
@@ -24,16 +25,17 @@ import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
 import { ReactNode, useState } from "react";
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
 import { DateDisplay } from "@/components/accounting/common/DateDisplay";
-import {
-  EMPTY_PAYMENT_ACCOUNT,
-  PaymentAccountFields,
-  PaymentAccountValue,
-  formatCurrencyAmount,
-  isPaymentAccountComplete,
-  parseExchangeRate,
-  usdToCurrency,
-} from "@/components/accounting/common/PaymentAccountFields";
+import { formatCurrencyAmount } from "@/components/accounting/common/PaymentAccountFields";
 import { AmountDueInCurrency } from "@/components/accounting/common/AmountDueInCurrency";
+import {
+  PaymentPartValue,
+  PaymentPartsFields,
+  isPartComplete,
+  newPaymentPart,
+  partsPayload,
+  partsTotalUsd,
+} from "@/components/accounting/common/PaymentPartsFields";
+import type { VendorPaymentPart } from "@/lib/hooks/useVendorInvoices";
 import {
   PdfUploadField,
   PdfUploadPurpose,
@@ -48,14 +50,12 @@ export interface VendorSideInvoice {
   paymentStatus: "Paid" | "Pending" | "Cancelled";
   totalAmount: Amount;
   paidDate: string | null;
-  paymentAmount?: Amount | null;
-  paymentExchangeRate?: Amount | null;
-  paymentAmountUsd?: Amount | null;
-  transactionFee?: Amount | null;
   paymentReceiptKey?: string | null;
-  paymentEntity?: { id: string; name: string } | null;
-  paymentBank?: { id: string; name: string } | null;
-  paymentCurrency?: { id: string; code: string; name: string } | null;
+  /**
+   * Payment details come only from the parts; the invoice's single-currency
+   * payment columns are deprecated (backfilled into one part each).
+   */
+  paymentParts?: VendorPaymentPart[];
 }
 
 /** D8, mirrored from the server: converted amount within $0.01 of the total. */
@@ -91,8 +91,9 @@ function PaidSummary({
   invoice: VendorSideInvoice;
   receiptHref: string;
 }) {
-  const code = invoice.paymentCurrency?.code;
-  const hasDetails = !!(invoice.paymentEntity && code);
+  const parts = invoice.paymentParts ?? [];
+  const multi = parts.length > 1;
+  const totalUsd = parts.reduce((sum, p) => sum + Number(p.amountUsd), 0);
 
   return (
     <Stack spacing={2}>
@@ -105,55 +106,75 @@ function PaidSummary({
         )}
       </Alert>
 
-      {hasDetails ? (
-        <Box
-          sx={{
-            display: "grid",
-            gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
-            gap: 2,
-          }}
-        >
-          <SummaryRow label="Entity">{invoice.paymentEntity?.name}</SummaryRow>
-          <SummaryRow label="Bank">
-            {invoice.paymentBank?.name ?? "—"}
-          </SummaryRow>
-          <SummaryRow label="Amount Paid">
-            {invoice.paymentAmount != null
-              ? formatCurrencyAmount(invoice.paymentAmount, code!)
-              : "—"}
-          </SummaryRow>
-          <SummaryRow label="Exchange Rate">
-            {invoice.paymentExchangeRate != null
-              ? `1 USD = ${Number(invoice.paymentExchangeRate)} ${code}`
-              : "—"}
-          </SummaryRow>
-          <SummaryRow label="USD Equivalent">
-            {invoice.paymentAmountUsd != null ? (
-              <CurrencyDisplay value={invoice.paymentAmountUsd} />
-            ) : (
-              "—"
-            )}
-          </SummaryRow>
-          <SummaryRow label="Transaction Fee">
-            {invoice.transactionFee != null
-              ? formatCurrencyAmount(invoice.transactionFee, code!)
-              : "—"}
-          </SummaryRow>
-          <SummaryRow label="Payment Receipt">
-            {invoice.paymentReceiptKey ? (
-              <MuiLink
-                href={receiptHref}
-                target="_blank"
-                rel="noopener noreferrer"
-                sx={{ display: "inline-flex", alignItems: "center", gap: 0.5 }}
+      {parts.length > 0 ? (
+        <>
+          {parts.map((part, index) => (
+            <Box key={part.id}>
+              {multi && (
+                <Typography sx={{ fontWeight: 600, mb: 1 }}>
+                  Currency part {index + 1}
+                </Typography>
+              )}
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
+                  gap: 2,
+                }}
               >
-                <PictureAsPdfIcon fontSize="small" /> View receipt
-              </MuiLink>
-            ) : (
-              "No receipt"
+                <SummaryRow label="Entity">{part.entity.name}</SummaryRow>
+                <SummaryRow label="Bank">{part.bank.name}</SummaryRow>
+                <SummaryRow label="Amount Paid">
+                  {formatCurrencyAmount(part.amount, part.currency.code)}
+                </SummaryRow>
+                <SummaryRow label="Exchange Rate">
+                  {`1 USD = ${Number(part.exchangeRate)} ${part.currency.code}`}
+                </SummaryRow>
+                <SummaryRow label="USD Equivalent">
+                  <CurrencyDisplay value={part.amountUsd} />
+                </SummaryRow>
+                <SummaryRow label="Transaction Fee">
+                  {formatCurrencyAmount(
+                    part.transactionFee,
+                    part.currency.code,
+                  )}
+                </SummaryRow>
+              </Box>
+              {multi && <Divider sx={{ mt: 2 }} />}
+            </Box>
+          ))}
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
+              gap: 2,
+            }}
+          >
+            {multi && (
+              <SummaryRow label="Total Paid (USD)">
+                <CurrencyDisplay value={totalUsd} />
+              </SummaryRow>
             )}
-          </SummaryRow>
-        </Box>
+            <SummaryRow label="Payment Receipt">
+              {invoice.paymentReceiptKey ? (
+                <MuiLink
+                  href={receiptHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  sx={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 0.5,
+                  }}
+                >
+                  <PictureAsPdfIcon fontSize="small" /> View receipt
+                </MuiLink>
+              ) : (
+                "No receipt"
+              )}
+            </SummaryRow>
+          </Box>
+        </>
       ) : (
         <Typography variant="body2" color="textSecondary">
           This invoice was paid before payment details were recorded, so it has
@@ -182,11 +203,9 @@ export function VendorPaymentSection({
   onCancelClick,
 }: VendorPaymentSectionProps) {
   const [paidDate, setPaidDate] = useState("");
-  const [account, setAccount] = useState<PaymentAccountValue>(
-    EMPTY_PAYMENT_ACCOUNT,
-  );
-  const [paymentAmount, setPaymentAmount] = useState("");
-  const [transactionFee, setTransactionFee] = useState("");
+  const [parts, setParts] = useState<PaymentPartValue[]>(() => [
+    newPaymentPart(),
+  ]);
   const [receipt, setReceipt] = useState<UploadedPdf | null>(null);
   const [receiptUploading, setReceiptUploading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -199,24 +218,17 @@ export function VendorPaymentSection({
   }
 
   const totalUsd = Number(invoice.totalAmount);
-  const rate = parseExchangeRate(account);
-  const code = account.currencyCode;
-  const amount = paymentAmount.trim() === "" ? null : Number(paymentAmount);
-  const fee = transactionFee.trim() === "" ? null : Number(transactionFee);
-  const amountUsd = rate && amount != null ? amount / rate : null;
-  const neededAmount = rate ? usdToCurrency(totalUsd, rate) : null;
-  const amountValid = amount != null && Number.isFinite(amount) && amount > 0;
-  const feeValid = fee != null && Number.isFinite(fee) && fee >= 0;
+  const enteredUsd = partsTotalUsd(parts);
+  const partsComplete = parts.every((p) =>
+    isPartComplete(p, { withFee: true }),
+  );
   // Small epsilon so float division can't flip an exact match.
-  const matchesTotal =
-    amountUsd != null && Math.abs(amountUsd - totalUsd) <= TOLERANCE_USD + 1e-9;
+  const matchesTotal = Math.abs(enteredUsd - totalUsd) <= TOLERANCE_USD + 1e-9;
 
   const canSubmit =
     !!paidDate &&
-    isPaymentAccountComplete(account) &&
-    amountValid &&
+    partsComplete &&
     matchesTotal &&
-    feeValid &&
     !!receipt &&
     !receiptUploading &&
     !saving;
@@ -232,12 +244,7 @@ export function VendorPaymentSection({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           paidDate: new Date(paidDate).toISOString(),
-          entityId: account.entityId,
-          bankId: account.bankId,
-          currencyId: account.currencyId,
-          exchangeRate: account.exchangeRate.trim(),
-          paymentAmount: paymentAmount.trim(),
-          transactionFee: transactionFee.trim(),
+          parts: partsPayload(parts, true),
           receiptKey: receipt.key,
         }),
       });
@@ -254,12 +261,6 @@ export function VendorPaymentSection({
     }
   };
 
-  const currencyAdornment = code
-    ? {
-        input: { endAdornment: <Typography sx={{ ml: 1 }}>{code}</Typography> },
-      }
-    : {};
-
   return (
     <Stack spacing={2}>
       {error && <Alert severity="error">{error}</Alert>}
@@ -275,48 +276,13 @@ export function VendorPaymentSection({
         slotProps={{ inputLabel: { shrink: true } }}
       />
 
-      <PaymentAccountFields
-        value={account}
-        onChange={setAccount}
+      <PaymentPartsFields
+        parts={parts}
+        onChange={setParts}
         disabled={saving}
+        withFee
+        targetUsd={totalUsd}
       />
-
-      <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-        <TextField
-          fullWidth
-          label={code ? `Amount Paid (${code})` : "Amount Paid"}
-          type="number"
-          value={paymentAmount}
-          onChange={(e) => setPaymentAmount(e.target.value)}
-          required
-          disabled={saving || !rate}
-          error={amount != null && amountValid && !matchesTotal}
-          helperText={
-            rate
-              ? `Enter the amount paid in ${code}`
-              : "Choose the currency and rate first"
-          }
-          slotProps={{
-            htmlInput: { min: 0, step: "0.01" },
-            ...currencyAdornment,
-          }}
-        />
-        <TextField
-          fullWidth
-          label={code ? `Transaction Fee (${code})` : "Transaction Fee"}
-          type="number"
-          value={transactionFee}
-          onChange={(e) => setTransactionFee(e.target.value)}
-          required
-          disabled={saving || !code}
-          error={fee != null && !feeValid}
-          helperText="Enter 0 if there was no fee. For reference only."
-          slotProps={{
-            htmlInput: { min: 0, step: "0.01" },
-            ...currencyAdornment,
-          }}
-        />
-      </Stack>
 
       <Box
         sx={{
@@ -330,11 +296,7 @@ export function VendorPaymentSection({
         <Stack direction="row" justifyContent="space-between">
           <Typography color="textSecondary">USD equivalent</Typography>
           <Typography sx={{ fontWeight: 600 }}>
-            {amountUsd != null && Number.isFinite(amountUsd) ? (
-              <CurrencyDisplay value={amountUsd} />
-            ) : (
-              "—"
-            )}
+            {enteredUsd > 0 ? <CurrencyDisplay value={enteredUsd} /> : "—"}
           </Typography>
         </Stack>
         <Divider sx={{ my: 1 }} />
@@ -344,11 +306,15 @@ export function VendorPaymentSection({
             <CurrencyDisplay value={totalUsd} />
           </Typography>
         </Stack>
-        <AmountDueInCurrency usd={totalUsd} account={account} compact />
-        {amountValid && rate && !matchesTotal && (
+        {parts.length === 1 && (
+          <AmountDueInCurrency usd={totalUsd} account={parts[0]} compact />
+        )}
+        {enteredUsd > 0 && !matchesTotal && (
           <Alert severity="warning" sx={{ mt: 1.5 }}>
-            The amount paid must match the invoice total within $0.01. At this
-            rate that&apos;s {formatCurrencyAmount(neededAmount!, code)}.
+            The amount paid must match the invoice total within $0.01.{" "}
+            {enteredUsd < totalUsd
+              ? `$${(totalUsd - enteredUsd).toFixed(2)} USD is still to be entered.`
+              : `The parts are $${(enteredUsd - totalUsd).toFixed(2)} USD over.`}
           </Alert>
         )}
       </Box>

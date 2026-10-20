@@ -28,6 +28,10 @@ export async function PUT(
             vendorInvoicePayments: true,
             hardwarePurchasePayments: true,
             costPayments: true,
+            // Farm Tariff / Hardware Purchase payment parts. The two
+            // *Payments counts above cover the deprecated single-currency
+            // columns; remove them when those columns are dropped.
+            vendorPaymentParts: true,
           },
         },
       },
@@ -58,9 +62,13 @@ export async function PUT(
           vendorInvoicePayments,
           hardwarePurchasePayments,
           costPayments,
+          vendorPaymentParts,
         } = existing._count;
         if (
-          vendorInvoicePayments + hardwarePurchasePayments + costPayments >
+          vendorInvoicePayments +
+            hardwarePurchasePayments +
+            costPayments +
+            vendorPaymentParts >
           0
         ) {
           return NextResponse.json(
@@ -152,6 +160,10 @@ export async function DELETE(
             vendorInvoicePayments: true,
             hardwarePurchasePayments: true,
             costPayments: true,
+            // Farm Tariff / Hardware Purchase payment parts. The two
+            // *Payments counts above cover the deprecated single-currency
+            // columns; remove them when those columns are dropped.
+            vendorPaymentParts: true,
           },
         },
       },
@@ -168,10 +180,15 @@ export async function DELETE(
       vendorInvoicePayments,
       hardwarePurchasePayments,
       costPayments,
+      vendorPaymentParts,
     } = existing._count;
     if (
       banks > 0 ||
-      vendorInvoicePayments + hardwarePurchasePayments + costPayments > 0
+      vendorInvoicePayments +
+        hardwarePurchasePayments +
+        costPayments +
+        vendorPaymentParts >
+        0
     ) {
       return NextResponse.json(
         {
