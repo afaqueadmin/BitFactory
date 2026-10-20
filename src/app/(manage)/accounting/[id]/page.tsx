@@ -104,6 +104,11 @@ export default function InvoiceDetailPage() {
     null,
   );
   const [cancelLoading, setCancelLoading] = useState(false);
+  const [unpaidDialogOpen, setUnpaidDialogOpen] = useState(false);
+  const [unpaidDialogError, setUnpaidDialogError] = useState<string | null>(
+    null,
+  );
+  const [unpaidLoading, setUnpaidLoading] = useState(false);
   const [memoModalOpen, setMemoModalOpen] = useState(false);
   const [memoNotification, setMemoNotification] = useState("");
 
@@ -152,6 +157,7 @@ export default function InvoiceDetailPage() {
   }, [invoice?.user?.id]);
 
   const isAdmin = user?.role === "ADMIN" || user?.role === "SUPER_ADMIN";
+  const isSuperAdmin = user?.role === "SUPER_ADMIN";
 
   const isPastDate = (dateStr: string) => {
     if (!dateStr) return false;
@@ -308,6 +314,37 @@ export default function InvoiceDetailPage() {
       );
     } finally {
       setCancelLoading(false);
+    }
+  };
+
+  // Handle reverting a PAID invoice back to ISSUED (SUPER_ADMIN only)
+  const handleMarkUnpaid = async () => {
+    try {
+      setUnpaidDialogError(null);
+      setUnpaidLoading(true);
+
+      const response = await fetch(
+        `/api/accounting/invoices/${invoice!.id}/mark-unpaid`,
+        {
+          method: "POST",
+          credentials: "include",
+        },
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to mark invoice as unpaid");
+      }
+
+      setUnpaidDialogOpen(false);
+      // Reload to show updated invoice status and audit trail
+      window.location.reload();
+    } catch (err) {
+      setUnpaidDialogError(
+        err instanceof Error ? err.message : "Failed to mark invoice as unpaid",
+      );
+    } finally {
+      setUnpaidLoading(false);
     }
   };
 
@@ -694,6 +731,22 @@ export default function InvoiceDetailPage() {
                 >
                   Record Payment
                 </Button>
+
+                {isSuperAdmin && invoice.status === "PAID" && (
+                  <Button
+                    sx={{ displayPrint: "none" }}
+                    variant="outlined"
+                    color="warning"
+                    fullWidth
+                    size="large"
+                    onClick={() => {
+                      setUnpaidDialogError(null);
+                      setUnpaidDialogOpen(true);
+                    }}
+                  >
+                    Mark as Unpaid
+                  </Button>
+                )}
               </Stack>
             </CardContent>
           </Card>
@@ -1275,6 +1328,44 @@ export default function InvoiceDetailPage() {
             disabled={cancelLoading}
           >
             {cancelLoading ? "Cancelling..." : "Cancel Invoice"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+      {/* Mark as Unpaid Confirmation Dialog */}
+      <Dialog
+        open={unpaidDialogOpen}
+        onClose={() => setUnpaidDialogOpen(false)}
+      >
+        <DialogTitle>Mark Invoice as Unpaid</DialogTitle>
+        <DialogContent>
+          <Box sx={{ pt: 2 }}>
+            {unpaidDialogError && (
+              <Alert severity="error" sx={{ mb: 2 }}>
+                {unpaidDialogError}
+              </Alert>
+            )}
+            <Typography sx={{ mb: 2 }}>
+              Are you sure you want to mark this invoice as unpaid? The invoice
+              status will be changed back to &quot;Issued&quot;, its paid date
+              will be cleared and all payments recorded against it will be
+              removed.
+            </Typography>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => setUnpaidDialogOpen(false)}
+            disabled={unpaidLoading}
+          >
+            Keep as Paid
+          </Button>
+          <Button
+            onClick={handleMarkUnpaid}
+            variant="contained"
+            color="warning"
+            disabled={unpaidLoading}
+          >
+            {unpaidLoading ? "Updating..." : "Mark as Unpaid"}
           </Button>
         </DialogActions>
       </Dialog>{" "}
