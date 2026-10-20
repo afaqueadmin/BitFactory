@@ -2,7 +2,7 @@
  * A simulated account's hardware + hosting invoice: what a real client is
  * invoiced when they buy a miner - one hardware line and Hosting &
  * Colocation for the first month - built in code on every request and never
- * written to the invoices table. Issued at registration, unpaid, view only.
+ * written to the invoices table. Issued and shown as paid at registration, view only.
  *
  * Laid out exactly like a real Hardware Sales invoice (same row labels, so
  * the same PDF). Priced from the CLIENT payback config: hardware = the
@@ -89,7 +89,7 @@ export function buildSimInvoice(input: {
     totalMiners: 1,
     unitPrice: hardware,
     totalAmount: total,
-    status: "ISSUED" as const,
+    status: "PAID" as const,
     invoiceType: "HARDWARE_SALES" as const,
     invoiceGeneratedDate: issued,
     issuedDate: issued,
@@ -98,7 +98,7 @@ export function buildSimInvoice(input: {
     machineHostingLocation: ctx.demoMiner.space.location
       ? [ctx.demoMiner.space.location]
       : [],
-    paidDate: null,
+    paidDate: issued,
     discountAmount: 0,
     minerId: null,
     miner: null,

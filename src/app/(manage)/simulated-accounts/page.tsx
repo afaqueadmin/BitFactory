@@ -20,6 +20,9 @@ import {
   Typography,
 } from "@mui/material";
 import { useQueryClient } from "@tanstack/react-query";
+import SimulationSettingsCard from "@/components/simulation/SimulationSettingsCard";
+import SimulatedLedgerDialog from "@/components/simulation/SimulatedLedgerDialog";
+import { formatValue } from "@/lib/helpers/formatValue";
 
 interface SimulatedAccount {
   id: string;
@@ -29,6 +32,7 @@ interface SimulatedAccount {
   createdAt: string;
   lastLoginAt: string | null;
   active: boolean;
+  balance: number;
 }
 
 interface SimulationRequest {
@@ -60,7 +64,8 @@ const csvCell = (value: string | null) =>
  * their contact details for sales and marketing. Accounts are deactivated
  * rather than deleted, so every lead stays listed; an active one can also be
  * turned into a real customer. Potential Customers' requests for a simulated
- * account are reviewed here too.
+ * account are reviewed here too, along with the simulation settings and each
+ * account's simulated cost ledger.
  */
 export default function SimulatedAccountsPage() {
   const [accounts, setAccounts] = useState<SimulatedAccount[]>([]);
@@ -71,6 +76,7 @@ export default function SimulatedAccountsPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [ledgerId, setLedgerId] = useState<string | null>(null);
 
   const visible = accounts.filter(
     (a) => statusFilter === "all" || a.active === (statusFilter === "active"),
@@ -202,6 +208,7 @@ export default function SimulatedAccountsPage() {
       "Status",
       "Registered",
       "Last login",
+      "Balance (USD)",
     ];
     const rows = visible.map((a) =>
       [
@@ -211,6 +218,7 @@ export default function SimulatedAccountsPage() {
         a.active ? "Active" : "Inactive",
         new Date(a.createdAt).toISOString(),
         a.lastLoginAt ? new Date(a.lastLoginAt).toISOString() : "",
+        a.balance.toFixed(2),
       ]
         .map(csvCell)
         .join(","),
@@ -280,6 +288,8 @@ export default function SimulatedAccountsPage() {
         </Alert>
       )}
 
+      <SimulationSettingsCard onSaved={load} />
+
       {!loading && requests.length > 0 && (
         <Box sx={{ mb: 3 }}>
           <Typography variant="h6" fontWeight={700} mb={1}>
@@ -348,13 +358,14 @@ export default function SimulatedAccountsPage() {
                 <TableCell>Status</TableCell>
                 <TableCell>Registered</TableCell>
                 <TableCell>Last login</TableCell>
+                <TableCell align="right">Balance</TableCell>
                 <TableCell align="right">Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {visible.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
+                  <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
                     {accounts.length === 0
                       ? "No simulated accounts yet."
                       : "No accounts match this filter."}
@@ -377,6 +388,12 @@ export default function SimulatedAccountsPage() {
                     <TableCell>{formatDateTime(a.createdAt)}</TableCell>
                     <TableCell>{formatDateTime(a.lastLoginAt)}</TableCell>
                     <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
+                      {formatValue(a.balance, "currency")}
+                    </TableCell>
+                    <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
+                      <Button size="small" onClick={() => setLedgerId(a.id)}>
+                        Ledger
+                      </Button>
                       {a.active && (
                         <Button
                           size="small"
@@ -413,6 +430,12 @@ export default function SimulatedAccountsPage() {
           </Table>
         </TableContainer>
       )}
+
+      <SimulatedLedgerDialog
+        accountId={ledgerId}
+        onClose={() => setLedgerId(null)}
+        onChanged={load}
+      />
     </Box>
   );
 }

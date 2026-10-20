@@ -70,8 +70,11 @@ export function simCostPaymentsPage(
         consumption:
           r.consumption > 0 ? `${r.consumption.toFixed(2)} kWh` : "N/A",
         amount:
-          (r.type === "PAYMENT" ? (r.amount >= 0 ? "+ " : "- ") : "- ") +
-          `${Math.abs(r.amount).toFixed(2)} $`,
+          (r.type === "PAYMENT" || r.type === "ADJUSTMENT"
+            ? r.amount >= 0
+              ? "+ "
+              : "- "
+            : "- ") + `${Math.abs(r.amount).toFixed(2)} $`,
         balance:
           (balance >= 0 ? "+ " : "- ") + `${Math.abs(balance).toFixed(2)} $`,
         rawBalance: balance,

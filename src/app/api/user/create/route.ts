@@ -19,6 +19,8 @@ import {
 } from "@/lib/auth/emailIdentity";
 import { generateTempPassword } from "@/lib/helpers/generateTempPassword";
 import { getOrCreatePaybackConfig } from "@/lib/paybackConfigHelpers";
+import { startSimLedger } from "@/lib/simulation/ledgerStore";
+import { currentWelcomeBonusUsd } from "@/lib/simulation/settings";
 
 /**
  * Response structure from /api/luxor proxy route
@@ -268,6 +270,15 @@ export async function POST(request: NextRequest) {
           ? dbError.message
           : "Failed to create user in database";
       throw new Error(message);
+    }
+
+    // A simulated account starts its own ledger with the welcome bonus.
+    if (role === "SIMULATED") {
+      const created = newUser;
+      const bonusUsd = await currentWelcomeBonusUsd();
+      await prisma.$transaction((tx) =>
+        startSimLedger(tx, created.id, created.createdAt, bonusUsd, userId),
+      );
     }
 
     // If client role and initial deposit provided, create cost payment entry

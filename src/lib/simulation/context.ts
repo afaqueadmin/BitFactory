@@ -13,10 +13,8 @@ import {
   SIM_CONVERSION_NOTE_LEGACY,
   SIM_REREGISTER_NOTE,
   isSimulatedRole,
-  simDemoMinerId,
-  simDemoMinerName,
 } from "./config";
-import type { RatePoint } from "./ledger";
+import { getSimSettings, type SimSettings } from "./settings";
 
 export class SimNotConfiguredError extends Error {
   constructor(message: string) {
@@ -45,7 +43,8 @@ export interface DemoMiner {
   };
   space: { location: string; name: string };
   pool: { id: string; name: string } | null;
-  rates: RatePoint[];
+  /** The real miner's own latest rate - shown to admins for reference. */
+  realRatePerKwh: number;
 }
 
 export interface SimContext {
@@ -56,14 +55,42 @@ export interface SimContext {
   demoMiner: DemoMiner;
   /** What the simulated miner and its worker are shown as. */
   displayName: string;
+  /** USD/kWh simulated charges use (simulation_settings). */
+  ratePerKwh: number;
   /** The owner's Luxor subaccounts - the miner can sit in any of them. */
   ownerSubaccounts: WorkerSubaccount[];
 }
 
-async function loadDemoMiner(): Promise<DemoMiner> {
-  const id = simDemoMinerId();
-  if (!id) throw new SimNotConfiguredError("SIM_DEMO_MINER_ID is not set");
+/** Settings plus the miner they point at; throws when either is missing. */
+export async function loadSimSetup(): Promise<{
+  settings: SimSettings;
+  demoMiner: DemoMiner;
+  /** The settings rate, or the real miner's own on the env fallback. */
+  ratePerKwh: number;
+}> {
+  const settings = await getSimSettings();
+  if (!settings) {
+    throw new SimNotConfiguredError("Simulation settings are not set");
+  }
+  const demoMiner = await loadDemoMiner(settings.sourceMinerId);
+  return {
+    settings,
+    demoMiner,
+    ratePerKwh: settings.ratePerKwh ?? demoMiner.realRatePerKwh,
+  };
+}
 
+/** USD charged per day for the simulated miner: kW x rate x 24. */
+export function simDailyChargeUsd(
+  demoMiner: Pick<DemoMiner, "hardware">,
+  ratePerKwh: number,
+): number {
+  return (
+    Math.round(demoMiner.hardware.powerUsage * ratePerKwh * 24 * 100) / 100
+  );
+}
+
+async function loadDemoMiner(id: string): Promise<DemoMiner> {
   const miner = await prisma.miner.findFirst({
     where: { id, isDeleted: false },
     select: {
@@ -83,8 +110,9 @@ async function loadDemoMiner(): Promise<DemoMiner> {
       space: { select: { location: true, name: true } },
       pool: { select: { id: true, name: true } },
       rateHistory: {
-        select: { rate_per_kwh: true, createdAt: true },
-        orderBy: { createdAt: "asc" },
+        select: { rate_per_kwh: true },
+        orderBy: { createdAt: "desc" },
+        take: 1,
       },
     },
   });
@@ -111,10 +139,9 @@ async function loadDemoMiner(): Promise<DemoMiner> {
     },
     space: miner.space,
     pool: miner.pool,
-    rates: miner.rateHistory.map((r) => ({
-      effectiveFrom: r.createdAt,
-      ratePerKwh: Number(r.rate_per_kwh),
-    })),
+    realRatePerKwh: miner.rateHistory.length
+      ? Number(miner.rateHistory[0].rate_per_kwh)
+      : 0,
   };
 }
 
@@ -134,25 +161,21 @@ async function loadOwnerSubaccounts(
     }));
 }
 
-/** Null for any caller that isn't a simulated account. */
-export async function getSimContext(decoded: {
-  userId: string;
-  role: string;
-}): Promise<SimContext | null> {
-  if (!isSimulatedRole(decoded.role)) return null;
-
-  const [user, conversion, demoMiner] = await Promise.all([
+/**
+ * When a simulated account's simulation starts: registration, or - for an
+ * existing customer an admin turned into a simulated account, or an inactive
+ * one re-registered - that later moment. Null if the user doesn't exist.
+ */
+export async function loadSimStart(userId: string): Promise<Date | null> {
+  const [user, restart] = await Promise.all([
     prisma.user.findUnique({
-      where: { id: decoded.userId },
+      where: { id: userId },
       select: { createdAt: true },
     }),
-    // An existing customer an admin turned into a simulated account, or an
-    // inactive one re-registered, starts from that moment, not from when the
-    // account was first created.
     prisma.auditLog.findFirst({
       where: {
         entityType: "User",
-        entityId: decoded.userId,
+        entityId: userId,
         action: "USER_UPDATED",
         OR: [
           { description: { endsWith: SIM_CONVERSION_NOTE } },
@@ -163,22 +186,34 @@ export async function getSimContext(decoded: {
       orderBy: { createdAt: "desc" },
       select: { createdAt: true },
     }),
-    loadDemoMiner(),
   ]);
-  if (!user) throw new SimNotConfiguredError("Simulated account not found");
+  if (!user) return null;
+  return restart && restart.createdAt > user.createdAt
+    ? restart.createdAt
+    : user.createdAt;
+}
 
-  const since =
-    conversion && conversion.createdAt > user.createdAt
-      ? conversion.createdAt
-      : user.createdAt;
+/** Null for any caller that isn't a simulated account. */
+export async function getSimContext(decoded: {
+  userId: string;
+  role: string;
+}): Promise<SimContext | null> {
+  if (!isSimulatedRole(decoded.role)) return null;
+
+  const [since, setup] = await Promise.all([
+    loadSimStart(decoded.userId),
+    loadSimSetup(),
+  ]);
+  if (!since) throw new SimNotConfiguredError("Simulated account not found");
 
   return {
     userId: decoded.userId,
     since,
     now: new Date(),
-    demoMiner,
-    displayName: simDemoMinerName(),
-    ownerSubaccounts: await loadOwnerSubaccounts(demoMiner.ownerId),
+    demoMiner: setup.demoMiner,
+    displayName: setup.settings.displayName,
+    ratePerKwh: setup.ratePerKwh,
+    ownerSubaccounts: await loadOwnerSubaccounts(setup.demoMiner.ownerId),
   };
 }
 

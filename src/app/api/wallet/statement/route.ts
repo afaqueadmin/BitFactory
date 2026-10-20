@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { generatePDFFromHTML } from "@/lib/email";
 import { paymentTypeLabel } from "@/lib/accounting/paymentTypes";
 import { getSimContext } from "@/lib/simulation/context";
-import { loadSimLedger } from "@/lib/simulation/data";
+import { loadSimLedger } from "@/lib/simulation/ledgerStore";
 import { readFileSync } from "fs";
 import { join } from "path";
 
@@ -105,7 +105,7 @@ export async function GET(request: NextRequest) {
     // Simulated accounts get their simulated ledger; nothing is in cost_payments.
     const simCtx = await getSimContext(jwtPayload);
     const simLedger = simCtx
-      ? [...(await loadSimLedger(simCtx))].sort(
+      ? [...(await loadSimLedger(simCtx.userId))].sort(
           (a, b) => a.createdAt.getTime() - b.createdAt.getTime(),
         )
       : null;

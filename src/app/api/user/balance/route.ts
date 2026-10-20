@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { NON_BALANCE_PAYMENT_TYPES } from "@/lib/accounting/paymentTypes";
 import { verifyJwtToken } from "@/lib/jwt";
 import { simRoute } from "@/lib/simulation/context";
-import { loadSimLedger } from "@/lib/simulation/data";
+import { loadSimLedger } from "@/lib/simulation/ledgerStore";
 import { ledgerBalance } from "@/lib/simulation/ledger";
 
 export async function GET(request: NextRequest) {
@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
 
     const sim = await simRoute(decoded, async (ctx) =>
       NextResponse.json({
-        balance: ledgerBalance(await loadSimLedger(ctx)),
+        balance: ledgerBalance(await loadSimLedger(ctx.userId)),
         userId: ctx.userId,
       }),
     );

@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyJwtToken } from "@/lib/jwt";
 import { prisma } from "@/lib/prisma";
 import { simRoute } from "@/lib/simulation/context";
-import { loadSimLedger } from "@/lib/simulation/data";
+import { loadSimInvoice } from "@/lib/simulation/invoice";
+import { ledgerElectricityTotal } from "@/lib/simulation/ledger";
+import { loadSimLedger } from "@/lib/simulation/ledgerStore";
 
 export const dynamic = "force-dynamic";
 
@@ -28,17 +30,21 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Simulated accounts have no invoices; their cost is the simulated charges.
+    // Simulated accounts: electricity is the simulated daily charges so far;
+    // hardware is the simulated Hardware Sales invoice, shown as paid.
     const sim = await simRoute(decoded, async (ctx) => {
-      const charges = (await loadSimLedger(ctx))
-        .filter((r) => r.type === "ELECTRICITY_CHARGES")
-        .reduce((sum, r) => sum - r.amount, 0);
+      const [ledger, invoice] = await Promise.all([
+        loadSimLedger(ctx.userId),
+        loadSimInvoice(ctx),
+      ]);
+      const electricity = ledgerElectricityTotal(ledger);
+      const hardware = invoice.totalAmount;
       return NextResponse.json(
         {
           totals: {
-            electricityCostTotal: parseFloat(charges.toFixed(2)),
-            hardwareCostTotal: 0,
-            totalCosts: parseFloat(charges.toFixed(2)),
+            electricityCostTotal: parseFloat(electricity.toFixed(2)),
+            hardwareCostTotal: parseFloat(hardware.toFixed(2)),
+            totalCosts: parseFloat((electricity + hardware).toFixed(2)),
           },
         },
         { headers: { "Cache-Control": "no-store" } },

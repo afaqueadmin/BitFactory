@@ -193,7 +193,7 @@ export default function CustomerInvoiceDetailPage() {
             </Button>
             {isSimulated ? (
               <Typography variant="caption" color="text.secondary">
-                Simulated invoice - view only, payment not available
+                Simulated invoice - view only
               </Typography>
             ) : (
               <>

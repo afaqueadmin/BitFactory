@@ -8,74 +8,93 @@ import { poolDataCache } from "@/lib/cache";
 import { createLuxorClient, type Worker } from "@/lib/luxor";
 import { joinSubaccountNames } from "@/lib/luxorSubaccounts";
 import { fetchLiveBtcKlines } from "@/lib/services/btcPriceService";
-import type { SimContext } from "./context";
-import { SIM_SUBACCOUNT_NAME, simBonusUsd } from "./config";
-import { dayKey, dayKeysBetween, utcDayStart } from "./dates";
-import { simCostLedger, type SimLedgerRow } from "./ledger";
+import { simDailyChargeUsd, type SimContext } from "./context";
+import { SIM_SUBACCOUNT_NAME } from "./config";
+import { addDays, dayKey, dayKeysBetween, utcDayStart } from "./dates";
 import {
   DEFAULT_PAYOUT_CATEGORIES,
   simPoolLedger,
   type SimDay,
   type SimPoolLedger,
 } from "./payouts";
+import { SHARE_LOOKBACK_DAYS, simShareDays } from "./share";
 
 /**
- * The simulated worker's completed days since registration: daily hashrate and
- * Luxor's per-worker est. revenue (PoolWorkerDailyMetric, written by
- * cron_pool_worker_transactions). A miner only hashes in one subaccount at a
- * time, so rows from several subaccounts are summed per day.
+ * The simulated miner's completed days since registration: its share of the
+ * owner subaccount's real Miner Revenue credit each day (see ./share), from
+ * PoolWorkerDailyMetric (cron_pool_worker_transactions) and
+ * PoolSubaccountDailySnapshot (cron_pool_daily_snapshot).
  */
 export async function loadSimDays(ctx: SimContext): Promise<SimDay[]> {
   if (ctx.ownerSubaccounts.length === 0) return [];
+  const subaccountIds = ctx.ownerSubaccounts.map((s) => s.poolSubaccountId);
   const today = utcDayStart(ctx.now);
+  const firstDay = utcDayStart(ctx.since);
+  if (firstDay >= today) return [];
+  // Earlier days too, so a day with missing worker metrics can borrow the
+  // most recent share.
+  const lookbackFrom = addDays(firstDay, -SHARE_LOOKBACK_DAYS);
 
-  const rows = await prisma.poolWorkerDailyMetric.findMany({
-    where: {
-      poolSubaccountId: {
-        in: ctx.ownerSubaccounts.map((s) => s.poolSubaccountId),
+  const [worker, totals, credits] = await Promise.all([
+    prisma.poolWorkerDailyMetric.findMany({
+      where: {
+        poolSubaccountId: { in: subaccountIds },
+        workerName: ctx.demoMiner.workerName,
+        date: { gte: lookbackFrom, lt: today },
       },
-      workerName: ctx.demoMiner.workerName,
-      date: { gte: utcDayStart(ctx.since), lt: today },
-    },
-    select: { date: true, hashrate: true, estRevenue: true },
+      select: {
+        poolSubaccountId: true,
+        date: true,
+        hashrate: true,
+        estRevenue: true,
+      },
+    }),
+    prisma.poolWorkerDailyMetric.groupBy({
+      by: ["poolSubaccountId", "date"],
+      where: {
+        poolSubaccountId: { in: subaccountIds },
+        date: { gte: lookbackFrom, lt: today },
+      },
+      _sum: { estRevenue: true },
+    }),
+    prisma.poolSubaccountDailySnapshot.findMany({
+      where: {
+        poolSubaccountId: { in: subaccountIds },
+        date: { gte: firstDay, lt: today },
+      },
+      select: { poolSubaccountId: true, date: true, miningRevenue: true },
+    }),
+  ]);
+
+  return simShareDays({
+    days: dayKeysBetween(firstDay, addDays(today, -1)),
+    worker: worker.map((w) => ({
+      subaccountId: w.poolSubaccountId,
+      date: dayKey(w.date),
+      estRevenue: w.estRevenue !== null ? Number(w.estRevenue) : 0,
+      hashrate: w.hashrate !== null ? Number(w.hashrate) : 0,
+    })),
+    totals: totals.map((t) => ({
+      subaccountId: t.poolSubaccountId,
+      date: dayKey(t.date),
+      estRevenue: t._sum.estRevenue !== null ? Number(t._sum.estRevenue) : 0,
+    })),
+    credits: credits.map((c) => ({
+      subaccountId: c.poolSubaccountId,
+      date: dayKey(c.date),
+      miningRevenue: Number(c.miningRevenue),
+    })),
   });
-
-  const byDay = new Map<string, SimDay>();
-  for (const r of rows) {
-    const key = dayKey(r.date);
-    const day = byDay.get(key) ?? { date: key, hashrate: 0, btc: 0 };
-    day.hashrate += r.hashrate !== null ? Number(r.hashrate) : 0;
-    day.btc += r.estRevenue !== null ? Number(r.estRevenue) : 0;
-    byDay.set(key, day);
-  }
-  return Array.from(byDay.values()).sort((a, b) =>
-    a.date.localeCompare(b.date),
-  );
 }
 
-export function simLedgerFromDays(
-  ctx: SimContext,
-  days: SimDay[],
-): SimLedgerRow[] {
-  return simCostLedger({
-    since: ctx.since,
-    now: ctx.now,
-    bonusUsd: simBonusUsd(),
-    powerUsageKw: ctx.demoMiner.hardware.powerUsage,
-    rates: ctx.demoMiner.rates,
-    hashrateByDay: new Map(days.map((d) => [d.date, d.hashrate])),
-  });
-}
-
-export async function loadSimLedger(ctx: SimContext): Promise<SimLedgerRow[]> {
-  return simLedgerFromDays(ctx, await loadSimDays(ctx));
-}
-
-/** Today's daily charge at the latest rate - the "days left" projection. */
+/**
+ * The daily charge right now - the "Daily cost" card and the days-left
+ * projection. Like a real miner, nothing while the miner isn't AUTO.
+ */
 export function simDailyCost(ctx: SimContext): number {
-  const rates = ctx.demoMiner.rates;
-  const latest = rates.length ? rates[rates.length - 1].ratePerKwh : 0;
-  return ctx.demoMiner.hardware.powerUsage * latest * 24;
+  return ctx.demoMiner.status === "AUTO"
+    ? simDailyChargeUsd(ctx.demoMiner, ctx.ratePerKwh)
+    : 0;
 }
 
 const KLINE_CACHE_KEY = "sim_btc_daily_closes";

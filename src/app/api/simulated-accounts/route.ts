@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
 import { pendingSimulationRequests } from "@/lib/simulation/convert";
+import { loadSimBalances } from "@/lib/simulation/ledgerStore";
 
 export const runtime = "nodejs";
 
@@ -64,6 +65,7 @@ export async function GET(request: NextRequest) {
     const lastLoginById = new Map(
       lastLogins.map((l) => [l.userId, l._max.loginAt]),
     );
+    const balanceById = await loadSimBalances(users.map((u) => u.id));
 
     return NextResponse.json({
       success: true,
@@ -71,6 +73,7 @@ export async function GET(request: NextRequest) {
         ...u,
         active: !isDeleted,
         lastLoginAt: lastLoginById.get(u.id) ?? null,
+        balance: balanceById.get(u.id) ?? 0,
       })),
       requests,
     });

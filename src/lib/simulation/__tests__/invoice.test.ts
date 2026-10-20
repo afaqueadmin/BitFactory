@@ -32,8 +32,8 @@ describe("buildSimInvoice", () => {
     });
     expect(inv.id).toBe(SIM_INVOICE_ID);
     expect(inv.invoiceType).toBe("HARDWARE_SALES");
-    expect(inv.status).toBe("ISSUED");
-    expect(inv.paidDate).toBeNull();
+    expect(inv.status).toBe("PAID");
+    expect(inv.paidDate?.toISOString()).toBe("2026-10-19T09:30:00.000Z");
     expect(inv.totalAmount).toBe(4675.5);
     expect(inv.unitPrice).toBe(4250);
     expect(
@@ -62,7 +62,7 @@ describe("buildSimInvoice", () => {
     expect(inv.totalAmount).toBe(4550);
   });
 
-  it("is issued at registration and due a week later", () => {
+  it("is issued and paid at registration and due a week later", () => {
     const inv = buildSimInvoice({
       ctx: ctxFor("Bitmain S21XP"),
       user: { name: "Jane Doe", email: "jane@example.com" },

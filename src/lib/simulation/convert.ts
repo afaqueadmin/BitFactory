@@ -1,14 +1,16 @@
 /**
  * Turning a regular customer into a simulated account - shared by the admin
  * "Change to Simulated Account" action and approving a customer's own
- * request for one. Writes only the user row, their open sessions and an
- * audit entry; no simulated data is ever stored.
+ * request for one. Writes the user row, their open sessions, an audit entry
+ * and the welcome bonus that starts their simulated ledger.
  */
 
 import { AuditAction } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { sessionCutoffNow } from "@/lib/auth/sessionRevocation";
 import { SIM_CONVERSION_NOTE } from "./config";
+import { startSimLedger } from "./ledgerStore";
+import { currentWelcomeBonusUsd } from "./settings";
 
 /** UserActivity types for a customer's request (no table of its own). */
 export const SIM_REQUEST_ACTIVITY = "SIMULATION_REQUESTED";
@@ -77,6 +79,7 @@ export async function convertToSimulated(
   const label = user.name || user.email;
 
   const now = new Date();
+  const bonusUsd = await currentWelcomeBonusUsd();
   await prisma.$transaction(async (tx) => {
     await tx.user.update({
       where: { id: userId },
@@ -101,8 +104,11 @@ export async function convertToSimulated(
           role: { from: "CLIENT", to: "SIMULATED" },
           segment: { from: user.segment, to: null },
         }),
+        // The simulation starts here (see loadSimStart), with the bonus.
+        createdAt: now,
       },
     });
+    await startSimLedger(tx, userId, now, bonusUsd, actorId);
   });
 
   return { label, email: user.email, name: user.name };

@@ -119,6 +119,9 @@ model User {
   secondaryLoginRequestsReviewed          SecondaryLoginRequest[]         @relation("secondaryLoginRequestsReviewed")
   accountingEntitiesCreated               AccountingEntity[]              @relation("accountingEntitiesCreated")
   accountingBanksCreated                  AccountingBank[]                @relation("accountingBanksCreated")
+  simulatedCostPayments                   SimulatedCostPayment[]          @relation("simulatedCostPayments")
+  simulatedCostPaymentsCreated            SimulatedCostPayment[]          @relation("simulatedCostPaymentsCreated")
+  simulationSettingsUpdated               SimulationSettings[]            @relation("simulationSettingsUpdated")
 
   @@index([isDeleted])
   @@index([franchiseeId])
@@ -651,6 +654,7 @@ model Miner {
   repairInvoices         Invoice[]                @relation("minerRepairInvoices")
   tickets                SupportTicket[]
   firmwareChangeRequests FirmwareChangeRequest[]
+  simulationSettings     SimulationSettings[]
 
   @@unique([name, userId])
   @@index([hardwareId])
@@ -853,6 +857,56 @@ model PoolTransaction {
   @@index([externalTransactionId])
   @@index([occurredAt])
   @@map("pool_transactions")
+}
+
+/// Admin-managed settings for every simulated account. One row (id = 1).
+model SimulationSettings {
+  id              Int      @id @default(1)
+  /// The real company miner every simulated account mirrors.
+  sourceMinerId   String
+  /// What the mirrored miner is shown as (its real name can identify its owner).
+  displayName     String   @default("Simulated Miner")
+  /// Welcome bonus written to a new simulated account's ledger.
+  welcomeBonusUsd Decimal  @db.Decimal(12, 2)
+  /// Electricity rate for simulated charges - separate from the real miner's.
+  ratePerKwh      Decimal  @db.Decimal(10, 6)
+  updatedById     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  sourceMiner Miner @relation(fields: [sourceMinerId], references: [id], onDelete: Restrict)
+  updatedBy   User? @relation("simulationSettingsUpdated", fields: [updatedById], references: [id])
+
+  @@map("simulation_settings")
+}
+
+/// A simulated account's cost ledger: welcome bonus, daily electricity
+/// charges (cron_simulated_daily_cost) and admin payments/adjustments.
+/// Same shape as CostPayment but kept apart so simulated money never reaches
+/// real accounting.
+model SimulatedCostPayment {
+  id          String      @id @default(cuid())
+  userId      String
+  /// USD; negative for a charge.
+  amount      Float
+  /// kWh.
+  consumption Float       @default(0)
+  type        PaymentType
+  narration   String?
+  /// The UTC day an ELECTRICITY_CHARGES row is for; null on other types.
+  /// Unique per user so the cron never charges a day twice.
+  chargeDate  DateTime?   @db.Date
+  createdAt   DateTime    @default(now())
+  createdById String?
+  isDeleted   Boolean     @default(false)
+
+  user      User  @relation("simulatedCostPayments", fields: [userId], references: [id], onDelete: Cascade)
+  createdBy User? @relation("simulatedCostPaymentsCreated", fields: [createdById], references: [id])
+
+  @@unique([userId, chargeDate])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("simulated_cost_payments")
 }
 
 model CostPayment {
@@ -1532,8 +1586,10 @@ enum Role {
   CLIENT
   SUPER_ADMIN
   FRANCHISEE
-  /// Demo account: sees one company miner's data, simulated in code
-  /// (src/lib/simulation). Never billed, never in customer lists.
+  /// Simulated account: mirrors one company miner (simulation_settings).
+  /// Its cost ledger lives in simulated_cost_payments, never cost_payments;
+  /// revenue is computed from the real miner's pool data (src/lib/simulation).
+  /// Never billed, never in customer lists.
   SIMULATED
 }
 

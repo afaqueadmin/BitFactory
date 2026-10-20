@@ -27,7 +27,6 @@ export async function GET(request: NextRequest) {
 
     const sim = await simRoute(decoded, (ctx) => {
       const m = ctx.demoMiner;
-      const rates = m.rates;
       const dailyCost = simDailyCost(ctx);
       return NextResponse.json({
         userId: ctx.userId,
@@ -40,7 +39,7 @@ export async function GET(request: NextRequest) {
             status: m.status,
             powerUsage: m.hardware.powerUsage,
             location: m.space.location,
-            ratePerKwh: rates.length ? rates[rates.length - 1].ratePerKwh : 0,
+            ratePerKwh: ctx.ratePerKwh,
             dailyCost,
           },
         ],

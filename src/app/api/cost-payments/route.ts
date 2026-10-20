@@ -4,7 +4,7 @@ import { verifyJwtToken } from "@/lib/jwt";
 import { AuditAction } from "@prisma/client";
 import { paymentTypeLabel } from "@/lib/accounting/paymentTypes";
 import { simRoute } from "@/lib/simulation/context";
-import { loadSimLedger } from "@/lib/simulation/data";
+import { loadSimLedger } from "@/lib/simulation/ledgerStore";
 import { simCostPaymentsPage } from "@/lib/simulation/views";
 
 export async function GET(request: NextRequest) {
@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
     // Simulated accounts: the simulated ledger, never cost_payments.
     const sim = await simRoute(decoded, async (ctx) =>
       NextResponse.json(
-        simCostPaymentsPage(await loadSimLedger(ctx), page, pageSize),
+        simCostPaymentsPage(await loadSimLedger(ctx.userId), page, pageSize),
       ),
     );
     if (sim) return sim;

@@ -12,6 +12,8 @@ import { getOrCreatePaybackConfig } from "@/lib/paybackConfigHelpers";
 import { enforceAuthRateLimit, getClientIp } from "@/lib/rateLimit";
 import { sessionCutoffNow } from "@/lib/auth/sessionRevocation";
 import { SIM_REREGISTER_NOTE } from "@/lib/simulation/config";
+import { startSimLedger } from "@/lib/simulation/ledgerStore";
+import { currentWelcomeBonusUsd } from "@/lib/simulation/settings";
 
 /**
  * POST /api/simulated-accounts/register  (public, no auth)
@@ -85,20 +87,25 @@ async function createSimulatedAccount(
   }
 
   const { defaultInvoicedAmount } = await getOrCreatePaybackConfig("CLIENT");
+  const bonusUsd = await currentWelcomeBonusUsd();
   try {
-    const user = await prisma.user.create({
-      data: {
-        name,
-        email,
-        phoneNumber,
-        password: hashedPassword,
-        role: "SIMULATED",
-        invoicedAmount: defaultInvoicedAmount,
-        logins: {
-          create: { email, password: hashedPassword, isPrimary: true },
+    const user = await prisma.$transaction(async (tx) => {
+      const created = await tx.user.create({
+        data: {
+          name,
+          email,
+          phoneNumber,
+          password: hashedPassword,
+          role: "SIMULATED",
+          invoicedAmount: defaultInvoicedAmount,
+          logins: {
+            create: { email, password: hashedPassword, isPrimary: true },
+          },
         },
-      },
-      select: { id: true },
+        select: { id: true, createdAt: true },
+      });
+      await startSimLedger(tx, created.id, created.createdAt, bonusUsd, null);
+      return created;
     });
     await prisma.userActivity.create({
       data: {
@@ -133,6 +140,8 @@ async function reactivateSimulatedAccount(
     return;
   }
 
+  const now = new Date();
+  const bonusUsd = await currentWelcomeBonusUsd();
   await prisma.$transaction(async (tx) => {
     await tx.user.update({
       where: { id: userId },
@@ -160,8 +169,11 @@ async function reactivateSimulatedAccount(
         userId,
         description: `Simulated account ${email} ${SIM_REREGISTER_NOTE}`,
         changes: JSON.stringify({ active: { from: false, to: true } }),
+        createdAt: now,
       },
     });
+    // A fresh ledger: the old one is voided, a new welcome bonus written.
+    await startSimLedger(tx, userId, now, bonusUsd, null);
     await tx.userActivity.create({
       data: {
         userId,
