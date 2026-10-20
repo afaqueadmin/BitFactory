@@ -6,6 +6,8 @@ import {
   selectRequestedSubaccounts,
 } from "@/lib/luxorSubaccounts";
 import { weightedAverage } from "@/lib/hashrateHistory";
+import { simRoute } from "@/lib/simulation/context";
+import { loadSimDays } from "@/lib/simulation/data";
 
 interface HashpricePoint {
   date: string;
@@ -13,6 +15,79 @@ interface HashpricePoint {
   hashprice: number;
   revenue: number;
   hashrate: number;
+}
+
+/** The last `days` completed UTC days, ending yesterday. */
+function historyWindow(days: number): { startDate: Date; endDate: Date } {
+  const endDate = new Date();
+  endDate.setUTCDate(endDate.getUTCDate() - 1);
+  endDate.setUTCHours(0, 0, 0, 0);
+  const startDate = new Date(endDate);
+  startDate.setUTCDate(startDate.getUTCDate() - (days - 1));
+  return { startDate, endDate };
+}
+
+type SnapshotRow = {
+  date: Date;
+  hashrate: unknown;
+  hashprice: unknown;
+  totalRevenue: unknown;
+};
+
+/**
+ * One point per day. Same-day rows from more than one subaccount combine:
+ * hashrate and revenue are additive, hashprice is a hashrate-weighted
+ * average (same rationale as the hashrate chart's efficiency/uptime).
+ */
+function hashpricePoints(snapshots: SnapshotRow[]): HashpricePoint[] {
+  const byDate = new Map<number, SnapshotRow[]>();
+  for (const snap of snapshots) {
+    const t = snap.date.getTime();
+    const existing = byDate.get(t);
+    if (existing) existing.push(snap);
+    else byDate.set(t, [snap]);
+  }
+
+  return Array.from(byDate.entries())
+    .sort(([a], [b]) => a - b)
+    .map(([t, rows]) => {
+      const hashrate = rows.reduce(
+        (sum, r) => sum + (r.hashrate != null ? Number(r.hashrate) : 0),
+        0,
+      );
+      const revenue = rows.reduce((sum, r) => sum + Number(r.totalRevenue), 0);
+      const hashprice = weightedAverage(
+        rows.map((r) => ({
+          value: r.hashprice !== null ? Number(r.hashprice) : null,
+          weight: r.hashrate != null ? Number(r.hashrate) : 0,
+        })),
+      );
+      return {
+        date: new Date(t).toISOString().split("T")[0],
+        timestamp: t,
+        hashprice,
+        revenue,
+        hashrate,
+      };
+    })
+    .filter((point): point is HashpricePoint => point.hashprice !== null);
+}
+
+function hashpriceResponse(hashpriceData: HashpricePoint[]) {
+  const values = hashpriceData.map((d) => d.hashprice);
+  return {
+    success: true,
+    data: hashpriceData,
+    statistics: {
+      current: values.length > 0 ? values[values.length - 1] : 0,
+      high: values.length > 0 ? Math.max(...values) : 0,
+      low: values.length > 0 ? Math.min(...values) : 0,
+      daysReturned: hashpriceData.length,
+      currency: "BTC",
+      unit: "BTC/PH/s/Day",
+    },
+    timestamp: new Date().toISOString(),
+  };
 }
 
 /**
@@ -38,8 +113,9 @@ export async function GET(request: NextRequest) {
 
     // Verify token and extract user ID
     let userId: string;
+    let decoded;
     try {
-      const decoded = await verifyJwtToken(token);
+      decoded = await verifyJwtToken(token);
       userId = decoded.userId;
     } catch (error) {
       console.error(
@@ -59,6 +135,37 @@ export async function GET(request: NextRequest) {
         { status: 400 },
       );
     }
+
+    const { startDate, endDate } = historyWindow(days);
+
+    // Simulated accounts own no miners: they see the hashprice Luxor
+    // reported for the subaccount(s) their mirrored miner sits in, with that
+    // one miner's own hashrate and revenue - never the subaccount's totals.
+    const sim = await simRoute(decoded, async (ctx) => {
+      const [snapshots, simDays] = await Promise.all([
+        prisma.poolSubaccountDailySnapshot.findMany({
+          where: {
+            poolSubaccountId: {
+              in: ctx.ownerSubaccounts.map((s) => s.poolSubaccountId),
+            },
+            date: { gte: startDate, lte: endDate },
+          },
+          orderBy: { date: "asc" },
+        }),
+        loadSimDays(ctx),
+      ]);
+      const simDayByDate = new Map(simDays.map((d) => [d.date, d]));
+      const data = hashpricePoints(snapshots).map((point) => {
+        const own = simDayByDate.get(point.date);
+        return {
+          ...point,
+          revenue: own?.btc ?? 0,
+          hashrate: own?.hashrate ?? 0,
+        };
+      });
+      return NextResponse.json(hashpriceResponse(data), { status: 200 });
+    });
+    if (sim) return sim;
 
     console.log(
       `[Hashprice History API] Fetching ${days} days of hashprice data for user ${userId}`,
@@ -155,12 +262,6 @@ export async function GET(request: NextRequest) {
     }
 
     // Step 5: Pull daily snapshots for the requested window from our own DB
-    const endDate = new Date();
-    endDate.setUTCDate(endDate.getUTCDate() - 1);
-    endDate.setUTCHours(0, 0, 0, 0);
-    const startDate = new Date(endDate);
-    startDate.setUTCDate(startDate.getUTCDate() - (days - 1));
-
     const snapshots = await prisma.poolSubaccountDailySnapshot.findMany({
       where: {
         poolSubaccountId: { in: poolSubaccounts.map((s) => s.id) },
@@ -169,78 +270,15 @@ export async function GET(request: NextRequest) {
       orderBy: { date: "asc" },
     });
 
-    // Combine same-day rows from more than one subaccount: hashrate and
-    // revenue are additive, hashprice is a hashrate-weighted average (same
-    // rationale as the hashrate chart's efficiency/uptime combining).
-    const byDate = new Map<number, typeof snapshots>();
-    for (const snap of snapshots) {
-      const t = snap.date.getTime();
-      const existing = byDate.get(t);
-      if (existing) existing.push(snap);
-      else byDate.set(t, [snap]);
-    }
-
-    const hashpriceData: HashpricePoint[] = Array.from(byDate.entries())
-      .sort(([a], [b]) => a - b)
-      .map(([t, rows]) => {
-        const hashrate = rows.reduce(
-          (sum, r) => sum + (r.hashrate != null ? Number(r.hashrate) : 0),
-          0,
-        );
-        const revenue = rows.reduce(
-          (sum, r) => sum + Number(r.totalRevenue),
-          0,
-        );
-        const hashprice = weightedAverage(
-          rows.map((r) => ({
-            value: r.hashprice !== null ? Number(r.hashprice) : null,
-            weight: r.hashrate != null ? Number(r.hashrate) : 0,
-          })),
-        );
-        return {
-          date: new Date(t).toISOString().split("T")[0],
-          timestamp: t,
-          hashprice,
-          revenue,
-          hashrate,
-        };
-      })
-      .filter((point): point is HashpricePoint => point.hashprice !== null);
+    const hashpriceData = hashpricePoints(snapshots);
 
     console.log(
       `[Hashprice History API] Found ${hashpriceData.length} snapshot day(s) for subaccount(s) [${selectedAuthKeys.join(", ")}]`,
     );
 
-    // Calculate statistics
-    const current =
-      hashpriceData.length > 0
-        ? hashpriceData[hashpriceData.length - 1].hashprice
-        : 0;
-    const high =
-      hashpriceData.length > 0
-        ? Math.max(...hashpriceData.map((d) => d.hashprice))
-        : 0;
-    const low =
-      hashpriceData.length > 0
-        ? Math.min(...hashpriceData.map((d) => d.hashprice))
-        : 0;
-
-    return NextResponse.json(
-      {
-        success: true,
-        data: hashpriceData,
-        statistics: {
-          current,
-          high,
-          low,
-          daysReturned: hashpriceData.length,
-          currency: "BTC",
-          unit: "BTC/PH/s/Day",
-        },
-        timestamp: new Date().toISOString(),
-      },
-      { status: 200 },
-    );
+    return NextResponse.json(hashpriceResponse(hashpriceData), {
+      status: 200,
+    });
   } catch (error) {
     console.error("[Hashprice History API] Error:", error);
     return NextResponse.json(
