@@ -8,6 +8,9 @@ import {
 } from "@/lib/simulation/context";
 import { simChargeDay } from "@/lib/simulation/ledger";
 import { chargeSimDay } from "@/lib/simulation/ledgerStore";
+import { sendCronSuccessEmailToDeveloper } from "@/lib/email";
+
+const CRON_NAME = "cron_simulated_daily_cost";
 
 /**
  * GET /api/cron_simulated_daily_cost
@@ -34,13 +37,18 @@ export async function GET(request: NextRequest) {
       console.log(
         `[Simulated Daily Cost] Nothing charged: miner status ${demoMiner.status}, daily cost ${amountUsd}`,
       );
+      const reason =
+        demoMiner.status !== "AUTO"
+          ? `Simulated miner is ${demoMiner.status}`
+          : "No simulated rate set";
+      const email = await sendCronSuccessEmailToDeveloper(CRON_NAME, [
+        `Nothing charged: ${reason}.`,
+      ]);
       return NextResponse.json({
         success: true,
         charged: 0,
-        reason:
-          demoMiner.status !== "AUTO"
-            ? `Simulated miner is ${demoMiner.status}`
-            : "No simulated rate set",
+        reason,
+        emailSent: email.success,
       });
     }
 
@@ -69,7 +77,21 @@ export async function GET(request: NextRequest) {
     console.log(
       `[Simulated Daily Cost] Charged ${charged}/${users.length} accounts $${amountUsd} each`,
     );
-    return NextResponse.json({ success: true, charged, amountUsd, results });
+    const email = await sendCronSuccessEmailToDeveloper(CRON_NAME, [
+      `Charged ${charged} of ${users.length} active simulated account(s) $${amountUsd.toFixed(2)} each (${consumptionKwh.toFixed(2)} kWh at ${ratePerKwh} USD/kWh) for ${results[0]?.day ?? "no day"}.`,
+      ...(results.length > charged
+        ? [
+            `${results.length - charged} account(s) were already charged for that day.`,
+          ]
+        : []),
+    ]);
+    return NextResponse.json({
+      success: true,
+      charged,
+      amountUsd,
+      results,
+      emailSent: email.success,
+    });
   } catch (error) {
     if (error instanceof SimNotConfiguredError) {
       console.error(`[Simulated Daily Cost] ${error.message}`);

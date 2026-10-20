@@ -1019,6 +1019,41 @@ export const sendCronRunSuccessfulEmail = async (userCount: number) => {
   }
 };
 
+/** Where the success emails of the smaller crons go. */
+const CRON_DEVELOPER_EMAIL = "webdeveloper.sas@gmail.com";
+
+/**
+ * "Cron run: <name>" success email to the developer, with one line per
+ * fact the cron reports (e.g. rows written).
+ */
+export const sendCronSuccessEmailToDeveloper = async (
+  cronName: string,
+  lines: string[],
+) => {
+  const mailOptions = {
+    from:
+      `BitFactory Admin <${process.env.SMTP_FROM}>` || "noreply@bitfactory.com",
+    to: CRON_DEVELOPER_EMAIL,
+    subject: `Cron run: ${cronName} - BitFactory`,
+    html: `
+      <h1>${cronName}</h1>
+      <p>Ran successfully at ${new Date().toISOString()}.</p>
+      ${lines.map((line) => `<p>${line}</p>`).join("")}
+      <br>
+      <p>Best regards,</p>
+      <p>The BitFactory Team</p>
+    `,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    return { success: true };
+  } catch (error) {
+    console.error(`Error sending ${cronName} success email:`, error);
+    return { success: false, error };
+  }
+};
+
 interface PoolCronDaySummary {
   date: string;
   results: Array<{

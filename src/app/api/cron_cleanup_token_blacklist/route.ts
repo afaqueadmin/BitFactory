@@ -16,6 +16,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { sendCronSuccessEmailToDeveloper } from "@/lib/email";
 
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get("authorization");
@@ -30,7 +31,16 @@ export async function GET(request: NextRequest) {
 
     console.log(`[Cron] Purged ${count} expired token_blacklist row(s)`);
 
-    return NextResponse.json({ success: true, deleted: count });
+    const email = await sendCronSuccessEmailToDeveloper(
+      "cron_cleanup_token_blacklist",
+      [`Purged ${count} expired token_blacklist row(s).`],
+    );
+
+    return NextResponse.json({
+      success: true,
+      deleted: count,
+      emailSent: email.success,
+    });
   } catch (error) {
     console.error("[Cron] Failed to purge token_blacklist:", error);
     return NextResponse.json(
