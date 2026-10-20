@@ -12,12 +12,16 @@ function setPasskeyOfferFlag() {
 
 // Pages a signed-out visitor is meant to be on, so a failed auth check there
 // must not bounce them to /login (C-1: the emailed reset link lands on
-// /reset-password without a session). Keep in step with publicPaths in
-// src/proxy.ts.
+// /reset-password without a session; the headless PDF renderer loads
+// /wallet-snapshot/* with only a wallet snapshot ticket). Keep in step with
+// publicPaths in src/proxy.ts.
 function shouldRedirectToLogin(): boolean {
   const path = window.location.pathname;
   return (
-    path !== "/" && !path.startsWith("/login") && path !== "/reset-password"
+    path !== "/" &&
+    !path.startsWith("/login") &&
+    path !== "/reset-password" &&
+    !path.startsWith("/wallet-snapshot/")
   );
 }
 

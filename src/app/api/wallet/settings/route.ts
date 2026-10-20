@@ -9,7 +9,7 @@ import {
   selectRequestedSubaccounts,
 } from "@/lib/luxorSubaccounts";
 import { simRoute } from "@/lib/simulation/context";
-import { resolveWalletTarget } from "@/lib/walletTarget";
+import { authenticateWalletRequest } from "@/lib/walletTarget";
 import { loadSimPoolLedger } from "@/lib/simulation/data";
 import { simWalletSettings } from "@/lib/simulation/views";
 
@@ -58,74 +58,32 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       `[Wallet API] GET /wallet/settings?currency=${currency}${customerId ? `&customerId=${customerId}` : ""}`,
     );
 
-    // 2. Verify authentication
-    const token = request.cookies.get("token")?.value;
-    if (!token) {
-      console.warn("[Wallet API] No token provided");
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Unauthorized",
-          code: "UNAUTHORIZED",
-          timestamp: new Date().toISOString(),
-        } as WalletErrorResponse,
-        {
-          status: 401,
-          headers: {
-            "Cache-Control": "no-store, no-cache, must-revalidate",
-          },
-        },
-      );
-    }
-
-    let userId: string;
-    let userRole: string;
-    let decoded;
-    try {
-      decoded = await verifyJwtToken(token);
-      userId = decoded.userId;
-      userRole = decoded.role;
-    } catch (error) {
-      console.error("[Wallet API] Token verification failed:", error);
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Invalid token",
-          code: "UNAUTHORIZED",
-          timestamp: new Date().toISOString(),
-        } as WalletErrorResponse,
-        {
-          status: 401,
-          headers: {
-            "Cache-Control": "no-store, no-cache, must-revalidate",
-          },
-        },
-      );
-    }
-
-    // 2.4. Resolve whose settings to load: the caller, or ?customerId= for an
-    // admin (any user) or a franchisee (their own customers).
-    const target = await resolveWalletTarget(decoded, customerId);
+    // 2. Authenticate (signed-in session, or the PDF renderer's wallet
+    // snapshot ticket) and resolve whose settings to load: the caller, or
+    // ?customerId= for an admin (any user) or a franchisee (their own
+    // customers).
+    const target = await authenticateWalletRequest(request);
     if (target instanceof NextResponse) {
+      const status = target.status;
       console.warn(
-        `[Wallet API] ${userRole} ${userId} denied access to customerId ${customerId}`,
+        `[Wallet API] Wallet settings request refused (${status})${customerId ? ` for customerId ${customerId}` : ""}`,
       );
       return NextResponse.json(
         {
           success: false,
-          error: "Forbidden",
-          code: "FORBIDDEN",
+          error: status === 401 ? "Unauthorized" : "Forbidden",
+          code: status === 401 ? "UNAUTHORIZED" : "FORBIDDEN",
           timestamp: new Date().toISOString(),
         } as WalletErrorResponse,
         {
-          status: 403,
+          status,
           headers: {
             "Cache-Control": "no-store, no-cache, must-revalidate",
           },
         },
       );
     }
-    userId = target.userId;
+    const userId = target.userId;
 
     // 2.5. Simulated accounts: monthly payouts, no wallet address configured.
     const sim = await simRoute(target, async (ctx) => {

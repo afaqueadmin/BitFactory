@@ -121,6 +121,7 @@ model User {
   accountingBanksCreated                  AccountingBank[]                @relation("accountingBanksCreated")
   simulatedCostPayments                   SimulatedCostPayment[]          @relation("simulatedCostPayments")
   simulatedCostPaymentsCreated            SimulatedCostPayment[]          @relation("simulatedCostPaymentsCreated")
+  walletPaymentEmails                     WalletPaymentEmail[]
   simulationSettingsUpdated               SimulationSettings[]            @relation("simulationSettingsUpdated")
 
   @@index([isDeleted])
@@ -907,6 +908,36 @@ model SimulatedCostPayment {
   @@index([userId])
   @@index([createdAt])
   @@map("simulated_cost_payments")
+}
+
+// One "you've been paid" wallet snapshot email per customer per payout day,
+// written by cron_wallet_payment_email. Several subaccounts paid on the same
+// day share one row (and one email); FAILED rows are retried until
+// attempts reaches the cron's limit.
+model WalletPaymentEmail {
+  id         String    @id @default(cuid())
+  userId     String
+  /// The UTC day of the payout.
+  payoutDate DateTime  @db.Date
+  /// "luxor" | "simulated"
+  source     String
+  /// Sum of the day's Payment debits, BTC.
+  payoutBtc  Decimal   @db.Decimal(20, 8)
+  /// "SENT" | "FAILED"
+  status     String
+  attempts   Int       @default(0)
+  lastError  String?
+  sentTo     String?
+  ccEmails   String?
+  sentAt     DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, payoutDate])
+  @@index([payoutDate])
+  @@map("wallet_payment_emails")
 }
 
 model CostPayment {

@@ -33,6 +33,10 @@
       "schedule": "0 5 * * *"
     },
     {
+      "path": "/api/cron_wallet_payment_email",
+      "schedule": "30 6-11 * * *"
+    },
+    {
       "path": "/api/cron_cleanup_token_blacklist",
       "schedule": "30 3 * * *"
     }

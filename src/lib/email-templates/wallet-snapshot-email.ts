@@ -45,9 +45,62 @@ export function defaultWalletSnapshotBody(
   return [
     `Dear ${customerName},`,
     `Please find attached a snapshot of your ${wallet} as of ${formatSnapshotDate(date)}. It includes your total earnings, 24-hour revenue, pending payouts, payout settings and profit & loss overview.`,
-    "You can view your live wallet any time at https://bitfactory.ae/wallet.",
+    "You can view your live wallet any time at https://my.bitfactory.ae/wallet.",
     "Best regards,\nBitFactory Team",
   ].join("\n\n");
+}
+
+// Payout days are UTC calendar days (pool_transactions are dated 00:00 UTC),
+// so they're formatted in UTC rather than converted to local time.
+const formatPayoutDate = (date: Date): string =>
+  date.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    timeZone: "UTC",
+  });
+
+const formatBtc = (btc: number): string => `₿${btc.toFixed(8)}`;
+
+export interface PayoutEmailDetails {
+  customerName: string;
+  /** The UTC day of the payout. */
+  payoutDate: Date;
+  totalBtc: number;
+  /** One entry per subaccount paid that day. */
+  subaccounts: { name: string; btc: number }[];
+  isSimulated: boolean;
+}
+
+/** Subject of the automatic "you've been paid" wallet snapshot email. */
+export function payoutEmailSubject(details: PayoutEmailDetails): string {
+  const kind = details.isSimulated ? "simulated payout" : "payout";
+  return `Your BitFactory ${kind} of ${formatBtc(details.totalBtc)} - ${formatPayoutDate(details.payoutDate)}`;
+}
+
+/** Plain-text body (renderWalletSnapshotEmailHTML format) of that email. */
+export function payoutEmailBody(details: PayoutEmailDetails): string {
+  const kind = details.isSimulated ? "simulated payout" : "payout";
+  const wallet = details.isSimulated
+    ? "simulated BitFactory wallet"
+    : "BitFactory wallet";
+  const paragraphs = [
+    `Dear ${details.customerName},`,
+    `Your ${kind} of ${formatBtc(details.totalBtc)} was sent to your wallet on ${formatPayoutDate(details.payoutDate)}.`,
+  ];
+  if (details.subaccounts.length > 1) {
+    paragraphs.push(
+      details.subaccounts
+        .map((s) => `${s.name}: ${formatBtc(s.btc)}`)
+        .join("\n"),
+    );
+  }
+  paragraphs.push(
+    `Attached is a snapshot of your ${wallet} as of today, including your total earnings, 24-hour revenue, pending payouts, payout settings and profit & loss overview.`,
+    "You can view your live wallet any time at https://my.bitfactory.ae/wallet.",
+    "Best regards,\nBitFactory Team",
+  );
+  return paragraphs.join("\n\n");
 }
 
 export function renderWalletSnapshotEmailHTML(body: string): string {

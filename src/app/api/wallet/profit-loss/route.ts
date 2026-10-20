@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyJwtToken } from "@/lib/jwt";
 import { prisma } from "@/lib/prisma";
 import { simRoute } from "@/lib/simulation/context";
 import { loadSimInvoice } from "@/lib/simulation/invoice";
 import { ledgerElectricityTotal } from "@/lib/simulation/ledger";
 import { loadSimLedger } from "@/lib/simulation/ledgerStore";
-import { resolveWalletTarget } from "@/lib/walletTarget";
+import { authenticateWalletRequest } from "@/lib/walletTarget";
 
 export const dynamic = "force-dynamic";
 
@@ -19,22 +18,8 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(request: NextRequest) {
   try {
-    const token = request.cookies.get("token")?.value;
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    let decoded;
-    try {
-      decoded = await verifyJwtToken(token);
-    } catch {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const target = await resolveWalletTarget(
-      decoded,
-      request.nextUrl.searchParams.get("customerId"),
-    );
+    // Signed-in session, or the PDF renderer's wallet snapshot ticket.
+    const target = await authenticateWalletRequest(request);
     if (target instanceof NextResponse) return target;
 
     // Simulated accounts: electricity is the simulated daily charges so far;

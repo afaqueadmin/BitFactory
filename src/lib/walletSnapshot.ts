@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { verifyJwtToken } from "@/lib/jwt";
-import { generatePDFFromUrl } from "@/lib/email";
+import { signWalletSnapshotTicket, verifyJwtToken } from "@/lib/jwt";
+import { generatePDFFromUrl, type PdfBrowser } from "@/lib/email";
+import { appBaseUrl } from "@/lib/auth/passwordReset";
+import { WALLET_SNAPSHOT_TICKET_COOKIE } from "@/lib/walletTarget";
 
 /**
- * Server side of the admin "Email wallet snapshot" feature: the PDF is the
- * customer's wallet overview rendered by /wallet-snapshot/[customerId] (the
- * same component as their /wallet page) and printed by Puppeteer.
+ * Server side of the wallet snapshot emails (the admin's manual send and
+ * cron_wallet_payment_email): the PDF is the customer's wallet overview
+ * rendered by /wallet-snapshot/[customerId] (the same component as their
+ * /wallet page) and printed by Puppeteer.
  */
 
 // Layout width of the /wallet-snapshot page, in CSS px.
@@ -52,17 +55,35 @@ export async function loadSnapshotCustomer(customerId: string) {
   return customer;
 }
 
-/** Renders the customer's wallet overview to a PDF as the requesting admin. */
+/**
+ * Where the headless browser loads the snapshot page from. Never built from
+ * the request's Host header: the browser carries a ticket for the
+ * customer's data, and a forged Host would hand it to someone else's site.
+ */
+function snapshotBaseUrl(): string {
+  if (process.env.NODE_ENV !== "production") {
+    return `http://localhost:${process.env.PORT || 3000}`;
+  }
+  return appBaseUrl();
+}
+
+/**
+ * Renders the customer's wallet overview to a PDF. No one signs in: the
+ * headless browser gets a 5-minute wallet snapshot ticket that can only
+ * read this customer's wallet overview. Pass `browser` to reuse one browser
+ * across several PDFs (the cron does).
+ */
 export async function renderWalletSnapshotPdf(
-  request: NextRequest,
   customerId: string,
+  browser?: PdfBrowser,
 ): Promise<Buffer> {
-  const token = request.cookies.get("token")?.value ?? "";
-  const url = `${request.nextUrl.origin}/wallet-snapshot/${encodeURIComponent(customerId)}`;
+  const ticket = await signWalletSnapshotTicket(customerId);
+  const url = `${snapshotBaseUrl()}/wallet-snapshot/${encodeURIComponent(customerId)}`;
   return generatePDFFromUrl(
     url,
-    [{ name: "token", value: token }],
+    [{ name: WALLET_SNAPSHOT_TICKET_COOKIE, value: ticket }],
     SNAPSHOT_WIDTH,
+    browser,
   );
 }
 

@@ -31,12 +31,16 @@ const WEBAUTHN_REG_TOKEN_TYPE = "webauthn_reg";
 const WEBAUTHN_AUTH_TOKEN_TYPE = "webauthn_auth";
 //   pwd_reset: the emailed forgotten-password link for one user (C-1)
 const PASSWORD_RESET_TOKEN_TYPE = "pwd_reset";
+//   wallet_snapshot: lets the headless PDF renderer read one customer's
+//   wallet overview (src/lib/walletSnapshot.ts) - not a login at all
+const WALLET_SNAPSHOT_TOKEN_TYPE = "wallet_snapshot";
 const NON_SESSION_TYPES = new Set([
   ENROLLMENT_TOKEN_TYPE,
   PENDING_2FA_TOKEN_TYPE,
   WEBAUTHN_REG_TOKEN_TYPE,
   WEBAUTHN_AUTH_TOKEN_TYPE,
   PASSWORD_RESET_TOKEN_TYPE,
+  WALLET_SNAPSHOT_TOKEN_TYPE,
 ]);
 
 // Read lazily (not at import time) so builds and public pages still load when
@@ -286,6 +290,35 @@ export async function verifyPasswordResetToken(token: string): Promise<{
     pwd: payload.pwd,
     exp: payload.exp,
   };
+}
+
+/**
+ * 5-minute read-only ticket for one customer's wallet snapshot. Server-side
+ * only: minted for the headless browser that prints the snapshot PDF and
+ * honoured solely by the wallet overview routes (authenticateWalletRequest),
+ * for that customer. Never a session - verifyJwtToken refuses it.
+ */
+export function signWalletSnapshotTicket(customerId: string) {
+  return signJwtToken(
+    {
+      userId: customerId,
+      loginId: "",
+      role: "",
+      type: WALLET_SNAPSHOT_TOKEN_TYPE,
+    },
+    "5m",
+  );
+}
+
+/** The customer id a wallet snapshot ticket is for. */
+export async function verifyWalletSnapshotTicket(
+  token: string,
+): Promise<string> {
+  const payload = await decodeJwt(token);
+  if (payload.type !== WALLET_SNAPSHOT_TOKEN_TYPE || !payload.userId) {
+    throw new Error("Not a wallet snapshot ticket");
+  }
+  return payload.userId;
 }
 
 async function verifyLoginStepToken(

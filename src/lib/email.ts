@@ -1416,7 +1416,7 @@ export const sendInvoiceEmailWithPDF = async (
  * Generate PDF from HTML content
  * Uses Puppeteer for server-side rendering
  */
-const launchPdfBrowser = async () => {
+export const launchPdfBrowser = async () => {
   // 🔑 Required for PDFs (typings are wrong, runtime is correct)
   // await (chromium as unknown as { fonts: () => Promise<void> }).fonts();
   if (process.env.NODE_ENV === "production") {
@@ -1441,21 +1441,30 @@ const launchPdfBrowser = async () => {
   });
 };
 
+export type PdfBrowser = Awaited<ReturnType<typeof launchPdfBrowser>>;
+
 /**
  * Print one of our own app pages to an A4 PDF. The page is loaded with the
- * given cookies (the requesting admin's session) and must set
- * body[data-snapshot-ready="true"] once it has finished loading.
- * `contentWidth` is the page's layout width in CSS px; the PDF is scaled so
- * it fits the A4 width.
+ * given cookies and must set body[data-snapshot-ready="true"] once it has
+ * finished loading. `contentWidth` is the page's layout width in CSS px; the
+ * PDF is scaled so it fits the A4 width.
+ *
+ * Pass `browser` to reuse one browser across several PDFs (the caller closes
+ * it); each PDF still gets its own isolated context, so cookies never carry
+ * over from one page to the next.
  */
 export const generatePDFFromUrl = async (
   url: string,
   cookies: { name: string; value: string }[],
   contentWidth: number,
+  browser?: PdfBrowser,
 ): Promise<Buffer> => {
-  const browser = await launchPdfBrowser();
+  const ownBrowser = browser ? null : await launchPdfBrowser();
+  let context: Awaited<ReturnType<PdfBrowser["createBrowserContext"]>> | null =
+    null;
   try {
-    const page = await browser.newPage();
+    context = await (browser ?? ownBrowser!).createBrowserContext();
+    const page = await context.newPage();
     await page.setViewport({ width: contentWidth, height: 900 });
     await page.setCookie(...cookies.map((c) => ({ ...c, url })));
     await page.goto(url, { waitUntil: "networkidle0", timeout: 60_000 });
@@ -1475,7 +1484,8 @@ export const generatePDFFromUrl = async (
     });
     return Buffer.from(pdfBuffer);
   } finally {
-    await browser.close();
+    await context?.close().catch(() => {});
+    await ownBrowser?.close();
   }
 };
 

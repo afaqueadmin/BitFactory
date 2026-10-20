@@ -37,6 +37,11 @@ const publicPaths = new Set([
   "/favicon.svg",
 ]);
 
+// /wallet-snapshot/<customerId>: printed to PDF without a session (see the
+// public-path check in proxy()). Keep in step with auth-context.tsx.
+const isWalletSnapshotPath = (pathname: string) =>
+  singleSegmentPattern("/wallet-snapshot").test(pathname);
+
 // CLIENT paths, extracted so FRANCHISEE (who can also act as a client for
 // their own personal mining operation, in addition to managing their
 // onboarded customers) can reuse the exact same set below.
@@ -135,8 +140,6 @@ const dynamicPatternsPaths = {
         /^\/franchisees\/[^/]+\/incentives$/.test(pathname),
     },
     prefixPattern("/tickets"),
-    // Bare wallet render printed to the emailed PDF snapshot.
-    singleSegmentPattern("/wallet-snapshot"),
   ],
   FRANCHISEE: [...clientDynamicPatterns, prefixPattern("/franchise/support")],
   SIMULATED: clientDynamicPatterns,
@@ -177,8 +180,14 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // ✅ Allow public assets, icons, and login page
-  if (publicPaths.has(pathname) || pathname.startsWith("/icons/")) {
+  // ✅ Allow public assets, icons, and login page. /wallet-snapshot/* is the
+  // bare shell the PDF renderer prints: it holds no data itself, and the
+  // wallet APIs it calls require a session or a wallet snapshot ticket.
+  if (
+    publicPaths.has(pathname) ||
+    pathname.startsWith("/icons/") ||
+    isWalletSnapshotPath(pathname)
+  ) {
     // Prevent logged-in users from visiting /login again
     if (pathname === "/login") {
       const token = request.cookies.get("token")?.value;

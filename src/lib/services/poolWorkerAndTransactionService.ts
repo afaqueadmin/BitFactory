@@ -197,6 +197,122 @@ interface LuxorTransactionsResponse {
 
 const CREDIT_CATEGORIES = new Set(["Miner Revenue", "LuxOS Rebate"]);
 
+/** The Luxor subaccounts the transaction ledger is synced for. */
+export function findLuxorSubaccountsForSync() {
+  return prisma.poolSubaccount.findMany({
+    where: {
+      pool: { name: "Luxor" },
+      poolAuthId: { not: null },
+      subaccountName: { notIn: [...EXCLUDED_SUBACCOUNTS] },
+    },
+    include: { poolAuth: true },
+  });
+}
+
+type SyncSubaccount = Awaited<
+  ReturnType<typeof findLuxorSubaccountsForSync>
+>[number];
+
+/**
+ * Fetches one Luxor subaccount's transactions over [startDate, endDate]
+ * (inclusive, YYYY-MM-DD strings) and inserts any not already stored.
+ * Shared by the nightly ledger sync below and cron_wallet_payment_email's
+ * fallback for subaccounts that sync missed.
+ */
+export async function syncSubaccountTransactions(
+  sub: SyncSubaccount,
+  startDate: string,
+  endDate: string,
+): Promise<RangeResult> {
+  if (!sub.poolAuth) {
+    return {
+      subaccountName: sub.subaccountName,
+      status: "error",
+      fetched: 0,
+      written: 0,
+      error: "No pool auth",
+    };
+  }
+  try {
+    const client = createLuxorClient(sub.poolAuth.authKey);
+    let pageNumber = 1;
+    let hasMore = true;
+    const records: Array<{
+      poolId: string;
+      poolSubaccountId: string;
+      externalTransactionId: string | null;
+      transactionType: string;
+      category: string;
+      amount: number;
+      usdEquivalent: number;
+      addressName: string | null;
+      occurredAt: Date;
+    }> = [];
+
+    while (hasMore) {
+      const page = (await withRetry(
+        () =>
+          client.getTransactions("BTC", {
+            subaccount_names: sub.poolAuth!.authKey,
+            start_date: startDate,
+            end_date: endDate,
+            page_number: pageNumber,
+            page_size: 250,
+          }),
+        `${sub.subaccountName} transactions p${pageNumber}`,
+      )) as unknown as LuxorTransactionsResponse;
+
+      for (const tx of page.transactions || []) {
+        records.push({
+          poolId: sub.poolId,
+          poolSubaccountId: sub.id,
+          externalTransactionId: tx.transaction_id || null,
+          transactionType: CREDIT_CATEGORIES.has(tx.transaction_category)
+            ? "credit"
+            : tx.transaction_type,
+          category: tx.transaction_category,
+          amount: tx.currency_amount,
+          usdEquivalent: tx.usd_equivalent,
+          addressName: tx.address_name || null,
+          occurredAt: new Date(tx.date_time),
+        });
+      }
+
+      hasMore = page.pagination?.next_page_url != null;
+      pageNumber++;
+      if (pageNumber > 20) break;
+    }
+
+    let written = 0;
+    if (records.length) {
+      const result = await prisma.poolTransaction.createMany({
+        data: records,
+        skipDuplicates: true,
+      });
+      written = result.count;
+    }
+
+    return {
+      subaccountName: sub.subaccountName,
+      status: "written",
+      fetched: records.length,
+      written,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    console.error(
+      `[Transactions] ${sub.subaccountName} ${startDate}->${endDate}: ${message}`,
+    );
+    return {
+      subaccountName: sub.subaccountName,
+      status: "error",
+      fetched: 0,
+      written: 0,
+      error: message,
+    };
+  }
+}
+
 /**
  * Upserts the Luxor transaction ledger for every Luxor subaccount over
  * [startDate, endDate] (inclusive, YYYY-MM-DD strings).
@@ -205,14 +321,7 @@ export async function upsertTransactionsForRange(
   startDate: string,
   endDate: string,
 ): Promise<RangeResult[]> {
-  const subaccounts = await prisma.poolSubaccount.findMany({
-    where: {
-      pool: { name: "Luxor" },
-      poolAuthId: { not: null },
-      subaccountName: { notIn: [...EXCLUDED_SUBACCOUNTS] },
-    },
-    include: { poolAuth: true },
-  });
+  const subaccounts = await findLuxorSubaccountsForSync();
 
   const results: RangeResult[] = [];
 
@@ -221,84 +330,7 @@ export async function upsertTransactionsForRange(
 
     if (index > 0) await sleep(SUBACCOUNT_SPACING_MS);
 
-    try {
-      const client = createLuxorClient(sub.poolAuth.authKey);
-      let pageNumber = 1;
-      let hasMore = true;
-      const records: Array<{
-        poolId: string;
-        poolSubaccountId: string;
-        externalTransactionId: string | null;
-        transactionType: string;
-        category: string;
-        amount: number;
-        usdEquivalent: number;
-        addressName: string | null;
-        occurredAt: Date;
-      }> = [];
-
-      while (hasMore) {
-        const page = (await withRetry(
-          () =>
-            client.getTransactions("BTC", {
-              subaccount_names: sub.poolAuth!.authKey,
-              start_date: startDate,
-              end_date: endDate,
-              page_number: pageNumber,
-              page_size: 250,
-            }),
-          `${sub.subaccountName} transactions p${pageNumber}`,
-        )) as unknown as LuxorTransactionsResponse;
-
-        for (const tx of page.transactions || []) {
-          records.push({
-            poolId: sub.poolId,
-            poolSubaccountId: sub.id,
-            externalTransactionId: tx.transaction_id || null,
-            transactionType: CREDIT_CATEGORIES.has(tx.transaction_category)
-              ? "credit"
-              : tx.transaction_type,
-            category: tx.transaction_category,
-            amount: tx.currency_amount,
-            usdEquivalent: tx.usd_equivalent,
-            addressName: tx.address_name || null,
-            occurredAt: new Date(tx.date_time),
-          });
-        }
-
-        hasMore = page.pagination?.next_page_url != null;
-        pageNumber++;
-        if (pageNumber > 20) break;
-      }
-
-      let written = 0;
-      if (records.length) {
-        const result = await prisma.poolTransaction.createMany({
-          data: records,
-          skipDuplicates: true,
-        });
-        written = result.count;
-      }
-
-      results.push({
-        subaccountName: sub.subaccountName,
-        status: "written",
-        fetched: records.length,
-        written,
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown error";
-      console.error(
-        `[Transactions] ${sub.subaccountName} ${startDate}->${endDate}: ${message}`,
-      );
-      results.push({
-        subaccountName: sub.subaccountName,
-        status: "error",
-        fetched: 0,
-        written: 0,
-        error: message,
-      });
-    }
+    results.push(await syncSubaccountTransactions(sub, startDate, endDate));
   }
 
   return results;

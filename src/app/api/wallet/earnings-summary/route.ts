@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyJwtToken } from "@/lib/jwt";
 import { createLuxorClient } from "@/lib/luxor";
 import { createBraiinsClient } from "@/lib/braiins";
 import { prisma } from "@/lib/prisma";
@@ -9,7 +8,7 @@ import {
 } from "@/lib/luxorSubaccounts";
 import { simRoute } from "@/lib/simulation/context";
 import { loadSimPoolLedger } from "@/lib/simulation/data";
-import { resolveWalletTarget } from "@/lib/walletTarget";
+import { authenticateWalletRequest } from "@/lib/walletTarget";
 
 /**
  * GET /api/wallet/earnings-summary
@@ -29,29 +28,10 @@ import { resolveWalletTarget } from "@/lib/walletTarget";
  */
 export async function GET(request: NextRequest) {
   try {
-    // Verify authentication via JWT token in cookies
-    const token = request.cookies.get("token")?.value;
-    if (!token) {
-      console.log(
-        "[Earnings Summary API] Unauthorized access attempt - no token",
-      );
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    let decoded;
-    try {
-      decoded = await verifyJwtToken(token);
-    } catch (error) {
-      console.log("[Earnings Summary API] Invalid token:", error);
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const url = new URL(request.url);
-    const target = await resolveWalletTarget(
-      decoded,
-      url.searchParams.get("customerId"),
-    );
+    // Signed-in session, or the PDF renderer's wallet snapshot ticket.
+    const target = await authenticateWalletRequest(request);
     if (target instanceof NextResponse) return target;
+    const url = new URL(request.url);
     const userId = target.userId;
 
     // Simulated accounts: earned since registration; pending since the last
