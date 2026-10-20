@@ -55,7 +55,11 @@ import {
   calculateStrategy3Values,
 } from "@/lib/helpers/paybackCalculations";
 import { usePaybackHistory } from "@/hooks/usePaybackHistory";
-import { buildPaybackBaseCase } from "@/lib/helpers/paybackBaseCase";
+import {
+  BASE_CASE_HALVINGS,
+  LIFETIME_BTC_NOTE,
+  buildPaybackBaseCase,
+} from "@/lib/helpers/paybackBaseCase";
 import Segmented, { SegmentedOption } from "@/components/daylight/Segmented";
 import ToggleChip from "@/components/daylight/ToggleChip";
 import { RADIUS_CARD, useDaylight } from "@/lib/daylight";
@@ -603,9 +607,10 @@ export default function PaybackAnalysisPage() {
     : 0;
 
   // Strategy 2 & 3 run over the machine's life, mostly after the 2028
-  // halving, so they highlight the post-halving base-case column: today's
-  // mining cost doubled, plus the past year's average mining advantage from
-  // the Buy vs Mine history. Recomputed from live data on every load.
+  // halving, so they highlight a base-case column per halving: today's
+  // mining cost x2 (2028) or x4 (2032), plus the past year's average mining
+  // advantage from the Buy vs Mine history. Recomputed from live data on
+  // every load.
   const showBaseCase =
     selectedStrategy === "STRATEGY_2" || selectedStrategy === "STRATEGY_3";
   const { historyData: baseCaseHistory } = usePaybackHistory(
@@ -613,37 +618,54 @@ export default function PaybackAnalysisPage() {
     selectedMiner,
     "1Y",
   );
-  const baseCase = useMemo(
+  const baseCases = useMemo(
     () =>
       showBaseCase
-        ? buildPaybackBaseCase(
-            selectedBreakevenPrice,
-            baseCaseHistory,
-            selectedOS,
-          )
-        : null,
+        ? BASE_CASE_HALVINGS.flatMap((halving) => {
+            const baseCase = buildPaybackBaseCase(
+              selectedBreakevenPrice,
+              baseCaseHistory,
+              selectedOS,
+              FIXED_SCENARIO_PRICES,
+              halving.costMultiplier,
+            );
+            return baseCase ? [{ ...halving, ...baseCase }] : [];
+          })
+        : [],
     [showBaseCase, selectedBreakevenPrice, baseCaseHistory, selectedOS],
   );
+  const baseCaseTone = (year: number) =>
+    year === 2028
+      ? { soft: d.skySoft, strong: d.action }
+      : { soft: d.mint, strong: d.success };
   // Column 0 is CURRENT, so scenario i sits at column i + 1.
-  const baseCaseColumn = baseCase ? baseCase.scenarioIndex + 1 : null;
+  const baseCaseByColumn = new Map(
+    baseCases.map((baseCase) => [baseCase.scenarioIndex + 1, baseCase]),
+  );
+  const baseCaseCellSx = (index: number) => {
+    const baseCase = baseCaseByColumn.get(index);
+    if (!baseCase) return {};
+    const tone = baseCaseTone(baseCase.year);
+    return {
+      backgroundColor: tone.soft,
+      borderLeft: `2px solid ${tone.strong}`,
+      borderRight: `2px solid ${tone.strong}`,
+    };
+  };
   const formatWholeUsd = (value: number) =>
     formatValue(value, "currency", {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     });
-  const baseCaseCellSx = {
-    backgroundColor: d.skySoft,
-    borderLeft: `2px solid ${d.action}`,
-    borderRight: `2px solid ${d.action}`,
-  };
 
   const columns = (
     showDepreciationRows
       ? [...BASE_COLUMNS, "BREAKEVEN\n(incl. Depreciation)"]
       : BASE_COLUMNS
-  ).map((column, index) =>
-    index === baseCaseColumn ? `${column}\nBase Case` : column,
-  );
+  ).map((column, index) => {
+    const baseCase = baseCaseByColumn.get(index);
+    return baseCase ? `${column}\n${baseCase.shortLabel}` : column;
+  });
 
   // Index 0 is CURRENT (live BTC price), then one column per scenario price:
   // the fixed steps, the calculated breakeven, and (optionally) the breakeven
@@ -1511,10 +1533,15 @@ export default function PaybackAnalysisPage() {
                           borderLeft: `1px solid ${d.border}`,
                           borderBottomColor: d.border,
                           whiteSpace: "pre-line",
-                          ...(index === baseCaseColumn && baseCaseCellSx),
-                          ...(index === baseCaseColumn && {
-                            color: d.action,
-                            borderTop: `2px solid ${d.action}`,
+                          ...baseCaseCellSx(index),
+                          ...(baseCaseByColumn.has(index) && {
+                            color: baseCaseTone(
+                              baseCaseByColumn.get(index)!.year,
+                            ).strong,
+                            borderTop: `2px solid ${
+                              baseCaseTone(baseCaseByColumn.get(index)!.year)
+                                .strong
+                            }`,
                           }),
                         }}
                         align="right"
@@ -1578,7 +1605,7 @@ export default function PaybackAnalysisPage() {
                             index === DEPRECIATION_BREAKEVEN_COLUMN
                               ? { backgroundColor: d.dangerSoft } // chart's depreciation line
                               : {}),
-                            ...(index === baseCaseColumn && baseCaseCellSx),
+                            ...baseCaseCellSx(index),
                           }}
                         >
                           {value}
@@ -1593,10 +1620,8 @@ export default function PaybackAnalysisPage() {
               <Box
                 sx={{
                   display: "flex",
-                  flexWrap: "wrap",
-                  alignItems: "center",
-                  columnGap: "24px",
-                  rowGap: "6px",
+                  flexDirection: "column",
+                  gap: "6px",
                   px: { xs: "14px", sm: "16px" },
                   py: "10px",
                   borderTop: `1px solid ${d.border}`,
@@ -1606,56 +1631,66 @@ export default function PaybackAnalysisPage() {
                   lineHeight: 1.5,
                 }}
               >
-                {baseCase && (
-                  <Box
-                    sx={{ display: "flex", alignItems: "center", gap: "8px" }}
-                  >
+                {baseCases.map((baseCase) => {
+                  const tone = baseCaseTone(baseCase.year);
+                  return (
                     <Box
-                      aria-hidden
+                      key={baseCase.year}
                       sx={{
-                        flexShrink: 0,
-                        width: 12,
-                        height: 12,
-                        borderRadius: "3px",
-                        bgcolor: d.skySoft,
-                        border: `2px solid ${d.action}`,
+                        display: "flex",
+                        alignItems: "flex-start",
+                        gap: "8px",
                       }}
-                    />
-                    <Typography
-                      component="span"
-                      sx={{ fontFamily: "inherit", fontSize: "inherit" }}
                     >
                       <Box
+                        aria-hidden
+                        sx={{
+                          flexShrink: 0,
+                          width: 12,
+                          height: 12,
+                          mt: "3px",
+                          borderRadius: "3px",
+                          bgcolor: tone.soft,
+                          border: `2px solid ${tone.strong}`,
+                        }}
+                      />
+                      <Typography
                         component="span"
-                        sx={{ fontWeight: 650, color: d.action }}
+                        sx={{
+                          fontFamily: "inherit",
+                          fontSize: "inherit",
+                          color: d.muted,
+                        }}
                       >
-                        Base case {formatWholeUsd(baseCase.scenarioPrice)}
-                      </Box>
-                      <Box component="span" sx={{ color: d.muted }}>
-                        {" "}
-                        · production cost doubled for the 2028 halving, plus
-                        Bitcoin&apos;s 12-month average premium
-                      </Box>
-                    </Typography>
-                  </Box>
-                )}
+                        <Box
+                          component="span"
+                          sx={{ fontWeight: 650, color: tone.strong }}
+                        >
+                          {baseCase.label}{" "}
+                          {formatWholeUsd(baseCase.scenarioPrice)}:
+                        </Box>{" "}
+                        {baseCase.description}
+                      </Typography>
+                    </Box>
+                  );
+                })}
                 <Box
                   sx={{
                     display: "flex",
-                    alignItems: "center",
-                    gap: "6px",
+                    alignItems: "flex-start",
+                    gap: "8px",
                     color: d.muted,
                   }}
                 >
                   <InfoOutlinedIcon
                     aria-hidden
-                    sx={{ fontSize: 14, flexShrink: 0 }}
+                    sx={{ fontSize: 14, flexShrink: 0, mt: "2px" }}
                   />
                   <Typography
                     component="span"
                     sx={{ fontFamily: "inherit", fontSize: "inherit" }}
                   >
-                    Lifetime BTC reflects halved block rewards from April 2028
+                    {LIFETIME_BTC_NOTE}
                   </Typography>
                 </Box>
               </Box>

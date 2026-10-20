@@ -25,6 +25,9 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getOwnFranchise } from "@/lib/franchiseeScope";
+import { isCustomerRole } from "@/lib/customerRoles";
+
+export { isCustomerRole };
 
 interface AuthedUser {
   userId: string;
@@ -35,13 +38,15 @@ interface AuthedUser {
 export function ticketListWhereForUser(
   user: AuthedUser,
 ): Prisma.SupportTicketWhereInput {
-  if (user.role === "CLIENT")
+  if (isCustomerRole(user.role))
     return {
       OR: [{ raisedById: user.userId }, { onBehalfOfUserId: user.userId }],
     };
   if (user.role === "FRANCHISEE")
     return { franchise: { franchiseeId: user.userId } };
-  return {}; // ADMIN / SUPER_ADMIN see every ticket
+  if (user.role === "ADMIN" || user.role === "SUPER_ADMIN") return {};
+  // Any other role sees nothing rather than everything.
+  return { id: { in: [] } };
 }
 
 /** True if `user` is allowed to view/act on this specific ticket. */

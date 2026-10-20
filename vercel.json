@@ -5,6 +5,10 @@
       "schedule": "0 0 * * *"
     },
     {
+      "path": "/api/cron_simulated_daily_cost",
+      "schedule": "5 0 * * *"
+    },
+    {
       "path": "/api/cron_payback_snapshot",
       "schedule": "10 0 * * *"
     },

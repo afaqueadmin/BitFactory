@@ -1,8 +1,15 @@
 "use client";
 
+/**
+ * Company Payback Analysis page - BitFactory Daylight theme (v1.3)
+ *
+ * Mirrors the client payback-analysis page: the default "Scenario Table" view
+ * is fully re-themed, while the shared "Graphical Analysis" view keeps its
+ * current MUI-theme-based look.
+ */
+
 import {
   Box,
-  Paper,
   Typography,
   Button,
   Table,
@@ -15,18 +22,9 @@ import {
   Alert,
   TextField,
   InputAdornment,
-  ToggleButtonGroup,
-  ToggleButton,
-  Tabs,
-  Tab,
-  useTheme,
   useMediaQuery,
 } from "@mui/material";
-import {
-  TableChart as TableChartIcon,
-  InsightsOutlined as InsightsIcon,
-  InfoOutlined as InfoOutlinedIcon,
-} from "@mui/icons-material";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { formatValue } from "@/lib/helpers/formatValue";
 import PaybackHistoryChart from "@/components/PaybackHistoryChart";
@@ -54,14 +52,45 @@ import {
   calculateStrategy3Values,
 } from "@/lib/helpers/paybackCalculations";
 import { usePaybackHistory } from "@/hooks/usePaybackHistory";
-import { buildPaybackBaseCase } from "@/lib/helpers/paybackBaseCase";
+import {
+  BASE_CASE_HALVINGS,
+  LIFETIME_BTC_NOTE,
+  buildPaybackBaseCase,
+} from "@/lib/helpers/paybackBaseCase";
+import Segmented, { SegmentedOption } from "@/components/daylight/Segmented";
+import ToggleChip from "@/components/daylight/ToggleChip";
+import { RADIUS_CARD, useDaylight } from "@/lib/daylight";
 
 type PaybackStrategy = PaybackStrategyKey;
+type ViewMode = "TABLE" | "GRAPHS";
+type OsSelection = "STOCK" | "CUSTOM";
 
-const OS_LABELS: Record<"STOCK" | "CUSTOM", string> = {
+const OS_LABELS: Record<OsSelection, string> = {
   STOCK: "Stock OS",
   CUSTOM: "Custom OS",
 };
+
+const VIEW_OPTIONS: SegmentedOption<ViewMode>[] = [
+  { id: "TABLE", label: "Scenario Table" },
+  { id: "GRAPHS", label: "Graphical Analysis" },
+];
+
+const STRATEGY_OPTIONS: SegmentedOption<PaybackStrategy>[] = [
+  { id: "STRATEGY_0", label: "Strategy 0" },
+  { id: "STRATEGY_1", label: "Strategy 1" },
+  { id: "STRATEGY_2", label: "Strategy 2" },
+  { id: "STRATEGY_3", label: "Strategy 3" },
+];
+
+const MINER_OPTIONS: SegmentedOption<MinerModel>[] = [
+  { id: "S21PRO", label: "S21 Pro" },
+  { id: "S21XP", label: "S21 XP" },
+];
+
+const OS_OPTIONS: SegmentedOption<OsSelection>[] = [
+  { id: "STOCK", label: "Stock OS" },
+  { id: "CUSTOM", label: "Custom OS" },
+];
 
 // CURRENT (live price), one column per fixed scenario price, then BREAKEVEN.
 // With machine depreciation on, a second breakeven column is appended.
@@ -96,9 +125,32 @@ interface PaybackConfigData {
   breakevenBtcPrice: number;
 }
 
+/** A label/value pair in the config summary fact sheet. */
+function Fact({ label, value }: { label: string; value: string }) {
+  const { d, fonts } = useDaylight();
+  return (
+    <Box>
+      <Typography sx={{ fontSize: 11, color: d.muted, fontFamily: fonts.body }}>
+        {label}
+      </Typography>
+      <Typography
+        sx={{
+          fontSize: 13,
+          fontWeight: 600,
+          color: d.text,
+          mt: "2px",
+          fontFamily: fonts.body,
+        }}
+      >
+        {value}
+      </Typography>
+    </Box>
+  );
+}
+
 export default function PaybackAnalysisCompanyPage() {
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const { d, fonts } = useDaylight();
+  const isMobile = useMediaQuery("(max-width:599.95px)");
 
   // Config state
   const [config, setConfig] = useState<PaybackConfigData | null>(null);
@@ -142,13 +194,13 @@ export default function PaybackAnalysisCompanyPage() {
   const showDepreciationRows = supportsDepreciation && includeDepreciation;
 
   // OS selector state
-  const [selectedOS, setSelectedOS] = useState<"STOCK" | "CUSTOM">("STOCK");
+  const [selectedOS, setSelectedOS] = useState<OsSelection>("STOCK");
 
   // Miner selector state
   const [selectedMiner, setSelectedMiner] = useState<MinerModel>("S21PRO");
 
   // Which half of the analysis is on screen: the scenario grid, or the charts.
-  const [viewMode, setViewMode] = useState<"TABLE" | "GRAPHS">("TABLE");
+  const [viewMode, setViewMode] = useState<ViewMode>("TABLE");
 
   // Fetch config from API
   const fetchConfig = useCallback(async () => {
@@ -506,9 +558,10 @@ export default function PaybackAnalysisCompanyPage() {
     : 0;
 
   // Strategy 2 & 3 run over the machine's life, mostly after the 2028
-  // halving, so they highlight the post-halving base-case column: today's
-  // mining cost doubled, plus the past year's average mining advantage from
-  // the Buy vs Mine history. Recomputed from live data on every load.
+  // halving, so they highlight a base-case column per halving: today's
+  // mining cost x2 (2028) or x4 (2032), plus the past year's average mining
+  // advantage from the company's own Buy vs Mine history. Recomputed from
+  // live data on every load.
   const showBaseCase =
     selectedStrategy === "STRATEGY_2" || selectedStrategy === "STRATEGY_3";
   const { historyData: baseCaseHistory } = usePaybackHistory(
@@ -516,25 +569,39 @@ export default function PaybackAnalysisCompanyPage() {
     selectedMiner,
     "1Y",
   );
-  const baseCase = useMemo(
+  const baseCases = useMemo(
     () =>
       showBaseCase
-        ? buildPaybackBaseCase(
-            selectedBreakevenPrice,
-            baseCaseHistory,
-            selectedOS,
-          )
-        : null,
+        ? BASE_CASE_HALVINGS.flatMap((halving) => {
+            const baseCase = buildPaybackBaseCase(
+              selectedBreakevenPrice,
+              baseCaseHistory,
+              selectedOS,
+              FIXED_SCENARIO_PRICES,
+              halving.costMultiplier,
+            );
+            return baseCase ? [{ ...halving, ...baseCase }] : [];
+          })
+        : [],
     [showBaseCase, selectedBreakevenPrice, baseCaseHistory, selectedOS],
   );
+  const baseCaseTone = (year: number) =>
+    year === 2028
+      ? { soft: d.skySoft, strong: d.action }
+      : { soft: d.mint, strong: d.success };
   // Column 0 is CURRENT, so scenario i sits at column i + 1.
-  const baseCaseColumn = baseCase ? baseCase.scenarioIndex + 1 : null;
-  const baseCaseColor = theme.palette.mode === "dark" ? "#5CB8E8" : "#1675A9";
-  const baseCaseCellSx = {
-    backgroundColor:
-      theme.palette.mode === "dark" ? "rgba(56,182,255,0.14)" : "#EAF6FE",
-    borderLeft: `2px solid ${baseCaseColor}`,
-    borderRight: `2px solid ${baseCaseColor}`,
+  const baseCaseByColumn = new Map(
+    baseCases.map((baseCase) => [baseCase.scenarioIndex + 1, baseCase]),
+  );
+  const baseCaseCellSx = (index: number) => {
+    const baseCase = baseCaseByColumn.get(index);
+    if (!baseCase) return {};
+    const tone = baseCaseTone(baseCase.year);
+    return {
+      backgroundColor: tone.soft,
+      borderLeft: `2px solid ${tone.strong}`,
+      borderRight: `2px solid ${tone.strong}`,
+    };
   };
   const formatWholeUsd = (value: number) =>
     formatValue(value, "currency", {
@@ -546,9 +613,10 @@ export default function PaybackAnalysisCompanyPage() {
     showDepreciationRows
       ? [...BASE_COLUMNS, "BREAKEVEN\n(incl. Depreciation)"]
       : BASE_COLUMNS
-  ).map((column, index) =>
-    index === baseCaseColumn ? `${column}\nBase Case` : column,
-  );
+  ).map((column, index) => {
+    const baseCase = baseCaseByColumn.get(index);
+    return baseCase ? `${column}\n${baseCase.shortLabel}` : column;
+  });
 
   // Index 0 is CURRENT (live BTC price), then one column per scenario price:
   // the fixed steps, the calculated breakeven, and (optionally) the breakeven
@@ -928,10 +996,64 @@ export default function PaybackAnalysisCompanyPage() {
 
   const tableRows = [btcPriceRow, rewardRow, ...staticRows, ...dynamicRows];
 
+  const alertSx = (tone: "success" | "error") => ({
+    mb: 2,
+    borderRadius: "8px",
+    bgcolor: tone === "success" ? d.mint : d.dangerSoft,
+    color: tone === "success" ? d.success : d.danger,
+    fontFamily: fonts.body,
+    "& .MuiAlert-icon": { color: tone === "success" ? d.success : d.danger },
+  });
+
+  const inputSx = {
+    "& .MuiOutlinedInput-root": {
+      borderRadius: "8px",
+      fontFamily: fonts.body,
+      "& fieldset": { borderColor: d.inputBorder },
+      "&:hover fieldset": { borderColor: d.action },
+    },
+    "& .MuiOutlinedInput-root.Mui-focused fieldset": {
+      borderColor: d.action,
+      borderWidth: "2px",
+    },
+    "& .MuiInputLabel-root": { fontFamily: fonts.body },
+  };
+
+  const primaryBtnSx = {
+    textTransform: "none",
+    fontFamily: fonts.body,
+    fontWeight: 650,
+    borderRadius: "8px",
+    minHeight: 40,
+    bgcolor: d.action,
+    color: "#fff",
+    boxShadow: "none",
+    "&:hover": { bgcolor: d.actionHover, boxShadow: "none" },
+    "&.Mui-disabled": { bgcolor: d.border, color: d.muted },
+  } as const;
+
+  const outlineBtnSx = {
+    textTransform: "none",
+    fontFamily: fonts.body,
+    fontWeight: 600,
+    borderRadius: "8px",
+    minHeight: 40,
+    color: d.text,
+    borderColor: d.inputBorder,
+    "&:hover": { bgcolor: d.hover, borderColor: d.action },
+  } as const;
+
+  // The admin layout has no Daylight canvas, so the page paints its own.
+  const canvasSx = {
+    minHeight: "100%",
+    bgcolor: d.canvas,
+    p: { xs: "16px", sm: "24px", md: "28px 32px" },
+  };
+
   // Show loading state
   if (configLoading) {
     return (
-      <Box sx={{ p: { xs: 1.5, sm: 2, md: 3 }, mt: { xs: 1, md: 2 } }}>
+      <Box sx={canvasSx}>
         <Box
           sx={{
             display: "flex",
@@ -940,7 +1062,7 @@ export default function PaybackAnalysisCompanyPage() {
             minHeight: "400px",
           }}
         >
-          <CircularProgress />
+          <CircularProgress sx={{ color: d.action }} />
         </Box>
       </Box>
     );
@@ -949,11 +1071,11 @@ export default function PaybackAnalysisCompanyPage() {
   // Show error state
   if (configError || !config) {
     return (
-      <Box sx={{ p: { xs: 1.5, sm: 2, md: 3 }, mt: { xs: 1, md: 2 } }}>
-        <Alert severity="error" sx={{ mb: 3 }}>
+      <Box sx={canvasSx}>
+        <Alert severity="error" sx={alertSx("error")}>
           {configError || "Failed to load configuration"}
         </Alert>
-        <Button variant="contained" onClick={fetchConfig}>
+        <Button onClick={fetchConfig} sx={primaryBtnSx}>
           Retry
         </Button>
       </Box>
@@ -961,570 +1083,545 @@ export default function PaybackAnalysisCompanyPage() {
   }
 
   return (
-    <Box sx={{ p: { xs: 1.5, sm: 2, md: 3 }, mt: { xs: 1, md: 2 } }}>
-      {/* Success/Error messages for cost update */}
-      {costsUpdateSuccess && (
-        <Alert
-          severity="success"
-          sx={{ mb: 2 }}
-          onClose={() => setCostsUpdateSuccess(null)}
-        >
-          {costsUpdateSuccess}
-        </Alert>
-      )}
-      {costsUpdateError && (
-        <Alert
-          severity="error"
-          sx={{ mb: 2 }}
-          onClose={() => setCostsUpdateError(null)}
-        >
-          {costsUpdateError}
-        </Alert>
-      )}
+    <Box sx={canvasSx}>
+      <Box
+        sx={{
+          maxWidth: 1600,
+          mx: "auto",
+          fontFamily: fonts.body,
+          color: d.text,
+        }}
+      >
+        {/* Success/Error messages for cost update */}
+        {costsUpdateSuccess && (
+          <Alert
+            severity="success"
+            sx={alertSx("success")}
+            onClose={() => setCostsUpdateSuccess(null)}
+          >
+            {costsUpdateSuccess}
+          </Alert>
+        )}
+        {costsUpdateError && (
+          <Alert
+            severity="error"
+            sx={alertSx("error")}
+            onClose={() => setCostsUpdateError(null)}
+          >
+            {costsUpdateError}
+          </Alert>
+        )}
 
-      <Box sx={{ mb: { xs: 2, md: 3 } }}>
-        {/* Title + view switcher */}
-        <Box
-          sx={{
-            display: "flex",
-            alignItems: { xs: "flex-start", sm: "center" },
-            flexDirection: { xs: "column", sm: "row" },
-            justifyContent: "space-between",
-            gap: { xs: 1.5, sm: 2 },
-            mb: { xs: 2, md: 3 },
-          }}
-        >
-          <Typography
-            variant="h4"
+        <Box sx={{ mb: { xs: "18px", md: "22px" } }}>
+          {/* Title + view switcher */}
+          <Box
             sx={{
-              fontWeight: 700,
-              fontSize: { xs: "1.6rem", sm: "2rem", md: "2.125rem" },
+              display: "flex",
+              alignItems: { xs: "flex-start", sm: "center" },
+              flexDirection: { xs: "column", sm: "row" },
+              justifyContent: "space-between",
+              gap: "14px",
+              mb: "16px",
             }}
           >
-            Company Payback Analysis
-          </Typography>
-
-          <ToggleButtonGroup
-            value={viewMode}
-            exclusive
-            onChange={(e, newValue) => {
-              if (newValue !== null) setViewMode(newValue);
-            }}
-            aria-label="Analysis view"
-            size="small"
-            sx={{
-              "& .MuiToggleButton-root": {
-                px: { xs: 1.5, sm: 2 },
-                py: 0.75,
-                fontSize: { xs: "0.75rem", sm: "0.8125rem" },
-                lineHeight: 1.5,
-                gap: 0.75,
-              },
-            }}
-          >
-            <ToggleButton value="TABLE" aria-label="Scenario table">
-              <TableChartIcon sx={{ fontSize: "1.05rem" }} />
-              {isMobile ? "Table" : "Scenario Table"}
-            </ToggleButton>
-            <ToggleButton value="GRAPHS" aria-label="Graphical analysis">
-              <InsightsIcon sx={{ fontSize: "1.05rem" }} />
-              {isMobile ? "Graphs" : "Graphical Analysis"}
-            </ToggleButton>
-          </ToggleButtonGroup>
-        </Box>
-
-        {/* Strategy tabs */}
-        <Tabs
-          value={selectedStrategy}
-          onChange={(e, newValue) => setSelectedStrategy(newValue)}
-          aria-label="Strategy selector"
-          sx={{ mb: { xs: 1.5, sm: 2 }, minHeight: 36 }}
-        >
-          <Tab
-            value="STRATEGY_0"
-            label="Strategy 0"
-            sx={{ minHeight: 36, py: 0.5 }}
-          />
-          <Tab
-            value="STRATEGY_1"
-            label="Strategy 1"
-            sx={{ minHeight: 36, py: 0.5 }}
-          />
-          <Tab
-            value="STRATEGY_2"
-            label="Strategy 2"
-            sx={{ minHeight: 36, py: 0.5 }}
-          />
-          <Tab
-            value="STRATEGY_3"
-            label="Strategy 3"
-            sx={{ minHeight: 36, py: 0.5 }}
-          />
-        </Tabs>
-
-        <Box
-          sx={{
-            borderLeft: `4px solid ${theme.palette.primary.main}`,
-            backgroundColor:
-              theme.palette.mode === "dark"
-                ? "rgba(255,255,255,0.05)"
-                : "rgba(0,0,0,0.03)",
-            borderRadius: 1,
-            px: { xs: 1.5, sm: 2 },
-            py: { xs: 1, sm: 1.25 },
-            mb: { xs: 1.5, sm: 2 },
-          }}
-        >
-          <Typography
-            sx={{
-              fontWeight: 650,
-              fontSize: { xs: "0.95rem", sm: "1.05rem" },
-            }}
-          >
-            {STRATEGY_COPY[selectedStrategy].headline}
-          </Typography>
-          <Typography
-            variant="body2"
-            sx={{
-              color: "text.secondary",
-              maxWidth: "72ch",
-              mt: 0.25,
-              fontSize: { xs: "0.8rem", sm: "0.875rem" },
-            }}
-          >
-            {STRATEGY_COPY[selectedStrategy].detail}
-          </Typography>
-        </Box>
-
-        {/* Miner model + OS selectors */}
-        <Box
-          sx={{
-            display: "flex",
-            flexWrap: "wrap",
-            alignItems: "center",
-            gap: { xs: 1.5, sm: 2 },
-            mb: { xs: 1.5, sm: 2 },
-            "& .MuiToggleButton-root": {
-              px: { xs: 1.5, sm: 2 },
-              py: 0.75,
-              fontSize: { xs: "0.75rem", sm: "0.8125rem" },
-              lineHeight: 1.5,
-            },
-          }}
-        >
-          <ToggleButtonGroup
-            value={selectedMiner}
-            exclusive
-            onChange={(e, newValue) => {
-              if (newValue !== null) setSelectedMiner(newValue);
-            }}
-            aria-label="Miner model selector"
-            size="small"
-          >
-            <ToggleButton value="S21PRO" aria-label="S21 Pro Analysis">
-              S21 Pro Analysis
-            </ToggleButton>
-            <ToggleButton value="S21XP" aria-label="S21 XP Analysis">
-              S21 XP Analysis
-            </ToggleButton>
-          </ToggleButtonGroup>
-
-          <ToggleButtonGroup
-            value={selectedOS}
-            exclusive
-            onChange={(e, newValue) => {
-              if (newValue !== null) setSelectedOS(newValue);
-            }}
-            aria-label="OS selector"
-            size="small"
-          >
-            <ToggleButton value="STOCK" aria-label="Stock OS">
-              {isMobile ? "Stock" : "Stock OS"}
-            </ToggleButton>
-            <ToggleButton value="CUSTOM" aria-label="Custom OS">
-              {isMobile ? "Custom" : "Custom OS"}
-            </ToggleButton>
-          </ToggleButtonGroup>
-        </Box>
-
-        {/* Controls row */}
-        <Box
-          sx={{
-            display: "flex",
-            alignItems: { xs: "stretch", sm: "center" },
-            flexDirection: { xs: "column", sm: "row" },
-            gap: { xs: 1.5, sm: 2 },
-            flexWrap: "wrap",
-          }}
-        >
-          <TextField
-            label={`${MINER_LABELS[selectedMiner]} Machine Cost`}
-            type="number"
-            value={editableActiveMachineCost}
-            onChange={(e) => setEditableActiveMachineCost(e.target.value)}
-            size="small"
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">$</InputAdornment>
-              ),
-            }}
-            inputProps={{ step: "0.01", min: "0" }}
-            sx={{ width: { xs: "100%", sm: "200px" } }}
-          />
-
-          <TextField
-            label={`${MINER_LABELS[selectedMiner]} Operating Cost (Monthly)`}
-            type="number"
-            value={editableActiveOperatingCost}
-            onChange={(e) => setEditableActiveOperatingCost(e.target.value)}
-            size="small"
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">$</InputAdornment>
-              ),
-            }}
-            inputProps={{ step: "0.01", min: "0" }}
-            sx={{ width: { xs: "100%", sm: "200px" } }}
-          />
-
-          <Button
-            variant="contained"
-            onClick={handleSaveCosts}
-            disabled={isSavingCosts}
-            size="small"
-            fullWidth={isMobile}
-          >
-            {isSavingCosts ? "Saving..." : "Save Costs"}
-          </Button>
-
-          <Button
-            variant="outlined"
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-            size="small"
-            fullWidth={isMobile}
-          >
-            {isRefreshing ? "Refreshing..." : "Refresh"}
-          </Button>
-        </Box>
-
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-          Updated:{" "}
-          {lastUpdated
-            ? lastUpdated.toLocaleString(undefined, {
-                year: "numeric",
-                month: "2-digit",
-                day: "2-digit",
-                hour: "2-digit",
-                minute: "2-digit",
-              })
-            : "—"}
-        </Typography>
-      </Box>
-
-      {/* Config summary card — the spec both views are built on */}
-      <Paper sx={{ p: { xs: 2, sm: 3 }, mb: { xs: 2, md: 3 } }}>
-        <Box
-          sx={{
-            display: "grid",
-            gridTemplateColumns: { xs: "1fr 1fr", md: "1fr 1fr 1fr" },
-            gap: { xs: 2, sm: 2 },
-          }}
-        >
-          <Box>
-            <Typography variant="subtitle2" color="text.secondary">
-              Document
-            </Typography>
-            <Typography variant="body2">
-              Company Payback Analysis (Self-Mining)
-            </Typography>
-          </Box>
-          <Box>
-            <Typography variant="subtitle2" color="text.secondary">
-              Hosting Charges
-            </Typography>
-            <Typography variant="body2">{`$${activeHostingCharges.toFixed(5)}`}</Typography>
-          </Box>
-          <Box>
-            <Typography variant="subtitle2" color="text.secondary">
-              Operating Cost (Monthly)
-            </Typography>
-            <Typography variant="body2">
-              {formatValue(monthlyElectricityHosting, "currency")}
-            </Typography>
-          </Box>
-          <Box>
-            <Typography variant="subtitle2" color="text.secondary">
-              Power Consumption
-            </Typography>
-            <Typography variant="body2">{`${activePowerConsumption.toFixed(4)} KWH`}</Typography>
-          </Box>
-          <Box>
-            <Typography variant="subtitle2" color="text.secondary">
-              {MINER_LABELS[selectedMiner]} Machine Cost
-            </Typography>
-            <Typography variant="body2">
-              {formatValue(machineCost, "currency")}
-            </Typography>
-          </Box>
-          <Box>
-            <Typography variant="subtitle2" color="text.secondary">
-              Current Miner
-            </Typography>
-            <Typography variant="body2">
-              {MINER_LABELS[selectedMiner]}
-            </Typography>
-          </Box>
-          <Box>
-            <Typography variant="subtitle2" color="text.secondary">
-              Current OS
-            </Typography>
-            <Typography variant="body2">{OS_LABELS[selectedOS]}</Typography>
-          </Box>
-          <Box>
-            <Typography variant="subtitle2" color="text.secondary">
-              {`${MINER_LABELS[selectedMiner]} Hashrate`}
-            </Typography>
-            <Typography variant="body2">{activeHashrateSummary}</Typography>
-          </Box>
-          {(selectedStrategy === "STRATEGY_2" ||
-            selectedStrategy === "STRATEGY_3") && (
-            <Box>
-              <Typography variant="subtitle2" color="text.secondary">
-                Machine Life
+            <Box sx={{ display: "flex", alignItems: "center", gap: "12px" }}>
+              <Typography
+                component="h1"
+                sx={{
+                  fontFamily: fonts.heading,
+                  fontWeight: 750,
+                  fontSize: { xs: 27, md: 32 },
+                  letterSpacing: "-.035em",
+                  color: d.text,
+                }}
+              >
+                Company Payback Analysis
               </Typography>
-              <Typography variant="body2">{`${MACHINE_LIFE_YEARS} Years`}</Typography>
+              <Box
+                sx={{
+                  px: "10px",
+                  py: "4px",
+                  borderRadius: "999px",
+                  bgcolor: d.skySoft,
+                  color: d.action,
+                  fontSize: 11,
+                  fontWeight: 650,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                Self-Mining
+              </Box>
             </Box>
-          )}
-          {selectedStrategy === "STRATEGY_3" && (
-            <Box>
-              <Typography variant="subtitle2" color="text.secondary">
-                USDT/(BTC Collateral) Borrowing Rate
-              </Typography>
-              <Typography variant="body2">{`${BORROWING_RATE_APR.toFixed(2)}%`}</Typography>
-            </Box>
-          )}
-        </Box>
-      </Paper>
 
-      {viewMode === "GRAPHS" && (
-        <PaybackGraphicalView
-          miner={selectedMiner}
-          os={selectedOS}
-          strategy={selectedStrategy}
-          reward={resolvedRewardBtcPerPhDay}
-          liveBtcPrice={resolvedBtcPriceValue}
-          breakevenPrice={selectedBreakevenPrice}
-          loanInterest={selectedStrategy === "STRATEGY_3" ? loanInterest : 0}
-          minerSpec={minerSpec}
-          calculateAtPrice={calculateAtPrice}
-          capitalLabel="machine cost"
-          purchaseLabel="Machine cost"
-          historyChart={
-            /* Same Buy BTC vs Mine BTC history as the scenario table view. */
+            <Segmented
+              value={viewMode}
+              onChange={setViewMode}
+              ariaLabel="Analysis view"
+              options={VIEW_OPTIONS}
+            />
+          </Box>
+
+          {/* Strategy tabs */}
+          <Box sx={{ mb: "14px" }}>
+            <Segmented
+              value={selectedStrategy}
+              onChange={setSelectedStrategy}
+              ariaLabel="Strategy selector"
+              options={STRATEGY_OPTIONS}
+            />
+          </Box>
+
+          <Box
+            sx={{
+              borderLeft: `3px solid ${d.action}`,
+              bgcolor: d.skySoft,
+              borderRadius: "8px",
+              px: "16px",
+              py: "12px",
+              mb: "16px",
+            }}
+          >
+            <Typography sx={{ fontWeight: 650, fontSize: 14, color: d.text }}>
+              {STRATEGY_COPY[selectedStrategy].headline}
+            </Typography>
+            <Typography
+              sx={{ color: d.muted, maxWidth: "72ch", mt: "2px", fontSize: 12 }}
+            >
+              {STRATEGY_COPY[selectedStrategy].detail}
+            </Typography>
+          </Box>
+
+          {/* Controls row: everything that drives the model, plus its actions */}
+          <Box
+            sx={{
+              display: "flex",
+              flexWrap: "wrap",
+              alignItems: "center",
+              gap: "14px",
+            }}
+          >
+            <Segmented
+              value={selectedMiner}
+              onChange={setSelectedMiner}
+              ariaLabel="Miner model selector"
+              options={MINER_OPTIONS}
+            />
+
+            <Segmented
+              value={selectedOS}
+              onChange={setSelectedOS}
+              ariaLabel="OS selector"
+              options={OS_OPTIONS}
+            />
+
+            <TextField
+              label={`${MINER_LABELS[selectedMiner]} Machine Cost`}
+              type="number"
+              value={editableActiveMachineCost}
+              onChange={(e) => setEditableActiveMachineCost(e.target.value)}
+              size="small"
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">$</InputAdornment>
+                ),
+              }}
+              inputProps={{ step: "0.01", min: "0" }}
+              sx={{ width: { xs: "100%", sm: "200px" }, ...inputSx }}
+            />
+
+            <TextField
+              label={`${MINER_LABELS[selectedMiner]} Operating Cost (Monthly)`}
+              type="number"
+              value={editableActiveOperatingCost}
+              onChange={(e) => setEditableActiveOperatingCost(e.target.value)}
+              size="small"
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">$</InputAdornment>
+                ),
+              }}
+              inputProps={{ step: "0.01", min: "0" }}
+              sx={{ width: { xs: "100%", sm: "240px" }, ...inputSx }}
+            />
+
+            <Box
+              sx={{
+                display: "flex",
+                gap: "10px",
+                width: { xs: "100%", sm: "auto" },
+              }}
+            >
+              <Button
+                onClick={handleSaveCosts}
+                disabled={isSavingCosts}
+                fullWidth={isMobile}
+                sx={primaryBtnSx}
+              >
+                {isSavingCosts ? "Saving..." : "Save Costs"}
+              </Button>
+
+              <Button
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+                fullWidth={isMobile}
+                sx={outlineBtnSx}
+              >
+                {isRefreshing ? "Refreshing..." : "Refresh"}
+              </Button>
+            </Box>
+          </Box>
+
+          <Typography sx={{ mt: "10px", fontSize: 11, color: d.muted }}>
+            Updated:{" "}
+            {lastUpdated
+              ? lastUpdated.toLocaleString(undefined, {
+                  year: "numeric",
+                  month: "2-digit",
+                  day: "2-digit",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })
+              : "—"}
+          </Typography>
+        </Box>
+
+        {/* Config summary card — the spec both views are built on */}
+        <Box
+          sx={{
+            p: { xs: "16px", sm: "20px 24px" },
+            mb: { xs: "18px", md: "22px" },
+            bgcolor: d.surface,
+            border: `1px solid ${d.border}`,
+            borderRadius: RADIUS_CARD,
+            boxShadow: d.shadow,
+          }}
+        >
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr 1fr", md: "1fr 1fr 1fr" },
+              gap: "16px",
+            }}
+          >
+            <Fact
+              label="Document"
+              value="Company Payback Analysis (Self-Mining)"
+            />
+            <Fact
+              label="Hosting Charges"
+              value={formatValue(activeHostingCharges, "currency", {
+                minimumFractionDigits: 5,
+                maximumFractionDigits: 5,
+              })}
+            />
+            <Fact
+              label="Operating Cost (Monthly)"
+              value={formatValue(monthlyElectricityHosting, "currency")}
+            />
+            <Fact
+              label="Power Consumption"
+              value={`${formatValue(activePowerConsumption, "number", {
+                minimumFractionDigits: 4,
+                maximumFractionDigits: 4,
+              })} KWH`}
+            />
+            <Fact
+              label={`${MINER_LABELS[selectedMiner]} Machine Cost`}
+              value={formatValue(machineCost, "currency")}
+            />
+            <Fact label="Current Miner" value={MINER_LABELS[selectedMiner]} />
+            <Fact label="Current OS" value={OS_LABELS[selectedOS]} />
+            <Fact
+              label={`${MINER_LABELS[selectedMiner]} Hashrate`}
+              value={activeHashrateSummary}
+            />
+            {(selectedStrategy === "STRATEGY_2" ||
+              selectedStrategy === "STRATEGY_3") && (
+              <Fact
+                label="Machine Life"
+                value={`${MACHINE_LIFE_YEARS} Years`}
+              />
+            )}
+            {selectedStrategy === "STRATEGY_3" && (
+              <Fact
+                label="USDT/(BTC Collateral) Borrowing Rate"
+                value={`${BORROWING_RATE_APR.toFixed(2)}%`}
+              />
+            )}
+          </Box>
+        </Box>
+
+        {viewMode === "GRAPHS" && (
+          <PaybackGraphicalView
+            miner={selectedMiner}
+            os={selectedOS}
+            strategy={selectedStrategy}
+            reward={resolvedRewardBtcPerPhDay}
+            liveBtcPrice={resolvedBtcPriceValue}
+            breakevenPrice={selectedBreakevenPrice}
+            loanInterest={selectedStrategy === "STRATEGY_3" ? loanInterest : 0}
+            minerSpec={minerSpec}
+            calculateAtPrice={calculateAtPrice}
+            capitalLabel="machine cost"
+            purchaseLabel="Machine cost"
+            historyChart={
+              /* Same Buy BTC vs Mine BTC history as the scenario table view. */
+              <PaybackHistoryChart
+                daylight
+                profile="COMPANY"
+                miner={selectedMiner}
+                os={selectedOS}
+                depreciation={chartDepreciation}
+              />
+            }
+          />
+        )}
+
+        {viewMode === "TABLE" && (
+          <>
             <PaybackHistoryChart
+              daylight
               profile="COMPANY"
               miner={selectedMiner}
               os={selectedOS}
               depreciation={chartDepreciation}
             />
-          }
-        />
-      )}
 
-      {viewMode === "TABLE" && (
-        <>
-          <PaybackHistoryChart
-            profile="COMPANY"
-            miner={selectedMiner}
-            os={selectedOS}
-            depreciation={chartDepreciation}
-          />
-
-          {supportsDepreciation && (
-            <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 1 }}>
-              <ToggleButton
-                value="includeDepreciation"
-                selected={includeDepreciation}
-                onChange={() => setIncludeDepreciation((prev) => !prev)}
-                aria-label="Include Machine Depreciation"
-                size="small"
-                color="primary"
-                sx={{ borderRadius: 999, px: 2, textTransform: "none" }}
-              >
-                Include Machine Depreciation
-              </ToggleButton>
-            </Box>
-          )}
-
-          {/* Data table — horizontally scrollable on mobile */}
-          <TableContainer
-            component={Paper}
-            sx={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}
-          >
-            <Table size="small" sx={{ minWidth: 920 }}>
-              <TableHead
-                sx={{
-                  backgroundColor:
-                    theme.palette.mode === "dark"
-                      ? "rgba(255,255,255,0.05)"
-                      : "rgba(0,0,0,0.03)",
-                }}
-              >
-                <TableRow>
-                  <TableCell
-                    sx={{
-                      fontWeight: 700,
-                      minWidth: { xs: 130, sm: 200 },
-                      fontSize: { xs: "0.75rem", sm: "0.85rem" },
-                      px: { xs: 1, sm: 1.5 },
-                      py: { xs: "9px", sm: "11px" },
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    Metric
-                  </TableCell>
-                  {columns.map((column, index) => (
-                    <TableCell
-                      key={column}
-                      sx={{
-                        fontWeight: 700,
-                        fontSize: { xs: "0.65rem", sm: "0.75rem" },
-                        lineHeight: 1.25,
-                        px: { xs: 0.75, sm: 1.25 },
-                        py: { xs: "9px", sm: "11px" },
-                        borderLeft: `1px solid ${theme.palette.divider}`,
-                        whiteSpace: "pre-line",
-                        ...(index === baseCaseColumn && baseCaseCellSx),
-                        ...(index === baseCaseColumn && {
-                          color: baseCaseColor,
-                          borderTop: `2px solid ${baseCaseColor}`,
-                        }),
-                      }}
-                      align="right"
-                    >
-                      {column}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {tableRows.map((row) => (
-                  <TableRow
-                    key={row.label}
-                    hover
-                    sx={
-                      row.label === "Reward (BTC/PH/Day)"
-                        ? { backgroundColor: "rgba(103, 177, 42, 0.35)" }
-                        : undefined
-                    }
-                  >
-                    <TableCell
-                      sx={{
-                        fontWeight: 600,
-                        fontSize: { xs: "0.7rem", sm: "0.8rem" },
-                        whiteSpace: "nowrap",
-                        px: { xs: 1, sm: 1.5 },
-                        py: { xs: "9px", sm: "11px" },
-                      }}
-                    >
-                      {row.label}
-                    </TableCell>
-                    {row.values.map((value, index) => (
-                      <TableCell
-                        key={`${row.label}-${index}`}
-                        align="right"
-                        sx={{
-                          fontWeight: 400,
-                          fontSize: { xs: "0.65rem", sm: "0.8rem" },
-                          whiteSpace: "nowrap",
-                          px: { xs: 0.5, sm: 1 },
-                          py: { xs: "9px", sm: "11px" },
-                          borderLeft: `1px solid ${theme.palette.divider}`,
-                          ...(row.label === "BTC Price (USD)" && index === 0
-                            ? { backgroundColor: "rgba(103, 177, 42, 0.35)" }
-                            : {}),
-                          ...(row.label === "BTC Price (USD)" &&
-                          index === DEPRECIATION_BREAKEVEN_COLUMN
-                            ? {
-                                // chart's depreciation line
-                                backgroundColor:
-                                  theme.palette.mode === "dark"
-                                    ? "rgba(240,138,130,0.14)"
-                                    : "rgba(173,72,64,0.12)",
-                              }
-                            : {}),
-                          ...(index === baseCaseColumn && baseCaseCellSx),
-                        }}
-                      >
-                        {value}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-
-          {showBaseCase && (
-            <Paper
-              variant="outlined"
+            {/* Data table — horizontally scrollable on mobile */}
+            <Box
               sx={{
-                mt: 1.5,
-                px: 2,
-                py: 1.25,
-                display: "flex",
-                flexWrap: "wrap",
-                alignItems: "center",
-                columnGap: 3,
-                rowGap: 0.75,
+                bgcolor: d.surface,
+                border: `1px solid ${d.border}`,
+                borderRadius: RADIUS_CARD,
+                boxShadow: d.shadow,
+                overflow: "hidden",
               }}
             >
-              {baseCase && (
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  <Box
-                    aria-hidden
-                    sx={{
-                      flexShrink: 0,
-                      width: 12,
-                      height: 12,
-                      borderRadius: "3px",
-                      backgroundColor: baseCaseCellSx.backgroundColor,
-                      border: `2px solid ${baseCaseColor}`,
-                    }}
+              {supportsDepreciation && (
+                <Box
+                  sx={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    alignItems: "center",
+                    justifyContent: "flex-end",
+                    gap: "10px",
+                    px: { xs: "12px", sm: "16px" },
+                    py: "10px",
+                    borderBottom: `1px solid ${d.border}`,
+                  }}
+                >
+                  <ToggleChip
+                    checked={includeDepreciation}
+                    onChange={setIncludeDepreciation}
+                    label="Include Machine Depreciation"
                   />
-                  <Typography variant="body2" component="span">
-                    <Box
-                      component="span"
-                      sx={{ fontWeight: 700, color: baseCaseColor }}
-                    >
-                      Base case {formatWholeUsd(baseCase.scenarioPrice)}
-                    </Box>
-                    <Box component="span" sx={{ color: "text.secondary" }}>
-                      {" "}
-                      · production cost doubled for the 2028 halving, plus
-                      Bitcoin&apos;s 12-month average premium
-                    </Box>
-                  </Typography>
                 </Box>
               )}
-              <Box
-                sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 0.75,
-                  color: "text.secondary",
-                }}
+              <TableContainer
+                sx={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}
               >
-                <InfoOutlinedIcon aria-hidden sx={{ fontSize: 14 }} />
-                <Typography variant="body2" component="span">
-                  Lifetime BTC reflects halved block rewards from April 2028
-                </Typography>
-              </Box>
-            </Paper>
-          )}
-        </>
-      )}
+                <Table size="small" sx={{ minWidth: 1160 }}>
+                  <TableHead sx={{ backgroundColor: d.tableHead }}>
+                    <TableRow>
+                      <TableCell
+                        sx={{
+                          fontFamily: fonts.body,
+                          fontWeight: 600,
+                          fontSize: 10,
+                          letterSpacing: ".015em",
+                          textTransform: "uppercase",
+                          color: d.muted,
+                          borderBottomColor: d.border,
+                          minWidth: { xs: 130, sm: 200 },
+                          px: { xs: 1, sm: 1.5 },
+                          py: { xs: "9px", sm: "11px" },
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        Metric
+                      </TableCell>
+                      {columns.map((column, index) => (
+                        <TableCell
+                          key={column}
+                          sx={{
+                            fontFamily: fonts.body,
+                            fontWeight: 600,
+                            fontSize: { xs: 9, sm: 10 },
+                            letterSpacing: ".01em",
+                            textTransform: "uppercase",
+                            color: d.muted,
+                            lineHeight: 1.25,
+                            px: { xs: 0.75, sm: 1.25 },
+                            py: { xs: "9px", sm: "11px" },
+                            borderLeft: `1px solid ${d.border}`,
+                            borderBottomColor: d.border,
+                            whiteSpace: "pre-line",
+                            ...baseCaseCellSx(index),
+                            ...(baseCaseByColumn.has(index) && {
+                              color: baseCaseTone(
+                                baseCaseByColumn.get(index)!.year,
+                              ).strong,
+                              borderTop: `2px solid ${
+                                baseCaseTone(baseCaseByColumn.get(index)!.year)
+                                  .strong
+                              }`,
+                            }),
+                          }}
+                          align="right"
+                        >
+                          {column}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {tableRows.map((row) => (
+                      <TableRow
+                        key={row.label}
+                        hover
+                        sx={{
+                          "&:hover": { backgroundColor: d.hover },
+                          "& .MuiTableCell-root": {
+                            borderBottomColor: d.border,
+                            fontFamily: fonts.body,
+                          },
+                        }}
+                      >
+                        <TableCell
+                          sx={{
+                            fontWeight: 600,
+                            fontSize: { xs: "0.7rem", sm: "0.8rem" },
+                            color: d.text,
+                            whiteSpace: "nowrap",
+                            px: { xs: 1, sm: 1.5 },
+                            py: { xs: "9px", sm: "11px" },
+                          }}
+                        >
+                          {row.label}
+                        </TableCell>
+                        {row.values.map((value, index) => (
+                          <TableCell
+                            key={`${row.label}-${index}`}
+                            align="right"
+                            sx={{
+                              fontWeight: 400,
+                              fontSize: { xs: "0.65rem", sm: "0.8rem" },
+                              color: d.text,
+                              whiteSpace: "nowrap",
+                              px: { xs: 0.5, sm: 1 },
+                              py: { xs: "9px", sm: "11px" },
+                              borderLeft: `1px solid ${d.border}`,
+                              ...(row.label === "BTC Price (USD)" && index === 0
+                                ? { backgroundColor: d.amber }
+                                : {}),
+                              ...(row.label === "BTC Price (USD)" &&
+                              index === BREAKEVEN_COLUMN &&
+                              selectedOS === "CUSTOM"
+                                ? { backgroundColor: d.mint } // Custom OS
+                                : {}),
+                              ...(row.label === "BTC Price (USD)" &&
+                              index === BREAKEVEN_COLUMN &&
+                              selectedOS === "STOCK"
+                                ? { backgroundColor: d.skySoft } // Stock OS
+                                : {}),
+                              ...(row.label === "BTC Price (USD)" &&
+                              index === DEPRECIATION_BREAKEVEN_COLUMN
+                                ? { backgroundColor: d.dangerSoft } // chart's depreciation line
+                                : {}),
+                              ...baseCaseCellSx(index),
+                            }}
+                          >
+                            {value}
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+              {showBaseCase && (
+                <Box
+                  sx={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "6px",
+                    px: { xs: "14px", sm: "16px" },
+                    py: "10px",
+                    borderTop: `1px solid ${d.border}`,
+                    bgcolor: d.tableHead,
+                    fontFamily: fonts.body,
+                    fontSize: 12,
+                    lineHeight: 1.5,
+                  }}
+                >
+                  {baseCases.map((baseCase) => {
+                    const tone = baseCaseTone(baseCase.year);
+                    return (
+                      <Box
+                        key={baseCase.year}
+                        sx={{
+                          display: "flex",
+                          alignItems: "flex-start",
+                          gap: "8px",
+                        }}
+                      >
+                        <Box
+                          aria-hidden
+                          sx={{
+                            flexShrink: 0,
+                            width: 12,
+                            height: 12,
+                            mt: "3px",
+                            borderRadius: "3px",
+                            bgcolor: tone.soft,
+                            border: `2px solid ${tone.strong}`,
+                          }}
+                        />
+                        <Typography
+                          component="span"
+                          sx={{
+                            fontFamily: "inherit",
+                            fontSize: "inherit",
+                            color: d.muted,
+                          }}
+                        >
+                          <Box
+                            component="span"
+                            sx={{ fontWeight: 650, color: tone.strong }}
+                          >
+                            {baseCase.label}{" "}
+                            {formatWholeUsd(baseCase.scenarioPrice)}:
+                          </Box>{" "}
+                          {baseCase.description}
+                        </Typography>
+                      </Box>
+                    );
+                  })}
+                  <Box
+                    sx={{
+                      display: "flex",
+                      alignItems: "flex-start",
+                      gap: "8px",
+                      color: d.muted,
+                    }}
+                  >
+                    <InfoOutlinedIcon
+                      aria-hidden
+                      sx={{ fontSize: 14, flexShrink: 0, mt: "2px" }}
+                    />
+                    <Typography
+                      component="span"
+                      sx={{ fontFamily: "inherit", fontSize: "inherit" }}
+                    >
+                      {LIFETIME_BTC_NOTE}
+                    </Typography>
+                  </Box>
+                </Box>
+              )}
+            </Box>
+          </>
+        )}
+      </Box>
     </Box>
   );
 }

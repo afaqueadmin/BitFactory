@@ -5,6 +5,23 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 
+/**
+ * One currency part of a Farm Tariff / Hardware Purchase payment, as the
+ * detail endpoints return it. Amounts arrive as decimal strings; amount and
+ * transactionFee are in the part's currency, exchangeRate is 1 USD = X.
+ */
+export interface VendorPaymentPart {
+  id: string;
+  amount: string;
+  exchangeRate: string;
+  amountUsd: string;
+  transactionFee: string;
+  sortOrder: number;
+  entity: { id: string; name: string };
+  bank: { id: string; name: string };
+  currency: { id: string; code: string; name: string };
+}
+
 export interface VendorInvoice {
   id: string;
   invoiceNumber: string;
@@ -18,7 +35,9 @@ export interface VendorInvoice {
   paymentStatus: "Paid" | "Pending" | "Cancelled";
   notes: string | null;
   invoicePdfKey: string | null;
-  // Set when the payment is recorded; amounts arrive as decimal strings.
+  // DEPRECATED (2026-10-20): single-currency payment columns, no longer
+  // written or read (the payment lives in paymentParts). TODO: remove
+  // with the columns after 2026-11-19.
   paymentEntityId: string | null;
   paymentBankId: string | null;
   paymentCurrencyId: string | null;
@@ -27,6 +46,8 @@ export interface VendorInvoice {
   paymentAmountUsd: string | null;
   transactionFee: string | null;
   paymentReceiptKey: string | null;
+  /** The payment's currency parts (detail responses only). */
+  paymentParts?: VendorPaymentPart[];
   createdBy: string;
   updatedBy: string | null;
   createdAt: Date;

@@ -43,6 +43,8 @@ export default function RequestPaymentFrequencyChangeModal({
 }: RequestPaymentFrequencyChangeModalProps) {
   const createRequest = useCreatePaymentFrequencyChangeRequest();
   const { user } = useUser();
+  // Simulated accounts see the form but can't submit it.
+  const isSimulated = user?.role === "SIMULATED";
   const requires2fa = !!user?.twoFactorEnabled;
 
   const [frequency, setFrequency] = useState<PaymentFrequency | "">("");
@@ -106,6 +108,11 @@ export default function RequestPaymentFrequencyChangeModal({
     <Dialog open={open} onClose={resetAndClose} maxWidth="sm" fullWidth>
       <DialogTitle>Request Payment Frequency Change</DialogTitle>
       <DialogContent>
+        {isSimulated && (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            Not available on simulated accounts.
+          </Alert>
+        )}
         <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 1 }}>
           {error && <Alert severity="error">{error}</Alert>}
 
@@ -201,7 +208,7 @@ export default function RequestPaymentFrequencyChangeModal({
         <Button
           onClick={handleSubmit}
           variant="contained"
-          disabled={createRequest.isPending}
+          disabled={createRequest.isPending || isSimulated}
           startIcon={
             createRequest.isPending ? <CircularProgress size={16} /> : undefined
           }

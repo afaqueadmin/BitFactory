@@ -5,8 +5,24 @@ import { generatePDFFromHTML, renderInvoiceTemplate } from "@/lib/email";
 import { INVOICE_TYPE_LABELS } from "@/lib/constants/accounting";
 import { readFileSync } from "fs";
 import { join } from "path";
+import { InvoiceStatus, InvoiceType, Prisma } from "@prisma/client";
+import { getSimContext } from "@/lib/simulation/context";
+import { loadSimInvoice } from "@/lib/simulation/invoice";
 
 export const dynamic = "force-dynamic";
+
+/** What the statement reads from an invoice row or a simulated one. */
+type StatementInvoice = {
+  invoiceNumber: string;
+  status: InvoiceStatus;
+  invoiceType: InvoiceType;
+  totalAmount: number | Prisma.Decimal;
+  issuedDate: Date | null;
+  invoiceGeneratedDate: Date;
+  dueDate: Date;
+  paidDate: Date | null;
+  costPayments: Array<{ amount: number }>;
+};
 
 export async function GET(request: NextRequest) {
   try {
@@ -32,20 +48,23 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "User not found" }, { status: 401 });
     }
 
-    const invoices = (
-      await prisma.invoice.findMany({
-        where: {
-          userId,
-          status: {
-            in: ["PAID", "ISSUED", "OVERDUE"],
+    // Simulated accounts: their view-only invoice (never in the DB).
+    const simCtx = await getSimContext(jwtPayload);
+    const source: StatementInvoice[] = simCtx
+      ? [await loadSimInvoice(simCtx)]
+      : await prisma.invoice.findMany({
+          where: {
+            userId,
+            status: {
+              in: ["PAID", "ISSUED", "OVERDUE"],
+            },
           },
-        },
-        include: {
-          // Voided payments (e.g. reversed memo adjustments) aren't paid.
-          costPayments: { where: { isDeleted: false } },
-        },
-      })
-    ).sort((a, b) => {
+          include: {
+            // Voided payments (e.g. reversed memo adjustments) aren't paid.
+            costPayments: { where: { isDeleted: false } },
+          },
+        });
+    const invoices = source.sort((a, b) => {
       const aDate = new Date(a.issuedDate || a.invoiceGeneratedDate).getTime();
       const bDate = new Date(b.issuedDate || b.invoiceGeneratedDate).getTime();
       return bDate - aDate;

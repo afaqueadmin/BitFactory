@@ -128,6 +128,9 @@ export default function CustomerOverviewContent() {
   const [franchiseeLookupError, setFranchiseeLookupError] = useState("");
   const [changePasswordModalOpen, setChangePasswordModalOpen] = useState(false);
   const [accountTypeModalOpen, setAccountTypeModalOpen] = useState(false);
+  const [accountTypeTarget, setAccountTypeTarget] = useState<
+    "FRANCHISEE" | "SIMULATED"
+  >("FRANCHISEE");
   const [showDeleted, setShowDeleted] = useState(false);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<FetchedUser | null>(
@@ -528,8 +531,11 @@ export default function CustomerOverviewContent() {
     }
   };
 
-  const handleChangeAccountType = () => {
+  const handleChangeAccountType = (
+    target: "FRANCHISEE" | "SIMULATED" = "FRANCHISEE",
+  ) => {
     if (selectedCustomer) {
+      setAccountTypeTarget(target);
       setAccountTypeModalOpen(true);
     }
     handleMenuClose();
@@ -647,6 +653,7 @@ export default function CustomerOverviewContent() {
         onClose={handleModalClose}
         onSuccess={handleUserCreated}
         customer={selectedCustomer}
+        target={accountTypeTarget}
       />
 
       <Snackbar
@@ -1110,7 +1117,7 @@ export default function CustomerOverviewContent() {
         {(selectedCustomer?.role === "CLIENT" ||
           selectedCustomer?.role === "FRANCHISEE") && (
           <MenuItem
-            onClick={handleChangeAccountType}
+            onClick={() => handleChangeAccountType("FRANCHISEE")}
             disabled={
               selectedCustomer.isDeleted || !canManage(selectedCustomer)
             }
@@ -1118,6 +1125,16 @@ export default function CustomerOverviewContent() {
             {selectedCustomer.role === "FRANCHISEE"
               ? "Change to Regular Customer"
               : "Change to Franchisee"}
+          </MenuItem>
+        )}
+        {selectedCustomer?.role === "CLIENT" && (
+          <MenuItem
+            onClick={() => handleChangeAccountType("SIMULATED")}
+            disabled={
+              selectedCustomer.isDeleted || !canManage(selectedCustomer)
+            }
+          >
+            Change to Simulated Account
           </MenuItem>
         )}
         {selectedCustomer?.isDeleted ? (

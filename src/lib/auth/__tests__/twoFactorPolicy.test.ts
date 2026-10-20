@@ -12,7 +12,7 @@ afterEach(() => {
 });
 
 describe("twoFactorRequirement", () => {
-  it.each(["SUPER_ADMIN", "ADMIN", "FRANCHISEE", "CLIENT"])(
+  it.each(["SUPER_ADMIN", "ADMIN", "FRANCHISEE", "CLIENT", "SIMULATED"])(
     "applies to %s",
     (role) => {
       expect(twoFactorRequirement(role, false, BEFORE)).toBe("grace");

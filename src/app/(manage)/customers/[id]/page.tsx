@@ -19,7 +19,10 @@ import {
   Checkbox,
   ListItemText,
 } from "@mui/material";
-import { ArrowBack as ArrowBackIcon } from "@mui/icons-material";
+import {
+  ArrowBack as ArrowBackIcon,
+  Email as EmailIcon,
+} from "@mui/icons-material";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import ElectricityCostTable from "@/components/ElectricityCostTable";
 import HostedMinersList from "@/components/HostedMinersList";
@@ -530,7 +533,28 @@ export default function CustomerDetailPage() {
                 </Box>
               )}
             </Box>
-            {BtcLivePriceComponent}
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "flex-end",
+                gap: 1.5,
+              }}
+            >
+              {BtcLivePriceComponent}
+              {/* Opens the compose page in a new tab: email the customer a
+                  PDF of their wallet page. */}
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<EmailIcon />}
+                href={`/customers/${customerId}/wallet-email`}
+                target="_blank"
+                rel="noopener"
+              >
+                Email wallet snapshot
+              </Button>
+            </Box>
           </Box>
 
           {error && (

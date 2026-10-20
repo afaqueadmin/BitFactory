@@ -15,6 +15,12 @@
  *   account owned before (converted away earlier) is brought back with the
  *   new details, so it keeps its code and history; otherwise one is created.
  *
+ * CLIENT -> SIMULATED    { role: "SIMULATED" }
+ *   Simulated account (src/lib/simulation). Only for a direct customer with no
+ *   miners, pool subaccounts, invoices or payments - e.g. a Potential
+ *   Customer - since simulated accounts are never billed. Their simulated data
+ *   starts at the conversion, not at registration.
+ *
  * The account is signed out everywhere, since its role is part of the token.
  * Same tier rules as deletion (an ADMIN acts on CLIENT/FRANCHISEE accounts).
  */
@@ -26,6 +32,10 @@ import { sessionCutoffNow } from "@/lib/auth/sessionRevocation";
 import { canManageAccount } from "@/lib/auth/accountTiers";
 import { resolveLuxorSubaccounts } from "@/lib/luxorSubaccounts";
 import { generateFranchiseCode } from "@/lib/franchiseCode";
+import {
+  SimConversionError,
+  convertToSimulated,
+} from "@/lib/simulation/convert";
 
 export const runtime = "nodejs";
 
@@ -323,8 +333,22 @@ export async function POST(
       });
     }
 
+    if (body.role === "SIMULATED") {
+      try {
+        const { label: converted } = await convertToSimulated(id, actorId);
+        return NextResponse.json({
+          message: `${converted} is now a simulated account. Their simulated data starts today.`,
+        });
+      } catch (error) {
+        if (error instanceof SimConversionError) {
+          return NextResponse.json({ error: error.message }, { status: 400 });
+        }
+        throw error;
+      }
+    }
+
     return NextResponse.json(
-      { error: "role must be CLIENT or FRANCHISEE" },
+      { error: "role must be CLIENT, FRANCHISEE or SIMULATED" },
       { status: 400 },
     );
   } catch (error) {

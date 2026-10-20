@@ -13,6 +13,12 @@ import { sendWorkerTransactionCronSummaryEmail } from "@/lib/email";
 // happened. skipDuplicates makes re-fetching the same days on every run safe.
 const RETRY_WINDOW_DAYS = 3;
 
+// Two sequential passes over every subaccount with 500ms spacing and 429
+// backoff took ~145s in a manual run (2026-10-20). Without an explicit limit
+// the platform default can kill the run mid-way, before anything is written
+// or the summary email is sent.
+export const maxDuration = 300;
+
 /**
  * GET /api/cron_pool_worker_transactions
  *

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
 import { AuditAction, InvoiceStatus } from "@prisma/client";
+import { simRoute } from "@/lib/simulation/context";
+import { SIM_INVOICE_ID, loadSimInvoice } from "@/lib/simulation/invoice";
 import { sendInvoiceCancellationEmail } from "@/lib/email";
 import { getGroupByUserId } from "@/lib/groupUtils";
 import { InvoiceEmailService } from "@/services/invoiceEmailService";
@@ -45,11 +47,24 @@ export async function GET(
     }
 
     let requesterId: string;
+    let decoded;
     try {
-      ({ userId: requesterId } = await verifyJwtToken(token));
+      decoded = await verifyJwtToken(token);
+      requesterId = decoded.userId;
     } catch {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    // Simulated accounts only have their view-only invoice (never stored).
+    const sim = await simRoute(decoded, async (ctx) =>
+      id === SIM_INVOICE_ID
+        ? NextResponse.json(
+            { ...(await loadSimInvoice(ctx)), group: null },
+            { headers: { "Cache-Control": "no-store" } },
+          )
+        : NextResponse.json({ error: "Invoice not found" }, { status: 404 }),
+    );
+    if (sim) return sim;
 
     const requester = await prisma.user.findUnique({
       where: { id: requesterId },

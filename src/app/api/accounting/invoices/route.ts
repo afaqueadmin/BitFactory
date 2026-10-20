@@ -17,6 +17,8 @@ import {
   nextInvoiceNumber,
 } from "./invoiceNumber";
 import { createRepairInvoice } from "./repair";
+import { simRoute } from "@/lib/simulation/context";
+import { loadSimInvoice } from "@/lib/simulation/invoice";
 import {
   buildInvoiceListWhere,
   buildInvoiceOrderBy,
@@ -51,7 +53,15 @@ export async function GET(request: NextRequest) {
     const decoded = await verifyJwtToken(token);
     const userRole = decoded.role;
 
-    if (customerId && userRole === "CLIENT" && customerId != decoded.userId) {
+    // Anyone who isn't staff or a franchisee (clients, simulated accounts, any
+    // future role) may only ask for their own invoices.
+    if (
+      customerId &&
+      userRole !== "ADMIN" &&
+      userRole !== "SUPER_ADMIN" &&
+      userRole !== "FRANCHISEE" &&
+      customerId !== decoded.userId
+    ) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -70,6 +80,21 @@ export async function GET(request: NextRequest) {
         { status: 403 },
       );
     }
+
+    // Simulated accounts: their one view-only hardware + hosting invoice,
+    // built in code (never in the invoices table).
+    const sim = await simRoute(decoded, async (ctx) =>
+      NextResponse.json({
+        invoices: [await loadSimInvoice(ctx)],
+        pagination: {
+          page: 1,
+          limit: parseInt(searchParams.get("limit") || "10", 10),
+          total: 1,
+          pages: 1,
+        },
+      }),
+    );
+    if (sim) return sim;
 
     const { sortBy, sortDirection } = parseInvoiceListSort(searchParams);
     const page = parseInt(searchParams.get("page") || "1", 10);

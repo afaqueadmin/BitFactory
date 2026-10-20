@@ -32,6 +32,7 @@ import DownloadIcon from "@mui/icons-material/Download";
 import PayWithBitcoinButton from "@/components/PayWithBitcoinButton";
 import PayWithBinanceButton from "@/components/PayWithBinanceButton";
 import { RepairMinerDetails } from "@/components/accounting/invoices/RepairMinerDetails";
+import { useUser } from "@/lib/hooks/useUser";
 
 type RepairLineRow = {
   id: string;
@@ -45,6 +46,9 @@ export default function CustomerInvoiceDetailPage() {
   const params = useParams();
   const router = useRouter();
   const { invoice, loading, error } = useInvoice(params.id as string);
+  // Simulated accounts' invoice is view only: it can't be paid.
+  const { user } = useUser();
+  const isSimulated = user?.role === "SIMULATED";
   const [downloadLoading, setDownloadLoading] = useState(false);
   const [memoDownloadingId, setMemoDownloadingId] = useState<string | null>(
     null,
@@ -187,20 +191,28 @@ export default function CustomerInvoiceDetailPage() {
             >
               {downloadLoading ? "Downloading..." : "Download Invoice"}
             </Button>
-            {process.env.NEXT_PUBLIC_BTCPAY_ENABLED === "true" &&
-              ["sonofaunali@gmail.com", "hamzanajeebmusic@gmail.com"] //@TODO: remove this condition when feature is ready
-                .includes(invoice.user.email) && (
-                <PayWithBitcoinButton
+            {isSimulated ? (
+              <Typography variant="caption" color="text.secondary">
+                Simulated invoice - view only
+              </Typography>
+            ) : (
+              <>
+                {process.env.NEXT_PUBLIC_BTCPAY_ENABLED === "true" &&
+                  ["sonofaunali@gmail.com", "hamzanajeebmusic@gmail.com"] //@TODO: remove this condition when feature is ready
+                    .includes(invoice.user.email) && (
+                    <PayWithBitcoinButton
+                      invoiceId={invoice.id}
+                      disabled={invoice.status === "PAID"}
+                    />
+                  )}
+                <PayWithBinanceButton
                   invoiceId={invoice.id}
-                  disabled={invoice.status === "PAID"}
+                  disabled={
+                    invoice.status === "PAID" || invoice.status === "CANCELLED"
+                  }
                 />
-              )}
-            <PayWithBinanceButton
-              invoiceId={invoice.id}
-              disabled={
-                invoice.status === "PAID" || invoice.status === "CANCELLED"
-              }
-            />
+              </>
+            )}
           </Box>
         </Box>
         <Typography variant="h4" sx={{ fontWeight: 700 }}>

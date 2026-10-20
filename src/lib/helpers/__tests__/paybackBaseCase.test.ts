@@ -33,6 +33,24 @@ describe("buildPaybackBaseCase", () => {
     expect(baseCase.historyDays).toBe(2);
   });
 
+  it("quadruples the cost for the 2032 halving", () => {
+    const history = [
+      point("2026-10-01", 65000, 50000), // +30%
+      point("2026-10-02", 67500, 50000), // +35%
+    ];
+    const baseCase = buildPaybackBaseCase(
+      55000,
+      history,
+      "STOCK",
+      [250000, 300000, 350000],
+      4,
+    )!;
+
+    expect(baseCase.postHalvingCost).toBe(220000);
+    expect(baseCase.basePrice).toBeCloseTo(291500);
+    expect(baseCase.scenarioPrice).toBe(300000);
+  });
+
   it("uses the selected OS's breakeven", () => {
     const history = [point("2026-10-01", 60000, 50000, 40000)]; // custom +50%
     const baseCase = buildPaybackBaseCase(40000, history, "CUSTOM", PRICES)!;

@@ -8,6 +8,8 @@ import {
   selectRequestedSubaccounts,
   joinSubaccountNames,
 } from "@/lib/luxorSubaccounts";
+import { simRoute } from "@/lib/simulation/context";
+import { loadSimPoolLedger } from "@/lib/simulation/data";
 
 /**
  * Transaction object from unified transaction history
@@ -220,6 +222,81 @@ export async function GET(request: NextRequest) {
 
     const userStartDate = searchParams.get("start_date");
     const userEndDate = searchParams.get("end_date");
+
+    // Simulated accounts: the simulated ledger (daily revenue credits, monthly
+    // payout debits), filtered and paged the same way as real history.
+    const sim = await simRoute(decoded, async (ctx) => {
+      const now = ctx.now;
+      let from = new Date("2020-01-01");
+      let to = now;
+      if (isLivePreferred) {
+        const days = rangeParam === "10d" ? 10 : rangeParam === "20d" ? 20 : 30;
+        from = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+      } else if (userStartDate || userEndDate) {
+        if (userStartDate) from = new Date(userStartDate);
+        if (userEndDate) to = new Date(userEndDate);
+      }
+
+      const { transactions } = await loadSimPoolLedger(ctx);
+      const matching: WalletTransaction[] = wantLuxor
+        ? transactions.filter((tx) => {
+            const at = new Date(tx.date_time);
+            return (
+              at >= from &&
+              at <= to &&
+              (typeFilter === "all" || tx.transaction_type === typeFilter)
+            );
+          })
+        : [];
+
+      const stats = emptyStats();
+      for (const tx of matching) accumulate(stats, tx);
+      const net = (a: number, b: number, dp: number) =>
+        parseFloat((a - b).toFixed(dp));
+
+      const totalItems = matching.length;
+      const totalPages = exportAll ? 1 : Math.ceil(totalItems / limit);
+      const pageRows = exportAll
+        ? matching
+        : matching.slice((page - 1) * limit, page * limit);
+
+      return NextResponse.json(
+        {
+          transactions: pageRows,
+          pagination: {
+            pageNumber: page,
+            pageSize: limit,
+            totalItems,
+            totalPages,
+            hasNextPage: page < totalPages,
+            hasPreviousPage: page > 1,
+          },
+          summary: {
+            totalCredits: parseFloat(stats.totalCredits.toFixed(8)),
+            totalDebits: parseFloat(stats.totalDebits.toFixed(8)),
+            netAmount: net(stats.totalCredits, stats.totalDebits, 8),
+            totalCreditsUsd: parseFloat(stats.totalCreditsUsd.toFixed(2)),
+            totalDebitsUsd: parseFloat(stats.totalDebitsUsd.toFixed(2)),
+            netAmountUsd: net(stats.totalCreditsUsd, stats.totalDebitsUsd, 2),
+          },
+          poolBreakdown: {
+            luxor: {
+              ...stats,
+              netAmount: net(stats.totalCredits, stats.totalDebits, 8),
+              netAmountUsd: net(stats.totalCreditsUsd, stats.totalDebitsUsd, 2),
+            },
+            braiins: {
+              ...emptyStats(),
+              netAmount: 0,
+              netAmountUsd: 0,
+            },
+          },
+          source: "db",
+        },
+        { headers: { "Cache-Control": "no-store" } },
+      );
+    });
+    if (sim) return sim;
 
     // Get PoolAuth entries for this user (contains API keys). Which pools
     // are active is determined directly from PoolAuth, not from

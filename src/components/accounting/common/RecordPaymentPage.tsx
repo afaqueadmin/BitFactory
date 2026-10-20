@@ -24,17 +24,16 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import Link from "next/link";
 import { useInvoice, useRecordPayment } from "@/lib/hooks/useInvoices";
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
-import {
-  EMPTY_PAYMENT_ACCOUNT,
-  PaymentAccountFields,
-  PaymentAccountValue,
-  conversionRate,
-  formatCurrencyAmount,
-  isPaymentAccountComplete,
-  parseExchangeRate,
-  usdToCurrency,
-} from "@/components/accounting/common/PaymentAccountFields";
 import { AmountDueInCurrency } from "@/components/accounting/common/AmountDueInCurrency";
+import {
+  PaymentPartValue,
+  PaymentPartsFields,
+  isPartComplete,
+  newPaymentPart,
+  partsEnteredAmount,
+  partsPayload,
+  partsTotalUsd,
+} from "@/components/accounting/common/PaymentPartsFields";
 import { CostPayment } from "@prisma/client";
 import {
   lineItemBucket,
@@ -46,11 +45,18 @@ interface RecordPaymentPageProps {
   basePath: string;
 }
 
-/** Typed amount as a number; blank or invalid counts as 0. */
-const toNumber = (value: string) => {
-  const n = Number(value);
-  return value.trim() !== "" && Number.isFinite(n) ? n : 0;
-};
+/** Mark as Paid: one part per section, amounts cleared. */
+const clearAmounts = (parts: PaymentPartValue[]) =>
+  parts.slice(0, 1).map((p) => ({ ...p, amount: "" }));
+
+/**
+ * Whether a section's parts can be submitted. With Mark as Paid only the
+ * account and rate are needed (a zero-amount payment is recorded);
+ * otherwise every part needs an amount > 0.
+ */
+const sectionReady = (parts: PaymentPartValue[], markAsPaid: boolean) =>
+  parts.length > 0 &&
+  parts.every((p) => isPartComplete(p, { allowZeroAmount: markAsPaid }));
 
 export default function RecordPaymentPage({
   basePath,
@@ -67,20 +73,21 @@ export default function RecordPaymentPage({
     error: paymentError,
   } = useRecordPayment();
 
-  // Amounts are kept as typed text, in the selected currency.
   const [formData, setFormData] = useState({
-    amountPaid: "",
-    hostingAmountPaid: "",
     paymentDate: new Date().toISOString().split("T")[0],
     notes: "",
     hostingNotes: "",
     markAsPaid: false,
   });
-  // One receiving account, currency and rate for the whole payment; in the
-  // split form it applies to both sections (D7).
-  const [account, setAccount] = useState<PaymentAccountValue>(
-    EMPTY_PAYMENT_ACCOUNT,
-  );
+  // The payment's currency parts, each with its own receiving account,
+  // currency, rate and amount (typed text, in that currency). The split
+  // form has a separate list for the hosting section.
+  const [parts, setParts] = useState<PaymentPartValue[]>(() => [
+    newPaymentPart(),
+  ]);
+  const [hostingParts, setHostingParts] = useState<PaymentPartValue[]>(() => [
+    newPaymentPart(),
+  ]);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -132,39 +139,30 @@ export default function RecordPaymentPage({
   const hardwareOutstanding = hardwareSubtotal - hardwarePaid;
   const hostingOutstanding = hostingSubtotal - hostingPaid;
 
-  // Entered amounts, and their USD value at the chosen rate.
-  const rate = parseExchangeRate(account);
-  const currencyCode = account.currencyCode;
-  const enteredAmount = toNumber(formData.amountPaid);
-  const enteredHosting = isSplitPayment
-    ? toNumber(formData.hostingAmountPaid)
-    : 0;
+  // Entered amounts (any currency, for "> 0" checks) and their USD value.
+  const enteredAmount = partsEnteredAmount(parts);
+  const enteredHosting = isSplitPayment ? partsEnteredAmount(hostingParts) : 0;
   const enteredTotal = enteredAmount + enteredHosting;
-  const enteredTotalUsd = rate ? enteredTotal / rate : 0;
-  const amountLabel = currencyCode
-    ? `Amount Paid (${currencyCode})`
-    : "Amount Paid";
-  const usdHint = (value: number) =>
-    rate && value > 0 && currencyCode !== "USD"
-      ? ` ≈ $${(value / rate).toFixed(2)} USD`
-      : "";
-  // " (20.00 AED settles it)" - the outstanding in the payment currency.
-  const convRate = conversionRate(account);
-  const settleHint = (outstandingUsd: number) =>
-    convRate && outstandingUsd > 0
-      ? ` (${formatCurrencyAmount(usdToCurrency(outstandingUsd, convRate), currencyCode)} settles it)`
-      : "";
+  const enteredTotalUsd =
+    partsTotalUsd(parts) + (isSplitPayment ? partsTotalUsd(hostingParts) : 0);
+
+  // On the split form a section with nothing entered is left out; with
+  // Mark as Paid both sections are recorded (as zero-amount payments).
+  const { markAsPaid } = formData;
+  const sendHardware = markAsPaid || !isSplitPayment || enteredAmount > 0;
+  const sendHosting = isSplitPayment && (markAsPaid || enteredHosting > 0);
+  const canSubmit =
+    (sendHardware || sendHosting) &&
+    (!sendHardware || sectionReady(parts, markAsPaid)) &&
+    (!sendHosting || sectionReady(hostingParts, markAsPaid));
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, checked, type } = e.target;
     const fieldValue = type === "checkbox" ? checked : value;
 
     if (name === "markAsPaid" && checked) {
-      setFormData((prev) => ({
-        ...prev,
-        amountPaid: "",
-        hostingAmountPaid: "",
-      }));
+      setParts(clearAmounts);
+      setHostingParts(clearAmounts);
     }
     setFormData((prev) => ({
       ...prev,
@@ -180,39 +178,31 @@ export default function RecordPaymentPage({
       setError(null);
 
       // Validate
-      if (!isPaymentAccountComplete(account)) {
+      if (!markAsPaid && isSplitPayment && !sendHardware && !sendHosting) {
         throw new Error(
-          "Select the entity, bank and currency, and enter the exchange rate",
+          "Enter a Hardware Sales Payment amount and/or a Hosting and Colocation Payment amount greater than 0",
         );
       }
-      if (!formData.markAsPaid) {
-        if (isSplitPayment) {
-          if (enteredAmount <= 0 && enteredHosting <= 0) {
-            throw new Error(
-              "Enter a Hardware Sales Payment amount and/or a Hosting and Colocation Payment amount greater than 0",
-            );
-          }
-        } else if (enteredAmount <= 0) {
-          throw new Error("Payment amount must be greater than 0");
-        }
+      if (!canSubmit) {
+        throw new Error(
+          markAsPaid
+            ? "Select the entity, bank and currency, and enter the exchange rate"
+            : "Complete every currency part: entity, bank, currency, exchange rate and an amount greater than 0",
+        );
       }
 
       // Call API to record payment
       await recordPayment(invoiceId, {
-        amountPaid: formData.amountPaid.trim() || "0",
         paymentDate: formData.paymentDate,
         notes: formData.notes,
+        markAsPaid,
+        parts: sendHardware ? partsPayload(parts) : [],
         ...(isSplitPayment
           ? {
-              hostingAmountPaid: formData.hostingAmountPaid.trim() || "0",
+              hostingParts: sendHosting ? partsPayload(hostingParts) : [],
               hostingNotes: formData.hostingNotes,
             }
           : {}),
-        markAsPaid: formData.markAsPaid,
-        entityId: account.entityId,
-        bankId: account.bankId,
-        currencyId: account.currencyId,
-        exchangeRate: account.exchangeRate.trim(),
       });
 
       // Redirect back to invoice detail
@@ -250,25 +240,7 @@ export default function RecordPaymentPage({
     );
   }
 
-  const accountBlock = (
-    <Box>
-      <h3 style={{ marginTop: 0, marginBottom: 16 }}>Received Into</h3>
-      <PaymentAccountFields
-        value={account}
-        onChange={setAccount}
-        disabled={loading || paymentLoading}
-      />
-      {isSplitPayment && (
-        <Typography
-          variant="caption"
-          color="textSecondary"
-          sx={{ display: "block", mt: 1 }}
-        >
-          Applies to both the hardware and hosting payments.
-        </Typography>
-      )}
-    </Box>
-  );
+  const busy = loading || paymentLoading;
 
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
@@ -306,10 +278,6 @@ export default function RecordPaymentPage({
         <Paper sx={{ p: 4 }}>
           <form onSubmit={handleSubmit}>
             <Stack spacing={3}>
-              {accountBlock}
-
-              <Divider />
-
               {isSplitPayment ? (
                 <>
                   <Box>
@@ -317,16 +285,13 @@ export default function RecordPaymentPage({
                       Hardware Sales Payment
                     </h3>
                     <Stack spacing={2}>
-                      <TextField
-                        label={amountLabel}
-                        name="amountPaid"
-                        type="number"
-                        value={formData.amountPaid}
-                        onChange={handleInputChange}
-                        fullWidth
-                        inputProps={{ min: 0, step: 0.01 }}
-                        helperText={`Enter the hardware sales payment amount${settleHint(hardwareOutstanding)}${usdHint(enteredAmount)}`}
-                        disabled={formData.markAsPaid || !rate}
+                      <PaymentPartsFields
+                        parts={parts}
+                        onChange={setParts}
+                        disabled={busy}
+                        amountsDisabled={markAsPaid}
+                        targetUsd={hardwareOutstanding}
+                        amountLabel="hardware sales payment"
                       />
                       <TextField
                         label="Notes (Optional)"
@@ -346,16 +311,13 @@ export default function RecordPaymentPage({
                       Hosting and Colocation Payment
                     </h3>
                     <Stack spacing={2}>
-                      <TextField
-                        label={amountLabel}
-                        name="hostingAmountPaid"
-                        type="number"
-                        value={formData.hostingAmountPaid}
-                        onChange={handleInputChange}
-                        fullWidth
-                        inputProps={{ min: 0, step: 0.01 }}
-                        helperText={`Enter the hosting and colocation payment amount${settleHint(hostingOutstanding)}${usdHint(enteredHosting)}`}
-                        disabled={formData.markAsPaid || !rate}
+                      <PaymentPartsFields
+                        parts={hostingParts}
+                        onChange={setHostingParts}
+                        disabled={busy}
+                        amountsDisabled={markAsPaid}
+                        targetUsd={hostingOutstanding}
+                        amountLabel="hosting and colocation payment"
                       />
                       <TextField
                         label="Notes (Optional)"
@@ -402,47 +364,23 @@ export default function RecordPaymentPage({
                     Payment Details
                   </h3>
                   <Stack spacing={2}>
-                    <Box
-                      sx={{ display: "flex", gap: 2, alignItems: "flex-start" }}
-                    >
-                      <Box sx={{ flex: 1 }}>
-                        <TextField
-                          label={amountLabel}
-                          name="amountPaid"
-                          type="number"
-                          value={formData.amountPaid}
+                    <PaymentPartsFields
+                      parts={parts}
+                      onChange={setParts}
+                      disabled={busy}
+                      amountsDisabled={markAsPaid}
+                      targetUsd={outstandingAmount}
+                    />
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          name="markAsPaid"
+                          checked={formData.markAsPaid}
                           onChange={handleInputChange}
-                          fullWidth
-                          inputProps={{ min: 0, step: 0.01 }}
-                          helperText={
-                            rate
-                              ? `Enter the payment amount${settleHint(outstandingAmount)}${usdHint(enteredAmount)}`
-                              : "Choose the currency and rate first"
-                          }
-                          required={!formData.markAsPaid}
-                          disabled={formData.markAsPaid || !rate}
                         />
-                      </Box>
-                      <Box
-                        sx={{
-                          flex: 1,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                      >
-                        <FormControlLabel
-                          control={
-                            <Checkbox
-                              name="markAsPaid"
-                              checked={formData.markAsPaid}
-                              onChange={handleInputChange}
-                            />
-                          }
-                          label="Mark as Paid"
-                        />
-                      </Box>
-                    </Box>
+                      }
+                      label="Mark as Paid"
+                    />
                     <TextField
                       label="Payment Date"
                       name="paymentDate"
@@ -478,15 +416,7 @@ export default function RecordPaymentPage({
                   startIcon={
                     loading ? <CircularProgress size={20} /> : <SaveIcon />
                   }
-                  disabled={
-                    loading ||
-                    paymentLoading ||
-                    !isPaymentAccountComplete(account) ||
-                    (!formData.markAsPaid &&
-                      (isSplitPayment
-                        ? enteredAmount <= 0 && enteredHosting <= 0
-                        : enteredAmount <= 0))
-                  }
+                  disabled={busy || !canSubmit}
                 >
                   {loading ? "Recording..." : "Record Payment"}
                 </Button>
@@ -530,11 +460,13 @@ export default function RecordPaymentPage({
                       </Typography>
                       <CurrencyDisplay value={hardwareOutstanding} />
                     </Stack>
-                    <AmountDueInCurrency
-                      usd={hardwareOutstanding}
-                      account={account}
-                      compact
-                    />
+                    {parts.length === 1 && (
+                      <AmountDueInCurrency
+                        usd={hardwareOutstanding}
+                        account={parts[0]}
+                        compact
+                      />
+                    )}
                   </Box>
                   <Box>
                     <Typography sx={{ fontWeight: 600, mb: 0.5 }}>
@@ -552,11 +484,13 @@ export default function RecordPaymentPage({
                       </Typography>
                       <CurrencyDisplay value={hostingOutstanding} />
                     </Stack>
-                    <AmountDueInCurrency
-                      usd={hostingOutstanding}
-                      account={account}
-                      compact
-                    />
+                    {hostingParts.length === 1 && (
+                      <AmountDueInCurrency
+                        usd={hostingOutstanding}
+                        account={hostingParts[0]}
+                        compact
+                      />
+                    )}
                   </Box>
                 </>
               )}
@@ -581,13 +515,17 @@ export default function RecordPaymentPage({
                   variant="h6"
                   fontWeight="bold"
                 />
-                <AmountDueInCurrency
-                  usd={outstandingAmount}
-                  account={account}
-                />
+                {/* In the payment currency only while there's one currency
+                    part (and, on the split form, one account for both). */}
+                {!isSplitPayment && parts.length === 1 && (
+                  <AmountDueInCurrency
+                    usd={outstandingAmount}
+                    account={parts[0]}
+                  />
+                )}
               </Box>
 
-              {enteredTotal > 0 && rate && (
+              {enteredTotal > 0 && enteredTotalUsd > 0 && (
                 <Box
                   sx={{
                     p: 1.5,

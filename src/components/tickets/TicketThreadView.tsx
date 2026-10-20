@@ -21,6 +21,7 @@ import {
   TicketStatusBadge,
   TicketPriorityBadge,
   TicketCategoryLabel,
+  SimulatedAccountTag,
 } from "./TicketBadges";
 import {
   TICKET_STATUSES,
@@ -29,11 +30,13 @@ import {
   TICKET_PRIORITY_LABELS,
 } from "@/lib/constants/tickets";
 import { RADIUS_CARD, useDaylight } from "@/lib/daylight";
+import { isCustomerRole } from "@/lib/customerRoles";
 
 interface TicketThreadViewProps {
   ticketId: string;
   currentUserId: string;
-  currentUserRole: "ADMIN" | "SUPER_ADMIN" | "CLIENT" | "FRANCHISEE";
+  currentUserRole:
+    "ADMIN" | "SUPER_ADMIN" | "CLIENT" | "FRANCHISEE" | "SIMULATED";
   /** Extra content rendered above the thread (e.g. an assignment control, admin-only). */
   headerExtra?: React.ReactNode;
   daylight?: boolean;
@@ -150,6 +153,7 @@ export default function TicketThreadView({
                 {ticket.onBehalfOf
                   ? ` for ${ticket.onBehalfOf.name || ticket.onBehalfOf.email}`
                   : ""}
+                <SimulatedAccountTag role={ticket.raisedBy.role} />
                 {ticket.franchise ? ` · ${ticket.franchise.businessName}` : ""}
                 {ticket.miner ? ` · Miner: ${ticket.miner.name}` : ""}
                 {ticket.invoice
@@ -220,7 +224,7 @@ export default function TicketThreadView({
               {statusError}
             </Alert>
           )}
-          {currentUserRole === "CLIENT" && canClose && (
+          {isCustomerRole(currentUserRole) && canClose && (
             <Box sx={{ mt: 2 }}>
               <Button
                 variant="outlined"
@@ -417,6 +421,7 @@ export default function TicketThreadView({
               {ticket.onBehalfOf
                 ? ` for ${ticket.onBehalfOf.name || ticket.onBehalfOf.email}`
                 : ""}
+              <SimulatedAccountTag role={ticket.raisedBy.role} />
               {ticket.franchise ? ` · ${ticket.franchise.businessName}` : ""}
               {ticket.miner ? ` · Miner: ${ticket.miner.name}` : ""}
               {ticket.invoice
@@ -493,7 +498,7 @@ export default function TicketThreadView({
             {statusError}
           </Alert>
         )}
-        {currentUserRole === "CLIENT" && canClose && (
+        {isCustomerRole(currentUserRole) && canClose && (
           <Box sx={{ mt: 2 }}>
             <Button
               variant="outlined"

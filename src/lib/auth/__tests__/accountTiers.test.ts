@@ -1,14 +1,21 @@
 import { describe, expect, it } from "vitest";
 import { canManageAccount } from "@/lib/auth/accountTiers";
 
-const ROLES = ["CLIENT", "FRANCHISEE", "ADMIN", "SUPER_ADMIN"] as const;
+const ROLES = [
+  "CLIENT",
+  "FRANCHISEE",
+  "SIMULATED",
+  "ADMIN",
+  "SUPER_ADMIN",
+] as const;
 
 // actor → targets it may manage (N-8)
 const ALLOWED: Record<string, string[]> = {
   CLIENT: [],
   FRANCHISEE: [],
-  ADMIN: ["CLIENT", "FRANCHISEE"],
-  SUPER_ADMIN: ["CLIENT", "FRANCHISEE", "ADMIN"],
+  SIMULATED: [],
+  ADMIN: ["CLIENT", "FRANCHISEE", "SIMULATED"],
+  SUPER_ADMIN: ["CLIENT", "FRANCHISEE", "SIMULATED", "ADMIN"],
 };
 
 describe("canManageAccount", () => {

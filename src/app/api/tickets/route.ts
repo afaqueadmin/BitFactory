@@ -35,6 +35,7 @@ import { verifyJwtToken } from "@/lib/jwt";
 import {
   ticketListWhereForUser,
   resolveTicketFranchiseId,
+  isCustomerRole,
   stripPriorityForClient,
 } from "@/lib/ticketScope";
 import {
@@ -135,10 +136,9 @@ export async function GET(request: NextRequest) {
 
     // Priority is a triage concept for support/franchise staff, not for the
     // client raising the ticket - never expose it to a CLIENT viewer.
-    const data =
-      auth.decoded.role === "CLIENT"
-        ? tickets.map(stripPriorityForClient)
-        : tickets;
+    const data = isCustomerRole(auth.decoded.role)
+      ? tickets.map(stripPriorityForClient)
+      : tickets;
 
     return NextResponse.json({ success: true, data });
   } catch (error) {
@@ -160,7 +160,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (auth.decoded.role !== "CLIENT" && auth.decoded.role !== "FRANCHISEE") {
+    if (
+      !isCustomerRole(auth.decoded.role) &&
+      auth.decoded.role !== "FRANCHISEE"
+    ) {
       return NextResponse.json(
         {
           success: false,
@@ -212,7 +215,7 @@ export async function POST(request: NextRequest) {
     }
     if (
       priority !== undefined &&
-      auth.decoded.role !== "CLIENT" &&
+      !isCustomerRole(auth.decoded.role) &&
       !PRIORITIES.has(priority)
     ) {
       return NextResponse.json(
@@ -348,10 +351,9 @@ export async function POST(request: NextRequest) {
           // A CLIENT can't set priority - it's a support/triage concept,
           // not the customer's call. Always NORMAL for them regardless of
           // what was submitted.
-          priority:
-            auth.decoded.role === "CLIENT"
-              ? "NORMAL"
-              : (priority as "LOW" | "NORMAL" | "HIGH" | "URGENT") || "NORMAL",
+          priority: isCustomerRole(auth.decoded.role)
+            ? "NORMAL"
+            : (priority as "LOW" | "NORMAL" | "HIGH" | "URGENT") || "NORMAL",
         },
       });
 
@@ -429,7 +431,7 @@ export async function POST(request: NextRequest) {
     });
 
     const responseData =
-      auth.decoded.role === "CLIENT" && withMessages
+      isCustomerRole(auth.decoded.role) && withMessages
         ? stripPriorityForClient(withMessages)
         : withMessages;
 

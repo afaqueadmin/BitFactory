@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
+import { simRoute } from "@/lib/simulation/context";
+import { simMinerView } from "@/lib/simulation/views";
 
 export async function GET(request: NextRequest) {
   try {
@@ -13,14 +15,20 @@ export async function GET(request: NextRequest) {
     // Verify token and get user ID
     let userId: string;
     let userRole: string;
+    let decoded;
     try {
-      const decoded = await verifyJwtToken(token);
+      decoded = await verifyJwtToken(token);
       userId = decoded.userId;
       userRole = decoded.role;
     } catch (error) {
       console.error("Token verification failed:", error);
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
+
+    const sim = await simRoute(decoded, (ctx) =>
+      NextResponse.json({ miners: [simMinerView(ctx)], count: 1 }),
+    );
+    if (sim) return sim;
     const url = new URL(request.url);
     const customerId = url.searchParams.get("customerId");
     if (customerId) {

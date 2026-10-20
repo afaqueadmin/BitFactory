@@ -46,12 +46,21 @@ export async function POST(
     }
 
     // Only a still-Pending invoice is updated, so two concurrent submits
-    // can't both record a payment.
-    const { count } = await prisma.vendorInvoice.updateMany({
-      where: { id, paymentStatus: "Pending" },
-      data: { ...parsed.data, updatedBy: userId },
+    // can't both record a payment. The status change and the currency parts
+    // are written together, or not at all.
+    const { data, parts, totalUsd, audit } = parsed;
+    const recorded = await prisma.$transaction(async (tx) => {
+      const { count } = await tx.vendorInvoice.updateMany({
+        where: { id, paymentStatus: "Pending" },
+        data: { ...data, updatedBy: userId },
+      });
+      if (count === 0) return false;
+      await tx.vendorPaymentPart.createMany({
+        data: parts.map((part) => ({ ...part, vendorInvoiceId: id })),
+      });
+      return true;
     });
-    if (count === 0) {
+    if (!recorded) {
       return NextResponse.json(
         {
           error:
@@ -61,25 +70,14 @@ export async function POST(
       );
     }
 
-    const { data } = parsed;
     await prisma.auditLog.create({
       data: {
         action: AuditAction.VENDOR_INVOICE_PAID,
         entityType: "VendorInvoice",
         entityId: id,
         userId,
-        description: `Payment of ${data.paymentAmount.toFixed(2)} recorded for vendor invoice ${invoice.invoiceNumber}`,
-        changes: JSON.stringify({
-          paidDate: data.paidDate,
-          entityId: data.paymentEntityId,
-          bankId: data.paymentBankId,
-          currencyId: data.paymentCurrencyId,
-          paymentAmount: data.paymentAmount.toString(),
-          exchangeRate: data.paymentExchangeRate.toString(),
-          paymentAmountUsd: data.paymentAmountUsd.toString(),
-          transactionFee: data.transactionFee.toString(),
-          paymentReceiptKey: data.paymentReceiptKey,
-        }),
+        description: `Payment of $${totalUsd.toFixed(2)} (${parts.length} currency part${parts.length === 1 ? "" : "s"}) recorded for vendor invoice ${invoice.invoiceNumber}`,
+        changes: JSON.stringify(audit),
       },
     });
 

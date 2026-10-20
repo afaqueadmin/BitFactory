@@ -39,6 +39,12 @@ interface ProfitLossChartProps {
    * (electricity/hardware/revenue) are left as-is - they're a semantic
    * category key, not a brand accent. */
   daylight?: boolean;
+  /** Load another customer's costs (admin wallet snapshot). */
+  customerId?: string;
+  /** Bar grow-in animation; off for the PDF snapshot. */
+  animate?: boolean;
+  /** Called once the cost fetch has settled (loaded or failed). */
+  onLoaded?: () => void;
 }
 
 const COLOR_ELECTRICITY = "#ffb300";
@@ -51,6 +57,9 @@ export default function ProfitLossChart({
   totalEarningsBtc,
   btcPriceUsd,
   daylight = false,
+  customerId,
+  animate = true,
+  onLoaded,
 }: ProfitLossChartProps) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
@@ -66,9 +75,10 @@ export default function ProfitLossChart({
         setLoading(true);
         setError(null);
 
-        const response = await fetch("/api/wallet/profit-loss", {
-          credentials: "include",
-        });
+        const response = await fetch(
+          `/api/wallet/profit-loss${customerId ? `?customerId=${encodeURIComponent(customerId)}` : ""}`,
+          { credentials: "include" },
+        );
 
         if (!response.ok) {
           throw new Error("Failed to fetch profit & loss data");
@@ -83,11 +93,14 @@ export default function ProfitLossChart({
         );
       } finally {
         setLoading(false);
+        onLoaded?.();
       }
     };
 
     fetchProfitLoss();
-  }, []);
+    // onLoaded is a one-shot readiness signal, not a fetch input.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customerId]);
 
   const revenueUsd = totalEarningsBtc * (btcPriceUsd || 0);
   const electricityCost = data?.totals.electricityCostTotal ?? 0;
@@ -339,6 +352,7 @@ export default function ProfitLossChart({
                   fill={COLOR_ELECTRICITY}
                   radius={[4, 0, 0, 4]}
                   barSize={isMobile ? 26 : 34}
+                  isAnimationActive={animate}
                 />
                 <Bar
                   dataKey="hardware"
@@ -347,6 +361,7 @@ export default function ProfitLossChart({
                   fill={COLOR_HARDWARE}
                   radius={[0, 4, 4, 0]}
                   barSize={isMobile ? 26 : 34}
+                  isAnimationActive={animate}
                 />
                 <Bar
                   dataKey="revenue"
@@ -355,6 +370,7 @@ export default function ProfitLossChart({
                   fill={COLOR_REVENUE}
                   radius={[4, 4, 4, 4]}
                   barSize={isMobile ? 26 : 34}
+                  isAnimationActive={animate}
                 />
               </BarChart>
             </ResponsiveContainer>

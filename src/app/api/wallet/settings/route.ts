@@ -8,6 +8,10 @@ import {
   resolveLuxorSubaccounts,
   selectRequestedSubaccounts,
 } from "@/lib/luxorSubaccounts";
+import { simRoute } from "@/lib/simulation/context";
+import { resolveWalletTarget } from "@/lib/walletTarget";
+import { loadSimPoolLedger } from "@/lib/simulation/data";
+import { simWalletSettings } from "@/lib/simulation/views";
 
 // Route segment config
 export const runtime = "nodejs";
@@ -76,8 +80,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     let userId: string;
     let userRole: string;
+    let decoded;
     try {
-      const decoded = await verifyJwtToken(token);
+      decoded = await verifyJwtToken(token);
       userId = decoded.userId;
       userRole = decoded.role;
     } catch (error) {
@@ -98,54 +103,42 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    // 2.5. Handle customerId parameter (admin, or franchisee for their own customer)
-    if (customerId) {
-      if (userRole === "FRANCHISEE") {
-        const owned = await prisma.user.findFirst({
-          where: { id: customerId, franchisee: { franchiseeId: userId } },
-          select: { id: true },
-        });
-        if (!owned) {
-          return NextResponse.json(
-            {
-              success: false,
-              error: "Forbidden",
-              code: "FORBIDDEN",
-              timestamp: new Date().toISOString(),
-            } as WalletErrorResponse,
-            {
-              status: 403,
-              headers: {
-                "Cache-Control": "no-store, no-cache, must-revalidate",
-              },
-            },
-          );
-        }
-      } else if (userRole !== "ADMIN" && userRole !== "SUPER_ADMIN") {
-        console.warn(
-          `[Wallet API] Non-admin user ${userId} attempted to access customerId ${customerId}`,
-        );
-        return NextResponse.json(
-          {
-            success: false,
-            error:
-              "Only administrators can access other users' wallet settings",
-            code: "FORBIDDEN",
-            timestamp: new Date().toISOString(),
-          } as WalletErrorResponse,
-          {
-            status: 403,
-            headers: {
-              "Cache-Control": "no-store, no-cache, must-revalidate",
-            },
+    // 2.4. Resolve whose settings to load: the caller, or ?customerId= for an
+    // admin (any user) or a franchisee (their own customers).
+    const target = await resolveWalletTarget(decoded, customerId);
+    if (target instanceof NextResponse) {
+      console.warn(
+        `[Wallet API] ${userRole} ${userId} denied access to customerId ${customerId}`,
+      );
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Forbidden",
+          code: "FORBIDDEN",
+          timestamp: new Date().toISOString(),
+        } as WalletErrorResponse,
+        {
+          status: 403,
+          headers: {
+            "Cache-Control": "no-store, no-cache, must-revalidate",
           },
-        );
-      }
-      userId = customerId;
-      console.log(
-        `[Wallet API] ${userRole} accessing wallet settings for user: ${customerId}`,
+        },
       );
     }
+    userId = target.userId;
+
+    // 2.5. Simulated accounts: monthly payouts, no wallet address configured.
+    const sim = await simRoute(target, async (ctx) => {
+      const { pendingBtc } = await loadSimPoolLedger(ctx);
+      return NextResponse.json(
+        {
+          ...simWalletSettings(ctx, pendingBtc),
+          timestamp: new Date().toISOString(),
+        },
+        { headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } },
+      );
+    });
+    if (sim) return sim as NextResponse;
 
     // 3. Get user from database
     const user = await prisma.user.findUnique({

@@ -7,6 +7,12 @@ import {
   selectRequestedSubaccounts,
   joinSubaccountNames,
 } from "@/lib/luxorSubaccounts";
+import { simRoute } from "@/lib/simulation/context";
+import {
+  loadSimDays,
+  loadSimLiveWorker,
+  loadSimPoolSummary,
+} from "@/lib/simulation/data";
 
 /**
  * GET /api/miners/summary
@@ -29,13 +35,69 @@ export async function GET(request: NextRequest) {
 
     // Verify token and extract user ID
     let userId: string;
+    let decoded;
     try {
-      const decoded = await verifyJwtToken(token);
+      decoded = await verifyJwtToken(token);
       userId = decoded.userId;
     } catch (error) {
       console.error("[Miners Summary API] Token verification failed:", error);
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
+
+    // Simulated accounts: the simulated worker's live hashrate; efficiency, uptime and
+    // hashprice from its subaccount (Luxor has no per-worker equivalent).
+    const sim = await simRoute(decoded, async (ctx) => {
+      const [live, pool, days] = await Promise.all([
+        loadSimLiveWorker(ctx).catch((error) => {
+          console.error("[Miners Summary API] Simulated worker failed:", error);
+          return null;
+        }),
+        loadSimPoolSummary(ctx).catch((error) => {
+          console.error(
+            "[Miners Summary API] Simulated summary failed:",
+            error,
+          );
+          return null;
+        }),
+        loadSimDays(ctx),
+      ]);
+      const hashrate = live?.hashrate ?? 0;
+      const activeMiners = live?.status === "ACTIVE" ? 1 : 0;
+      const revenue = days.length ? days[days.length - 1].btc : 0;
+      const luxor = {
+        miners: 1,
+        hashrate: parseFloat(hashrate.toFixed(2)),
+        activeWorkers: activeMiners,
+        hashprice: pool?.hashprice ?? 0,
+        efficiency_5m: pool?.efficiency_5m ?? 0,
+        uptime_24h: pool?.uptime_24h ?? 0,
+      };
+      return NextResponse.json({
+        success: true,
+        data: {
+          totalHashrate: luxor.hashrate,
+          activeMiners,
+          totalRevenue: parseFloat(revenue.toFixed(8)),
+          hashprice: luxor.hashprice,
+          efficiency_5m: luxor.efficiency_5m,
+          uptime_24h: luxor.uptime_24h,
+          activePoolNames: ["Luxor"],
+          pools: {
+            luxor,
+            braiins: {
+              miners: 0,
+              hashrate: 0,
+              activeWorkers: 0,
+              hashprice: 0,
+              efficiency_5m: 0,
+              uptime_24h: 0,
+            },
+          },
+        },
+        timestamp: new Date().toISOString(),
+      });
+    });
+    if (sim) return sim;
 
     // Get PoolAuth entries for this user (contains API keys). Which pools
     // are active is determined directly from PoolAuth, not from

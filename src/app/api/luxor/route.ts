@@ -25,12 +25,21 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyJwtToken } from "@/lib/jwt";
 import { createLuxorClient, LuxorError } from "@/lib/luxor";
 import { prisma } from "@/lib/prisma";
-import { franchiseeUserFilter } from "@/lib/franchiseeScope";
+import { isSimulatedRole } from "@/lib/simulation/config";
+import { simRoute } from "@/lib/simulation/context";
+import { loadSimLiveWorker, simWorkerForDisplay } from "@/lib/simulation/data";
 import {
   joinSubaccountNames,
   selectRequestedSubaccounts,
   type LuxorSubaccount,
 } from "@/lib/luxorSubaccounts";
+import {
+  franchiseeCustomerSubaccountNames,
+  isAdminRole,
+  parseRequestedSubaccounts,
+  resolveAllowedSubaccounts,
+  scopeRequestedSubaccounts,
+} from "@/lib/luxorProxyScope";
 
 // ✅ Ensure this runs on Node.js runtime (required for async operations)
 export const runtime = "nodejs";
@@ -71,14 +80,17 @@ const endpointMap: Record<
   // Workspace & Sites
   workspace: {
     method: "GET",
+    adminOnly: true,
     description: "Get workspace with sites list",
   },
   sites: {
     method: "GET",
+    adminOnly: true,
     description: "List all sites in workspace",
   },
   site: {
     method: "GET",
+    adminOnly: true,
     description: "Get single site by ID",
   },
 
@@ -89,6 +101,7 @@ const endpointMap: Record<
   },
   subaccount: {
     method: "GET",
+    adminOnly: true,
     description: "Get single subaccount",
   },
 
@@ -275,43 +288,21 @@ function checkAdminAccess(
 }
 
 /**
- * Helper: Resolve a FRANCHISEE user's own customers' Luxor subaccount names
- *
- * Server-side derived only — never trusts a client-supplied subaccount list,
- * matching the same security posture as the existing CLIENT branch (which
- * only ever uses the caller's own DB-stored PoolAuth subaccounts, never a
- * client-supplied value).
- *
- * @param franchiseeUserId - the authenticated FRANCHISEE user's id
- * @returns comma-joined subaccount names (empty string if none)
+ * Endpoints whose data belongs to particular subaccounts. For non-admins the
+ * subaccounts are narrowed to the caller's own (see luxorProxyScope.ts) and
+ * the company-wide site_id fallback is never used.
  */
-async function getFranchiseeSubaccountNames(
-  franchiseeUserId: string,
-): Promise<string> {
-  const customers = await prisma.user.findMany({
-    where: {
-      role: "CLIENT",
-      isDeleted: false,
-      ...franchiseeUserFilter({ id: franchiseeUserId, role: "FRANCHISEE" }),
-    },
-    select: {
-      poolAuths: {
-        where: { pool: { name: "Luxor" } },
-        select: { authKey: true },
-      },
-    },
-  });
-
-  // Every one of each customer's Luxor subaccounts (PoolAuth).
-  const names = new Set<string>();
-  for (const customer of customers) {
-    for (const { authKey: name } of customer.poolAuths) {
-      if (!name.includes("_test")) names.add(name);
-    }
-  }
-
-  return Array.from(names).join(",");
-}
+const SUBACCOUNT_SCOPED_ENDPOINTS = new Set([
+  "payment-settings",
+  "transactions",
+  "revenue",
+  "active-workers",
+  "hashrate-efficiency",
+  "workers-hashrate-efficiency",
+  "uptime",
+  "summary",
+  "dev-fee",
+]);
 
 /**
  * GET /api/luxor
@@ -415,6 +406,83 @@ export async function GET(
 
     const endpointConfig = endpointMap[endpoint];
 
+    if (endpointConfig.adminOnly) {
+      const denied = checkAdminAccess(user.role);
+      if (denied) return denied;
+    }
+
+    // ✅ STEP 2.4: Simulated accounts see the simulated worker and the pool-wide stats
+    // (no customer data) and nothing else.
+    if (isSimulatedRole(user.role)) {
+      if (endpoint === "workers") {
+        const sim = await simRoute(user, async (ctx) => {
+          const live = await loadSimLiveWorker(ctx);
+          const workers = live ? [simWorkerForDisplay(ctx, live)] : [];
+          const active = workers.filter((w) => w.status === "ACTIVE").length;
+          return NextResponse.json({
+            success: true,
+            data: {
+              currency_type: "BTC",
+              subaccounts: [],
+              total_active: active,
+              total_inactive: workers.length - active,
+              workers,
+              pagination: {
+                page_number: 1,
+                page_size: workers.length,
+                item_count: workers.length,
+                previous_page_url: null,
+                next_page_url: null,
+              },
+            },
+            timestamp: new Date().toISOString(),
+          });
+        });
+        if (sim) return sim as NextResponse<ProxyResponse>;
+      } else if (endpoint !== "pool-hashrate" && endpoint !== "pool-stats") {
+        return NextResponse.json<ProxyResponse>(
+          { success: false, error: "Not available on simulated accounts" },
+          { status: 403 },
+        );
+      }
+    }
+
+    // ✅ STEP 2.5: Scope subaccounts for non-admins. Names come from the DB,
+    // never from the request; a requested name outside them is refused.
+    const isAdmin = isAdminRole(user.role);
+    const allowedSubaccounts =
+      !isAdmin &&
+      (SUBACCOUNT_SCOPED_ENDPOINTS.has(endpoint) || endpoint === "subaccounts")
+        ? ((await resolveAllowedSubaccounts(user)) ?? [])
+        : null;
+
+    let scopedSubaccountNames: string | undefined;
+    if (!isAdmin && SUBACCOUNT_SCOPED_ENDPOINTS.has(endpoint)) {
+      const scope = scopeRequestedSubaccounts(
+        allowedSubaccounts ?? [],
+        parseRequestedSubaccounts(searchParams),
+      );
+      if (!scope.ok) {
+        console.warn(
+          `[Luxor Proxy V2] GET: ${user.role} ${user.userId} requested subaccounts outside their own: ${scope.forbidden.join(", ")}`,
+        );
+        return NextResponse.json<ProxyResponse>(
+          { success: false, error: "Access to that subaccount is not allowed" },
+          { status: 403 },
+        );
+      }
+      if (scope.names.length === 0) {
+        return NextResponse.json<ProxyResponse>(
+          {
+            success: false,
+            error: "No Luxor subaccounts are linked to this account",
+          },
+          { status: 404 },
+        );
+      }
+      scopedSubaccountNames = joinSubaccountNames(scope.names);
+    }
+
     // ✅ STEP 3: Build query parameters
     const queryParams = buildQueryParams(searchParams);
     const currency = searchParams.get("currency");
@@ -423,6 +491,12 @@ export async function GET(
     const subaccountName = searchParams.get("subaccount_name") || undefined;
     const subaccountNamesParam =
       searchParams.get("subaccount_names") || undefined;
+    // What the subaccount-scoped endpoints below send to Luxor: admins as
+    // requested (with the site fallback), everyone else only their own.
+    const scopedSubaccountName = isAdmin
+      ? subaccountName
+      : scopedSubaccountNames;
+    const scopedSiteId = isAdmin ? siteId || undefined : undefined;
 
     console.log("[Luxor Proxy V2] GET: Built query params:", queryParams);
 
@@ -555,6 +629,14 @@ export async function GET(
               `[Luxor Proxy V2] All subaccount names:`,
               allSubaccounts.map((s) => s.name),
             );
+            // Non-admins only ever see their own subaccounts in the list
+            // (the franchise dashboard uses it to check which are live).
+            if (allowedSubaccounts) {
+              const allowed = new Set(allowedSubaccounts);
+              allSubaccounts = allSubaccounts.filter((s) =>
+                allowed.has(s.name),
+              );
+            }
             data = {
               subaccounts: allSubaccounts,
             };
@@ -603,8 +685,8 @@ export async function GET(
             `[Luxor Proxy V2] GET: Getting payment settings for ${currency}`,
           );
           data = await luxorClient.getPaymentSettings(currency, {
-            subaccount_names: subaccountName,
-            site_id: siteId || undefined,
+            subaccount_names: scopedSubaccountName,
+            site_id: scopedSiteId,
             page_number: searchParams.get("page_number")
               ? parseInt(searchParams.get("page_number")!)
               : undefined,
@@ -629,8 +711,8 @@ export async function GET(
             `[Luxor Proxy V2] GET: Getting transactions for ${currency}`,
           );
           data = await luxorClient.getTransactions(currency, {
-            subaccount_names: subaccountName,
-            site_id: siteId || undefined,
+            subaccount_names: scopedSubaccountName,
+            site_id: scopedSiteId,
             start_date: searchParams.get("start_date") || undefined,
             end_date: searchParams.get("end_date") || undefined,
             transaction_type: searchParams.get("transaction_type") || undefined,
@@ -666,8 +748,9 @@ export async function GET(
               user.role === "CLIENT" && clientSelectedSubaccounts
                 ? clientSelectedSubaccounts
                 : user.role === "FRANCHISEE"
-                  ? (await getFranchiseeSubaccountNames(user.userId)) ||
-                    undefined
+                  ? joinSubaccountNames(
+                      await franchiseeCustomerSubaccountNames(user.userId),
+                    ) || undefined
                   : ["ADMIN", "SUPER_ADMIN"].includes(user.role)
                     ? subaccountNamesParam
                     : undefined,
@@ -702,8 +785,8 @@ export async function GET(
           // env-var fallback below, so it must be suppressed whenever a
           // caller-supplied subaccount_name is present.
           data = await luxorClient.getRevenue(currency, {
-            subaccount_names: subaccountName,
-            site_id: subaccountName ? undefined : siteId || undefined,
+            subaccount_names: scopedSubaccountName,
+            site_id: scopedSubaccountName ? undefined : scopedSiteId,
             start_date: searchParams.get("start_date") || undefined,
             end_date: searchParams.get("end_date") || undefined,
           });
@@ -724,8 +807,8 @@ export async function GET(
             `[Luxor Proxy V2] GET: Getting active workers for ${currency}`,
           );
           data = await luxorClient.getActiveWorkers(currency, {
-            subaccount_names: subaccountName,
-            site_id: siteId || undefined,
+            subaccount_names: scopedSubaccountName,
+            site_id: scopedSiteId,
             start_date: searchParams.get("start_date") || undefined,
             end_date: searchParams.get("end_date") || undefined,
             tick_size: searchParams.get("tick_size") || undefined,
@@ -753,8 +836,8 @@ export async function GET(
             `[Luxor Proxy V2] GET: Getting hashrate efficiency for ${currency}`,
           );
           data = await luxorClient.getHashrateEfficiency(currency, {
-            subaccount_names: subaccountName,
-            site_id: siteId || undefined,
+            subaccount_names: scopedSubaccountName,
+            site_id: scopedSiteId,
             start_date: searchParams.get("start_date") || undefined,
             end_date: searchParams.get("end_date") || undefined,
             tick_size: searchParams.get("tick_size") || undefined,
@@ -828,8 +911,8 @@ export async function GET(
           }
           console.log(`[Luxor Proxy V2] GET: Getting uptime for ${currency}`);
           data = await luxorClient.getUptime(currency, {
-            subaccount_names: subaccountName,
-            site_id: siteId || undefined,
+            subaccount_names: scopedSubaccountName,
+            site_id: scopedSiteId,
             start_date: searchParams.get("start_date") || undefined,
             end_date: searchParams.get("end_date") || undefined,
             tick_size: searchParams.get("tick_size") || undefined,
@@ -869,37 +952,22 @@ export async function GET(
             );
           }
           console.log(`[Luxor Proxy V2] GET: Getting summary for ${currency}`);
-          // NOTE: Luxor API requires exactly ONE of subaccount_names or site_id, not both
-          // Prefer subaccount_names if provided, otherwise use site_id
-
-          const summarySelectedSubaccounts = joinSubaccountNames(
-            selectRequestedSubaccounts(
-              user.luxorSubaccounts,
-              searchParams.get("subaccounts"),
-            ).map((s) => s.authKey),
-          );
+          // NOTE: Luxor API requires exactly ONE of subaccount_names or site_id, not both.
+          // Admins: the subaccount_names they pass, else the site. Everyone
+          // else: their own (scoped) subaccounts, never the site.
           data = await luxorClient.getSummary(currency, {
-            subaccount_names:
-              user.role === "CLIENT" && summarySelectedSubaccounts
-                ? summarySelectedSubaccounts
-                : ["ADMIN", "SUPER_ADMIN", "FRANCHISEE"].includes(user.role)
-                  ? subaccountNamesParam
-                  : undefined,
-            // ADMIN/SUPER_ADMIN/FRANCHISEE fall back to site_id only when no
-            // subaccount_names was supplied by the caller.
-            site_id:
-              ["ADMIN", "SUPER_ADMIN", "FRANCHISEE"].includes(user.role) &&
-              !subaccountNamesParam
-                ? siteId
-                : undefined,
+            subaccount_names: isAdmin
+              ? subaccountNamesParam
+              : scopedSubaccountNames,
+            site_id: isAdmin && !subaccountNamesParam ? siteId : undefined,
           });
           break;
 
         case "dev-fee":
           console.log("[Luxor Proxy V2] GET: Getting dev fee data");
           data = await luxorClient.getDevFee({
-            subaccount_names: subaccountName,
-            site_id: siteId || undefined,
+            subaccount_names: scopedSubaccountName,
+            site_id: scopedSiteId,
             start_date: searchParams.get("start_date") || undefined,
             end_date: searchParams.get("end_date") || undefined,
             page_number: searchParams.get("page_number")

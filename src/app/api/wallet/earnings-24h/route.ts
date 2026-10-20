@@ -7,6 +7,9 @@ import {
   selectRequestedSubaccounts,
   joinSubaccountNames,
 } from "@/lib/luxorSubaccounts";
+import { simRoute } from "@/lib/simulation/context";
+import { loadSimPoolLedger } from "@/lib/simulation/data";
+import { resolveWalletTarget } from "@/lib/walletTarget";
 
 /**
  * GET /api/wallet/earnings-24h
@@ -39,7 +42,44 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const userId = decoded.userId;
+    const target = await resolveWalletTarget(
+      decoded,
+      request.nextUrl.searchParams.get("customerId"),
+    );
+    if (target instanceof NextResponse) return target;
+
+    // Simulated accounts: simulated credits in the same date window as below.
+    const sim = await simRoute(target, async (ctx) => {
+      const { transactions } = await loadSimPoolLedger(ctx);
+      const from = new Date(ctx.now.getTime() - 24 * 60 * 60 * 1000)
+        .toISOString()
+        .split("T")[0];
+      const to = ctx.now.toISOString().split("T")[0];
+      let btc = 0;
+      let usd = 0;
+      for (const tx of transactions) {
+        const day = tx.date_time.slice(0, 10);
+        if (tx.transaction_type === "credit" && day >= from && day <= to) {
+          btc += tx.currency_amount;
+          usd += tx.usd_equivalent;
+        }
+      }
+      const luxor = {
+        btc: Number(btc.toFixed(8)),
+        usd: Number(usd.toFixed(2)),
+      };
+      return NextResponse.json({
+        revenue24h: luxor,
+        currency: "BTC",
+        timestamp: new Date().toISOString(),
+        dataSource: "luxor",
+        activePoolNames: ["Luxor"],
+        poolBreakdown: { luxor, braiins: { btc: 0, usd: 0 } },
+      });
+    });
+    if (sim) return sim;
+
+    const userId = target.userId;
     console.log(`[24h Revenue API] Fetching data for user: ${userId}`);
 
     // Get PoolAuth entries for this user (contains API keys). Which pools

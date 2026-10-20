@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { InvoiceStatus } from "@prisma/client";
 import { REPAIR_MINER_SELECT } from "@/lib/accounting/hardwareRepair";
 import { generateInvoicePDF, repairDetailsFromInvoice } from "@/lib/email";
+import { simRoute } from "@/lib/simulation/context";
+import { SIM_INVOICE_ID, loadSimInvoice } from "@/lib/simulation/invoice";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +22,56 @@ export async function GET(
     }
 
     const userId = await verifyJwtToken(token);
+
+    // Simulated accounts: their view-only invoice, rendered from code.
+    const sim = await simRoute(userId, async (ctx) => {
+      if (invoiceId !== SIM_INVOICE_ID) {
+        return NextResponse.json(
+          { error: "Invoice not found" },
+          { status: 404 },
+        );
+      }
+      const inv = await loadSimInvoice(ctx);
+      const pdf = await generateInvoicePDF(
+        inv.invoiceNumber,
+        inv.user.name || "Valued Customer",
+        inv.user.email,
+        inv.totalAmount,
+        inv.issuedDate,
+        inv.dueDate,
+        inv.totalMiners,
+        inv.unitPrice,
+        inv.id,
+        new Date(),
+        null,
+        ctx.demoMiner.hardware.model,
+        inv.billingMonth,
+        inv.status,
+        inv.paidDate,
+        inv.lineItems.map((li) => ({
+          model: li.model,
+          quantity: li.quantity,
+          unitPrice: li.unitPrice,
+          totalPrice: li.totalPrice,
+          lineItemType: li.lineItemType,
+          hardwareId: li.hardwareId,
+          billingMonth: li.billingMonth,
+          id: li.id,
+          parentLineItemId: li.parentLineItemId,
+        })),
+        inv.invoiceType,
+        inv.machineHostingLocation,
+        null,
+      );
+      return new NextResponse(pdf as unknown as ArrayBuffer, {
+        headers: {
+          "Content-Type": "application/pdf",
+          "Content-Disposition": `attachment; filename="invoice-${inv.invoiceNumber}.pdf"`,
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+        },
+      });
+    });
+    if (sim) return sim;
 
     // Fetch invoice from database
     const invoice = await prisma.invoice.findUnique({

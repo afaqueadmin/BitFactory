@@ -17,6 +17,7 @@ import { Box, Typography, Button } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import { useTickets } from "@/lib/hooks/useTickets";
 import { useUser } from "@/lib/hooks/useUser";
+import { isCustomerRole } from "@/lib/customerRoles";
 import TicketListTable from "@/components/tickets/TicketListTable";
 import CreateTicketModal from "@/components/tickets/CreateTicketModal";
 import RelationshipManagerCard from "@/components/daylight/RelationshipManagerCard";
@@ -99,7 +100,7 @@ export default function SupportPage() {
         error={error}
         detailBasePath="/support"
         showRaisedBy
-        showPriority={user?.role !== "CLIENT"}
+        showPriority={!isCustomerRole(user?.role)}
         daylight
       />
 

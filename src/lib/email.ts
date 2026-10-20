@@ -143,6 +143,70 @@ export const sendWelcomeEmail = async (email: string, tempPassword: string) => {
   }
 };
 
+/** Sign-in details for a self-registered simulated (SIMULATED) account. */
+export const sendSimulatedWelcomeEmail = async (
+  email: string,
+  name: string,
+  tempPassword: string,
+) => {
+  const mailOptions = {
+    from:
+      `BitFactory Admin <${process.env.SMTP_FROM}>` || "noreply@bitfactory.com",
+    to: email,
+    subject: "Your BitFactory Simulated Account",
+    html: `
+      <h1>Welcome to BitFactory, ${escapeHtml(name)}!</h1>
+      <p>Your simulated account is ready. It shows how a real BitFactory miner performs and earns, starting from today, with a simulated starting balance - no money involved.</p>
+      <p><strong>URL:</strong><a href="https://my.bitfactory.ae" target="_blank"> my.bitfactory.ae</a></p>
+      <p><strong>Username:</strong> ${escapeHtml(email)}</p>
+      <p><strong>Temporary Password:</strong> ${tempPassword}</p>
+      <p>For security reasons, please change your password after logging in. You'll also be asked to set up two-factor authentication.</p>
+      <p>If you didn't sign up for a simulated account, you can ignore this email.</p>
+      <br>
+      <p>Best regards,</p>
+      <p>The BitFactory Team</p>
+    `,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    return { success: true };
+  } catch (error) {
+    console.error("Error sending simulated welcome email:", error);
+    return { success: false, error };
+  }
+};
+
+/** A customer's own request for a simulated account was approved. */
+export const sendSimulatedAccountReadyEmail = async (
+  email: string,
+  name: string | null,
+) => {
+  const mailOptions = {
+    from:
+      `BitFactory Admin <${process.env.SMTP_FROM}>` || "noreply@bitfactory.com",
+    to: email,
+    subject: "Your BitFactory Simulated Account Is Ready",
+    html: `
+      <h1>Your simulated account is ready${name ? `, ${escapeHtml(name)}` : ""}!</h1>
+      <p>Your account now shows how a real BitFactory miner performs and earns, starting from today, with a simulated starting balance - no money involved.</p>
+      <p>Log in as usual at <a href="https://my.bitfactory.ae" target="_blank">my.bitfactory.ae</a> with your existing email and password.</p>
+      <p>If you have any questions, please don't hesitate to contact our support team.</p>
+      <br>
+      <p>Best regards,</p>
+      <p>The BitFactory Team</p>
+    `,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    return { success: true };
+  } catch (error) {
+    console.error("Error sending simulated account ready email:", error);
+    return { success: false, error };
+  }
+};
+
 export const sendPasswordResetEmail = async (
   email: string,
   tempPassword: string,
@@ -955,6 +1019,41 @@ export const sendCronRunSuccessfulEmail = async (userCount: number) => {
   }
 };
 
+/** Where the success emails of the smaller crons go. */
+const CRON_DEVELOPER_EMAIL = "webdeveloper.sas@gmail.com";
+
+/**
+ * "Cron run: <name>" success email to the developer, with one line per
+ * fact the cron reports (e.g. rows written).
+ */
+export const sendCronSuccessEmailToDeveloper = async (
+  cronName: string,
+  lines: string[],
+) => {
+  const mailOptions = {
+    from:
+      `BitFactory Admin <${process.env.SMTP_FROM}>` || "noreply@bitfactory.com",
+    to: CRON_DEVELOPER_EMAIL,
+    subject: `Cron run: ${cronName} - BitFactory`,
+    html: `
+      <h1>${cronName}</h1>
+      <p>Ran successfully at ${new Date().toISOString()}.</p>
+      ${lines.map((line) => `<p>${line}</p>`).join("")}
+      <br>
+      <p>Best regards,</p>
+      <p>The BitFactory Team</p>
+    `,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    return { success: true };
+  } catch (error) {
+    console.error(`Error sending ${cronName} success email:`, error);
+    return { success: false, error };
+  }
+};
+
 interface PoolCronDaySummary {
   date: string;
   results: Array<{
@@ -1317,34 +1416,74 @@ export const sendInvoiceEmailWithPDF = async (
  * Generate PDF from HTML content
  * Uses Puppeteer for server-side rendering
  */
+const launchPdfBrowser = async () => {
+  // 🔑 Required for PDFs (typings are wrong, runtime is correct)
+  // await (chromium as unknown as { fonts: () => Promise<void> }).fonts();
+  if (process.env.NODE_ENV === "production") {
+    return puppeteerCore.launch({
+      headless: true,
+      args: chromium.args,
+      //
+      //   args: [
+      //   "--no-sandbox",
+      //   "--disable-setuid-sandbox",
+      //   "--disable-dev-shm-usage",
+      //   "--disable-gpu",
+      // ],
+      executablePath: await chromium.executablePath(
+        `https://github.com/Sparticuz/chromium/releases/download/v121.0.0/chromium-v121.0.0-pack.tar`, //.br
+      ),
+    });
+  }
+  return puppeteer.launch({
+    headless: true,
+    args: ["--no-sandbox", "--disable-setuid-sandbox"],
+  });
+};
+
+/**
+ * Print one of our own app pages to an A4 PDF. The page is loaded with the
+ * given cookies (the requesting admin's session) and must set
+ * body[data-snapshot-ready="true"] once it has finished loading.
+ * `contentWidth` is the page's layout width in CSS px; the PDF is scaled so
+ * it fits the A4 width.
+ */
+export const generatePDFFromUrl = async (
+  url: string,
+  cookies: { name: string; value: string }[],
+  contentWidth: number,
+): Promise<Buffer> => {
+  const browser = await launchPdfBrowser();
+  try {
+    const page = await browser.newPage();
+    await page.setViewport({ width: contentWidth, height: 900 });
+    await page.setCookie(...cookies.map((c) => ({ ...c, url })));
+    await page.goto(url, { waitUntil: "networkidle0", timeout: 60_000 });
+    await page.waitForSelector('body[data-snapshot-ready="true"]', {
+      timeout: 60_000,
+    });
+    await page.emulateMediaType("screen");
+
+    // A4 is 8.27in wide; 0.3in margins each side leave 7.67in = 736px at
+    // 96dpi for the content.
+    const scale = Math.min(1, 736 / contentWidth);
+    const pdfBuffer = await page.pdf({
+      format: "A4",
+      scale,
+      margin: { top: "0.3in", right: "0.3in", bottom: "0.3in", left: "0.3in" },
+      printBackground: true,
+    });
+    return Buffer.from(pdfBuffer);
+  } finally {
+    await browser.close();
+  }
+};
+
 export const generatePDFFromHTML = async (
   htmlContent: string,
 ): Promise<Buffer> => {
   try {
-    // 🔑 Required for PDFs (typings are wrong, runtime is correct)
-    // await (chromium as unknown as { fonts: () => Promise<void> }).fonts();
-    let browser;
-    if (process.env.NODE_ENV === "production") {
-      browser = await puppeteerCore.launch({
-        headless: true,
-        args: chromium.args,
-        //
-        //   args: [
-        //   "--no-sandbox",
-        //   "--disable-setuid-sandbox",
-        //   "--disable-dev-shm-usage",
-        //   "--disable-gpu",
-        // ],
-        executablePath: await chromium.executablePath(
-          `https://github.com/Sparticuz/chromium/releases/download/v121.0.0/chromium-v121.0.0-pack.tar`, //.br
-        ),
-      });
-    } else {
-      browser = await puppeteer.launch({
-        headless: true,
-        args: ["--no-sandbox", "--disable-setuid-sandbox"],
-      });
-    }
+    const browser = await launchPdfBrowser();
 
     const page = await browser.newPage();
     await page.setContent(htmlContent, { waitUntil: "networkidle0" });
@@ -2123,6 +2262,48 @@ export const sendMemoEmail = async (
   } catch (error) {
     console.error("Error sending memo email:", error);
     return { success: false as const, error, ccEmails: normalizedCcEmails };
+  }
+};
+
+/**
+ * Send the customer a PDF snapshot of their wallet overview, with the
+ * admin-edited subject and body. `ccEmails` is used exactly as given (the
+ * admin picks which of secondary login / RM / invoices inbox to copy).
+ */
+export const sendWalletSnapshotEmail = async (params: {
+  email: string;
+  ccEmails: string[];
+  subject: string;
+  body: string;
+  pdfBuffer: Buffer;
+  pdfFilename: string;
+}) => {
+  const ccEmails = Array.from(new Set(params.ccEmails.filter(Boolean)));
+  try {
+    const { renderWalletSnapshotEmailHTML } =
+      await import("./email-templates/wallet-snapshot-email");
+
+    await transporter.sendMail({
+      from:
+        `BitFactory Accounts <${process.env.SMTP_FROM}>` ||
+        "noreply@bitfactory.com",
+      replyTo: REPLY_TO_EMAILS,
+      to: params.email,
+      cc: ccEmails.length > 0 ? ccEmails.join(",") : undefined,
+      subject: params.subject,
+      html: renderWalletSnapshotEmailHTML(params.body),
+      attachments: [
+        {
+          filename: params.pdfFilename,
+          content: params.pdfBuffer,
+          contentType: "application/pdf",
+        },
+      ],
+    });
+    return { success: true as const, ccEmails };
+  } catch (error) {
+    console.error("Error sending wallet snapshot email:", error);
+    return { success: false as const, error, ccEmails };
   }
 };
 

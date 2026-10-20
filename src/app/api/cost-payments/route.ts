@@ -3,6 +3,9 @@ import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
 import { AuditAction } from "@prisma/client";
 import { paymentTypeLabel } from "@/lib/accounting/paymentTypes";
+import { simRoute } from "@/lib/simulation/context";
+import { loadSimLedger } from "@/lib/simulation/ledgerStore";
+import { simCostPaymentsPage } from "@/lib/simulation/views";
 
 export async function GET(request: NextRequest) {
   try {
@@ -15,8 +18,9 @@ export async function GET(request: NextRequest) {
     // Verify token and extract user ID
     let userId: string;
     let userRole: string;
+    let decoded;
     try {
-      const decoded = await verifyJwtToken(token);
+      decoded = await verifyJwtToken(token);
       userId = decoded.userId;
       userRole = decoded.role;
     } catch (error) {
@@ -53,6 +57,14 @@ export async function GET(request: NextRequest) {
         { status: 400 },
       );
     }
+
+    // Simulated accounts: the simulated ledger, never cost_payments.
+    const sim = await simRoute(decoded, async (ctx) =>
+      NextResponse.json(
+        simCostPaymentsPage(await loadSimLedger(ctx.userId), page, pageSize),
+      ),
+    );
+    if (sim) return sim;
 
     console.log(
       `[Cost Payments GET] Fetching payments for userId: ${userId}, page: ${page}, pageSize: ${pageSize}`,

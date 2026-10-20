@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyJwtToken } from "@/lib/jwt";
 import { prisma } from "@/lib/prisma";
 import { toUtcDateOnly } from "@/lib/services/paybackSnapshotService";
+import { SimNotConfiguredError, getSimContext } from "@/lib/simulation/context";
+import { loadSimDays } from "@/lib/simulation/data";
+
+/** Stand-in subaccount id for a simulated account's simulated snapshots. */
+const SIM_SNAPSHOT_ID = "simulated";
 
 interface DailyPerformanceData {
   date: string;
@@ -39,8 +44,9 @@ export async function GET(request: NextRequest) {
     }
 
     let userId: string;
+    let decoded;
     try {
-      const decoded = await verifyJwtToken(token);
+      decoded = await verifyJwtToken(token);
       userId = decoded.userId;
     } catch (error) {
       console.error(
@@ -88,12 +94,28 @@ export async function GET(request: NextRequest) {
         : `[Mining Performance API] Reading monthly DB revenue data for user ${userId}`,
     );
 
-    const subaccounts = await prisma.poolSubaccount.findMany({
-      where: { userId, pool: { name: { in: ["Luxor", "Braiins"] } } },
-      include: { pool: { select: { name: true } } },
+    // Simulated accounts: the simulated worker's own daily earnings since
+    // registration, bucketed below exactly like a client's snapshots.
+    const simContext = await getSimContext(decoded).catch((error) => {
+      if (error instanceof SimNotConfiguredError) return "unavailable" as const;
+      throw error;
     });
+    if (simContext === "unavailable") {
+      return NextResponse.json(
+        { success: false, error: "Simulation data is not available right now" },
+        { status: 503 },
+      );
+    }
+    const simDays = simContext ? await loadSimDays(simContext) : null;
 
-    if (subaccounts.length === 0) {
+    const subaccounts = simDays
+      ? []
+      : await prisma.poolSubaccount.findMany({
+          where: { userId, pool: { name: { in: ["Luxor", "Braiins"] } } },
+          include: { pool: { select: { name: true } } },
+        });
+
+    if (!simDays && subaccounts.length === 0) {
       console.warn(
         `[Mining Performance API] User ${userId} has no pool subaccounts`,
       );
@@ -119,12 +141,24 @@ export async function GET(request: NextRequest) {
       subaccounts.map((s) => [s.id, s.pool.name]),
     );
 
-    const snapshots = await prisma.poolSubaccountDailySnapshot.findMany({
-      where: {
-        poolSubaccountId: { in: subaccounts.map((s) => s.id) },
-        date: { gte: startDate, lte: yesterday },
-      },
-    });
+    const snapshots = simDays
+      ? simDays
+          .map((d) => ({
+            poolSubaccountId: SIM_SNAPSHOT_ID,
+            date: new Date(`${d.date}T00:00:00.000Z`),
+            miningRevenue: d.btc,
+            referralRevenue: 0,
+            otherRevenue: 0,
+            totalRevenue: d.btc,
+          }))
+          .filter((s) => s.date >= startDate && s.date <= yesterday)
+      : await prisma.poolSubaccountDailySnapshot.findMany({
+          where: {
+            poolSubaccountId: { in: subaccounts.map((s) => s.id) },
+            date: { gte: startDate, lte: yesterday },
+          },
+        });
+    if (simDays) poolNameBySubaccountId.set(SIM_SNAPSHOT_ID, "Luxor");
 
     // Monthly bucket key ("2026-08") vs daily ("2026-08-17") — the current,
     // still-open month is excluded explicitly below rather than relying on

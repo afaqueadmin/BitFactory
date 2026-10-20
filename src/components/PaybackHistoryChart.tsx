@@ -45,6 +45,7 @@ import {
   buildPaybackChartHeading,
   PaybackOsFilter,
 } from "@/lib/helpers/paybackChartHeading";
+import { calculateAverageMiningAdvantage } from "@/lib/helpers/paybackBaseCase";
 import { RADIUS_CARD, useDaylight } from "@/lib/daylight";
 
 const RANGE_LABELS: Record<PaybackHistoryRange, string> = {
@@ -109,6 +110,14 @@ export default function PaybackHistoryChart({
     profile,
     miner,
     range,
+  );
+
+  // Yearly average stays on the last 365 days whatever range is shown, so it
+  // matches the base case the payback tables highlight.
+  const { historyData: yearHistory } = usePaybackHistory(profile, miner, "1Y");
+  const yearlyAdvantage = useMemo(
+    () => calculateAverageMiningAdvantage(yearHistory, os),
+    [yearHistory, os],
   );
 
   const chartData = useMemo((): Array<
@@ -625,6 +634,40 @@ export default function PaybackHistoryChart({
             </LineChart>
           </ResponsiveContainer>
         </Box>
+      )}
+
+      {!isLoading && !isError && chartData.length > 0 && yearlyAdvantage && (
+        <Typography
+          variant="caption"
+          sx={{
+            display: "block",
+            mt: 1,
+            textAlign: "right",
+            fontSize: 11,
+            color: daylight ? d.muted : "text.secondary",
+            ...(daylight && { fontFamily: fonts.body }),
+          }}
+        >
+          Yearly average mining advantage:{" "}
+          <Box
+            component="span"
+            sx={{
+              fontWeight: 650,
+              color:
+                yearlyAdvantage.averageAdvantage >= 0
+                  ? daylight
+                    ? d.success
+                    : "success.main"
+                  : daylight
+                    ? d.danger
+                    : "error.main",
+            }}
+          >
+            {yearlyAdvantage.averageAdvantage >= 0 ? "+" : ""}
+            {(yearlyAdvantage.averageAdvantage * 100).toFixed(1)}%
+          </Box>{" "}
+          · BTC price vs breakeven, last {yearlyAdvantage.historyDays} days
+        </Typography>
       )}
     </Paper>
   );

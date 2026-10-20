@@ -28,6 +28,7 @@ import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
 import {
   assertCanAccessTicket,
+  isCustomerRole,
   stripPriorityForClient,
 } from "@/lib/ticketScope";
 import { getLiveMinerTelemetry } from "@/lib/ticketTelemetry";
@@ -108,7 +109,7 @@ export async function GET(
       );
     }
 
-    if (auth.decoded.role === "CLIENT") {
+    if (isCustomerRole(auth.decoded.role)) {
       const messages = ticket.messages.filter((m) => !m.isInternal);
       return NextResponse.json({
         success: true,
@@ -190,7 +191,7 @@ export async function PATCH(
 
     if (
       status !== undefined &&
-      auth.decoded.role === "CLIENT" &&
+      isCustomerRole(auth.decoded.role) &&
       status !== "CLOSED"
     ) {
       return NextResponse.json(
@@ -232,7 +233,7 @@ export async function PATCH(
     // Priority is a support/triage concept - a CLIENT never sets it, same
     // restriction as ticket creation.
     if (priority !== undefined) {
-      if (auth.decoded.role === "CLIENT") {
+      if (isCustomerRole(auth.decoded.role)) {
         return NextResponse.json(
           {
             success: false,
