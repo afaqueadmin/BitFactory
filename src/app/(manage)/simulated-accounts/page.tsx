@@ -394,6 +394,14 @@ export default function SimulatedAccountsPage() {
                       <Button size="small" onClick={() => setLedgerId(a.id)}>
                         Ledger
                       </Button>
+                      <Button
+                        size="small"
+                        href={`/customers/${a.id}/wallet-email`}
+                        target="_blank"
+                        rel="noopener"
+                      >
+                        Email wallet
+                      </Button>
                       {a.active && (
                         <Button
                           size="small"

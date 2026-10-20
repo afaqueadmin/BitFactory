@@ -135,6 +135,8 @@ const dynamicPatternsPaths = {
         /^\/franchisees\/[^/]+\/incentives$/.test(pathname),
     },
     prefixPattern("/tickets"),
+    // Bare wallet render printed to the emailed PDF snapshot.
+    singleSegmentPattern("/wallet-snapshot"),
   ],
   FRANCHISEE: [...clientDynamicPatterns, prefixPattern("/franchise/support")],
   SIMULATED: clientDynamicPatterns,

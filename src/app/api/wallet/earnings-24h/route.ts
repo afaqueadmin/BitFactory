@@ -9,6 +9,7 @@ import {
 } from "@/lib/luxorSubaccounts";
 import { simRoute } from "@/lib/simulation/context";
 import { loadSimPoolLedger } from "@/lib/simulation/data";
+import { resolveWalletTarget } from "@/lib/walletTarget";
 
 /**
  * GET /api/wallet/earnings-24h
@@ -41,8 +42,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const target = await resolveWalletTarget(
+      decoded,
+      request.nextUrl.searchParams.get("customerId"),
+    );
+    if (target instanceof NextResponse) return target;
+
     // Simulated accounts: simulated credits in the same date window as below.
-    const sim = await simRoute(decoded, async (ctx) => {
+    const sim = await simRoute(target, async (ctx) => {
       const { transactions } = await loadSimPoolLedger(ctx);
       const from = new Date(ctx.now.getTime() - 24 * 60 * 60 * 1000)
         .toISOString()
@@ -72,7 +79,7 @@ export async function GET(request: NextRequest) {
     });
     if (sim) return sim;
 
-    const userId = decoded.userId;
+    const userId = target.userId;
     console.log(`[24h Revenue API] Fetching data for user: ${userId}`);
 
     // Get PoolAuth entries for this user (contains API keys). Which pools

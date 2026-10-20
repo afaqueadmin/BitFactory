@@ -5,6 +5,7 @@ import { simRoute } from "@/lib/simulation/context";
 import { loadSimInvoice } from "@/lib/simulation/invoice";
 import { ledgerElectricityTotal } from "@/lib/simulation/ledger";
 import { loadSimLedger } from "@/lib/simulation/ledgerStore";
+import { resolveWalletTarget } from "@/lib/walletTarget";
 
 export const dynamic = "force-dynamic";
 
@@ -30,9 +31,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const target = await resolveWalletTarget(
+      decoded,
+      request.nextUrl.searchParams.get("customerId"),
+    );
+    if (target instanceof NextResponse) return target;
+
     // Simulated accounts: electricity is the simulated daily charges so far;
     // hardware is the simulated Hardware Sales invoice, shown as paid.
-    const sim = await simRoute(decoded, async (ctx) => {
+    const sim = await simRoute(target, async (ctx) => {
       const [ledger, invoice] = await Promise.all([
         loadSimLedger(ctx.userId),
         loadSimInvoice(ctx),
@@ -52,7 +59,7 @@ export async function GET(request: NextRequest) {
     });
     if (sim) return sim;
 
-    const userId = decoded.userId;
+    const userId = target.userId;
 
     const [electricityInvoices, hardwareInvoices] = await Promise.all([
       prisma.invoice.findMany({

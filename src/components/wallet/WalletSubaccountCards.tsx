@@ -50,6 +50,9 @@ interface WalletSubaccountCardsProps {
   /** Daylight styling: flat soft-tone cards instead of the saturated
    * gradients (guide §4: "do not use gradients on KPI cards"). */
   daylight?: boolean;
+  /** Static copy for the emailed PDF snapshot: no copy button, no request
+   * buttons and no pending-request pills. */
+  readOnly?: boolean;
 }
 
 export default function WalletSubaccountCards({
@@ -64,6 +67,7 @@ export default function WalletSubaccountCards({
   activeFrequencyChangeRequest,
   onRequestFrequencyChange,
   daylight = false,
+  readOnly = false,
 }: WalletSubaccountCardsProps) {
   const [copiedAddress, setCopiedAddress] = useState(false);
   const { d, fonts } = useDaylight();
@@ -195,7 +199,7 @@ export default function WalletSubaccountCards({
           >
             Wallet Address
           </Typography>
-          {primaryAddress() !== "Not configured" && (
+          {!readOnly && primaryAddress() !== "Not configured" && (
             <Tooltip title={copiedAddress ? "Copied!" : "Copy Address"}>
               <IconButton
                 size="small"
@@ -252,7 +256,7 @@ export default function WalletSubaccountCards({
           {primaryAddress()}
         </Typography>
 
-        {hasPendingWalletChange ? (
+        {readOnly ? null : hasPendingWalletChange ? (
           <Typography variant="caption" sx={statusPillSx}>
             {isPayoutFrozen && freezeLabel
               ? `🔒 ${freezeLabel}`
@@ -337,7 +341,7 @@ export default function WalletSubaccountCards({
           )}
         </Box>
 
-        {activeFrequencyChangeRequest ? (
+        {readOnly ? null : activeFrequencyChangeRequest ? (
           <Typography variant="caption" sx={statusPillSx}>
             {activeFrequencyChangeRequest.status === "CONFIRMED"
               ? "✅ Confirmed — awaiting final approval"

@@ -9,6 +9,7 @@ import {
 } from "@/lib/luxorSubaccounts";
 import { simRoute } from "@/lib/simulation/context";
 import { loadSimPoolLedger } from "@/lib/simulation/data";
+import { resolveWalletTarget } from "@/lib/walletTarget";
 
 /**
  * GET /api/wallet/earnings-summary
@@ -45,9 +46,17 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const url = new URL(request.url);
+    const target = await resolveWalletTarget(
+      decoded,
+      url.searchParams.get("customerId"),
+    );
+    if (target instanceof NextResponse) return target;
+    const userId = target.userId;
+
     // Simulated accounts: earned since registration; pending since the last
     // simulated monthly payout.
-    const sim = await simRoute(decoded, async (ctx) => {
+    const sim = await simRoute(target, async (ctx) => {
       const ledger = await loadSimPoolLedger(ctx);
       return NextResponse.json(
         {
@@ -69,28 +78,6 @@ export async function GET(request: NextRequest) {
       );
     });
     if (sim) return sim;
-
-    let userId = decoded.userId;
-    const userRole = decoded.role;
-    const url = new URL(request.url);
-    const customerId = url.searchParams.get("customerId");
-    if (customerId) {
-      if (userRole === "FRANCHISEE") {
-        const owned = await prisma.user.findFirst({
-          where: { id: customerId, franchisee: { franchiseeId: userId } },
-          select: { id: true },
-        });
-        if (!owned) {
-          return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-        }
-      } else if (userRole !== "ADMIN" && userRole !== "SUPER_ADMIN") {
-        return NextResponse.json(
-          { error: "Only administrators can search by customerId" },
-          { status: 403 },
-        );
-      }
-      userId = customerId;
-    }
 
     console.log(`[Earnings Summary API] Fetching data for user: ${userId}`);
 

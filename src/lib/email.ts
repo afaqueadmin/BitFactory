@@ -1416,34 +1416,74 @@ export const sendInvoiceEmailWithPDF = async (
  * Generate PDF from HTML content
  * Uses Puppeteer for server-side rendering
  */
+const launchPdfBrowser = async () => {
+  // 🔑 Required for PDFs (typings are wrong, runtime is correct)
+  // await (chromium as unknown as { fonts: () => Promise<void> }).fonts();
+  if (process.env.NODE_ENV === "production") {
+    return puppeteerCore.launch({
+      headless: true,
+      args: chromium.args,
+      //
+      //   args: [
+      //   "--no-sandbox",
+      //   "--disable-setuid-sandbox",
+      //   "--disable-dev-shm-usage",
+      //   "--disable-gpu",
+      // ],
+      executablePath: await chromium.executablePath(
+        `https://github.com/Sparticuz/chromium/releases/download/v121.0.0/chromium-v121.0.0-pack.tar`, //.br
+      ),
+    });
+  }
+  return puppeteer.launch({
+    headless: true,
+    args: ["--no-sandbox", "--disable-setuid-sandbox"],
+  });
+};
+
+/**
+ * Print one of our own app pages to an A4 PDF. The page is loaded with the
+ * given cookies (the requesting admin's session) and must set
+ * body[data-snapshot-ready="true"] once it has finished loading.
+ * `contentWidth` is the page's layout width in CSS px; the PDF is scaled so
+ * it fits the A4 width.
+ */
+export const generatePDFFromUrl = async (
+  url: string,
+  cookies: { name: string; value: string }[],
+  contentWidth: number,
+): Promise<Buffer> => {
+  const browser = await launchPdfBrowser();
+  try {
+    const page = await browser.newPage();
+    await page.setViewport({ width: contentWidth, height: 900 });
+    await page.setCookie(...cookies.map((c) => ({ ...c, url })));
+    await page.goto(url, { waitUntil: "networkidle0", timeout: 60_000 });
+    await page.waitForSelector('body[data-snapshot-ready="true"]', {
+      timeout: 60_000,
+    });
+    await page.emulateMediaType("screen");
+
+    // A4 is 8.27in wide; 0.3in margins each side leave 7.67in = 736px at
+    // 96dpi for the content.
+    const scale = Math.min(1, 736 / contentWidth);
+    const pdfBuffer = await page.pdf({
+      format: "A4",
+      scale,
+      margin: { top: "0.3in", right: "0.3in", bottom: "0.3in", left: "0.3in" },
+      printBackground: true,
+    });
+    return Buffer.from(pdfBuffer);
+  } finally {
+    await browser.close();
+  }
+};
+
 export const generatePDFFromHTML = async (
   htmlContent: string,
 ): Promise<Buffer> => {
   try {
-    // 🔑 Required for PDFs (typings are wrong, runtime is correct)
-    // await (chromium as unknown as { fonts: () => Promise<void> }).fonts();
-    let browser;
-    if (process.env.NODE_ENV === "production") {
-      browser = await puppeteerCore.launch({
-        headless: true,
-        args: chromium.args,
-        //
-        //   args: [
-        //   "--no-sandbox",
-        //   "--disable-setuid-sandbox",
-        //   "--disable-dev-shm-usage",
-        //   "--disable-gpu",
-        // ],
-        executablePath: await chromium.executablePath(
-          `https://github.com/Sparticuz/chromium/releases/download/v121.0.0/chromium-v121.0.0-pack.tar`, //.br
-        ),
-      });
-    } else {
-      browser = await puppeteer.launch({
-        headless: true,
-        args: ["--no-sandbox", "--disable-setuid-sandbox"],
-      });
-    }
+    const browser = await launchPdfBrowser();
 
     const page = await browser.newPage();
     await page.setContent(htmlContent, { waitUntil: "networkidle0" });
@@ -2222,6 +2262,48 @@ export const sendMemoEmail = async (
   } catch (error) {
     console.error("Error sending memo email:", error);
     return { success: false as const, error, ccEmails: normalizedCcEmails };
+  }
+};
+
+/**
+ * Send the customer a PDF snapshot of their wallet overview, with the
+ * admin-edited subject and body. `ccEmails` is used exactly as given (the
+ * admin picks which of secondary login / RM / invoices inbox to copy).
+ */
+export const sendWalletSnapshotEmail = async (params: {
+  email: string;
+  ccEmails: string[];
+  subject: string;
+  body: string;
+  pdfBuffer: Buffer;
+  pdfFilename: string;
+}) => {
+  const ccEmails = Array.from(new Set(params.ccEmails.filter(Boolean)));
+  try {
+    const { renderWalletSnapshotEmailHTML } =
+      await import("./email-templates/wallet-snapshot-email");
+
+    await transporter.sendMail({
+      from:
+        `BitFactory Accounts <${process.env.SMTP_FROM}>` ||
+        "noreply@bitfactory.com",
+      replyTo: REPLY_TO_EMAILS,
+      to: params.email,
+      cc: ccEmails.length > 0 ? ccEmails.join(",") : undefined,
+      subject: params.subject,
+      html: renderWalletSnapshotEmailHTML(params.body),
+      attachments: [
+        {
+          filename: params.pdfFilename,
+          content: params.pdfBuffer,
+          contentType: "application/pdf",
+        },
+      ],
+    });
+    return { success: true as const, ccEmails };
+  } catch (error) {
+    console.error("Error sending wallet snapshot email:", error);
+    return { success: false as const, error, ccEmails };
   }
 };
 
