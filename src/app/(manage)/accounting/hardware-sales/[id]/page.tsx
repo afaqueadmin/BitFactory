@@ -1211,8 +1211,9 @@ export default function InvoiceDetailPage() {
             )}
             <Typography sx={{ mb: 2 }}>
               Are you sure you want to mark this invoice as unpaid? The invoice
-              status will be changed back to &quot;Issued&quot; and its paid
-              date will be cleared. Recorded payments will not be removed.
+              status will be changed back to &quot;Issued&quot;, its paid date
+              will be cleared and all payments recorded against it will be
+              removed.
             </Typography>
           </Box>
         </DialogContent>

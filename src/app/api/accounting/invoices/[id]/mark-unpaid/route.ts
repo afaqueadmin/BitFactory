@@ -6,8 +6,8 @@ import { InvoiceStatus, AuditAction } from "@prisma/client";
 /**
  * POST /api/accounting/invoices/[id]/mark-unpaid
  *
- * Reverts a PAID invoice back to ISSUED and clears its paid date.
- * Restricted to SUPER_ADMIN. Recorded payments are left untouched.
+ * Reverts a PAID invoice back to ISSUED, clears its paid date and voids
+ * (soft-deletes) every payment recorded against it. Restricted to SUPER_ADMIN.
  */
 export async function POST(
   request: NextRequest,
@@ -67,6 +67,31 @@ export async function POST(
 
       if (result.count === 0) return false;
 
+      const payments = await tx.costPayment.findMany({
+        where: { invoiceId: id, isDeleted: false },
+        select: { id: true, amount: true },
+      });
+
+      await tx.costPayment.updateMany({
+        where: { id: { in: payments.map((p) => p.id) } },
+        data: { isDeleted: true },
+      });
+
+      // One PAYMENT_REMOVED entry per payment, matching DELETE /api/accounting/payments/[id]
+      await tx.auditLog.createMany({
+        data: payments.map((p) => ({
+          action: AuditAction.PAYMENT_REMOVED,
+          entityType: "CostPayment",
+          entityId: p.id,
+          userId,
+          description: `Payment removed from invoice ${invoice.invoiceNumber} (invoice marked as unpaid)`,
+          changes: JSON.stringify({
+            amount: p.amount.toString(),
+            invoiceId: id,
+          }),
+        })),
+      });
+
       await tx.auditLog.create({
         data: {
           action: AuditAction.INVOICE_UPDATED,
@@ -80,6 +105,7 @@ export async function POST(
               from: invoice.paidDate?.toISOString() ?? null,
               to: null,
             },
+            removedPaymentIds: payments.map((p) => p.id),
           }),
         },
       });
