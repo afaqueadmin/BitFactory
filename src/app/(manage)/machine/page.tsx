@@ -637,7 +637,7 @@ export default function MachinePage() {
       component="main"
       sx={{ py: 4, backgroundColor: "background.default", minHeight: "100vh" }}
     >
-      <Container maxWidth="xl">
+      <Container maxWidth={false}>
         {/* Header Section */}
         <Stack
           direction="row"

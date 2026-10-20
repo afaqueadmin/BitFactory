@@ -8,7 +8,7 @@
 
 "use client";
 
-import React, { Dispatch, SetStateAction, useMemo } from "react";
+import React, { Dispatch, SetStateAction, useEffect, useMemo } from "react";
 import {
   Box,
   Button,
@@ -25,17 +25,16 @@ import {
   TableCell,
   TableContainer,
   TableHead,
+  TablePagination,
   TableRow,
   CircularProgress,
   Alert,
-  FormControl,
-  Select,
   MenuItem,
-  SelectChangeEvent,
   Menu,
   FormControlLabel,
   Checkbox,
   Tooltip,
+  alpha,
 } from "@mui/material";
 import RepairNotesModal from "./RepairNotesModal";
 import {
@@ -49,8 +48,6 @@ import {
 import {
   sortMiners,
   toggleSortDirection,
-  getSortFieldLabel,
-  getAllSortFields,
   type SortConfig,
   type MinerSortField,
 } from "@/lib/utils/sortMiners";
@@ -203,6 +200,15 @@ export default function MinersTable({
   const [rateHistoryOpen, setRateHistoryOpen] = React.useState(false);
   const [repairNotesOpen, setRepairNotesOpen] = React.useState(false);
   const [selectedMinerName, setSelectedMinerName] = React.useState("");
+  const [page, setPage] = React.useState(0);
+  const [rowsPerPage, setRowsPerPage] = React.useState(25);
+
+  // Parents pass a fresh array every render, so reset paging on the set of
+  // miner ids rather than the array reference (i.e. when filters change).
+  const minerIdsKey = miners.map((m) => m.id).join(",");
+  useEffect(() => {
+    setPage(0);
+  }, [minerIdsKey]);
 
   /**
    * Handle delete confirmation
@@ -217,24 +223,6 @@ export default function MinersTable({
     } finally {
       setDeleting(false);
     }
-  };
-
-  /**
-   * Handle sort field change
-   */
-  const handleSortFieldChange = (event: SelectChangeEvent<MinerSortField>) => {
-    const newField = event.target.value as MinerSortField;
-    setSortConfig({ field: newField, direction: "asc" });
-  };
-
-  /**
-   * Handle sort direction toggle
-   */
-  const handleSortDirectionToggle = () => {
-    setSortConfig({
-      ...sortConfig,
-      direction: toggleSortDirection(sortConfig.direction),
-    });
   };
 
   /**
@@ -295,6 +283,7 @@ export default function MinersTable({
    * Handle header cell click to sort
    */
   const handleHeaderClick = (field: MinerSortField) => {
+    setPage(0);
     if (sortConfig.field === field) {
       // Same field clicked - toggle direction
       setSortConfig({
@@ -349,6 +338,58 @@ export default function MinersTable({
     [miners, sortConfig],
   );
 
+  // Page through the sorted rows; -1 is MUI's "All" option. The page is
+  // clamped because the reset effect only runs after the render that needs it.
+  const lastPage =
+    rowsPerPage === -1
+      ? 0
+      : Math.max(0, Math.ceil(memoizedRows.length / rowsPerPage) - 1);
+  const currentPage = Math.min(page, lastPage);
+  const pagedRows =
+    rowsPerPage === -1
+      ? memoizedRows
+      : memoizedRows.slice(
+          currentPage * rowsPerPage,
+          currentPage * rowsPerPage + rowsPerPage,
+        );
+
+  /**
+   * Header cell that sorts the table by `field` when clicked
+   */
+  const renderSortableHeader = (
+    label: string,
+    field: MinerSortField,
+    align: "left" | "right" | "center" = "left",
+  ) => (
+    <TableCell
+      align={align}
+      onClick={() => handleHeaderClick(field)}
+      sx={{
+        cursor: "pointer",
+        userSelect: "none",
+        "&:hover": { backgroundColor: "action.selected" },
+      }}
+    >
+      {label}
+      {sortConfig.field === field &&
+        (sortConfig.direction === "asc" ? (
+          <ArrowUpwardIcon
+            sx={{ fontSize: "1rem", verticalAlign: "middle", ml: 0.25 }}
+          />
+        ) : (
+          <ArrowDownwardIcon
+            sx={{ fontSize: "1rem", verticalAlign: "middle", ml: 0.25 }}
+          />
+        ))}
+    </TableCell>
+  );
+
+  const emptyValue = (
+    <Typography variant="body2" color="text.secondary" component="span">
+      —
+    </Typography>
+  );
+
   return (
     <Box>
       {error && (
@@ -357,63 +398,11 @@ export default function MinersTable({
         </Alert>
       )}
 
-      {/* Sort Controls */}
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          mb: 2,
-          flexWrap: "wrap",
-          gap: 2,
-        }}
-      >
-        <Box
-          sx={{
-            display: "flex",
-            alignItems: "center",
-            gap: 1,
-            flexWrap: "wrap",
-          }}
-        >
-          <Typography
-            variant="body2"
-            sx={{ fontWeight: "600", whiteSpace: "nowrap" }}
-          >
-            Sort by:
-          </Typography>
-          <FormControl sx={{ minWidth: 180 }}>
-            <Select
-              value={sortConfig.field}
-              onChange={handleSortFieldChange}
-              size="small"
-            >
-              {getAllSortFields().map((field) => (
-                <MenuItem key={field} value={field}>
-                  {getSortFieldLabel(field)}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <Button
-            size="small"
-            onClick={handleSortDirectionToggle}
-            startIcon={
-              sortConfig.direction === "asc" ? (
-                <ArrowUpwardIcon fontSize="small" />
-              ) : (
-                <ArrowDownwardIcon fontSize="small" />
-              )
-            }
-            variant="outlined"
-            sx={{ textTransform: "capitalize", whiteSpace: "nowrap" }}
-          >
-            {sortConfig.direction === "asc" ? "Asc" : "Desc"}
-          </Button>
-        </Box>
+      <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 1 }}>
         <FormControlLabel
           control={
             <Checkbox
+              size="small"
               checked={showDeleted}
               onChange={(e) => setShowDeleted(e.target.checked)}
             />
@@ -422,562 +411,317 @@ export default function MinersTable({
         />
       </Box>
 
-      <TableContainer
-        component={Paper}
-        sx={{
-          backgroundColor: "background.paper",
-          overflowX: "auto",
-          overflowY: "visible",
-          width: "100%",
-          maxWidth: "100%",
-        }}
-      >
-        <Table
-          sx={{
-            minWidth: "900px",
-            tableLayout: "auto",
-            "& th": {
-              whiteSpace: "nowrap",
-              padding: "12px 8px",
-              fontSize: "0.875rem",
-            },
-            "& td": {
-              padding: "12px 8px",
-              fontSize: "0.875rem",
-            },
-          }}
-          aria-label="miners table"
-        >
-          <TableHead sx={{ backgroundColor: "action.hover" }}>
-            <TableRow>
-              <TableCell
-                sx={{
-                  fontWeight: "bold",
-                  cursor: "pointer",
-                  userSelect: "none",
-                  "&:hover": { backgroundColor: "action.selected" },
-                  whiteSpace: "nowrap",
-                }}
-                onClick={() => handleHeaderClick("name")}
-              >
-                Name{" "}
-                {sortConfig.field === "name" &&
-                  (sortConfig.direction === "asc" ? (
-                    <ArrowUpwardIcon
-                      fontSize="small"
-                      sx={{ verticalAlign: "middle", ml: 0.5 }}
-                    />
-                  ) : (
-                    <ArrowDownwardIcon
-                      fontSize="small"
-                      sx={{ verticalAlign: "middle", ml: 0.5 }}
-                    />
-                  ))}
-              </TableCell>
-              <TableCell
-                sx={{
-                  fontWeight: "bold",
-                  cursor: "pointer",
-                  userSelect: "none",
-                  "&:hover": { backgroundColor: "action.selected" },
-                  whiteSpace: "nowrap",
-                }}
-                onClick={() => handleHeaderClick("model")}
-              >
-                Model{" "}
-                {sortConfig.field === "model" &&
-                  (sortConfig.direction === "asc" ? (
-                    <ArrowUpwardIcon
-                      fontSize="small"
-                      sx={{ verticalAlign: "middle", ml: 0.5 }}
-                    />
-                  ) : (
-                    <ArrowDownwardIcon
-                      fontSize="small"
-                      sx={{ verticalAlign: "middle", ml: 0.5 }}
-                    />
-                  ))}
-              </TableCell>
-              <TableCell
-                sx={{
-                  fontWeight: "bold",
-                  cursor: "pointer",
-                  userSelect: "none",
-                  "&:hover": { backgroundColor: "action.selected" },
-                  whiteSpace: "nowrap",
-                }}
-                onClick={() => handleHeaderClick("user")}
-              >
-                User{" "}
-                {sortConfig.field === "user" &&
-                  (sortConfig.direction === "asc" ? (
-                    <ArrowUpwardIcon
-                      fontSize="small"
-                      sx={{ verticalAlign: "middle", ml: 0.5 }}
-                    />
-                  ) : (
-                    <ArrowDownwardIcon
-                      fontSize="small"
-                      sx={{ verticalAlign: "middle", ml: 0.5 }}
-                    />
-                  ))}
-              </TableCell>
-              <TableCell
-                sx={{
-                  fontWeight: "bold",
-                  cursor: "pointer",
-                  userSelect: "none",
-                  "&:hover": { backgroundColor: "action.selected" },
-                  whiteSpace: "nowrap",
-                }}
-                onClick={() => handleHeaderClick("subaccount")}
-              >
-                Subaccount{" "}
-                {sortConfig.field === "subaccount" &&
-                  (sortConfig.direction === "asc" ? (
-                    <ArrowUpwardIcon
-                      fontSize="small"
-                      sx={{ verticalAlign: "middle", ml: 0.5 }}
-                    />
-                  ) : (
-                    <ArrowDownwardIcon
-                      fontSize="small"
-                      sx={{ verticalAlign: "middle", ml: 0.5 }}
-                    />
-                  ))}
-              </TableCell>
-              <TableCell
-                sx={{
-                  fontWeight: "bold",
-                  cursor: "pointer",
-                  userSelect: "none",
-                  "&:hover": { backgroundColor: "action.selected" },
-                  whiteSpace: "nowrap",
-                }}
-                onClick={() => handleHeaderClick("segment")}
-              >
-                Type{" "}
-                {sortConfig.field === "segment" &&
-                  (sortConfig.direction === "asc" ? (
-                    <ArrowUpwardIcon
-                      fontSize="small"
-                      sx={{ verticalAlign: "middle", ml: 0.5 }}
-                    />
-                  ) : (
-                    <ArrowDownwardIcon
-                      fontSize="small"
-                      sx={{ verticalAlign: "middle", ml: 0.5 }}
-                    />
-                  ))}
-              </TableCell>
-              <TableCell sx={{ fontWeight: "bold", whiteSpace: "nowrap" }}>
-                Pool
-              </TableCell>
-              <TableCell sx={{ fontWeight: "bold" }}>Space</TableCell>
-              <TableCell
-                sx={{
-                  fontWeight: "bold",
-                  cursor: "pointer",
-                  userSelect: "none",
-                  "&:hover": { backgroundColor: "action.selected" },
-                  whiteSpace: "nowrap",
-                }}
-                align="right"
-                onClick={() => handleHeaderClick("powerUsage")}
-              >
-                Power (kW){" "}
-                {sortConfig.field === "powerUsage" &&
-                  (sortConfig.direction === "asc" ? (
-                    <ArrowUpwardIcon
-                      fontSize="small"
-                      sx={{ verticalAlign: "middle", ml: 0.5 }}
-                    />
-                  ) : (
-                    <ArrowDownwardIcon
-                      fontSize="small"
-                      sx={{ verticalAlign: "middle", ml: 0.5 }}
-                    />
-                  ))}
-              </TableCell>
-              <TableCell
-                sx={{
-                  fontWeight: "bold",
-                  cursor: "pointer",
-                  userSelect: "none",
-                  "&:hover": { backgroundColor: "action.selected" },
-                  whiteSpace: "nowrap",
-                }}
-                align="right"
-                onClick={() => handleHeaderClick("hashRate")}
-              >
-                Hash Rate (TH/s){" "}
-                {sortConfig.field === "hashRate" &&
-                  (sortConfig.direction === "asc" ? (
-                    <ArrowUpwardIcon
-                      fontSize="small"
-                      sx={{ verticalAlign: "middle", ml: 0.5 }}
-                    />
-                  ) : (
-                    <ArrowDownwardIcon
-                      fontSize="small"
-                      sx={{ verticalAlign: "middle", ml: 0.5 }}
-                    />
-                  ))}
-              </TableCell>
-              <TableCell
-                sx={{
-                  fontWeight: "bold",
-                  cursor: "pointer",
-                  userSelect: "none",
-                  "&:hover": { backgroundColor: "action.selected" },
-                  whiteSpace: "nowrap",
-                }}
-                align="right"
-                onClick={() => handleHeaderClick("ratePerKwh")}
-              >
-                Rate (USD){" "}
-                {sortConfig.field === "ratePerKwh" &&
-                  (sortConfig.direction === "asc" ? (
-                    <ArrowUpwardIcon
-                      fontSize="small"
-                      sx={{ verticalAlign: "middle", ml: 0.5 }}
-                    />
-                  ) : (
-                    <ArrowDownwardIcon
-                      fontSize="small"
-                      sx={{ verticalAlign: "middle", ml: 0.5 }}
-                    />
-                  ))}
-              </TableCell>
-              <TableCell
-                sx={{
-                  fontWeight: "bold",
-                  cursor: "pointer",
-                  userSelect: "none",
-                  "&:hover": { backgroundColor: "action.selected" },
-                  whiteSpace: "nowrap",
-                }}
-                align="right"
-                onClick={() => handleHeaderClick("benchmarkHashrate")}
-              >
-                Benchmark (TH/s){" "}
-                {sortConfig.field === "benchmarkHashrate" &&
-                  (sortConfig.direction === "asc" ? (
-                    <ArrowUpwardIcon
-                      fontSize="small"
-                      sx={{ verticalAlign: "middle", ml: 0.5 }}
-                    />
-                  ) : (
-                    <ArrowDownwardIcon
-                      fontSize="small"
-                      sx={{ verticalAlign: "middle", ml: 0.5 }}
-                    />
-                  ))}
-              </TableCell>
-              <TableCell
-                sx={{
-                  fontWeight: "bold",
-                  cursor: "pointer",
-                  userSelect: "none",
-                  "&:hover": { backgroundColor: "action.selected" },
-                  whiteSpace: "nowrap",
-                }}
-                onClick={() => handleHeaderClick("warrantyExpiresAt")}
-              >
-                Warranty{" "}
-                {sortConfig.field === "warrantyExpiresAt" &&
-                  (sortConfig.direction === "asc" ? (
-                    <ArrowUpwardIcon
-                      fontSize="small"
-                      sx={{ verticalAlign: "middle", ml: 0.5 }}
-                    />
-                  ) : (
-                    <ArrowDownwardIcon
-                      fontSize="small"
-                      sx={{ verticalAlign: "middle", ml: 0.5 }}
-                    />
-                  ))}
-              </TableCell>
-              <TableCell
-                sx={{
-                  fontWeight: "bold",
-                  cursor: "pointer",
-                  userSelect: "none",
-                  "&:hover": { backgroundColor: "action.selected" },
-                  whiteSpace: "nowrap",
-                }}
-                align="center"
-                onClick={() => handleHeaderClick("status")}
-              >
-                Status{" "}
-                {sortConfig.field === "status" &&
-                  (sortConfig.direction === "asc" ? (
-                    <ArrowUpwardIcon
-                      fontSize="small"
-                      sx={{ verticalAlign: "middle", ml: 0.5 }}
-                    />
-                  ) : (
-                    <ArrowDownwardIcon
-                      fontSize="small"
-                      sx={{ verticalAlign: "middle", ml: 0.5 }}
-                    />
-                  ))}
-              </TableCell>
-              <TableCell
-                sx={{
-                  fontWeight: "bold",
-                  cursor: "pointer",
-                  userSelect: "none",
-                  "&:hover": { backgroundColor: "action.selected" },
-                  whiteSpace: "nowrap",
-                }}
-                onClick={() => handleHeaderClick("createdAt")}
-              >
-                Created{" "}
-                {sortConfig.field === "createdAt" &&
-                  (sortConfig.direction === "asc" ? (
-                    <ArrowUpwardIcon
-                      fontSize="small"
-                      sx={{ verticalAlign: "middle", ml: 0.5 }}
-                    />
-                  ) : (
-                    <ArrowDownwardIcon
-                      fontSize="small"
-                      sx={{ verticalAlign: "middle", ml: 0.5 }}
-                    />
-                  ))}
-              </TableCell>
-              <TableCell sx={{ fontWeight: "bold" }} align="center">
-                Actions
-              </TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {isLoading ? (
+      <Paper sx={{ width: "100%", overflow: "hidden" }}>
+        <TableContainer sx={{ maxHeight: "calc(100vh - 260px)" }}>
+          <Table
+            stickyHeader
+            sx={{
+              width: "100%",
+              tableLayout: "auto",
+              "& th": {
+                fontWeight: "bold",
+                padding: "8px 6px",
+                fontSize: "0.8125rem",
+                lineHeight: 1.3,
+                verticalAlign: "bottom",
+                backgroundColor: "background.paper",
+                borderBottom: "2px solid",
+                borderBottomColor: "divider",
+              },
+              "& td": {
+                padding: "8px 6px",
+                fontSize: "0.8125rem",
+                overflowWrap: "anywhere",
+              },
+              "& td .MuiTypography-body2": { fontSize: "inherit" },
+            }}
+            aria-label="miners table"
+          >
+            <TableHead>
               <TableRow>
-                <TableCell colSpan={14} align="center" sx={{ py: 4 }}>
-                  <CircularProgress />
-                </TableCell>
+                {renderSortableHeader("Name", "name")}
+                {renderSortableHeader("Model", "model")}
+                {renderSortableHeader("User", "user")}
+                {renderSortableHeader("Subaccount", "subaccount")}
+                {renderSortableHeader("Type", "segment")}
+                {renderSortableHeader("Pool", "pool")}
+                {renderSortableHeader("Space", "space")}
+                {renderSortableHeader("Power (kW)", "powerUsage", "right")}
+                {renderSortableHeader("Hash Rate (TH/s)", "hashRate", "right")}
+                {renderSortableHeader("Rate (USD)", "ratePerKwh", "right")}
+                {renderSortableHeader(
+                  "Benchmark (TH/s)",
+                  "benchmarkHashrate",
+                  "right",
+                )}
+                {renderSortableHeader("Warranty", "warrantyExpiresAt")}
+                {renderSortableHeader("Status", "status", "center")}
+                {renderSortableHeader("Created", "createdAt")}
+                <TableCell align="center">Actions</TableCell>
               </TableRow>
-            ) : memoizedRows.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={14} align="center" sx={{ py: 4 }}>
-                  <Typography color="text.secondary">
-                    No miners found. Create one to get started.
-                  </Typography>
-                </TableCell>
-              </TableRow>
-            ) : (
-              memoizedRows.map((miner) => (
-                <TableRow
-                  key={miner.id}
-                  hover
-                  sx={{ "&:last-child td, &:last-child th": { border: 0 } }}
-                >
-                  <TableCell sx={{ fontWeight: "500", maxWidth: "200px" }}>
-                    <Tooltip
-                      title={
-                        miner.serialNumber ||
-                        miner.macAddress ||
-                        miner.warrantyExpiresAt ? (
-                          <Box sx={{ p: 0.5 }}>
-                            {miner.serialNumber && (
-                              <Typography variant="caption" display="block">
-                                SN: {miner.serialNumber}
-                              </Typography>
-                            )}
-                            {miner.macAddress && (
-                              <Typography variant="caption" display="block">
-                                MAC: {miner.macAddress}
-                              </Typography>
-                            )}
-                            {miner.warrantyExpiresAt && (
-                              <Typography variant="caption" display="block">
-                                Warranty until:{" "}
-                                {formatWarrantyDate(miner.warrantyExpiresAt)}
-                              </Typography>
-                            )}
-                          </Box>
-                        ) : (
-                          ""
-                        )
-                      }
-                      placement="top"
-                      arrow
-                    >
-                      <Typography
-                        component="span"
-                        sx={{
-                          cursor:
-                            miner.serialNumber ||
-                            miner.macAddress ||
-                            miner.warrantyExpiresAt
-                              ? "help"
-                              : "auto",
-                          color: "info.main", // Info is usually a light/sky blue in MUI
-                          textDecoration: "underline",
-                          textUnderlineOffset: "3px",
-                          "&:hover": { color: "info.light" },
-                        }}
-                      >
-                        {miner.name}
-                      </Typography>
-                    </Tooltip>
-                  </TableCell>
-                  <TableCell>{miner.hardware?.model || "—"}</TableCell>
-                  <TableCell>
-                    {miner.user?.name || miner.user?.email || "—"}
-                  </TableCell>
-                  <TableCell>
-                    {miner.user?.luxorSubaccounts?.length
-                      ? miner.user.luxorSubaccounts.join(", ")
-                      : "—"}
-                  </TableCell>
-                  <TableCell>{miner.user?.segment || "—"}</TableCell>
-                  <TableCell>
-                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                    {(miner as any).pool?.name ? (
-                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                      (miner as any).pool.name
-                    ) : (
-                      <Typography variant="body2" color="text.secondary">
-                        Unassigned
-                      </Typography>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {miner.space ? (
-                      <Box>
-                        <Typography variant="body2" sx={{ fontWeight: "500" }}>
-                          {miner.space.name}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {miner.space.location}
-                        </Typography>
-                      </Box>
-                    ) : (
-                      "—"
-                    )}
-                  </TableCell>
-                  <TableCell align="right">
-                    {miner.hardware?.powerUsage || 0} kW
-                  </TableCell>
-                  <TableCell align="right">
-                    {parseFloat(String(miner.hardware?.hashRate || 0)).toFixed(
-                      2,
-                    )}{" "}
-                    TH/s
-                  </TableCell>
-                  <TableCell align="right">
-                    {miner.rate_per_kwh ? (
-                      `$${Number(miner.rate_per_kwh).toFixed(4)}`
-                    ) : (
-                      <Typography variant="body2" color="text.secondary">
-                        —
-                      </Typography>
-                    )}
-                  </TableCell>
-                  <TableCell align="right">
-                    {miner.benchmarkHashrate !== undefined &&
-                    miner.benchmarkHashrate !== null ? (
-                      `${Number(miner.benchmarkHashrate).toFixed(2)} TH/s`
-                    ) : (
-                      <Typography variant="body2" color="text.secondary">
-                        —
-                      </Typography>
-                    )}
-                  </TableCell>
-                  <TableCell sx={{ whiteSpace: "nowrap" }}>
-                    {(() => {
-                      const warrantyStatus = getWarrantyStatus(
-                        miner.warrantyExpiresAt,
-                      );
-                      if (warrantyStatus === "NONE") {
-                        return (
-                          <Typography variant="body2" color="text.secondary">
-                            —
-                          </Typography>
-                        );
-                      }
-                      return (
-                        <Box>
-                          <Typography variant="body2">
-                            {formatWarrantyDate(miner.warrantyExpiresAt)}
-                          </Typography>
-                          <Chip
-                            label={WARRANTY_STATUS_LABEL[warrantyStatus]}
-                            color={getWarrantyColor(warrantyStatus)}
-                            size="small"
-                            variant="outlined"
-                            sx={{ mt: 0.5, height: 20, fontSize: "0.7rem" }}
-                          />
-                        </Box>
-                      );
-                    })()}
-                  </TableCell>
-                  <TableCell align="center">
-                    <Chip
-                      label={miner.status}
-                      color={getStatusColor(miner.status)}
-                      size="small"
-                      variant="outlined"
-                    />
-                  </TableCell>
-                  <TableCell>{formatDate(miner.createdAt)}</TableCell>
-                  <TableCell align="center">
-                    <IconButton
-                      size="small"
-                      onClick={(e) => handleMenuOpen(e, miner.id)}
-                      disabled={isLoading}
-                      title="Actions"
-                    >
-                      <MoreVertIcon fontSize="small" />
-                    </IconButton>
-                    <Menu
-                      anchorEl={anchorEl}
-                      open={anchorEl !== null && selectedMinerId === miner.id}
-                      onClose={handleMenuClose}
-                    >
-                      {!readOnly && (
-                        <MenuItem onClick={() => handleEdit(miner)}>
-                          <EditIcon fontSize="small" sx={{ mr: 1 }} />
-                          Edit
-                        </MenuItem>
-                      )}
-                      {!readOnly && (
-                        <MenuItem
-                          onClick={() =>
-                            handleViewRepairNotes(miner.id, miner.name)
-                          }
-                        >
-                          <Typography fontSize="small">
-                            🛠️ Repair Notes
-                          </Typography>
-                        </MenuItem>
-                      )}
-                      <MenuItem onClick={() => handleViewRateHistory(miner.id)}>
-                        <Typography fontSize="small">
-                          📈 See Miner History
-                        </Typography>
-                      </MenuItem>
-                      {!readOnly && (
-                        <MenuItem
-                          disabled={miner.isDeleted}
-                          onClick={() => handleDelete(miner.id)}
-                          sx={{ color: "error.main" }}
-                        >
-                          <DeleteIcon fontSize="small" sx={{ mr: 1 }} />
-                          Delete
-                        </MenuItem>
-                      )}
-                    </Menu>
+            </TableHead>
+            <TableBody>
+              {isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={15} align="center" sx={{ py: 4 }}>
+                    <CircularProgress />
                   </TableCell>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </TableContainer>
+              ) : memoizedRows.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={15} align="center" sx={{ py: 4 }}>
+                    <Typography color="text.secondary">
+                      No miners found. Create one to get started.
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                pagedRows.map((miner) => (
+                  <TableRow
+                    key={miner.id}
+                    hover
+                    sx={{
+                      "&:nth-of-type(even)": {
+                        backgroundColor: (theme) =>
+                          alpha(theme.palette.text.primary, 0.025),
+                      },
+                      "&:last-child td": { border: 0 },
+                    }}
+                  >
+                    <TableCell sx={{ fontWeight: "500" }}>
+                      <Tooltip
+                        title={
+                          miner.serialNumber ||
+                          miner.macAddress ||
+                          miner.warrantyExpiresAt ? (
+                            <Box sx={{ p: 0.5 }}>
+                              {miner.serialNumber && (
+                                <Typography variant="caption" display="block">
+                                  SN: {miner.serialNumber}
+                                </Typography>
+                              )}
+                              {miner.macAddress && (
+                                <Typography variant="caption" display="block">
+                                  MAC: {miner.macAddress}
+                                </Typography>
+                              )}
+                              {miner.warrantyExpiresAt && (
+                                <Typography variant="caption" display="block">
+                                  Warranty until:{" "}
+                                  {formatWarrantyDate(miner.warrantyExpiresAt)}
+                                </Typography>
+                              )}
+                            </Box>
+                          ) : (
+                            ""
+                          )
+                        }
+                        placement="top"
+                        arrow
+                      >
+                        <Typography
+                          component="span"
+                          sx={{
+                            fontSize: "inherit",
+                            fontWeight: "inherit",
+                            cursor:
+                              miner.serialNumber ||
+                              miner.macAddress ||
+                              miner.warrantyExpiresAt
+                                ? "help"
+                                : "auto",
+                            color: "info.main", // Info is usually a light/sky blue in MUI
+                            textDecoration: "underline",
+                            textUnderlineOffset: "3px",
+                            "&:hover": { color: "info.light" },
+                          }}
+                        >
+                          {miner.name}
+                        </Typography>
+                      </Tooltip>
+                    </TableCell>
+                    <TableCell>{miner.hardware?.model || "—"}</TableCell>
+                    <TableCell>
+                      {miner.user?.name || miner.user?.email || "—"}
+                    </TableCell>
+                    <TableCell>
+                      {miner.user?.luxorSubaccounts?.length
+                        ? miner.user.luxorSubaccounts.join(", ")
+                        : "—"}
+                    </TableCell>
+                    <TableCell>{miner.user?.segment || "—"}</TableCell>
+                    <TableCell>
+                      {miner.pool?.name ? (
+                        miner.pool.name
+                      ) : (
+                        <Typography variant="body2" color="text.secondary">
+                          Unassigned
+                        </Typography>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {miner.space ? (
+                        <Box>
+                          <Typography
+                            variant="body2"
+                            sx={{ fontWeight: "500" }}
+                          >
+                            {miner.space.name}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {miner.space.location}
+                          </Typography>
+                        </Box>
+                      ) : (
+                        "—"
+                      )}
+                    </TableCell>
+                    <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
+                      {miner.hardware?.powerUsage || 0}
+                    </TableCell>
+                    <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
+                      {parseFloat(
+                        String(miner.hardware?.hashRate || 0),
+                      ).toFixed(2)}
+                    </TableCell>
+                    <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
+                      {miner.rate_per_kwh
+                        ? Number(miner.rate_per_kwh).toFixed(4)
+                        : emptyValue}
+                    </TableCell>
+                    <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
+                      {miner.benchmarkHashrate !== undefined &&
+                      miner.benchmarkHashrate !== null
+                        ? Number(miner.benchmarkHashrate).toFixed(2)
+                        : emptyValue}
+                    </TableCell>
+                    <TableCell sx={{ whiteSpace: "nowrap" }}>
+                      {(() => {
+                        const warrantyStatus = getWarrantyStatus(
+                          miner.warrantyExpiresAt,
+                        );
+                        if (warrantyStatus === "NONE") {
+                          return emptyValue;
+                        }
+                        return (
+                          <Box>
+                            <Typography variant="body2">
+                              {formatWarrantyDate(miner.warrantyExpiresAt)}
+                            </Typography>
+                            <Chip
+                              label={WARRANTY_STATUS_LABEL[warrantyStatus]}
+                              color={getWarrantyColor(warrantyStatus)}
+                              size="small"
+                              variant="outlined"
+                              sx={{ mt: 0.5, height: 20, fontSize: "0.7rem" }}
+                            />
+                          </Box>
+                        );
+                      })()}
+                    </TableCell>
+                    <TableCell align="center">
+                      <Chip
+                        label={miner.status}
+                        color={getStatusColor(miner.status)}
+                        size="small"
+                        variant="outlined"
+                        sx={{
+                          height: 22,
+                          fontSize: "0.7rem",
+                          "& .MuiChip-label": { px: 0.75 },
+                        }}
+                      />
+                    </TableCell>
+                    <TableCell sx={{ whiteSpace: "nowrap" }}>
+                      {formatDate(miner.createdAt)}
+                    </TableCell>
+                    <TableCell align="center">
+                      <IconButton
+                        size="small"
+                        onClick={(e) => handleMenuOpen(e, miner.id)}
+                        disabled={isLoading}
+                        title="Actions"
+                      >
+                        <MoreVertIcon fontSize="small" />
+                      </IconButton>
+                      <Menu
+                        anchorEl={anchorEl}
+                        open={anchorEl !== null && selectedMinerId === miner.id}
+                        onClose={handleMenuClose}
+                      >
+                        {!readOnly && (
+                          <MenuItem onClick={() => handleEdit(miner)}>
+                            <EditIcon fontSize="small" sx={{ mr: 1 }} />
+                            Edit
+                          </MenuItem>
+                        )}
+                        {!readOnly && (
+                          <MenuItem
+                            onClick={() =>
+                              handleViewRepairNotes(miner.id, miner.name)
+                            }
+                          >
+                            <Typography fontSize="small">
+                              🛠️ Repair Notes
+                            </Typography>
+                          </MenuItem>
+                        )}
+                        <MenuItem
+                          onClick={() => handleViewRateHistory(miner.id)}
+                        >
+                          <Typography fontSize="small">
+                            📈 See Miner History
+                          </Typography>
+                        </MenuItem>
+                        {!readOnly && (
+                          <MenuItem
+                            disabled={miner.isDeleted}
+                            onClick={() => handleDelete(miner.id)}
+                            sx={{ color: "error.main" }}
+                          >
+                            <DeleteIcon fontSize="small" sx={{ mr: 1 }} />
+                            Delete
+                          </MenuItem>
+                        )}
+                      </Menu>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+        <TablePagination
+          rowsPerPageOptions={[25, 50, 100, { value: -1, label: "All" }]}
+          component="div"
+          count={memoizedRows.length}
+          rowsPerPage={rowsPerPage}
+          page={currentPage}
+          onPageChange={(_, newPage) => setPage(newPage)}
+          onRowsPerPageChange={(e) => {
+            setRowsPerPage(parseInt(e.target.value, 10));
+            setPage(0);
+          }}
+          sx={{
+            borderTop: "1px solid",
+            borderColor: "divider",
+            "& .MuiTablePagination-toolbar": {
+              paddingLeft: { xs: 1, sm: 2 },
+              paddingRight: { xs: 1, sm: 1 },
+              flexWrap: "wrap",
+              minHeight: { xs: 48, sm: 52 },
+            },
+            "& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows":
+              {
+                margin: 0,
+                fontSize: { xs: "0.75rem", sm: "0.875rem" },
+              },
+            "& .MuiTablePagination-actions": {
+              marginLeft: { xs: 1, sm: 2 },
+            },
+          }}
+        />
+      </Paper>
 
       {/* Delete Confirmation Dialog */}
       <Dialog

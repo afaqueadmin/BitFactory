@@ -14,6 +14,8 @@ export type MinerSortField =
   | "subaccount"
   | "segment"
   | "model"
+  | "pool"
+  | "space"
   | "powerUsage"
   | "hashRate"
   | "status"
@@ -87,6 +89,7 @@ interface Miner {
   user?: User;
   space?: Space;
   hardware?: Hardware;
+  pool?: { name: string } | null;
   rateHistory?: Array<{
     rate_per_kwh: number;
     createdAt: string;
@@ -148,6 +151,12 @@ function getSortValue(miner: Miner, field: MinerSortField): string | number {
     case "model":
       return (miner.hardware?.model || "").toLowerCase();
 
+    case "pool":
+      return (miner.pool?.name || "").toLowerCase();
+
+    case "space":
+      return (miner.space?.name || "").toLowerCase();
+
     case "powerUsage":
       return Number(miner.hardware?.powerUsage || 0);
 
@@ -196,7 +205,10 @@ function compareValues(a: string | number, b: string | number): -1 | 0 | 1 {
  * @example
  * const sortedMiners = sortMiners(miners, { field: "name", direction: "asc" });
  */
-export function sortMiners(miners: Miner[], config: SortConfig): Miner[] {
+export function sortMiners<T extends Miner>(
+  miners: T[],
+  config: SortConfig,
+): T[] {
   const sorted = [...miners];
 
   sorted.sort((a, b) => {
@@ -239,6 +251,8 @@ export function getSortFieldLabel(field: MinerSortField): string {
     subaccount: "Subaccount",
     segment: "Type",
     model: "Model",
+    pool: "Pool",
+    space: "Space",
     powerUsage: "Power Usage",
     hashRate: "Hash Rate",
     status: "Status",
@@ -263,6 +277,8 @@ export function getAllSortFields(): MinerSortField[] {
     "subaccount",
     "segment",
     "model",
+    "pool",
+    "space",
     "powerUsage",
     "hashRate",
     "status",

@@ -232,7 +232,7 @@ export default function FranchiseMinersContent() {
       component="main"
       sx={{ py: 4, backgroundColor: "background.default", minHeight: "100vh" }}
     >
-      <Container maxWidth="xl">
+      <Container maxWidth={false}>
         <Stack
           direction="row"
           justifyContent="space-between"
