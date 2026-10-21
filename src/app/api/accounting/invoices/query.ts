@@ -40,9 +40,9 @@ export function parseIssuedDateRange(searchParams: URLSearchParams): {
  */
 
 /**
- * `isAdmin`: whether the caller is ADMIN/SUPER_ADMIN. A customer filter hides
- * DRAFT invoices (customers never see drafts); admin pages opt out with
- * `includeDrafts=true`, which is ignored for everyone else.
+ * `isAdmin`: whether the caller is ADMIN/SUPER_ADMIN/ACCOUNTING. A customer
+ * filter hides DRAFT invoices (customers never see drafts); admin pages opt
+ * out with `includeDrafts=true`, which is ignored for everyone else.
  */
 export function buildInvoiceListWhere(
   searchParams: URLSearchParams,

@@ -2,11 +2,13 @@
  * POST /api/admin/hashrate-alerts/bulk-acknowledge
  *
  * Marks multiple below-benchmark hashrate alerts as acknowledged in one call.
- * ADMIN/SUPER_ADMIN only. Ids that don't exist or are already acknowledged
- * are silently skipped (same acknowledgedAt: null guard as the single
- * acknowledge route) - the caller gets back how many were actually claimed.
+ * ADMIN/SUPER_ADMIN/ACCOUNTING only. Ids that don't exist or are already
+ * acknowledged are silently skipped (same acknowledgedAt: null guard as the
+ * single acknowledge route) - the caller gets back how many were actually
+ * claimed.
  */
 
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
@@ -16,7 +18,7 @@ async function requireAdmin(request: NextRequest) {
   if (!token) return { error: "Unauthorized", status: 401 as const };
   try {
     const decoded = await verifyJwtToken(token);
-    if (decoded.role !== "ADMIN" && decoded.role !== "SUPER_ADMIN") {
+    if (!isStaffRole(decoded.role)) {
       return { error: "Admin access required", status: 403 as const };
     }
     return { decoded };

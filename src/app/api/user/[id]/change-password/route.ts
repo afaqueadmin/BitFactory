@@ -1,3 +1,4 @@
+import { isStaffRole, staffActorLabel } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sessionCutoffNow } from "@/lib/auth/sessionRevocation";
@@ -38,7 +39,7 @@ export async function PUT(
       select: { role: true, email: true },
     });
 
-    if (user?.role !== "ADMIN" && user?.role !== "SUPER_ADMIN") {
+    if (!user || !isStaffRole(user.role)) {
       return NextResponse.json(
         { error: "Only administrators can change user passwords" },
         { status: 403 },
@@ -55,9 +56,10 @@ export async function PUT(
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    // An ADMIN cannot reset another ADMIN's or a SUPER_ADMIN's password.
-    // A SUPER_ADMIN can reset an ADMIN's password, but not another
-    // SUPER_ADMIN's. Only CLIENT/FRANCHISEE targets are unrestricted.
+    // An ADMIN or ACCOUNTING user cannot reset any staff password (ADMIN,
+    // ACCOUNTING or SUPER_ADMIN). A SUPER_ADMIN can reset an ADMIN's or
+    // ACCOUNTING user's password, but not another SUPER_ADMIN's. Only
+    // CLIENT/FRANCHISEE/SIMULATED targets are open to all staff.
     if (!canManageAccount(user.role, targetUser.role)) {
       return NextResponse.json(
         { error: "You do not have permission to reset this user's password" },
@@ -141,9 +143,9 @@ export async function PUT(
         entityType: "User",
         entityId: id,
         userId,
-        description: `Password reset for ${targetLogin.email} by ${
-          user.role === "SUPER_ADMIN" ? "super admin" : "admin"
-        } ${user.email}`,
+        description: `Password reset for ${targetLogin.email} by ${staffActorLabel(
+          user.role,
+        )} ${user.email}`,
         ipAddress: request.headers.get("x-forwarded-for") || "unknown",
         userAgent: request.headers.get("user-agent") || "unknown",
       },

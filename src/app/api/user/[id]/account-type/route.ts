@@ -22,8 +22,10 @@
  *   starts at the conversion, not at registration.
  *
  * The account is signed out everywhere, since its role is part of the token.
- * Same tier rules as deletion (an ADMIN acts on CLIENT/FRANCHISEE accounts).
+ * Same tier rules as deletion (an ADMIN or ACCOUNTING user acts on
+ * CLIENT/FRANCHISEE accounts).
  */
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { AuditAction } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -80,7 +82,7 @@ export async function POST(
       where: { id: actorId, isDeleted: false },
       select: { role: true },
     });
-    if (actor?.role !== "ADMIN" && actor?.role !== "SUPER_ADMIN") {
+    if (!actor || !isStaffRole(actor.role)) {
       return NextResponse.json(
         { error: "Only administrators can change account types" },
         { status: 403 },

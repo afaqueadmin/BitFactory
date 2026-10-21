@@ -1,3 +1,4 @@
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
@@ -83,8 +84,7 @@ export async function GET(
     if (!requester) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const isAdmin =
-      requester.role === "ADMIN" || requester.role === "SUPER_ADMIN";
+    const isAdmin = isStaffRole(requester.role);
 
     const userSelect = { select: { id: true, email: true, name: true } };
 
@@ -183,7 +183,7 @@ export async function PATCH(
       select: { role: true },
     });
 
-    if (user?.role !== "ADMIN" && user?.role !== "SUPER_ADMIN") {
+    if (!user || !isStaffRole(user.role)) {
       return NextResponse.json(
         { error: "Only administrators can update invoices" },
         { status: 403 },
@@ -366,7 +366,7 @@ export async function PUT(
       select: { role: true },
     });
 
-    if (user?.role !== "ADMIN" && user?.role !== "SUPER_ADMIN") {
+    if (!user || !isStaffRole(user.role)) {
       return NextResponse.json(
         { error: "Only administrators can update invoices" },
         { status: 403 },
@@ -481,7 +481,7 @@ export async function POST(
       select: { role: true, email: true },
     });
 
-    if (user?.role !== "ADMIN" && user?.role !== "SUPER_ADMIN") {
+    if (!user || !isStaffRole(user.role)) {
       return NextResponse.json(
         { error: "Only administrators can cancel invoices" },
         { status: 403 },
@@ -648,7 +648,7 @@ export async function DELETE(
       select: { role: true },
     });
 
-    if (user?.role !== "ADMIN" && user?.role !== "SUPER_ADMIN") {
+    if (!user || !isStaffRole(user.role)) {
       return NextResponse.json(
         { error: "Only administrators can delete invoices" },
         { status: 403 },

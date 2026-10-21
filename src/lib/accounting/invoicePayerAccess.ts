@@ -1,3 +1,4 @@
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import type { Invoice } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -42,8 +43,7 @@ export async function getInvoiceForPayer(
   }
 
   const isOwner = invoice.userId === currentUser.userId;
-  const isAdmin =
-    currentUser.role === "ADMIN" || currentUser.role === "SUPER_ADMIN";
+  const isAdmin = isStaffRole(currentUser.role);
   const isCustomersFranchisee =
     currentUser.role === "FRANCHISEE" &&
     (await assertFranchiseeOwnsCustomer(currentUser.userId, invoice.userId));

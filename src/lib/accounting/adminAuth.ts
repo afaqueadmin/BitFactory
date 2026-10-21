@@ -1,11 +1,12 @@
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
 
 /**
- * Same check as the existing accounting routes (token cookie, then role
- * ADMIN or SUPER_ADMIN), shared by the payment-account and upload routes.
+ * Same check as the existing accounting routes (token cookie, then a staff
+ * role - see isStaffRole), shared by the payment-account and upload routes.
  * Returns the caller's userId, or a ready 401/403 response.
  */
 export async function requireAccountingAdmin(
@@ -32,7 +33,7 @@ export async function requireAccountingAdmin(
     select: { role: true },
   });
 
-  if (user?.role !== "ADMIN" && user?.role !== "SUPER_ADMIN") {
+  if (!user || !isStaffRole(user.role)) {
     return {
       response: NextResponse.json(
         { error: "Only administrators can manage accounting records" },

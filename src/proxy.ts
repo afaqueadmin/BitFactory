@@ -1,3 +1,4 @@
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { JwtPayload, verifyJwtToken } from "@/lib/jwt";
@@ -150,6 +151,7 @@ const getDefaultPathForRole = (role: string) => {
   switch (role) {
     case "ADMIN":
     case "SUPER_ADMIN":
+    case "ACCOUNTING":
       return "/adminpanel";
     case "CLIENT":
     case "SIMULATED":
@@ -237,9 +239,9 @@ export async function proxy(request: NextRequest) {
     // ✅ Role-based access control
     const userRole = decoded.role;
 
-    if (userRole === "ADMIN" || userRole === "SUPER_ADMIN") {
-      const role = "ADMIN"; // Don't distinguish between ADMIN and SUPER_ADMIN for route access
-      // Prevent admin/super_admin from accessing client routes
+    if (isStaffRole(userRole)) {
+      const role = "ADMIN"; // Every staff role shares the ADMIN route set
+      // Prevent staff from accessing client routes
       if (!isInRouteGroup(pathname, role)) {
         return NextResponse.redirect(new URL("/adminpanel", request.url));
       }

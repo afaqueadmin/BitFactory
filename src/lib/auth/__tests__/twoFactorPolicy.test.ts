@@ -12,13 +12,17 @@ afterEach(() => {
 });
 
 describe("twoFactorRequirement", () => {
-  it.each(["SUPER_ADMIN", "ADMIN", "FRANCHISEE", "CLIENT", "SIMULATED"])(
-    "applies to %s",
-    (role) => {
-      expect(twoFactorRequirement(role, false, BEFORE)).toBe("grace");
-      expect(twoFactorRequirement(role, false, AFTER)).toBe("enforced");
-    },
-  );
+  it.each([
+    "SUPER_ADMIN",
+    "ADMIN",
+    "ACCOUNTING",
+    "FRANCHISEE",
+    "CLIENT",
+    "SIMULATED",
+  ])("applies to %s", (role) => {
+    expect(twoFactorRequirement(role, false, BEFORE)).toBe("grace");
+    expect(twoFactorRequirement(role, false, AFTER)).toBe("enforced");
+  });
 
   it("is satisfied once 2FA is enabled, before or after the deadline", () => {
     expect(twoFactorRequirement("ADMIN", true, BEFORE)).toBe("satisfied");

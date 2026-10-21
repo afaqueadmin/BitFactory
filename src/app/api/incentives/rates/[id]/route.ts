@@ -1,3 +1,4 @@
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
@@ -21,7 +22,7 @@ export async function GET(
       select: { role: true },
     });
 
-    if (user?.role !== "ADMIN" && user?.role !== "SUPER_ADMIN") {
+    if (!user || !isStaffRole(user.role)) {
       return NextResponse.json(
         { error: "Only administrators can access incentive rates" },
         { status: 403 },
@@ -77,7 +78,7 @@ export async function DELETE(
       select: { role: true },
     });
 
-    if (user?.role !== "ADMIN" && user?.role !== "SUPER_ADMIN") {
+    if (!user || !isStaffRole(user.role)) {
       return NextResponse.json(
         { error: "Only administrators can delete incentive rates" },
         { status: 403 },

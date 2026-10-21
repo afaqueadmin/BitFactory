@@ -1,11 +1,12 @@
 /**
  * DELETE /api/admin/customer-requests/[id]
  *
- * Deletes a franchisee customer request record. ADMIN/SUPER_ADMIN only.
- * Safe for requests in any status — deleting an APPROVED request only
+ * Deletes a franchisee customer request record. ADMIN/SUPER_ADMIN/ACCOUNTING
+ * only. Safe for requests in any status — deleting an APPROVED request only
  * removes the request log entry, not the customer User it created.
  */
 
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
@@ -35,7 +36,7 @@ export async function DELETE(
       );
     }
 
-    if (decoded.role !== "ADMIN" && decoded.role !== "SUPER_ADMIN") {
+    if (!isStaffRole(decoded.role)) {
       return NextResponse.json(
         { success: false, error: "Admin access required" },
         { status: 403 },

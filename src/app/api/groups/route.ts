@@ -9,6 +9,7 @@
  * Authorization: Admin/Super Admin only
  */
 
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
@@ -65,7 +66,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     }
 
     // Check authorization (Admin or Super Admin)
-    if (user.role !== "ADMIN" && user.role !== "SUPER_ADMIN") {
+    if (!isStaffRole(user.role)) {
       console.warn("[Groups API] GET - Forbidden: User role is", user.role);
       return NextResponse.json(
         {
@@ -152,7 +153,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     // Check authorization (Admin or Super Admin)
-    if (user.role !== "ADMIN" && user.role !== "SUPER_ADMIN") {
+    if (!isStaffRole(user.role)) {
       console.warn("[Groups API] POST - Forbidden: User role is", user.role);
       return NextResponse.json(
         {

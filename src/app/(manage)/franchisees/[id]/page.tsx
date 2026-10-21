@@ -8,6 +8,7 @@
  * the customers attached to it, and a summary of its incentive activity.
  */
 
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import React, { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -76,9 +77,7 @@ interface FranchiseCustomer {
 }
 
 type IncentiveType =
-  | "HARDWARE_SALE"
-  | "OWN_MACHINE_HOSTING_REBATE"
-  | "CLIENT_HOSTING_COMMISSION";
+  "HARDWARE_SALE" | "OWN_MACHINE_HOSTING_REBATE" | "CLIENT_HOSTING_COMMISSION";
 
 interface IncentiveRate {
   id: string;
@@ -126,7 +125,7 @@ export default function FranchiseDetailsPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { user } = useUser();
-  const isAdmin = user?.role === "ADMIN" || user?.role === "SUPER_ADMIN";
+  const isAdmin = isStaffRole(user?.role);
   const franchiseId = params.id as string;
 
   const [editModalOpen, setEditModalOpen] = useState(false);

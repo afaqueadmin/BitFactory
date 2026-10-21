@@ -1,5 +1,6 @@
 "use client";
 
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import React, { useState } from "react";
 import {
   Box,
@@ -36,7 +37,12 @@ interface TicketThreadViewProps {
   ticketId: string;
   currentUserId: string;
   currentUserRole:
-    "ADMIN" | "SUPER_ADMIN" | "CLIENT" | "FRANCHISEE" | "SIMULATED";
+    | "ADMIN"
+    | "SUPER_ADMIN"
+    | "ACCOUNTING"
+    | "CLIENT"
+    | "FRANCHISEE"
+    | "SIMULATED";
   /** Extra content rendered above the thread (e.g. an assignment control, admin-only). */
   headerExtra?: React.ReactNode;
   daylight?: boolean;
@@ -67,15 +73,13 @@ export default function TicketThreadView({
   const { d, fonts } = useDaylight();
 
   // Priority + internal notes stay a "staff" concept (ADMIN/SUPER_ADMIN/
-  // FRANCHISEE). Status is narrower: FRANCHISEE can raise/reply but never
-  // manually changes status - only ADMIN/SUPER_ADMIN can, plus a CLIENT
-  // self-closing their own ticket (handled separately below).
+  // ACCOUNTING/FRANCHISEE). Status is narrower: FRANCHISEE can raise/reply
+  // but never manually changes status - only ADMIN/SUPER_ADMIN/ACCOUNTING
+  // can, plus a CLIENT self-closing their own ticket (handled separately
+  // below).
   const isStaff =
-    currentUserRole === "ADMIN" ||
-    currentUserRole === "SUPER_ADMIN" ||
-    currentUserRole === "FRANCHISEE";
-  const canManageStatus =
-    currentUserRole === "ADMIN" || currentUserRole === "SUPER_ADMIN";
+    isStaffRole(currentUserRole) || currentUserRole === "FRANCHISEE";
+  const canManageStatus = isStaffRole(currentUserRole);
 
   if (loading) {
     return (

@@ -6,7 +6,8 @@ import { requireSimAdmin } from "@/lib/simulation/adminAuth";
 export const runtime = "nodejs";
 
 /**
- * DELETE /api/simulated-accounts/[id]/entries/[entryId]  (ADMIN / SUPER_ADMIN)
+ * DELETE /api/simulated-accounts/[id]/entries/[entryId]  (ADMIN / SUPER_ADMIN /
+ * ACCOUNTING)
  *
  * Voids one simulated ledger entry (soft delete). A voided daily charge
  * keeps its day, so the cron won't charge that day again.

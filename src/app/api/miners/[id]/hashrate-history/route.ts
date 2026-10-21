@@ -1,3 +1,4 @@
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { verifyJwtToken } from "@/lib/jwt";
 import { prisma } from "@/lib/prisma";
@@ -112,7 +113,7 @@ export async function GET(
             { status: 403 },
           );
         }
-      } else if (callerRole !== "ADMIN" && callerRole !== "SUPER_ADMIN") {
+      } else if (!isStaffRole(callerRole)) {
         return NextResponse.json(
           { success: false, error: "Forbidden" },
           { status: 403 },

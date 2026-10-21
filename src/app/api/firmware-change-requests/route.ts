@@ -6,8 +6,8 @@
  *     review trail (confirmedById/confirmedAt/confirmationMethod/
  *     confirmationContact/confirmationNote/confirmedBy) stripped, same as
  *     /api/wallet/frequency-change-requests.
- *   - ADMIN/SUPER_ADMIN: every request, optionally filtered by ?status=,
- *     including the full review trail.
+ *   - ADMIN/SUPER_ADMIN/ACCOUNTING: every request, optionally filtered by
+ *     ?status=, including the full review trail.
  *
  * POST: submit a new firmware change request for one of the caller's own
  * miners. CLIENT/FRANCHISEE only. Requires step-up re-authentication (current
@@ -25,6 +25,7 @@
  * option name. Only one request in flight (PENDING or CONFIRMED) per miner.
  */
 
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { AuditAction, Prisma } from "@prisma/client";
 import { verifyStepUp } from "@/lib/auth/stepUp";
@@ -61,8 +62,7 @@ export async function GET(request: NextRequest) {
     }
 
     const statusParam = request.nextUrl.searchParams.get("status");
-    const isAdmin =
-      auth.decoded.role === "ADMIN" || auth.decoded.role === "SUPER_ADMIN";
+    const isAdmin = isStaffRole(auth.decoded.role);
 
     const where: Prisma.FirmwareChangeRequestWhereInput = {
       ...(isAdmin ? {} : { userId: auth.decoded.userId }),

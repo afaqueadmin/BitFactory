@@ -3,7 +3,8 @@
  *
  * Records that an admin restarted this miner from the Luxor backend. Nothing
  * is sent to Luxor - this only writes a MinerRestart history row plus a
- * MINER_RESTARTED audit log entry, in one transaction. ADMIN/SUPER_ADMIN only.
+ * MINER_RESTARTED audit log entry, in one transaction.
+ * ADMIN/SUPER_ADMIN/ACCOUNTING only.
  *
  * Request Body:
  * {
@@ -16,6 +17,7 @@
  * separate action.
  */
 
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
@@ -26,7 +28,7 @@ async function requireAdmin(request: NextRequest) {
   if (!token) return { error: "Unauthorized", status: 401 as const };
   try {
     const decoded = await verifyJwtToken(token);
-    if (decoded.role !== "ADMIN" && decoded.role !== "SUPER_ADMIN") {
+    if (!isStaffRole(decoded.role)) {
       return { error: "Admin access required", status: 403 as const };
     }
     return { decoded };

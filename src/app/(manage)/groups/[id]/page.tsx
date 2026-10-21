@@ -80,7 +80,7 @@ interface GroupSubaccount {
     id: string;
     name: string;
     email: string;
-    role: "ADMIN" | "CLIENT" | "SUPER_ADMIN";
+    role: "ADMIN" | "CLIENT" | "SUPER_ADMIN" | "ACCOUNTING";
     luxorSubaccounts: string[];
   };
   minerCount: number;
@@ -690,7 +690,8 @@ export default function GroupDetailPage() {
                               size="small"
                               variant="outlined"
                               color={
-                                subaccount.user.role === "ADMIN"
+                                subaccount.user.role === "ADMIN" ||
+                                subaccount.user.role === "ACCOUNTING"
                                   ? "error"
                                   : subaccount.user.role === "SUPER_ADMIN"
                                     ? "warning"

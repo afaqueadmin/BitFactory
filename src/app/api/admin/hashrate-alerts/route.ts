@@ -2,10 +2,12 @@
  * GET /api/admin/hashrate-alerts
  *
  * Lists below-benchmark hashrate alerts written by cron_hashrate_benchmark_alert
- * (see MinerHashrateAlertLog / hashrateBenchmarkAlertService.ts). ADMIN/SUPER_ADMIN
- * only. Optional ?acknowledged=true|false filter (defaults to all).
+ * (see MinerHashrateAlertLog / hashrateBenchmarkAlertService.ts).
+ * ADMIN/SUPER_ADMIN/ACCOUNTING only. Optional ?acknowledged=true|false filter
+ * (defaults to all).
  */
 
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
@@ -15,7 +17,7 @@ async function requireAdmin(request: NextRequest) {
   if (!token) return { error: "Unauthorized", status: 401 as const };
   try {
     const decoded = await verifyJwtToken(token);
-    if (decoded.role !== "ADMIN" && decoded.role !== "SUPER_ADMIN") {
+    if (!isStaffRole(decoded.role)) {
       return { error: "Admin access required", status: 403 as const };
     }
     return { decoded };

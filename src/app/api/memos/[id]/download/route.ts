@@ -1,3 +1,4 @@
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { verifyJwtToken } from "@/lib/jwt";
 import { prisma } from "@/lib/prisma";
@@ -36,8 +37,7 @@ export async function GET(
       select: { role: true },
     });
 
-    const isAdmin =
-      requester?.role === "ADMIN" || requester?.role === "SUPER_ADMIN";
+    const isAdmin = isStaffRole(requester?.role);
     const isOwnMemo = memo.userId === decoded.userId;
 
     if (!isAdmin && !isOwnMemo) {

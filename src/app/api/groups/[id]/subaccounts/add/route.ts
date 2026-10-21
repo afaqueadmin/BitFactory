@@ -1,3 +1,4 @@
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
@@ -33,7 +34,7 @@ export async function POST(
       );
     }
 
-    if (role !== "ADMIN" && role !== "SUPER_ADMIN") {
+    if (!isStaffRole(role)) {
       return NextResponse.json(
         {
           success: false,

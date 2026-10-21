@@ -9,8 +9,8 @@
  *     response for these callers - it can contain the client's own phone
  *     number/email plus internal notes, none of which the client needs to
  *     see back.
- *   - ADMIN/SUPER_ADMIN: every request, optionally filtered by ?status=,
- *     including the full review trail.
+ *   - ADMIN/SUPER_ADMIN/ACCOUNTING: every request, optionally filtered by
+ *     ?status=, including the full review trail.
  *
  * POST: submit a new wallet change request. CLIENT/FRANCHISEE only. Requires
  * step-up re-authentication (current password, or a 2FA code/backup code for
@@ -34,6 +34,7 @@
  * Braiins is out of scope - see src/lib/wallet.ts.
  */
 
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { AuditAction, Prisma } from "@prisma/client";
 import { validate, Network } from "bitcoin-address-validation";
@@ -68,8 +69,7 @@ export async function GET(request: NextRequest) {
     }
 
     const statusParam = request.nextUrl.searchParams.get("status");
-    const isAdmin =
-      auth.decoded.role === "ADMIN" || auth.decoded.role === "SUPER_ADMIN";
+    const isAdmin = isStaffRole(auth.decoded.role);
 
     const where: Prisma.WalletChangeRequestWhereInput = {
       ...(isAdmin ? {} : { userId: auth.decoded.userId }),

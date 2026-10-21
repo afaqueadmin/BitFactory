@@ -23,7 +23,7 @@ async function findSimulatedAccount(id: string) {
 }
 
 /**
- * GET /api/simulated-accounts/[id]/entries  (ADMIN / SUPER_ADMIN)
+ * GET /api/simulated-accounts/[id]/entries  (ADMIN / SUPER_ADMIN / ACCOUNTING)
  *
  * The account's simulated cost ledger, newest first with running balance,
  * plus its balance, current daily cost and days left - what the customer's
@@ -85,7 +85,7 @@ export async function GET(
 }
 
 /**
- * POST /api/simulated-accounts/[id]/entries  (ADMIN / SUPER_ADMIN)
+ * POST /api/simulated-accounts/[id]/entries  (ADMIN / SUPER_ADMIN / ACCOUNTING)
  * Body: { type: "PAYMENT" | "ADJUSTMENT", amount, narration? }
  *
  * Same rules as an admin payment on a real customer (POST /api/cost-payments):

@@ -53,7 +53,11 @@ export default async function PaymentSuccessPage({ params }: PageProps) {
   }
 
   // Only allow customer or admin to view
-  if (userRole !== "ADMIN" && invoice.userId !== userId) {
+  if (
+    userRole !== "ADMIN" &&
+    userRole !== "ACCOUNTING" &&
+    invoice.userId !== userId
+  ) {
     redirect("/invoices");
   }
 

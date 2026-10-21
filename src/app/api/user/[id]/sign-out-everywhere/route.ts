@@ -6,9 +6,11 @@
  * when an account may be in use by someone else, together with a password
  * reset if needed.
  *
- * Same tier rules as an admin password reset: an ADMIN can act on CLIENT and
- * FRANCHISEE accounts, a SUPER_ADMIN also on ADMIN accounts.
+ * Same tier rules as an admin password reset: an ADMIN or ACCOUNTING user can
+ * act on CLIENT and FRANCHISEE accounts, a SUPER_ADMIN also on ADMIN and
+ * ACCOUNTING accounts.
  */
+import { isStaffRole, staffActorLabel } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { AuditAction } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -41,7 +43,7 @@ export async function POST(
       where: { id: actorId, isDeleted: false },
       select: { role: true, email: true },
     });
-    if (actor?.role !== "ADMIN" && actor?.role !== "SUPER_ADMIN") {
+    if (!actor || !isStaffRole(actor.role)) {
       return NextResponse.json(
         { error: "Only administrators can sign users out" },
         { status: 403 },
@@ -80,9 +82,9 @@ export async function POST(
           entityType: "User",
           entityId: id,
           userId: actorId,
-          description: `All sessions of ${target.email} signed out by ${
-            actor.role === "SUPER_ADMIN" ? "super admin" : "admin"
-          } ${actor.email}`,
+          description: `All sessions of ${target.email} signed out by ${staffActorLabel(
+            actor.role,
+          )} ${actor.email}`,
           ipAddress: request.headers.get("x-forwarded-for") || "unknown",
           userAgent: request.headers.get("user-agent") || "unknown",
         },

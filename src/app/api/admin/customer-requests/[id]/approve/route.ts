@@ -3,9 +3,11 @@
  *
  * Approves a pending franchisee customer request: creates the actual CLIENT
  * user (RETAIL segment, attached to the requesting franchise), links it back
- * to the request, and marks the request APPROVED. ADMIN/SUPER_ADMIN only.
+ * to the request, and marks the request APPROVED. ADMIN/SUPER_ADMIN/ACCOUNTING
+ * only.
  */
 
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { hash } from "bcrypt";
@@ -50,7 +52,7 @@ export async function POST(
       );
     }
 
-    if (decoded.role !== "ADMIN" && decoded.role !== "SUPER_ADMIN") {
+    if (!isStaffRole(decoded.role)) {
       return NextResponse.json(
         { success: false, error: "Admin access required" },
         { status: 403 },

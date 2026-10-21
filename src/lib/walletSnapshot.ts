@@ -1,3 +1,4 @@
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { signWalletSnapshotTicket, verifyJwtToken } from "@/lib/jwt";
@@ -15,7 +16,10 @@ import { WALLET_SNAPSHOT_TICKET_COOKIE } from "@/lib/walletTarget";
 // Layout width of the /wallet-snapshot page, in CSS px.
 const SNAPSHOT_WIDTH = 1200;
 
-/** The caller's id when they're ADMIN/SUPER_ADMIN, else an error response. */
+/**
+ * The caller's id when they're ADMIN/SUPER_ADMIN/ACCOUNTING, else an error
+ * response.
+ */
 export async function authorizeAdmin(
   request: NextRequest,
 ): Promise<{ adminId: string } | NextResponse> {
@@ -33,7 +37,7 @@ export async function authorizeAdmin(
     where: { id: decoded.userId },
     select: { role: true },
   });
-  if (admin?.role !== "ADMIN" && admin?.role !== "SUPER_ADMIN") {
+  if (!admin || !isStaffRole(admin.role)) {
     return NextResponse.json(
       { error: "Only administrators can send wallet snapshots" },
       { status: 403 },

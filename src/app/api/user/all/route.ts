@@ -1,3 +1,4 @@
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { prisma } from "@/lib/prisma";
 import { NON_BALANCE_PAYMENT_TYPES } from "@/lib/accounting/paymentTypes";
 import { NextRequest, NextResponse } from "next/server";
@@ -44,12 +45,7 @@ export async function GET(request: NextRequest) {
       select: { id: true, role: true },
     });
 
-    if (
-      user &&
-      user.role !== "ADMIN" &&
-      user.role !== "SUPER_ADMIN" &&
-      user.role !== "FRANCHISEE"
-    ) {
+    if (user && !isStaffRole(user.role) && user.role !== "FRANCHISEE") {
       return NextResponse.json(
         { error: "Only administrators can view all users" },
         { status: 403 },

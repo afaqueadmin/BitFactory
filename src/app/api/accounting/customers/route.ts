@@ -1,3 +1,4 @@
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
@@ -20,11 +21,7 @@ export async function GET(request: NextRequest) {
       select: { id: true, role: true },
     });
 
-    if (
-      user?.role !== "ADMIN" &&
-      user?.role !== "SUPER_ADMIN" &&
-      user?.role !== "FRANCHISEE"
-    ) {
+    if (!user || (!isStaffRole(user.role) && user.role !== "FRANCHISEE")) {
       return NextResponse.json(
         { error: "Only administrators can access customers" },
         { status: 403 },
@@ -42,8 +39,7 @@ export async function GET(request: NextRequest) {
     const hostingOnly = scope === "hosting";
     const withMinersOnly = scope === "withMiners";
     const includeSimulated =
-      searchParams.get("includeSimulated") === "1" &&
-      (user.role === "ADMIN" || user.role === "SUPER_ADMIN");
+      searchParams.get("includeSimulated") === "1" && isStaffRole(user.role);
 
     // Fetch all customers (users with role CLIENT, plus SIMULATED on request)
     const customers = await prisma.user.findMany({

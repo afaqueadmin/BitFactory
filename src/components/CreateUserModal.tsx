@@ -395,6 +395,9 @@ export default function CreateUserModal({
                 {user && user.role === "SUPER_ADMIN" && (
                   <MenuItem value="ADMIN">Admin</MenuItem>
                 )}
+                {user && user.role === "SUPER_ADMIN" && (
+                  <MenuItem value="ACCOUNTING">Accounting</MenuItem>
+                )}
               </Select>
             </FormControl>
 

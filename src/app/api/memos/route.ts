@@ -1,3 +1,4 @@
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
@@ -57,7 +58,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
 
-    const isAdmin = userRole === "ADMIN" || userRole === "SUPER_ADMIN";
+    const isAdmin = isStaffRole(userRole);
     // Simulated accounts are self-scoped like clients (and simply have no memos).
     const isClient = isCustomerRole(userRole);
 
@@ -227,7 +228,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
 
-    if (userRole !== "ADMIN" && userRole !== "SUPER_ADMIN") {
+    if (!isStaffRole(userRole)) {
       return NextResponse.json(
         { error: "Only administrators can create memos" },
         { status: 403 },

@@ -1,3 +1,4 @@
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sessionCutoffNow } from "@/lib/auth/sessionRevocation";
@@ -47,7 +48,7 @@ export async function PUT(
       select: { role: true },
     });
 
-    if (user?.role !== "ADMIN" && user?.role !== "SUPER_ADMIN") {
+    if (!user || !isStaffRole(user.role)) {
       return NextResponse.json(
         { error: "Only administrators can update users" },
         { status: 403 },
@@ -393,7 +394,7 @@ export async function DELETE(
       select: { role: true },
     });
 
-    if (user?.role !== "ADMIN" && user?.role !== "SUPER_ADMIN") {
+    if (!user || !isStaffRole(user.role)) {
       return NextResponse.json(
         { error: "Only administrators can delete users" },
         { status: 403 },
@@ -416,8 +417,9 @@ export async function DELETE(
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    // N-8: same tier rule as password reset - an ADMIN can't delete another
-    // ADMIN or a SUPER_ADMIN, and nobody deletes a SUPER_ADMIN here.
+    // N-8: same tier rule as password reset - an ADMIN or ACCOUNTING user
+    // can't delete any staff account (ADMIN, ACCOUNTING or SUPER_ADMIN), and
+    // nobody deletes a SUPER_ADMIN here.
     if (!canManageAccount(user.role, targetUser.role)) {
       return NextResponse.json(
         { error: "You do not have permission to delete this user" },

@@ -1,3 +1,4 @@
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { prisma } from "@/lib/prisma";
 import { hash } from "bcrypt";
 import { NextRequest, NextResponse } from "next/server";
@@ -75,7 +76,7 @@ export async function POST(request: NextRequest) {
       select: { role: true },
     });
 
-    if (!user || (user.role !== "ADMIN" && user.role !== "SUPER_ADMIN")) {
+    if (!user || !isStaffRole(user.role)) {
       return NextResponse.json(
         { error: "Only administrators can create users" },
         { status: 403 },
@@ -112,10 +113,7 @@ export async function POST(request: NextRequest) {
     }
     const email = canonicalEmail(rawEmail);
 
-    if (
-      user.role !== "SUPER_ADMIN" &&
-      ["ADMIN", "SUPER_ADMIN"].includes(role)
-    ) {
+    if (user.role !== "SUPER_ADMIN" && isStaffRole(role)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 

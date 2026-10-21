@@ -10,7 +10,8 @@
  * - Real-time status and feedback
  *
  * This page uses the secure /api/luxor proxy route to handle all subaccount operations
- * with server-side authentication and ADMIN-only authorization.
+ * with server-side authentication and staff-only (ADMIN/SUPER_ADMIN/ACCOUNTING)
+ * authorization.
  *
  * NOTE: This replaces the V1 Groups API. Sites are the new organizational unit in V2.
  */

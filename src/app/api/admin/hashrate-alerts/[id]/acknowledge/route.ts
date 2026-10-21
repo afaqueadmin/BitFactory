@@ -1,12 +1,14 @@
 /**
  * POST /api/admin/hashrate-alerts/[id]/acknowledge
  *
- * Marks a below-benchmark hashrate alert as acknowledged. ADMIN/SUPER_ADMIN
- * only. Claimed via an updateMany guarded by acknowledgedAt: null so two
- * concurrent acknowledge calls on the same row can't both succeed - the same
- * pattern used by the wallet-change-request approve route.
+ * Marks a below-benchmark hashrate alert as acknowledged.
+ * ADMIN/SUPER_ADMIN/ACCOUNTING only. Claimed via an updateMany guarded by
+ * acknowledgedAt: null so two concurrent acknowledge calls on the same row
+ * can't both succeed - the same pattern used by the wallet-change-request
+ * approve route.
  */
 
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
@@ -16,7 +18,7 @@ async function requireAdmin(request: NextRequest) {
   if (!token) return { error: "Unauthorized", status: 401 as const };
   try {
     const decoded = await verifyJwtToken(token);
-    if (decoded.role !== "ADMIN" && decoded.role !== "SUPER_ADMIN") {
+    if (!isStaffRole(decoded.role)) {
       return { error: "Admin access required", status: 403 as const };
     }
     return { decoded };

@@ -1,3 +1,4 @@
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { verifyJwtToken } from "@/lib/jwt";
 import { prisma } from "@/lib/prisma";
@@ -109,7 +110,7 @@ export async function GET(
 
     // Check if user has permission to download this invoice
     // Users can download their own invoices, admins can download any invoice
-    const isAdmin = user.role === "ADMIN" || user.role === "SUPER_ADMIN";
+    const isAdmin = isStaffRole(user.role);
     const isOwnInvoice = invoice.userId === userId.userId;
 
     if (!isAdmin && !isOwnInvoice) {

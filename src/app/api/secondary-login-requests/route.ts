@@ -5,8 +5,8 @@
  * approves it (which adds the login exactly like Edit Customer does - see
  * src/lib/auth/addSecondaryLogin.ts) or rejects it with a reason.
  *
- * GET: CLIENT - their own requests. ADMIN/SUPER_ADMIN - every request,
- *   optionally filtered by ?status=.
+ * GET: CLIENT - their own requests. ADMIN/SUPER_ADMIN/ACCOUNTING - every
+ *   request, optionally filtered by ?status=.
  *
  * POST { requestedEmail, reason?, currentPassword | twoFactorToken }: CLIENT
  *   only. Requires step-up re-authentication, like a wallet change request -
@@ -16,6 +16,7 @@
  *   client can't probe which emails have accounts; the admin sees that when
  *   approving.
  */
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { AuditAction, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -54,8 +55,7 @@ export async function GET(request: NextRequest) {
     }
 
     const statusParam = request.nextUrl.searchParams.get("status");
-    const isAdmin =
-      auth.decoded.role === "ADMIN" || auth.decoded.role === "SUPER_ADMIN";
+    const isAdmin = isStaffRole(auth.decoded.role);
 
     const where: Prisma.SecondaryLoginRequestWhereInput = {
       ...(isAdmin ? {} : { userId: auth.decoded.userId }),

@@ -6,6 +6,7 @@
 
 "use client";
 
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import {
   Box,
   Container,
@@ -67,7 +68,7 @@ type BulkStatusType = "ISSUED" | "PAID" | "OVERDUE" | "CANCELLED" | "REFUNDED";
 
 export default function HardwareRepairDashboard() {
   const { user } = useUser();
-  const isAdmin = user?.role === "ADMIN" || user?.role === "SUPER_ADMIN";
+  const isAdmin = isStaffRole(user?.role);
 
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);

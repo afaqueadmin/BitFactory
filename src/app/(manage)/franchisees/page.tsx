@@ -7,6 +7,7 @@
 
 "use client";
 
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import React, { useState, useEffect, useCallback } from "react";
 import {
   Box,
@@ -87,7 +88,7 @@ export default function FranchiseesPage() {
   const router = useRouter();
   const { user } = useUser();
   const isSuperAdmin = user?.role === "SUPER_ADMIN";
-  const isAdmin = user?.role === "ADMIN" || user?.role === "SUPER_ADMIN";
+  const isAdmin = isStaffRole(user?.role);
 
   const [franchises, setFranchises] = useState<Franchise[]>([]);
   const [loading, setLoading] = useState(true);

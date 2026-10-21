@@ -1,3 +1,4 @@
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { verifyJwtToken } from "@/lib/jwt";
 import { listAssignedLuxorSubaccountNames } from "@/lib/luxorSubaccounts";
@@ -28,7 +29,7 @@ export async function GET(request: NextRequest) {
 
     // Subaccount assignment is an admin-only capability — franchisees must
     // not be able to view which Luxor subaccounts exist/are taken.
-    if (decoded.role !== "ADMIN" && decoded.role !== "SUPER_ADMIN") {
+    if (!isStaffRole(decoded.role)) {
       return NextResponse.json(
         { error: "Only administrators can view subaccount assignments" },
         { status: 403 },

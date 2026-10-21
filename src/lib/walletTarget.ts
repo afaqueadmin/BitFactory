@@ -1,3 +1,4 @@
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken, verifyWalletSnapshotTicket } from "@/lib/jwt";
@@ -16,8 +17,8 @@ export const WALLET_SNAPSHOT_TICKET_COOKIE = "wallet_snapshot_ticket";
 
 /**
  * Resolves `?customerId=` for the wallet routes: the caller themselves when
- * absent; otherwise any user for ADMIN/SUPER_ADMIN, or one of their own
- * customers for a FRANCHISEE. The target's own role is returned so a
+ * absent; otherwise any user for ADMIN/SUPER_ADMIN/ACCOUNTING, or one of their
+ * own customers for a FRANCHISEE. The target's own role is returned so a
  * simulated customer viewed by an admin still gets simulated data.
  */
 export async function resolveWalletTarget(
@@ -26,7 +27,7 @@ export async function resolveWalletTarget(
 ): Promise<WalletTarget | NextResponse> {
   if (!customerId) return { userId: decoded.userId, role: decoded.role };
 
-  const isAdmin = decoded.role === "ADMIN" || decoded.role === "SUPER_ADMIN";
+  const isAdmin = isStaffRole(decoded.role);
   if (!isAdmin && decoded.role !== "FRANCHISEE") {
     return NextResponse.json(
       { error: "Only administrators can search by customerId" },

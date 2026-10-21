@@ -1,3 +1,4 @@
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
@@ -18,11 +19,7 @@ export async function GET(
     }
 
     const decoded = await verifyJwtToken(token);
-    if (
-      decoded.role !== "ADMIN" &&
-      decoded.role !== "SUPER_ADMIN" &&
-      decoded.role !== "CLIENT"
-    ) {
+    if (!isStaffRole(decoded.role) && decoded.role !== "CLIENT") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
     const { id: minerId } = await params;

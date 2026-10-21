@@ -6,6 +6,7 @@
 
 "use client";
 
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import {
   Alert,
   Box,
@@ -90,7 +91,7 @@ export default function AccountingDashboard() {
     includeSimulated: true,
   });
   const { user } = useUser();
-  const isAdmin = user?.role === "ADMIN" || user?.role === "SUPER_ADMIN";
+  const isAdmin = isStaffRole(user?.role);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [customerFilter, setCustomerFilter] = useState<string>("");

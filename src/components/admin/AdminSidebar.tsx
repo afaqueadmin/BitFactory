@@ -1,5 +1,6 @@
 "use client";
 
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import React from "react";
 import {
   Box,
@@ -104,11 +105,11 @@ interface SidebarItem {
   // e.g. hosting invoice detail pages at /accounting/[id].
   activeMatch?: RegExp[];
   items?: SidebarItem[];
-  // Roles allowed to see this item. Defaults to ADMIN/SUPER_ADMIN (today's
+  // Roles allowed to see this item. Defaults to every staff role (today's
   // behavior) when omitted, so existing items don't need to be touched.
   // FRANCHISEE no longer renders this sidebar at all — they get their own
   // dedicated FranchiseSidebar under the (franchise) route group.
-  roles?: Array<"ADMIN" | "SUPER_ADMIN">;
+  roles?: Array<"ADMIN" | "SUPER_ADMIN" | "ACCOUNTING">;
   openInNewTab?: boolean;
   badgeKey?: BadgeKey;
 }
@@ -475,8 +476,10 @@ export default function AdminSidebar() {
 
   const visibleSections = React.useMemo(() => {
     const isAllowed = (item: SidebarItem) => {
-      const allowedRoles = item.roles ?? ["ADMIN", "SUPER_ADMIN"];
-      return user ? (allowedRoles as string[]).includes(user.role) : false;
+      if (!user) return false;
+      return item.roles
+        ? (item.roles as string[]).includes(user.role)
+        : isStaffRole(user.role);
     };
     const filterItems = (items: SidebarItem[]): SidebarItem[] =>
       items.filter(isAllowed).flatMap((item) => {

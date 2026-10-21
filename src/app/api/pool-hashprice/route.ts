@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
     const luxorIdentifier = user?.poolAuths[0]?.authKey;
 
     let subaccountForAuth: string;
-    if (user?.role === "ADMIN") {
+    if (user?.role === "ADMIN" || user?.role === "ACCOUNTING") {
       subaccountForAuth = "higgs"; // Use main/admin subaccount for auth
     } else if (luxorIdentifier) {
       subaccountForAuth = luxorIdentifier;

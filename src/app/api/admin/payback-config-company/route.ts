@@ -1,3 +1,4 @@
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { verifyJwtToken } from "@/lib/jwt";
 import {
@@ -31,7 +32,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Only admins and super admins can access this endpoint
-    if (userRole !== "ADMIN" && userRole !== "SUPER_ADMIN") {
+    if (!isStaffRole(userRole)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -81,7 +82,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Only admins and super admins can access this endpoint
-    if (userRole !== "ADMIN" && userRole !== "SUPER_ADMIN") {
+    if (!isStaffRole(userRole)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

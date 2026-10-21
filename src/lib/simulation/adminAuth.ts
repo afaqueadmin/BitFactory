@@ -1,11 +1,13 @@
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
 
 /**
  * The admin check for the simulated-account management routes: token
- * cookie, then an active ADMIN or SUPER_ADMIN read from the database (not
- * the token). Returns the caller's id, or a ready 401/403 response.
+ * cookie, then an active ADMIN, SUPER_ADMIN or ACCOUNTING user read from the
+ * database (not the token). Returns the caller's id, or a ready 401/403
+ * response.
  */
 export async function requireSimAdmin(
   request: NextRequest,
@@ -30,7 +32,7 @@ export async function requireSimAdmin(
     where: { id: actorId, isDeleted: false },
     select: { role: true },
   });
-  if (actor?.role !== "ADMIN" && actor?.role !== "SUPER_ADMIN") {
+  if (!actor || !isStaffRole(actor.role)) {
     return {
       response: NextResponse.json(
         { error: "Only administrators can manage simulated accounts" },

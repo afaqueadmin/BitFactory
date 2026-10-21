@@ -14,6 +14,7 @@ export function redirectPathForRole(role: string): string {
   switch (role) {
     case "ADMIN":
     case "SUPER_ADMIN":
+    case "ACCOUNTING":
       return "/adminpanel";
     case "FRANCHISEE":
       return "/franchise/dashboard";

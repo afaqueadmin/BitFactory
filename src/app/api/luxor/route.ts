@@ -21,6 +21,7 @@
  * ```
  */
 
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { verifyJwtToken } from "@/lib/jwt";
 import { createLuxorClient, LuxorError } from "@/lib/luxor";
@@ -261,9 +262,10 @@ function buildQueryParams(
 }
 
 /**
- * Helper: Check if user has ADMIN access for protected endpoints
+ * Helper: Check if user has staff access for protected endpoints
  *
- * Some endpoints (like subaccount operations) require ADMIN role.
+ * Some endpoints (like subaccount operations) require a staff role
+ * (ADMIN/SUPER_ADMIN/ACCOUNTING).
  * This helper validates authorization and returns 403 Forbidden if needed.
  *
  * @param userRole - The user's role from JWT
@@ -272,9 +274,9 @@ function buildQueryParams(
 function checkAdminAccess(
   userRole: string,
 ): NextResponse<ProxyResponse> | null {
-  if (userRole !== "ADMIN" && userRole !== "SUPER_ADMIN") {
+  if (!isStaffRole(userRole)) {
     console.log(
-      `[Luxor Proxy V2] Authorization denied: user role "${userRole}" is not ADMIN or SUPER_ADMIN`,
+      `[Luxor Proxy V2] Authorization denied: user role "${userRole}" is not a staff role`,
     );
     return NextResponse.json<ProxyResponse>(
       {
@@ -751,12 +753,11 @@ export async function GET(
                   ? joinSubaccountNames(
                       await franchiseeCustomerSubaccountNames(user.userId),
                     ) || undefined
-                  : ["ADMIN", "SUPER_ADMIN"].includes(user.role)
+                  : isStaffRole(user.role)
                     ? subaccountNamesParam
                     : undefined,
             site_id:
-              ["ADMIN", "SUPER_ADMIN"].includes(user.role) &&
-              !subaccountNamesParam
+              isStaffRole(user.role) && !subaccountNamesParam
                 ? siteId
                 : undefined,
             status: searchParams.get("status") || undefined,

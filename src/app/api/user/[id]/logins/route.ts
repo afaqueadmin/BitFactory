@@ -18,6 +18,7 @@
  * (/api/secondary-login-requests). The primary login can't be removed here;
  * its email is changed with the account's email (PUT /api/user/[id]).
  */
+import { STAFF_ROLES, staffActorLabel } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { AuditAction } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -65,8 +66,6 @@ async function getActor(
   return actor;
 }
 
-const ADMIN_ROLES: ReadonlySet<string> = new Set(["ADMIN", "SUPER_ADMIN"]);
-
 function requestMeta(request: NextRequest) {
   return {
     ipAddress: request.headers.get("x-forwarded-for") || "unknown",
@@ -80,7 +79,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const actor = await getActor(request, ADMIN_ROLES);
+    const actor = await getActor(request, STAFF_ROLES);
     if (actor instanceof NextResponse) return actor;
 
     const account = await prisma.user.findUnique({
@@ -272,9 +271,9 @@ export async function DELETE(
           entityId: id,
           userId: actor.id,
           changes: { loginId, email: login.email },
-          description: `Sign-in email ${login.email} removed from ${login.user.email} by ${
-            actor.role === "SUPER_ADMIN" ? "super admin" : "admin"
-          } ${actor.email}`,
+          description: `Sign-in email ${login.email} removed from ${login.user.email} by ${staffActorLabel(
+            actor.role,
+          )} ${actor.email}`,
           ...meta,
         },
       }),

@@ -1,5 +1,5 @@
 /**
- * /api/firmware-options/[id] - ADMIN/SUPER_ADMIN only.
+ * /api/firmware-options/[id] - ADMIN/SUPER_ADMIN/ACCOUNTING only.
  *
  * PUT: rename and/or activate/deactivate. Body: { name?, isActive? }.
  *   Renaming doesn't touch past requests - each one keeps its own snapshot
@@ -11,6 +11,7 @@
  *   enforces this too.
  */
 
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { AuditAction, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -23,7 +24,7 @@ async function requireAdmin(request: NextRequest) {
   if (!token) return { error: "Unauthorized", status: 401 as const };
   try {
     const decoded = await verifyJwtToken(token);
-    if (decoded.role !== "ADMIN" && decoded.role !== "SUPER_ADMIN") {
+    if (!isStaffRole(decoded.role)) {
       return { error: "Admin access required", status: 403 as const };
     }
     return { decoded };

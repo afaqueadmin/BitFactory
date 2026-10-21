@@ -1,4 +1,5 @@
 // app/api/invoices/[id]/btcpay/route.ts
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { createBtcpayInvoice, isBtcpayEnabled } from "@/lib/btcpay";
@@ -39,8 +40,7 @@ export async function POST(
 
   // Only the invoice's customer, an admin, or the customer's franchisee may pay it
   const isOwner = invoice.userId === currentUser.userId;
-  const isAdmin =
-    currentUser.role === "ADMIN" || currentUser.role === "SUPER_ADMIN";
+  const isAdmin = isStaffRole(currentUser.role);
   const isCustomersFranchisee =
     currentUser.role === "FRANCHISEE" &&
     (await assertFranchiseeOwnsCustomer(currentUser.userId, invoice.userId));

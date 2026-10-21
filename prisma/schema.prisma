@@ -1681,6 +1681,8 @@ enum Role {
   /// revenue is computed from the real miner's pool data (src/lib/simulation).
   /// Never billed, never in customer lists.
   SIMULATED
+  /// Staff account with the same privileges as ADMIN (src/lib/auth/staffRoles).
+  ACCOUNTING
 }
 
 enum Segment {

@@ -1,3 +1,4 @@
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { AuditAction } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -8,7 +9,7 @@ import { canManageAccount } from "@/lib/auth/accountTiers";
 export const runtime = "nodejs";
 
 /**
- * POST /api/simulated-accounts/[id]/convert  (ADMIN / SUPER_ADMIN)
+ * POST /api/simulated-accounts/[id]/convert  (ADMIN / SUPER_ADMIN / ACCOUNTING)
  *
  * Turns a simulated account into a real client: role CLIENT, segment Potential
  * Customer, same login. Its sessions are ended so no token issued under the
@@ -38,7 +39,7 @@ export async function POST(
       where: { id: actorId, isDeleted: false },
       select: { role: true },
     });
-    if (actor?.role !== "ADMIN" && actor?.role !== "SUPER_ADMIN") {
+    if (!actor || !isStaffRole(actor.role)) {
       return NextResponse.json(
         { error: "Only administrators can convert simulated accounts" },
         { status: 403 },

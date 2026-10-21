@@ -6,6 +6,7 @@ const ROLES = [
   "FRANCHISEE",
   "SIMULATED",
   "ADMIN",
+  "ACCOUNTING",
   "SUPER_ADMIN",
 ] as const;
 
@@ -15,7 +16,8 @@ const ALLOWED: Record<string, string[]> = {
   FRANCHISEE: [],
   SIMULATED: [],
   ADMIN: ["CLIENT", "FRANCHISEE", "SIMULATED"],
-  SUPER_ADMIN: ["CLIENT", "FRANCHISEE", "SIMULATED", "ADMIN"],
+  ACCOUNTING: ["CLIENT", "FRANCHISEE", "SIMULATED"],
+  SUPER_ADMIN: ["CLIENT", "FRANCHISEE", "SIMULATED", "ADMIN", "ACCOUNTING"],
 };
 
 describe("canManageAccount", () => {

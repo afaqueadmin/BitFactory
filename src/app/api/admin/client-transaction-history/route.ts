@@ -1,3 +1,4 @@
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { verifyJwtToken } from "@/lib/jwt";
@@ -89,13 +90,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Only ADMIN, SUPER_ADMIN, and FRANCHISEE (scoped to their own customers) can access this endpoint
+    // Only ADMIN, SUPER_ADMIN, ACCOUNTING, and FRANCHISEE (scoped to their own
+    // customers) can access this endpoint
     const userRole = decoded.role;
-    if (
-      userRole !== "ADMIN" &&
-      userRole !== "SUPER_ADMIN" &&
-      userRole !== "FRANCHISEE"
-    ) {
+    if (!isStaffRole(userRole) && userRole !== "FRANCHISEE") {
       console.log(
         `[Client Transaction History API] Forbidden - user role: ${userRole}`,
       );

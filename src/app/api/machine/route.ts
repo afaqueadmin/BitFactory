@@ -11,6 +11,7 @@
  * - DELETE /api/machine/[id] - Delete a miner (admin only)
  */
 
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
@@ -61,7 +62,7 @@ async function verifyAdminAuth(
     const decoded = await verifyJwtToken(token);
 
     // Verify user is admin (optionally, a franchisee scoped to their own data)
-    const isAdmin = decoded.role === "ADMIN" || decoded.role === "SUPER_ADMIN";
+    const isAdmin = isStaffRole(decoded.role);
     const isAllowedFranchisee =
       allowFranchisee && decoded.role === "FRANCHISEE";
     if (!isAdmin && !isAllowedFranchisee) {

@@ -2,8 +2,8 @@
  * POST /api/tickets/[id]/messages
  *
  * Reply to a ticket. isInternal notes (hidden from the CLIENT who raised the
- * ticket) can only be posted by ADMIN/SUPER_ADMIN/FRANCHISEE - a CLIENT's
- * own replies are always customer-facing. Replying to a CLOSED ticket
+ * ticket) can only be posted by ADMIN/SUPER_ADMIN/ACCOUNTING/FRANCHISEE - a
+ * CLIENT's own replies are always customer-facing. Replying to a CLOSED ticket
  * reopens it (back to OPEN) unless the replier is the one closing it via
  * PATCH, which is a separate action.
  *
@@ -14,8 +14,8 @@
  *
  * The ticket's "customer side" is whoever the ticket concerns: the
  * onBehalfOf client if one is set, otherwise whoever raised it. Everyone
- * else with access (ADMIN/SUPER_ADMIN always; a FRANCHISEE only when the
- * ticket isn't theirs) is the "support side".
+ * else with access (ADMIN/SUPER_ADMIN/ACCOUNTING always; a FRANCHISEE only when
+ * the ticket isn't theirs) is the "support side".
  *
  * - A customer-facing reply from the support side on an OPEN/IN_PROGRESS
  *   ticket auto-advances status to WAITING_ON_CUSTOMER - support has said
@@ -27,6 +27,7 @@
  *   regardless of which side replied.
  */
 
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { AuditAction } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -96,9 +97,7 @@ export async function POST(
     }
 
     const staffRole =
-      auth.decoded.role === "ADMIN" ||
-      auth.decoded.role === "SUPER_ADMIN" ||
-      auth.decoded.role === "FRANCHISEE";
+      isStaffRole(auth.decoded.role) || auth.decoded.role === "FRANCHISEE";
 
     const created = await prisma.$transaction(async (tx) => {
       const msg = await tx.ticketMessage.create({
@@ -127,8 +126,7 @@ export async function POST(
       const isCustomerSide = auth.decoded.userId === customerSideUserId;
       const isSupportSideReply =
         !isCustomerSide &&
-        (auth.decoded.role === "ADMIN" ||
-          auth.decoded.role === "SUPER_ADMIN" ||
+        (isStaffRole(auth.decoded.role) ||
           auth.decoded.role === "FRANCHISEE") &&
         !msg.isInternal;
 

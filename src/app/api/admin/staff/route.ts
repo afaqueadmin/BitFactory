@@ -1,8 +1,8 @@
 /**
  * GET /api/admin/staff
  *
- * Lists ADMIN/SUPER_ADMIN users, for the ticket-assignment dropdown.
- * SUPER_ADMIN only, matching /api/tickets/[id]/assign's restriction.
+ * Lists staff users (ADMIN/SUPER_ADMIN/ACCOUNTING), for the ticket-assignment
+ * dropdown. SUPER_ADMIN only, matching /api/tickets/[id]/assign's restriction.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -37,7 +37,10 @@ export async function GET(request: NextRequest) {
     }
 
     const staff = await prisma.user.findMany({
-      where: { role: { in: ["ADMIN", "SUPER_ADMIN"] }, isDeleted: false },
+      where: {
+        role: { in: ["ADMIN", "SUPER_ADMIN", "ACCOUNTING"] },
+        isDeleted: false,
+      },
       select: { id: true, name: true, email: true, role: true },
       orderBy: { name: "asc" },
     });

@@ -1,3 +1,4 @@
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
@@ -413,7 +414,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     // Check if user is admin
-    if (userRole !== "ADMIN" && userRole !== "SUPER_ADMIN") {
+    if (!isStaffRole(userRole)) {
       console.warn(
         "[Wallet API] Non-admin attempted cache invalidation:",
         userId,

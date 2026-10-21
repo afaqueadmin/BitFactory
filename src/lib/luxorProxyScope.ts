@@ -7,13 +7,12 @@
  * gets the company-wide site_id fallback.
  */
 
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { prisma } from "@/lib/prisma";
 import { franchiseeUserFilter } from "@/lib/franchiseeScope";
 
-const ADMIN_ROLES = new Set(["ADMIN", "SUPER_ADMIN"]);
-
 export function isAdminRole(role: string): boolean {
-  return ADMIN_ROLES.has(role);
+  return isStaffRole(role);
 }
 
 /** The caller's own Luxor subaccount names (PoolAuth), oldest first. */

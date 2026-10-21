@@ -1,13 +1,14 @@
 /**
  * POST /api/tickets/[id]/assign
  *
- * SUPER_ADMIN-only: assign a ticket to a specific ADMIN/SUPER_ADMIN user, or
+ * SUPER_ADMIN-only: assign a ticket to a specific staff user, or
  * pass assignedToId: null to unassign back to the shared queue. Any
- * ADMIN/SUPER_ADMIN can still act on unassigned (or someone else's
+ * ADMIN/SUPER_ADMIN/ACCOUNTING can still act on unassigned (or someone else's
  * assigned) tickets - assignment is ownership bookkeeping, not an access
  * restriction.
  */
 
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { AuditAction } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -60,14 +61,11 @@ export async function POST(
         where: { id: assignedToId },
         select: { id: true, role: true },
       });
-      if (
-        !assignee ||
-        (assignee.role !== "ADMIN" && assignee.role !== "SUPER_ADMIN")
-      ) {
+      if (!assignee || !isStaffRole(assignee.role)) {
         return NextResponse.json(
           {
             success: false,
-            error: "assignedToId must be an ADMIN or SUPER_ADMIN user",
+            error: "assignedToId must be a staff user",
           },
           { status: 400 },
         );

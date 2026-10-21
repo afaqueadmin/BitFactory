@@ -43,7 +43,7 @@ export default function PaymentSettingsPage() {
 
   // Redirect non-admin users
   useEffect(() => {
-    if (user && user.role !== "ADMIN") {
+    if (user && user.role !== "ADMIN" && user.role !== "ACCOUNTING") {
       router.push("/dashboard");
     }
   }, [user, router]);

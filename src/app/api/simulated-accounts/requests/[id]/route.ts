@@ -1,3 +1,4 @@
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { AuditAction } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -14,7 +15,8 @@ import {
 export const runtime = "nodejs";
 
 /**
- * POST /api/simulated-accounts/requests/[id]  (ADMIN / SUPER_ADMIN)
+ * POST /api/simulated-accounts/requests/[id]  (ADMIN / SUPER_ADMIN /
+ * ACCOUNTING)
  * Body: { action: "approve" | "decline" }   [id] = the requesting customer
  *
  * approve: converts that same account into a simulated account (same rules
@@ -44,7 +46,7 @@ export async function POST(
       where: { id: actorId, isDeleted: false },
       select: { role: true },
     });
-    if (actor?.role !== "ADMIN" && actor?.role !== "SUPER_ADMIN") {
+    if (!actor || !isStaffRole(actor.role)) {
       return NextResponse.json(
         { error: "Only administrators can review simulation requests" },
         { status: 403 },

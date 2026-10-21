@@ -26,6 +26,7 @@
  * }
  */
 
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { verifyJwtToken } from "@/lib/jwt";
 import { prisma } from "@/lib/prisma";
@@ -103,7 +104,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Verify admin role
-  if (!["ADMIN", "SUPER_ADMIN"].includes(userInfo.role)) {
+  if (!isStaffRole(userInfo.role)) {
     console.log(
       `[Braiins Workers All] GET: User ${userInfo.userId} is not admin`,
     );

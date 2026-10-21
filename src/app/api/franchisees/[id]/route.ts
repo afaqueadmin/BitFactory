@@ -9,6 +9,7 @@
  * Authorization: Super Admin only
  */
 
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
@@ -93,7 +94,7 @@ export async function GET(
       );
     }
 
-    if (user.role !== "ADMIN" && user.role !== "SUPER_ADMIN") {
+    if (!isStaffRole(user.role)) {
       return NextResponse.json(
         {
           success: false,
@@ -164,7 +165,7 @@ export async function PUT(
       );
     }
 
-    if (user.role !== "ADMIN" && user.role !== "SUPER_ADMIN") {
+    if (!isStaffRole(user.role)) {
       return NextResponse.json(
         {
           success: false,

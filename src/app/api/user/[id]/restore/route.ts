@@ -5,9 +5,10 @@
  * shows up in the customer lists again and can sign in with its existing
  * logins. Sessions from before the delete stay revoked.
  *
- * Same tier rules as deletion: an ADMIN can restore CLIENT and FRANCHISEE
- * accounts, a SUPER_ADMIN also ADMIN accounts.
+ * Same tier rules as deletion: an ADMIN or ACCOUNTING user can restore CLIENT
+ * and FRANCHISEE accounts, a SUPER_ADMIN also ADMIN and ACCOUNTING accounts.
  */
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { AuditAction } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -40,7 +41,7 @@ export async function POST(
       where: { id: actorId, isDeleted: false },
       select: { role: true },
     });
-    if (actor?.role !== "ADMIN" && actor?.role !== "SUPER_ADMIN") {
+    if (!actor || !isStaffRole(actor.role)) {
       return NextResponse.json(
         { error: "Only administrators can restore users" },
         { status: 403 },

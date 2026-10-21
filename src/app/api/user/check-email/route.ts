@@ -1,3 +1,4 @@
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { isEmailTaken } from "@/lib/auth/emailIdentity";
 import { verifyJwtToken } from "@/lib/jwt";
@@ -5,7 +6,7 @@ import { verifyJwtToken } from "@/lib/jwt";
 /**
  * GET /api/user/check-email?email=test@example.com
  * Check if an email is already registered in the database.
- * ADMIN/SUPER_ADMIN only - it backs the admin create-user and
+ * ADMIN/SUPER_ADMIN/ACCOUNTING only - it backs the admin create-user and
  * create-franchisee forms, and left public it would let anyone probe which
  * emails have accounts.
  */
@@ -21,7 +22,7 @@ export async function GET(request: NextRequest) {
     } catch {
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
-    if (role !== "ADMIN" && role !== "SUPER_ADMIN") {
+    if (!isStaffRole(role)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

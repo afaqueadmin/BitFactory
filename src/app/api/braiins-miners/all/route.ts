@@ -16,6 +16,7 @@
  * }
  */
 
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { verifyJwtToken } from "@/lib/jwt";
 import { prisma } from "@/lib/prisma";
@@ -63,7 +64,7 @@ async function extractUserFromToken(request: NextRequest) {
     }
 
     // Check if user is admin
-    if (user.role !== "ADMIN" && user.role !== "SUPER_ADMIN") {
+    if (!isStaffRole(user.role)) {
       throw new Error("Admin access required");
     }
 

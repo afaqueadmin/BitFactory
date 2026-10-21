@@ -4,14 +4,15 @@
  * The admin-managed list of firmware a client can pick from when requesting
  * a firmware change on a miner (see /api/firmware-change-requests).
  *
- * GET: any signed-in user. Active options only, unless an ADMIN/SUPER_ADMIN
- *   passes ?includeInactive=1 - then every option, with a count of the
- *   requests that used it (an option with requests can't be deleted, only
- *   deactivated - see [id]/route.ts).
+ * GET: any signed-in user. Active options only, unless an
+ *   ADMIN/SUPER_ADMIN/ACCOUNTING passes ?includeInactive=1 - then every
+ *   option, with a count of the requests that used it (an option with
+ *   requests can't be deleted, only deactivated - see [id]/route.ts).
  *
- * POST: ADMIN/SUPER_ADMIN only. Body: { name }.
+ * POST: ADMIN/SUPER_ADMIN/ACCOUNTING only. Body: { name }.
  */
 
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { AuditAction } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -40,8 +41,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const isAdmin =
-      auth.decoded.role === "ADMIN" || auth.decoded.role === "SUPER_ADMIN";
+    const isAdmin = isStaffRole(auth.decoded.role);
     const includeInactive =
       isAdmin && request.nextUrl.searchParams.get("includeInactive") === "1";
 
@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
         { status: auth.status },
       );
     }
-    if (auth.decoded.role !== "ADMIN" && auth.decoded.role !== "SUPER_ADMIN") {
+    if (!isStaffRole(auth.decoded.role)) {
       return NextResponse.json(
         { success: false, error: "Admin access required" },
         { status: 403 },

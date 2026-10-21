@@ -1,3 +1,4 @@
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
@@ -35,7 +36,7 @@ export async function POST(
     }
 
     // N-15: was any signed-in user, including customers.
-    if (user.role !== "ADMIN" && user.role !== "SUPER_ADMIN") {
+    if (!isStaffRole(user.role)) {
       return NextResponse.json(
         { success: false, error: "Admin access required" },
         { status: 403 },

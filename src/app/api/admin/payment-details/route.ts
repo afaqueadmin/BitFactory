@@ -1,3 +1,4 @@
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
@@ -33,8 +34,8 @@ export async function GET(request: NextRequest) {
     try {
       const decoded = await verifyJwtToken(token);
 
-      // Only ADMIN and SUPER_ADMIN can access
-      if (decoded.role !== "ADMIN" && decoded.role !== "SUPER_ADMIN") {
+      // Only ADMIN, SUPER_ADMIN and ACCOUNTING can access
+      if (!isStaffRole(decoded.role)) {
         return NextResponse.json(
           { error: "Forbidden: Admin access required" },
           { status: 403 },
@@ -116,8 +117,8 @@ export async function PUT(req: NextRequest) {
     try {
       const decoded = await verifyJwtToken(token);
 
-      // Only ADMIN and SUPER_ADMIN can update
-      if (decoded.role !== "ADMIN" && decoded.role !== "SUPER_ADMIN") {
+      // Only ADMIN, SUPER_ADMIN and ACCOUNTING can update
+      if (!isStaffRole(decoded.role)) {
         return NextResponse.json(
           { error: "Forbidden: Admin access required" },
           { status: 403 },

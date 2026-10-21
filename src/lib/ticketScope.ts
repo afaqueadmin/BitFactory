@@ -11,8 +11,8 @@
  * visible to BOTH the franchisee and BitFactory admin simultaneously - admin
  * can act on any ticket at any time, franchisee is scoped to their own
  * franchise's tickets only. isInternal messages are hidden from CLIENT only
- * (ADMIN/SUPER_ADMIN/FRANCHISEE can all see and post them) - "internal"
- * means "hidden from the end customer", not "BitFactory-staff-only".
+ * (ADMIN/SUPER_ADMIN/ACCOUNTING/FRANCHISEE can all see and post them) -
+ * "internal" means "hidden from the end customer", not "BitFactory-staff-only".
  *
  * A FRANCHISEE can also raise a ticket on behalf of one of their own
  * clients (onBehalfOfUserId) instead of for their own account - raisedById
@@ -22,6 +22,7 @@
  * everything that concerns them.
  */
 
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getOwnFranchise } from "@/lib/franchiseeScope";
@@ -44,7 +45,7 @@ export function ticketListWhereForUser(
     };
   if (user.role === "FRANCHISEE")
     return { franchise: { franchiseeId: user.userId } };
-  if (user.role === "ADMIN" || user.role === "SUPER_ADMIN") return {};
+  if (isStaffRole(user.role)) return {};
   // Any other role sees nothing rather than everything.
   return { id: { in: [] } };
 }
@@ -58,7 +59,7 @@ export async function assertCanAccessTicket(
     franchiseId: string | null;
   },
 ): Promise<boolean> {
-  if (user.role === "ADMIN" || user.role === "SUPER_ADMIN") return true;
+  if (isStaffRole(user.role)) return true;
   if (ticket.raisedById === user.userId) return true;
   if (ticket.onBehalfOfUserId === user.userId) return true;
   if (user.role === "FRANCHISEE" && ticket.franchiseId) {

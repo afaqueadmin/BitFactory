@@ -1,3 +1,4 @@
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { verifyJwtToken } from "@/lib/jwt";
 import { prisma } from "@/lib/prisma";
@@ -9,7 +10,8 @@ import { createLuxorClient } from "@/lib/luxor";
  * Debug endpoint to see the raw Luxor API response
  * Shows transaction_type values and transaction breakdown
  *
- * ADMIN ONLY - Used for debugging case sensitivity and transaction type issues
+ * STAFF ONLY (ADMIN/SUPER_ADMIN/ACCOUNTING) - Used for debugging case
+ * sensitivity and transaction type issues
  */
 export async function GET(request: NextRequest) {
   try {
@@ -26,7 +28,7 @@ export async function GET(request: NextRequest) {
     }
 
     const userRole = decoded.role;
-    if (userRole !== "ADMIN" && userRole !== "SUPER_ADMIN") {
+    if (!isStaffRole(userRole)) {
       return NextResponse.json(
         { error: "Only administrators can access this endpoint" },
         { status: 403 },

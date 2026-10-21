@@ -1,9 +1,11 @@
 /**
  * POST /api/admin/customer-requests/[id]/reject
  *
- * Rejects a pending franchisee customer request. ADMIN/SUPER_ADMIN only.
+ * Rejects a pending franchisee customer request. ADMIN/SUPER_ADMIN/ACCOUNTING
+ * only.
  */
 
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
@@ -33,7 +35,7 @@ export async function POST(
       );
     }
 
-    if (decoded.role !== "ADMIN" && decoded.role !== "SUPER_ADMIN") {
+    if (!isStaffRole(decoded.role)) {
       return NextResponse.json(
         { success: false, error: "Admin access required" },
         { status: 403 },

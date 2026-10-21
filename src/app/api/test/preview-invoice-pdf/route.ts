@@ -1,3 +1,4 @@
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { generateInvoicePDF } from "@/lib/email";
 import { verifyJwtToken } from "@/lib/jwt";
@@ -18,7 +19,7 @@ export async function GET(request: NextRequest) {
   if (!role) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  if (role !== "ADMIN" && role !== "SUPER_ADMIN") {
+  if (!isStaffRole(role)) {
     return NextResponse.json(
       { error: "Admin access required" },
       { status: 403 },

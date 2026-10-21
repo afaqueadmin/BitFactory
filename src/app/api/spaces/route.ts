@@ -11,6 +11,7 @@
  * - DELETE /api/spaces/[id] - Delete a space (admin only)
  */
 
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
@@ -42,7 +43,7 @@ async function verifyAdminAuth(request: NextRequest) {
     const decoded = await verifyJwtToken(token);
 
     // Verify user is admin
-    if (decoded.role !== "ADMIN" && decoded.role !== "SUPER_ADMIN") {
+    if (!isStaffRole(decoded.role)) {
       throw new Error("Forbidden: Admin access required");
     }
 

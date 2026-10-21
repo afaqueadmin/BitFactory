@@ -5,7 +5,7 @@
  *   - CLIENT: only tickets they raised.
  *   - FRANCHISEE: tickets raised anywhere in their own franchise (their own
  *     personal-account tickets + their onboarded clients' tickets).
- *   - ADMIN/SUPER_ADMIN: every ticket.
+ *   - ADMIN/SUPER_ADMIN/ACCOUNTING: every ticket.
  *
  * POST: raise a new ticket. CLIENT/FRANCHISEE only. A FRANCHISEE can raise
  * either for their own personal mining account (the same way a CLIENT
@@ -24,8 +24,8 @@
  * Priority is a support/triage concept, not something a CLIENT sets or
  * sees: a CLIENT-submitted priority is ignored (always created as NORMAL),
  * and `priority` is stripped out of every ticket in a CLIENT's GET
- * response. ADMIN/SUPER_ADMIN/FRANCHISEE can set it at creation and change
- * it later via PATCH /api/tickets/[id].
+ * response. ADMIN/SUPER_ADMIN/ACCOUNTING/FRANCHISEE can set it at creation and
+ * change it later via PATCH /api/tickets/[id].
  */
 
 import { NextRequest, NextResponse } from "next/server";

@@ -1,3 +1,4 @@
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
@@ -19,11 +20,7 @@ export async function GET(request: NextRequest) {
       select: { id: true, role: true },
     });
 
-    if (
-      user?.role !== "ADMIN" &&
-      user?.role !== "SUPER_ADMIN" &&
-      user?.role !== "FRANCHISEE"
-    ) {
+    if (!user || (!isStaffRole(user.role) && user.role !== "FRANCHISEE")) {
       return NextResponse.json(
         { error: "Only administrators can access statements" },
         { status: 403 },

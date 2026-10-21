@@ -31,8 +31,9 @@ beforeEach(() => {
 });
 
 describe("isAdminRole", () => {
-  it("is true only for ADMIN and SUPER_ADMIN", () => {
+  it("is true only for staff roles", () => {
     expect(isAdminRole("ADMIN")).toBe(true);
+    expect(isAdminRole("ACCOUNTING")).toBe(true);
     expect(isAdminRole("SUPER_ADMIN")).toBe(true);
     expect(isAdminRole("CLIENT")).toBe(false);
     expect(isAdminRole("FRANCHISEE")).toBe(false);

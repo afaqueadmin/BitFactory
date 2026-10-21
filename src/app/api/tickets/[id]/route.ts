@@ -3,14 +3,14 @@
  *
  * GET: ticket detail + its message thread. isInternal messages are stripped
  * out for a CLIENT viewer - "internal" means hidden from the end customer,
- * visible to ADMIN/SUPER_ADMIN/FRANCHISEE. priority is stripped out too -
- * it's a support/triage concept the client never sees, same as the create
+ * visible to ADMIN/SUPER_ADMIN/ACCOUNTING/FRANCHISEE. priority is stripped out
+ * too - it's a support/triage concept the client never sees, same as the create
  * flow in POST /api/tickets.
  *
  * PATCH: change status and/or priority (either or both, in one request).
  * CLIENT may only close their own ticket (self-service "I fixed it").
  * FRANCHISEE cannot change status at all (raise/reply only) or priority.
- * ADMIN/SUPER_ADMIN may set any status and set priority.
+ * ADMIN/SUPER_ADMIN/ACCOUNTING may set any status and set priority.
  *
  * Resolving/closing a HARDWARE_MINER or POOL_HASHRATE ticket requires its
  * linked miner (mandatory on these categories since creation - see

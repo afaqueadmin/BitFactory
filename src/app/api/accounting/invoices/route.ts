@@ -1,3 +1,4 @@
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
@@ -58,8 +59,7 @@ export async function GET(request: NextRequest) {
     // future role) may only ask for their own invoices.
     if (
       customerId &&
-      userRole !== "ADMIN" &&
-      userRole !== "SUPER_ADMIN" &&
+      !isStaffRole(userRole) &&
       userRole !== "FRANCHISEE" &&
       customerId !== decoded.userId
     ) {
@@ -75,7 +75,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (!customerId && userRole !== "ADMIN" && userRole !== "SUPER_ADMIN") {
+    if (!customerId && !isStaffRole(userRole)) {
       return NextResponse.json(
         { error: "Only administrators can access invoices" },
         { status: 403 },
@@ -107,10 +107,7 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get("page") || "1", 10);
     const limit = parseInt(searchParams.get("limit") || "10", 10);
 
-    const where = buildInvoiceListWhere(
-      searchParams,
-      userRole === "ADMIN" || userRole === "SUPER_ADMIN",
-    );
+    const where = buildInvoiceListWhere(searchParams, isStaffRole(userRole));
 
     const skip = (page - 1) * limit;
 
@@ -118,10 +115,9 @@ export async function GET(request: NextRequest) {
       user: { select: { id: true, email: true, name: true } },
       // Customers and franchisees don't get voided payments or the
       // payment-account columns (§2c P2-5, P2-7).
-      costPayments:
-        userRole === "ADMIN" || userRole === "SUPER_ADMIN"
-          ? true
-          : { where: { isDeleted: false }, omit: costPaymentAccountOmit },
+      costPayments: isStaffRole(userRole)
+        ? true
+        : { where: { isDeleted: false }, omit: costPaymentAccountOmit },
       // Hardware Repair invoices: the repaired miner (null for other types).
       miner: { select: { id: true, name: true, serialNumber: true } },
     };
@@ -196,7 +192,7 @@ export async function POST(request: NextRequest) {
       select: { role: true },
     });
 
-    if (user?.role !== "ADMIN" && user?.role !== "SUPER_ADMIN") {
+    if (!user || !isStaffRole(user.role)) {
       return NextResponse.json(
         { error: "Only administrators can create invoices" },
         { status: 403 },

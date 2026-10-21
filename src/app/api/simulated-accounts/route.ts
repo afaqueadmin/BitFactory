@@ -1,3 +1,4 @@
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
@@ -7,7 +8,7 @@ import { loadSimBalances } from "@/lib/simulation/ledgerStore";
 export const runtime = "nodejs";
 
 /**
- * GET /api/simulated-accounts  (ADMIN / SUPER_ADMIN)
+ * GET /api/simulated-accounts  (ADMIN / SUPER_ADMIN / ACCOUNTING)
  *
  * Every simulated (SIMULATED) account - active and inactive - with the
  * contact details given at signup and its last login: the marketing lead
@@ -33,7 +34,7 @@ export async function GET(request: NextRequest) {
       where: { id: actorId, isDeleted: false },
       select: { role: true },
     });
-    if (actor?.role !== "ADMIN" && actor?.role !== "SUPER_ADMIN") {
+    if (!actor || !isStaffRole(actor.role)) {
       return NextResponse.json(
         { error: "Only administrators can view simulated accounts" },
         { status: 403 },

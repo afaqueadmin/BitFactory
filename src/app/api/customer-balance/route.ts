@@ -1,3 +1,4 @@
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { NON_BALANCE_PAYMENT_TYPES } from "@/lib/accounting/paymentTypes";
@@ -25,11 +26,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Check if user is admin, super admin, or franchisee
-    if (
-      userRole !== "ADMIN" &&
-      userRole !== "SUPER_ADMIN" &&
-      userRole !== "FRANCHISEE"
-    ) {
+    if (!isStaffRole(userRole) && userRole !== "FRANCHISEE") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

@@ -1,3 +1,4 @@
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
@@ -94,7 +95,7 @@ export async function GET(request: NextRequest) {
         if (!owned) {
           return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
-      } else if (userRole !== "ADMIN" && userRole !== "SUPER_ADMIN") {
+      } else if (!isStaffRole(userRole)) {
         return NextResponse.json(
           { error: "Only administrators can search by customerId" },
           { status: 403 },

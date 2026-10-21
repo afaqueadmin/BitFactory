@@ -1,5 +1,6 @@
 "use client";
 
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Alert, Button, Snackbar } from "@mui/material";
@@ -8,9 +9,7 @@ import { useUser } from "@/lib/hooks/useUser";
 const DISMISSED_FLAG = "bf_2fa_reminder_dismissed";
 
 function settingsPathForRole(role: string) {
-  return role === "ADMIN" || role === "SUPER_ADMIN"
-    ? "/security-settings"
-    : "/security-setting";
+  return isStaffRole(role) ? "/security-settings" : "/security-setting";
 }
 
 /**

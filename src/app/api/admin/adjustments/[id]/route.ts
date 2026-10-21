@@ -1,3 +1,4 @@
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
@@ -36,7 +37,7 @@ export async function requireAdmin(
     };
   }
 
-  if (userRole !== "ADMIN" && userRole !== "SUPER_ADMIN") {
+  if (!isStaffRole(userRole)) {
     return {
       error: NextResponse.json(
         { error: "Only administrators can manage adjustments" },

@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
       select: { role: true },
     });
 
-    if (user?.role !== "ADMIN") {
+    if (user?.role !== "ADMIN" && user?.role !== "ACCOUNTING") {
       return NextResponse.json(
         { error: "Admin access required" },
         { status: 403 },
@@ -70,7 +70,7 @@ export async function PUT(request: NextRequest) {
       select: { role: true },
     });
 
-    if (user?.role !== "ADMIN") {
+    if (user?.role !== "ADMIN" && user?.role !== "ACCOUNTING") {
       return NextResponse.json(
         { error: "Admin access required" },
         { status: 403 },

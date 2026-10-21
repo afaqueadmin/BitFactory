@@ -1,3 +1,4 @@
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
@@ -22,7 +23,7 @@ export async function GET(
       where: { id: decoded.userId },
       select: { role: true },
     });
-    if (requester?.role !== "ADMIN" && requester?.role !== "SUPER_ADMIN") {
+    if (!requester || !isStaffRole(requester.role)) {
       return NextResponse.json(
         { error: "Only administrators can access invoice payments" },
         { status: 403 },
@@ -80,7 +81,7 @@ export async function DELETE(
       select: { role: true },
     });
 
-    if (user?.role !== "ADMIN" && user?.role !== "SUPER_ADMIN") {
+    if (!user || !isStaffRole(user.role)) {
       return NextResponse.json(
         { error: "Only administrators can delete payments" },
         { status: 403 },

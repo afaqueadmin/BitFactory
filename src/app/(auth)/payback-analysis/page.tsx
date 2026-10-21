@@ -10,6 +10,7 @@
  * look for now - see the PR/commit notes for scope.
  */
 
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import {
   Box,
   Typography,
@@ -108,7 +109,8 @@ const DEPRECIATION_BREAKEVEN_COLUMN = BASE_COLUMNS.length;
 // Data Sources:
 // - BTC Price: CoinGecko API (live market price)
 // - Hashprice: Live pool-wide Luxor API (/api/pool-hashprice-live - real-time summary)
-// Note: Using live pool-wide hashprice ensures CLIENT and ADMIN see identical values
+// Note: Using live pool-wide hashprice ensures CLIENT and staff see identical
+// values
 // Note: Same live endpoint as hashprice history page for consistency
 
 // Interface for config data from API
@@ -240,7 +242,7 @@ export default function PaybackAnalysisPage() {
         setEditableS21XpMachineCost(String(data.data.s21xpMachineCost));
 
         // Set editable invoiced amount based on user role
-        if (data.userRole === "ADMIN" || data.userRole === "SUPER_ADMIN") {
+        if (isStaffRole(data.userRole)) {
           // Admin/Super Admin default: 4250 (session-only, not persisted)
           setEditableInvoicedAmount("4250");
         } else {
@@ -326,8 +328,9 @@ export default function PaybackAnalysisPage() {
         return;
       }
 
-      // For ADMIN/SUPER_ADMIN: just use the value temporarily (no API call)
-      if (userRole === "ADMIN" || userRole === "SUPER_ADMIN") {
+      // For ADMIN/SUPER_ADMIN/ACCOUNTING: just use the value temporarily (no
+      // API call)
+      if (isStaffRole(userRole)) {
         setInvoicedUpdateSuccess("Invoiced amount updated for this session");
         setTimeout(() => setInvoicedUpdateSuccess(null), 3000);
         return;

@@ -6,6 +6,7 @@
  * cron.
  */
 
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
@@ -26,7 +27,7 @@ async function verifyAdminAuth(request: NextRequest) {
   if (!token) throw new Error("Unauthorized: No token provided");
 
   const decoded = await verifyJwtToken(token);
-  if (decoded.role !== "ADMIN" && decoded.role !== "SUPER_ADMIN") {
+  if (!isStaffRole(decoded.role)) {
     throw new Error("Forbidden: Admin access required");
   }
   return { userId: decoded.userId, role: decoded.role };

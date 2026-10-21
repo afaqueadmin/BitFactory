@@ -6,8 +6,8 @@
  *     trail (confirmedById/confirmedAt/confirmationMethod/
  *     confirmationContact/confirmationNote/confirmedBy) is stripped, same as
  *     /api/wallet/change-requests.
- *   - ADMIN/SUPER_ADMIN: every request, optionally filtered by ?status=,
- *     including the full review trail.
+ *   - ADMIN/SUPER_ADMIN/ACCOUNTING: every request, optionally filtered by
+ *     ?status=, including the full review trail.
  *
  * POST: submit a new payment frequency change request. CLIENT/FRANCHISEE
  * only. Requires step-up re-authentication (current password, or a 2FA
@@ -29,6 +29,7 @@
  * Braiins is out of scope - see src/lib/wallet.ts.
  */
 
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { AuditAction, Prisma } from "@prisma/client";
 import { verifyStepUp } from "@/lib/auth/stepUp";
@@ -67,8 +68,7 @@ export async function GET(request: NextRequest) {
     }
 
     const statusParam = request.nextUrl.searchParams.get("status");
-    const isAdmin =
-      auth.decoded.role === "ADMIN" || auth.decoded.role === "SUPER_ADMIN";
+    const isAdmin = isStaffRole(auth.decoded.role);
 
     const where: Prisma.PaymentFrequencyChangeRequestWhereInput = {
       ...(isAdmin ? {} : { userId: auth.decoded.userId }),

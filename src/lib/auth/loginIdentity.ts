@@ -19,12 +19,14 @@ export const MULTI_LOGIN_ROLES: ReadonlySet<string> = new Set(["CLIENT"]);
 
 /**
  * Who may add or remove a secondary login.
- * TODO: ADMIN is allowed only while multi-login is being tested - restrict
- * to SUPER_ADMIN (like changing an account's email, N-6) once that's done.
+ * TODO: ADMIN (and ACCOUNTING, which has ADMIN's privileges) is allowed only
+ * while multi-login is being tested - restrict to SUPER_ADMIN (like changing
+ * an account's email, N-6) once that's done.
  */
 export const LOGIN_MANAGER_ROLES: ReadonlySet<string> = new Set([
   "SUPER_ADMIN",
   "ADMIN",
+  "ACCOUNTING",
 ]);
 
 /**

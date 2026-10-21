@@ -213,19 +213,20 @@ export default function CustomerOverviewContent() {
 
     let filteredUsers = usersData.users;
 
-    // ADMIN can see CLIENT and FRANCHISEE users
-    if (currentUserRole === "ADMIN") {
+    // ADMIN (and ACCOUNTING) can see CLIENT and FRANCHISEE users
+    if (currentUserRole === "ADMIN" || currentUserRole === "ACCOUNTING") {
       filteredUsers = usersData.users.filter(
         (user: FetchedUser) =>
           user.role === "CLIENT" || user.role === "FRANCHISEE",
       );
     }
-    // SUPER_ADMIN can see CLIENT, ADMIN, and FRANCHISEE users
+    // SUPER_ADMIN can see CLIENT, ADMIN, ACCOUNTING, and FRANCHISEE users
     else if (currentUserRole === "SUPER_ADMIN") {
       filteredUsers = usersData.users.filter(
         (user: FetchedUser) =>
           user.role === "CLIENT" ||
           user.role === "ADMIN" ||
+          user.role === "ACCOUNTING" ||
           user.role === "FRANCHISEE",
       );
     }

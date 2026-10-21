@@ -45,7 +45,7 @@ const minerView = (m: MinerRow) => ({
 });
 
 /**
- * GET /api/simulated-accounts/settings  (ADMIN / SUPER_ADMIN)
+ * GET /api/simulated-accounts/settings  (ADMIN / SUPER_ADMIN / ACCOUNTING)
  *
  * The simulation settings, the miner they mirror (with its real rate and
  * power for reference) and the miners an admin can pick from.
@@ -90,7 +90,7 @@ export async function GET(request: NextRequest) {
 }
 
 /**
- * PUT /api/simulated-accounts/settings  (ADMIN / SUPER_ADMIN)
+ * PUT /api/simulated-accounts/settings  (ADMIN / SUPER_ADMIN / ACCOUNTING)
  * Body: { sourceMinerId, displayName, welcomeBonusUsd, ratePerKwh }
  *
  * A new rate applies from the next daily charge; a new bonus applies to

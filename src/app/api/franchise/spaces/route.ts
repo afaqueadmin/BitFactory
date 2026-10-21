@@ -5,8 +5,8 @@
  * dropdowns. Spaces are global infrastructure (not owned per-franchise), so
  * no ownership scoping is needed here — only that the caller is a
  * FRANCHISEE. Independent of the admin /api/spaces route (which is
- * ADMIN/SUPER_ADMIN only and includes management-only capacity analytics
- * this page doesn't need).
+ * ADMIN/SUPER_ADMIN/ACCOUNTING only and includes management-only capacity
+ * analytics this page doesn't need).
  */
 
 import { NextRequest, NextResponse } from "next/server";

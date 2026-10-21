@@ -1,3 +1,4 @@
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { verifyJwtToken } from "@/lib/jwt";
 import { prisma } from "@/lib/prisma";
@@ -30,7 +31,7 @@ import { simHashrateHistoryPayload } from "@/lib/simulation/views";
  *   end     ISO instant, required — window end
  *   period  1D|1W|1M|3M|1Y|ALL, optional. Only influences tick preference;
  *           omit it for a custom range and the tick is chosen from the span.
- *   userId  ADMIN/SUPER_ADMIN or the owning FRANCHISEE only
+ *   userId  ADMIN/SUPER_ADMIN/ACCOUNTING or the owning FRANCHISEE only
  *
  * The caller supplies absolute instants rather than a period+offset because
  * calendar buckets ("today", "this week") must be resolved in the VIEWER's
@@ -129,7 +130,7 @@ export async function GET(request: NextRequest) {
     let targetUserId = callerId;
 
     if (requestedUserId && requestedUserId !== callerId) {
-      if (callerRole === "ADMIN" || callerRole === "SUPER_ADMIN") {
+      if (isStaffRole(callerRole)) {
         targetUserId = requestedUserId;
       } else if (callerRole === "FRANCHISEE") {
         const owned = await assertFranchiseeOwnsCustomer(

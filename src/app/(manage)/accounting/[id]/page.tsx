@@ -6,6 +6,7 @@
  */
 "use client";
 
+import { isStaffRole } from "@/lib/auth/staffRoles";
 import { useParams, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import {
@@ -156,7 +157,7 @@ export default function InvoiceDetailPage() {
       });
   }, [invoice?.user?.id]);
 
-  const isAdmin = user?.role === "ADMIN" || user?.role === "SUPER_ADMIN";
+  const isAdmin = isStaffRole(user?.role);
   const isSuperAdmin = user?.role === "SUPER_ADMIN";
 
   const isPastDate = (dateStr: string) => {
