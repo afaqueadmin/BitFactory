@@ -44,8 +44,8 @@ export function defaultWalletSnapshotBody(
     : "BitFactory wallet";
   return [
     `Dear ${customerName},`,
-    `Please find attached a snapshot of your ${wallet} as of ${formatSnapshotDate(date)}. It includes your total earnings, 24-hour revenue, pending payouts, payout settings and profit & loss overview.`,
-    "You can view your live wallet any time at https://my.bitfactory.ae/wallet.",
+    `Attached is a snapshot of your ${wallet} section, as of ${formatSnapshotDate(date)}, including your total earnings, 24-hour revenue, pending payouts, payout settings and profit & loss overview.`,
+    "You can view your live wallet section at any time: https://my.bitfactory.ae/wallet.",
     "Best regards,\nBitFactory Team",
   ].join("\n\n");
 }
@@ -86,7 +86,7 @@ export function payoutEmailBody(details: PayoutEmailDetails): string {
     : "BitFactory wallet";
   const paragraphs = [
     `Dear ${details.customerName},`,
-    `Your ${kind} of ${formatBtc(details.totalBtc)} was sent to your wallet on ${formatPayoutDate(details.payoutDate)}.`,
+    `A ${kind} of ${formatBtc(details.totalBtc)} was sent to your designated wallet on ${formatPayoutDate(details.payoutDate)}.`,
   ];
   if (details.subaccounts.length > 1) {
     paragraphs.push(
@@ -96,8 +96,8 @@ export function payoutEmailBody(details: PayoutEmailDetails): string {
     );
   }
   paragraphs.push(
-    `Attached is a snapshot of your ${wallet} as of today, including your total earnings, 24-hour revenue, pending payouts, payout settings and profit & loss overview.`,
-    "You can view your live wallet any time at https://my.bitfactory.ae/wallet.",
+    `Attached is a snapshot of your ${wallet} section, as of today, including your total earnings, 24-hour revenue, pending payouts, payout settings and profit & loss overview.`,
+    "You can view your live wallet section at any time: https://my.bitfactory.ae/wallet.",
     "Best regards,\nBitFactory Team",
   );
   return paragraphs.join("\n\n");
