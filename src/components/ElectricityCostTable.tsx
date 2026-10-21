@@ -19,10 +19,16 @@ import {
   useTheme,
   CircularProgress,
   Alert,
+  Button,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
+import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
 import { visuallyHidden } from "@mui/utils";
 import { RADIUS_CARD, useDaylight } from "@/lib/daylight";
+import { buildCsv } from "@/lib/helpers/admin/tableExport";
+
+// /api/cost-payments' largest allowed pageSize.
+const EXPORT_PAGE_SIZE = 9999;
 
 interface ElectricityData {
   id: string;
@@ -286,6 +292,65 @@ export default function ElectricityCostTable({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, rowsPerPage]);
 
+  // Admin view only: downloads the customer's whole statement (every page,
+  // newest first) as CSV with the same values the table shows.
+  const [isExporting, setIsExporting] = useState(false);
+  const handleDownloadCsv = async () => {
+    if (!customerId) return;
+    try {
+      setIsExporting(true);
+      setError(null);
+
+      const rows: ElectricityData[] = [];
+      for (let exportPage = 0; ; exportPage++) {
+        const response = await fetch(
+          `/api/cost-payments?page=${exportPage}&pageSize=${EXPORT_PAGE_SIZE}&customerId=${customerId}`,
+        );
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || "Failed to export statement");
+        }
+        const result = await response.json();
+        rows.push(...(result.data ?? []));
+        if (exportPage + 1 >= (result.pagination?.totalPages ?? 0)) break;
+      }
+
+      const csv = buildCsv(
+        [
+          "Date",
+          "Type",
+          "Consumption (kWh)",
+          "Amount (USD)",
+          "Balance (USD)",
+          "Description",
+        ],
+        rows.map((row) => [
+          row.date,
+          row.type,
+          row.consumption === "N/A" ? "" : row.consumption.replace(" kWh", ""),
+          (row.rawAmount ?? 0).toFixed(2),
+          (row.rawBalance ?? 0).toFixed(2),
+          row.narration ?? "",
+        ]),
+      );
+
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `account-statement-${new Date().toISOString().slice(0, 10)}.csv`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Error exporting cost payments:", err);
+      setError(
+        err instanceof Error ? err.message : "Failed to export statement",
+      );
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   const handleRequestSort = (
     event: React.MouseEvent<unknown>,
     property: OrderBy,
@@ -372,44 +437,71 @@ export default function ElectricityCostTable({
         >
           Account Statement
         </Typography>
-        <TextField
-          size="small"
-          placeholder="Search transactions..."
-          value={searchTerm}
-          onChange={handleSearchChange}
-          fullWidth
+        <Box
           sx={{
-            maxWidth: { sm: 280 },
-            "& .MuiOutlinedInput-root": {
-              backgroundColor: daylight
-                ? d.surface
-                : theme.palette.background.paper,
-              ...(daylight && {
-                borderRadius: "8px",
-                fontFamily: fonts.body,
-                "& fieldset": { borderColor: d.inputBorder },
-                "&:hover fieldset": { borderColor: d.action },
-              }),
-            },
-            ...(daylight && {
-              "& .MuiOutlinedInput-root.Mui-focused fieldset": {
-                borderColor: d.action,
-                borderWidth: "2px",
+            display: "flex",
+            alignItems: "center",
+            gap: 1.5,
+            width: { xs: "100%", sm: "auto" },
+          }}
+        >
+          {customerId && (
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={handleDownloadCsv}
+              disabled={isExporting || loading}
+              startIcon={
+                isExporting ? (
+                  <CircularProgress size={14} />
+                ) : (
+                  <DownloadOutlinedIcon />
+                )
+              }
+              sx={{ flexShrink: 0 }}
+            >
+              Download CSV
+            </Button>
+          )}
+          <TextField
+            size="small"
+            placeholder="Search transactions..."
+            value={searchTerm}
+            onChange={handleSearchChange}
+            fullWidth
+            sx={{
+              maxWidth: { sm: 280 },
+              "& .MuiOutlinedInput-root": {
+                backgroundColor: daylight
+                  ? d.surface
+                  : theme.palette.background.paper,
+                ...(daylight && {
+                  borderRadius: "8px",
+                  fontFamily: fonts.body,
+                  "& fieldset": { borderColor: d.inputBorder },
+                  "&:hover fieldset": { borderColor: d.action },
+                }),
               },
-            }),
-          }}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon
-                  sx={{
-                    color: daylight ? d.muted : theme.palette.text.secondary,
-                  }}
-                />
-              </InputAdornment>
-            ),
-          }}
-        />
+              ...(daylight && {
+                "& .MuiOutlinedInput-root.Mui-focused fieldset": {
+                  borderColor: d.action,
+                  borderWidth: "2px",
+                },
+              }),
+            }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon
+                    sx={{
+                      color: daylight ? d.muted : theme.palette.text.secondary,
+                    }}
+                  />
+                </InputAdornment>
+              ),
+            }}
+          />
+        </Box>
       </Box>
 
       {error && (

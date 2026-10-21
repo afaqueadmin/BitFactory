@@ -18,9 +18,29 @@ import {
   useTheme,
   CircularProgress,
   Alert,
+  Button,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
+import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
+import type { InvoiceStatus, InvoiceType } from "@prisma/client";
 import { useInvoices } from "@/lib/hooks/useInvoices";
+import {
+  INVOICE_STATUS_LABELS,
+  INVOICE_TYPE_LABELS,
+} from "@/lib/constants/accounting";
+import { buildCsv, formatIsoDate } from "@/lib/helpers/admin/tableExport";
+
+const EXPORT_PAGE_SIZE = 500;
+
+interface ExportInvoice {
+  invoiceNumber: string;
+  invoiceType: InvoiceType;
+  issuedDate: string | null;
+  dueDate: string;
+  paidDate: string | null;
+  totalAmount: number | string;
+  status: InvoiceStatus;
+}
 import { StatusBadge } from "@/components/accounting/common/StatusBadge";
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
 import { DateDisplay } from "@/components/accounting/common/DateDisplay";
@@ -75,6 +95,73 @@ export default function CustomerInvoicesTable({
     setPage(1);
   };
 
+  // Downloads every invoice the table lists for this customer (all pages,
+  // same filters: drafts excluded) as CSV. Dates are in the viewer's timezone.
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const handleDownloadCsv = async () => {
+    if (!customerId) return;
+    try {
+      setIsExporting(true);
+      setExportError(null);
+
+      const all: ExportInvoice[] = [];
+      for (let exportPage = 1; ; exportPage++) {
+        const params = new URLSearchParams({
+          page: exportPage.toString(),
+          limit: EXPORT_PAGE_SIZE.toString(),
+          customerId,
+        });
+        const res = await fetch(`/api/accounting/invoices?${params}`, {
+          credentials: "include",
+        });
+        if (!res.ok) throw new Error("Failed to export invoices");
+        const data = await res.json();
+        all.push(...(data.invoices ?? []));
+        if (exportPage >= (data.pagination?.pages ?? 0)) break;
+      }
+
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const csv = buildCsv(
+        [
+          "Invoice #",
+          "Type",
+          "Issued Date",
+          "Due Date",
+          "Paid Date",
+          "Amount (USD)",
+          "Status",
+        ],
+        all.map((invoice) => [
+          invoice.invoiceNumber,
+          INVOICE_TYPE_LABELS[invoice.invoiceType] ?? invoice.invoiceType,
+          invoice.issuedDate ? formatIsoDate(invoice.issuedDate, tz) : "",
+          formatIsoDate(invoice.dueDate, tz),
+          invoice.status === "PAID" && invoice.paidDate
+            ? formatIsoDate(invoice.paidDate, tz)
+            : "",
+          Number(invoice.totalAmount).toFixed(2),
+          INVOICE_STATUS_LABELS[invoice.status] ?? invoice.status,
+        ]),
+      );
+
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `invoices-${formatIsoDate(new Date(), tz)}.csv`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Error exporting invoices:", err);
+      setExportError(
+        err instanceof Error ? err.message : "Failed to export invoices",
+      );
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   return (
     <Box sx={{ width: "100%", mt: { xs: 2, md: 3 } }}>
       <Box
@@ -90,31 +177,58 @@ export default function CustomerInvoicesTable({
         <Typography variant="h6" fontWeight="bold">
           Invoices
         </Typography>
-        <TextField
-          size="small"
-          placeholder="Search invoices..."
-          value={searchTerm}
-          onChange={handleSearchChange}
-          fullWidth
+        <Box
           sx={{
-            maxWidth: { sm: 280 },
-            "& .MuiOutlinedInput-root": {
-              backgroundColor: theme.palette.background.paper,
-            },
+            display: "flex",
+            alignItems: "center",
+            gap: 1.5,
+            width: { xs: "100%", sm: "auto" },
           }}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon sx={{ color: theme.palette.text.secondary }} />
-              </InputAdornment>
-            ),
-          }}
-        />
+        >
+          {customerId && (
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={handleDownloadCsv}
+              disabled={isExporting || loading}
+              startIcon={
+                isExporting ? (
+                  <CircularProgress size={14} />
+                ) : (
+                  <DownloadOutlinedIcon />
+                )
+              }
+              sx={{ flexShrink: 0 }}
+            >
+              Download CSV
+            </Button>
+          )}
+          <TextField
+            size="small"
+            placeholder="Search invoices..."
+            value={searchTerm}
+            onChange={handleSearchChange}
+            fullWidth
+            sx={{
+              maxWidth: { sm: 280 },
+              "& .MuiOutlinedInput-root": {
+                backgroundColor: theme.palette.background.paper,
+              },
+            }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon sx={{ color: theme.palette.text.secondary }} />
+                </InputAdornment>
+              ),
+            }}
+          />
+        </Box>
       </Box>
 
-      {error && (
+      {(error || exportError) && (
         <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
+          {error || exportError}
         </Alert>
       )}
 

@@ -6,6 +6,7 @@ import { paymentTypeLabel } from "@/lib/accounting/paymentTypes";
 import { simRoute } from "@/lib/simulation/context";
 import { loadSimLedger } from "@/lib/simulation/ledgerStore";
 import { simCostPaymentsPage } from "@/lib/simulation/views";
+import { resolveWalletTarget } from "@/lib/walletTarget";
 
 export async function GET(request: NextRequest) {
   try {
@@ -15,14 +16,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Verify token and extract user ID
-    let userId: string;
-    let userRole: string;
     let decoded;
     try {
       decoded = await verifyJwtToken(token);
-      userId = decoded.userId;
-      userRole = decoded.role;
     } catch (error) {
       console.error("[Cost Payments GET] Token verification failed:", error);
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
@@ -32,24 +28,16 @@ export async function GET(request: NextRequest) {
     const url = new URL(request.url);
     const page = parseInt(url.searchParams.get("page") || "0", 10);
     const pageSize = parseInt(url.searchParams.get("pageSize") || "10", 10);
-    const customerId = url.searchParams.get("customerId");
-    if (customerId) {
-      if (userRole === "FRANCHISEE") {
-        const owned = await prisma.user.findFirst({
-          where: { id: customerId, franchisee: { franchiseeId: userId } },
-          select: { id: true },
-        });
-        if (!owned) {
-          return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-        }
-      } else if (userRole !== "ADMIN" && userRole !== "SUPER_ADMIN") {
-        return NextResponse.json(
-          { error: "Only administrators can search by customerId" },
-          { status: 403 },
-        );
-      }
-      userId = customerId;
-    }
+
+    // ?customerId= (admin / franchisee access) resolves to the target
+    // customer, carrying the target's own role so a simulated customer viewed
+    // by an admin still gets the simulated ledger.
+    const target = await resolveWalletTarget(
+      decoded,
+      url.searchParams.get("customerId"),
+    );
+    if (target instanceof NextResponse) return target;
+    const userId = target.userId;
     // Validate pagination parameters
     if (page < 0 || pageSize < 1 || pageSize > 9999) {
       return NextResponse.json(
@@ -59,7 +47,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Simulated accounts: the simulated ledger, never cost_payments.
-    const sim = await simRoute(decoded, async (ctx) =>
+    const sim = await simRoute(target, async (ctx) =>
       NextResponse.json(
         simCostPaymentsPage(await loadSimLedger(ctx.userId), page, pageSize),
       ),
