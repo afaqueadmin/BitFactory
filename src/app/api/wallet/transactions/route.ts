@@ -10,6 +10,7 @@ import {
 } from "@/lib/luxorSubaccounts";
 import { simRoute } from "@/lib/simulation/context";
 import { loadSimPoolLedger } from "@/lib/simulation/data";
+import { resolveWalletTarget } from "@/lib/walletTarget";
 
 /**
  * Transaction object from unified transaction history
@@ -158,33 +159,16 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    let userId = decoded.userId;
-    const userRole = decoded.role;
+    // ?customerId= (admin / franchisee access) resolves to the target
+    // customer, carrying the target's own role so a simulated customer viewed
+    // by an admin still gets the simulated ledger.
+    const target = await resolveWalletTarget(
+      decoded,
+      request.nextUrl.searchParams.get("customerId"),
+    );
+    if (target instanceof NextResponse) return target;
+    const userId = target.userId;
     console.log(`[Transactions API] Fetching transactions for user: ${userId}`);
-
-    // Check for customerId in query params (for admin access)
-    const url = new URL(request.url);
-    const customerId = url.searchParams.get("customerId");
-    if (customerId) {
-      if (userRole === "FRANCHISEE") {
-        const owned = await prisma.user.findFirst({
-          where: { id: customerId, franchisee: { franchiseeId: userId } },
-          select: { id: true },
-        });
-        if (!owned) {
-          return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-        }
-      } else if (userRole !== "ADMIN" && userRole !== "SUPER_ADMIN") {
-        return NextResponse.json(
-          { error: "Only administrators can search by customerId" },
-          { status: 403 },
-        );
-      }
-      userId = customerId;
-      console.log(
-        `[Transactions API] Override - fetching for customer: ${customerId}`,
-      );
-    }
 
     // Get pagination and filter parameters
     const searchParams = request.nextUrl.searchParams;
@@ -225,7 +209,7 @@ export async function GET(request: NextRequest) {
 
     // Simulated accounts: the simulated ledger (daily revenue credits, monthly
     // payout debits), filtered and paged the same way as real history.
-    const sim = await simRoute(decoded, async (ctx) => {
+    const sim = await simRoute(target, async (ctx) => {
       const now = ctx.now;
       let from = new Date("2020-01-01");
       let to = now;
