@@ -24,6 +24,7 @@ import MinerPoolHistoryModal from "./admin/MinerPoolHistoryModal";
 import HashrateHistoryChart from "./HashrateHistoryChart";
 import RequestFirmwareChangeModal from "./miners/RequestFirmwareChangeModal";
 import { useFirmwareChangeRequests } from "@/lib/hooks/useFirmwareChangeRequests";
+import { dedupeWorkers } from "@/lib/luxorWorkerDedupe";
 import { RADIUS_CARD, useDaylight } from "@/lib/daylight";
 import {
   formatWarrantyDate,
@@ -269,7 +270,20 @@ export default function HostedMinersList({
               luxorData.data?.workers &&
               Array.isArray(luxorData.data.workers)
             ) {
-              luxorData.data.workers.forEach(
+              // A moved miner is also listed under its old subaccount (as
+              // INACTIVE) - keep one entry per name, preferring ACTIVE, rather
+              // than whichever Luxor happened to return last. Keyed by the exact
+              // name, since that's how miners are looked up below.
+              dedupeWorkers(
+                luxorData.data.workers as Array<{
+                  name: string;
+                  status: string;
+                  hashrate: number;
+                  firmware: string;
+                  last_share_time?: string;
+                }>,
+                (w) => w.name,
+              ).forEach(
                 (worker: {
                   name: string;
                   status: string;

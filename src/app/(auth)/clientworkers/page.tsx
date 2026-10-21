@@ -44,6 +44,7 @@ import ElectricBoltIcon from "@mui/icons-material/ElectricBolt";
 import GradientStatCard from "@/components/GradientStatCard";
 import { WorkersResponse } from "@/lib/luxor";
 import { useSubaccountFilter } from "@/lib/contexts/subaccountFilter-context";
+import { dedupeWorkers, workerNameKey } from "@/lib/luxorWorkerDedupe";
 
 /**
  * Response structure from the /api/luxor proxy route
@@ -66,7 +67,7 @@ interface WorkersState {
 
 export default function WorkersPage() {
   const theme = useTheme();
-  const { queryParam: subaccountsParam } = useSubaccountFilter();
+  const { queryParam: subaccountsParam, available } = useSubaccountFilter();
   const [state, setState] = useState<WorkersState>({
     workers: null,
     loading: true,
@@ -91,19 +92,20 @@ export default function WorkersPage() {
     try {
       setState((prev) => ({ ...prev, error: null }));
 
-      // Build query string from filters
+      // Everything in one request - status filter, search and paging are
+      // applied client-side after de-duplication (see below), since a moved
+      // miner's stale entry can only be dropped next to its ACTIVE twin.
       const params = new URLSearchParams({
         endpoint: "workers",
         currency: filters.currency,
-        status: filters.status,
-        page_number: filters.page_number,
-        page_size: filters.page_size,
+        page_number: "1",
+        page_size: "1000",
         subaccounts: subaccountsParam,
       });
 
       const queryString = params.toString();
 
-      console.log("[Workers Page] Fetching data with filters:", filters);
+      console.log("[Workers Page] Fetching data for", filters.currency);
 
       const response = await fetch(`/api/luxor?${queryString}`);
 
@@ -134,14 +136,15 @@ export default function WorkersPage() {
         error: errorMsg,
       }));
     }
-  }, [filters, subaccountsParam]);
+  }, [filters.currency, subaccountsParam]);
 
   /**
-   * Fetch data on component mount and when filters change
+   * Fetch data on mount and when the currency or subaccount selection
+   * changes - the other filters are client-side.
    */
   useEffect(() => {
     fetchWorkersData();
-  }, [filters, subaccountsParam, fetchWorkersData]);
+  }, [fetchWorkersData]);
 
   /**
    * Handle filter change
@@ -153,7 +156,7 @@ export default function WorkersPage() {
     setFilters((prev) => ({
       ...prev,
       [key]: value,
-      ...(key === "status" || key === "currency" ? { page_number: "1" } : {}), // Reset page when filter changes
+      ...(key !== "page_number" ? { page_number: "1" } : {}), // Reset page when filter changes
     }));
   };
 
@@ -180,10 +183,37 @@ export default function WorkersPage() {
   };
 
   /**
-   * Filter workers by search term
+   * One row per miner. A miner moved between the viewer's own subaccounts is
+   * still listed under the old one as INACTIVE - collapse those by name.
+   * Workers on someone else's subaccounts (a franchisee sees their
+   * customers') stay keyed per subaccount: names are only unique per
+   * customer, so collapsing across owners could merge different miners.
    */
-  const filteredWorkers = state.workers?.workers.filter((worker) =>
-    worker.name.toLowerCase().includes(filters.search.toLowerCase()),
+  const ownSubaccounts = new Set(available.map((s) => s.authKey));
+  const distinctWorkers = dedupeWorkers(state.workers?.workers ?? [], (w) =>
+    ownSubaccounts.has(w.subaccount_name)
+      ? `own::${workerNameKey(w.name)}`
+      : `${w.subaccount_name}::${workerNameKey(w.name)}`,
+  );
+  const activeCount = distinctWorkers.filter(
+    (w) => w.status === "ACTIVE",
+  ).length;
+  const inactiveCount = distinctWorkers.length - activeCount;
+
+  /**
+   * Filter by status and search term, then page client-side
+   */
+  const matchingWorkers = distinctWorkers.filter(
+    (worker) =>
+      worker.status === filters.status &&
+      worker.name.toLowerCase().includes(filters.search.toLowerCase()),
+  );
+  const pageSize = parseInt(filters.page_size);
+  const pageCount = Math.max(1, Math.ceil(matchingWorkers.length / pageSize));
+  const pageNumber = Math.min(parseInt(filters.page_number), pageCount);
+  const filteredWorkers = matchingWorkers.slice(
+    (pageNumber - 1) * pageSize,
+    pageNumber * pageSize,
   );
 
   /**
@@ -303,7 +333,7 @@ export default function WorkersPage() {
             <Box>
               <GradientStatCard
                 title="Total Active"
-                value={String(state.workers.total_active)}
+                value={String(activeCount)}
                 gradient="linear-gradient(135deg, #00C6FF 0%, #0072FF 100%)"
                 icon={<StorageIcon fontSize="small" />}
               />
@@ -312,7 +342,7 @@ export default function WorkersPage() {
             <Box>
               <GradientStatCard
                 title="Total Inactive"
-                value={String(state.workers.total_inactive)}
+                value={String(inactiveCount)}
                 gradient="linear-gradient(135deg, #FF6B6B 0%, #FF5252 100%)"
                 icon={<StorageIcon fontSize="small" />}
               />
@@ -330,7 +360,7 @@ export default function WorkersPage() {
             <Box>
               <GradientStatCard
                 title="Total Workers"
-                value={String(state.workers.workers.length)}
+                value={String(distinctWorkers.length)}
                 gradient="linear-gradient(135deg, #2196F3 0%, #21CBF3 100%)"
                 icon={<SpeedIcon fontSize="small" />}
               />
@@ -433,7 +463,7 @@ export default function WorkersPage() {
         </Paper>
 
         {/* Workers Table */}
-        {state.workers && state.workers.workers.length > 0 ? (
+        {matchingWorkers.length > 0 ? (
           <Box>
             <TableContainer component={Paper} sx={{ mb: 3 }}>
               <Table>
@@ -546,37 +576,27 @@ export default function WorkersPage() {
             </TableContainer>
 
             {/* Pagination */}
-            {state.workers.pagination &&
-              state.workers.pagination.item_count && (
-                <Box
-                  sx={{
-                    display: "flex",
-                    justifyContent: "center",
-                    alignItems: "center",
-                    gap: 2,
-                    mt: 3,
-                  }}
-                >
-                  <Typography variant="body2" color="text.secondary">
-                    Page {filters.page_number} of{" "}
-                    {Math.ceil(
-                      (state.workers.pagination.item_count || 1) /
-                        parseInt(filters.page_size),
-                    )}
-                    {" | Total: "}
-                    {state.workers.pagination.item_count} workers
-                  </Typography>
-                  <Pagination
-                    count={Math.ceil(
-                      (state.workers.pagination.item_count || 1) /
-                        parseInt(filters.page_size),
-                    )}
-                    page={parseInt(filters.page_number)}
-                    onChange={handlePageChange}
-                    color="primary"
-                  />
-                </Box>
-              )}
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                gap: 2,
+                mt: 3,
+              }}
+            >
+              <Typography variant="body2" color="text.secondary">
+                Page {pageNumber} of {pageCount}
+                {" | Total: "}
+                {matchingWorkers.length} workers
+              </Typography>
+              <Pagination
+                count={pageCount}
+                page={pageNumber}
+                onChange={handlePageChange}
+                color="primary"
+              />
+            </Box>
           </Box>
         ) : (
           <Paper sx={{ p: 4, textAlign: "center" }}>

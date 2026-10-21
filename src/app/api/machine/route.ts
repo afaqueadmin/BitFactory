@@ -374,14 +374,21 @@ export async function GET(
       // reporting under any of them).
       const luxorAuthKeys = poolAuths.map((pa) => pa.authKey);
 
+      // A miner moved between the customer's subaccounts is still listed
+      // under the old one as INACTIVE, so it only counts as down when none of
+      // its entries is ACTIVE - never by whichever subaccount comes first.
       let status = miner.status;
       if (status === "AUTO" && luxorAuthKeys.length > 0) {
-        const liveStatus = luxorAuthKeys
+        const liveStatuses = luxorAuthKeys
           .map((authKey) =>
             luxorWorkerStatusByKey.get(`${authKey}::${miner.name}`),
           )
-          .find((s) => s !== undefined);
-        if (liveStatus === "INACTIVE") {
+          .filter((s): s is string => s !== undefined);
+        if (
+          liveStatuses.length > 0 &&
+          liveStatuses.includes("INACTIVE") &&
+          !liveStatuses.includes("ACTIVE")
+        ) {
           status = "UNDER_MAINTENANCE";
         }
       }
@@ -389,6 +396,9 @@ export async function GET(
       return {
         ...miner,
         status,
+        // The stored status, before the live-Luxor override above. Edit forms
+        // must start from this, or saving any field persists the override.
+        dbStatus: miner.status,
         user: {
           ...user,
           luxorSubaccounts: luxorAuthKeys,

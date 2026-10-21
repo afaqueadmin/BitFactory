@@ -10,6 +10,7 @@ import {
 } from "@/lib/luxor";
 import { BraiinsClient } from "@/lib/braiins";
 import { franchiseeUserFilter } from "@/lib/franchiseeScope";
+import { countDistinctWorkers, workerOwnerKeyFn } from "@/lib/luxorSubaccounts";
 import { fetchLiveBtcPrice } from "@/lib/services/btcPriceService";
 
 interface PoolData {
@@ -273,10 +274,17 @@ async function fetchAllWorkers(
         });
       }
 
+      // Not total_active/total_inactive: those count a miner that moved
+      // between a customer's subaccounts twice (old entry stays INACTIVE).
+      const { active, inactive } = countDistinctWorkers(
+        data.workers || [],
+        await workerOwnerKeyFn(subaccountNames),
+      );
+
       return {
-        active: data.total_active || 0,
-        inactive: data.total_inactive || 0,
-        total: (data.total_active || 0) + (data.total_inactive || 0),
+        active,
+        inactive,
+        total: active + inactive,
         activeHashrate,
         inactiveHashrate,
         workers: data.workers || [],

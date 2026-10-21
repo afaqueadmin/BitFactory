@@ -11,7 +11,7 @@
 import { prisma } from "@/lib/prisma";
 import { AuditAction, Prisma } from "@prisma/client";
 import { logPoolCredentialChange } from "@/lib/audit/logPoolCredentialChange";
-import type { Worker } from "@/lib/luxor";
+import { workerNameKey } from "@/lib/luxorWorkerDedupe";
 
 export interface LuxorSubaccount {
   id: string | null;
@@ -46,24 +46,29 @@ export function joinSubaccountNames(authKeys: string[]): string {
     .join(",");
 }
 
+// Moved to the client-safe luxorWorkerDedupe module; re-exported so existing
+// server imports keep working.
+export { countDistinctWorkers } from "@/lib/luxorWorkerDedupe";
+
 /**
- * Counts distinct workers in a (possibly multi-subaccount) Luxor workers
- * list. A miner moved between subaccounts leaves its old entry behind as
- * INACTIVE while the new one is ACTIVE, so Luxor's total_active /
- * total_inactive count it twice. Workers are keyed by name (trimmed,
- * case-insensitive); a name is active if any of its entries is ACTIVE.
+ * Key function for de-duplicating a workers list that spans several
+ * customers: "<owner userId>::<name>", so a miner that moved between one
+ * customer's subaccounts collapses to one entry while two customers' miners
+ * that happen to share a name stay apart (names are only unique per user).
+ * A subaccount with no owner is keyed by the subaccount itself.
  */
-export function countDistinctWorkers(
-  workers: Pick<Worker, "name" | "status">[],
-): { active: number; inactive: number } {
-  const byName = new Map<string, boolean>();
-  for (const w of workers) {
-    const name = w.name.trim().toLowerCase();
-    byName.set(name, byName.get(name) === true || w.status === "ACTIVE");
-  }
-  let active = 0;
-  for (const isActive of byName.values()) if (isActive) active++;
-  return { active, inactive: byName.size - active };
+export async function workerOwnerKeyFn(
+  subaccountNames: string[],
+): Promise<(w: { name: string; subaccount_name: string }) => string> {
+  const rows = subaccountNames.length
+    ? await prisma.poolAuth.findMany({
+        where: { pool: { name: "Luxor" }, authKey: { in: subaccountNames } },
+        select: { authKey: true, userId: true },
+      })
+    : [];
+  const ownerBySubaccount = new Map(rows.map((r) => [r.authKey, r.userId]));
+  return (w) =>
+    `${ownerBySubaccount.get(w.subaccount_name) ?? `sub:${w.subaccount_name}`}::${workerNameKey(w.name)}`;
 }
 
 /**

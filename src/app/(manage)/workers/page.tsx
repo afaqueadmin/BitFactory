@@ -18,7 +18,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   Box,
   Container,
@@ -51,6 +51,7 @@ import { Refresh as RefreshIcon } from "@mui/icons-material";
 import BuildIcon from "@mui/icons-material/Build";
 import GradientStatCard from "@/components/GradientStatCard";
 import { Subaccount, WorkersResponse } from "@/lib/luxor";
+import { dedupeWorkers, workerNameKey } from "@/lib/luxorWorkerDedupe";
 
 /**
  * Response structure from the /api/luxor proxy route
@@ -77,41 +78,31 @@ const CURRENCY = "BTC";
 type StatusFilter = "ALL" | "ACTIVE" | "INACTIVE";
 
 /**
- * Luxor can return more than one worker "session" sharing the same
- * subaccount + name (e.g. a stale disconnected session left behind
- * alongside a live one, often from IP-derived worker names being reused
- * by different hardware). Collapse those down to a single row per name,
- * preferring the ACTIVE session, then the one with the most recent share.
+ * Luxor subaccount name -> owning customer's userId, from our PoolAuth rows.
+ * Used to collapse a miner that moved between one customer's subaccounts
+ * (Luxor keeps the old entry as INACTIVE) without merging two customers'
+ * miners that share a name. Empty on failure - rows then fall back to
+ * per-subaccount keys, i.e. the shadow stays visible rather than hiding data.
  */
-function dedupeWorkers(
-  workers: WorkersResponse["workers"],
-): WorkersResponse["workers"] {
-  const byKey = new Map<string, WorkersResponse["workers"][number]>();
+async function loadLuxorSubaccountOwners(): Promise<Map<string, string>> {
+  const owners = new Map<string, string>();
+  try {
+    const poolsRes = await fetch("/api/pools");
+    if (!poolsRes.ok) return owners;
+    const pools: ProxyResponse<Array<{ id: string; name: string }>> =
+      await poolsRes.json();
+    const luxorPoolId = pools.data?.find((p) => p.name === "Luxor")?.id;
+    if (!luxorPoolId) return owners;
 
-  for (const worker of workers) {
-    const key = `${worker.subaccount_name}::${worker.name}`;
-    const existing = byKey.get(key);
-
-    if (!existing) {
-      byKey.set(key, worker);
-      continue;
-    }
-
-    const existingIsActive = existing.status === "ACTIVE";
-    const workerIsActive = worker.status === "ACTIVE";
-
-    if (workerIsActive && !existingIsActive) {
-      byKey.set(key, worker);
-    } else if (workerIsActive === existingIsActive) {
-      const existingTime = new Date(existing.last_share_time).getTime();
-      const workerTime = new Date(worker.last_share_time).getTime();
-      if (workerTime > existingTime) {
-        byKey.set(key, worker);
-      }
-    }
+    const authsRes = await fetch(`/api/pool-auth?poolId=${luxorPoolId}`);
+    if (!authsRes.ok) return owners;
+    const auths: ProxyResponse<Array<{ authKey: string; userId: string }>> =
+      await authsRes.json();
+    for (const a of auths.data || []) owners.set(a.authKey, a.userId);
+  } catch (error) {
+    console.warn("[Luxor Workers] Could not load subaccount owners:", error);
   }
-
-  return Array.from(byKey.values());
+  return owners;
 }
 
 /**
@@ -146,12 +137,18 @@ export default function WorkersPage() {
     workers: [],
     selectedSubaccountNames: [],
     currentPage: 1,
-    pageSize: 200,
+    // Everything in one request: de-duplication and the status filter need
+    // the whole list (the table paginates client-side below).
+    pageSize: 1000,
     totalItems: 0,
     loading: true,
     error: null,
     statusFilter: "ALL",
   });
+
+  // Subaccount -> owner userId, loaded once on mount (see
+  // loadLuxorSubaccountOwners). A ref so fetchWorkers stays stable.
+  const subaccountOwnersRef = useRef<Map<string, string>>(new Map());
 
   const [stats, setStats] = useState<WorkerStats>({
     totalWorkers: 0,
@@ -279,9 +276,9 @@ export default function WorkersPage() {
         url.searchParams.set("subaccount_names", subaccountNamesParam);
         url.searchParams.set("page_number", String(pageNumber));
         url.searchParams.set("page_size", String(pageSize));
-        if (statusFilter !== "ALL") {
-          url.searchParams.set("status", statusFilter);
-        }
+        // The status filter is applied after de-duplication below, not by
+        // Luxor: filtering INACTIVE server-side would return a moved miner's
+        // stale entry without the ACTIVE twin that should hide it.
 
         const response = await fetch(url.toString());
 
@@ -296,7 +293,16 @@ export default function WorkersPage() {
         }
 
         const workersData = (data.data as WorkersResponse) || {};
-        const workersList = dedupeWorkers(workersData.workers || []);
+        // One row per miner: collapse a stale session in the same subaccount
+        // and a moved miner's old-subaccount entry, keyed per owner since
+        // names are only unique per customer. Unowned subaccounts key by
+        // subaccount.
+        const owners = subaccountOwnersRef.current;
+        const workersList = dedupeWorkers(
+          workersData.workers || [],
+          (w) =>
+            `${owners.get(w.subaccount_name) ?? `sub:${w.subaccount_name}`}::${workerNameKey(w.name)}`,
+        ).filter((w) => statusFilter === "ALL" || w.status === statusFilter);
         const totalItems = workersList.length;
 
         const activeCount = workersList.filter(
@@ -358,8 +364,12 @@ export default function WorkersPage() {
       try {
         console.log("[Luxor Workers] Initializing - fetching subaccounts...");
 
-        // Fetch all subaccounts
-        const response = await fetch("/api/luxor?endpoint=subaccounts");
+        // Fetch all subaccounts, and who owns each (for de-duplication)
+        const [response, owners] = await Promise.all([
+          fetch("/api/luxor?endpoint=subaccounts"),
+          loadLuxorSubaccountOwners(),
+        ]);
+        subaccountOwnersRef.current = owners;
 
         if (!response.ok) {
           throw new Error(`API returned status ${response.status}`);

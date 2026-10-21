@@ -166,11 +166,17 @@ export async function checkHashrateBenchmarks(
       if (reported.length > 0) {
         actualThs =
           reported.reduce((sum, m) => sum + Number(m.hashrate), 0) / HS_PER_THS;
-      } else if (minerMetrics.some((m) => m.status === "INACTIVE")) {
-        // AUTO miner, pool confirmed no hashing that day - real 0, not missing data.
+      } else if (
+        minerMetrics.some((m) => m.status === "INACTIVE") &&
+        !minerMetrics.some((m) => m.status === "ACTIVE")
+      ) {
+        // AUTO miner, pool confirmed no hashing that day - real 0, not missing
+        // data. Only when no subaccount saw it ACTIVE: a miner that moved
+        // leaves an INACTIVE row in its old subaccount while the new one is
+        // ACTIVE with hashrate not backfilled yet.
         actualThs = 0;
       } else {
-        continue; // null hashrate with no INACTIVE confirmation - ambiguous, wait for real data
+        continue; // null hashrate with no INACTIVE-only confirmation - ambiguous, wait for real data
       }
 
       const benchmarkThs = Number(

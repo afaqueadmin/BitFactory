@@ -21,6 +21,7 @@ import { prisma } from "@/lib/prisma";
 import { createLuxorClient } from "@/lib/luxor";
 import { createBraiinsClient } from "@/lib/braiins";
 import { joinSubaccountNames } from "@/lib/luxorSubaccounts";
+import { pickWorkerForMiner } from "@/lib/luxorWorkerDedupe";
 
 export interface MinerTelemetrySnapshot {
   poolName: "Luxor" | "Braiins";
@@ -56,9 +57,12 @@ async function fetchLiveLuxorSnapshot(
   const client = createLuxorClient("ticket-telemetry");
   const response = await client.getWorkers("BTC", {
     subaccount_names: joinSubaccountNames(authKeys),
+    page_size: 1000,
   });
 
-  const worker = response.workers.find((w) => w.name === minerName);
+  // A moved miner is listed under both subaccounts (old one INACTIVE), so
+  // prefer the ACTIVE / most recent entry rather than the first match.
+  const worker = pickWorkerForMiner(response.workers, minerName);
   if (!worker) return null;
 
   return {

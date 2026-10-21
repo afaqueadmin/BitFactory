@@ -95,6 +95,8 @@ interface Miner {
   name: string;
   hardwareId: string;
   status: "AUTO" | "DEPLOYMENT_IN_PROGRESS" | "UNDER_MAINTENANCE";
+  // Stored status from GET /api/machine; `status` may be a live-Luxor override.
+  dbStatus?: "AUTO" | "DEPLOYMENT_IN_PROGRESS" | "UNDER_MAINTENANCE";
   userId: string;
   spaceId: string;
   poolId?: string | null;
@@ -188,7 +190,9 @@ export default function MinerFormModal({
         userId: miner.userId,
         spaceId: miner.spaceId,
         poolId: miner.poolId || "",
-        status: miner.status,
+        // The stored status, not the displayed one - a live-Luxor override
+        // would otherwise be saved back on any edit.
+        status: miner.dbStatus ?? miner.status,
         rate_per_kwh: miner.rate_per_kwh || "",
         benchmarkHashrate: miner.benchmarkHashrate ?? "",
         serialNumber: miner.serialNumber || "",

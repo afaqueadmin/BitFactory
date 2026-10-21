@@ -20,12 +20,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
-import { SummaryResponse } from "@/lib/luxor";
+import { SummaryResponse, Worker } from "@/lib/luxor";
 import { BraiinsClient } from "@/lib/braiins";
 import {
   franchiseeUserFilter,
   franchiseeMinerFilter,
 } from "@/lib/franchiseeScope";
+import { countDistinctWorkers, workerOwnerKeyFn } from "@/lib/luxorSubaccounts";
 
 interface PoolData {
   hashrate_5m: number;
@@ -256,10 +257,15 @@ async function fetchScopedWorkers(request: NextRequest): Promise<{
 
     const result = await response.json();
     if (result.success && result.data) {
-      return {
-        active: result.data.total_active || 0,
-        inactive: result.data.total_inactive || 0,
-      };
+      // Not total_active/total_inactive: those count a miner that moved
+      // between a customer's subaccounts twice (old entry stays INACTIVE).
+      const workers: Worker[] = result.data.workers || [];
+      return countDistinctWorkers(
+        workers,
+        await workerOwnerKeyFn(
+          Array.from(new Set(workers.map((w) => w.subaccount_name))),
+        ),
+      );
     }
   } catch (error) {
     console.error("[Franchise Dashboard] Error fetching workers:", error);
@@ -304,8 +310,7 @@ async function fetchScopedRevenue(
     const result = await response.json();
     if (result.success && result.data) {
       const revenueArray = result.data.revenue as
-        | Array<{ revenue: { revenue: number } }>
-        | undefined;
+        Array<{ revenue: { revenue: number } }> | undefined;
       if (!revenueArray) return { revenue: 0 };
       return {
         revenue: revenueArray.reduce(
