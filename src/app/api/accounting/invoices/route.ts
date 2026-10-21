@@ -18,7 +18,8 @@ import {
 } from "./invoiceNumber";
 import { createRepairInvoice } from "./repair";
 import { simRoute } from "@/lib/simulation/context";
-import { loadSimInvoice } from "@/lib/simulation/invoice";
+import { isSimulatedRole } from "@/lib/simulation/config";
+import { hasRealIssuedInvoice, loadSimInvoice } from "@/lib/simulation/invoice";
 import {
   buildInvoiceListWhere,
   buildInvoiceOrderBy,
@@ -82,19 +83,25 @@ export async function GET(request: NextRequest) {
     }
 
     // Simulated accounts: their one view-only hardware + hosting invoice,
-    // built in code (never in the invoices table).
-    const sim = await simRoute(decoded, async (ctx) =>
-      NextResponse.json({
-        invoices: [await loadSimInvoice(ctx)],
-        pagination: {
-          page: 1,
-          limit: parseInt(searchParams.get("limit") || "10", 10),
-          total: 1,
-          pages: 1,
-        },
-      }),
-    );
-    if (sim) return sim;
+    // built in code (never in the invoices table) - until an admin issues
+    // them a real one, after which they get their real invoices below.
+    if (
+      !isSimulatedRole(userRole) ||
+      !(await hasRealIssuedInvoice(decoded.userId))
+    ) {
+      const sim = await simRoute(decoded, async (ctx) =>
+        NextResponse.json({
+          invoices: [await loadSimInvoice(ctx)],
+          pagination: {
+            page: 1,
+            limit: parseInt(searchParams.get("limit") || "10", 10),
+            total: 1,
+            pages: 1,
+          },
+        }),
+      );
+      if (sim) return sim;
+    }
 
     const { sortBy, sortDirection } = parseInvoiceListSort(searchParams);
     const page = parseInt(searchParams.get("page") || "1", 10);
@@ -309,7 +316,7 @@ export async function POST(request: NextRequest) {
     // no matter how many more they're given later.
     const customer = await prisma.user.findUnique({
       where: { id: customerId },
-      select: INVOICE_NUMBER_CUSTOMER_SELECT,
+      select: { ...INVOICE_NUMBER_CUSTOMER_SELECT, role: true },
     });
 
     if (!customer) {
@@ -321,8 +328,10 @@ export async function POST(request: NextRequest) {
 
     // Hosting invoices (the default type) are blocked for potential customers
     // and customers with no segment; hardware sales invoices are allowed.
+    // Simulated accounts have no segment but can be billed hosting.
     if (
       (invoiceType || "ELECTRICITY_CHARGES") === "ELECTRICITY_CHARGES" &&
+      customer.role !== "SIMULATED" &&
       !isHostingEligibleSegment(customer.segment)
     ) {
       return NextResponse.json(

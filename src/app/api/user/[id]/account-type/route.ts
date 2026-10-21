@@ -17,8 +17,8 @@
  *
  * CLIENT -> SIMULATED    { role: "SIMULATED" }
  *   Simulated account (src/lib/simulation). Only for a direct customer with no
- *   miners, pool subaccounts, invoices or payments - e.g. a Potential
- *   Customer - since simulated accounts are never billed. Their simulated data
+ *   miners, pool subaccounts or payments - e.g. a Potential Customer.
+ *   Invoices are allowed, and admins can issue new ones. Their simulated data
  *   starts at the conversion, not at registration.
  *
  * The account is signed out everywhere, since its role is part of the token.

@@ -21,6 +21,12 @@ export const SIM_REREGISTER_NOTE = "re-registered as a simulated account";
 /** Shown wherever a real subaccount name would appear. */
 export const SIM_SUBACCOUNT_NAME = "Simulation";
 
+/**
+ * The simulated invoice's id (see ./invoice); any other id is a real one.
+ * Here so client components can tell it apart without the server code.
+ */
+export const SIM_INVOICE_ID = "sim-hardware-invoice";
+
 /** Narration on the ledger row that starts every simulated account. */
 export const SIM_WELCOME_BONUS_NARRATION = "Welcome bonus";
 

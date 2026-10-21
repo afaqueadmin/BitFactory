@@ -167,10 +167,11 @@ export default function ChangeAccountTypeModal({
                 {customer?.name} will become a simulated account: they keep
                 their login and see the simulated miner&apos;s simulated data
                 starting today, with the welcome bonus as their balance. They
-                drop out of the customer list and billing (find them under
-                Simulated Accounts), and will be signed out on all devices. Only
-                a customer with no miners, subaccounts, invoices or payments can
-                be changed.
+                drop out of the customer list (find them under Simulated
+                Accounts), and will be signed out on all devices. Their invoices
+                stay, and you can still issue them new ones; until one is issued
+                they see a simulated paid invoice. Only a customer with no
+                miners, subaccounts or payments can be changed.
               </Typography>
             ) : (
               <>

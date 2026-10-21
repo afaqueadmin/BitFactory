@@ -87,6 +87,7 @@ export default function AccountingDashboard() {
   } = useDashboardStats();
   const { customers, loading: customersLoading } = useCustomers({
     hostingOnly: true,
+    includeSimulated: true,
   });
   const { user } = useUser();
   const isAdmin = user?.role === "ADMIN" || user?.role === "SUPER_ADMIN";

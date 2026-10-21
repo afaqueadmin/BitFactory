@@ -274,20 +274,27 @@ export interface Customer {
 // hostingOnly excludes potential customers and customers with no segment -
 // use it on hosting (ELECTRICITY_CHARGES) screens, not hardware sales.
 // withMiners lists only customers who own a non-deleted miner (Hardware
-// Repair invoices are per miner).
+// Repair invoices are per miner). includeSimulated also lists simulated
+// accounts - for the Hardware Sales and Hosting invoice screens.
 export function useCustomers(
-  options: { hostingOnly?: boolean; withMiners?: boolean } = {},
+  options: {
+    hostingOnly?: boolean;
+    withMiners?: boolean;
+    includeSimulated?: boolean;
+  } = {},
 ) {
   const hostingOnly = !!options.hostingOnly;
   const withMiners = !!options.withMiners;
+  const includeSimulated = !!options.includeSimulated;
   const { data, isLoading, error } = useQuery({
-    queryKey: ["customers", { hostingOnly, withMiners }],
+    queryKey: ["customers", { hostingOnly, withMiners, includeSimulated }],
     queryFn: async () => {
-      const url = hostingOnly
-        ? "/api/accounting/customers?scope=hosting"
-        : withMiners
-          ? "/api/accounting/customers?scope=withMiners"
-          : "/api/accounting/customers";
+      const params = new URLSearchParams();
+      if (hostingOnly) params.set("scope", "hosting");
+      else if (withMiners) params.set("scope", "withMiners");
+      if (includeSimulated) params.set("includeSimulated", "1");
+      const query = params.toString();
+      const url = `/api/accounting/customers${query ? `?${query}` : ""}`;
       const res = await fetch(url, {
         method: "GET",
         credentials: "include",

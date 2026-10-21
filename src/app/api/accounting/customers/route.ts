@@ -35,22 +35,34 @@ export async function GET(request: NextRequest) {
     // hosting (excludes potential customers and customers with no segment).
     // ?scope=withMiners limits it to customers who own at least one
     // non-deleted miner (Hardware Repair invoices are per miner).
-    const scope = new URL(request.url).searchParams.get("scope");
+    // ?includeSimulated=1 (admin invoice screens) also lists simulated
+    // accounts, which can be issued Hardware Sales and Hosting invoices.
+    const searchParams = new URL(request.url).searchParams;
+    const scope = searchParams.get("scope");
     const hostingOnly = scope === "hosting";
     const withMinersOnly = scope === "withMiners";
+    const includeSimulated =
+      searchParams.get("includeSimulated") === "1" &&
+      (user.role === "ADMIN" || user.role === "SUPER_ADMIN");
 
-    // Fetch all customers (users with role CLIENT)
+    // Fetch all customers (users with role CLIENT, plus SIMULATED on request)
     const customers = await prisma.user.findMany({
       where: {
-        role: "CLIENT",
+        role: includeSimulated ? { in: ["CLIENT", "SIMULATED"] } : "CLIENT",
         isDeleted: false,
         ...franchiseeUserFilter(user),
-        ...(hostingOnly ? hostingEligibleUserFilter() : {}),
+        // Simulated accounts have no segment but can still be billed hosting.
+        ...(hostingOnly
+          ? includeSimulated
+            ? { OR: [hostingEligibleUserFilter(), { role: "SIMULATED" }] }
+            : hostingEligibleUserFilter()
+          : {}),
         ...(withMinersOnly ? { miners: { some: { isDeleted: false } } } : {}),
       },
       select: {
         id: true,
         name: true,
+        role: true,
         poolAuths: {
           where: { pool: { name: "Luxor" } },
           orderBy: { createdAt: "asc" },
@@ -66,7 +78,7 @@ export async function GET(request: NextRequest) {
       const names = c.poolAuths.map((pa) => pa.authKey);
       return {
         id: c.id,
-        displayName: `${c.name || "Unnamed Customer"} (${names.length > 0 ? names.join(", ") : "No subaccount assigned"})`,
+        displayName: `${c.name || "Unnamed Customer"} (${names.length > 0 ? names.join(", ") : "No subaccount assigned"})${c.role === "SIMULATED" ? " - Simulated" : ""}`,
         name: c.name,
         luxorSubaccounts: names,
       };

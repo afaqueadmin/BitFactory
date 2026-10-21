@@ -38,7 +38,9 @@ import { LocationsMultiSelect } from "@/components/accounting/invoices/Locations
 export default function CreateHardwareSalesInvoicePage() {
   const router = useRouter();
   const { create: createInvoice, error: createError } = useCreateInvoice();
-  const { customers, loading: customersLoading } = useCustomers();
+  const { customers, loading: customersLoading } = useCustomers({
+    includeSimulated: true,
+  });
 
   const [formData, setFormData] = useState({
     customerId: "",

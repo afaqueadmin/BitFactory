@@ -24,9 +24,10 @@ export class SimConversionError extends Error {
 }
 
 /**
- * Why `userId` can't become a simulated account, or null if it can. A
- * simulated account is never billed and drops out of every customer list,
- * so only a direct customer with nothing real on the account qualifies.
+ * Why `userId` can't become a simulated account, or null if it can. Only a
+ * direct customer with no miners, subaccounts or payments qualifies.
+ * Invoices don't block it: a simulated account can hold real invoices, and
+ * once one is issued it sees them instead of the simulated one.
  */
 export async function simConversionBlocker(
   userId: string,
@@ -43,20 +44,18 @@ export async function simConversionBlocker(
     return "This customer is assigned to a franchise. Change them to a Direct BitFactory Customer first.";
   }
 
-  const [miners, poolAuths, invoices, payments] = await Promise.all([
+  const [miners, poolAuths, payments] = await Promise.all([
     prisma.miner.count({ where: { userId, isDeleted: false } }),
     prisma.poolAuth.count({ where: { userId } }),
-    prisma.invoice.count({ where: { userId } }),
     prisma.costPayment.count({ where: { userId, isDeleted: false } }),
   ]);
   const blockers = [
     miners && `${miners} miner(s)`,
     poolAuths && `${poolAuths} pool subaccount(s)`,
-    invoices && `${invoices} invoice(s)`,
     payments && `${payments} payment/ledger entr(ies)`,
   ].filter(Boolean);
   return blockers.length > 0
-    ? `Only a customer with no miners, subaccounts, invoices or payments can become a simulated account. This one has ${blockers.join(", ")}.`
+    ? `Only a customer with no miners, subaccounts or payments can become a simulated account. This one has ${blockers.join(", ")}.`
     : null;
 }
 

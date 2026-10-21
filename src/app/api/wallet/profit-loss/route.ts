@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { simRoute } from "@/lib/simulation/context";
-import { loadSimInvoice } from "@/lib/simulation/invoice";
+import {
+  hasRealIssuedInvoice,
+  loadSimInvoice,
+  realHardwareInvoicedTotal,
+} from "@/lib/simulation/invoice";
 import { ledgerElectricityTotal } from "@/lib/simulation/ledger";
 import { loadSimLedger } from "@/lib/simulation/ledgerStore";
 import { authenticateWalletRequest } from "@/lib/walletTarget";
@@ -23,14 +27,19 @@ export async function GET(request: NextRequest) {
     if (target instanceof NextResponse) return target;
 
     // Simulated accounts: electricity is the simulated daily charges so far;
-    // hardware is the simulated Hardware Sales invoice, shown as paid.
+    // hardware is the simulated Hardware Sales invoice, shown as paid - or,
+    // once an admin has issued them real invoices, their real Hardware Sales
+    // total, paid or not.
     const sim = await simRoute(target, async (ctx) => {
-      const [ledger, invoice] = await Promise.all([
+      const [ledger, hardware] = await Promise.all([
         loadSimLedger(ctx.userId),
-        loadSimInvoice(ctx),
+        hasRealIssuedInvoice(ctx.userId).then(async (real) =>
+          real
+            ? realHardwareInvoicedTotal(ctx.userId)
+            : (await loadSimInvoice(ctx)).totalAmount,
+        ),
       ]);
       const electricity = ledgerElectricityTotal(ledger);
-      const hardware = invoice.totalAmount;
       return NextResponse.json(
         {
           totals: {

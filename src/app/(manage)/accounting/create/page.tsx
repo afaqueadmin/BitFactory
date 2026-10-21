@@ -46,6 +46,7 @@ export default function CreateInvoicePage() {
   const { create: createInvoice, error: createError } = useCreateInvoice();
   const { customers, loading: customersLoading } = useCustomers({
     hostingOnly: true,
+    includeSimulated: true,
   });
 
   const now = new Date();

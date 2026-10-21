@@ -32,7 +32,7 @@ import DownloadIcon from "@mui/icons-material/Download";
 import PayWithBitcoinButton from "@/components/PayWithBitcoinButton";
 import PayWithBinanceButton from "@/components/PayWithBinanceButton";
 import { RepairMinerDetails } from "@/components/accounting/invoices/RepairMinerDetails";
-import { useUser } from "@/lib/hooks/useUser";
+import { SIM_INVOICE_ID } from "@/lib/simulation/config";
 
 type RepairLineRow = {
   id: string;
@@ -46,9 +46,9 @@ export default function CustomerInvoiceDetailPage() {
   const params = useParams();
   const router = useRouter();
   const { invoice, loading, error } = useInvoice(params.id as string);
-  // Simulated accounts' invoice is view only: it can't be paid.
-  const { user } = useUser();
-  const isSimulated = user?.role === "SIMULATED";
+  // A simulated account's simulated invoice is view only: it can't be paid.
+  // Real invoices issued to them are paid like anyone else's.
+  const isSimulated = params.id === SIM_INVOICE_ID;
   const [downloadLoading, setDownloadLoading] = useState(false);
   const [memoDownloadingId, setMemoDownloadingId] = useState<string | null>(
     null,

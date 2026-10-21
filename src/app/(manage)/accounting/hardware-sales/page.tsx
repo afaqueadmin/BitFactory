@@ -98,7 +98,9 @@ export default function HardwareSalesDashboard() {
   const [exporting, setExporting] = useState<"csv" | "pdf" | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
 
-  const { customers, loading: customersLoading } = useCustomers();
+  const { customers, loading: customersLoading } = useCustomers({
+    includeSimulated: true,
+  });
 
   const listOptions = {
     startDate: startDateFilter || undefined,

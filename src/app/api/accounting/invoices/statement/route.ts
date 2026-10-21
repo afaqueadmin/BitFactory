@@ -6,8 +6,9 @@ import { INVOICE_TYPE_LABELS } from "@/lib/constants/accounting";
 import { readFileSync } from "fs";
 import { join } from "path";
 import { InvoiceStatus, InvoiceType, Prisma } from "@prisma/client";
+import { isSimulatedRole } from "@/lib/simulation/config";
 import { getSimContext } from "@/lib/simulation/context";
-import { loadSimInvoice } from "@/lib/simulation/invoice";
+import { hasRealIssuedInvoice, loadSimInvoice } from "@/lib/simulation/invoice";
 
 export const dynamic = "force-dynamic";
 
@@ -48,8 +49,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "User not found" }, { status: 401 });
     }
 
-    // Simulated accounts: their view-only invoice (never in the DB).
-    const simCtx = await getSimContext(jwtPayload);
+    // Simulated accounts: their view-only invoice (never in the DB), until
+    // an admin issues them a real one.
+    const simCtx =
+      isSimulatedRole(jwtPayload.role) && !(await hasRealIssuedInvoice(userId))
+        ? await getSimContext(jwtPayload)
+        : null;
     const source: StatementInvoice[] = simCtx
       ? [await loadSimInvoice(simCtx)]
       : await prisma.invoice.findMany({
