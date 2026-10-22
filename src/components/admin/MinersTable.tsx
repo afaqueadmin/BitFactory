@@ -44,7 +44,9 @@ import {
   ArrowUpward as ArrowUpwardIcon,
   ArrowDownward as ArrowDownwardIcon,
   MoreVert as MoreVertIcon,
+  Download as DownloadIcon,
 } from "@mui/icons-material";
+import { buildCsv, formatIsoDate } from "@/lib/helpers/admin/tableExport";
 import {
   sortMiners,
   toggleSortDirection,
@@ -115,6 +117,7 @@ interface Miner {
   createdAt: string;
   updatedAt: string;
   isDeleted: boolean;
+  deletedAt?: string | null;
   rate_per_kwh?: number;
   benchmarkHashrate?: number;
   serialNumber?: string | null;
@@ -175,6 +178,8 @@ interface MinersTableProps {
   setShowDeleted: Dispatch<SetStateAction<boolean>>;
   /** Hides Edit/Delete/Repair Notes actions, leaving history viewing only. */
   readOnly?: boolean;
+  /** Shows a Download CSV button exporting every listed miner. */
+  csvExport?: boolean;
 }
 
 export default function MinersTable({
@@ -186,6 +191,7 @@ export default function MinersTable({
   showDeleted,
   setShowDeleted,
   readOnly = false,
+  csvExport = false,
 }: MinersTableProps) {
   const [deleteConfirm, setDeleteConfirm] = React.useState<string | null>(null);
   const [deleting, setDeleting] = React.useState(false);
@@ -338,6 +344,79 @@ export default function MinersTable({
     [miners, sortConfig],
   );
 
+  /**
+   * Downloads every listed miner (all pages, in the current sort) as CSV,
+   * including fields the table only shows in tooltips (SN, MAC, warranty).
+   * The parent's filters and Show Deleted already shaped `miners`. Created /
+   * Deleted dates are in the viewer's timezone; warranty is a calendar date.
+   */
+  const handleDownloadCsv = () => {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const csv = buildCsv(
+      [
+        "Name",
+        "Serial Number",
+        "MAC Address",
+        "Model",
+        "User",
+        "User Email",
+        "Subaccount",
+        "Type",
+        "Pool",
+        "Space",
+        "Location",
+        "Power (kW)",
+        "Hash Rate (TH/s)",
+        "Rate (USD/kWh)",
+        "Benchmark (TH/s)",
+        "Warranty Expires",
+        "Warranty Status",
+        "Status",
+        "Deleted",
+        "Deleted At",
+        "Created",
+      ],
+      memoizedRows.map((miner) => [
+        miner.name,
+        miner.serialNumber || "",
+        miner.macAddress || "",
+        miner.hardware?.model || "",
+        miner.user?.name || "",
+        miner.user?.email || "",
+        miner.user?.luxorSubaccounts?.join(", ") || "",
+        miner.user?.segment || "",
+        miner.pool?.name || "Unassigned",
+        miner.space?.name || "",
+        miner.space?.location || "",
+        String(miner.hardware?.powerUsage ?? ""),
+        miner.hardware?.hashRate !== undefined
+          ? parseFloat(String(miner.hardware.hashRate)).toFixed(2)
+          : "",
+        miner.rate_per_kwh ? Number(miner.rate_per_kwh).toFixed(4) : "",
+        miner.benchmarkHashrate !== undefined &&
+        miner.benchmarkHashrate !== null
+          ? Number(miner.benchmarkHashrate).toFixed(2)
+          : "",
+        miner.warrantyExpiresAt
+          ? formatIsoDate(miner.warrantyExpiresAt, "UTC")
+          : "",
+        WARRANTY_STATUS_LABEL[getWarrantyStatus(miner.warrantyExpiresAt)],
+        miner.status,
+        miner.isDeleted ? "Yes" : "No",
+        miner.deletedAt ? formatIsoDate(miner.deletedAt, tz) : "",
+        formatIsoDate(miner.createdAt, tz),
+      ]),
+    );
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `miners-${formatIsoDate(new Date(), tz)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   // Page through the sorted rows; -1 is MUI's "All" option. The page is
   // clamped because the reset effect only runs after the render that needs it.
   const lastPage =
@@ -398,7 +477,26 @@ export default function MinersTable({
         </Alert>
       )}
 
-      <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 1 }}>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "flex-end",
+          alignItems: "center",
+          gap: 2,
+          mb: 1,
+        }}
+      >
+        {csvExport && (
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<DownloadIcon />}
+            onClick={handleDownloadCsv}
+            disabled={isLoading || memoizedRows.length === 0}
+          >
+            Download CSV
+          </Button>
+        )}
         <FormControlLabel
           control={
             <Checkbox
