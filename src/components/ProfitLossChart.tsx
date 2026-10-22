@@ -129,7 +129,7 @@ export default function ProfitLossChart({
   const cards = [
     { label: "BTC Mined Revenue", value: revenueUsd, color: COLOR_REVENUE },
     {
-      label: "Electricity Paid",
+      label: "Hosting Charges Paid",
       value: electricityCost,
       color: COLOR_ELECTRICITY,
     },
@@ -347,7 +347,7 @@ export default function ProfitLossChart({
                 />
                 <Bar
                   dataKey="electricity"
-                  name="Electricity"
+                  name="Hosting Charges"
                   stackId="row"
                   fill={COLOR_ELECTRICITY}
                   radius={[4, 0, 0, 4]}
@@ -386,7 +386,7 @@ export default function ProfitLossChart({
             }}
           >
             {[
-              { label: "Electricity", color: COLOR_ELECTRICITY },
+              { label: "Hosting Charges", color: COLOR_ELECTRICITY },
               { label: "Hardware", color: COLOR_HARDWARE },
               { label: "Revenue", color: COLOR_REVENUE },
             ].map((item) => (

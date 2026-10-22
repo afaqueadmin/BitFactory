@@ -71,23 +71,49 @@ function snapshotBaseUrl(): string {
   return appBaseUrl();
 }
 
+const escapeHtml = (value: string): string =>
+  value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+/** Every page's footer: document name on the left, page X of Y on the right. */
+function snapshotFooterTemplate(customerName: string | null | undefined) {
+  const label = ["BitFactory", "Wallet Summary", customerName?.trim()]
+    .filter(Boolean)
+    .map((part) => escapeHtml(part as string))
+    .join(" &middot; ");
+  return `
+    <div style="width: 100%; padding: 0 0.3in; font-family: Arial, sans-serif; font-size: 8px; color: #8a94a6; display: flex; justify-content: space-between;">
+      <span>${label}</span>
+      <span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>
+    </div>
+  `;
+}
+
 /**
  * Renders the customer's wallet overview to a PDF. No one signs in: the
  * headless browser gets a 5-minute wallet snapshot ticket that can only
- * read this customer's wallet overview. Pass `browser` to reuse one browser
- * across several PDFs (the cron does).
+ * read this customer's wallet. Pass `browser` to reuse one browser across
+ * several PDFs (the cron does). `payoutDate` (a UTC day) adds that day's
+ * payout transactions (payments and fees) below the overview.
  */
 export async function renderWalletSnapshotPdf(
   customerId: string,
   browser?: PdfBrowser,
+  options: { customerName?: string | null; payoutDate?: Date } = {},
 ): Promise<Buffer> {
   const ticket = await signWalletSnapshotTicket(customerId);
-  const url = `${snapshotBaseUrl()}/wallet-snapshot/${encodeURIComponent(customerId)}`;
+  const query = new URLSearchParams();
+  if (options.customerName) query.set("name", options.customerName);
+  if (options.payoutDate) {
+    query.set("payoutDate", options.payoutDate.toISOString().slice(0, 10));
+  }
+  const search = query.size > 0 ? `?${query}` : "";
+  const url = `${snapshotBaseUrl()}/wallet-snapshot/${encodeURIComponent(customerId)}${search}`;
   return generatePDFFromUrl(
     url,
     [{ name: WALLET_SNAPSHOT_TICKET_COOKIE, value: ticket }],
     SNAPSHOT_WIDTH,
     browser,
+    snapshotFooterTemplate(options.customerName),
   );
 }
 

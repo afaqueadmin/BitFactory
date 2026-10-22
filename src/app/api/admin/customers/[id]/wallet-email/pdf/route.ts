@@ -29,7 +29,9 @@ export async function GET(
   }
 
   try {
-    const pdf = await renderWalletSnapshotPdf(customer.id);
+    const pdf = await renderWalletSnapshotPdf(customer.id, undefined, {
+      customerName: customer.name,
+    });
     return new NextResponse(new Uint8Array(pdf), {
       headers: {
         "Content-Type": "application/pdf",

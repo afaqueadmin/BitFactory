@@ -1458,6 +1458,9 @@ export const generatePDFFromUrl = async (
   cookies: { name: string; value: string }[],
   contentWidth: number,
   browser?: PdfBrowser,
+  /** Printed at the bottom of every page (Chrome's pageNumber/totalPages
+   * classes work in it). Not affected by `scale`, so set its font size. */
+  footerTemplate?: string,
 ): Promise<Buffer> => {
   const ownBrowser = browser ? null : await launchPdfBrowser();
   let context: Awaited<ReturnType<PdfBrowser["createBrowserContext"]>> | null =
@@ -1479,8 +1482,20 @@ export const generatePDFFromUrl = async (
     const pdfBuffer = await page.pdf({
       format: "A4",
       scale,
-      margin: { top: "0.3in", right: "0.3in", bottom: "0.3in", left: "0.3in" },
+      margin: {
+        top: "0.3in",
+        right: "0.3in",
+        bottom: footerTemplate ? "0.55in" : "0.3in",
+        left: "0.3in",
+      },
       printBackground: true,
+      ...(footerTemplate
+        ? {
+            displayHeaderFooter: true,
+            headerTemplate: "<span></span>",
+            footerTemplate,
+          }
+        : {}),
     });
     return Buffer.from(pdfBuffer);
   } finally {
