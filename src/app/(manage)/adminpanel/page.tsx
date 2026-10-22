@@ -8,6 +8,7 @@ import AdminValueCard from "@/components/admin/AdminValueCard";
 import { Box, CircularProgress, Alert, useTheme } from "@mui/material";
 import { useVendorInvoices } from "@/lib/hooks/useVendorInvoices";
 import { useHardwarePurchases } from "@/lib/hooks/useHardwarePurchases";
+import { useSecurityDeposits } from "@/lib/hooks/useSecurityDeposits";
 import { useInvoices, InvoiceWithDetails } from "@/lib/hooks/useInvoices";
 
 interface PoolData {
@@ -227,10 +228,18 @@ export default function AdminDashboard() {
     });
 
   const { hardwarePurchases } = useHardwarePurchases(1, 100000, undefined);
-  const hardwarePurchasesTotalAmount = hardwarePurchases.reduce(
-    (sum, invoice) => sum + Number(invoice.totalAmount),
-    0,
-  );
+  // Hardware cost = quantity x unit price + misc on Pending and Paid
+  // invoices. The security deposit is part of totalAmount but is refundable,
+  // so it is not a cost (it has its own card).
+  const hardwarePurchasesTotalAmount = hardwarePurchases
+    .filter((invoice) => invoice.paymentStatus !== "Cancelled")
+    .reduce(
+      (sum, invoice) =>
+        sum + Number(invoice.totalAmount) - Number(invoice.securityDeposit),
+      0,
+    );
+
+  const { data: securityDeposits } = useSecurityDeposits();
 
   const hardwareProfit = hardwareRevenueData?.hardwareRevenue
     ? hardwareRevenueData.hardwareRevenue - hardwarePurchasesTotalAmount
@@ -326,6 +335,7 @@ export default function AdminDashboard() {
       "Hardware Revenue",
       "Hardware Revenue Pending",
       "Hardware Cost",
+      "Security Deposit",
       "Hardware Profit",
       "Positive Customer Balance",
       "Negative Customer Balance",
@@ -839,6 +849,17 @@ export default function AdminDashboard() {
             borderColor="#757575"
             value={hardwarePurchasesTotalAmount}
             type="currency"
+            infoText="Quantity × unit price plus miscellaneous charges on all Hardware Purchase invoices that are Pending or Paid (Cancelled ones excluded). Security deposits are not included; see the Security Deposit card."
+          />
+
+          {/* Security Deposit - held by vendors, from Hardware Purchase invoices */}
+          <AdminValueCard
+            title="Security Deposit"
+            borderColor="#757575"
+            value={securityDeposits?.totals.outstanding ?? 0}
+            type="currency"
+            onClick={() => router.push("/accounting/security-deposits")}
+            infoText="Security deposits on Pending and Paid Hardware Purchase invoices, minus what vendors have returned or applied to their invoices. Click for the breakdown by vendor."
           />
 
           {/* Hardware Profit - Hardware Revenue minus Hardware Cost */}

@@ -10,22 +10,22 @@ import {
   PDF_DELETE_FAILED_MESSAGE,
   vendorPaymentInclude,
 } from "@/lib/accounting/vendorInvoiceRules";
+import { checkVendorForInvoice } from "@/lib/accounting/vendorRules";
 import {
-  VENDOR_NAME_OPTIONS,
-  VendorNameValue,
-} from "@/lib/hooks/useHardwarePurchases";
-
-const VALID_VENDOR_NAMES = VENDOR_NAME_OPTIONS.map((o) => o.value);
+  adjustedOnInvoice,
+  checkInvoiceChangeWithAdjustments,
+} from "@/lib/accounting/vendorDeposit";
 
 interface UpdateHardwarePurchaseRequest {
   invoiceNumber?: string;
-  vendorName?: VendorNameValue;
+  vendorId?: string;
   hardwareDescription?: string;
   billingDate?: string;
   dueDate?: string;
   quantity?: number;
   unitPrice?: number;
   miscellaneousCharges?: number;
+  securityDeposit?: number;
   totalAmount?: number;
   notes?: string | null;
   paymentStatus?: "Paid" | "Pending" | "Cancelled";
@@ -136,6 +136,7 @@ export async function PUT(
           quantity: existingInvoice.quantity,
           unitPrice: existingInvoice.unitPrice,
           miscellaneousCharges: existingInvoice.miscellaneousCharges,
+          securityDeposit: existingInvoice.securityDeposit,
           totalAmount: existingInvoice.totalAmount,
         },
       },
@@ -146,12 +147,39 @@ export async function PUT(
           quantity: body.quantity,
           unitPrice: body.unitPrice,
           miscellaneousCharges: body.miscellaneousCharges,
+          securityDeposit: body.securityDeposit,
           totalAmount: body.totalAmount,
         },
       },
     );
     if (ruleError) {
       return NextResponse.json({ error: ruleError }, { status: 400 });
+    }
+
+    const adjustmentError = checkInvoiceChangeWithAdjustments(
+      await adjustedOnInvoice(prisma, "hardware", invoiceId),
+      {
+        cancel:
+          body.paymentStatus === "Cancelled" &&
+          existingInvoice.paymentStatus !== "Cancelled",
+        vendorChanged:
+          body.vendorId !== undefined &&
+          body.vendorId !== existingInvoice.vendorId,
+        newTotal: body.totalAmount,
+      },
+    );
+    if (adjustmentError) {
+      return NextResponse.json({ error: adjustmentError }, { status: 400 });
+    }
+
+    if (
+      body.securityDeposit !== undefined &&
+      (!Number.isFinite(body.securityDeposit) || body.securityDeposit < 0)
+    ) {
+      return NextResponse.json(
+        { error: "Security deposit cannot be negative" },
+        { status: 400 },
+      );
     }
 
     // Validate required fields if they are being updated
@@ -169,16 +197,15 @@ export async function PUT(
       );
     }
 
-    if (
-      body.vendorName !== undefined &&
-      !VALID_VENDOR_NAMES.includes(body.vendorName)
-    ) {
-      return NextResponse.json(
-        {
-          error: `vendorName must be one of: ${VALID_VENDOR_NAMES.join(", ")}`,
-        },
-        { status: 400 },
+    if (body.vendorId !== undefined) {
+      const vendor = await checkVendorForInvoice(
+        body.vendorId,
+        "hardware",
+        existingInvoice.vendorId,
       );
+      if ("error" in vendor) {
+        return NextResponse.json({ error: vendor.error }, { status: 400 });
+      }
     }
 
     // If invoice number is being changed, check for duplicates
@@ -202,13 +229,14 @@ export async function PUT(
     interface UpdateDataType {
       updatedBy: string;
       invoiceNumber?: string;
-      vendorName?: VendorNameValue;
+      vendorId?: string;
       hardwareDescription?: string;
       billingDate?: Date;
       dueDate?: Date;
       quantity?: number;
       unitPrice?: Decimal;
       miscellaneousCharges?: Decimal;
+      securityDeposit?: Decimal;
       totalAmount?: Decimal;
       notes?: string | null;
       paymentStatus?: "Paid" | "Pending" | "Cancelled";
@@ -222,8 +250,8 @@ export async function PUT(
     if (body.invoiceNumber !== undefined) {
       updateData.invoiceNumber = body.invoiceNumber;
     }
-    if (body.vendorName !== undefined) {
-      updateData.vendorName = body.vendorName;
+    if (body.vendorId !== undefined) {
+      updateData.vendorId = body.vendorId;
     }
     if (body.hardwareDescription !== undefined) {
       updateData.hardwareDescription = body.hardwareDescription;
@@ -242,6 +270,9 @@ export async function PUT(
     }
     if (body.miscellaneousCharges !== undefined) {
       updateData.miscellaneousCharges = new Decimal(body.miscellaneousCharges);
+    }
+    if (body.securityDeposit !== undefined) {
+      updateData.securityDeposit = new Decimal(body.securityDeposit);
     }
     if (body.totalAmount !== undefined) {
       updateData.totalAmount = new Decimal(body.totalAmount);
@@ -336,6 +367,14 @@ export async function DELETE(
         { error: "Paid invoices can't be deleted" },
         { status: 400 },
       );
+    }
+
+    const adjustmentError = checkInvoiceChangeWithAdjustments(
+      await adjustedOnInvoice(prisma, "hardware", invoiceId),
+      { remove: true },
+    );
+    if (adjustmentError) {
+      return NextResponse.json({ error: adjustmentError }, { status: 400 });
     }
 
     // Remove its PDFs from R2 first; if that fails, keep the invoice so

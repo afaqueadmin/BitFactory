@@ -15,12 +15,13 @@ import {
   formatTableDate,
   resolveExportTimeZone,
 } from "@/lib/helpers/admin/tableExport";
-import { parseVendorInvoiceQuery } from "../query";
+import { NO_VENDOR_FILTER, parseVendorInvoiceQuery } from "../query";
 
 // Exports the Farm Tariffs table: every vendor invoice matching the list
 // filters/sort, unpaginated, with the same columns as the dashboard table.
 const COLUMNS = [
   { header: "Invoice" },
+  { header: "Vendor" },
   { header: "Amount", align: "right" as const, nowrap: true },
   { header: "Status", nowrap: true },
   { header: "Issued Date", nowrap: true },
@@ -66,7 +67,7 @@ export async function GET(request: NextRequest) {
       );
     }
     const tz = resolveExportTimeZone(searchParams.get("tz"));
-    const { where, orderBy, startDate, endDate } =
+    const { where, orderBy, vendorId, startDate, endDate } =
       parseVendorInvoiceQuery(searchParams);
 
     const vendorInvoices = await prisma.vendorInvoice.findMany({
@@ -74,6 +75,7 @@ export async function GET(request: NextRequest) {
       orderBy,
       select: {
         invoiceNumber: true,
+        vendor: { select: { name: true } },
         totalAmount: true,
         paymentStatus: true,
         billingDate: true,
@@ -96,6 +98,7 @@ export async function GET(request: NextRequest) {
       const isPaid = invoice.paymentStatus === "Paid";
       return [
         invoice.invoiceNumber,
+        invoice.vendor?.name ?? empty,
         amount(Number(invoice.totalAmount)),
         INVOICE_STATUS_LABELS[invoice.paymentStatus],
         invoice.billingDate ? date(invoice.billingDate) : empty,
@@ -129,9 +132,23 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    // Name the vendor filter on the PDF so a printed copy is unambiguous.
+    const filterVendor =
+      vendorId && vendorId !== NO_VENDOR_FILTER
+        ? await prisma.accountingVendor.findUnique({
+            where: { id: vendorId },
+            select: { name: true },
+          })
+        : null;
+    const vendorLabel = !vendorId
+      ? "All vendors"
+      : vendorId === NO_VENDOR_FILTER
+        ? "No vendor set"
+        : (filterVendor?.name ?? "Unknown vendor");
+
     const html = buildTablePdfHtml({
       title: "Farm Tariffs — Vendor Invoices",
-      subtitle: `Issued: ${formatIssuedRange(startDate, endDate)}`,
+      subtitle: `Vendor: ${vendorLabel} · Issued: ${formatIssuedRange(startDate, endDate)}`,
       columns: COLUMNS,
       rows: vendorInvoices.map((invoice) =>
         toRow(invoice, (d) => formatTableDate(d, tz), formatTableCurrency, "-"),

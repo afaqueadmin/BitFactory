@@ -1,4 +1,8 @@
-import type { VendorPaymentPart } from "@/lib/hooks/useVendorInvoices";
+import type {
+  DepositAdjustment,
+  InvoiceVendor,
+  VendorPaymentPart,
+} from "@/lib/hooks/useVendorInvoices";
 import {
   keepPreviousData,
   useQuery,
@@ -6,25 +10,12 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 
-export type VendorNameValue = "HASHLABS_PTE_LTD" | "QRB_LABS" | "LUXOR_TECH";
-
-export const VENDOR_NAME_OPTIONS: Array<{
-  value: VendorNameValue;
-  label: string;
-}> = [
-  { value: "HASHLABS_PTE_LTD", label: "HashLabs Pte Ltd" },
-  { value: "QRB_LABS", label: "QRB Labs" },
-  { value: "LUXOR_TECH", label: "Luxor Tech" },
-];
-
-export const VENDOR_NAME_LABELS: Record<string, string> = Object.fromEntries(
-  VENDOR_NAME_OPTIONS.map((o) => [o.value, o.label]),
-);
-
 export interface HardwarePurchaseInvoice {
   id: string;
   invoiceNumber: string;
-  vendorName: VendorNameValue;
+  vendorId: string;
+  vendor?: InvoiceVendor;
+  depositAdjustments?: DepositAdjustment[];
   hardwareDescription: string;
   billingDate: Date;
   paidDate: Date | null;
@@ -32,6 +23,8 @@ export interface HardwarePurchaseInvoice {
   quantity: number;
   unitPrice: number;
   miscellaneousCharges: number;
+  /** Refundable; part of totalAmount but not a hardware cost. */
+  securityDeposit: number;
   totalAmount: number;
   paymentStatus: "Paid" | "Pending" | "Cancelled";
   notes: string | null;
@@ -83,7 +76,7 @@ export interface HardwarePurchaseSummary {
 }
 
 export interface HardwarePurchaseFilters {
-  vendorName?: VendorNameValue;
+  vendorId?: string;
   /** Matches any part of the hardware description, ignoring case. */
   hardware?: string;
   /** Issued Date (billingDate) range, as YYYY-MM-DD from a date input. */
@@ -108,7 +101,7 @@ export const useHardwarePurchases = (
         paymentStatus,
         sortBy,
         sortOrder,
-        filters?.vendorName,
+        filters?.vendorId,
         filters?.hardware,
         filters?.startDate,
         filters?.endDate,
@@ -126,8 +119,7 @@ export const useHardwarePurchases = (
           params.append("sortBy", sortBy);
           params.append("sortOrder", sortOrder || "asc");
         }
-        if (filters?.vendorName)
-          params.append("vendorName", filters.vendorName);
+        if (filters?.vendorId) params.append("vendorId", filters.vendorId);
         if (filters?.hardware) params.append("hardware", filters.hardware);
         if (filters?.startDate) params.append("startDate", filters.startDate);
         if (filters?.endDate) params.append("endDate", filters.endDate);
@@ -168,13 +160,14 @@ export const useCreateHardwarePurchase = () => {
   return useMutation({
     mutationFn: async (data: {
       invoiceNumber: string;
-      vendorName: VendorNameValue;
+      vendorId: string;
       hardwareDescription: string;
       billingDate: string;
       dueDate: string;
       quantity: number;
       unitPrice: number;
       miscellaneousCharges: number;
+      securityDeposit: number;
       totalAmount: number;
       notes?: string;
       invoicePdfKey: string;

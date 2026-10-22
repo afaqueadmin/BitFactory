@@ -276,6 +276,15 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   [AuditAction.ACCOUNTING_CURRENCY_CREATED]: "Accounting Currency Created",
   [AuditAction.ACCOUNTING_CURRENCY_UPDATED]: "Accounting Currency Updated",
   [AuditAction.ACCOUNTING_CURRENCY_DELETED]: "Accounting Currency Deleted",
+  [AuditAction.ACCOUNTING_VENDOR_CREATED]: "Vendor Created",
+  [AuditAction.ACCOUNTING_VENDOR_UPDATED]: "Vendor Updated",
+  [AuditAction.ACCOUNTING_VENDOR_DELETED]: "Vendor Deleted",
+  [AuditAction.VENDOR_DEPOSIT_RETURN_RECORDED]:
+    "Security Deposit Return Recorded",
+  [AuditAction.VENDOR_DEPOSIT_ADJUSTMENT_RECORDED]:
+    "Security Deposit Adjustment Recorded",
+  [AuditAction.VENDOR_DEPOSIT_MOVEMENT_DELETED]:
+    "Security Deposit Return/Adjustment Deleted",
   [AuditAction.FRANCHISE_CREATED]: "Franchise Created",
   [AuditAction.FRANCHISE_UPDATED]: "Franchise Updated",
   [AuditAction.FRANCHISE_DELETED]: "Franchise Deleted",

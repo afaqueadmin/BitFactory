@@ -1,4 +1,4 @@
-import { Prisma, VendorName, VendorPaymentStatus } from "@prisma/client";
+import { Prisma, VendorPaymentStatus } from "@prisma/client";
 import { parseDateParam, utcDayStart } from "@/lib/helpers/admin/tableExport";
 
 /**
@@ -23,7 +23,7 @@ export interface ParsedHardwarePurchaseQuery {
   orderBy: Prisma.HardwarePurchaseInvoiceOrderByWithRelationInput[];
   /** The filters actually applied, for the export's PDF subtitle. */
   filters: {
-    vendorName: VendorName | null;
+    vendorId: string | null;
     hardware: string | null;
     paymentStatus: VendorPaymentStatus | null;
     startDate: string | null;
@@ -40,23 +40,20 @@ export function parseHardwarePurchaseQuery(
   searchParams: URLSearchParams,
 ): ParsedHardwarePurchaseQuery {
   const paymentStatusParam = searchParams.get("paymentStatus");
-  const vendorNameParam = searchParams.get("vendorName");
   const sortByParam = searchParams.get("sortBy");
   const sortOrderParam = searchParams.get("sortOrder");
 
   const paymentStatus = isEnumValue(VendorPaymentStatus, paymentStatusParam)
     ? paymentStatusParam
     : null;
-  const vendorName = isEnumValue(VendorName, vendorNameParam)
-    ? vendorNameParam
-    : null;
+  const vendorId = searchParams.get("vendorId")?.trim() || null;
   const hardware = searchParams.get("hardware")?.trim() || null;
   const startDate = parseDateParam(searchParams.get("startDate"));
   const endDate = parseDateParam(searchParams.get("endDate"));
 
   const where: Prisma.HardwarePurchaseInvoiceWhereInput = {
     ...(paymentStatus ? { paymentStatus } : {}),
-    ...(vendorName ? { vendorName } : {}),
+    ...(vendorId ? { vendorId } : {}),
     // Hardware is a free-text description, so match any part of it.
     ...(hardware
       ? { hardwareDescription: { contains: hardware, mode: "insensitive" } }
@@ -80,9 +77,15 @@ export function parseHardwarePurchaseQuery(
 
   return {
     where,
-    // id breaks ties (e.g. equal amounts) so rows keep a stable order across
-    // table pages and match the export.
-    orderBy: [{ [sortBy]: sortOrder }, { id: "asc" }],
-    filters: { vendorName, hardware, paymentStatus, startDate, endDate },
+    // "vendorName" sorts by the vendor's name. id breaks ties (e.g. equal
+    // amounts) so rows keep a stable order across table pages and match the
+    // export.
+    orderBy: [
+      sortBy === "vendorName"
+        ? { vendor: { name: sortOrder } }
+        : { [sortBy]: sortOrder },
+      { id: "asc" },
+    ],
+    filters: { vendorId, hardware, paymentStatus, startDate, endDate },
   };
 }

@@ -10,10 +10,16 @@ import {
   resolveExportTimeZone,
   utcDayStart,
 } from "@/lib/helpers/admin/tableExport";
+import {
+  checkVendorForInvoice,
+  vendorSelect,
+} from "@/lib/accounting/vendorRules";
 import { parseVendorInvoiceQuery } from "./query";
 
 interface CreateVendorInvoiceRequest {
   invoiceNumber: string;
+  /** Optional on Farm Tariffs. */
+  vendorId?: string | null;
   billingDate: string;
   dueDate: string;
   totalMiners: number;
@@ -63,6 +69,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    let vendorId: string | null = null;
+    if (body.vendorId) {
+      const vendor = await checkVendorForInvoice(body.vendorId, "farm");
+      if ("error" in vendor) {
+        return NextResponse.json({ error: vendor.error }, { status: 400 });
+      }
+      vendorId = vendor.vendorId;
+    }
+
     // Check if invoice number already exists
     const existingInvoice = await prisma.vendorInvoice.findUnique({
       where: { invoiceNumber: body.invoiceNumber },
@@ -91,6 +106,7 @@ export async function POST(request: NextRequest) {
     const vendorInvoice = await prisma.vendorInvoice.create({
       data: {
         invoiceNumber: body.invoiceNumber,
+        vendorId,
         billingDate: new Date(body.billingDate),
         dueDate: new Date(body.dueDate),
         totalMiners: body.totalMiners,
@@ -175,6 +191,7 @@ export async function GET(request: NextRequest) {
         prisma.vendorInvoice.findMany({
           where,
           include: {
+            vendor: vendorSelect,
             createdByUser: {
               select: { id: true, email: true, name: true },
             },

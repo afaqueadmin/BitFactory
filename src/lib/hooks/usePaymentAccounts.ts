@@ -32,7 +32,23 @@ export interface AccountingBank {
   }[];
 }
 
-type Kind = "entities" | "banks" | "currencies";
+/** A Hardware Purchase / Farm Tariff vendor (Finance Settings -> Vendors). */
+export interface AccountingVendor {
+  id: string;
+  name: string;
+  isActive: boolean;
+  forHardwarePurchases: boolean;
+  forFarmTariffs: boolean;
+  createdAt: string;
+  updatedAt: string;
+  _count: {
+    hardwarePurchases: number;
+    vendorInvoices: number;
+    depositMovements: number;
+  };
+}
+
+type Kind = "entities" | "banks" | "currencies" | "vendors";
 
 const ROOT_KEY = "paymentAccounts";
 
@@ -76,8 +92,29 @@ export function useAccountingCurrencies(activeOnly = false) {
 }
 
 /**
+ * Vendors, optionally only active ones tagged for one invoice type
+ * ("hardware" = Hardware Purchases, "farm" = Farm Tariffs).
+ */
+export function useAccountingVendors(
+  activeOnly = false,
+  forType?: "hardware" | "farm",
+) {
+  const params = new URLSearchParams();
+  if (activeOnly) params.set("active", "true");
+  if (forType) params.set("for", forType);
+  const query = params.toString();
+  return useQuery({
+    queryKey: [ROOT_KEY, "vendors", activeOnly, forType ?? null],
+    queryFn: () =>
+      request<AccountingVendor[]>(
+        `/api/accounting/vendors${query ? `?${query}` : ""}`,
+      ),
+  });
+}
+
+/**
  * Create, update or delete one master-data record. Any change refreshes all
- * three lists, since bank counts and currency chips depend on each other.
+ * the lists, since bank counts and currency chips depend on each other.
  */
 export function useSavePaymentAccount(kind: Kind) {
   const queryClient = useQueryClient();

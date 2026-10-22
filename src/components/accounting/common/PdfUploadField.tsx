@@ -25,7 +25,8 @@ export type PdfUploadPurpose =
   | "vendor-invoice"
   | "vendor-receipt"
   | "hardware-purchase-invoice"
-  | "hardware-purchase-receipt";
+  | "hardware-purchase-receipt"
+  | "vendor-deposit-return-receipt";
 
 export interface UploadedPdf {
   key: string;

@@ -105,6 +105,8 @@ export async function DELETE(
             // *Payments counts above cover the deprecated single-currency
             // columns; remove them when those columns are dropped.
             vendorPaymentParts: true,
+            // Security deposit returns received into it.
+            depositReturns: true,
           },
         },
       },
@@ -119,13 +121,15 @@ export async function DELETE(
       hardwarePurchasePayments,
       costPayments,
       vendorPaymentParts,
+      depositReturns,
     } = existing._count;
     if (
       banks > 0 ||
       vendorInvoicePayments +
         hardwarePurchasePayments +
         costPayments +
-        vendorPaymentParts >
+        vendorPaymentParts +
+        depositReturns >
         0
     ) {
       return NextResponse.json(

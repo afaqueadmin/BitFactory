@@ -30,13 +30,11 @@ import {
   VendorPaymentSection,
   VendorSideInvoice,
 } from "@/components/accounting/common/VendorPaymentSection";
-import { VENDOR_NAME_LABELS } from "@/lib/hooks/useHardwarePurchases";
 
 interface HardwarePurchaseDetail extends VendorSideInvoice {
   id: string;
   invoicePdfKey: string | null;
   invoiceNumber: string;
-  vendorName: string;
   hardwareDescription: string;
   billingDate: string;
   paidDate: string | null;
@@ -44,6 +42,7 @@ interface HardwarePurchaseDetail extends VendorSideInvoice {
   quantity: number;
   unitPrice: number;
   miscellaneousCharges: number;
+  securityDeposit: number;
   totalAmount: number;
   paymentStatus: "Paid" | "Pending" | "Cancelled";
   notes: string | null;
@@ -240,7 +239,7 @@ export default function HardwarePurchaseDetailPage() {
                 Vendor Name
               </Typography>
               <Typography variant="body1">
-                {VENDOR_NAME_LABELS[invoice.vendorName] || invoice.vendorName}
+                {invoice.vendor?.name ?? "-"}
               </Typography>
             </Box>
 
@@ -329,6 +328,20 @@ export default function HardwarePurchaseDetailPage() {
               </Typography>
             </Box>
 
+            {/* Security Deposit */}
+            <Box>
+              <Typography
+                variant="subtitle2"
+                color="textSecondary"
+                sx={{ fontWeight: "600", mb: 0.5 }}
+              >
+                Security Deposit
+              </Typography>
+              <Typography variant="body1">
+                <CurrencyDisplay value={invoice.securityDeposit} />
+              </Typography>
+            </Box>
+
             {/* Unit Total */}
             <Box>
               <Typography
@@ -399,6 +412,14 @@ export default function HardwarePurchaseDetailPage() {
                 </Typography>
                 <Typography variant="body1">
                   <CurrencyDisplay value={invoice.miscellaneousCharges} />
+                </Typography>
+              </Box>
+              <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                <Typography variant="body1" sx={{ fontWeight: "500" }}>
+                  Security Deposit:
+                </Typography>
+                <Typography variant="body1">
+                  <CurrencyDisplay value={invoice.securityDeposit} />
                 </Typography>
               </Box>
               <Box
@@ -547,6 +568,9 @@ export default function HardwarePurchaseDetailPage() {
                 apiBase="/api/hardware-purchases"
                 receiptPurpose="hardware-purchase-receipt"
                 onPaid={handlePaid}
+                onUpdated={(updated) =>
+                  setInvoice(updated as HardwarePurchaseDetail)
+                }
                 onCancelClick={() => setOpenCancelDialog(true)}
               />
             </Box>

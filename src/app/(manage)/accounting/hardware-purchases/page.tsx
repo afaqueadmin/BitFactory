@@ -35,10 +35,8 @@ import { downloadExport } from "@/lib/downloadExport";
 import {
   useHardwarePurchases,
   HardwarePurchaseInvoice,
-  VENDOR_NAME_LABELS,
-  VENDOR_NAME_OPTIONS,
-  VendorNameValue,
 } from "@/lib/hooks/useHardwarePurchases";
+import { useAccountingVendors } from "@/lib/hooks/usePaymentAccounts";
 import EditHardwarePurchaseModal from "@/components/accounting/EditHardwarePurchaseModal";
 
 export default function HardwarePurchases() {
@@ -54,7 +52,12 @@ export default function HardwarePurchases() {
     useState<HardwarePurchaseInvoice | null>(null);
   const [exporting, setExporting] = useState<"csv" | "pdf" | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
-  const [vendorFilter, setVendorFilter] = useState<"" | VendorNameValue>("");
+  const [vendorFilter, setVendorFilter] = useState("");
+  // Every vendor that is or was used for hardware purchases, inactive too.
+  const { data: allVendors = [] } = useAccountingVendors();
+  const vendorOptions = allVendors.filter(
+    (v) => v.forHardwarePurchases || v._count.hardwarePurchases > 0,
+  );
   const [statusFilter, setStatusFilter] = useState("");
   const [hardwareInput, setHardwareInput] = useState("");
   const [hardwareFilter, setHardwareFilter] = useState("");
@@ -84,7 +87,7 @@ export default function HardwarePurchases() {
     sortBy,
     sortOrder,
     {
-      vendorName: vendorFilter || undefined,
+      vendorId: vendorFilter || undefined,
       hardware: hardwareFilter || undefined,
       startDate: startDateFilter || undefined,
       endDate: endDateFilter || undefined,
@@ -111,7 +114,7 @@ export default function HardwarePurchases() {
         sortOrder,
         tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
       });
-      if (vendorFilter) params.set("vendorName", vendorFilter);
+      if (vendorFilter) params.set("vendorId", vendorFilter);
       if (hardwareFilter) params.set("hardware", hardwareFilter);
       if (statusFilter) params.set("paymentStatus", statusFilter);
       if (startDateFilter) params.set("startDate", startDateFilter);
@@ -269,15 +272,16 @@ export default function HardwarePurchases() {
               label="Filter by vendor"
               value={vendorFilter}
               onChange={(e) => {
-                setVendorFilter(e.target.value as "" | VendorNameValue);
+                setVendorFilter(e.target.value);
                 setPage(1);
               }}
               sx={{ minWidth: 180 }}
             >
               <MenuItem value="">All vendors</MenuItem>
-              {VENDOR_NAME_OPTIONS.map((option) => (
-                <MenuItem key={option.value} value={option.value}>
-                  {option.label}
+              {vendorOptions.map((vendor) => (
+                <MenuItem key={vendor.id} value={vendor.id}>
+                  {vendor.name}
+                  {!vendor.isActive && " (inactive)"}
                 </MenuItem>
               ))}
             </TextField>
@@ -468,10 +472,7 @@ export default function HardwarePurchases() {
                           {invoice.invoiceNumber}
                         </Link>
                       </TableCell>
-                      <TableCell>
-                        {VENDOR_NAME_LABELS[invoice.vendorName] ||
-                          invoice.vendorName}
-                      </TableCell>
+                      <TableCell>{invoice.vendor?.name ?? "-"}</TableCell>
                       <TableCell>{invoice.hardwareDescription}</TableCell>
                       <TableCell>
                         <CurrencyDisplay value={invoice.totalAmount} />

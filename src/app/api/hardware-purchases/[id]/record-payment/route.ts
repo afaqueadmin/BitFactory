@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { AuditAction } from "@prisma/client";
-import { prisma } from "@/lib/prisma";
 import { requireAccountingAdmin } from "@/lib/accounting/adminAuth";
-import { vendorPaymentInclude } from "@/lib/accounting/vendorInvoiceRules";
 import {
-  parseVendorPayment,
-  RecordVendorPaymentRequest,
-} from "@/lib/accounting/vendorPayment";
+  recordVendorSidePayment,
+  RecordVendorPaymentWithDepositRequest,
+} from "@/lib/accounting/recordVendorPayment";
 
-/** Records the payment of a Pending hardware purchase invoice and marks it Paid. */
+/**
+ * Records the payment of a Pending hardware purchase invoice and marks it
+ * Paid, optionally applying part of the vendor's held security deposit.
+ */
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -16,83 +16,10 @@ export async function POST(
   try {
     const auth = await requireAccountingAdmin(request);
     if ("response" in auth) return auth.response;
-    const { userId } = auth;
     const { id } = await params;
 
-    const invoice = await prisma.hardwarePurchaseInvoice.findUnique({
-      where: { id },
-    });
-    if (!invoice) {
-      return NextResponse.json(
-        { error: "Hardware purchase invoice not found" },
-        { status: 404 },
-      );
-    }
-    if (invoice.paymentStatus !== "Pending") {
-      return NextResponse.json(
-        {
-          error: `Cannot record payment for a ${invoice.paymentStatus.toLowerCase()} invoice`,
-        },
-        { status: 400 },
-      );
-    }
-
-    const body: RecordVendorPaymentRequest = await request.json();
-    const parsed = await parseVendorPayment(
-      body,
-      invoice.totalAmount,
-      "hardware-purchase-receipt",
-    );
-    if ("error" in parsed) {
-      return NextResponse.json({ error: parsed.error }, { status: 400 });
-    }
-
-    // Only a still-Pending invoice is updated, so two concurrent submits
-    // can't both record a payment. The status change and the currency parts
-    // are written together, or not at all.
-    const { data, parts, totalUsd, audit } = parsed;
-    const recorded = await prisma.$transaction(async (tx) => {
-      const { count } = await tx.hardwarePurchaseInvoice.updateMany({
-        where: { id, paymentStatus: "Pending" },
-        data: { ...data, updatedBy: userId },
-      });
-      if (count === 0) return false;
-      await tx.vendorPaymentPart.createMany({
-        data: parts.map((part) => ({ ...part, hardwarePurchaseId: id })),
-      });
-      return true;
-    });
-    if (!recorded) {
-      return NextResponse.json(
-        {
-          error:
-            "This invoice was updated by someone else. Reload and try again.",
-        },
-        { status: 409 },
-      );
-    }
-
-    await prisma.auditLog.create({
-      data: {
-        action: AuditAction.HARDWARE_PURCHASE_INVOICE_PAID,
-        entityType: "HardwarePurchaseInvoice",
-        entityId: id,
-        userId,
-        description: `Payment of $${totalUsd.toFixed(2)} (${parts.length} currency part${parts.length === 1 ? "" : "s"}) recorded for hardware purchase invoice ${invoice.invoiceNumber}`,
-        changes: JSON.stringify(audit),
-      },
-    });
-
-    const updated = await prisma.hardwarePurchaseInvoice.findUnique({
-      where: { id },
-      include: {
-        ...vendorPaymentInclude,
-        createdByUser: { select: { id: true, email: true, name: true } },
-        updatedByUser: { select: { id: true, email: true, name: true } },
-      },
-    });
-
-    return NextResponse.json({ success: true, data: updated });
+    const body: RecordVendorPaymentWithDepositRequest = await request.json();
+    return await recordVendorSidePayment("hardware", id, auth.userId, body);
   } catch (error) {
     console.error("Error recording hardware purchase payment:", error);
     return NextResponse.json(

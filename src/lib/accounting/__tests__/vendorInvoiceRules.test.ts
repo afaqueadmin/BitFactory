@@ -94,3 +94,27 @@ describe("deleteInvoicePdfs", () => {
     await expect(deleteInvoicePdfs(["c.pdf"])).rejects.toThrow("R2 down");
   });
 });
+
+describe("checkVendorInvoiceUpdate security deposit", () => {
+  const paidWithDeposit = {
+    ...paid,
+    amounts: { ...paid.amounts, securityDeposit: new Decimal("25") },
+  };
+
+  it("locks the deposit on a paid invoice", () => {
+    expect(
+      checkVendorInvoiceUpdate(paidWithDeposit, {
+        amounts: { securityDeposit: 30 },
+      }),
+    ).toMatch(/can't be changed/);
+  });
+
+  it("lets a pending invoice change its deposit", () => {
+    expect(
+      checkVendorInvoiceUpdate(
+        { ...paidWithDeposit, paymentStatus: "Pending", paidDate: null },
+        { amounts: { securityDeposit: 30 } },
+      ),
+    ).toBeNull();
+  });
+});

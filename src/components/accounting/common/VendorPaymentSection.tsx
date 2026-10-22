@@ -6,6 +6,12 @@
  * parts - each with its own Entity/Bank/Currency, rate, amount and fee -
  * and the receipt PDF) posting to `<apiBase>/<id>/record-payment`.
  * Paid: a read-only summary of the parts with a link to the receipt.
+ *
+ * Security deposit: the vendor may apply part of the deposit it holds to
+ * the invoice. Adjustments recorded earlier (Security Deposits page) and
+ * the optional "Apply from deposit" amount lower the cash due, which the
+ * currency parts must then match. If the deposit covers the whole total,
+ * no cash parts or receipt are needed.
  */
 
 import {
@@ -14,13 +20,16 @@ import {
   Button,
   CircularProgress,
   Divider,
+  IconButton,
   Link as MuiLink,
   Stack,
   TextField,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CancelIcon from "@mui/icons-material/Cancel";
+import DeleteIcon from "@mui/icons-material/Delete";
 import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
 import { ReactNode, useState } from "react";
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
@@ -35,7 +44,15 @@ import {
   partsPayload,
   partsTotalUsd,
 } from "@/components/accounting/common/PaymentPartsFields";
-import type { VendorPaymentPart } from "@/lib/hooks/useVendorInvoices";
+import type {
+  DepositAdjustment,
+  InvoiceVendor,
+  VendorPaymentPart,
+} from "@/lib/hooks/useVendorInvoices";
+import {
+  useSaveDepositMovement,
+  useVendorDeposit,
+} from "@/lib/hooks/useSecurityDeposits";
 import {
   PdfUploadField,
   PdfUploadPurpose,
@@ -56,10 +73,82 @@ export interface VendorSideInvoice {
    * payment columns are deprecated (backfilled into one part each).
    */
   paymentParts?: VendorPaymentPart[];
+  /** Optional on Farm Tariffs. */
+  vendorId?: string | null;
+  vendor?: InvoiceVendor | null;
+  /** Security deposit the vendor applied to this invoice. */
+  depositAdjustments?: DepositAdjustment[];
 }
 
 /** D8, mirrored from the server: converted amount within $0.01 of the total. */
 const TOLERANCE_USD = 0.01;
+
+/** Gaps under half a cent count as settled. */
+const CENT_EPSILON = 0.005;
+
+const adjustedTotal = (invoice: VendorSideInvoice) =>
+  (invoice.depositAdjustments ?? []).reduce(
+    (sum, a) => sum + Number(a.amountUsd),
+    0,
+  );
+
+/** "From security deposit" rows (paid summary and pending form). */
+function DepositAdjustmentRows({
+  adjustments,
+  onDelete,
+  busy = false,
+}: {
+  adjustments: DepositAdjustment[];
+  onDelete?: (id: string) => void;
+  busy?: boolean;
+}) {
+  if (adjustments.length === 0) return null;
+  return (
+    <Box>
+      <Typography
+        variant="subtitle2"
+        color="textSecondary"
+        sx={{ fontWeight: 600, mb: 0.5 }}
+      >
+        From Security Deposit
+      </Typography>
+      <Stack spacing={0.5}>
+        {adjustments.map((a) => (
+          <Stack
+            key={a.id}
+            direction="row"
+            alignItems="center"
+            justifyContent="space-between"
+            spacing={1}
+          >
+            <Typography variant="body2">
+              <DateDisplay date={new Date(a.date)} format="date" />
+              {a.note ? ` · ${a.note}` : ""}
+            </Typography>
+            <Stack direction="row" alignItems="center" spacing={0.5}>
+              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                <CurrencyDisplay value={a.amountUsd} />
+              </Typography>
+              {onDelete && (
+                <Tooltip title="Remove this deposit adjustment">
+                  <span>
+                    <IconButton
+                      size="small"
+                      onClick={() => onDelete(a.id)}
+                      disabled={busy}
+                    >
+                      <DeleteIcon fontSize="small" color="error" />
+                    </IconButton>
+                  </span>
+                </Tooltip>
+              )}
+            </Stack>
+          </Stack>
+        ))}
+      </Stack>
+    </Box>
+  );
+}
 
 function SummaryRow({
   label,
@@ -92,6 +181,7 @@ function PaidSummary({
   receiptHref: string;
 }) {
   const parts = invoice.paymentParts ?? [];
+  const adjustments = invoice.depositAdjustments ?? [];
   const multi = parts.length > 1;
   const totalUsd = parts.reduce((sum, p) => sum + Number(p.amountUsd), 0);
 
@@ -106,7 +196,14 @@ function PaidSummary({
         )}
       </Alert>
 
-      {parts.length > 0 ? (
+      <DepositAdjustmentRows adjustments={adjustments} />
+
+      {parts.length === 0 && adjustments.length > 0 ? (
+        <Typography variant="body2" color="textSecondary">
+          Paid in full from the vendor&apos;s security deposit; there was no
+          cash payment.
+        </Typography>
+      ) : parts.length > 0 ? (
         <>
           {parts.map((part, index) => (
             <Box key={part.id}>
@@ -192,6 +289,8 @@ interface VendorPaymentSectionProps {
   receiptPurpose: PdfUploadPurpose;
   /** Called with the updated invoice after the payment is recorded. */
   onPaid: (invoice: VendorSideInvoice) => void;
+  /** Called with the reloaded invoice after a deposit adjustment is removed. */
+  onUpdated?: (invoice: VendorSideInvoice) => void;
   onCancelClick: () => void;
 }
 
@@ -200,16 +299,23 @@ export function VendorPaymentSection({
   apiBase,
   receiptPurpose,
   onPaid,
+  onUpdated,
   onCancelClick,
 }: VendorPaymentSectionProps) {
   const [paidDate, setPaidDate] = useState("");
   const [parts, setParts] = useState<PaymentPartValue[]>(() => [
     newPaymentPart(),
   ]);
+  const [applyDeposit, setApplyDeposit] = useState("");
   const [receipt, setReceipt] = useState<UploadedPdf | null>(null);
   const [receiptUploading, setReceiptUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const isPending = invoice.paymentStatus === "Pending";
+  const depositQuery = useVendorDeposit(
+    isPending ? (invoice.vendorId ?? null) : null,
+  );
+  const removeAdjustment = useSaveDepositMovement();
 
   const receiptHref = `${apiBase}/${invoice.id}/documents/receipt`;
 
@@ -218,23 +324,56 @@ export function VendorPaymentSection({
   }
 
   const totalUsd = Number(invoice.totalAmount);
+  const alreadyAdjusted = adjustedTotal(invoice);
+  const remainingUsd = totalUsd - alreadyAdjusted;
+  const held = depositQuery.data?.balance.held ?? 0;
+  const maxApply = Math.max(0, Math.min(held, remainingUsd));
+  const applyTrimmed = applyDeposit.trim();
+  const applied = applyTrimmed === "" ? 0 : Number(applyTrimmed);
+  const applyInvalid =
+    applyTrimmed !== "" &&
+    (!Number.isFinite(applied) ||
+      applied < 0 ||
+      !/^\d+(\.\d{1,2})?$/.test(applyTrimmed) ||
+      applied > maxApply + CENT_EPSILON);
+  const cashDueUsd = Math.max(0, remainingUsd - (applyInvalid ? 0 : applied));
+  // The deposit covers everything: no cash payment, parts or receipt.
+  const noCash = cashDueUsd < CENT_EPSILON;
+
   const enteredUsd = partsTotalUsd(parts);
   const partsComplete = parts.every((p) =>
     isPartComplete(p, { withFee: true }),
   );
   // Small epsilon so float division can't flip an exact match.
-  const matchesTotal = Math.abs(enteredUsd - totalUsd) <= TOLERANCE_USD + 1e-9;
+  const matchesTotal =
+    Math.abs(enteredUsd - cashDueUsd) <= TOLERANCE_USD + 1e-9;
 
   const canSubmit =
     !!paidDate &&
-    partsComplete &&
-    matchesTotal &&
-    !!receipt &&
-    !receiptUploading &&
+    !applyInvalid &&
+    (noCash
+      ? true
+      : partsComplete && matchesTotal && !!receipt && !receiptUploading) &&
     !saving;
 
+  const handleRemoveAdjustment = async (id: string) => {
+    setError(null);
+    try {
+      await removeAdjustment.mutateAsync({ id });
+      const res = await fetch(`${apiBase}/${invoice.id}`, {
+        credentials: "include",
+      });
+      const body = await res.json().catch(() => ({}));
+      if (res.ok && body.data) onUpdated?.(body.data);
+    } catch (e) {
+      setError(
+        e instanceof Error ? e.message : "Failed to remove the adjustment",
+      );
+    }
+  };
+
   const handleSubmit = async () => {
-    if (!canSubmit || !receipt) return;
+    if (!canSubmit) return;
     setSaving(true);
     setError(null);
     try {
@@ -244,8 +383,13 @@ export function VendorPaymentSection({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           paidDate: new Date(paidDate).toISOString(),
-          parts: partsPayload(parts, true),
-          receiptKey: receipt.key,
+          depositAdjustment: applied > 0 ? applyTrimmed : undefined,
+          ...(noCash
+            ? {}
+            : {
+                parts: partsPayload(parts, true),
+                receiptKey: receipt?.key,
+              }),
         }),
       });
       const body = await res.json().catch(() => ({}));
@@ -276,13 +420,44 @@ export function VendorPaymentSection({
         slotProps={{ inputLabel: { shrink: true } }}
       />
 
-      <PaymentPartsFields
-        parts={parts}
-        onChange={setParts}
-        disabled={saving}
-        withFee
-        targetUsd={totalUsd}
+      <DepositAdjustmentRows
+        adjustments={invoice.depositAdjustments ?? []}
+        onDelete={handleRemoveAdjustment}
+        busy={saving || removeAdjustment.isPending}
       />
+
+      {invoice.vendorId && (held > 0 || applyTrimmed !== "") && (
+        <TextField
+          fullWidth
+          label="Apply from security deposit (USD, optional)"
+          type="number"
+          value={applyDeposit}
+          onChange={(e) => setApplyDeposit(e.target.value)}
+          disabled={saving}
+          error={applyInvalid}
+          helperText={
+            applyInvalid
+              ? `Enter up to $${maxApply.toFixed(2)} (2 decimal places)`
+              : `${invoice.vendor?.name ?? "The vendor"} holds $${held.toFixed(2)} of deposit. Use this if they took part of this invoice from it.`
+          }
+          slotProps={{ htmlInput: { min: 0, step: 0.01 } }}
+        />
+      )}
+
+      {noCash ? (
+        <Alert severity="info">
+          The security deposit covers the whole invoice, so no cash payment or
+          receipt is needed.
+        </Alert>
+      ) : (
+        <PaymentPartsFields
+          parts={parts}
+          onChange={setParts}
+          disabled={saving}
+          withFee
+          targetUsd={cashDueUsd}
+        />
+      )}
 
       <Box
         sx={{
@@ -293,41 +468,65 @@ export function VendorPaymentSection({
           borderColor: "divider",
         }}
       >
-        <Stack direction="row" justifyContent="space-between">
-          <Typography color="textSecondary">USD equivalent</Typography>
-          <Typography sx={{ fontWeight: 600 }}>
-            {enteredUsd > 0 ? <CurrencyDisplay value={enteredUsd} /> : "—"}
-          </Typography>
-        </Stack>
-        <Divider sx={{ my: 1 }} />
+        {!noCash && (
+          <>
+            <Stack direction="row" justifyContent="space-between">
+              <Typography color="textSecondary">USD equivalent</Typography>
+              <Typography sx={{ fontWeight: 600 }}>
+                {enteredUsd > 0 ? <CurrencyDisplay value={enteredUsd} /> : "—"}
+              </Typography>
+            </Stack>
+            <Divider sx={{ my: 1 }} />
+          </>
+        )}
         <Stack direction="row" justifyContent="space-between">
           <Typography color="textSecondary">Invoice total (USD)</Typography>
           <Typography sx={{ fontWeight: 600 }}>
             <CurrencyDisplay value={totalUsd} />
           </Typography>
         </Stack>
-        {parts.length === 1 && (
-          <AmountDueInCurrency usd={totalUsd} account={parts[0]} compact />
+        {cashDueUsd < totalUsd - CENT_EPSILON && (
+          <>
+            <Stack direction="row" justifyContent="space-between">
+              <Typography color="textSecondary">
+                From security deposit
+              </Typography>
+              <Typography sx={{ fontWeight: 600 }}>
+                − <CurrencyDisplay value={totalUsd - cashDueUsd} />
+              </Typography>
+            </Stack>
+            <Stack direction="row" justifyContent="space-between">
+              <Typography color="textSecondary">Cash due (USD)</Typography>
+              <Typography sx={{ fontWeight: 600 }}>
+                <CurrencyDisplay value={cashDueUsd} />
+              </Typography>
+            </Stack>
+          </>
         )}
-        {enteredUsd > 0 && !matchesTotal && (
+        {!noCash && parts.length === 1 && (
+          <AmountDueInCurrency usd={cashDueUsd} account={parts[0]} compact />
+        )}
+        {!noCash && enteredUsd > 0 && !matchesTotal && (
           <Alert severity="warning" sx={{ mt: 1.5 }}>
-            The amount paid must match the invoice total within $0.01.{" "}
-            {enteredUsd < totalUsd
-              ? `$${(totalUsd - enteredUsd).toFixed(2)} USD is still to be entered.`
-              : `The parts are $${(enteredUsd - totalUsd).toFixed(2)} USD over.`}
+            The amount paid must match the cash due within $0.01.{" "}
+            {enteredUsd < cashDueUsd
+              ? `$${(cashDueUsd - enteredUsd).toFixed(2)} USD is still to be entered.`
+              : `The parts are $${(enteredUsd - cashDueUsd).toFixed(2)} USD over.`}
           </Alert>
         )}
       </Box>
 
-      <PdfUploadField
-        label="Payment Receipt PDF"
-        purpose={receiptPurpose}
-        value={receipt}
-        onChange={setReceipt}
-        onUploadingChange={setReceiptUploading}
-        required
-        disabled={saving}
-      />
+      {!noCash && (
+        <PdfUploadField
+          label="Payment Receipt PDF"
+          purpose={receiptPurpose}
+          value={receipt}
+          onChange={setReceipt}
+          onUploadingChange={setReceiptUploading}
+          required
+          disabled={saving}
+        />
+      )}
 
       <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ mt: 1 }}>
         <Button

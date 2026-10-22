@@ -7,7 +7,6 @@ import {
   Paper,
   Stack,
   TextField,
-  MenuItem,
   CircularProgress,
   Alert,
   Typography,
@@ -17,11 +16,8 @@ import { useRouter } from "next/navigation";
 import SaveIcon from "@mui/icons-material/Save";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import Link from "next/link";
-import {
-  useCreateHardwarePurchase,
-  VENDOR_NAME_OPTIONS,
-  VendorNameValue,
-} from "@/lib/hooks/useHardwarePurchases";
+import { useCreateHardwarePurchase } from "@/lib/hooks/useHardwarePurchases";
+import { VendorSelect } from "@/components/accounting/VendorSelect";
 import {
   PdfUploadField,
   UploadedPdf,
@@ -29,13 +25,14 @@ import {
 
 export interface HardwarePurchaseFormData {
   invoiceNumber: string;
-  vendorName: VendorNameValue | "";
+  vendorId: string;
   hardwareDescription: string;
   billingDate: string;
   dueDate: string;
   quantity: number | string;
   unitPrice: number | string;
   miscellaneousCharges: number | string;
+  securityDeposit: number | string;
   notes: string;
 }
 
@@ -43,7 +40,7 @@ export default function CreateHardwarePurchasePage() {
   const router = useRouter();
   const [formData, setFormData] = useState<HardwarePurchaseFormData>({
     invoiceNumber: "",
-    vendorName: "",
+    vendorId: "",
     hardwareDescription: "",
     billingDate: new Date().toISOString().split("T")[0],
     dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
@@ -52,6 +49,7 @@ export default function CreateHardwarePurchasePage() {
     quantity: 0,
     unitPrice: 0,
     miscellaneousCharges: 0,
+    securityDeposit: 0,
     notes: "",
   });
 
@@ -62,12 +60,13 @@ export default function CreateHardwarePurchasePage() {
   const [pdfUploading, setPdfUploading] = useState(false);
   const createHardwarePurchase = useCreateHardwarePurchase();
 
-  // Calculate total amount
+  // Total = hardware cost (quantity x unit price + misc) + security deposit
   const calculateTotalAmount = (): number => {
     const quantity = Number(formData.quantity) || 0;
     const unitPrice = Number(formData.unitPrice) || 0;
     const miscellaneousCharges = Number(formData.miscellaneousCharges) || 0;
-    return quantity * unitPrice + miscellaneousCharges;
+    const securityDeposit = Number(formData.securityDeposit) || 0;
+    return quantity * unitPrice + miscellaneousCharges + securityDeposit;
   };
 
   const handleInputChange = (
@@ -79,7 +78,8 @@ export default function CreateHardwarePurchasePage() {
       if (
         name === "quantity" ||
         name === "unitPrice" ||
-        name === "miscellaneousCharges"
+        name === "miscellaneousCharges" ||
+        name === "securityDeposit"
       ) {
         return {
           ...prev,
@@ -107,7 +107,7 @@ export default function CreateHardwarePurchasePage() {
         setError("Invoice number is required");
         return;
       }
-      if (!formData.vendorName.trim()) {
+      if (!formData.vendorId) {
         setError("Vendor name is required");
         return;
       }
@@ -131,6 +131,10 @@ export default function CreateHardwarePurchasePage() {
         setError("Unit price cannot be negative");
         return;
       }
+      if ((Number(formData.securityDeposit) || 0) < 0) {
+        setError("Security deposit cannot be negative");
+        return;
+      }
       if (!invoicePdf) {
         setError("Please upload the vendor invoice PDF");
         return;
@@ -140,13 +144,14 @@ export default function CreateHardwarePurchasePage() {
 
       await createHardwarePurchase.mutateAsync({
         invoiceNumber: formData.invoiceNumber,
-        vendorName: formData.vendorName as VendorNameValue,
+        vendorId: formData.vendorId,
         hardwareDescription: formData.hardwareDescription,
         billingDate: formData.billingDate,
         dueDate: formData.dueDate,
         quantity: Number(formData.quantity) || 0,
         unitPrice: Number(formData.unitPrice) || 0,
         miscellaneousCharges: Number(formData.miscellaneousCharges) || 0,
+        securityDeposit: Number(formData.securityDeposit) || 0,
         totalAmount: totalAmount,
         notes: formData.notes || undefined,
         invoicePdfKey: invoicePdf.key,
@@ -212,23 +217,15 @@ export default function CreateHardwarePurchasePage() {
                 required
                 disabled={saving}
               />
-              <TextField
-                select
-                fullWidth
-                label="Vendor Name"
-                name="vendorName"
-                value={formData.vendorName}
-                onChange={handleInputChange}
+              <VendorSelect
+                type="hardware"
+                value={formData.vendorId}
+                onChange={(vendorId) =>
+                  setFormData((prev) => ({ ...prev, vendorId }))
+                }
                 required
                 disabled={saving}
-              >
-                <MenuItem value="">-- Select Vendor --</MenuItem>
-                {VENDOR_NAME_OPTIONS.map((option) => (
-                  <MenuItem key={option.value} value={option.value}>
-                    {option.label}
-                  </MenuItem>
-                ))}
-              </TextField>
+              />
             </Stack>
 
             {/* Row 2: Hardware Description */}
@@ -306,22 +303,40 @@ export default function CreateHardwarePurchasePage() {
               />
             </Stack>
 
-            {/* Row 5: Miscellaneous Charges */}
-            <TextField
-              fullWidth
-              label="Miscellaneous Charges"
-              name="miscellaneousCharges"
-              type="number"
-              value={formData.miscellaneousCharges}
-              onChange={handleInputChange}
-              slotProps={{
-                htmlInput: { step: 0.01 },
-                input: {
-                  startAdornment: "$",
-                },
-              }}
-              disabled={saving}
-            />
+            {/* Row 5: Miscellaneous Charges and Security Deposit */}
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+              <TextField
+                fullWidth
+                label="Miscellaneous Charges"
+                name="miscellaneousCharges"
+                type="number"
+                value={formData.miscellaneousCharges}
+                onChange={handleInputChange}
+                slotProps={{
+                  htmlInput: { step: 0.01 },
+                  input: {
+                    startAdornment: "$",
+                  },
+                }}
+                disabled={saving}
+              />
+              <TextField
+                fullWidth
+                label="Security Deposit (optional)"
+                name="securityDeposit"
+                type="number"
+                value={formData.securityDeposit}
+                onChange={handleInputChange}
+                helperText="Refundable; added to the total but not a hardware cost"
+                slotProps={{
+                  htmlInput: { min: 0, step: 0.01 },
+                  input: {
+                    startAdornment: "$",
+                  },
+                }}
+                disabled={saving}
+              />
+            </Stack>
 
             {/* Row 6: Notes */}
             <TextField
@@ -377,6 +392,14 @@ export default function CreateHardwarePurchasePage() {
                 </Typography>
                 <Typography variant="body1">
                   ${(Number(formData.miscellaneousCharges) || 0).toFixed(2)}
+                </Typography>
+              </Box>
+              <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                <Typography variant="body1" sx={{ fontWeight: "500" }}>
+                  Security Deposit:
+                </Typography>
+                <Typography variant="body1">
+                  ${(Number(formData.securityDeposit) || 0).toFixed(2)}
                 </Typography>
               </Box>
               <Box

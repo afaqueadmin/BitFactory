@@ -4,7 +4,6 @@ import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
 import { generatePDFFromHTML } from "@/lib/email";
 import { INVOICE_STATUS_LABELS } from "@/lib/constants/accounting";
-import { VENDOR_NAME_LABELS } from "@/lib/hooks/useHardwarePurchases";
 import {
   buildCsv,
   buildTablePdfHtml,
@@ -78,7 +77,7 @@ export async function GET(request: NextRequest) {
       orderBy,
       select: {
         invoiceNumber: true,
-        vendorName: true,
+        vendor: { select: { name: true } },
         hardwareDescription: true,
         totalAmount: true,
         paymentStatus: true,
@@ -102,7 +101,7 @@ export async function GET(request: NextRequest) {
       const isPaid = invoice.paymentStatus === "Paid";
       return [
         invoice.invoiceNumber,
-        VENDOR_NAME_LABELS[invoice.vendorName] || invoice.vendorName,
+        invoice.vendor.name,
         invoice.hardwareDescription,
         amount(Number(invoice.totalAmount)),
         INVOICE_STATUS_LABELS[invoice.paymentStatus],
@@ -138,12 +137,14 @@ export async function GET(request: NextRequest) {
     }
 
     // Name the active filters on the PDF so a printed copy is unambiguous.
+    const filterVendor = filters.vendorId
+      ? await prisma.accountingVendor.findUnique({
+          where: { id: filters.vendorId },
+          select: { name: true },
+        })
+      : null;
     const subtitle = [
-      `Vendor: ${
-        filters.vendorName
-          ? VENDOR_NAME_LABELS[filters.vendorName] || filters.vendorName
-          : "All vendors"
-      }`,
+      `Vendor: ${filters.vendorId ? (filterVendor?.name ?? "Unknown vendor") : "All vendors"}`,
       `Hardware: ${filters.hardware ? `"${filters.hardware}"` : "All hardware"}`,
       `Status: ${
         filters.paymentStatus
