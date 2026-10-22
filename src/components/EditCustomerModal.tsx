@@ -59,6 +59,7 @@ interface EditCustomerModalProps {
     groupId?: string;
     franchiseeId?: string | null;
     segment?: string | null;
+    role?: string;
   };
 }
 
@@ -104,6 +105,8 @@ export default function EditCustomerModal({
   });
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  // Pool credentials, group, franchisee and segment only apply to CLIENT users.
+  const isClient = initialData?.role === "CLIENT";
 
   useEffect(() => {
     if (initialData && open) {
@@ -272,6 +275,7 @@ export default function EditCustomerModal({
 
     // Segment is required unless a franchise is assigned (which implies Retail)
     if (
+      isClient &&
       !formData.franchiseeId &&
       formData.segment !== "CORPORATE" &&
       formData.segment !== "SME" &&
@@ -287,6 +291,7 @@ export default function EditCustomerModal({
 
     // Subaccount is required for active customer types
     if (
+      isClient &&
       formData.segment !== "POTENTIAL_CUSTOMER" &&
       formData.luxorSubaccountNames.length === 0
     ) {
@@ -486,128 +491,136 @@ export default function EditCustomerModal({
               type="url"
               placeholder="https://example.com"
             />
-            {/* Every Luxor subaccount of this client - added/removed
+            {isClient && (
+              <>
+                {/* Every Luxor subaccount of this client - added/removed
                 together when the form is saved. */}
-            <LuxorSubaccountMultiSelect
-              open={open}
-              value={formData.luxorSubaccountNames}
-              onChange={(names) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  luxorSubaccountNames: names,
-                }))
-              }
-              ownNames={savedSubaccounts}
-              disabled={loadingSubaccounts}
-              required={formData.segment !== "POTENTIAL_CUSTOMER"}
-              label={
-                formData.segment === "POTENTIAL_CUSTOMER"
-                  ? "Luxor Subaccounts (Optional)"
-                  : "Luxor Subaccounts"
-              }
-              helperText="Changes are saved when you click Update."
-            />
+                <LuxorSubaccountMultiSelect
+                  open={open}
+                  value={formData.luxorSubaccountNames}
+                  onChange={(names) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      luxorSubaccountNames: names,
+                    }))
+                  }
+                  ownNames={savedSubaccounts}
+                  disabled={loadingSubaccounts}
+                  required={formData.segment !== "POTENTIAL_CUSTOMER"}
+                  label={
+                    formData.segment === "POTENTIAL_CUSTOMER"
+                      ? "Luxor Subaccounts (Optional)"
+                      : "Luxor Subaccounts"
+                  }
+                  helperText="Changes are saved when you click Update."
+                />
 
-            <TextField
-              fullWidth
-              label="Braiins Auth Key (Optional)"
-              value={formData.braiinsAuthKey || ""}
-              onChange={(e) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  braiinsAuthKey: e.target.value,
-                }))
-              }
-              helperText="Braiins API token for this client, if applicable. Leave blank to remove."
-            />
-            <FormControl fullWidth disabled={fetchingGroups}>
-              <InputLabel>Group (Optional)</InputLabel>
-              <Select
-                value={
-                  groupIsMixed && !groupTouched
-                    ? MIXED_GROUPS
-                    : formData.groupId || ""
-                }
-                onChange={(e) => {
-                  if (e.target.value === MIXED_GROUPS) return;
-                  setGroupTouched(true);
-                  setFormData((prev) => ({
-                    ...prev,
-                    groupId: e.target.value,
-                  }));
-                }}
-                label="Group (Optional)"
-              >
-                {groupIsMixed && !groupTouched && (
-                  <MenuItem value={MIXED_GROUPS} disabled>
-                    Multiple groups (unchanged)
-                  </MenuItem>
-                )}
-                <MenuItem value="">No Group</MenuItem>
-                {groups.map((group) => (
-                  <MenuItem key={group.id} value={group.id}>
-                    {group.name}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <FormControl fullWidth disabled={fetchingFranchises}>
-              <InputLabel>Franchisee (Optional)</InputLabel>
-              <Select
-                value={formData.franchiseeId || ""}
-                onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    franchiseeId: e.target.value,
-                  }))
-                }
-                label="Franchisee (Optional)"
-              >
-                <MenuItem value="">Direct BitFactory Customer</MenuItem>
-                {franchises.map((franchise) => (
-                  <MenuItem key={franchise.id} value={franchise.id}>
-                    {franchise.businessName}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <FormControl fullWidth disabled={!!formData.franchiseeId} required>
-              <InputLabel>Type</InputLabel>
-              <Select
-                value={
-                  formData.franchiseeId ? "RETAIL" : formData.segment || ""
-                }
-                onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    segment: e.target.value,
-                  }))
-                }
-                label="Type"
-              >
-                {formData.franchiseeId ? (
-                  <MenuItem value="RETAIL">Retail (via franchise)</MenuItem>
-                ) : (
-                  [
-                    <MenuItem key="CORPORATE" value="CORPORATE">
-                      Corporate
-                    </MenuItem>,
-                    <MenuItem key="SME" value="SME">
-                      SME
-                    </MenuItem>,
-                    <MenuItem key="SELF_MINING" value="SELF_MINING">
-                      Self Mining
-                    </MenuItem>,
-                    <MenuItem
-                      key="POTENTIAL_CUSTOMER"
-                      value="POTENTIAL_CUSTOMER"
-                    >
-                      Potential Customer
-                    </MenuItem>,
-                  ]
-                )}
-              </Select>
-            </FormControl>
+                <TextField
+                  fullWidth
+                  label="Braiins Auth Key (Optional)"
+                  value={formData.braiinsAuthKey || ""}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      braiinsAuthKey: e.target.value,
+                    }))
+                  }
+                  helperText="Braiins API token for this client, if applicable. Leave blank to remove."
+                />
+                <FormControl fullWidth disabled={fetchingGroups}>
+                  <InputLabel>Group (Optional)</InputLabel>
+                  <Select
+                    value={
+                      groupIsMixed && !groupTouched
+                        ? MIXED_GROUPS
+                        : formData.groupId || ""
+                    }
+                    onChange={(e) => {
+                      if (e.target.value === MIXED_GROUPS) return;
+                      setGroupTouched(true);
+                      setFormData((prev) => ({
+                        ...prev,
+                        groupId: e.target.value,
+                      }));
+                    }}
+                    label="Group (Optional)"
+                  >
+                    {groupIsMixed && !groupTouched && (
+                      <MenuItem value={MIXED_GROUPS} disabled>
+                        Multiple groups (unchanged)
+                      </MenuItem>
+                    )}
+                    <MenuItem value="">No Group</MenuItem>
+                    {groups.map((group) => (
+                      <MenuItem key={group.id} value={group.id}>
+                        {group.name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                <FormControl fullWidth disabled={fetchingFranchises}>
+                  <InputLabel>Franchisee (Optional)</InputLabel>
+                  <Select
+                    value={formData.franchiseeId || ""}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        franchiseeId: e.target.value,
+                      }))
+                    }
+                    label="Franchisee (Optional)"
+                  >
+                    <MenuItem value="">Direct BitFactory Customer</MenuItem>
+                    {franchises.map((franchise) => (
+                      <MenuItem key={franchise.id} value={franchise.id}>
+                        {franchise.businessName}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                <FormControl
+                  fullWidth
+                  disabled={!!formData.franchiseeId}
+                  required
+                >
+                  <InputLabel>Type</InputLabel>
+                  <Select
+                    value={
+                      formData.franchiseeId ? "RETAIL" : formData.segment || ""
+                    }
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        segment: e.target.value,
+                      }))
+                    }
+                    label="Type"
+                  >
+                    {formData.franchiseeId ? (
+                      <MenuItem value="RETAIL">Retail (via franchise)</MenuItem>
+                    ) : (
+                      [
+                        <MenuItem key="CORPORATE" value="CORPORATE">
+                          Corporate
+                        </MenuItem>,
+                        <MenuItem key="SME" value="SME">
+                          SME
+                        </MenuItem>,
+                        <MenuItem key="SELF_MINING" value="SELF_MINING">
+                          Self Mining
+                        </MenuItem>,
+                        <MenuItem
+                          key="POTENTIAL_CUSTOMER"
+                          value="POTENTIAL_CUSTOMER"
+                        >
+                          Potential Customer
+                        </MenuItem>,
+                      ]
+                    )}
+                  </Select>
+                </FormControl>
+              </>
+            )}
           </Box>
         </DialogContent>
         <DialogActions sx={{ px: 3, py: 2 }}>
