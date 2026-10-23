@@ -1164,8 +1164,11 @@ export const sendWorkerTransactionCronSummaryEmail = async (params: {
   endDate: string;
   workerResults: RangeCronSectionSummary[];
   transactionResults: RangeCronSectionSummary[];
+  /** Set when the run died before finishing (e.g. database unreachable). */
+  fatalError?: string;
 }) => {
-  const { startDate, endDate, workerResults, transactionResults } = params;
+  const { startDate, endDate, workerResults, transactionResults, fatalError } =
+    params;
   const date = new Date();
 
   const section = (label: string, results: RangeCronSectionSummary[]) => {
@@ -1190,10 +1193,15 @@ export const sendWorkerTransactionCronSummaryEmail = async (params: {
     from:
       `BitFactory Admin <${process.env.SMTP_FROM}>` || "noreply@bitfactory.com",
     to: process.env.SMTP_USER,
-    subject: `${hasErrors ? "⚠️ " : ""}Cron run: cron_pool_worker_transactions - BitFactory`,
+    subject: `${fatalError ? "⚠️ FAILED " : hasErrors ? "⚠️ " : ""}Cron run: cron_pool_worker_transactions - BitFactory`,
     html: `
       <h1>cron_pool_worker_transactions</h1>
       <p>Ran at ${date.toISOString()}, covering ${startDate} to ${endDate}.</p>
+      ${
+        fatalError
+          ? `<h3 style="color:#c62828;">Run failed — nothing after this point was written</h3><p style="color:#c62828;">${fatalError}</p>`
+          : ""
+      }
       ${section("Worker-level metrics", workerResults)}
       ${section("Transactions", transactionResults)}
       <br>
