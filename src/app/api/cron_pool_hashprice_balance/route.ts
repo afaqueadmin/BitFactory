@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { upsertTodayHashpriceAndBalance } from "@/lib/services/poolHashpriceBalanceService";
+import { waitForDatabase } from "@/lib/services/cronRetry";
 import { sendPoolCronSummaryEmail } from "@/lib/email";
 
 /**
@@ -20,7 +21,43 @@ export async function GET(request: NextRequest) {
     return new Response("Unauthorized", { status: 401 });
   }
 
-  const results = await upsertTodayHashpriceAndBalance();
+  let results: Awaited<ReturnType<typeof upsertTodayHashpriceAndBalance>>;
+  try {
+    await waitForDatabase("cron_pool_hashprice_balance");
+    results = await upsertTodayHashpriceAndBalance();
+  } catch (error) {
+    // Still email on a fatal error (e.g. database unreachable): this data is
+    // live-only, so a failed run loses the day for good and must be visible.
+    const message = error instanceof Error ? error.message : "Unknown error";
+    console.error("[Hashprice/Balance Cron] fatal -", error);
+    try {
+      await sendPoolCronSummaryEmail({
+        cronName: "cron_pool_hashprice_balance",
+        days: [
+          {
+            date: new Date().toISOString().slice(0, 10),
+            results: [
+              {
+                pool: "Luxor",
+                subaccountName: "(run failed)",
+                status: "error",
+                error: message,
+              },
+            ],
+          },
+        ],
+      });
+    } catch (emailError) {
+      console.error(
+        "[Hashprice/Balance Cron] Failed to send summary email:",
+        emailError,
+      );
+    }
+    return NextResponse.json(
+      { success: false, error: message },
+      { status: 500 },
+    );
+  }
 
   console.log(
     "[Hashprice/Balance Cron] " +

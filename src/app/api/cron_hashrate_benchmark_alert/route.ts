@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkHashrateBenchmarks } from "@/lib/services/hashrateBenchmarkAlertService";
-import { sendHashrateBenchmarkAlertEmail } from "@/lib/email";
+import { waitForDatabase } from "@/lib/services/cronRetry";
+import {
+  sendCronFailureEmail,
+  sendHashrateBenchmarkAlertEmail,
+} from "@/lib/email";
 
 /**
  * GET /api/cron_hashrate_benchmark_alert
@@ -19,6 +23,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    await waitForDatabase("cron_hashrate_benchmark_alert");
     const result = await checkHashrateBenchmarks();
 
     console.log(
@@ -40,6 +45,11 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     console.error("[Hashrate Benchmark Alert Cron] fatal -", error);
+    await sendCronFailureEmail(
+      "cron_hashrate_benchmark_alert",
+      message,
+      "admin",
+    );
     return NextResponse.json(
       { success: false, error: message },
       { status: 500 },

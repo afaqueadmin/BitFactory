@@ -1054,6 +1054,42 @@ export const sendCronSuccessEmailToDeveloper = async (
   }
 };
 
+/**
+ * "⚠️ FAILED Cron run: <name>" email for a cron that died before finishing
+ * (e.g. database unreachable), so a failed run is announced rather than only
+ * noticed by its usual email not arriving. `recipient` matches where that
+ * cron's normal email goes: "admin" = SMTP_USER, "developer" =
+ * CRON_DEVELOPER_EMAIL.
+ */
+export const sendCronFailureEmail = async (
+  cronName: string,
+  message: string,
+  recipient: "admin" | "developer",
+) => {
+  const mailOptions = {
+    from:
+      `BitFactory Admin <${process.env.SMTP_FROM}>` || "noreply@bitfactory.com",
+    to: recipient === "admin" ? process.env.SMTP_USER : CRON_DEVELOPER_EMAIL,
+    subject: `⚠️ FAILED Cron run: ${cronName} - BitFactory`,
+    html: `
+      <h1>${cronName}</h1>
+      <p>Failed at ${new Date().toISOString()}. Nothing after this point was written.</p>
+      <p style="color:#c62828;">${message}</p>
+      <br>
+      <p>Best regards,</p>
+      <p>The BitFactory Team</p>
+    `,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    return { success: true };
+  } catch (error) {
+    console.error(`Error sending ${cronName} failure email:`, error);
+    return { success: false, error };
+  }
+};
+
 interface PoolCronDaySummary {
   date: string;
   results: Array<{
