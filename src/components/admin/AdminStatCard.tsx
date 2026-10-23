@@ -3,6 +3,7 @@
 import React from "react";
 import { Card, CardContent, Typography, Box, useTheme } from "@mui/material";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
+import { RADIUS_CARD, useDaylight } from "@/lib/daylight";
 
 interface StatItem {
   label: string;
@@ -15,6 +16,9 @@ interface AdminStatCardProps {
   stats: StatItem[];
   total?: number;
   borderColor?: string; // Color for left border (e.g., "#757575" for DB, "#1565C0" for Luxor, etc.)
+  /** Daylight styling (admin dashboard). `borderColor` becomes a small
+   * data-source marker next to the title instead of a thick left border. */
+  daylight?: boolean;
 }
 
 export default function AdminStatCard({
@@ -22,8 +26,10 @@ export default function AdminStatCard({
   stats,
   total,
   borderColor,
+  daylight = false,
 }: AdminStatCardProps) {
   const theme = useTheme();
+  const { d, fonts } = useDaylight();
 
   // Calculate total if not provided
   const totalValue = total ?? stats.reduce((sum, stat) => sum + stat.value, 0);
@@ -42,6 +48,196 @@ export default function AdminStatCard({
           value: stat.value,
           color: stat.color,
         }));
+
+  if (daylight) {
+    return (
+      <Box
+        role="article"
+        aria-label={title}
+        sx={{
+          minWidth: 0,
+          height: "100%",
+          bgcolor: d.surface,
+          border: `1px solid ${d.border}`,
+          borderRadius: RADIUS_CARD,
+          boxShadow: d.shadow,
+          p: { xs: "16px", sm: "20px" },
+          fontFamily: fonts.body,
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        {/* Title row spans the card; labels + ring share the row below. */}
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            mb: "14px",
+          }}
+        >
+          {borderColor && (
+            <Box
+              aria-hidden
+              sx={{
+                width: 8,
+                height: 8,
+                borderRadius: "2px",
+                bgcolor: borderColor,
+                flexShrink: 0,
+              }}
+            />
+          )}
+          <Typography
+            component="h2"
+            sx={{
+              m: 0,
+              fontFamily: fonts.heading,
+              fontWeight: 700,
+              fontSize: { xs: 15, md: 16 },
+              lineHeight: 1.3,
+              color: d.text,
+            }}
+          >
+            {title}
+          </Typography>
+        </Box>
+
+        <Box
+          sx={{
+            flex: 1,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "12px",
+          }}
+        >
+          <Box
+            component="ul"
+            sx={{
+              // Shrinks only after the ring has reached its 64px minimum (the
+              // ring's much larger shrink factor makes it give way first);
+              // then a value wraps under its label.
+              flexShrink: 1,
+              minWidth: 0,
+              listStyle: "none",
+              m: 0,
+              p: 0,
+              display: "flex",
+              flexDirection: "column",
+              gap: "10px",
+            }}
+          >
+            {stats.map((stat) => (
+              <Box
+                component="li"
+                key={stat.label}
+                sx={{
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: "8px",
+                  fontSize: { xs: 13, md: 14 },
+                  lineHeight: 1.4,
+                  fontWeight: 500,
+                  color: d.muted,
+                }}
+              >
+                <Box
+                  aria-hidden
+                  sx={{
+                    width: 10,
+                    height: 10,
+                    // Centre on the first text line (1.4 line-height).
+                    mt: "calc(0.7em - 5px)",
+                    borderRadius: "50%",
+                    bgcolor: stat.color,
+                    flexShrink: 0,
+                  }}
+                />
+                <Box
+                  component="span"
+                  sx={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    columnGap: "8px",
+                    minWidth: 0,
+                    "& > span": { whiteSpace: "nowrap" },
+                  }}
+                >
+                  <span>{stat.label}</span>
+                  <Box
+                    component="span"
+                    sx={{
+                      fontWeight: 700,
+                      color: d.text,
+                      fontVariantNumeric: "tabular-nums",
+                    }}
+                  >
+                    {stat.value}
+                  </Box>
+                </Box>
+              </Box>
+            ))}
+          </Box>
+
+          <Box
+            sx={{
+              // Gives way before the labels (92px max, 64px min) so the two
+              // never wrap or overlap. The centre number scales with the
+              // ring via container units.
+              flex: "0 1000 92px",
+              minWidth: 64,
+              aspectRatio: "1 / 1",
+              containerType: "inline-size",
+              position: "relative",
+            }}
+          >
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={chartData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius="72%"
+                  outerRadius="94%"
+                  paddingAngle={totalValue === 0 ? 0 : 2}
+                  dataKey="value"
+                  startAngle={90}
+                  endAngle={-270}
+                  stroke="none"
+                  isAnimationActive={false}
+                >
+                  {chartData.map((entry, index) => (
+                    <Cell
+                      key={`cell-${index}`}
+                      fill={totalValue === 0 ? d.border : entry.color}
+                    />
+                  ))}
+                </Pie>
+              </PieChart>
+            </ResponsiveContainer>
+            <Box
+              sx={{
+                position: "absolute",
+                inset: 0,
+                display: "grid",
+                placeItems: "center",
+                fontFamily: fonts.heading,
+                fontWeight: 750,
+                fontSize: "clamp(14px, 23cqi, 21px)",
+                letterSpacing: "-.5px",
+                lineHeight: 1,
+                color: d.text,
+                fontVariantNumeric: "tabular-nums",
+              }}
+            >
+              {totalValue}
+            </Box>
+          </Box>
+        </Box>
+      </Box>
+    );
+  }
 
   return (
     <Card

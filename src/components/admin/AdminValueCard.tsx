@@ -10,7 +10,9 @@ import {
   IconButton,
 } from "@mui/material";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
 import { formatValue } from "@/lib/helpers/formatValue";
+import { RADIUS_CARD, focusRing, useDaylight } from "@/lib/daylight";
 
 interface AdminValueCardProps {
   title: string;
@@ -20,6 +22,9 @@ interface AdminValueCardProps {
   onClick?: () => void;
   borderColor?: string; // Color for left border (e.g., "#757575" for DB, "#1565C0" for Luxor, etc.)
   infoText?: React.ReactNode; // Shown in a tooltip explaining how the value is calculated
+  /** Daylight styling (admin dashboard). `borderColor` becomes a small
+   * data-source marker next to the title instead of a thick left border. */
+  daylight?: boolean;
 }
 
 export default function AdminValueCard({
@@ -30,8 +35,161 @@ export default function AdminValueCard({
   onClick,
   borderColor,
   infoText,
+  daylight = false,
 }: AdminValueCardProps) {
+  const { d, fonts } = useDaylight();
   const formattedValue = formatValue(value, type);
+
+  if (daylight) {
+    return (
+      <Box
+        role={onClick ? "button" : "article"}
+        aria-label={title}
+        tabIndex={onClick ? 0 : undefined}
+        onClick={onClick}
+        onKeyDown={
+          onClick
+            ? (e: React.KeyboardEvent) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onClick();
+                }
+              }
+            : undefined
+        }
+        sx={{
+          position: "relative",
+          minWidth: 0,
+          height: "100%",
+          minHeight: { xs: 108, md: 120 },
+          display: "flex",
+          flexDirection: "column",
+          bgcolor: d.surface,
+          border: `1px solid ${d.border}`,
+          borderRadius: RADIUS_CARD,
+          boxShadow: d.shadow,
+          p: { xs: "16px", sm: "20px" },
+          fontFamily: fonts.body,
+          cursor: onClick ? "pointer" : "default",
+          transition: "border-color .15s",
+          ...(onClick && {
+            "&:hover": {
+              borderColor: d.action,
+              "& .value-card-arrow": { color: d.action },
+            },
+            "&:focus-visible": focusRing(d.action),
+          }),
+        }}
+      >
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "flex-start",
+            gap: "8px",
+            fontSize: { xs: 13, md: 14 },
+            lineHeight: 1.4,
+            color: d.muted,
+          }}
+        >
+          {borderColor && (
+            <Box
+              aria-hidden
+              sx={{
+                width: 8,
+                height: 8,
+                mt: "0.4em",
+                borderRadius: "2px",
+                bgcolor: borderColor,
+                flexShrink: 0,
+              }}
+            />
+          )}
+          <Box component="span" sx={{ flex: 1, minWidth: 0, fontWeight: 600 }}>
+            {title}
+          </Box>
+          {infoText && (
+            <Tooltip
+              title={infoText}
+              arrow
+              enterTouchDelay={0}
+              leaveTouchDelay={5000}
+            >
+              <IconButton
+                size="small"
+                onClick={(e) => e.stopPropagation()}
+                sx={{
+                  p: "2px",
+                  mt: "-2px",
+                  color: d.muted,
+                  flexShrink: 0,
+                  "&:hover": { bgcolor: d.hover, color: d.action },
+                }}
+                aria-label={`How ${title} is calculated`}
+              >
+                <InfoOutlinedIcon sx={{ fontSize: 16 }} />
+              </IconButton>
+            </Tooltip>
+          )}
+        </Box>
+
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "flex-end",
+            justifyContent: "space-between",
+            gap: 1,
+            mt: "auto",
+            pt: "12px",
+          }}
+        >
+          <Typography
+            component="p"
+            sx={{
+              m: 0,
+              fontFamily: fonts.heading,
+              fontWeight: 750,
+              fontSize: { xs: 22, sm: 24, lg: 26 },
+              lineHeight: 1.2,
+              letterSpacing: "-0.02em",
+              color: d.text,
+              fontVariantNumeric: "tabular-nums",
+              overflowWrap: "anywhere",
+            }}
+          >
+            {formattedValue}
+            {subtitle && (
+              <Box
+                component="span"
+                sx={{
+                  fontFamily: fonts.body,
+                  fontWeight: 600,
+                  fontSize: { xs: 13, md: 14 },
+                  letterSpacing: 0,
+                  ml: "5px",
+                  color: d.muted,
+                }}
+              >
+                {subtitle}
+              </Box>
+            )}
+          </Typography>
+          {onClick && (
+            <ArrowForwardRoundedIcon
+              className="value-card-arrow"
+              aria-hidden
+              sx={{
+                fontSize: 18,
+                mb: "6px",
+                color: d.muted,
+                flexShrink: 0,
+                transition: "color .15s",
+              }}
+            />
+          )}
+        </Box>
+      </Box>
+    );
+  }
 
   return (
     <Card

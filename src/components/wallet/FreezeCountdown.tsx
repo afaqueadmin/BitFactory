@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { Box, Typography, alpha, useTheme } from "@mui/material";
 import LockClockIcon from "@mui/icons-material/LockClock";
+import { useDaylight } from "@/lib/daylight";
 
 const FREEZE_HOURS = 24;
 const FREEZE_MS = FREEZE_HOURS * 60 * 60 * 1000;
@@ -59,14 +60,44 @@ export function useFreezeRemaining(reviewedAt: string | null | undefined) {
 export default function FreezeCountdown({
   reviewedAt,
   dense = false,
+  daylight = false,
 }: {
   reviewedAt: string | null | undefined;
   dense?: boolean;
+  /** Daylight styling: soft sky pill with the action colour. */
+  daylight?: boolean;
 }) {
   const theme = useTheme();
+  const { d, fonts } = useDaylight();
   const { isFrozen, label } = useFreezeRemaining(reviewedAt);
 
   if (!isFrozen || !label) return null;
+
+  if (daylight) {
+    return (
+      <Box
+        sx={{
+          mt: dense ? 0.5 : 1,
+          px: "8px",
+          py: dense ? "3px" : "5px",
+          borderRadius: "8px",
+          display: "inline-flex",
+          alignItems: "center",
+          gap: "6px",
+          bgcolor: d.skySoft,
+          border: `1px solid ${d.borderSky}`,
+          color: d.action,
+          fontFamily: fonts.body,
+          fontSize: dense ? 11 : 12,
+          fontWeight: 600,
+          lineHeight: 1.4,
+        }}
+      >
+        <LockClockIcon sx={{ fontSize: dense ? 13 : 15, flexShrink: 0 }} />
+        {label}
+      </Box>
+    );
+  }
 
   return (
     <Box

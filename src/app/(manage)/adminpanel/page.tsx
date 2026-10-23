@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import AdminStatCard from "@/components/admin/AdminStatCard";
 import AdminValueCard from "@/components/admin/AdminValueCard";
-import { Box, CircularProgress, Alert, useTheme } from "@mui/material";
+import { Box, CircularProgress, Alert, Typography } from "@mui/material";
+import Segmented from "@/components/daylight/Segmented";
+import { RADIUS_CONTROL, useDaylight } from "@/lib/daylight";
 import { useVendorInvoices } from "@/lib/hooks/useVendorInvoices";
 import { useHardwarePurchases } from "@/lib/hooks/useHardwarePurchases";
 import { useSecurityDeposits } from "@/lib/hooks/useSecurityDeposits";
@@ -122,7 +124,7 @@ interface HardwareRevenueData {
 
 export default function AdminDashboard() {
   const router = useRouter();
-  const theme = useTheme();
+  const { d, fonts } = useDaylight();
   const [poolMode, setPoolMode] = useState<"total" | "luxor" | "braiins">(
     "total",
   );
@@ -313,6 +315,14 @@ export default function AdminDashboard() {
     };
   };
 
+  // Data-source marker colours (shown on each card and in the legend).
+  const sourceColor = {
+    db: d.muted,
+    combined: d.poolCombined,
+    luxor: d.poolLuxor,
+    braiins: d.poolBraiins,
+  };
+
   // Get border color based on poolMode and card data source
   const getCardBorderColor = (cardTitle: string): string => {
     // Cards that only have data from ONE pool (show pool color even in "All Pools" mode)
@@ -344,16 +354,16 @@ export default function AdminDashboard() {
     ];
 
     // Single pool mode - use that pool's color
-    if (poolMode === "luxor") return "#1565C0"; // Blue
-    if (poolMode === "braiins") return "#FFA500"; // Orange
+    if (poolMode === "luxor") return sourceColor.luxor;
+    if (poolMode === "braiins") return sourceColor.braiins;
 
     // "All Pools" mode - determine by data source
-    if (luxorOnlyCards.includes(cardTitle)) return "#1565C0"; // Blue - Luxor only
-    if (braiinsOnlyCards.includes(cardTitle)) return "#FFA500"; // Orange - Braiins only
-    if (dbOnlyCards.includes(cardTitle)) return "#757575"; // Gray - DB only
+    if (luxorOnlyCards.includes(cardTitle)) return sourceColor.luxor;
+    if (braiinsOnlyCards.includes(cardTitle)) return sourceColor.braiins;
+    if (dbOnlyCards.includes(cardTitle)) return sourceColor.db;
 
-    // Default to purple for cards with data from BOTH pools
-    return "#9C27B0"; // Purple - combined/aggregated
+    // Cards with data from BOTH pools
+    return sourceColor.combined;
   };
 
   const poolStats = useMemo(() => getPoolStats(poolMode), [poolMode, stats]);
@@ -395,17 +405,14 @@ export default function AdminDashboard() {
       <Box
         sx={{
           p: 4,
-          backgroundColor:
-            theme.palette.mode === "dark"
-              ? theme.palette.background.default
-              : "#f5f5f7",
-          minHeight: "calc(100vh - 64px)",
+          backgroundColor: d.canvas,
+          minHeight: "100%",
           display: "flex",
           justifyContent: "center",
           alignItems: "center",
         }}
       >
-        <CircularProgress />
+        <CircularProgress sx={{ color: d.action }} />
       </Box>
     );
   }
@@ -414,562 +421,584 @@ export default function AdminDashboard() {
     <>
       <Box
         sx={{
-          p: { xs: 1.5, sm: 2.5, md: 3.5 },
-          backgroundColor:
-            theme.palette.mode === "dark"
-              ? theme.palette.background.default
-              : "#f5f5f7",
-          minHeight: "calc(100vh - 64px)",
+          p: { xs: "24px 16px", sm: "28px 24px", md: "32px 36px" },
+          backgroundColor: d.canvas,
+          minHeight: "100%",
+          fontFamily: fonts.body,
+          color: d.text,
         }}
       >
-        {error && (
-          <Alert severity="error" sx={{ mb: 2.5, borderRadius: 2 }}>
-            {error?.message || "An error occurred"}
-          </Alert>
-        )}
+        <Box sx={{ maxWidth: { sm: "100%", lg: 1400 }, mx: "auto" }}>
+          {error && (
+            <Alert
+              severity="error"
+              sx={{
+                mb: 2.5,
+                borderRadius: RADIUS_CONTROL,
+                bgcolor: d.dangerSoft,
+                color: d.danger,
+                fontFamily: fonts.body,
+                "& .MuiAlert-icon": { color: d.danger },
+              }}
+            >
+              {error?.message || "An error occurred"}
+            </Alert>
+          )}
 
-        {/* Pool Mode Segmented Controls + Color Legend */}
-        <Box
-          sx={{
-            display: "flex",
-            flexDirection: { xs: "column", md: "row" },
-            alignItems: { xs: "stretch", md: "center" },
-            justifyContent: "space-between",
-            gap: 2,
-            mb: { xs: 2.5, md: 3.5 },
-          }}
-        >
-          {/* Segmented Pill Switcher */}
-          <Box
-            sx={{
-              display: "inline-flex",
-              alignItems: "center",
-              p: 0.5,
-              borderRadius: 999,
-              backgroundColor:
-                theme.palette.mode === "dark"
-                  ? "rgba(255, 255, 255, 0.06)"
-                  : "rgba(0, 0, 0, 0.05)",
-              border: `1px solid ${
-                theme.palette.mode === "dark"
-                  ? "rgba(255, 255, 255, 0.08)"
-                  : "rgba(0, 0, 0, 0.08)"
-              }`,
-              width: { xs: "100%", sm: "fit-content" },
-            }}
-          >
-            {[
-              {
-                key: "total",
-                label: "All Pools",
-                activeBg: "#9C27B0",
-                color: "#fff",
-              },
-              {
-                key: "luxor",
-                label: "🔷 Luxor",
-                activeBg: "#1565C0",
-                color: "#fff",
-              },
-              {
-                key: "braiins",
-                label: "🟧 Braiins",
-                activeBg: "#FFA500",
-                color: "#111",
-              },
-            ].map(({ key, label, activeBg, color }) => {
-              const active = poolMode === key;
-              return (
-                <Box
-                  key={key}
-                  component="button"
-                  onClick={() =>
-                    setPoolMode(key as "total" | "luxor" | "braiins")
-                  }
-                  sx={{
-                    flex: { xs: 1, sm: "initial" },
-                    py: { xs: 0.85, sm: 0.75 },
-                    px: { xs: 1.5, sm: 2 },
-                    borderRadius: 999,
-                    border: "none",
-                    cursor: "pointer",
-                    fontWeight: active ? 700 : 500,
-                    fontSize: { xs: "0.8rem", sm: "0.85rem" },
-                    backgroundColor: active ? activeBg : "transparent",
-                    color: active ? color : theme.palette.text.secondary,
-                    boxShadow: active ? "0 2px 8px rgba(0,0,0,0.2)" : "none",
-                    transition: "all 0.2s ease",
-                    whiteSpace: "nowrap",
-                    textAlign: "center",
-                    "&:hover": {
-                      color: active ? color : theme.palette.text.primary,
-                    },
-                  }}
-                >
-                  {label}
-                </Box>
-              );
-            })}
-          </Box>
-
-          {/* Color Legend */}
+          {/* Title + Data Source Legend + Pool Mode Segmented Control */}
           <Box
             sx={{
               display: "flex",
-              alignItems: "center",
-              gap: { xs: 1.25, sm: 2 },
-              flexWrap: "wrap",
+              flexDirection: { xs: "column", md: "row" },
+              alignItems: { xs: "flex-start", md: "flex-end" },
+              justifyContent: "space-between",
+              gap: 2,
+              mb: { xs: "20px", md: "24px" },
             }}
           >
-            {[
-              { color: "#757575", label: "DB value" },
-              { color: "#9C27B0", label: "Combined" },
-              { color: "#1565C0", label: "Luxor" },
-              { color: "#FFA500", label: "Braiins" },
-            ].map(({ color, label }) => (
-              <Box
-                key={color}
-                sx={{ display: "flex", alignItems: "center", gap: 0.75 }}
+            <Box>
+              <Typography
+                component="h1"
+                sx={{
+                  m: 0,
+                  fontFamily: fonts.heading,
+                  fontWeight: 750,
+                  fontSize: { xs: 22, sm: 26 },
+                  letterSpacing: "-.6px",
+                  lineHeight: 1.25,
+                  color: d.text,
+                }}
               >
-                <Box
-                  sx={{
-                    width: 10,
-                    height: 10,
-                    borderRadius: "3px",
-                    backgroundColor: color,
-                    flexShrink: 0,
-                  }}
-                />
-                <span
-                  style={{
-                    fontSize: "0.72rem",
-                    color: theme.palette.text.secondary,
-                    fontWeight: 500,
-                  }}
-                >
-                  {label}
-                </span>
+                Dashboard
+              </Typography>
+              <Box sx={{ mt: "4px", fontSize: 13, color: d.muted }}>
+                Fleet, customer and finance overview across pools
               </Box>
-            ))}
-          </Box>
-        </Box>
+            </Box>
 
-        <Box
-          sx={{
-            display: "grid",
-            gridTemplateColumns: {
-              xs: "1fr",
-              sm: "repeat(2, 1fr)",
-              md: "repeat(2, 1fr)",
-              lg: "repeat(4, 1fr)",
-            },
-            gap: { xs: 1.5, sm: 2, md: 2.5 },
-            maxWidth: { sm: "100%", lg: 1400 },
-            mx: "auto",
-          }}
-        >
-          {/* === LOCAL INFRASTRUCTURE STATS === */}
-
-          {/* Miners Card */}
-          <AdminStatCard
-            title="Miners"
-            borderColor={getCardBorderColor("Miners")}
-            stats={[
-              {
-                label: "Active",
-                value: minersStats.active,
-                color: "#2196F3",
-              },
-              {
-                label: "Inactive",
-                value: minersStats.inactive,
-                color: "#B0BEC5",
-              },
-              {
-                label: "Review",
-                value: minersStats.actionRequired,
-                color: "#FF5722",
-              },
-            ]}
-          />
-
-          {/* Spaces Card */}
-          <AdminStatCard
-            title="Spaces"
-            borderColor="#757575"
-            stats={[
-              {
-                label: "Free",
-                value: stats?.spaces.free ?? 0,
-                color: "#9C27B0",
-              },
-              {
-                label: "Used",
-                value: stats?.spaces.used ?? 0,
-                color: "#673AB7",
-              },
-            ]}
-          />
-
-          {/* Customers Card - Local DB */}
-          <AdminStatCard
-            title="Customers"
-            borderColor="#757575"
-            stats={[
-              {
-                label: "Active",
-                value: stats?.customers.active ?? 0,
-                color: "#EC407A",
-              },
-              {
-                label: "Inactive",
-                value: stats?.customers.inactive ?? 0,
-                color: "#B0BEC5",
-              },
-            ]}
-          />
-
-          {/* Power Card - DB-only (independent of pool) */}
-          <AdminStatCard
-            title="Power"
-            borderColor="#757575"
-            stats={[
-              {
-                label: "Free kW",
-                value: poolStats?.power.availablePower ?? 0,
-                color: "#00C853",
-              },
-              {
-                label: "Used kW",
-                value: poolStats?.power.usedPower ?? 0,
-                color: "#00B0FF",
-              },
-            ]}
-          />
-
-          {/* === LUXOR POOL STATS === */}
-
-          {/* Monthly Revenue - From Cost Payments, excludes self-mining users */}
-          <AdminValueCard
-            title="Monthly Customer Billing (30 days)"
-            borderColor="#757575"
-            value={stats?.financial.monthlyRevenue ?? 0}
-            type="currency"
-            infoText="Sum of Electricity Charges and Adjustments (cost payments) from the last 30 days, flipped to a positive value, for hosted customers only. Excludes Payments, Hardware Sales, and customers with segment = SELF_MINING."
-            onClick={() => router.push("/admin/monthly-customer-billing")}
-          />
-
-          {/* Total Customer Balance, from our database */}
-          <AdminValueCard
-            title="Total Customer Balance"
-            borderColor="#757575"
-            value={stats?.financial.totalCustomerBalance ?? 0}
-            type="currency"
-            infoText="Sum of all Payments, Electricity Charges, and Adjustments (cost payments) across hosted customers, all-time. Excludes Hardware Sales, deleted customers, and customers with segment = SELF_MINING."
-            onClick={() => router.push("/admin/customer-balance")}
-          />
-
-          {/* Total Customer Mined Revenue - Available from both Luxor and Braiins, excludes self-mining users */}
-          <AdminValueCard
-            title="Total Customer Mined Revenue"
-            borderColor={getCardBorderColor("Total Customer Mined Revenue")}
-            value={totalMinedRevenue}
-            type="BTC"
-            infoText={
-              poolMode === "braiins"
-                ? "Total BTC mined on Braiins for hosted customers, all-time. Excludes BTC mined by customers with segment = SELF_MINING (shown separately in the Self Mining Revenue (BTC) card)."
-                : "Total BTC mined since 2025-01-01 across all subaccounts at the site (Luxor" +
-                  (poolMode === "total" ? " + Braiins" : "") +
-                  "), for hosted customers only. Excludes BTC mined by customers with segment = SELF_MINING (shown separately in the Self Mining Revenue (BTC) card)."
-            }
-          />
-
-          {/* Uptime 24h - From Luxor, shows N/A for Braiins */}
-          <AdminValueCard
-            title="Uptime (24 hours)"
-            borderColor={getCardBorderColor("Uptime (24 hours)")}
-            value={
-              poolMode === "braiins"
-                ? "N/A"
-                : `${(poolStats?.uptime_24h ?? 0).toFixed(2)}%`
-            }
-          />
-
-          {/* Hashrate 5 min - Available from both Luxor and Braiins */}
-          <AdminValueCard
-            title="Hashrate (5 min)"
-            borderColor={getCardBorderColor("Hashrate (5 min)")}
-            value={poolStats?.hashrate_5m ?? 0}
-            subtitle="PH/s"
-          />
-
-          {/* Hashrate 24h - Available from both Luxor and Braiins */}
-          <AdminValueCard
-            title="Hashrate (24 hours)"
-            borderColor={getCardBorderColor("Hashrate (24 hours)")}
-            value={poolStats?.hashrate_24h ?? 0}
-            subtitle="PH/s"
-          />
-
-          {/* === LUXOR POOL ACCOUNTS === */}
-
-          {/* Total Pool Accounts - Luxor only, shows N/A for Braiins */}
-          <AdminValueCard
-            title="Total Pool Accounts"
-            borderColor={getCardBorderColor("Total Pool Accounts")}
-            value={
-              poolMode === "braiins"
-                ? "N/A"
-                : (stats?.luxor.poolAccounts.total ?? 0)
-            }
-          />
-
-          {/* Active Pool Accounts - Luxor only, shows N/A for Braiins */}
-          <AdminValueCard
-            title="Active Pool Accounts"
-            borderColor={getCardBorderColor("Active Pool Accounts")}
-            value={
-              poolMode === "braiins"
-                ? "N/A"
-                : (stats?.luxor.poolAccounts.active ?? 0)
-            }
-          />
-
-          {/* Inactive Pool Accounts - Luxor only, shows N/A for Braiins */}
-          <AdminValueCard
-            title="Inactive Pool Accounts"
-            borderColor={getCardBorderColor("Inactive Pool Accounts")}
-            value={
-              poolMode === "braiins"
-                ? "N/A"
-                : (stats?.luxor.poolAccounts.inactive ?? 0)
-            }
-          />
-
-          {/* === WORKER STATISTICS FROM LUXOR === */}
-
-          {/* Total Workers - Available from both Luxor and Braiins */}
-          <AdminValueCard
-            title={
-              poolMode === "braiins"
-                ? "Total Workers (Braiins)"
-                : poolMode === "total"
-                  ? "Total Workers"
-                  : "Total Workers (Luxor)"
-            }
-            borderColor={getCardBorderColor("Total Workers")}
-            value={poolStats?.workers.totalWorkers ?? 0}
-          />
-
-          {/* Active Workers - Available from both Luxor and Braiins */}
-          <AdminValueCard
-            title={
-              poolMode === "braiins"
-                ? "Active Workers (Braiins)"
-                : poolMode === "total"
-                  ? "Active Workers"
-                  : "Active Workers (Luxor)"
-            }
-            borderColor={getCardBorderColor("Active Workers")}
-            value={poolStats?.workers.activeWorkers ?? 0}
-          />
-
-          {/* Inactive Workers - Available from both Luxor and Braiins */}
-          <AdminValueCard
-            title={
-              poolMode === "braiins"
-                ? "Inactive Workers (Braiins)"
-                : poolMode === "total"
-                  ? "Inactive Workers"
-                  : "Inactive Workers (Luxor)"
-            }
-            borderColor={getCardBorderColor("Inactive Workers")}
-            value={poolStats?.workers.inactiveWorkers ?? 0}
-          />
-
-          {/* === CUSTOMER FINANCIAL METRICS === */}
-
-          {/* Total Customers Count */}
-          <AdminValueCard
-            title="Total Customers"
-            borderColor="#757575"
-            value={stats?.customers.total ?? 0}
-          />
-
-          {/* === RESERVED FOR FUTURE LUXOR ENDPOINTS === */}
-
-          {/* Hosting and Colocation - From ELECTRICITY_CHARGES invoices (ISSUED/OVERDUE/PAID) */}
-          <AdminValueCard
-            title="Hosting and Colocation (Invoice)"
-            borderColor="#757575"
-            value={hostingRevenueData?.hostingRevenue ?? 0}
-            type="currency"
-            infoText="Sum of the total amount on all Electricity Charges invoices with status Issued, Overdue, or Paid. Draft, Cancelled, and Refunded invoices are excluded. Includes unpaid and overdue invoices, not just ones customers have actually paid."
-          />
-
-          {/* Hosting Cost - implemented */}
-          <AdminValueCard
-            title="Hosting Cost (Invoice)"
-            borderColor="#757575"
-            value={vendorInvoicesTotalAmount}
-            type="currency"
-            infoText="Sum of the total amount on all Vendor Invoices (what Bitfactory owes the hosting vendor), excluding Cancelled ones. Includes both Pending and Paid vendor invoices, not just paid ones."
-          />
-
-          {/* Hosting Profit - implemented */}
-          <AdminValueCard
-            title="Hosting Profit (Invoice)"
-            borderColor="#757575"
-            value={hostingProfit}
-            type="currency"
-            infoText="Hosting and Colocation (Invoice) minus Hosting Cost (Invoice) — what customers were invoiced for hosting minus what the vendor invoiced Bitfactory for the same, regardless of whether either invoice has actually been paid yet."
-          />
-
-          {/* Hardware Revenue - From Cost Payments (HARDWARE_SALES + HARDWARE_REPAIR payments) */}
-          <AdminValueCard
-            title="Hardware Revenue"
-            borderColor="#757575"
-            value={hardwareRevenueData?.hardwareRevenue ?? 0}
-            type="currency"
-            infoText="Sum of all payments recorded against Hardware Sales and Hardware Repair invoices, minus issued Hardware credit memos."
-          />
-
-          {/* Hardware Revenue Pending - HARDWARE_SALES + HARDWARE_REPAIR invoices not yet paid (DRAFT/ISSUED/OVERDUE) */}
-          <AdminValueCard
-            title="Hardware Revenue Pending"
-            borderColor="#757575"
-            value={hardwareRevenuePending}
-            type="currency"
-            infoText="Sum of the total amount on all Hardware Sales and Hardware Repair invoices with status Draft, Issued, or Overdue."
-          />
-
-          {/* Hardware Cost - From Hardware Purchase Invoices */}
-          <AdminValueCard
-            title="Hardware Cost"
-            borderColor="#757575"
-            value={hardwarePurchasesTotalAmount}
-            type="currency"
-            infoText="Quantity × unit price plus miscellaneous charges on all Hardware Purchase invoices that are Pending or Paid (Cancelled ones excluded). Security deposits are not included; see the Security Deposit card."
-          />
-
-          {/* Security Deposit - held by vendors, from Hardware Purchase invoices */}
-          <AdminValueCard
-            title="Security Deposit"
-            borderColor="#757575"
-            value={securityDeposits?.totals.outstanding ?? 0}
-            type="currency"
-            onClick={() => router.push("/accounting/security-deposits")}
-            infoText="Security deposits on Pending and Paid Hardware Purchase invoices, minus what vendors have returned or applied to their invoices. Click for the breakdown by vendor."
-          />
-
-          {/* Hardware Profit - Hardware Revenue minus Hardware Cost */}
-          <AdminValueCard
-            title="Hardware Profit"
-            borderColor="#757575"
-            value={hardwareProfit}
-            type="currency"
-          />
-
-          {/* Est Monthly Hosting Revenue - Not yet implemented */}
-          {/*<AdminValueCard title="Est Monthly Hosting Revenue" value="N/A" />*/}
-
-          {/* Est Monthly Hosting Profit - Not yet implemented */}
-          {/*<AdminValueCard title="Est Monthly Hosting Profit" value="N/A" />*/}
-
-          {/* Est Yearly Hosting Revenue - Not yet implemented */}
-          {/*<AdminValueCard title="Est Yearly Hosting Revenue" value="N/A" />*/}
-
-          {/* Est Yearly Hosting Profit - Not yet implemented */}
-          {/*<AdminValueCard title="Est Yearly Hosting Profit" value="N/A" />*/}
-
-          {/* Positive Balance - Aggregated from customer payments */}
-          <AdminValueCard
-            title="Positive Customer Balance"
-            borderColor="#757575"
-            value={customerBalanceData?.totalPositiveBalance ?? 0}
-            type="currency"
-          />
-
-          {/* Negative Balance - Aggregated from customer payments */}
-          <AdminValueCard
-            title="Negative Customer Balance"
-            borderColor="#757575"
-            value={customerBalanceData?.totalNegativeBalance ?? 0}
-            type="currency"
-          />
-
-          {/* Positive Balance Customers Count */}
-          <AdminValueCard
-            title="Positive Balance Customers"
-            borderColor="#757575"
-            value={customerBalanceData?.positiveCustomerCount ?? 0}
-            onClick={() => router.push("/customers/overview?balanceFilter=> 0")}
-          />
-
-          {/* Negative Balance Customers Count */}
-          <AdminValueCard
-            title="Negative Balance Customers"
-            borderColor="#757575"
-            value={customerBalanceData?.negativeCustomerCount ?? 0}
-            onClick={() => router.push("/customers/overview?balanceFilter=< 0")}
-          />
-
-          {/* Self Mining Revenue (BTC) - always Luxor + Braiins combined; only shown on "All Pools" filter */}
-          {poolMode === "total" && (
-            <AdminValueCard
-              title="Self Mining Revenue (BTC)"
-              borderColor="#9C27B0"
-              value={stats?.financial.selfMiningRevenueBtc ?? 0}
-              type="BTC"
-              infoText="Combined all-time BTC mined for customers with segment = SELF_MINING (e.g. Higgs Self Mining), across both pools: Luxor (since 2025-01-01) plus Braiins (all-time reward)."
-            />
-          )}
-
-          {/* Self Mining Revenue (USD) - always Luxor + Braiins combined; only shown on "All Pools" filter */}
-          {poolMode === "total" && (
-            <AdminValueCard
-              title="Self Mining Revenue (USD)"
-              borderColor="#9C27B0"
-              value={stats?.financial.selfMiningRevenueUsd ?? 0}
-              type="currency"
-              infoText="Self Mining Revenue (BTC) multiplied by the current BTC/USD market price (live from Binance)."
-            />
-          )}
-
-          {/* Self Mining Hosting Cost - electricity invoices issued to SELF_MINING users; a DB value, not pool-specific, always visible */}
-          <AdminValueCard
-            title="Self Mining Hosting Cost"
-            borderColor="#757575"
-            value={stats?.financial.selfMiningHostingCost ?? 0}
-            type="currency"
-            infoText="Sum of all issued Electricity Charges invoices (status not Draft) for customers with segment = SELF_MINING. Excludes Hardware Sales invoices. This is a single DB total and does not change with the pool filter."
-          />
-
-          {/* Self Mining Profit - always combined USD revenue minus hosting cost; only shown on "All Pools" filter */}
-          {poolMode === "total" && (
-            <AdminValueCard
-              title="Self Mining Profit"
-              borderColor="#9C27B0"
-              value={stats?.financial.selfMiningProfitUsd ?? 0}
-              type="currency"
-              infoText="Self Mining Revenue (USD) minus Self Mining Hosting Cost."
-            />
-          )}
-        </Box>
-
-        {/* === WARNINGS AND NOTES === */}
-        {stats?.warnings && stats.warnings.length > 0 && (
-          <Box sx={{ mt: 3 }}>
-            <Alert severity="warning">
-              <strong>Data Availability Notes:</strong>
-              <ul style={{ margin: "8px 0 0 0", paddingLeft: "20px" }}>
-                {stats.warnings.map((warning: string, idx: number) => (
-                  <li key={idx}>{warning}</li>
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: { xs: "column-reverse", sm: "row" },
+                alignItems: { xs: "flex-start", sm: "center" },
+                gap: { xs: 1.5, sm: 2.5 },
+              }}
+            >
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: { xs: 1.5, sm: 2 },
+                  flexWrap: "wrap",
+                }}
+              >
+                {[
+                  { color: sourceColor.db, label: "DB value" },
+                  { color: sourceColor.combined, label: "Combined" },
+                  { color: sourceColor.luxor, label: "Luxor" },
+                  { color: sourceColor.braiins, label: "Braiins" },
+                ].map(({ color, label }) => (
+                  <Box
+                    key={label}
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      fontSize: 11,
+                      fontWeight: 500,
+                      color: d.muted,
+                    }}
+                  >
+                    <Box
+                      aria-hidden
+                      sx={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: "2px",
+                        bgcolor: color,
+                        flexShrink: 0,
+                      }}
+                    />
+                    {label}
+                  </Box>
                 ))}
-              </ul>
-            </Alert>
+              </Box>
+              <Segmented
+                ariaLabel="Pool"
+                value={poolMode}
+                onChange={setPoolMode}
+                options={[
+                  { id: "total", label: "All Pools" },
+                  { id: "luxor", label: "Luxor" },
+                  { id: "braiins", label: "Braiins" },
+                ]}
+              />
+            </Box>
           </Box>
-        )}
+
+          <Box
+            sx={{
+              display: "grid",
+              // Columns follow the space the grid actually has (which also
+              // changes when the sidebar collapses), not the window width:
+              // as many 240px+ columns as fit, capped at 4 so the donut
+              // cards always share the first row.
+              gridTemplateColumns:
+                "repeat(auto-fill, minmax(max(min(240px, 100%), calc((100% - 60px) / 4)), 1fr))",
+              gap: { xs: "12px", sm: "16px", md: "20px" },
+            }}
+          >
+            {/* === LOCAL INFRASTRUCTURE STATS === */}
+
+            {/* Miners Card */}
+            <AdminStatCard
+              daylight
+              title="Miners"
+              borderColor={getCardBorderColor("Miners")}
+              stats={[
+                {
+                  label: "Active",
+                  value: minersStats.active,
+                  color: d.success,
+                },
+                {
+                  label: "Inactive",
+                  value: minersStats.inactive,
+                  color: d.inputBorder,
+                },
+                {
+                  label: "Review",
+                  value: minersStats.actionRequired,
+                  color: d.danger,
+                },
+              ]}
+            />
+
+            {/* Spaces Card */}
+            <AdminStatCard
+              daylight
+              title="Spaces"
+              borderColor={sourceColor.db}
+              stats={[
+                {
+                  label: "Free",
+                  value: stats?.spaces.free ?? 0,
+                  color: d.success,
+                },
+                {
+                  label: "Used",
+                  value: stats?.spaces.used ?? 0,
+                  color: d.action,
+                },
+              ]}
+            />
+
+            {/* Customers Card - Local DB */}
+            <AdminStatCard
+              daylight
+              title="Customers"
+              borderColor={sourceColor.db}
+              stats={[
+                {
+                  label: "Active",
+                  value: stats?.customers.active ?? 0,
+                  color: d.success,
+                },
+                {
+                  label: "Inactive",
+                  value: stats?.customers.inactive ?? 0,
+                  color: d.inputBorder,
+                },
+              ]}
+            />
+
+            {/* Power Card - DB-only (independent of pool) */}
+            <AdminStatCard
+              daylight
+              title="Power"
+              borderColor={sourceColor.db}
+              stats={[
+                {
+                  label: "Free kW",
+                  value: poolStats?.power.availablePower ?? 0,
+                  color: d.success,
+                },
+                {
+                  label: "Used kW",
+                  value: poolStats?.power.usedPower ?? 0,
+                  color: d.action,
+                },
+              ]}
+            />
+
+            {/* === LUXOR POOL STATS === */}
+
+            {/* Monthly Revenue - From Cost Payments, excludes self-mining users */}
+            <AdminValueCard
+              daylight
+              title="Monthly Customer Billing (30 days)"
+              borderColor={sourceColor.db}
+              value={stats?.financial.monthlyRevenue ?? 0}
+              type="currency"
+              infoText="Sum of Electricity Charges and Adjustments (cost payments) from the last 30 days, flipped to a positive value, for hosted customers only. Excludes Payments, Hardware Sales, and customers with segment = SELF_MINING."
+              onClick={() => router.push("/admin/monthly-customer-billing")}
+            />
+
+            {/* Total Customer Balance, from our database */}
+            <AdminValueCard
+              daylight
+              title="Total Customer Balance"
+              borderColor={sourceColor.db}
+              value={stats?.financial.totalCustomerBalance ?? 0}
+              type="currency"
+              infoText="Sum of all Payments, Electricity Charges, and Adjustments (cost payments) across hosted customers, all-time. Excludes Hardware Sales, deleted customers, and customers with segment = SELF_MINING."
+              onClick={() => router.push("/admin/customer-balance")}
+            />
+
+            {/* Total Customer Mined Revenue - Available from both Luxor and Braiins, excludes self-mining users */}
+            <AdminValueCard
+              daylight
+              title="Total Customer Mined Revenue"
+              borderColor={getCardBorderColor("Total Customer Mined Revenue")}
+              value={totalMinedRevenue}
+              type="BTC"
+              infoText={
+                poolMode === "braiins"
+                  ? "Total BTC mined on Braiins for hosted customers, all-time. Excludes BTC mined by customers with segment = SELF_MINING (shown separately in the Self Mining Revenue (BTC) card)."
+                  : "Total BTC mined since 2025-01-01 across all subaccounts at the site (Luxor" +
+                    (poolMode === "total" ? " + Braiins" : "") +
+                    "), for hosted customers only. Excludes BTC mined by customers with segment = SELF_MINING (shown separately in the Self Mining Revenue (BTC) card)."
+              }
+            />
+
+            {/* Uptime 24h - From Luxor, shows N/A for Braiins */}
+            <AdminValueCard
+              daylight
+              title="Uptime (24 hours)"
+              borderColor={getCardBorderColor("Uptime (24 hours)")}
+              value={
+                poolMode === "braiins"
+                  ? "N/A"
+                  : `${(poolStats?.uptime_24h ?? 0).toFixed(2)}%`
+              }
+            />
+
+            {/* Hashrate 5 min - Available from both Luxor and Braiins */}
+            <AdminValueCard
+              daylight
+              title="Hashrate (5 min)"
+              borderColor={getCardBorderColor("Hashrate (5 min)")}
+              value={poolStats?.hashrate_5m ?? 0}
+              subtitle="PH/s"
+            />
+
+            {/* Hashrate 24h - Available from both Luxor and Braiins */}
+            <AdminValueCard
+              daylight
+              title="Hashrate (24 hours)"
+              borderColor={getCardBorderColor("Hashrate (24 hours)")}
+              value={poolStats?.hashrate_24h ?? 0}
+              subtitle="PH/s"
+            />
+
+            {/* === LUXOR POOL ACCOUNTS === */}
+
+            {/* Total Pool Accounts - Luxor only, shows N/A for Braiins */}
+            <AdminValueCard
+              daylight
+              title="Total Pool Accounts"
+              borderColor={getCardBorderColor("Total Pool Accounts")}
+              value={
+                poolMode === "braiins"
+                  ? "N/A"
+                  : (stats?.luxor.poolAccounts.total ?? 0)
+              }
+            />
+
+            {/* Active Pool Accounts - Luxor only, shows N/A for Braiins */}
+            <AdminValueCard
+              daylight
+              title="Active Pool Accounts"
+              borderColor={getCardBorderColor("Active Pool Accounts")}
+              value={
+                poolMode === "braiins"
+                  ? "N/A"
+                  : (stats?.luxor.poolAccounts.active ?? 0)
+              }
+            />
+
+            {/* Inactive Pool Accounts - Luxor only, shows N/A for Braiins */}
+            <AdminValueCard
+              daylight
+              title="Inactive Pool Accounts"
+              borderColor={getCardBorderColor("Inactive Pool Accounts")}
+              value={
+                poolMode === "braiins"
+                  ? "N/A"
+                  : (stats?.luxor.poolAccounts.inactive ?? 0)
+              }
+            />
+
+            {/* === WORKER STATISTICS FROM LUXOR === */}
+
+            {/* Total Workers - Available from both Luxor and Braiins */}
+            <AdminValueCard
+              daylight
+              title={
+                poolMode === "braiins"
+                  ? "Total Workers (Braiins)"
+                  : poolMode === "total"
+                    ? "Total Workers"
+                    : "Total Workers (Luxor)"
+              }
+              borderColor={getCardBorderColor("Total Workers")}
+              value={poolStats?.workers.totalWorkers ?? 0}
+            />
+
+            {/* Active Workers - Available from both Luxor and Braiins */}
+            <AdminValueCard
+              daylight
+              title={
+                poolMode === "braiins"
+                  ? "Active Workers (Braiins)"
+                  : poolMode === "total"
+                    ? "Active Workers"
+                    : "Active Workers (Luxor)"
+              }
+              borderColor={getCardBorderColor("Active Workers")}
+              value={poolStats?.workers.activeWorkers ?? 0}
+            />
+
+            {/* Inactive Workers - Available from both Luxor and Braiins */}
+            <AdminValueCard
+              daylight
+              title={
+                poolMode === "braiins"
+                  ? "Inactive Workers (Braiins)"
+                  : poolMode === "total"
+                    ? "Inactive Workers"
+                    : "Inactive Workers (Luxor)"
+              }
+              borderColor={getCardBorderColor("Inactive Workers")}
+              value={poolStats?.workers.inactiveWorkers ?? 0}
+            />
+
+            {/* === CUSTOMER FINANCIAL METRICS === */}
+
+            {/* Total Customers Count */}
+            <AdminValueCard
+              daylight
+              title="Total Customers"
+              borderColor={sourceColor.db}
+              value={stats?.customers.total ?? 0}
+            />
+
+            {/* === RESERVED FOR FUTURE LUXOR ENDPOINTS === */}
+
+            {/* Hosting and Colocation - From ELECTRICITY_CHARGES invoices (ISSUED/OVERDUE/PAID) */}
+            <AdminValueCard
+              daylight
+              title="Hosting and Colocation (Invoice)"
+              borderColor={sourceColor.db}
+              value={hostingRevenueData?.hostingRevenue ?? 0}
+              type="currency"
+              infoText="Sum of the total amount on all Electricity Charges invoices with status Issued, Overdue, or Paid. Draft, Cancelled, and Refunded invoices are excluded. Includes unpaid and overdue invoices, not just ones customers have actually paid."
+            />
+
+            {/* Hosting Cost - implemented */}
+            <AdminValueCard
+              daylight
+              title="Hosting Cost (Invoice)"
+              borderColor={sourceColor.db}
+              value={vendorInvoicesTotalAmount}
+              type="currency"
+              infoText="Sum of the total amount on all Vendor Invoices (what Bitfactory owes the hosting vendor), excluding Cancelled ones. Includes both Pending and Paid vendor invoices, not just paid ones."
+            />
+
+            {/* Hosting Profit - implemented */}
+            <AdminValueCard
+              daylight
+              title="Hosting Profit (Invoice)"
+              borderColor={sourceColor.db}
+              value={hostingProfit}
+              type="currency"
+              infoText="Hosting and Colocation (Invoice) minus Hosting Cost (Invoice) — what customers were invoiced for hosting minus what the vendor invoiced Bitfactory for the same, regardless of whether either invoice has actually been paid yet."
+            />
+
+            {/* Hardware Revenue - From Cost Payments (HARDWARE_SALES + HARDWARE_REPAIR payments) */}
+            <AdminValueCard
+              daylight
+              title="Hardware Revenue"
+              borderColor={sourceColor.db}
+              value={hardwareRevenueData?.hardwareRevenue ?? 0}
+              type="currency"
+              infoText="Sum of all payments recorded against Hardware Sales and Hardware Repair invoices, minus issued Hardware credit memos."
+            />
+
+            {/* Hardware Revenue Pending - HARDWARE_SALES + HARDWARE_REPAIR invoices not yet paid (DRAFT/ISSUED/OVERDUE) */}
+            <AdminValueCard
+              daylight
+              title="Hardware Revenue Pending"
+              borderColor={sourceColor.db}
+              value={hardwareRevenuePending}
+              type="currency"
+              infoText="Sum of the total amount on all Hardware Sales and Hardware Repair invoices with status Draft, Issued, or Overdue."
+            />
+
+            {/* Hardware Cost - From Hardware Purchase Invoices */}
+            <AdminValueCard
+              daylight
+              title="Hardware Cost"
+              borderColor={sourceColor.db}
+              value={hardwarePurchasesTotalAmount}
+              type="currency"
+              infoText="Quantity × unit price plus miscellaneous charges on all Hardware Purchase invoices that are Pending or Paid (Cancelled ones excluded). Security deposits are not included; see the Security Deposit card."
+            />
+
+            {/* Security Deposit - held by vendors, from Hardware Purchase invoices */}
+            <AdminValueCard
+              daylight
+              title="Security Deposit"
+              borderColor={sourceColor.db}
+              value={securityDeposits?.totals.outstanding ?? 0}
+              type="currency"
+              onClick={() => router.push("/accounting/security-deposits")}
+              infoText="Security deposits on Pending and Paid Hardware Purchase invoices, minus what vendors have returned or applied to their invoices. Click for the breakdown by vendor."
+            />
+
+            {/* Hardware Profit - Hardware Revenue minus Hardware Cost */}
+            <AdminValueCard
+              daylight
+              title="Hardware Profit"
+              borderColor={sourceColor.db}
+              value={hardwareProfit}
+              type="currency"
+            />
+
+            {/* Est Monthly Hosting Revenue - Not yet implemented */}
+            {/*<AdminValueCard title="Est Monthly Hosting Revenue" value="N/A" />*/}
+
+            {/* Est Monthly Hosting Profit - Not yet implemented */}
+            {/*<AdminValueCard title="Est Monthly Hosting Profit" value="N/A" />*/}
+
+            {/* Est Yearly Hosting Revenue - Not yet implemented */}
+            {/*<AdminValueCard title="Est Yearly Hosting Revenue" value="N/A" />*/}
+
+            {/* Est Yearly Hosting Profit - Not yet implemented */}
+            {/*<AdminValueCard title="Est Yearly Hosting Profit" value="N/A" />*/}
+
+            {/* Positive Balance - Aggregated from customer payments */}
+            <AdminValueCard
+              daylight
+              title="Positive Customer Balance"
+              borderColor={sourceColor.db}
+              value={customerBalanceData?.totalPositiveBalance ?? 0}
+              type="currency"
+            />
+
+            {/* Negative Balance - Aggregated from customer payments */}
+            <AdminValueCard
+              daylight
+              title="Negative Customer Balance"
+              borderColor={sourceColor.db}
+              value={customerBalanceData?.totalNegativeBalance ?? 0}
+              type="currency"
+            />
+
+            {/* Positive Balance Customers Count */}
+            <AdminValueCard
+              daylight
+              title="Positive Balance Customers"
+              borderColor={sourceColor.db}
+              value={customerBalanceData?.positiveCustomerCount ?? 0}
+              onClick={() =>
+                router.push("/customers/overview?balanceFilter=> 0")
+              }
+            />
+
+            {/* Negative Balance Customers Count */}
+            <AdminValueCard
+              daylight
+              title="Negative Balance Customers"
+              borderColor={sourceColor.db}
+              value={customerBalanceData?.negativeCustomerCount ?? 0}
+              onClick={() =>
+                router.push("/customers/overview?balanceFilter=< 0")
+              }
+            />
+
+            {/* Self Mining Revenue (BTC) - always Luxor + Braiins combined; only shown on "All Pools" filter */}
+            {poolMode === "total" && (
+              <AdminValueCard
+                daylight
+                title="Self Mining Revenue (BTC)"
+                borderColor={sourceColor.combined}
+                value={stats?.financial.selfMiningRevenueBtc ?? 0}
+                type="BTC"
+                infoText="Combined all-time BTC mined for customers with segment = SELF_MINING (e.g. Higgs Self Mining), across both pools: Luxor (since 2025-01-01) plus Braiins (all-time reward)."
+              />
+            )}
+
+            {/* Self Mining Revenue (USD) - always Luxor + Braiins combined; only shown on "All Pools" filter */}
+            {poolMode === "total" && (
+              <AdminValueCard
+                daylight
+                title="Self Mining Revenue (USD)"
+                borderColor={sourceColor.combined}
+                value={stats?.financial.selfMiningRevenueUsd ?? 0}
+                type="currency"
+                infoText="Self Mining Revenue (BTC) multiplied by the current BTC/USD market price (live from Binance)."
+              />
+            )}
+
+            {/* Self Mining Hosting Cost - electricity invoices issued to SELF_MINING users; a DB value, not pool-specific, always visible */}
+            <AdminValueCard
+              daylight
+              title="Self Mining Hosting Cost"
+              borderColor={sourceColor.db}
+              value={stats?.financial.selfMiningHostingCost ?? 0}
+              type="currency"
+              infoText="Sum of all issued Electricity Charges invoices (status not Draft) for customers with segment = SELF_MINING. Excludes Hardware Sales invoices. This is a single DB total and does not change with the pool filter."
+            />
+
+            {/* Self Mining Profit - always combined USD revenue minus hosting cost; only shown on "All Pools" filter */}
+            {poolMode === "total" && (
+              <AdminValueCard
+                daylight
+                title="Self Mining Profit"
+                borderColor={sourceColor.combined}
+                value={stats?.financial.selfMiningProfitUsd ?? 0}
+                type="currency"
+                infoText="Self Mining Revenue (USD) minus Self Mining Hosting Cost."
+              />
+            )}
+          </Box>
+
+          {/* === WARNINGS AND NOTES === */}
+          {stats?.warnings && stats.warnings.length > 0 && (
+            <Box sx={{ mt: 3 }}>
+              <Alert
+                severity="warning"
+                sx={{
+                  borderRadius: RADIUS_CONTROL,
+                  bgcolor: d.amber,
+                  color: d.warning,
+                  border: `1px solid ${d.borderAmber}`,
+                  fontFamily: fonts.body,
+                  fontSize: 13,
+                  "& .MuiAlert-icon": { color: d.warning },
+                }}
+              >
+                <strong>Data Availability Notes:</strong>
+                <ul style={{ margin: "8px 0 0 0", paddingLeft: "20px" }}>
+                  {stats.warnings.map((warning: string, idx: number) => (
+                    <li key={idx}>{warning}</li>
+                  ))}
+                </ul>
+              </Alert>
+            </Box>
+          )}
+        </Box>
       </Box>
     </>
   );

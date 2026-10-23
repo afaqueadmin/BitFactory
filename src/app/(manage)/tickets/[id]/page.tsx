@@ -6,6 +6,11 @@ import { Box, Button, TextField, MenuItem, Typography } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import { useUser } from "@/lib/hooks/useUser";
 import { useTicket } from "@/lib/hooks/useTickets";
+import { useDaylight } from "@/lib/daylight";
+import {
+  DaylightAdminPage,
+  useDaylightAdminSx,
+} from "@/components/daylight/AdminPage";
 import TicketThreadView from "@/components/tickets/TicketThreadView";
 
 interface StaffOption {
@@ -15,6 +20,7 @@ interface StaffOption {
 }
 
 function AssignControl({ ticketId }: { ticketId: string }) {
+  const ds = useDaylightAdminSx();
   const { ticket, assign, assigning } = useTicket(ticketId);
   const [staff, setStaff] = useState<StaffOption[]>([]);
 
@@ -36,7 +42,7 @@ function AssignControl({ ticketId }: { ticketId: string }) {
         value={ticket.assignedTo?.id || ""}
         onChange={(e) => assign(e.target.value || null)}
         disabled={assigning}
-        sx={{ minWidth: 260 }}
+        sx={{ minWidth: 260, ...ds.inputSx }}
       >
         <MenuItem value="">Unassigned (shared queue)</MenuItem>
         {staff.map((s) => (
@@ -53,15 +59,25 @@ export default function AdminTicketDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const { user } = useUser();
+  const { d, fonts } = useDaylight();
 
   if (!user) return null;
 
   return (
-    <Box sx={{ p: 4 }}>
+    <DaylightAdminPage>
       <Button
         startIcon={<ArrowBackIcon />}
         onClick={() => router.push("/tickets")}
-        sx={{ mb: 2 }}
+        sx={{
+          mb: 2,
+          textTransform: "none",
+          fontFamily: fonts.body,
+          fontWeight: 600,
+          fontSize: 13,
+          color: d.action,
+          borderRadius: "8px",
+          "&:hover": { bgcolor: d.hover },
+        }}
       >
         Back to Tickets
       </Button>
@@ -74,8 +90,12 @@ export default function AdminTicketDetailPage() {
             <Box>
               <Typography
                 variant="caption"
-                color="text.secondary"
-                sx={{ display: "block", mt: 1 }}
+                sx={{
+                  display: "block",
+                  mt: 1,
+                  color: d.muted,
+                  fontFamily: fonts.body,
+                }}
               >
                 Assignment (super admin only)
               </Typography>
@@ -83,7 +103,8 @@ export default function AdminTicketDetailPage() {
             </Box>
           ) : undefined
         }
+        daylight
       />
-    </Box>
+    </DaylightAdminPage>
   );
 }

@@ -14,24 +14,40 @@ export default function ManageLayout({
 }) {
   return (
     <AdminNavProvider>
-      <AdminHeader />
-      <PasskeySetupPrompt />
-      <TwoFactorReminder />
-      <Box sx={{ display: "flex", height: "calc(100vh - 64px)" }}>
-        <AdminSidebar />
-        <Box
-          component="main"
-          sx={{
-            flex: 1,
-            width: "100%",
-            minWidth: 0,
-            height: "100%",
-            overflowX: "hidden",
-            overflowY: "auto",
-            bgcolor: "background.default",
-          }}
-        >
-          {children}
+      {/* App shell: exactly one viewport tall, the header (and any prompt
+          banners) take their natural height and the sidebar + content fill
+          the rest. Only <main> scrolls, so the page never gets a second
+          scrollbar whatever the header's exact height is. dvh tracks the
+          mobile browser toolbar; vh is the fallback. */}
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: "column",
+          height: "100vh",
+          "@supports (height: 100dvh)": { height: "100dvh" },
+          overflow: "hidden",
+        }}
+      >
+        <AdminHeader />
+        <PasskeySetupPrompt />
+        <TwoFactorReminder />
+        <Box sx={{ display: "flex", flex: 1, minHeight: 0 }}>
+          <AdminSidebar />
+          <Box
+            component="main"
+            sx={{
+              flex: 1,
+              width: "100%",
+              minWidth: 0,
+              height: "100%",
+              overflowX: "hidden",
+              overflowY: "auto",
+              overscrollBehavior: "contain",
+              bgcolor: "background.default",
+            }}
+          >
+            {children}
+          </Box>
         </Box>
       </Box>
     </AdminNavProvider>

@@ -3,7 +3,6 @@
 import React, { useState } from "react";
 import {
   Box,
-  Typography,
   Stack,
   TextField,
   MenuItem,
@@ -14,7 +13,6 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  Chip,
   Button,
   CircularProgress,
   Alert,
@@ -29,6 +27,17 @@ import {
   FormLabel,
 } from "@mui/material";
 import {
+  CellNote,
+  DaylightAdminPage,
+  DaylightEmptyState,
+  DaylightLoading,
+  DaylightPageHeader,
+  DaylightStatusPill,
+  requestStatusTone,
+  statusLabel,
+  useDaylightAdminSx,
+} from "@/components/daylight/AdminPage";
+import {
   useFirmwareChangeRequests,
   useReviewFirmwareChangeRequest,
   FirmwareChangeRequestItem,
@@ -37,14 +46,9 @@ import { useUser } from "@/lib/hooks/useUser";
 import ManageFirmwareOptionsDialog from "@/components/admin/ManageFirmwareOptionsDialog";
 
 const STATUSES = ["PENDING", "CONFIRMED", "APPROVED", "REJECTED"];
-const STATUS_COLOR: Record<string, "warning" | "info" | "success" | "error"> = {
-  PENDING: "warning",
-  CONFIRMED: "info",
-  APPROVED: "success",
-  REJECTED: "error",
-};
 
 export default function FirmwareChangeRequestsPage() {
+  const ds = useDaylightAdminSx();
   const [status, setStatus] = useState("PENDING");
   const { requests, loading, error, refetch } = useFirmwareChangeRequests(
     status ? { status } : undefined,
@@ -213,16 +217,18 @@ export default function FirmwareChangeRequestsPage() {
   };
 
   return (
-    <Box sx={{ p: 4 }}>
-      <Typography variant="h4" fontWeight={700} sx={{ mb: 1 }}>
-        Firmware Change Requests
-      </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-        Client-submitted requests to change the firmware on one of their Luxor
-        miners. Confirm with the client (call/email) first, then approve.
-        Approving does not change anything on the miner - you must flash the new
-        firmware yourself.
-      </Typography>
+    <DaylightAdminPage>
+      <DaylightPageHeader
+        title="Firmware Change Requests"
+        description={
+          <>
+            Client-submitted requests to change the firmware on one of their
+            Luxor miners. Confirm with the client (call/email) first, then
+            approve. Approving does not change anything on the miner - you must
+            flash the new firmware yourself.
+          </>
+        }
+      />
 
       <Stack
         direction="row"
@@ -238,7 +244,7 @@ export default function FirmwareChangeRequestsPage() {
           label="Status"
           value={status}
           onChange={(e) => setStatus(e.target.value)}
-          sx={{ minWidth: 220 }}
+          sx={{ minWidth: 220, ...ds.inputSx }}
         >
           <MenuItem value="">All statuses</MenuItem>
           {STATUSES.map((s) => (
@@ -247,23 +253,29 @@ export default function FirmwareChangeRequestsPage() {
             </MenuItem>
           ))}
         </TextField>
-        <Button variant="outlined" onClick={() => setManageOptionsOpen(true)}>
+        <Button
+          sx={ds.outlineBtnSx}
+          variant="outlined"
+          onClick={() => setManageOptionsOpen(true)}
+        >
           Manage Firmware Options
         </Button>
       </Stack>
 
       {loading ? (
-        <Box sx={{ display: "flex", justifyContent: "center", p: 4 }}>
-          <CircularProgress />
-        </Box>
+        <DaylightLoading />
       ) : error ? (
-        <Alert severity="error">{error}</Alert>
+        <Alert severity="error" sx={{ ...ds.alertSx("error") }}>
+          {error}
+        </Alert>
       ) : requests.length === 0 ? (
-        <Typography variant="body2" color="text.secondary">
-          No requests found.
-        </Typography>
+        <DaylightEmptyState>No requests found.</DaylightEmptyState>
       ) : (
-        <TableContainer component={Paper} variant="outlined">
+        <TableContainer
+          component={Paper}
+          variant="outlined"
+          sx={ds.tableCardSx}
+        >
           <Table size="small">
             <TableHead>
               <TableRow>
@@ -282,21 +294,11 @@ export default function FirmwareChangeRequestsPage() {
                 <TableRow key={req.id}>
                   <TableCell>
                     {req.user.name || req.user.email}
-                    <Typography
-                      variant="caption"
-                      color="text.secondary"
-                      display="block"
-                    >
-                      {req.user.email}
-                    </Typography>
+                    <CellNote>{req.user.email}</CellNote>
                     {req.requestedBySecondary && req.requestedByEmail && (
-                      <Typography
-                        variant="caption"
-                        color="text.secondary"
-                        display="block"
-                      >
+                      <CellNote>
                         Requested by {req.requestedByEmail} (secondary sign-in)
-                      </Typography>
+                      </CellNote>
                     )}
                   </TableCell>
                   <TableCell>
@@ -305,13 +307,7 @@ export default function FirmwareChangeRequestsPage() {
                   <TableCell>
                     {req.minerName}
                     {req.subaccountName && (
-                      <Typography
-                        variant="caption"
-                        color="text.secondary"
-                        display="block"
-                      >
-                        Subaccount: {req.subaccountName}
-                      </Typography>
+                      <CellNote>Subaccount: {req.subaccountName}</CellNote>
                     )}
                   </TableCell>
                   <TableCell>{req.currentFirmware || "Unknown"}</TableCell>
@@ -320,35 +316,24 @@ export default function FirmwareChangeRequestsPage() {
                   </TableCell>
                   <TableCell>{req.reason || "—"}</TableCell>
                   <TableCell>
-                    <Chip
-                      label={req.status}
-                      size="small"
-                      color={STATUS_COLOR[req.status] || "default"}
+                    <DaylightStatusPill
+                      label={statusLabel(req.status)}
+                      tone={requestStatusTone(req.status)}
                     />
                     {req.status === "REJECTED" && req.rejectionReason && (
-                      <Typography
-                        variant="caption"
-                        color="text.secondary"
-                        display="block"
-                      >
-                        {req.rejectionReason}
-                      </Typography>
+                      <CellNote>{req.rejectionReason}</CellNote>
                     )}
                     {(req.status === "CONFIRMED" ||
                       req.status === "APPROVED") &&
                       req.confirmationMethod && (
-                        <Typography
-                          variant="caption"
-                          color="text.secondary"
-                          display="block"
-                        >
+                        <CellNote>
                           Confirmed via{" "}
                           {req.confirmationMethod === "EMAIL"
                             ? "email"
                             : "call"}{" "}
                           ({req.confirmationContact}) by{" "}
                           {req.confirmedBy?.name || req.confirmedBy?.email}
-                        </Typography>
+                        </CellNote>
                       )}
                   </TableCell>
                   <TableCell align="right">
@@ -359,9 +344,9 @@ export default function FirmwareChangeRequestsPage() {
                     >
                       {req.status === "PENDING" && (
                         <Button
+                          sx={ds.primaryBtnSx}
                           size="small"
                           variant="contained"
-                          color="info"
                           disabled={confirming || rejecting}
                           onClick={() => setConfirmTarget(req)}
                         >
@@ -370,9 +355,9 @@ export default function FirmwareChangeRequestsPage() {
                       )}
                       {req.status === "CONFIRMED" && (
                         <Button
+                          sx={ds.successBtnSx}
                           size="small"
                           variant="contained"
-                          color="success"
                           disabled={approving || rejecting}
                           onClick={() => setApproveTarget(req)}
                         >
@@ -382,9 +367,9 @@ export default function FirmwareChangeRequestsPage() {
                       {(req.status === "PENDING" ||
                         req.status === "CONFIRMED") && (
                         <Button
+                          sx={ds.dangerOutlineBtnSx}
                           size="small"
                           variant="outlined"
-                          color="error"
                           disabled={confirming || approving || rejecting}
                           onClick={() => setRejectTarget(req)}
                         >
@@ -625,6 +610,6 @@ export default function FirmwareChangeRequestsPage() {
         open={manageOptionsOpen}
         onClose={() => setManageOptionsOpen(false)}
       />
-    </Box>
+    </DaylightAdminPage>
   );
 }

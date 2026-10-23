@@ -1,25 +1,29 @@
 "use client";
 
 import React, { useState } from "react";
-import { Box, Typography, Stack, TextField, MenuItem } from "@mui/material";
+import { Stack, TextField, MenuItem } from "@mui/material";
+import {
+  DaylightAdminPage,
+  DaylightPageHeader,
+  useDaylightAdminSx,
+} from "@/components/daylight/AdminPage";
 import { useTickets } from "@/lib/hooks/useTickets";
 import TicketListTable from "@/components/tickets/TicketListTable";
 import { TICKET_STATUSES, TICKET_STATUS_LABELS } from "@/lib/constants/tickets";
 
 export default function AdminTicketsPage() {
+  const ds = useDaylightAdminSx();
   const [status, setStatus] = useState("");
   const { tickets, loading, error } = useTickets(
     status ? { status } : undefined,
   );
 
   return (
-    <Box sx={{ p: 4 }}>
-      <Typography variant="h4" fontWeight={700} sx={{ mb: 1 }}>
-        Support Tickets
-      </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-        Every ticket raised by a client or franchisee, across all franchises.
-      </Typography>
+    <DaylightAdminPage>
+      <DaylightPageHeader
+        title="Support Tickets"
+        description="Every ticket raised by a client or franchisee, across all franchises."
+      />
 
       <Stack direction="row" sx={{ mb: 3 }}>
         <TextField
@@ -28,7 +32,7 @@ export default function AdminTicketsPage() {
           label="Status"
           value={status}
           onChange={(e) => setStatus(e.target.value)}
-          sx={{ minWidth: 220 }}
+          sx={{ minWidth: 220, ...ds.inputSx }}
         >
           <MenuItem value="">All statuses</MenuItem>
           {TICKET_STATUSES.map((s) => (
@@ -47,7 +51,8 @@ export default function AdminTicketsPage() {
         showRaisedBy
         showFranchise
         showAssignee
+        daylight
       />
-    </Box>
+    </DaylightAdminPage>
   );
 }

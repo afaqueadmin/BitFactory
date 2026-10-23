@@ -2,7 +2,6 @@
 
 import React, { useState } from "react";
 import {
-  Box,
   Typography,
   Stack,
   TextField,
@@ -14,9 +13,7 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  Chip,
   Button,
-  CircularProgress,
   Alert,
   TableSortLabel,
   Dialog,
@@ -28,6 +25,15 @@ import {
   ListItem,
   ListItemText,
 } from "@mui/material";
+import {
+  CellNote,
+  DaylightAdminPage,
+  DaylightEmptyState,
+  DaylightLoading,
+  DaylightPageHeader,
+  DaylightStatusPill,
+  useDaylightAdminSx,
+} from "@/components/daylight/AdminPage";
 import {
   useHashrateAlerts,
   useAcknowledgeHashrateAlert,
@@ -66,6 +72,7 @@ type SortField =
   | "status";
 
 export default function HashrateAlertsPage() {
+  const ds = useDaylightAdminSx();
   const [filter, setFilter] = useState("false");
   const { alerts, loading, error, refetch } = useHashrateAlerts(
     filter ? { acknowledged: filter === "true" } : undefined,
@@ -252,14 +259,16 @@ export default function HashrateAlertsPage() {
   };
 
   return (
-    <Box sx={{ p: 4 }}>
-      <Typography variant="h4" fontWeight={700} sx={{ mb: 1 }}>
-        Hashrate Alerts
-      </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-        Miners whose previous day&apos;s hashrate fell below their configured
-        benchmark, as detected by cron_hashrate_benchmark_alert.
-      </Typography>
+    <DaylightAdminPage>
+      <DaylightPageHeader
+        title="Hashrate Alerts"
+        description={
+          <>
+            Miners whose previous day&apos;s hashrate fell below their
+            configured benchmark, as detected by cron_hashrate_benchmark_alert.
+          </>
+        }
+      />
 
       <Stack
         direction="row"
@@ -276,7 +285,7 @@ export default function HashrateAlertsPage() {
             label="Status"
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            sx={{ minWidth: 220 }}
+            sx={{ minWidth: 220, ...ds.inputSx }}
           >
             {FILTERS.map((f) => (
               <MenuItem key={f.value} value={f.value}>
@@ -289,14 +298,14 @@ export default function HashrateAlertsPage() {
             label="Miner"
             value={minerFilter}
             onChange={(e) => setMinerFilter(e.target.value)}
-            sx={{ minWidth: 220 }}
+            sx={{ minWidth: 220, ...ds.inputSx }}
           />
           <TextField
             size="small"
             label="Customer"
             value={customerFilter}
             onChange={(e) => setCustomerFilter(e.target.value)}
-            sx={{ minWidth: 220 }}
+            sx={{ minWidth: 220, ...ds.inputSx }}
           />
           <TextField
             size="small"
@@ -305,7 +314,7 @@ export default function HashrateAlertsPage() {
             value={minShortfallFilter}
             onChange={(e) => setMinShortfallFilter(e.target.value)}
             inputProps={{ min: 0, max: 100, step: 0.1 }}
-            sx={{ minWidth: 160 }}
+            sx={{ minWidth: 160, ...ds.inputSx }}
           />
           <TextField
             size="small"
@@ -314,7 +323,7 @@ export default function HashrateAlertsPage() {
             value={maxShortfallFilter}
             onChange={(e) => setMaxShortfallFilter(e.target.value)}
             inputProps={{ min: 0, max: 100, step: 0.1 }}
-            sx={{ minWidth: 160 }}
+            sx={{ minWidth: 160, ...ds.inputSx }}
           />
           <TextField
             size="small"
@@ -323,10 +332,11 @@ export default function HashrateAlertsPage() {
             value={dateFilter}
             onChange={(e) => setDateFilter(e.target.value)}
             InputLabelProps={{ shrink: true }}
-            sx={{ minWidth: 180 }}
+            sx={{ minWidth: 180, ...ds.inputSx }}
           />
         </Stack>
         <Button
+          sx={ds.primaryBtnSx}
           variant="contained"
           disabled={loading || pendingFilteredAlerts.length === 0}
           onClick={() => setBulkDialogOpen(true)}
@@ -338,23 +348,25 @@ export default function HashrateAlertsPage() {
       </Stack>
 
       {actionError && (
-        <Alert severity="error" sx={{ mb: 2 }}>
+        <Alert severity="error" sx={{ mb: 2, ...ds.alertSx("error") }}>
           {actionError}
         </Alert>
       )}
 
       {loading ? (
-        <Box sx={{ display: "flex", justifyContent: "center", p: 4 }}>
-          <CircularProgress />
-        </Box>
+        <DaylightLoading />
       ) : error ? (
-        <Alert severity="error">{error}</Alert>
+        <Alert severity="error" sx={{ ...ds.alertSx("error") }}>
+          {error}
+        </Alert>
       ) : sortedAlerts.length === 0 ? (
-        <Typography variant="body2" color="text.secondary">
-          No alerts found.
-        </Typography>
+        <DaylightEmptyState>No alerts found.</DaylightEmptyState>
       ) : (
-        <TableContainer component={Paper} variant="outlined">
+        <TableContainer
+          component={Paper}
+          variant="outlined"
+          sx={ds.tableCardSx}
+        >
           <Table size="small">
             <TableHead>
               <TableRow>
@@ -447,36 +459,27 @@ export default function HashrateAlertsPage() {
                     </TableCell>
                     <TableCell>
                       {alert.acknowledgedAt ? (
-                        <Chip
+                        <DaylightStatusPill
                           label="Acknowledged"
-                          size="small"
-                          color="success"
+                          tone="success"
                         />
                       ) : (
-                        <Chip label="Pending" size="small" color="warning" />
+                        <DaylightStatusPill label="Pending" tone="warning" />
                       )}
                       {alert.acknowledgedBy && (
-                        <Typography
-                          variant="caption"
-                          color="text.secondary"
-                          display="block"
-                        >
+                        <CellNote>
                           by{" "}
                           {alert.acknowledgedBy.name ||
                             alert.acknowledgedBy.email}
-                        </Typography>
+                        </CellNote>
                       )}
                       {alert.restarts?.[0] && (
-                        <Typography
-                          variant="caption"
-                          color="text.secondary"
-                          display="block"
-                        >
+                        <CellNote>
                           Restarted{" "}
                           {formatDateTime(alert.restarts[0].restartedAt)} by{" "}
                           {alert.restarts[0].createdBy.name ||
                             alert.restarts[0].createdBy.email}
-                        </Typography>
+                        </CellNote>
                       )}
                     </TableCell>
                     <TableCell align="right">
@@ -486,6 +489,7 @@ export default function HashrateAlertsPage() {
                         justifyContent="flex-end"
                       >
                         <Button
+                          sx={ds.outlineBtnSx}
                           size="small"
                           variant="outlined"
                           onClick={() => openRestartDialog(alert)}
@@ -494,6 +498,7 @@ export default function HashrateAlertsPage() {
                         </Button>
                         {!alert.acknowledgedAt && (
                           <Button
+                            sx={ds.primaryBtnSx}
                             size="small"
                             variant="contained"
                             disabled={acknowledging}
@@ -627,6 +632,6 @@ export default function HashrateAlertsPage() {
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
+    </DaylightAdminPage>
   );
 }

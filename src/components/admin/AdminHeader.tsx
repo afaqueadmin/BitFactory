@@ -6,7 +6,6 @@ import {
   AppBar,
   Toolbar,
   IconButton,
-  styled,
   Menu,
   MenuItem,
   CircularProgress,
@@ -21,18 +20,13 @@ import DarkModeIcon from "@mui/icons-material/DarkMode";
 import { useTheme } from "@/app/theme-provider";
 import BtcPriceLabel from "@/components/BtcPriceLabel";
 import { useAdminNav } from "@/lib/contexts/admin-nav-context";
-
-const StyledAppBar = styled(AppBar)(({ theme }) => ({
-  backgroundColor: theme.palette.background.paper,
-  color: theme.palette.text.primary,
-  borderBottom: `1px solid ${theme.palette.divider}`,
-}));
-
-const StyledIconButton = styled(IconButton)(({ theme }) => ({
-  "&:hover": {
-    backgroundColor: theme.palette.action.hover,
-  },
-}));
+import {
+  HEADER_HEIGHT,
+  MQ,
+  focusRing,
+  logoFilter,
+  useDaylight,
+} from "@/lib/daylight";
 
 export default function AdminHeader() {
   const router = useRouter();
@@ -43,6 +37,41 @@ export default function AdminHeader() {
   );
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const { darkMode, toggleDarkMode } = useTheme();
+  const { d, fonts } = useDaylight();
+
+  const iconBtnSx = {
+    width: 40,
+    height: 40,
+    border: `1px solid ${d.border}`,
+    bgcolor: d.surface,
+    borderRadius: "10px",
+    color: d.muted,
+    "&:hover": { bgcolor: d.hover },
+    "&:focus-visible": focusRing(d.action),
+    "& .MuiSvgIcon-root": { fontSize: 20 },
+    [MQ.mobile]: { width: 44, height: 44 },
+  } as const;
+
+  const menuPaperSx = {
+    mt: 1,
+    minWidth: 200,
+    borderRadius: "12px",
+    border: `1px solid ${d.border}`,
+    bgcolor: d.surface,
+    backgroundImage: "none",
+    boxShadow: "0 8px 30px rgba(100,114,124,.13)",
+    fontFamily: fonts.body,
+    "& .MuiMenuItem-root": {
+      minHeight: 44,
+      px: 2,
+      fontFamily: fonts.body,
+      fontSize: 13,
+      fontWeight: 500,
+      color: d.text,
+      "&:hover": { bgcolor: d.hover },
+      "&.Mui-focusVisible": { bgcolor: d.skySoft },
+    },
+  } as const;
 
   const handleAccountClick = (event: React.MouseEvent<HTMLElement>) => {
     setAccountAnchorEl(event.currentTarget);
@@ -69,12 +98,30 @@ export default function AdminHeader() {
   };
 
   return (
-    <StyledAppBar position="sticky" elevation={2}>
+    <AppBar
+      // Static: the layout shell keeps it on screen (only <main> scrolls).
+      position="static"
+      elevation={0}
+      sx={{
+        flexShrink: 0,
+        backgroundColor: d.surface,
+        backgroundImage: "none",
+        color: d.text,
+        borderBottom: `1px solid ${d.border}`,
+        boxShadow: "none",
+        fontFamily: fonts.body,
+      }}
+    >
       <Toolbar
+        disableGutters
         sx={{
-          px: { xs: 1.5, sm: 2.5, md: 3.5 },
-          minHeight: { xs: 64, sm: 70, md: 74 },
-          py: 0.5,
+          px: { xs: "16px", sm: "24px", md: "36px" },
+          height: HEADER_HEIGHT.desktop,
+          minHeight: HEADER_HEIGHT.desktop,
+          [MQ.mobile]: {
+            height: HEADER_HEIGHT.mobile,
+            minHeight: HEADER_HEIGHT.mobile,
+          },
         }}
       >
         {/* Mobile Hamburger Menu Toggle */}
@@ -84,11 +131,13 @@ export default function AdminHeader() {
           edge="start"
           onClick={toggleMobileOpen}
           sx={{
-            mr: { xs: 0.75, sm: 1.5 },
+            ...iconBtnSx,
+            ml: 0,
+            mr: { xs: 1.5, sm: 2 },
             display: { xs: "flex", md: "none" },
           }}
         >
-          <MenuIcon sx={{ fontSize: { xs: 26, sm: 28 } }} />
+          <MenuIcon />
         </IconButton>
 
         {/* Left Side - BitFactory Logo */}
@@ -96,8 +145,8 @@ export default function AdminHeader() {
           <Box
             sx={{
               position: "relative",
-              width: { xs: 190, sm: 230, md: 260 },
-              height: { xs: 50, sm: 58, md: 66 },
+              width: { xs: 150, sm: 190, md: 210 },
+              height: { xs: 44, sm: 52, md: 58 },
               cursor: "pointer",
             }}
             onClick={handleLogoClick}
@@ -106,9 +155,13 @@ export default function AdminHeader() {
               src="/BitfactoryLogo.webp"
               alt="BitFactory Logo"
               fill
-              sizes="(max-width: 600px) 190px, 260px"
+              sizes="(max-width: 600px) 150px, 210px"
               priority
-              style={{ objectFit: "contain", objectPosition: "left center" }}
+              style={{
+                objectFit: "contain",
+                objectPosition: "left center",
+                filter: logoFilter(darkMode),
+              }}
             />
           </Box>
         </Box>
@@ -118,23 +171,22 @@ export default function AdminHeader() {
           sx={{
             display: "flex",
             alignItems: "center",
-            gap: { xs: 0.5, sm: 1 },
+            gap: { xs: "8px", sm: "10px" },
           }}
         >
           {/* Live BTC Price Ticker */}
           <Box sx={{ display: { xs: "none", sm: "flex" }, mr: 0.5 }}>
-            <BtcPriceLabel />
+            <BtcPriceLabel daylight />
           </Box>
 
           {/* Dark Mode Toggle */}
-          <StyledIconButton
-            size="large"
+          <IconButton
             aria-label="darkmode"
-            color="inherit"
             onClick={toggleDarkMode}
+            sx={iconBtnSx}
           >
             {darkMode ? <LightModeIcon /> : <DarkModeIcon />}
-          </StyledIconButton>
+          </IconButton>
 
           {/*<StyledIconButton*/}
           {/*  size="large"*/}
@@ -167,18 +219,20 @@ export default function AdminHeader() {
           {/*  </MenuItem>*/}
           {/*</Menu>*/}
 
-          <StyledIconButton
-            size="large"
+          <IconButton
             aria-label="account"
-            color="inherit"
             onClick={handleAccountClick}
+            sx={{ ...iconBtnSx, color: d.action }}
           >
             <AccountCircleIcon />
-          </StyledIconButton>
+          </IconButton>
           <Menu
             anchorEl={accountAnchorEl}
             open={Boolean(accountAnchorEl)}
             onClose={handleClose}
+            anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+            transformOrigin={{ vertical: "top", horizontal: "right" }}
+            slotProps={{ paper: { sx: menuPaperSx } }}
           >
             <MenuItem
               onClick={() => {
@@ -225,7 +279,7 @@ export default function AdminHeader() {
             >
               {isLoggingOut ? (
                 <>
-                  <CircularProgress size={16} />
+                  <CircularProgress size={16} sx={{ color: d.action }} />
                   Signing Out...
                 </>
               ) : (
@@ -235,6 +289,6 @@ export default function AdminHeader() {
           </Menu>
         </Box>
       </Toolbar>
-    </StyledAppBar>
+    </AppBar>
   );
 }

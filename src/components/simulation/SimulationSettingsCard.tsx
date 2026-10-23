@@ -14,6 +14,8 @@ import {
   Typography,
 } from "@mui/material";
 import { formatValue } from "@/lib/helpers/formatValue";
+import { useDaylight } from "@/lib/daylight";
+import { useDaylightAdminSx } from "@/components/daylight/AdminPage";
 
 interface MinerOption {
   id: string;
@@ -47,6 +49,8 @@ export default function SimulationSettingsCard({
 }: {
   onSaved?: () => void;
 }) {
+  const { d, fonts } = useDaylight();
+  const ds = useDaylightAdminSx();
   const [miners, setMiners] = useState<MinerOption[]>([]);
   const [minerId, setMinerId] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState("");
@@ -130,29 +134,42 @@ export default function SimulationSettingsCard({
   };
 
   return (
-    <Paper variant="outlined" sx={{ p: 2, mb: 3 }}>
-      <Typography variant="h6" fontWeight={700}>
+    <Paper
+      component="section"
+      elevation={0}
+      sx={{ ...ds.cardSx, mb: { xs: "20px", md: "24px" } }}
+    >
+      <Typography component="h2" sx={ds.sectionTitleSx}>
         Simulation settings
       </Typography>
-      <Typography variant="body2" color="text.secondary" mb={2}>
+      <Box
+        sx={{
+          mt: "4px",
+          mb: 2,
+          maxWidth: 820,
+          fontSize: 13,
+          lineHeight: 1.55,
+          color: d.muted,
+        }}
+      >
         Every simulated account mirrors this miner&apos;s real earnings and is
         charged electricity at the rate below each day at 00:00 UTC. A new rate
         applies from the next charge; a new bonus applies to accounts that start
         from now on.
-      </Typography>
+      </Box>
 
       {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
+        <Alert severity="error" sx={{ mb: 2, ...ds.alertSx("error") }}>
           {error}
         </Alert>
       )}
       {notice && (
-        <Alert severity="success" sx={{ mb: 2 }}>
+        <Alert severity="success" sx={{ mb: 2, ...ds.alertSx("success") }}>
           {notice}
         </Alert>
       )}
       {!loading && !stored && (
-        <Alert severity="info" sx={{ mb: 2 }}>
+        <Alert severity="info" sx={{ mb: 2, ...ds.alertSx("info") }}>
           These values still come from the server environment. Save once to
           manage them here.
         </Alert>
@@ -160,10 +177,26 @@ export default function SimulationSettingsCard({
 
       {loading ? (
         <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}>
-          <CircularProgress size={24} />
+          <CircularProgress size={24} sx={{ color: d.action }} />
         </Box>
       ) : (
-        <Stack spacing={2}>
+        <Stack
+          spacing={2}
+          sx={{
+            ...ds.inputSx,
+            "& .MuiInputAdornment-root .MuiTypography-root": {
+              fontFamily: fonts.body,
+              fontSize: 13,
+              color: d.muted,
+            },
+            "& .MuiFormHelperText-root": {
+              fontFamily: fonts.body,
+              fontSize: 11.5,
+              color: d.muted,
+              mx: "2px",
+            },
+          }}
+        >
           <Autocomplete
             options={miners}
             value={selected}
@@ -177,7 +210,10 @@ export default function SimulationSettingsCard({
             )}
           />
           {selected && (
-            <Typography variant="caption" color="text.secondary">
+            <Typography
+              variant="caption"
+              sx={{ fontFamily: fonts.body, fontSize: 12, color: d.muted }}
+            >
               {selected.model}, {selected.powerUsageKw} kW, status{" "}
               {selected.status}. Its real client rate is{" "}
               {selected.realRatePerKwh} USD/kWh.
@@ -228,6 +264,7 @@ export default function SimulationSettingsCard({
             <Button
               variant="contained"
               onClick={handleSave}
+              sx={ds.primaryBtnSx}
               disabled={saving || !minerId || bonus === "" || rate === ""}
             >
               {saving ? "Saving..." : "Save settings"}

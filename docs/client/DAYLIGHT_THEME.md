@@ -9,10 +9,12 @@ business logic, data fetching, or API contracts change when a page is
 Daylight v1.3 style guide (PDF + reference `index.html`/`theme.css`, not
 checked into this repo).
 
-**Scope discipline:** Daylight only touches the client dashboard and its
-sidebar/header. Franchise (`(franchise)`) and admin (`(manage)`) pages must
-stay visually unchanged. This is enforced with two patterns, both described
-below:
+**Scope discipline:** Daylight covers the client portal plus the admin
+chrome (header + sidebar), the admin dashboard, the Work Queue pages,
+Customer Overview, Subaccount Groups, Subaccounts, Franchisees and Simulated
+Accounts - see "Admin pages" below. Franchise (`(franchise)`) pages and every other admin
+page body must stay visually unchanged. This is enforced with two patterns,
+both described below:
 1. New pages get a full rewrite (they're not shared with other roles).
 2. Existing components shared across roles get an **opt-in `daylight` prop**
    (default `false`) instead of being changed in place.
@@ -80,6 +82,7 @@ Reach for these before writing new one-off styles:
 | `FactoryStatusCard` | The dashboard's "fleet health" card (status ring + legend rows + pool breakdown + "view all miners" link). |
 | `Segmented<T>` | Small track of 2-3 mutually exclusive options (e.g. Daily/Monthly). Generic over the option id type. |
 | `PillTab` | Single pill for a scrollable row of filters (pool selector, miner filter), with an optional colour dot. |
+| `AdminPage` (several exports) | Admin list-page kit: `DaylightAdminPage` (canvas + padding), `DaylightPageHeader` (title, description, `actions`), `DaylightStatusPill` + `requestStatusTone`/`statusLabel`, `CellNote` (muted line under a cell value), `DaylightLoading`, `DaylightEmptyState`, and `useDaylightAdminSx()` (`inputSx`, button sx incl. `textBtnSx(tone)` for row actions, `alertSx` (success/error/info/warning), `cardSx`, `sectionTitleSx`, `tableSx`, `tableCardSx`). Per-cell overrides inside a themed table need a tripled selector (`sx={{ "&&&": {...} }}`) to beat the table-wide cell font. `tableSx` styles an unmodified MUI table through descendant selectors. |
 | `RelationshipManagerCard` | Customer's RM (name + mailto button) from `/api/user/relationship-manager`. `compact` for the sidebar/mobile drawer, full card on the Support page. Renders nothing when no RM is assigned. |
 
 ---
@@ -103,6 +106,9 @@ Components currently using this pattern:
 - `PaybackHistoryChart`
 - `TwoFactorSettings`, `PasskeySettings`
 - `tickets/TicketBadges`, `tickets/TicketListTable`, `tickets/TicketThreadView`
+- `admin/AdminStatCard`, `admin/AdminValueCard` (also used by franchise
+  pages and other admin pages; in Daylight mode `borderColor` renders as a
+  small data-source square next to the title instead of a 6px left border)
 
 When adding a new opt-in component, grep first to confirm which route
 groups actually import it (`grep -rn "ComponentName" src/app`) - that's how
@@ -230,6 +236,40 @@ Pages outside `(auth)` (themed unconditionally, no gating needed):
 still on its old MUI-theme styling - it renders acceptably against the new
 canvas but hasn't been reskinned. Do this only if asked; it's a secondary
 view (the default is "Scenario Table," which is themed).
+
+### Admin pages (`(manage)`)
+
+- `AdminHeader` and `AdminSidebar` are only rendered by
+  `src/app/(manage)/layout.tsx`, so they are restyled in place (no prop) and
+  every admin page gets the Daylight chrome. The header uses
+  `HEADER_HEIGHT` (76px / 72px below 700px) and the layout's content height
+  is `calc(100vh - header)` to match. Work-queue counts use the amber pill
+  when expanded and a `d.danger` badge on the icon when collapsed.
+- `/adminpanel` is fully themed: canvas background set by the page itself
+  (no layout gating), page title, `Segmented` pool switcher, data-source
+  legend. Source colours come from tokens: `d.muted` (DB value),
+  `d.poolCombined` (both pools), `d.poolLuxor`, `d.poolBraiins`.
+- `/adminpanel` grid: `repeat(auto-fill, minmax(max(min(240px, 100%),
+  calc((100% - 60px) / 4)), 1fr))` - columns follow the available width
+  (sidebar open or collapsed), never more than 4. Stat-card rings shrink
+  (92px -> 64px, centre number via container units) before a value wraps
+  under its label, so labels and ring never overlap.
+- The admin layout is a 100dvh flex column; only `<main>` scrolls. Don't
+  size anything with `calc(100vh - header)` - a 1px mismatch gives the page
+  a second scrollbar that flickers while resizing.
+- Work Queue pages (`/tickets`, `/tickets/[id]`, `/hashrate-alerts`,
+  `/wallet-requests`, `/payment-frequency-requests`,
+  `/firmware-change-requests`, `/secondary-login-requests`) and
+  `/customers/overview`, `/groups`, `/subaccounts`, `/franchisees` (incl.
+  the `CustomerRequestsPanel` tab) and `/simulated-accounts` (incl.
+  `SimulationSettingsCard`) use the `AdminPage` kit; their stat tiles use the
+  client `StatCard` or `AdminValueCard daylight`. Tickets reuse the client
+  `daylight` variants of `TicketListTable` / `TicketThreadView`;
+  `FreezeCountdown` got an opt-in `daylight` prop. Their dialogs follow the
+  deferred-modal policy. Wide tables scroll sideways inside their card.
+- `d.chartLine` is the single-series line colour (validated against each
+  mode's surface; `d.action` is too light for the dark band).
+- All other admin page bodies keep their existing look.
 
 Everything else under `(auth)`, `(franchise)` and `(manage)` is intentionally
 untouched.

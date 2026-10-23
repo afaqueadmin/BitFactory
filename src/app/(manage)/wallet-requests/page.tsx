@@ -3,7 +3,6 @@
 import React, { useState } from "react";
 import {
   Box,
-  Typography,
   Stack,
   TextField,
   MenuItem,
@@ -14,7 +13,6 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  Chip,
   Button,
   CircularProgress,
   Alert,
@@ -29,22 +27,73 @@ import {
   FormLabel,
 } from "@mui/material";
 import {
+  CellNote,
+  DaylightAdminPage,
+  DaylightEmptyState,
+  DaylightLoading,
+  DaylightPageHeader,
+  DaylightStatusPill,
+  requestStatusTone,
+  statusLabel,
+  useDaylightAdminSx,
+} from "@/components/daylight/AdminPage";
+import {
   useWalletChangeRequests,
   useReviewWalletChangeRequest,
   WalletChangeRequestItem,
 } from "@/lib/hooks/useWalletChangeRequests";
 import { useUser } from "@/lib/hooks/useUser";
 import FreezeCountdown from "@/components/wallet/FreezeCountdown";
+import { useDaylight } from "@/lib/daylight";
 
 const STATUSES = ["PENDING", "CONFIRMED", "APPROVED", "REJECTED"];
-const STATUS_COLOR: Record<string, "warning" | "info" | "success" | "error"> = {
-  PENDING: "warning",
-  CONFIRMED: "info",
-  APPROVED: "success",
-  REJECTED: "error",
-};
+
+/** "New" / "Current" label + wrapping monospace wallet address. */
+function AddressLine({
+  label,
+  address,
+  muted = false,
+}: {
+  label: string;
+  address: string | null;
+  muted?: boolean;
+}) {
+  const { d } = useDaylight();
+  return (
+    <Box sx={{ "& + &": { mt: "6px" } }}>
+      <Box
+        component="span"
+        sx={{
+          display: "block",
+          fontSize: 10,
+          fontWeight: 650,
+          letterSpacing: ".04em",
+          textTransform: "uppercase",
+          color: d.muted,
+        }}
+      >
+        {label}
+      </Box>
+      <Box
+        component="span"
+        sx={{
+          display: "block",
+          fontFamily:
+            "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+          fontSize: 12,
+          lineHeight: 1.45,
+          wordBreak: "break-all",
+          color: muted ? d.muted : d.text,
+        }}
+      >
+        {address || "Not configured"}
+      </Box>
+    </Box>
+  );
+}
 
 export default function WalletRequestsPage() {
+  const ds = useDaylightAdminSx();
   const [status, setStatus] = useState("PENDING");
   const { requests, loading, error, refetch } = useWalletChangeRequests(
     status ? { status } : undefined,
@@ -212,16 +261,18 @@ export default function WalletRequestsPage() {
   };
 
   return (
-    <Box sx={{ p: 4 }}>
-      <Typography variant="h4" fontWeight={700} sx={{ mb: 1 }}>
-        Wallet Requests
-      </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-        Client-submitted requests to change their Luxor payout wallet address.
-        Confirm with the client (call/email) first, then approve. Approving does
-        not update Luxor automatically - you must log in and update the payout
-        address there yourself.
-      </Typography>
+    <DaylightAdminPage>
+      <DaylightPageHeader
+        title="Wallet Requests"
+        description={
+          <>
+            Client-submitted requests to change their Luxor payout wallet
+            address. Confirm with the client (call/email) first, then approve.
+            Approving does not update Luxor automatically - you must log in and
+            update the payout address there yourself.
+          </>
+        }
+      />
 
       <Stack direction="row" sx={{ mb: 3 }}>
         <TextField
@@ -230,7 +281,7 @@ export default function WalletRequestsPage() {
           label="Status"
           value={status}
           onChange={(e) => setStatus(e.target.value)}
-          sx={{ minWidth: 220 }}
+          sx={{ minWidth: 220, ...ds.inputSx }}
         >
           <MenuItem value="">All statuses</MenuItem>
           {STATUSES.map((s) => (
@@ -242,25 +293,26 @@ export default function WalletRequestsPage() {
       </Stack>
 
       {loading ? (
-        <Box sx={{ display: "flex", justifyContent: "center", p: 4 }}>
-          <CircularProgress />
-        </Box>
+        <DaylightLoading />
       ) : error ? (
-        <Alert severity="error">{error}</Alert>
+        <Alert severity="error" sx={{ ...ds.alertSx("error") }}>
+          {error}
+        </Alert>
       ) : requests.length === 0 ? (
-        <Typography variant="body2" color="text.secondary">
-          No requests found.
-        </Typography>
+        <DaylightEmptyState>No requests found.</DaylightEmptyState>
       ) : (
-        <TableContainer component={Paper} variant="outlined">
+        <TableContainer
+          component={Paper}
+          variant="outlined"
+          sx={ds.tableCardSx}
+        >
           <Table size="small">
             <TableHead>
               <TableRow>
                 <TableCell>Client</TableCell>
                 <TableCell>Requested</TableCell>
                 <TableCell>Subaccount</TableCell>
-                <TableCell>Current Address</TableCell>
-                <TableCell>Requested Address</TableCell>
+                <TableCell>Address Change</TableCell>
                 <TableCell>Reason</TableCell>
                 <TableCell>Status</TableCell>
                 <TableCell align="right">Actions</TableCell>
@@ -271,88 +323,80 @@ export default function WalletRequestsPage() {
                 <TableRow key={req.id}>
                   <TableCell>
                     {req.user.name || req.user.email}
-                    <Typography
-                      variant="caption"
-                      color="text.secondary"
-                      display="block"
-                    >
-                      {req.user.email}
-                    </Typography>
+                    <CellNote>{req.user.email}</CellNote>
                     {req.requestedBySecondary && req.requestedByEmail && (
-                      <Typography
-                        variant="caption"
-                        color="text.secondary"
-                        display="block"
-                      >
+                      <CellNote>
                         Requested by {req.requestedByEmail} (secondary sign-in)
-                      </Typography>
+                      </CellNote>
                     )}
                   </TableCell>
                   <TableCell>
-                    {new Date(req.createdAt).toLocaleString()}
+                    <Box component="span" sx={{ whiteSpace: "nowrap" }}>
+                      {new Date(req.createdAt).toLocaleDateString()}
+                    </Box>
+                    <CellNote>
+                      {new Date(req.createdAt).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </CellNote>
                   </TableCell>
                   <TableCell sx={{ fontSize: "0.75rem" }}>
                     {req.subaccountName || "—"}
                   </TableCell>
-                  <TableCell
-                    sx={{ fontFamily: "monospace", fontSize: "0.75rem" }}
-                  >
-                    {req.currentAddress || "Not configured"}
-                  </TableCell>
-                  <TableCell
-                    sx={{ fontFamily: "monospace", fontSize: "0.75rem" }}
-                  >
-                    {req.requestedAddress}
+                  {/* One column for the change: new address first (what
+                      gets verified with the client), current one under it. */}
+                  <TableCell sx={{ "&&&": { minWidth: 220, maxWidth: 300 } }}>
+                    <AddressLine label="New" address={req.requestedAddress} />
+                    <AddressLine
+                      label="Current"
+                      address={req.currentAddress}
+                      muted
+                    />
                   </TableCell>
                   <TableCell>{req.reason || "—"}</TableCell>
-                  <TableCell>
-                    <Chip
-                      label={req.status}
-                      size="small"
-                      color={STATUS_COLOR[req.status] || "default"}
+                  <TableCell sx={{ "&&&": { minWidth: 170 } }}>
+                    <DaylightStatusPill
+                      label={statusLabel(req.status)}
+                      tone={requestStatusTone(req.status)}
                     />
                     {req.status === "REJECTED" && req.rejectionReason && (
-                      <Typography
-                        variant="caption"
-                        color="text.secondary"
-                        display="block"
-                      >
-                        {req.rejectionReason}
-                      </Typography>
+                      <CellNote>{req.rejectionReason}</CellNote>
                     )}
                     {(req.status === "CONFIRMED" ||
                       req.status === "APPROVED") &&
                       req.confirmationMethod && (
-                        <Typography
-                          variant="caption"
-                          color="text.secondary"
-                          display="block"
-                        >
+                        <CellNote>
                           Confirmed via{" "}
                           {req.confirmationMethod === "EMAIL"
                             ? "email"
                             : "call"}{" "}
                           ({req.confirmationContact}) by{" "}
                           {req.confirmedBy?.name || req.confirmedBy?.email}
-                        </Typography>
+                        </CellNote>
                       )}
                     {req.status === "APPROVED" && (
                       <Box sx={{ mt: 0.5 }}>
-                        <FreezeCountdown reviewedAt={req.reviewedAt} dense />
+                        <FreezeCountdown
+                          reviewedAt={req.reviewedAt}
+                          dense
+                          daylight
+                        />
                       </Box>
                     )}
                   </TableCell>
                   <TableCell align="right">
                     <Stack
-                      direction="row"
+                      direction="column"
+                      alignItems="flex-end"
                       spacing={1}
                       justifyContent="flex-end"
                     >
                       {req.status === "PENDING" && (
                         <Button
+                          sx={ds.primaryBtnSx}
                           size="small"
                           variant="contained"
-                          color="info"
                           disabled={confirming || rejecting}
                           onClick={() => setConfirmTarget(req)}
                         >
@@ -361,9 +405,9 @@ export default function WalletRequestsPage() {
                       )}
                       {req.status === "CONFIRMED" && (
                         <Button
+                          sx={ds.successBtnSx}
                           size="small"
                           variant="contained"
-                          color="success"
                           disabled={approving || rejecting}
                           onClick={() => setApproveTarget(req)}
                         >
@@ -373,9 +417,9 @@ export default function WalletRequestsPage() {
                       {(req.status === "PENDING" ||
                         req.status === "CONFIRMED") && (
                         <Button
+                          sx={ds.dangerOutlineBtnSx}
                           size="small"
                           variant="outlined"
-                          color="error"
                           disabled={confirming || approving || rejecting}
                           onClick={() => setRejectTarget(req)}
                         >
@@ -611,6 +655,6 @@ export default function WalletRequestsPage() {
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
+    </DaylightAdminPage>
   );
 }
