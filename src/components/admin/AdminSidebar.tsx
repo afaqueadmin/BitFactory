@@ -512,6 +512,13 @@ export default function AdminSidebar() {
     [visibleSections, pathname],
   );
 
+  // The item just clicked, highlighted until the navigation commits:
+  // usePathname() only changes once the new route has loaded, which can
+  // take a few seconds.
+  const [pendingPath, setPendingPath] = React.useState<string | null>(null);
+  React.useEffect(() => setPendingPath(null), [pathname]);
+  const selectedPath = pendingPath ?? active.path;
+
   const expandActiveGroups = React.useCallback(() => {
     if (active.groups.length === 0) return;
     setExpandedItems((prev) =>
@@ -561,7 +568,7 @@ export default function AdminSidebar() {
   const containsActive = (item: SidebarItem): boolean =>
     !!item.items &&
     item.items.some(
-      (child) => child.path === active.path || containsActive(child),
+      (child) => child.path === selectedPath || containsActive(child),
     );
 
   const renderItem = (
@@ -572,7 +579,7 @@ export default function AdminSidebar() {
     const isExpanded = isMobile || sideBarOpen || isHovered;
     const isGroup = !!item.items;
     const isOpen = expandedItems.includes(item.title);
-    const isSelected = !isGroup && item.path === active.path;
+    const isSelected = !isGroup && item.path === selectedPath;
     const isActiveParent = isGroup && containsActive(item);
     const badgeCount = getBadgeCount(item);
     // A group's own badge only matters while its children are hidden.
@@ -587,12 +594,20 @@ export default function AdminSidebar() {
               href={item.path || "#"}
               target={item.openInNewTab ? "_blank" : undefined}
               rel={item.openInNewTab ? "noopener noreferrer" : undefined}
-              onClick={() => {
+              onClick={(e: React.MouseEvent) => {
                 if (isGroup) {
                   handleExpandClick(item.title, isMobile);
-                } else if (isMobile) {
-                  setMobileOpen(false);
+                  return;
                 }
+                // Modified clicks open a new tab and don't navigate here.
+                const opensElsewhere =
+                  item.openInNewTab ||
+                  e.metaKey ||
+                  e.ctrlKey ||
+                  e.shiftKey ||
+                  e.altKey;
+                if (!opensElsewhere && item.path) setPendingPath(item.path);
+                if (isMobile) setMobileOpen(false);
               }}
               selected={isSelected}
               sx={{
