@@ -43,7 +43,8 @@ export default function AuthLayout({
     pathname === "/security-setting" ||
     pathname === "/support" ||
     pathname === "/faq" ||
-    (pathname?.startsWith("/support/") ?? false);
+    (pathname?.startsWith("/support/") ?? false) ||
+    (pathname?.startsWith("/invoices/") ?? false);
 
   return (
     <SubaccountFilterProvider>

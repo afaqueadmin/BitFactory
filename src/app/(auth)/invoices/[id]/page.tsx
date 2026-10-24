@@ -1,24 +1,19 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useState } from "react";
+import React, { useState } from "react";
 import {
-  Container,
-  Card,
-  CardContent,
-  CardHeader,
   Box,
   Button,
   Typography,
-  Divider,
   Alert,
   CircularProgress,
   Table,
   TableBody,
+  TableContainer,
   TableCell,
   TableHead,
   TableRow,
-  Chip,
   IconButton,
   Tooltip,
 } from "@mui/material";
@@ -33,6 +28,7 @@ import PayWithBitcoinButton from "@/components/PayWithBitcoinButton";
 import PayWithBinanceButton from "@/components/PayWithBinanceButton";
 import { RepairMinerDetails } from "@/components/accounting/invoices/RepairMinerDetails";
 import { SIM_INVOICE_ID } from "@/lib/simulation/config";
+import { RADIUS_CARD, useDaylight } from "@/lib/daylight";
 
 type RepairLineRow = {
   id: string;
@@ -43,6 +39,7 @@ type RepairLineRow = {
 };
 
 export default function CustomerInvoiceDetailPage() {
+  const { d, fonts } = useDaylight();
   const params = useParams();
   const router = useRouter();
   const { invoice, loading, error } = useInvoice(params.id as string);
@@ -119,340 +116,413 @@ export default function CustomerInvoiceDetailPage() {
     }
   };
 
+  // Shared Daylight pieces for this page.
+  const cardSx = {
+    bgcolor: d.surface,
+    border: `1px solid ${d.border}`,
+    borderRadius: RADIUS_CARD,
+    boxShadow: d.shadow,
+    p: { xs: "18px 16px", sm: "22px 24px" },
+    mb: { xs: "16px", md: "20px" },
+  } as const;
+  const sectionTitleSx = {
+    m: 0,
+    mb: "14px",
+    fontFamily: fonts.heading,
+    fontWeight: 700,
+    fontSize: 16,
+    color: d.text,
+  } as const;
+  const fieldGridSx = {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fill, minmax(min(200px, 100%), 1fr))",
+    gap: { xs: "14px", sm: "18px 24px" },
+  } as const;
+  const Field = ({
+    label,
+    children,
+  }: {
+    label: string;
+    children: React.ReactNode;
+  }) => (
+    <Box sx={{ minWidth: 0 }}>
+      <Box sx={{ fontSize: 12, color: d.muted, mb: "4px" }}>{label}</Box>
+      <Box
+        sx={{
+          fontSize: 14,
+          fontWeight: 600,
+          color: d.text,
+          overflowWrap: "anywhere",
+        }}
+      >
+        {children}
+      </Box>
+    </Box>
+  );
+  const tableSx = {
+    "& .MuiTableCell-head": {
+      fontFamily: fonts.body,
+      fontWeight: 600,
+      fontSize: 10,
+      letterSpacing: ".015em",
+      textTransform: "uppercase",
+      color: d.muted,
+      bgcolor: d.tableHead,
+      borderBottomColor: d.border,
+    },
+    "& .MuiTableCell-body": {
+      fontFamily: fonts.body,
+      fontSize: 13,
+      color: d.text,
+      borderBottomColor: d.border,
+    },
+    "& .MuiTableBody-root .MuiTableRow-root:last-of-type .MuiTableCell-body": {
+      borderBottom: 0,
+    },
+  } as const;
+  const outlineBtnSx = {
+    textTransform: "none",
+    fontFamily: fonts.body,
+    fontWeight: 600,
+    fontSize: 13,
+    minHeight: 42,
+    px: "16px",
+    borderRadius: "8px",
+    color: d.text,
+    borderColor: d.inputBorder,
+    bgcolor: d.surface,
+    "&:hover": { bgcolor: d.hover, borderColor: d.action },
+  } as const;
+
   if (loading) {
     return (
-      <Container sx={{ py: 4, display: "flex", justifyContent: "center" }}>
-        <CircularProgress />
-      </Container>
+      <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
+        <CircularProgress sx={{ color: d.action }} />
+      </Box>
     );
   }
 
+  const alertSx = (tone: "error" | "warning") => ({
+    borderRadius: "8px",
+    fontFamily: fonts.body,
+    fontSize: 13,
+    bgcolor: tone === "error" ? d.dangerSoft : d.amber,
+    color: tone === "error" ? d.danger : d.warning,
+    "& .MuiAlert-icon": { color: tone === "error" ? d.danger : d.warning },
+  });
+
   if (error) {
     return (
-      <Container sx={{ py: 4 }}>
-        <Alert severity="error">{error}</Alert>
-      </Container>
+      <Box sx={{ maxWidth: 1100, mx: "auto" }}>
+        <Alert severity="error" sx={alertSx("error")}>
+          {error}
+        </Alert>
+      </Box>
     );
   }
 
   if (!invoice) {
     return (
-      <Container sx={{ py: 4 }}>
-        <Alert severity="warning">Invoice not found</Alert>
-      </Container>
+      <Box sx={{ maxWidth: 1100, mx: "auto" }}>
+        <Alert severity="warning" sx={alertSx("warning")}>
+          Invoice not found
+        </Alert>
+      </Box>
     );
   }
 
   // Hardware Repair invoices: one miner, free-text line items and a flat
   // discount; unitPrice holds the line-item subtotal.
   const isRepair = invoice.invoiceType === "HARDWARE_REPAIR";
+  const daysPaidLate =
+    invoice.status === "PAID" && invoice.paidDate && invoice.dueDate
+      ? Math.max(
+          0,
+          Math.ceil(
+            (new Date(invoice.paidDate).getTime() -
+              new Date(invoice.dueDate).getTime()) /
+              (1000 * 60 * 60 * 24),
+          ),
+        )
+      : null;
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
-      <Box
+    <Box
+      sx={{ maxWidth: 1100, mx: "auto", fontFamily: fonts.body, color: d.text }}
+    >
+      <Button
+        startIcon={<ArrowBackIcon />}
+        onClick={() => router.push("/invoices")}
         sx={{
-          mb: 3,
+          mb: "14px",
+          ml: "-8px",
+          textTransform: "none",
+          fontFamily: fonts.body,
+          fontWeight: 600,
+          fontSize: 13,
+          color: d.action,
+          borderRadius: "8px",
+          "&:hover": { bgcolor: d.hover },
         }}
       >
-        <Box
-          sx={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            mb: 2,
-          }}
-        >
-          <Button
-            startIcon={<ArrowBackIcon />}
-            variant="text"
-            onClick={() => router.push("/invoices")}
-          >
-            Back to Invoices
-          </Button>
+        Back to Invoices
+      </Button>
+
+      {/* Summary: what this invoice is, what's owed, and what to do */}
+      <Box
+        component="section"
+        aria-label="Invoice summary"
+        sx={{
+          ...cardSx,
+          display: "flex",
+          flexDirection: { xs: "column", md: "row" },
+          alignItems: { xs: "stretch", md: "center" },
+          justifyContent: "space-between",
+          gap: { xs: "18px", md: "24px" },
+        }}
+      >
+        <Box sx={{ minWidth: 0 }}>
           <Box
             sx={{
               display: "flex",
-              flexDirection: "column",
-              alignItems: "flex-end",
-              gap: 1,
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: "10px",
             }}
           >
-            <Button
-              variant="contained"
-              startIcon={<DownloadIcon />}
-              onClick={handleDownload}
-              disabled={downloadLoading}
+            <Typography
+              component="h1"
               sx={{
-                bgcolor: "primary.main",
-                "&:hover": {
-                  bgcolor: "primary.dark",
-                },
+                fontFamily: fonts.heading,
+                fontWeight: 750,
+                fontSize: { xs: 24, md: 28 },
+                lineHeight: 1.25,
+                letterSpacing: "-.03em",
+                color: d.text,
               }}
             >
-              {downloadLoading ? "Downloading..." : "Download Invoice"}
-            </Button>
-            {isSimulated ? (
-              <Typography variant="caption" color="text.secondary">
-                Simulated invoice - view only
-              </Typography>
-            ) : (
+              {invoice.invoiceNumber}
+            </Typography>
+            <StatusBadge status={invoice.status} daylight />
+          </Box>
+          <Box sx={{ mt: "6px", fontSize: 13, color: d.muted }}>
+            {invoice.issuedDate ? (
               <>
-                <PayWithBinanceButton
-                  invoiceId={invoice.id}
-                  disabled={
-                    invoice.status === "PAID" || invoice.status === "CANCELLED"
-                  }
-                />
-                {process.env.NEXT_PUBLIC_BTCPAY_ENABLED === "true" &&
-                  ["sonofaunali@gmail.com", "hamzanajeebmusic@gmail.com"] //@TODO: remove this condition when feature is ready
-                    .includes(invoice.user.email) && (
-                    <PayWithBitcoinButton
-                      invoiceId={invoice.id}
-                      disabled={invoice.status === "PAID"}
-                    />
-                  )}
+                Issued <DateDisplay date={invoice.issuedDate} />
+                {" · "}
               </>
+            ) : (
+              "Not issued yet · "
             )}
+            Due <DateDisplay date={invoice.dueDate} />
+          </Box>
+          <Box sx={{ mt: "14px" }}>
+            <Box sx={{ fontSize: 12, color: d.muted }}>Total amount</Box>
+            <Box
+              sx={{
+                fontFamily: fonts.heading,
+                fontWeight: 750,
+                fontSize: { xs: 26, md: 30 },
+                letterSpacing: "-.03em",
+                fontVariantNumeric: "tabular-nums",
+                color: d.text,
+              }}
+            >
+              <CurrencyDisplay value={invoice.totalAmount} />
+            </Box>
           </Box>
         </Box>
-        <Typography variant="h4" sx={{ fontWeight: 700 }}>
-          {invoice.invoiceNumber}
-        </Typography>
-        <Typography color="textSecondary">Invoice Details</Typography>
+
+        <Box
+          sx={{
+            display: "flex",
+            flexDirection: { xs: "column", sm: "row", md: "column" },
+            alignItems: { xs: "stretch", md: "flex-end" },
+            gap: "10px",
+            flexShrink: 0,
+            "& .MuiButton-root": { width: { xs: "100%", sm: "auto" } },
+          }}
+        >
+          {isSimulated ? (
+            <Box sx={{ fontSize: 12, color: d.muted, textAlign: "right" }}>
+              Simulated invoice - view only
+            </Box>
+          ) : (
+            <>
+              <PayWithBinanceButton
+                invoiceId={invoice.id}
+                disabled={
+                  invoice.status === "PAID" || invoice.status === "CANCELLED"
+                }
+              />
+              {process.env.NEXT_PUBLIC_BTCPAY_ENABLED === "true" &&
+                ["sonofaunali@gmail.com", "hamzanajeebmusic@gmail.com"] //@TODO: remove this condition when feature is ready
+                  .includes(invoice.user.email) && (
+                  <PayWithBitcoinButton
+                    invoiceId={invoice.id}
+                    disabled={invoice.status === "PAID"}
+                  />
+                )}
+            </>
+          )}
+          <Button
+            variant="outlined"
+            startIcon={
+              downloadLoading ? (
+                <CircularProgress size={14} sx={{ color: d.action }} />
+              ) : (
+                <DownloadIcon />
+              )
+            }
+            onClick={handleDownload}
+            disabled={downloadLoading}
+            sx={outlineBtnSx}
+          >
+            {downloadLoading ? "Downloading..." : "Download Invoice"}
+          </Button>
+        </Box>
       </Box>
 
       {/* Invoice Details Section */}
-      <Box sx={{ mb: 3 }}>
-        <Card>
-          <CardHeader title="Invoice Details" />
-          <Divider />
-          <CardContent>
-            <Box
-              sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 3 }}
-            >
-              {/* Invoice Number */}
-              <Box>
-                <Typography color="textSecondary" variant="body2">
-                  Invoice Number
-                </Typography>
-                <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
-                  {invoice.invoiceNumber}
-                </Typography>
+      <Box component="section" sx={cardSx}>
+        <Typography component="h2" sx={sectionTitleSx}>
+          Invoice Details
+        </Typography>
+        <Box sx={fieldGridSx}>
+          <Field label="Invoice Number">{invoice.invoiceNumber}</Field>
+          <Field label="Status">
+            <StatusBadge status={invoice.status} daylight />
+          </Field>
+          {isRepair ? (
+            <>
+              <Field label="Subtotal">
+                <CurrencyDisplay value={invoice.unitPrice} />
+              </Field>
+              <Field label="Discount">
+                {Number(invoice.discountAmount) > 0 ? "- " : ""}
+                <CurrencyDisplay value={invoice.discountAmount} />
+              </Field>
+            </>
+          ) : (
+            <>
+              <Field label="Total Miners">
+                {invoice.totalMiners || 0} units
+              </Field>
+              <Field label="Unit Price">
+                <CurrencyDisplay value={invoice.unitPrice} />
+              </Field>
+            </>
+          )}
+          <Field label="Total Amount">
+            <CurrencyDisplay value={invoice.totalAmount} />
+          </Field>
+          <Field label="Issued Date">
+            {invoice.issuedDate ? (
+              <DateDisplay date={invoice.issuedDate} format="datetime" />
+            ) : (
+              "Not issued yet"
+            )}
+          </Field>
+          <Field label="Due Date">
+            <DateDisplay date={invoice.dueDate} />
+          </Field>
+          <Field label="Paid Date">
+            {invoice.paidDate ? (
+              <DateDisplay date={invoice.paidDate} format="datetime" />
+            ) : (
+              "Not yet paid"
+            )}
+          </Field>
+          {daysPaidLate !== null && (
+            <Field label="Paid Past Due">
+              <Box
+                component="span"
+                sx={{
+                  display: "inline-flex",
+                  px: "9px",
+                  py: "2px",
+                  borderRadius: "999px",
+                  bgcolor: daysPaidLate > 0 ? d.dangerSoft : d.mint,
+                  color: daysPaidLate > 0 ? d.danger : d.success,
+                  fontSize: 11,
+                  fontWeight: 650,
+                }}
+              >
+                {daysPaidLate} {daysPaidLate === 1 ? "day" : "days"}
               </Box>
-
-              {/* Status */}
-              <Box>
-                <Typography color="textSecondary" variant="body2">
-                  Status
-                </Typography>
-                <Box sx={{ mt: 0.5 }}>
-                  <StatusBadge status={invoice.status} />
-                </Box>
-              </Box>
-
-              {isRepair ? (
-                <>
-                  {/* Subtotal */}
-                  <Box>
-                    <Typography color="textSecondary" variant="body2">
-                      Subtotal
-                    </Typography>
-                    <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
-                      <CurrencyDisplay value={invoice.unitPrice} />
-                    </Typography>
-                  </Box>
-
-                  {/* Discount */}
-                  <Box>
-                    <Typography color="textSecondary" variant="body2">
-                      Discount
-                    </Typography>
-                    <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
-                      {Number(invoice.discountAmount) > 0 ? "- " : ""}
-                      <CurrencyDisplay value={invoice.discountAmount} />
-                    </Typography>
-                  </Box>
-                </>
-              ) : (
-                <>
-                  {/* Total Miners */}
-                  <Box>
-                    <Typography color="textSecondary" variant="body2">
-                      Total Miners
-                    </Typography>
-                    <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
-                      {invoice.totalMiners || 0} units
-                    </Typography>
-                  </Box>
-
-                  {/* Unit Price */}
-                  <Box>
-                    <Typography color="textSecondary" variant="body2">
-                      Unit Price
-                    </Typography>
-                    <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
-                      <CurrencyDisplay value={invoice.unitPrice} />
-                    </Typography>
-                  </Box>
-                </>
-              )}
-
-              {/* Total Amount */}
-              <Box>
-                <Typography color="textSecondary" variant="body2">
-                  Total Amount
-                </Typography>
-                <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
-                  <CurrencyDisplay value={invoice.totalAmount} />
-                </Typography>
-              </Box>
-
-              {/* Issued Date */}
-              <Box>
-                <Typography color="textSecondary" variant="body2">
-                  Issued Date
-                </Typography>
-                <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
-                  {invoice.issuedDate ? (
-                    <DateDisplay date={invoice.issuedDate} format="datetime" />
-                  ) : (
-                    "Not issued yet"
-                  )}
-                </Typography>
-              </Box>
-
-              {/* Due Date */}
-              <Box>
-                <Typography color="textSecondary" variant="body2">
-                  Due Date
-                </Typography>
-                <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
-                  <DateDisplay date={invoice.dueDate} />
-                </Typography>
-              </Box>
-
-              {/* Paid Date */}
-              <Box>
-                <Typography color="textSecondary" variant="body2">
-                  Paid Date
-                </Typography>
-                <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
-                  {invoice.paidDate ? (
-                    <DateDisplay date={invoice.paidDate} format="datetime" />
-                  ) : (
-                    "Not yet paid"
-                  )}
-                </Typography>
-              </Box>
-
-              {/* Paid Past Due */}
-              {invoice.status === "PAID" &&
-              invoice.paidDate &&
-              invoice.dueDate ? (
-                <Box>
-                  <Typography color="textSecondary" variant="body2">
-                    Paid Past Due
-                  </Typography>
-                  <Box sx={{ mt: 0.5 }}>
-                    <Box
-                      sx={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        px: 1.5,
-                        py: 0.4,
-                        borderRadius: "999px",
-                        backgroundColor: "#fdecea",
-                        border: "1px solid #f44336",
-                        color: "#c62828",
-                        fontSize: "0.8rem",
-                        fontWeight: 700,
-                      }}
-                    >
-                      {Math.max(
-                        0,
-                        Math.ceil(
-                          (new Date(invoice.paidDate).getTime() -
-                            new Date(invoice.dueDate).getTime()) /
-                            (1000 * 60 * 60 * 24),
-                        ),
-                      )}{" "}
-                      days
-                    </Box>
-                  </Box>
-                </Box>
-              ) : null}
-            </Box>
-          </CardContent>
-        </Card>
+            </Field>
+          )}
+        </Box>
       </Box>
 
       {isRepair && (
         <>
           {/* Repaired Miner */}
-          <Box sx={{ mb: 3 }}>
-            <Card>
-              <CardHeader title="Miner" />
-              <Divider />
-              <CardContent>
-                {invoice.miner ? (
-                  <RepairMinerDetails miner={invoice.miner} />
-                ) : (
-                  <Typography color="textSecondary">
-                    The miner on this invoice is no longer available.
-                  </Typography>
-                )}
-              </CardContent>
-            </Card>
+          <Box component="section" sx={cardSx}>
+            <Typography component="h2" sx={sectionTitleSx}>
+              Miner
+            </Typography>
+            {invoice.miner ? (
+              <RepairMinerDetails miner={invoice.miner} daylight />
+            ) : (
+              <Box sx={{ fontSize: 13, color: d.muted }}>
+                The miner on this invoice is no longer available.
+              </Box>
+            )}
           </Box>
 
           {/* Repair Line Items (description is stored in `model`) */}
           {invoice.lineItems && invoice.lineItems.length > 0 && (
-            <Box sx={{ mb: 3 }}>
-              <Card>
-                <CardHeader title="Line Items" />
-                <Divider />
-                <CardContent>
-                  <Table size="small">
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Description</TableCell>
-                        <TableCell align="right">Qty</TableCell>
-                        <TableCell align="right">Rate (USD)</TableCell>
-                        <TableCell align="right">Amount (USD)</TableCell>
+            <Box component="section" sx={cardSx}>
+              <Typography component="h2" sx={sectionTitleSx}>
+                Line Items
+              </Typography>
+              <TableContainer
+                sx={{
+                  ...tableSx,
+                  border: `1px solid ${d.border}`,
+                  borderRadius: "10px",
+                }}
+              >
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Description</TableCell>
+                      <TableCell align="right">Qty</TableCell>
+                      <TableCell align="right">Rate (USD)</TableCell>
+                      <TableCell align="right">Amount (USD)</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {invoice.lineItems.map((item: RepairLineRow) => (
+                      <TableRow key={item.id}>
+                        <TableCell>{item.model}</TableCell>
+                        <TableCell align="right">{item.quantity}</TableCell>
+                        <TableCell align="right">
+                          <CurrencyDisplay value={item.unitPrice} />
+                        </TableCell>
+                        <TableCell align="right">
+                          <CurrencyDisplay value={item.totalPrice} />
+                        </TableCell>
                       </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {invoice.lineItems.map((item: RepairLineRow) => (
-                        <TableRow key={item.id}>
-                          <TableCell>{item.model}</TableCell>
-                          <TableCell align="right">{item.quantity}</TableCell>
-                          <TableCell align="right">
-                            <CurrencyDisplay value={item.unitPrice} />
-                          </TableCell>
-                          <TableCell align="right">
-                            <CurrencyDisplay value={item.totalPrice} />
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
             </Box>
           )}
 
           {/* Repair Note (written to the miner's repair history) */}
           {invoice.repairNote?.note && (
-            <Box sx={{ mb: 3 }}>
-              <Card>
-                <CardHeader title="Repair Note" />
-                <Divider />
-                <CardContent>
-                  <Typography sx={{ whiteSpace: "pre-wrap" }}>
-                    {invoice.repairNote.note}
-                  </Typography>
-                </CardContent>
-              </Card>
+            <Box component="section" sx={cardSx}>
+              <Typography component="h2" sx={sectionTitleSx}>
+                Repair Note
+              </Typography>
+              <Box
+                sx={{ fontSize: 14, whiteSpace: "pre-wrap", lineHeight: 1.6 }}
+              >
+                {invoice.repairNote.note}
+              </Box>
             </Box>
           )}
         </>
@@ -460,199 +530,179 @@ export default function CustomerInvoiceDetailPage() {
 
       {/* Invoice Narration */}
       {invoice.costPayments && invoice.costPayments.length > 0 && (
-        <Box sx={{ mb: 3 }}>
-          <Card>
-            <CardHeader title="Invoice Narration" />
-            <Divider />
-            <CardContent>
-              {invoice.costPayments
-                .filter(
-                  (payment: { narration?: string | null }) => payment.narration,
-                )
-                .map(
-                  (
-                    payment: {
-                      id: string;
-                      amount: number;
-                      narration?: string | null;
-                      createdAt: string;
-                    },
-                    index: number,
-                    filtered: { id: string }[],
-                  ) => (
-                    <Box
-                      key={payment.id}
-                      sx={{
-                        pb: 2,
-                        mb: index < filtered.length - 1 ? 2 : 0,
-                        borderBottom:
-                          index < filtered.length - 1
-                            ? "1px solid #eee"
-                            : "none",
-                      }}
-                    >
-                      <Box
-                        sx={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          mb: 0.5,
-                        }}
-                      >
-                        <Typography variant="body2" color="textSecondary">
-                          Payment of <CurrencyDisplay value={payment.amount} />
-                        </Typography>
-                        <Typography variant="body2" color="textSecondary">
-                          {new Date(payment.createdAt).toLocaleDateString()}
-                        </Typography>
-                      </Box>
-                      <Typography variant="body1">
-                        {payment.narration}
-                      </Typography>
-                    </Box>
-                  ),
-                )}
-              {invoice.costPayments.every(
-                (payment: { narration?: string | null }) => !payment.narration,
-              ) && (
-                <Typography color="textSecondary">
-                  No narration added for this invoice
-                </Typography>
-              )}
-            </CardContent>
-          </Card>
+        <Box component="section" sx={cardSx}>
+          <Typography component="h2" sx={sectionTitleSx}>
+            Invoice Narration
+          </Typography>
+          {invoice.costPayments
+            .filter(
+              (payment: { narration?: string | null }) => payment.narration,
+            )
+            .map(
+              (
+                payment: {
+                  id: string;
+                  amount: number;
+                  narration?: string | null;
+                  createdAt: string;
+                },
+                index: number,
+                filtered: { id: string }[],
+              ) => (
+                <Box
+                  key={payment.id}
+                  sx={{
+                    pb: "14px",
+                    mb: index < filtered.length - 1 ? "14px" : 0,
+                    borderBottom:
+                      index < filtered.length - 1
+                        ? `1px solid ${d.border}`
+                        : "none",
+                  }}
+                >
+                  <Box
+                    sx={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      flexWrap: "wrap",
+                      gap: 1,
+                      mb: "4px",
+                      fontSize: 12,
+                      color: d.muted,
+                    }}
+                  >
+                    <span>
+                      Payment of <CurrencyDisplay value={payment.amount} />
+                    </span>
+                    <span>
+                      {new Date(payment.createdAt).toLocaleDateString()}
+                    </span>
+                  </Box>
+                  <Box sx={{ fontSize: 14, lineHeight: 1.6 }}>
+                    {payment.narration}
+                  </Box>
+                </Box>
+              ),
+            )}
+          {invoice.costPayments.every(
+            (payment: { narration?: string | null }) => !payment.narration,
+          ) && (
+            <Box sx={{ fontSize: 13, color: d.muted }}>
+              No narration added for this invoice
+            </Box>
+          )}
         </Box>
       )}
 
       {/* Memos Section */}
       {(memosLoading || memos.length > 0) && (
-        <Box sx={{ mb: 3 }}>
-          <Card>
-            <CardHeader title="Memos" />
-            <Divider />
-            <CardContent>
-              {memosLoading ? (
-                <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}>
-                  <CircularProgress size={30} />
-                </Box>
-              ) : (
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Memo #</TableCell>
-                      <TableCell>Date</TableCell>
-                      <TableCell align="right">Amount</TableCell>
-                      <TableCell>Status</TableCell>
-                      <TableCell align="right">PDF</TableCell>
+        <Box component="section" sx={cardSx}>
+          <Typography component="h2" sx={sectionTitleSx}>
+            Memos
+          </Typography>
+          {memosLoading ? (
+            <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}>
+              <CircularProgress size={28} sx={{ color: d.action }} />
+            </Box>
+          ) : (
+            <TableContainer
+              sx={{
+                ...tableSx,
+                border: `1px solid ${d.border}`,
+                borderRadius: "10px",
+              }}
+            >
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Memo #</TableCell>
+                    <TableCell>Date</TableCell>
+                    <TableCell align="right">Amount</TableCell>
+                    <TableCell>Status</TableCell>
+                    <TableCell align="right">PDF</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {memos.map((memo) => (
+                    <TableRow key={memo.id}>
+                      <TableCell sx={{ whiteSpace: "nowrap" }}>
+                        {memo.memoNumber}
+                      </TableCell>
+                      <TableCell sx={{ whiteSpace: "nowrap" }}>
+                        <DateDisplay date={memo.createdAt} />
+                      </TableCell>
+                      <TableCell align="right">
+                        <CurrencyDisplay value={memo.amount} />
+                      </TableCell>
+                      <TableCell>
+                        <Box
+                          component="span"
+                          sx={{
+                            display: "inline-flex",
+                            px: "9px",
+                            py: "2px",
+                            borderRadius: "999px",
+                            fontSize: 11,
+                            fontWeight: 650,
+                            bgcolor:
+                              memo.status === "VOIDED" ? d.hover : d.mint,
+                            color:
+                              memo.status === "VOIDED" ? d.muted : d.success,
+                          }}
+                        >
+                          {memo.status === "VOIDED" ? "Voided" : "Issued"}
+                        </Box>
+                      </TableCell>
+                      <TableCell align="right">
+                        <Tooltip title="Download PDF">
+                          <span>
+                            <IconButton
+                              size="small"
+                              aria-label={`Download memo ${memo.memoNumber}`}
+                              onClick={() => handleMemoDownload(memo)}
+                              disabled={memoDownloadingId === memo.id}
+                              sx={{
+                                color: d.muted,
+                                borderRadius: "8px",
+                                "&:hover": {
+                                  bgcolor: d.hover,
+                                  color: d.action,
+                                },
+                              }}
+                            >
+                              <DownloadIcon fontSize="small" />
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                      </TableCell>
                     </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {memos.map((memo) => (
-                      <TableRow key={memo.id}>
-                        <TableCell>{memo.memoNumber}</TableCell>
-                        <TableCell>
-                          <DateDisplay date={memo.createdAt} />
-                        </TableCell>
-                        <TableCell align="right">
-                          <CurrencyDisplay value={memo.amount} />
-                        </TableCell>
-                        <TableCell>
-                          <Chip
-                            label={memo.status}
-                            size="small"
-                            color={
-                              memo.status === "VOIDED" ? "default" : "success"
-                            }
-                            variant={
-                              memo.status === "VOIDED" ? "outlined" : "filled"
-                            }
-                          />
-                        </TableCell>
-                        <TableCell align="right">
-                          <Tooltip title="Download PDF">
-                            <span>
-                              <IconButton
-                                size="small"
-                                onClick={() => handleMemoDownload(memo)}
-                                disabled={memoDownloadingId === memo.id}
-                              >
-                                <DownloadIcon fontSize="small" />
-                              </IconButton>
-                            </span>
-                          </Tooltip>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
         </Box>
       )}
 
       {/* Customer & Relationship Manager Information Section */}
-      <Box>
-        <Card>
-          <CardHeader title="Customer & Relationship Manager Information" />
-          <Divider />
-          <CardContent>
-            <Box
-              sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 3 }}
-            >
-              {/* Customer Name */}
-              <Box>
-                <Typography color="textSecondary" variant="body2">
-                  Customer Name
-                </Typography>
-                <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
-                  {invoice.user?.name || "N/A"}
-                </Typography>
-              </Box>
-
-              {/* Customer Email */}
-              <Box>
-                <Typography color="textSecondary" variant="body2">
-                  Customer Email
-                </Typography>
-                <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
-                  {invoice.user?.email || "N/A"}
-                </Typography>
-              </Box>
-
-              {/* Relationship Manager Name */}
-              <Box>
-                <Typography color="textSecondary" variant="body2">
-                  Relationship Manager
-                </Typography>
-                <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
-                  {invoice.group?.relationshipManager || "Not assigned"}
-                </Typography>
-              </Box>
-
-              {/* Relationship Manager Email */}
-              <Box>
-                <Typography color="textSecondary" variant="body2">
-                  RM Email
-                </Typography>
-                <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
-                  {invoice.group?.email || "Not assigned"}
-                </Typography>
-              </Box>
-
-              {/* Group Name */}
-              <Box>
-                <Typography color="textSecondary" variant="body2">
-                  Group Name
-                </Typography>
-                <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
-                  {invoice.group?.name || "No group assigned"}
-                </Typography>
-              </Box>
-            </Box>
-          </CardContent>
-        </Card>
+      <Box component="section" sx={{ ...cardSx, mb: 0 }}>
+        <Typography component="h2" sx={sectionTitleSx}>
+          Customer &amp; Relationship Manager
+        </Typography>
+        <Box sx={fieldGridSx}>
+          <Field label="Customer Name">{invoice.user?.name || "N/A"}</Field>
+          <Field label="Customer Email">{invoice.user?.email || "N/A"}</Field>
+          <Field label="Relationship Manager">
+            {invoice.group?.relationshipManager || "Not assigned"}
+          </Field>
+          <Field label="RM Email">
+            {invoice.group?.email || "Not assigned"}
+          </Field>
+          <Field label="Group Name">
+            {invoice.group?.name || "No group assigned"}
+          </Field>
+        </Box>
       </Box>
-    </Container>
+    </Box>
   );
 }

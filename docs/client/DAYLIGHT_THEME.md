@@ -231,11 +231,15 @@ Client pages under `(auth)`, gated via `isDaylightPage` in
 `src/app/(auth)/layout.tsx`:
 `/dashboard`, `/miners`, `/wallet`, `/transaction`, `/invoices`,
 `/btc-price-history`, `/hashprice-history`, `/payback-analysis`,
-`/account-settings`, `/security-setting`, `/support`, `/support/[id]`, `/faq`
+`/account-settings`, `/security-setting`, `/support`, `/support/[id]`,
+`/invoices/[id]` (layout gate: `startsWith("/invoices/")`), `/faq`
 (content in `src/lib/faq.ts`).
 
 Pages outside `(auth)` (themed unconditionally, no gating needed):
 `/` (welcome), `/login` (incl. `TwoFactorVerification`), `/btc-price-predictor`.
+`/invoices/[id]/payment-success` (Confirmo return page, `(dashboard)` group):
+a server component that does the auth/ownership checks and DB read, then
+renders the client `PaymentResultView` with plain serialisable data.
 
 **Known gap:** Payback Analysis's alternate "Graphical Analysis" view
 (`PaybackGraphicalView.tsx` + `PaybackChartPrimitives.tsx` + `PaybackCharts.tsx`,
