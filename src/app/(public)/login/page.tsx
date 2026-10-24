@@ -222,6 +222,7 @@ export default function Login() {
             <Box mb={1} sx={{ display: "flex", justifyContent: "center" }}>
               <Image
                 src="/BitfactoryLogo.webp"
+                loading="eager"
                 alt="BitFactory Logo"
                 width={220}
                 height={110}

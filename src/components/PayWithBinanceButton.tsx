@@ -179,8 +179,8 @@ export default function PayWithBinanceButton({
                 </Typography>
                 <Alert severity="warning" sx={{ mb: 3 }}>
                   Send USDT only, on the network shown under the QR code you
-                  use. The amount that arrives must match exactly, so make sure
-                  any network or withdrawal fee is added on top.
+                  use. The amount that arrives <b>must match exactly</b>, so
+                  make sure any network or withdrawal fee is added on top.
                 </Alert>
 
                 <Stack
