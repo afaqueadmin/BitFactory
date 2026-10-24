@@ -87,6 +87,7 @@ Reach for these before writing new one-off styles:
 | `Segmented<T>` | Small track of 2-3 mutually exclusive options (e.g. Daily/Monthly). Generic over the option id type. |
 | `PillTab` | Single pill for a scrollable row of filters (pool selector, miner filter), with an optional colour dot. |
 | `AdminPage` (several exports) | Admin list-page kit: `DaylightAdminPage` (canvas + padding), `DaylightPageHeader` (title, description, `actions`), `DaylightStatusPill` + `requestStatusTone`/`statusLabel`, `CellNote` (muted line under a cell value), `DaylightLoading`, `DaylightEmptyState`, and `useDaylightAdminSx()` (`inputSx`, button sx incl. `textBtnSx(tone)` for row actions, `alertSx` (success/error/info/warning), `cardSx`, `sectionTitleSx`, `tableSx`, `tableCardSx`). Also `listCardSx` (a card holding filters + table + pagination; themes inputs and checkboxes inside it), `paginationSx`, `tabsSx`, `toggleGroupSx`, `pageTitleSx` / `pageDescSx` (for pages that keep their own header row) and `dangerBtnSx`. `DaylightAdminPage` also provides a scope: `useDaylightScope()` is true inside it, so shared components switch to Daylight only on themed admin pages (used by accounting `StatusBadge`, `MasterDataTable`'s `TableState`, `MemoTransactionsTable`, `CostPaymentTransactionsTable`). Per-cell overrides inside a themed table need a tripled selector (`sx={{ "&&&": {...} }}`) to beat the table-wide cell font. `tableSx` styles an unmodified MUI table through descendant selectors. |
+| `DaylightMuiScope` / `DaylightThemedPage` | For detail / edit / create pages built from stock MUI (Cards, Paper forms, TextFields, plain tables). `DaylightThemedPage` nests a scoped MUI theme (`buildDaylightMuiTheme`: palette, Inter/Manrope type, flat bordered Paper/Card, buttons, inputs, table cells, chips, alerts, tabs, dialogs) inside `DaylightAdminPage`, so the page is themed without restyling every element. It also exposes the palette as CSS variables (`--dl-text`, `--dl-muted`, `--dl-border`, `--dl-canvas`, `--dl-table-head`, `--dl-sky-soft`, `--dl-danger`, ...), so a hard-coded colour becomes `var(--dl-muted, #666)` and keeps its old value outside the wrapper. Layout rules inside the wrapper: button-row Stacks wrap (Stacks default to `useFlexGap`), tables without a `TableContainer` scroll inside their parent, and plain `<h1>`/`<h3>` get the page/section title styles. Grid columns holding tables need `"& > *": { minWidth: 0 }`. Used by the invoice & payables screens. |
 | `RelationshipManagerCard` | Customer's RM (name + mailto button) from `/api/user/relationship-manager`. `compact` for the sidebar/mobile drawer, full card on the Support page. Renders nothing when no RM is assigned. |
 
 ---
@@ -283,7 +284,23 @@ view (the default is "Scenario Table," which is themed).
   deferred-modal policy. Wide tables scroll sideways inside their card.
 - `d.chartLine` is the single-series line colour (validated against each
   mode's surface; `d.action` is too light for the dark band).
-- All other admin page bodies keep their existing look.
+- Invoice & payables screens: invoice detail / edit / create / bulk create,
+  hardware sales and repair detail / edit / create, vendor invoice and
+  hardware purchase detail / create, and the shared `RecordPaymentPage`
+  (three record-payment routes), all wrapped in `DaylightThemedPage`.
+- Admin settings: Admin Profile, Security Settings (2FA / passkeys via their
+  `daylight` prop), Payment Settings and External Resource, on
+  `DaylightThemedPage` + `DaylightPageHeader`.
+- Remaining admin pages: Customer Balance, Monthly Customer Billing,
+  Customer Statement, Email Report run detail, Customer detail, Group detail,
+  Franchisee detail + incentives and All Luxor Sites (all on
+  `DaylightThemedPage`); Payback Analysis reuses the client page inside
+  `DaylightAdminPage`. `GradientStatCard` is scope-aware: inside a themed
+  admin page it renders the Daylight `StatCard` (gradient picks the tone), so
+  the customer detail dashboard cards follow too. `Segmented` wraps when its
+  options don't fit.
+- Every `(manage)` page body is now Daylight; the franchise portal keeps its
+  existing look.
 
 Everything else under `(auth)`, `(franchise)` and `(manage)` is intentionally
 untouched.

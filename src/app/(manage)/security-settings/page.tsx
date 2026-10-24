@@ -1,17 +1,15 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import {
-  Box,
-  Paper,
-  Typography,
-  Button,
-  CircularProgress,
-  Alert,
-} from "@mui/material";
+import { Box, Paper, Typography, Button, Alert } from "@mui/material";
 import AdminSelfChangePasswordModal from "@/components/AdminSelfChangePasswordModal";
 import TwoFactorSettings from "@/components/TwoFactorSettings";
 import PasskeySettings from "@/components/PasskeySettings";
+import { DaylightThemedPage } from "@/components/daylight/DaylightMuiScope";
+import {
+  DaylightLoading,
+  DaylightPageHeader,
+} from "@/components/daylight/AdminPage";
 
 interface UserData {
   id?: string;
@@ -77,132 +75,75 @@ export default function SecuritySettingsPage() {
 
   if (loading) {
     return (
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          minHeight: "60vh",
-        }}
-      >
-        <CircularProgress />
-      </Box>
+      <DaylightThemedPage>
+        <DaylightLoading />
+      </DaylightThemedPage>
     );
   }
 
   if (!userData) {
     return (
-      <Box sx={{ p: 3 }}>
+      <DaylightThemedPage>
         <Alert severity="error">Failed to load security settings</Alert>
-      </Box>
+      </DaylightThemedPage>
     );
   }
 
   return (
-    <Box
-      sx={{
-        p: { xs: 2, sm: 3 },
-        mt: { xs: 1, sm: 2 },
-        maxWidth: 1200,
-        mx: "auto",
-        minHeight: "100vh",
-        bgcolor: (theme) =>
-          theme.palette.mode === "dark" ? "background.default" : "grey.50",
-      }}
-    >
-      <Typography
-        variant="h4"
-        fontWeight="bold"
-        gutterBottom
-        sx={{
-          color: (theme) =>
-            theme.palette.mode === "dark" ? "primary.light" : "primary.dark",
-          mb: 3,
-          borderBottom: (theme) => `2px solid ${theme.palette.primary.main}`,
-          pb: 1,
-        }}
-      >
-        Security Settings
-      </Typography>
+    <DaylightThemedPage>
+      <Box sx={{ maxWidth: 1200, mx: "auto" }}>
+        <DaylightPageHeader
+          title="Security Settings"
+          description="Password, two-factor authentication and passkeys for your admin account."
+        />
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
-        </Alert>
-      )}
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error}
+          </Alert>
+        )}
 
-      {/* Password Settings Section */}
-      <Paper
-        elevation={3}
-        sx={{
-          p: { xs: 2, sm: 4 },
-          mb: 4,
-          borderRadius: 2,
-          background: (theme) =>
-            theme.palette.mode === "dark"
-              ? "linear-gradient(145deg, rgba(40,40,40,0.9), rgba(30,30,30,0.9))"
-              : "linear-gradient(145deg, rgba(255,255,255,0.9), rgba(250,250,250,0.9))",
-          backdropFilter: "blur(10px)",
-          border: (theme) => `1px solid ${theme.palette.divider}`,
-        }}
-      >
-        <Typography
-          variant="h6"
-          fontWeight="medium"
-          gutterBottom
+        <Box
           sx={{
-            color: (theme) =>
-              theme.palette.mode === "dark" ? "primary.light" : "primary.dark",
-            mb: 3,
+            display: "grid",
+            gridTemplateColumns: "minmax(0, 1fr)",
+            gap: 3,
           }}
         >
-          Password Settings
-        </Typography>
+          {/* Password Settings Section */}
+          <Paper sx={{ p: { xs: 2.5, sm: 4 } }}>
+            <Typography variant="h6" component="h2" sx={{ mb: 0.5 }}>
+              Password
+            </Typography>
+            <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
+              Change your account password to keep your account secure.
+            </Typography>
+            <Button
+              variant="contained"
+              onClick={() => setChangePasswordModalOpen(true)}
+            >
+              Change Password
+            </Button>
+          </Paper>
 
-        <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
-          Change your account password to keep your account secure.
-        </Typography>
+          {/* Two Factor Authentication Section */}
+          <TwoFactorSettings
+            twoFactorEnabled={userData.twoFactorEnabled}
+            twoFactorMandatory={userData.twoFactorMandatory}
+            daylight
+          />
 
-        <Button
-          variant="contained"
-          onClick={() => setChangePasswordModalOpen(true)}
-          sx={{
-            px: 4,
-            py: 1,
-            background: (theme) =>
-              `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.primary.dark})`,
-            boxShadow: (theme) => `0 4px 20px ${theme.palette.primary.main}40`,
-            "&:hover": {
-              background: (theme) =>
-                `linear-gradient(45deg, ${theme.palette.primary.dark}, ${theme.palette.primary.main})`,
-              boxShadow: (theme) =>
-                `0 6px 25px ${theme.palette.primary.main}60`,
-            },
-          }}
-        >
-          Change Password
-        </Button>
-      </Paper>
+          {/* Passkey Settings Section */}
+          <PasskeySettings daylight />
+        </Box>
 
-      {/* Two Factor Authentication Section */}
-      <Box sx={{ mt: 4 }}>
-        <TwoFactorSettings
-          twoFactorEnabled={userData.twoFactorEnabled}
-          twoFactorMandatory={userData.twoFactorMandatory}
+        {/* Change Password Modal */}
+        <AdminSelfChangePasswordModal
+          open={changePasswordModalOpen}
+          onClose={handleModalClose}
+          onSuccess={handleSecurityUpdated}
         />
       </Box>
-
-      {/* Passkey Settings Section */}
-      <Box sx={{ mt: 4 }}>
-        <PasskeySettings />
-      </Box>
-
-      {/* Change Password Modal */}
-      <AdminSelfChangePasswordModal
-        open={changePasswordModalOpen}
-        onClose={handleModalClose}
-        onSuccess={handleSecurityUpdated}
-      />
-    </Box>
+    </DaylightThemedPage>
   );
 }

@@ -22,6 +22,7 @@ import {
   PdfUploadField,
   UploadedPdf,
 } from "@/components/accounting/common/PdfUploadField";
+import { DaylightThemedPage } from "@/components/daylight/DaylightMuiScope";
 
 export interface HardwarePurchaseFormData {
   invoiceNumber: string;
@@ -176,275 +177,279 @@ export default function CreateHardwarePurchasePage() {
   const totalAmount = calculateTotalAmount();
 
   return (
-    <Container maxWidth="md" sx={{ py: 4 }}>
-      <Stack direction="row" spacing={2} sx={{ mb: 4 }}>
-        <Link href="/accounting/hardware-purchases">
-          <Button startIcon={<ArrowBackIcon />}>Back</Button>
-        </Link>
-      </Stack>
+    <DaylightThemedPage>
+      <Container maxWidth="md" disableGutters>
+        <Stack spacing={1} sx={{ mb: 4, alignItems: "flex-start" }}>
+          <Link href="/accounting/hardware-purchases">
+            <Button startIcon={<ArrowBackIcon />}>Back</Button>
+          </Link>
+        </Stack>
 
-      <Paper sx={{ p: 4 }}>
-        <Typography variant="h4" sx={{ fontWeight: "bold", mb: 1 }}>
-          Record Hardware Purchase Invoice
-        </Typography>
-        <Typography color="textSecondary" sx={{ mb: 3 }}>
-          Add a new hardware purchase invoice entry
-        </Typography>
+        <Paper sx={{ p: 4 }}>
+          <Typography variant="h4" sx={{ fontWeight: "bold", mb: 1 }}>
+            Record Hardware Purchase Invoice
+          </Typography>
+          <Typography color="textSecondary" sx={{ mb: 3 }}>
+            Add a new hardware purchase invoice entry
+          </Typography>
 
-        {error && (
-          <Alert severity="error" sx={{ mb: 3 }}>
-            {error}
-          </Alert>
-        )}
+          {error && (
+            <Alert severity="error" sx={{ mb: 3 }}>
+              {error}
+            </Alert>
+          )}
 
-        {success && (
-          <Alert severity="success" sx={{ mb: 3 }}>
-            Hardware purchase invoice created successfully! Redirecting...
-          </Alert>
-        )}
+          {success && (
+            <Alert severity="success" sx={{ mb: 3 }}>
+              Hardware purchase invoice created successfully! Redirecting...
+            </Alert>
+          )}
 
-        <form onSubmit={handleSubmit}>
-          <Stack spacing={3}>
-            {/* Row 1: Invoice Number and Vendor Name */}
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+          <form onSubmit={handleSubmit}>
+            <Stack spacing={3}>
+              {/* Row 1: Invoice Number and Vendor Name */}
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                <TextField
+                  fullWidth
+                  label="Invoice Number"
+                  name="invoiceNumber"
+                  value={formData.invoiceNumber}
+                  onChange={handleInputChange}
+                  placeholder="e.g., HW-2026-001"
+                  required
+                  disabled={saving}
+                />
+                <VendorSelect
+                  type="hardware"
+                  value={formData.vendorId}
+                  onChange={(vendorId) =>
+                    setFormData((prev) => ({ ...prev, vendorId }))
+                  }
+                  required
+                  disabled={saving}
+                />
+              </Stack>
+
+              {/* Row 2: Hardware Description */}
               <TextField
                 fullWidth
-                label="Invoice Number"
-                name="invoiceNumber"
-                value={formData.invoiceNumber}
+                label="Hardware Description"
+                name="hardwareDescription"
+                value={formData.hardwareDescription}
                 onChange={handleInputChange}
-                placeholder="e.g., HW-2026-001"
+                placeholder="e.g., Antminer S21 x50"
                 required
                 disabled={saving}
               />
-              <VendorSelect
-                type="hardware"
-                value={formData.vendorId}
-                onChange={(vendorId) =>
-                  setFormData((prev) => ({ ...prev, vendorId }))
-                }
+
+              {/* Row 3: Billing Date and Due Date */}
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                <TextField
+                  fullWidth
+                  label="Billing Date"
+                  name="billingDate"
+                  type="date"
+                  value={formData.billingDate}
+                  onChange={handleInputChange}
+                  required
+                  disabled={saving}
+                  slotProps={{
+                    inputLabel: { shrink: true },
+                  }}
+                />
+                <TextField
+                  fullWidth
+                  label="Due Date"
+                  name="dueDate"
+                  type="date"
+                  value={formData.dueDate}
+                  onChange={handleInputChange}
+                  required
+                  disabled={saving}
+                  slotProps={{
+                    inputLabel: { shrink: true },
+                  }}
+                />
+              </Stack>
+
+              {/* Row 4: Quantity and Unit Price */}
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                <TextField
+                  fullWidth
+                  label="Quantity"
+                  name="quantity"
+                  type="number"
+                  value={formData.quantity}
+                  onChange={handleInputChange}
+                  slotProps={{
+                    htmlInput: { min: 0, step: 1 },
+                  }}
+                  required
+                  disabled={saving}
+                />
+                <TextField
+                  fullWidth
+                  label="Unit Price"
+                  name="unitPrice"
+                  type="number"
+                  value={formData.unitPrice}
+                  onChange={handleInputChange}
+                  slotProps={{
+                    htmlInput: { min: 0, step: 0.01 },
+                    input: {
+                      startAdornment: "$",
+                    },
+                  }}
+                  required
+                  disabled={saving}
+                />
+              </Stack>
+
+              {/* Row 5: Miscellaneous Charges and Security Deposit */}
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                <TextField
+                  fullWidth
+                  label="Miscellaneous Charges"
+                  name="miscellaneousCharges"
+                  type="number"
+                  value={formData.miscellaneousCharges}
+                  onChange={handleInputChange}
+                  slotProps={{
+                    htmlInput: { step: 0.01 },
+                    input: {
+                      startAdornment: "$",
+                    },
+                  }}
+                  disabled={saving}
+                />
+                <TextField
+                  fullWidth
+                  label="Security Deposit (optional)"
+                  name="securityDeposit"
+                  type="number"
+                  value={formData.securityDeposit}
+                  onChange={handleInputChange}
+                  helperText="Refundable; added to the total but not a hardware cost"
+                  slotProps={{
+                    htmlInput: { min: 0, step: 0.01 },
+                    input: {
+                      startAdornment: "$",
+                    },
+                  }}
+                  disabled={saving}
+                />
+              </Stack>
+
+              {/* Row 6: Notes */}
+              <TextField
+                fullWidth
+                label="Notes"
+                name="notes"
+                value={formData.notes}
+                onChange={handleInputChange}
+                multiline
+                rows={4}
+                placeholder="Add any additional notes or comments..."
+                disabled={saving}
+              />
+
+              {/* Row 7: Vendor invoice PDF (required) */}
+              <PdfUploadField
+                label="Vendor Invoice PDF"
+                purpose="hardware-purchase-invoice"
+                value={invoicePdf}
+                onChange={setInvoicePdf}
+                onUploadingChange={setPdfUploading}
                 required
                 disabled={saving}
               />
             </Stack>
 
-            {/* Row 2: Hardware Description */}
-            <TextField
-              fullWidth
-              label="Hardware Description"
-              name="hardwareDescription"
-              value={formData.hardwareDescription}
-              onChange={handleInputChange}
-              placeholder="e.g., Antminer S21 x50"
-              required
-              disabled={saving}
-            />
-
-            {/* Row 3: Billing Date and Due Date */}
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-              <TextField
-                fullWidth
-                label="Billing Date"
-                name="billingDate"
-                type="date"
-                value={formData.billingDate}
-                onChange={handleInputChange}
-                required
-                disabled={saving}
-                slotProps={{
-                  inputLabel: { shrink: true },
-                }}
-              />
-              <TextField
-                fullWidth
-                label="Due Date"
-                name="dueDate"
-                type="date"
-                value={formData.dueDate}
-                onChange={handleInputChange}
-                required
-                disabled={saving}
-                slotProps={{
-                  inputLabel: { shrink: true },
-                }}
-              />
-            </Stack>
-
-            {/* Row 4: Quantity and Unit Price */}
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-              <TextField
-                fullWidth
-                label="Quantity"
-                name="quantity"
-                type="number"
-                value={formData.quantity}
-                onChange={handleInputChange}
-                slotProps={{
-                  htmlInput: { min: 0, step: 1 },
-                }}
-                required
-                disabled={saving}
-              />
-              <TextField
-                fullWidth
-                label="Unit Price"
-                name="unitPrice"
-                type="number"
-                value={formData.unitPrice}
-                onChange={handleInputChange}
-                slotProps={{
-                  htmlInput: { min: 0, step: 0.01 },
-                  input: {
-                    startAdornment: "$",
-                  },
-                }}
-                required
-                disabled={saving}
-              />
-            </Stack>
-
-            {/* Row 5: Miscellaneous Charges and Security Deposit */}
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-              <TextField
-                fullWidth
-                label="Miscellaneous Charges"
-                name="miscellaneousCharges"
-                type="number"
-                value={formData.miscellaneousCharges}
-                onChange={handleInputChange}
-                slotProps={{
-                  htmlInput: { step: 0.01 },
-                  input: {
-                    startAdornment: "$",
-                  },
-                }}
-                disabled={saving}
-              />
-              <TextField
-                fullWidth
-                label="Security Deposit (optional)"
-                name="securityDeposit"
-                type="number"
-                value={formData.securityDeposit}
-                onChange={handleInputChange}
-                helperText="Refundable; added to the total but not a hardware cost"
-                slotProps={{
-                  htmlInput: { min: 0, step: 0.01 },
-                  input: {
-                    startAdornment: "$",
-                  },
-                }}
-                disabled={saving}
-              />
-            </Stack>
-
-            {/* Row 6: Notes */}
-            <TextField
-              fullWidth
-              label="Notes"
-              name="notes"
-              value={formData.notes}
-              onChange={handleInputChange}
-              multiline
-              rows={4}
-              placeholder="Add any additional notes or comments..."
-              disabled={saving}
-            />
-
-            {/* Row 7: Vendor invoice PDF (required) */}
-            <PdfUploadField
-              label="Vendor Invoice PDF"
-              purpose="hardware-purchase-invoice"
-              value={invoicePdf}
-              onChange={setInvoicePdf}
-              onUploadingChange={setPdfUploading}
-              required
-              disabled={saving}
-            />
-          </Stack>
-
-          {/* Total Amount Summary */}
-          <Box
-            sx={{
-              mt: 4,
-              p: 3,
-              backgroundColor: "#f5f5f5",
-              borderRadius: 1,
-              border: "1px solid #e0e0e0",
-            }}
-          >
-            <Stack spacing={2}>
-              <Box sx={{ display: "flex", justifyContent: "space-between" }}>
-                <Typography variant="body1" sx={{ fontWeight: "500" }}>
-                  Unit Total:
-                </Typography>
-                <Typography variant="body1">
-                  $
-                  {(
-                    (Number(formData.quantity) || 0) *
-                    (Number(formData.unitPrice) || 0)
-                  ).toFixed(2)}
-                </Typography>
-              </Box>
-              <Box sx={{ display: "flex", justifyContent: "space-between" }}>
-                <Typography variant="body1" sx={{ fontWeight: "500" }}>
-                  Miscellaneous:
-                </Typography>
-                <Typography variant="body1">
-                  ${(Number(formData.miscellaneousCharges) || 0).toFixed(2)}
-                </Typography>
-              </Box>
-              <Box sx={{ display: "flex", justifyContent: "space-between" }}>
-                <Typography variant="body1" sx={{ fontWeight: "500" }}>
-                  Security Deposit:
-                </Typography>
-                <Typography variant="body1">
-                  ${(Number(formData.securityDeposit) || 0).toFixed(2)}
-                </Typography>
-              </Box>
-              <Box
-                sx={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  pt: 2,
-                  borderTop: "2px solid #d0d0d0",
-                }}
-              >
-                <Typography variant="h6" sx={{ fontWeight: "bold" }}>
-                  Total Amount:
-                </Typography>
-                <Typography
-                  variant="h6"
-                  sx={{ fontWeight: "bold", color: "primary.main" }}
-                >
-                  ${totalAmount.toFixed(2)}
-                </Typography>
-              </Box>
-            </Stack>
-          </Box>
-
-          {/* Action Buttons */}
-          <Stack
-            direction="row"
-            spacing={2}
-            sx={{ mt: 4, justifyContent: "flex-end" }}
-          >
-            <Link href="/accounting/hardware-purchases">
-              <Button variant="outlined" disabled={saving}>
-                Cancel
-              </Button>
-            </Link>
-            <Button
-              type="submit"
-              variant="contained"
-              startIcon={saving ? <CircularProgress size={20} /> : <SaveIcon />}
-              disabled={saving || pdfUploading || !invoicePdf}
+            {/* Total Amount Summary */}
+            <Box
+              sx={{
+                mt: 4,
+                p: 3,
+                backgroundColor: "var(--dl-canvas, #f5f5f5)",
+                borderRadius: 1,
+                border: "1px solid var(--dl-border, #e0e0e0)",
+              }}
             >
-              {saving ? "Recording..." : "Record Hardware Purchase"}
-            </Button>
-          </Stack>
-        </form>
-      </Paper>
-    </Container>
+              <Stack spacing={2}>
+                <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                  <Typography variant="body1" sx={{ fontWeight: "500" }}>
+                    Unit Total:
+                  </Typography>
+                  <Typography variant="body1">
+                    $
+                    {(
+                      (Number(formData.quantity) || 0) *
+                      (Number(formData.unitPrice) || 0)
+                    ).toFixed(2)}
+                  </Typography>
+                </Box>
+                <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                  <Typography variant="body1" sx={{ fontWeight: "500" }}>
+                    Miscellaneous:
+                  </Typography>
+                  <Typography variant="body1">
+                    ${(Number(formData.miscellaneousCharges) || 0).toFixed(2)}
+                  </Typography>
+                </Box>
+                <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                  <Typography variant="body1" sx={{ fontWeight: "500" }}>
+                    Security Deposit:
+                  </Typography>
+                  <Typography variant="body1">
+                    ${(Number(formData.securityDeposit) || 0).toFixed(2)}
+                  </Typography>
+                </Box>
+                <Box
+                  sx={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    pt: 2,
+                    borderTop: "2px solid var(--dl-border, #d0d0d0)",
+                  }}
+                >
+                  <Typography variant="h6" sx={{ fontWeight: "bold" }}>
+                    Total Amount:
+                  </Typography>
+                  <Typography
+                    variant="h6"
+                    sx={{ fontWeight: "bold", color: "primary.main" }}
+                  >
+                    ${totalAmount.toFixed(2)}
+                  </Typography>
+                </Box>
+              </Stack>
+            </Box>
+
+            {/* Action Buttons */}
+            <Stack
+              direction="row"
+              spacing={2}
+              sx={{ mt: 4, justifyContent: "flex-end" }}
+            >
+              <Link href="/accounting/hardware-purchases">
+                <Button variant="outlined" disabled={saving}>
+                  Cancel
+                </Button>
+              </Link>
+              <Button
+                type="submit"
+                variant="contained"
+                startIcon={
+                  saving ? <CircularProgress size={20} /> : <SaveIcon />
+                }
+                disabled={saving || pdfUploading || !invoicePdf}
+              >
+                {saving ? "Recording..." : "Record Hardware Purchase"}
+              </Button>
+            </Stack>
+          </form>
+        </Paper>
+      </Container>
+    </DaylightThemedPage>
   );
 }

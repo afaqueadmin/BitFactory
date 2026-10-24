@@ -39,6 +39,12 @@ import { getDaysInCurrentMonth } from "@/lib/helpers/getDaysInCurrentMonth";
 import { formatValue } from "@/lib/helpers/formatValue";
 import { LuxorPaymentSettings } from "@/lib/types/wallet";
 import { useBitcoinLivePrice } from "@/components/useBitcoinLivePrice";
+import { DaylightThemedPage } from "@/components/daylight/DaylightMuiScope";
+import {
+  DaylightLoading,
+  useDaylightAdminSx,
+} from "@/components/daylight/AdminPage";
+import { useDaylight } from "@/lib/daylight";
 
 // "All subaccounts" option value in the subaccount filter.
 const ALL_SUBACCOUNTS = "__all__";
@@ -100,7 +106,7 @@ interface EarningsSummary {
 //         <Typography variant="subtitle1">{title}</Typography>
 //         {isLoading ? (
 //           <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1 }}>
-//             <CircularProgress size={24} sx={{ color: "white" }} />
+//             <CircularProgress size={20} color="inherit" />
 //             <Typography variant="body2">Loading...</Typography>
 //           </Box>
 //         ) : error ? (
@@ -384,19 +390,40 @@ export default function CustomerDetailPage() {
     settings.subaccount?.name || String(settings.subaccount?.id ?? "");
 
   const { btcLiveData, BtcLivePriceComponent } = useBitcoinLivePrice();
-  const minCardHeight = 140;
+  const { d, fonts } = useDaylight();
+  const { toggleGroupSx } = useDaylightAdminSx();
+  // Soft-tone value card, matching the Daylight StatCard next to it.
+  const toneCardSx = (tone: "sky" | "mint" | "amber") => {
+    const t = {
+      sky: { bg: d.skySoft, border: d.borderSky },
+      mint: { bg: d.mint, border: d.borderMint },
+      amber: { bg: d.amber, border: d.borderAmber },
+    }[tone];
+    return {
+      p: { xs: "15px 13px", sm: "19px 20px" },
+      height: "100%",
+      bgcolor: t.bg,
+      border: `1px solid ${t.border}`,
+      color: d.text,
+      "& .MuiTypography-h5, & .MuiTypography-h6": {
+        fontFamily: fonts.heading,
+        fontWeight: 750,
+        fontVariantNumeric: "tabular-nums",
+      },
+      "& .MuiTypography-h5": { fontSize: { xs: 20, sm: 22 } },
+      "& .MuiTypography-h6": { fontSize: { xs: 16, sm: 17 } },
+      "& .MuiTypography-caption, & .MuiTypography-body2": {
+        color: d.cardMuted,
+      },
+    };
+  };
+  const cardLabelSx = {
+    fontSize: { xs: 11, sm: 12 },
+    color: d.cardMuted,
+    mb: "8px",
+  };
   return (
-    <Box
-      component="main"
-      sx={{
-        flexGrow: 1,
-        p: 3,
-        mt: 2,
-        backgroundColor: (theme) =>
-          theme.palette.mode === "light" ? "#f5f5f5" : theme.palette.grey[900],
-        minHeight: "100vh",
-      }}
-    >
+    <DaylightThemedPage>
       {/* Back Button */}
       <Button
         startIcon={<ArrowBackIcon />}
@@ -407,9 +434,7 @@ export default function CustomerDetailPage() {
       </Button>
 
       {customerLoading ? (
-        <Box sx={{ display: "flex", justifyContent: "center", p: 4 }}>
-          <CircularProgress />
-        </Box>
+        <DaylightLoading />
       ) : customerError || !customer ? (
         <Alert severity="error">
           {customerError?.message || "Failed to load customer details"}
@@ -421,6 +446,8 @@ export default function CustomerDetailPage() {
             sx={{
               mb: 3,
               display: "flex",
+              flexWrap: "wrap",
+              gap: 2,
               justifyContent: "space-between",
               alignItems: "flex-start",
             }}
@@ -434,7 +461,7 @@ export default function CustomerDetailPage() {
                   <Typography
                     variant="h4"
                     fontWeight="bold"
-                    sx={{ color: "#d32f2f" }}
+                    sx={{ color: d.danger }}
                   >
                     (Deleted)
                   </Typography>
@@ -537,7 +564,7 @@ export default function CustomerDetailPage() {
               sx={{
                 display: "flex",
                 flexDirection: "column",
-                alignItems: "flex-end",
+                alignItems: { xs: "flex-start", sm: "flex-end" },
                 gap: 1.5,
               }}
             >
@@ -558,52 +585,29 @@ export default function CustomerDetailPage() {
           </Box>
 
           {error && (
-            <Paper
-              sx={{
-                p: 2,
-                mt: 2,
-                mb: 3,
-                backgroundColor: "#ffebee",
-                borderLeft: "4px solid #d32f2f",
-                color: "#d32f2f",
-              }}
-            >
-              <Typography variant="body2">
-                <strong>Error loading earnings:</strong>{" "}
-                {error?.message || "An error occurred"}
-              </Typography>
-            </Paper>
+            <Alert severity="error" sx={{ mb: 3 }}>
+              <strong>Error loading earnings:</strong>{" "}
+              {error?.message || "An error occurred"}
+            </Alert>
           )}
 
           {/* Balance Cards */}
           <Box
             sx={{
               display: "grid",
-              gridTemplateColumns: { xs: "1fr", md: "1fr 1fr 1fr" },
-              gap: 3,
-              mb: 4,
+              gridTemplateColumns:
+                "repeat(auto-fill, minmax(min(260px, 100%), 1fr))",
+              gap: 2,
+              mb: 3,
+              "& > *": { minWidth: 0 },
             }}
           >
             <Box sx={{ flex: { xs: 1, md: "1 1 25%" }, minWidth: 0 }}>
               <BalanceCard value={balanceLoading ? 0 : balance} />
             </Box>
             <Box>
-              <Paper
-                sx={{
-                  p: 3,
-                  borderRadius: 2,
-                  backgroundColor: (theme) =>
-                    theme.palette.mode === "light" ? "#2196f3" : "#1565c0",
-                  color: "white",
-                  minHeight: 120,
-                }}
-              >
-                <Typography
-                  variant="subtitle1"
-                  sx={{
-                    mb: 2,
-                  }}
-                >
+              <Paper sx={toneCardSx("sky")}>
+                <Typography component="div" sx={cardLabelSx}>
                   Total Earnings
                 </Typography>
                 {isLoading ? (
@@ -615,15 +619,17 @@ export default function CustomerDetailPage() {
                       mt: 1,
                     }}
                   >
-                    <CircularProgress size={24} sx={{ color: "white" }} />
+                    <CircularProgress size={20} color="inherit" />
                     <Typography variant="body2">Loading...</Typography>
                   </Box>
                 ) : (
                   <Box
                     sx={{
                       display: "flex",
+                      flexWrap: "wrap",
+                      columnGap: 2,
                       justifyContent: "space-between",
-                      alignItems: "center",
+                      alignItems: "baseline",
                     }}
                   >
                     <Typography variant="h5" fontWeight="bold">
@@ -643,22 +649,8 @@ export default function CustomerDetailPage() {
             </Box>
 
             <Box>
-              <Paper
-                sx={{
-                  p: 3,
-                  borderRadius: 2,
-                  backgroundColor: (theme) =>
-                    theme.palette.mode === "light" ? "#4caf50" : "#2e7d32",
-                  color: "white",
-                  minHeight: 120,
-                }}
-              >
-                <Typography
-                  variant="subtitle1"
-                  sx={{
-                    mb: 2,
-                  }}
-                >
+              <Paper sx={toneCardSx("mint")}>
+                <Typography component="div" sx={cardLabelSx}>
                   Pending Payouts
                 </Typography>
                 {isLoading ? (
@@ -670,15 +662,17 @@ export default function CustomerDetailPage() {
                       mt: 1,
                     }}
                   >
-                    <CircularProgress size={24} sx={{ color: "white" }} />
+                    <CircularProgress size={20} color="inherit" />
                     <Typography variant="body2">Loading...</Typography>
                   </Box>
                 ) : (
                   <Box
                     sx={{
                       display: "flex",
+                      flexWrap: "wrap",
+                      columnGap: 2,
                       justifyContent: "space-between",
-                      alignItems: "center",
+                      alignItems: "baseline",
                     }}
                   >
                     <Typography variant="h5" fontWeight="bold">
@@ -710,19 +704,8 @@ export default function CustomerDetailPage() {
             </Box>
 
             <Box sx={{ flex: { xs: 1, md: "1 1 25%" }, minWidth: 0 }}>
-              <Paper
-                sx={{
-                  p: 3,
-                  borderRadius: 2,
-                  backgroundColor: "#ff6f00",
-                  color: "white",
-                  height: "100%",
-                  display: "flex",
-                  flexDirection: "column",
-                  minHeight: minCardHeight,
-                }}
-              >
-                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+              <Paper sx={toneCardSx("amber")}>
+                <Typography component="div" sx={cardLabelSx}>
                   Payment Frequency
                 </Typography>
                 {walletLoading ? (
@@ -734,7 +717,7 @@ export default function CustomerDetailPage() {
                       mt: 1,
                     }}
                   >
-                    <CircularProgress size={24} sx={{ color: "white" }} />
+                    <CircularProgress size={20} color="inherit" />
                     <Typography variant="body2">Loading...</Typography>
                   </Box>
                 ) : walletError ? (
@@ -780,19 +763,8 @@ export default function CustomerDetailPage() {
             </Box>
 
             <Box sx={{ flex: { xs: 1, md: "1 1 25%" }, minWidth: 0 }}>
-              <Paper
-                sx={{
-                  p: 3,
-                  borderRadius: 2,
-                  backgroundColor: "#00796b",
-                  color: "white",
-                  height: "100%",
-                  display: "flex",
-                  flexDirection: "column",
-                  minHeight: minCardHeight,
-                }}
-              >
-                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+              <Paper sx={toneCardSx("sky")}>
+                <Typography component="div" sx={cardLabelSx}>
                   Next Payout
                 </Typography>
                 {walletLoading ? (
@@ -804,7 +776,7 @@ export default function CustomerDetailPage() {
                       mt: 1,
                     }}
                   >
-                    <CircularProgress size={24} sx={{ color: "white" }} />
+                    <CircularProgress size={20} color="inherit" />
                     <Typography variant="body2">Loading...</Typography>
                   </Box>
                 ) : walletError ? (
@@ -880,20 +852,7 @@ export default function CustomerDetailPage() {
           </Box>
 
           {/* Pool Authentication Section */}
-          <Paper
-            elevation={3}
-            sx={{
-              p: 3,
-              mb: 4,
-              borderRadius: 2,
-              background: (theme) =>
-                theme.palette.mode === "dark"
-                  ? "linear-gradient(145deg, rgba(40,40,40,0.9), rgba(30,30,30,0.9))"
-                  : "linear-gradient(145deg, rgba(255,255,255,0.9), rgba(250,250,250,0.9))",
-              backdropFilter: "blur(10px)",
-              border: (theme) => `1px solid ${theme.palette.divider}`,
-            }}
-          >
+          <Paper sx={{ p: { xs: 2, sm: 3 }, mb: 3 }}>
             <PoolAuthSection
               customerId={customerId}
               onChange={refreshSubaccountData}
@@ -902,69 +861,34 @@ export default function CustomerDetailPage() {
 
           {/* Sign-in emails: the primary, plus an optional second one for
               another person on the account. */}
-          <Paper
-            elevation={3}
-            sx={{
-              p: 3,
-              mb: 4,
-              borderRadius: 2,
-              background: (theme) =>
-                theme.palette.mode === "dark"
-                  ? "linear-gradient(145deg, rgba(40,40,40,0.9), rgba(30,30,30,0.9))"
-                  : "linear-gradient(145deg, rgba(255,255,255,0.9), rgba(250,250,250,0.9))",
-              backdropFilter: "blur(10px)",
-              border: (theme) => `1px solid ${theme.palette.divider}`,
-            }}
-          >
+          <Paper sx={{ p: { xs: 2, sm: 3 }, mb: 3 }}>
             <LoginEmailsSection customerId={customerId} />
           </Paper>
 
           {/* Hashrate & Shares Efficiency history for this customer. The API
               authorises the userId param for ADMIN/SUPER_ADMIN. */}
-          <HashrateHistoryChart
-            userId={customerId}
-            subaccountsParam={subaccountsParam}
-          />
+          <Box sx={{ mb: 3 }}>
+            <HashrateHistoryChart
+              daylight
+              userId={customerId}
+              subaccountsParam={subaccountsParam}
+            />
+          </Box>
 
           {/* Miners Section */}
-          <Paper
-            elevation={3}
-            sx={{
-              p: 3,
-              mb: 4,
-              borderRadius: 2,
-              background: (theme) =>
-                theme.palette.mode === "dark"
-                  ? "linear-gradient(145deg, rgba(40,40,40,0.9), rgba(30,30,30,0.9))"
-                  : "linear-gradient(145deg, rgba(255,255,255,0.9), rgba(250,250,250,0.9))",
-              backdropFilter: "blur(10px)",
-              border: (theme) => `1px solid ${theme.palette.divider}`,
-            }}
-          >
-            {/* Live status follows the subaccount filter - miners reporting
-                under an unselected subaccount show as offline. The list itself
-                isn't filtered: miners aren't linked to a subaccount yet. */}
+          {/* Live status follows the subaccount filter - miners reporting
+              under an unselected subaccount show as offline. The list itself
+              isn't filtered: miners aren't linked to a subaccount yet. */}
+          <Box sx={{ mb: 3 }}>
             <HostedMinersList
+              daylight
               customerId={customerId}
               subaccountsParam={subaccountsInView.join(",")}
             />
-          </Paper>
+          </Box>
 
           {/* Account Statement / Transaction History / Invoices Section */}
-          <Paper
-            elevation={3}
-            sx={{
-              p: 3,
-              mb: 4,
-              borderRadius: 2,
-              background: (theme) =>
-                theme.palette.mode === "dark"
-                  ? "linear-gradient(145deg, rgba(40,40,40,0.9), rgba(30,30,30,0.9))"
-                  : "linear-gradient(145deg, rgba(255,255,255,0.9), rgba(250,250,250,0.9))",
-              backdropFilter: "blur(10px)",
-              border: (theme) => `1px solid ${theme.palette.divider}`,
-            }}
-          >
+          <Box sx={{ mb: 3 }}>
             <ToggleButtonGroup
               value={activeView}
               exclusive
@@ -974,7 +898,7 @@ export default function CustomerDetailPage() {
                 }
               }}
               size="small"
-              sx={{ flexWrap: "wrap", mb: 1 }}
+              sx={{ ...toggleGroupSx, flexWrap: "wrap", mb: 2 }}
             >
               <ToggleButton value="statement">Account Statement</ToggleButton>
               <ToggleButton value="transactions">
@@ -984,20 +908,24 @@ export default function CustomerDetailPage() {
             </ToggleButtonGroup>
 
             {activeView === "statement" && (
-              <ElectricityCostTable customerId={customerId} />
+              <ElectricityCostTable daylight customerId={customerId} />
             )}
-            {activeView === "transactions" && (
-              <TransactionHistorySection
-                customerId={customerId}
-                subaccountsParam={subaccountsParam}
-              />
+            {activeView !== "statement" && (
+              <Paper sx={{ p: { xs: 2, sm: 3 } }}>
+                {activeView === "transactions" && (
+                  <TransactionHistorySection
+                    customerId={customerId}
+                    subaccountsParam={subaccountsParam}
+                  />
+                )}
+                {activeView === "invoices" && (
+                  <CustomerInvoicesTable customerId={customerId} />
+                )}
+              </Paper>
             )}
-            {activeView === "invoices" && (
-              <CustomerInvoicesTable customerId={customerId} />
-            )}
-          </Paper>
+          </Box>
         </>
       )}
-    </Box>
+    </DaylightThemedPage>
   );
 }

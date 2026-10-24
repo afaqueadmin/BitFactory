@@ -53,6 +53,8 @@ import GroupIcon from "@mui/icons-material/Group";
 import LocationOnIcon from "@mui/icons-material/LocationOn";
 import { Site, Subaccount } from "@/lib/luxor";
 import GradientStatCard from "@/components/GradientStatCard";
+import { DaylightThemedPage } from "@/components/daylight/DaylightMuiScope";
+import { DaylightLoading } from "@/components/daylight/AdminPage";
 
 /**
  * Response structure from the /api/luxor proxy route
@@ -151,8 +153,7 @@ export default function AllLuxorSitesPage() {
 
       // In V2, the sites endpoint returns an array directly or wrapped in 'sites'
       const responseData = data.data as
-        | Record<string, unknown>
-        | Array<unknown>;
+        Record<string, unknown> | Array<unknown>;
       let sitesList: Site[] = [];
 
       console.log("[Luxor Sites] Response data:", responseData);
@@ -522,25 +523,15 @@ export default function AllLuxorSitesPage() {
 
   if (state.loading) {
     return (
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          minHeight: "100vh",
-        }}
-      >
-        <CircularProgress />
-      </Box>
+      <DaylightThemedPage>
+        <DaylightLoading />
+      </DaylightThemedPage>
     );
   }
 
   return (
-    <Box
-      component="main"
-      sx={{ py: 4, backgroundColor: "background.default", minHeight: "100vh" }}
-    >
-      <Container maxWidth="xl">
+    <DaylightThemedPage>
+      <Container maxWidth="xl" disableGutters>
         {/* Page Header */}
         <Box
           sx={{
@@ -953,6 +944,6 @@ export default function AllLuxorSitesPage() {
           </DialogActions>
         </Dialog>
       </Container>
-    </Box>
+    </DaylightThemedPage>
   );
 }

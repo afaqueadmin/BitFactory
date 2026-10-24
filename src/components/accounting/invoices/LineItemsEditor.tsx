@@ -338,7 +338,7 @@ export function LineItemsEditor({
       <Box
         sx={{
           p: 2,
-          backgroundColor: "#f5f5f5",
+          backgroundColor: "var(--dl-canvas, #f5f5f5)",
           borderRadius: 1,
           mb: 2,
         }}
@@ -521,7 +521,15 @@ export function LineItemsEditor({
         </TableBody>
       </Table>
 
-      <Box sx={{ display: "flex", gap: 1, alignItems: "center", mt: 2 }}>
+      <Box
+        sx={{
+          display: "flex",
+          flexWrap: "wrap",
+          gap: 1,
+          alignItems: "center",
+          mt: 2,
+        }}
+      >
         <TextField
           select
           size="small"
@@ -614,7 +622,14 @@ export function LineItemsEditor({
         </Box>
       )}
 
-      <Box sx={{ p: 2, backgroundColor: "#f5f5f5", borderRadius: 1, mt: 2 }}>
+      <Box
+        sx={{
+          p: 2,
+          backgroundColor: "var(--dl-canvas, #f5f5f5)",
+          borderRadius: 1,
+          mt: 2,
+        }}
+      >
         {totals.discounts > 0 && (
           <>
             <Typography variant="body2">

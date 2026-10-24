@@ -23,6 +23,7 @@ import {
   discountLineItemsError,
   lineItemsFromSaved,
 } from "@/components/accounting/invoices/LineItemsEditor";
+import { DaylightThemedPage } from "@/components/daylight/DaylightMuiScope";
 
 export default function EditInvoicePage() {
   const params = useParams();
@@ -141,128 +142,139 @@ export default function EditInvoicePage() {
 
   if (invoiceLoading) {
     return (
-      <Container sx={{ py: 4, display: "flex", justifyContent: "center" }}>
-        <CircularProgress />
-      </Container>
+      <DaylightThemedPage>
+        <Container
+          sx={{ display: "flex", justifyContent: "center" }}
+          disableGutters
+        >
+          <CircularProgress />
+        </Container>
+      </DaylightThemedPage>
     );
   }
 
   if (!invoice) {
     return (
-      <Container sx={{ py: 4 }}>
-        <Alert severity="error">Invoice not found</Alert>
-      </Container>
+      <DaylightThemedPage>
+        <Container disableGutters>
+          <Alert severity="error">Invoice not found</Alert>
+        </Container>
+      </DaylightThemedPage>
     );
   }
 
   if (invoice.status !== "DRAFT") {
     return (
-      <Container sx={{ py: 4 }}>
-        <Alert severity="warning">Only DRAFT invoices can be edited</Alert>
-      </Container>
+      <DaylightThemedPage>
+        <Container disableGutters>
+          <Alert severity="warning">Only DRAFT invoices can be edited</Alert>
+        </Container>
+      </DaylightThemedPage>
     );
   }
 
   return (
-    <Container maxWidth="md" sx={{ py: 4 }}>
-      <Stack direction="row" spacing={2} sx={{ mb: 4 }}>
-        <Link href={`/accounting/hardware-sales/${invoiceId}`}>
-          <Button startIcon={<ArrowBackIcon />}>Back to Invoice</Button>
-        </Link>
-        <Box flex={1}>
-          <h1 style={{ margin: 0 }}>Edit Invoice</h1>
-          <p style={{ margin: "8px 0 0 0", color: "#666" }}>
-            Invoice: {invoice.invoiceNumber}
-          </p>
-        </Box>
-      </Stack>
+    <DaylightThemedPage>
+      <Container maxWidth="md" disableGutters>
+        <Stack spacing={1} sx={{ mb: 4, alignItems: "flex-start" }}>
+          <Link href={`/accounting/hardware-sales/${invoiceId}`}>
+            <Button startIcon={<ArrowBackIcon />}>Back to Invoice</Button>
+          </Link>
+          <Box flex={1}>
+            <h1 style={{ margin: 0 }}>Edit Invoice</h1>
+            <p style={{ margin: "8px 0 0 0", color: "var(--dl-muted, #666)" }}>
+              Invoice: {invoice.invoiceNumber}
+            </p>
+          </Box>
+        </Stack>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 3 }}>
-          {error}
-        </Alert>
-      )}
-      {updateError && (
-        <Alert severity="error" sx={{ mb: 3 }}>
-          {updateError}
-        </Alert>
-      )}
+        {error && (
+          <Alert severity="error" sx={{ mb: 3 }}>
+            {error}
+          </Alert>
+        )}
+        {updateError && (
+          <Alert severity="error" sx={{ mb: 3 }}>
+            {updateError}
+          </Alert>
+        )}
 
-      <Paper sx={{ p: 4 }}>
-        <form onSubmit={handleSubmit}>
-          <Stack spacing={3}>
-            <Box>
-              <h3 style={{ marginTop: 0, marginBottom: 16 }}>
-                Invoice Details
-              </h3>
-              <Stack spacing={2}>
-                {hasLineItems ? (
-                  <LineItemsEditor
-                    lineItems={lineItems}
-                    onChange={setLineItems}
-                    hardwareList={hardwareList}
-                    excludeUsedModels
-                    enableHostingColocation
-                    enableDiscounts
+        <Paper sx={{ p: 4 }}>
+          <form onSubmit={handleSubmit}>
+            <Stack spacing={3}>
+              <Box>
+                <h3 style={{ marginTop: 0, marginBottom: 16 }}>
+                  Invoice Details
+                </h3>
+                <Stack spacing={2}>
+                  {hasLineItems ? (
+                    <LineItemsEditor
+                      lineItems={lineItems}
+                      onChange={setLineItems}
+                      hardwareList={hardwareList}
+                      excludeUsedModels
+                      enableHostingColocation
+                      enableDiscounts
+                    />
+                  ) : (
+                    <>
+                      <TextField
+                        label="Number of Miners"
+                        name="totalMiners"
+                        type="number"
+                        value={formData.totalMiners}
+                        onChange={handleInputChange}
+                        fullWidth
+                        inputProps={{ min: 0, step: 1 }}
+                        helperText="Total active mining units allocated to this customer"
+                        required
+                      />
+                      <TextField
+                        label="Unit Price (USD)"
+                        name="unitPrice"
+                        type="number"
+                        value={formData.unitPrice}
+                        onChange={handleInputChange}
+                        fullWidth
+                        inputProps={{ min: 0, step: 0.01 }}
+                        helperText="Price per miner unit"
+                        required
+                      />
+                    </>
+                  )}
+                  <TextField
+                    label="Due Date"
+                    name="dueDate"
+                    type="date"
+                    value={formData.dueDate}
+                    onChange={handleInputChange}
+                    fullWidth
+                    InputLabelProps={{ shrink: true }}
+                    helperText="When payment is due"
+                    required
                   />
-                ) : (
-                  <>
-                    <TextField
-                      label="Number of Miners"
-                      name="totalMiners"
-                      type="number"
-                      value={formData.totalMiners}
-                      onChange={handleInputChange}
-                      fullWidth
-                      inputProps={{ min: 0, step: 1 }}
-                      helperText="Total active mining units allocated to this customer"
-                      required
-                    />
-                    <TextField
-                      label="Unit Price (USD)"
-                      name="unitPrice"
-                      type="number"
-                      value={formData.unitPrice}
-                      onChange={handleInputChange}
-                      fullWidth
-                      inputProps={{ min: 0, step: 0.01 }}
-                      helperText="Price per miner unit"
-                      required
-                    />
-                  </>
-                )}
-                <TextField
-                  label="Due Date"
-                  name="dueDate"
-                  type="date"
-                  value={formData.dueDate}
-                  onChange={handleInputChange}
-                  fullWidth
-                  InputLabelProps={{ shrink: true }}
-                  helperText="When payment is due"
-                  required
-                />
-              </Stack>
-            </Box>
+                </Stack>
+              </Box>
 
-            <Stack direction="row" spacing={2} sx={{ pt: 2 }}>
-              <Button variant="outlined" onClick={() => router.back()}>
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                variant="contained"
-                startIcon={
-                  loading ? <CircularProgress size={20} /> : <SaveIcon />
-                }
-                disabled={loading || updateLoading}
-              >
-                {loading ? "Saving..." : "Save Changes"}
-              </Button>
+              <Stack direction="row" spacing={2} sx={{ pt: 2 }}>
+                <Button variant="outlined" onClick={() => router.back()}>
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  variant="contained"
+                  startIcon={
+                    loading ? <CircularProgress size={20} /> : <SaveIcon />
+                  }
+                  disabled={loading || updateLoading}
+                >
+                  {loading ? "Saving..." : "Save Changes"}
+                </Button>
+              </Stack>
             </Stack>
-          </Stack>
-        </form>
-      </Paper>
-    </Container>
+          </form>
+        </Paper>
+      </Container>
+    </DaylightThemedPage>
   );
 }

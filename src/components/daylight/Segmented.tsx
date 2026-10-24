@@ -33,6 +33,9 @@ export default function Segmented<T extends string>({
       aria-label={ariaLabel}
       sx={{
         display: "inline-flex",
+        // Long option sets (4 strategies) wrap on the narrowest phones.
+        flexWrap: "wrap",
+        maxWidth: "100%",
         gap: "3px",
         p: "3px",
         border: `1px solid ${d.border}`,

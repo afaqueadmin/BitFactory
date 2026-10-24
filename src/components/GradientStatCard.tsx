@@ -17,6 +17,8 @@
  * Design:
  * - Uses specified gradient; in dark mode we add a subtle overlay to improve contrast.
  * - Text is white for readability on gradients.
+ * - Inside a themed admin page (`useDaylightScope()`) it renders the Daylight
+ *   StatCard instead; the gradient only picks the soft tone.
  */
 
 import React from "react";
@@ -27,6 +29,22 @@ import {
   SvgIcon,
   CircularProgress,
 } from "@mui/material";
+import InsightsOutlinedIcon from "@mui/icons-material/InsightsOutlined";
+import StatCard, { type StatCardTone } from "@/components/daylight/StatCard";
+import { useDaylightScope } from "@/components/daylight/AdminPage";
+
+// Warm (amber/orange/pink) and green gradients keep their hue family as a
+// Daylight tone; everything else (blues, purples) maps to sky.
+function toneForGradient(gradient?: string): StatCardTone {
+  if (!gradient) return "sky";
+  if (
+    /#(FFB300|FFCA28|FF9800|FFA726|f093fb|f5576c|fa709a|fee140)/i.test(gradient)
+  )
+    return "amber";
+  if (/#(00BFA6|1DE9B6|4CAF50|43e97b|38f9d7|11998e|38ef7d)/i.test(gradient))
+    return "mint";
+  return "sky";
+}
 
 export interface GradientStatCardProps {
   title: string;
@@ -48,6 +66,21 @@ export default function GradientStatCard({
   isLoading = false,
 }: GradientStatCardProps) {
   const theme = useTheme();
+  const daylight = useDaylightScope();
+
+  if (daylight) {
+    return (
+      <StatCard
+        title={title}
+        value={value}
+        unit={tag}
+        caption={caption}
+        tone={toneForGradient(gradient)}
+        icon={icon ?? <InsightsOutlinedIcon />}
+        isLoading={isLoading}
+      />
+    );
+  }
 
   // default gradient if none provided
   const baseGradient =

@@ -40,6 +40,7 @@ import {
   type LineItemBucket,
 } from "@/lib/accounting/hostingMonths";
 import type { SavedLineItem } from "@/components/accounting/invoices/InvoiceLineItemsTable";
+import { DaylightThemedPage } from "@/components/daylight/DaylightMuiScope";
 
 interface RecordPaymentPageProps {
   basePath: string;
@@ -216,73 +217,163 @@ export default function RecordPaymentPage({
 
   if (invoiceLoading) {
     return (
-      <Container sx={{ py: 4, display: "flex", justifyContent: "center" }}>
-        <CircularProgress />
-      </Container>
+      <DaylightThemedPage>
+        <Container
+          sx={{ display: "flex", justifyContent: "center" }}
+          disableGutters
+        >
+          <CircularProgress />
+        </Container>
+      </DaylightThemedPage>
     );
   }
 
   if (!invoice) {
     return (
-      <Container sx={{ py: 4 }}>
-        <Alert severity="error">Invoice not found</Alert>
-      </Container>
+      <DaylightThemedPage>
+        <Container disableGutters>
+          <Alert severity="error">Invoice not found</Alert>
+        </Container>
+      </DaylightThemedPage>
     );
   }
 
   if (invoice.status === "PAID" || invoice.status === "CANCELLED") {
     return (
-      <Container sx={{ py: 4 }}>
-        <Alert severity="warning">
-          Cannot record payment for {invoice.status.toLowerCase()} invoices
-        </Alert>
-      </Container>
+      <DaylightThemedPage>
+        <Container disableGutters>
+          <Alert severity="warning">
+            Cannot record payment for {invoice.status.toLowerCase()} invoices
+          </Alert>
+        </Container>
+      </DaylightThemedPage>
     );
   }
 
   const busy = loading || paymentLoading;
 
   return (
-    <Container maxWidth="md" sx={{ py: 4 }}>
-      <Stack direction="row" spacing={2} sx={{ mb: 4 }}>
-        <Link href={invoiceHref}>
-          <Button startIcon={<ArrowBackIcon />}>Back to Invoice</Button>
-        </Link>
-        <Box flex={1}>
-          <h1 style={{ margin: 0 }}>Record Payment</h1>
-          <p style={{ margin: "8px 0 0 0", color: "#666" }}>
-            Invoice: {invoice.invoiceNumber}
-          </p>
-        </Box>
-      </Stack>
+    <DaylightThemedPage>
+      <Container maxWidth="md" disableGutters>
+        <Stack spacing={1} sx={{ mb: 4, alignItems: "flex-start" }}>
+          <Link href={invoiceHref}>
+            <Button startIcon={<ArrowBackIcon />}>Back to Invoice</Button>
+          </Link>
+          <Box flex={1}>
+            <h1 style={{ margin: 0 }}>Record Payment</h1>
+            <p style={{ margin: "8px 0 0 0", color: "var(--dl-muted, #666)" }}>
+              Invoice: {invoice.invoiceNumber}
+            </p>
+          </Box>
+        </Stack>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 3 }}>
-          {error}
-        </Alert>
-      )}
-      {paymentError && (
-        <Alert severity="error" sx={{ mb: 3 }}>
-          {paymentError}
-        </Alert>
-      )}
+        {error && (
+          <Alert severity="error" sx={{ mb: 3 }}>
+            {error}
+          </Alert>
+        )}
+        {paymentError && (
+          <Alert severity="error" sx={{ mb: 3 }}>
+            {paymentError}
+          </Alert>
+        )}
 
-      <Box
-        sx={{
-          display: "grid",
-          gridTemplateColumns: { xs: "1fr", md: "2fr 1fr" },
-          gap: 3,
-        }}
-      >
-        {/* Payment Form */}
-        <Paper sx={{ p: 4 }}>
-          <form onSubmit={handleSubmit}>
-            <Stack spacing={3}>
-              {isSplitPayment ? (
-                <>
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: { xs: "1fr", md: "2fr 1fr" },
+            gap: 3,
+            "& > *": { minWidth: 0 },
+          }}
+        >
+          {/* Payment Form */}
+          <Paper sx={{ p: 4 }}>
+            <form onSubmit={handleSubmit}>
+              <Stack spacing={3}>
+                {isSplitPayment ? (
+                  <>
+                    <Box>
+                      <h3 style={{ marginTop: 0, marginBottom: 16 }}>
+                        Hardware Sales Payment
+                      </h3>
+                      <Stack spacing={2}>
+                        <PaymentPartsFields
+                          parts={parts}
+                          onChange={setParts}
+                          disabled={busy}
+                          amountsDisabled={markAsPaid}
+                          targetUsd={hardwareOutstanding}
+                          amountLabel="hardware sales payment"
+                        />
+                        <TextField
+                          label="Notes (Optional)"
+                          name="notes"
+                          multiline
+                          rows={2}
+                          value={formData.notes}
+                          onChange={handleInputChange}
+                          fullWidth
+                          helperText="Add any notes about this payment"
+                        />
+                      </Stack>
+                    </Box>
+
+                    <Box>
+                      <h3 style={{ marginTop: 0, marginBottom: 16 }}>
+                        Hosting and Colocation Payment
+                      </h3>
+                      <Stack spacing={2}>
+                        <PaymentPartsFields
+                          parts={hostingParts}
+                          onChange={setHostingParts}
+                          disabled={busy}
+                          amountsDisabled={markAsPaid}
+                          targetUsd={hostingOutstanding}
+                          amountLabel="hosting and colocation payment"
+                        />
+                        <TextField
+                          label="Notes (Optional)"
+                          name="hostingNotes"
+                          multiline
+                          rows={2}
+                          value={formData.hostingNotes}
+                          onChange={handleInputChange}
+                          fullWidth
+                          helperText="Add any notes about this payment"
+                        />
+                      </Stack>
+                    </Box>
+
+                    <Box>
+                      <Stack spacing={2}>
+                        <FormControlLabel
+                          control={
+                            <Checkbox
+                              name="markAsPaid"
+                              checked={formData.markAsPaid}
+                              onChange={handleInputChange}
+                            />
+                          }
+                          label="Mark as Paid"
+                        />
+                        <TextField
+                          label="Payment Date"
+                          name="paymentDate"
+                          type="date"
+                          value={formData.paymentDate}
+                          onChange={handleInputChange}
+                          fullWidth
+                          InputLabelProps={{ shrink: true }}
+                          helperText="When the payment was received (applies to both sections)"
+                          required
+                        />
+                      </Stack>
+                    </Box>
+                  </>
+                ) : (
                   <Box>
                     <h3 style={{ marginTop: 0, marginBottom: 16 }}>
-                      Hardware Sales Payment
+                      Payment Details
                     </h3>
                     <Stack spacing={2}>
                       <PaymentPartsFields
@@ -290,50 +381,8 @@ export default function RecordPaymentPage({
                         onChange={setParts}
                         disabled={busy}
                         amountsDisabled={markAsPaid}
-                        targetUsd={hardwareOutstanding}
-                        amountLabel="hardware sales payment"
+                        targetUsd={outstandingAmount}
                       />
-                      <TextField
-                        label="Notes (Optional)"
-                        name="notes"
-                        multiline
-                        rows={2}
-                        value={formData.notes}
-                        onChange={handleInputChange}
-                        fullWidth
-                        helperText="Add any notes about this payment"
-                      />
-                    </Stack>
-                  </Box>
-
-                  <Box>
-                    <h3 style={{ marginTop: 0, marginBottom: 16 }}>
-                      Hosting and Colocation Payment
-                    </h3>
-                    <Stack spacing={2}>
-                      <PaymentPartsFields
-                        parts={hostingParts}
-                        onChange={setHostingParts}
-                        disabled={busy}
-                        amountsDisabled={markAsPaid}
-                        targetUsd={hostingOutstanding}
-                        amountLabel="hosting and colocation payment"
-                      />
-                      <TextField
-                        label="Notes (Optional)"
-                        name="hostingNotes"
-                        multiline
-                        rows={2}
-                        value={formData.hostingNotes}
-                        onChange={handleInputChange}
-                        fullWidth
-                        helperText="Add any notes about this payment"
-                      />
-                    </Stack>
-                  </Box>
-
-                  <Box>
-                    <Stack spacing={2}>
                       <FormControlLabel
                         control={
                           <Checkbox
@@ -352,205 +401,169 @@ export default function RecordPaymentPage({
                         onChange={handleInputChange}
                         fullWidth
                         InputLabelProps={{ shrink: true }}
-                        helperText="When the payment was received (applies to both sections)"
+                        helperText="When the payment was received"
                         required
                       />
-                    </Stack>
-                  </Box>
-                </>
-              ) : (
-                <Box>
-                  <h3 style={{ marginTop: 0, marginBottom: 16 }}>
-                    Payment Details
-                  </h3>
-                  <Stack spacing={2}>
-                    <PaymentPartsFields
-                      parts={parts}
-                      onChange={setParts}
-                      disabled={busy}
-                      amountsDisabled={markAsPaid}
-                      targetUsd={outstandingAmount}
-                    />
-                    <FormControlLabel
-                      control={
-                        <Checkbox
-                          name="markAsPaid"
-                          checked={formData.markAsPaid}
-                          onChange={handleInputChange}
-                        />
-                      }
-                      label="Mark as Paid"
-                    />
-                    <TextField
-                      label="Payment Date"
-                      name="paymentDate"
-                      type="date"
-                      value={formData.paymentDate}
-                      onChange={handleInputChange}
-                      fullWidth
-                      InputLabelProps={{ shrink: true }}
-                      helperText="When the payment was received"
-                      required
-                    />
-                    <TextField
-                      label="Notes (Optional)"
-                      name="notes"
-                      multiline
-                      rows={3}
-                      value={formData.notes}
-                      onChange={handleInputChange}
-                      fullWidth
-                      helperText="Add any notes about this payment"
-                    />
-                  </Stack>
-                </Box>
-              )}
-
-              <Stack direction="row" spacing={2} sx={{ pt: 2 }}>
-                <Button variant="outlined" onClick={() => router.back()}>
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  variant="contained"
-                  startIcon={
-                    loading ? <CircularProgress size={20} /> : <SaveIcon />
-                  }
-                  disabled={busy || !canSubmit}
-                >
-                  {loading ? "Recording..." : "Record Payment"}
-                </Button>
-              </Stack>
-            </Stack>
-          </form>
-        </Paper>
-
-        {/* Invoice Summary (USD) */}
-        <Card>
-          <CardHeader title="Invoice Summary" subheader="Amounts in USD" />
-          <Divider />
-          <CardContent>
-            <Stack spacing={2}>
-              <Box>
-                <Typography color="textSecondary" variant="body2">
-                  Invoice Total
-                </Typography>
-                <CurrencyDisplay
-                  value={invoice.totalAmount}
-                  fontWeight="bold"
-                />
-              </Box>
-
-              {isSplitPayment && (
-                <>
-                  <Divider />
-                  <Box>
-                    <Typography sx={{ fontWeight: 600, mb: 0.5 }}>
-                      Hardware Sales
-                    </Typography>
-                    <Stack direction="row" justifyContent="space-between">
-                      <Typography color="textSecondary" variant="body2">
-                        Already Paid
-                      </Typography>
-                      <CurrencyDisplay value={hardwarePaid} />
-                    </Stack>
-                    <Stack direction="row" justifyContent="space-between">
-                      <Typography color="textSecondary" variant="body2">
-                        Outstanding
-                      </Typography>
-                      <CurrencyDisplay value={hardwareOutstanding} />
-                    </Stack>
-                    {parts.length === 1 && (
-                      <AmountDueInCurrency
-                        usd={hardwareOutstanding}
-                        account={parts[0]}
-                        compact
+                      <TextField
+                        label="Notes (Optional)"
+                        name="notes"
+                        multiline
+                        rows={3}
+                        value={formData.notes}
+                        onChange={handleInputChange}
+                        fullWidth
+                        helperText="Add any notes about this payment"
                       />
-                    )}
-                  </Box>
-                  <Box>
-                    <Typography sx={{ fontWeight: 600, mb: 0.5 }}>
-                      Hosting & Colocation
-                    </Typography>
-                    <Stack direction="row" justifyContent="space-between">
-                      <Typography color="textSecondary" variant="body2">
-                        Already Paid
-                      </Typography>
-                      <CurrencyDisplay value={hostingPaid} />
                     </Stack>
-                    <Stack direction="row" justifyContent="space-between">
-                      <Typography color="textSecondary" variant="body2">
-                        Outstanding
-                      </Typography>
-                      <CurrencyDisplay value={hostingOutstanding} />
-                    </Stack>
-                    {hostingParts.length === 1 && (
-                      <AmountDueInCurrency
-                        usd={hostingOutstanding}
-                        account={hostingParts[0]}
-                        compact
-                      />
-                    )}
                   </Box>
-                </>
-              )}
-
-              <Divider />
-
-              <Box>
-                <Typography color="textSecondary" variant="body2">
-                  Already Paid
-                </Typography>
-                <CurrencyDisplay value={paidAmount} fontWeight="bold" />
-              </Box>
-
-              <Divider />
-
-              <Box>
-                <Typography sx={{ fontWeight: 600, fontSize: "1.1rem" }}>
-                  Outstanding (USD)
-                </Typography>
-                <CurrencyDisplay
-                  value={outstandingAmount}
-                  variant="h6"
-                  fontWeight="bold"
-                />
-                {/* In the payment currency only while there's one currency
-                    part (and, on the split form, one account for both). */}
-                {!isSplitPayment && parts.length === 1 && (
-                  <AmountDueInCurrency
-                    usd={outstandingAmount}
-                    account={parts[0]}
-                  />
                 )}
-              </Box>
 
-              {enteredTotal > 0 && enteredTotalUsd > 0 && (
-                <Box
-                  sx={{
-                    p: 1.5,
-                    backgroundColor:
-                      enteredTotalUsd > outstandingAmount
-                        ? "#fff3cd"
-                        : "#e8f5e9",
-                    borderRadius: 1,
-                  }}
-                >
+                <Stack direction="row" spacing={2} sx={{ pt: 2 }}>
+                  <Button variant="outlined" onClick={() => router.back()}>
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    variant="contained"
+                    startIcon={
+                      loading ? <CircularProgress size={20} /> : <SaveIcon />
+                    }
+                    disabled={busy || !canSubmit}
+                  >
+                    {loading ? "Recording..." : "Record Payment"}
+                  </Button>
+                </Stack>
+              </Stack>
+            </form>
+          </Paper>
+
+          {/* Invoice Summary (USD) */}
+          <Card>
+            <CardHeader title="Invoice Summary" subheader="Amounts in USD" />
+            <Divider />
+            <CardContent>
+              <Stack spacing={2}>
+                <Box>
                   <Typography color="textSecondary" variant="body2">
-                    {enteredTotalUsd > outstandingAmount
-                      ? "Positive Balance After Payment"
-                      : "Remaining After Payment"}
+                    Invoice Total
                   </Typography>
                   <CurrencyDisplay
-                    value={Math.abs(outstandingAmount - enteredTotalUsd)}
+                    value={invoice.totalAmount}
                     fontWeight="bold"
                   />
                 </Box>
-              )}
-            </Stack>
-          </CardContent>
-        </Card>
-      </Box>
-    </Container>
+
+                {isSplitPayment && (
+                  <>
+                    <Divider />
+                    <Box>
+                      <Typography sx={{ fontWeight: 600, mb: 0.5 }}>
+                        Hardware Sales
+                      </Typography>
+                      <Stack direction="row" justifyContent="space-between">
+                        <Typography color="textSecondary" variant="body2">
+                          Already Paid
+                        </Typography>
+                        <CurrencyDisplay value={hardwarePaid} />
+                      </Stack>
+                      <Stack direction="row" justifyContent="space-between">
+                        <Typography color="textSecondary" variant="body2">
+                          Outstanding
+                        </Typography>
+                        <CurrencyDisplay value={hardwareOutstanding} />
+                      </Stack>
+                      {parts.length === 1 && (
+                        <AmountDueInCurrency
+                          usd={hardwareOutstanding}
+                          account={parts[0]}
+                          compact
+                        />
+                      )}
+                    </Box>
+                    <Box>
+                      <Typography sx={{ fontWeight: 600, mb: 0.5 }}>
+                        Hosting & Colocation
+                      </Typography>
+                      <Stack direction="row" justifyContent="space-between">
+                        <Typography color="textSecondary" variant="body2">
+                          Already Paid
+                        </Typography>
+                        <CurrencyDisplay value={hostingPaid} />
+                      </Stack>
+                      <Stack direction="row" justifyContent="space-between">
+                        <Typography color="textSecondary" variant="body2">
+                          Outstanding
+                        </Typography>
+                        <CurrencyDisplay value={hostingOutstanding} />
+                      </Stack>
+                      {hostingParts.length === 1 && (
+                        <AmountDueInCurrency
+                          usd={hostingOutstanding}
+                          account={hostingParts[0]}
+                          compact
+                        />
+                      )}
+                    </Box>
+                  </>
+                )}
+
+                <Divider />
+
+                <Box>
+                  <Typography color="textSecondary" variant="body2">
+                    Already Paid
+                  </Typography>
+                  <CurrencyDisplay value={paidAmount} fontWeight="bold" />
+                </Box>
+
+                <Divider />
+
+                <Box>
+                  <Typography sx={{ fontWeight: 600, fontSize: "1.1rem" }}>
+                    Outstanding (USD)
+                  </Typography>
+                  <CurrencyDisplay
+                    value={outstandingAmount}
+                    variant="h6"
+                    fontWeight="bold"
+                  />
+                  {/* In the payment currency only while there's one currency
+                    part (and, on the split form, one account for both). */}
+                  {!isSplitPayment && parts.length === 1 && (
+                    <AmountDueInCurrency
+                      usd={outstandingAmount}
+                      account={parts[0]}
+                    />
+                  )}
+                </Box>
+
+                {enteredTotal > 0 && enteredTotalUsd > 0 && (
+                  <Box
+                    sx={{
+                      p: 1.5,
+                      backgroundColor:
+                        enteredTotalUsd > outstandingAmount
+                          ? "#fff3cd"
+                          : "#e8f5e9",
+                      borderRadius: 1,
+                    }}
+                  >
+                    <Typography color="textSecondary" variant="body2">
+                      {enteredTotalUsd > outstandingAmount
+                        ? "Positive Balance After Payment"
+                        : "Remaining After Payment"}
+                    </Typography>
+                    <CurrencyDisplay
+                      value={Math.abs(outstandingAmount - enteredTotalUsd)}
+                      fontWeight="bold"
+                    />
+                  </Box>
+                )}
+              </Stack>
+            </CardContent>
+          </Card>
+        </Box>
+      </Container>
+    </DaylightThemedPage>
   );
 }
