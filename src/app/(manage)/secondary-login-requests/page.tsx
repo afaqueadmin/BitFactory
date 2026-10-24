@@ -14,7 +14,6 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  Chip,
   Button,
   CircularProgress,
   Alert,
@@ -24,6 +23,17 @@ import {
   DialogActions,
 } from "@mui/material";
 import {
+  CellNote,
+  DaylightAdminPage,
+  DaylightEmptyState,
+  DaylightLoading,
+  DaylightPageHeader,
+  DaylightStatusPill,
+  requestStatusTone,
+  statusLabel,
+  useDaylightAdminSx,
+} from "@/components/daylight/AdminPage";
+import {
   useSecondaryLoginRequests,
   useReviewSecondaryLoginRequest,
   SecondaryLoginRequestError,
@@ -31,13 +41,9 @@ import {
 } from "@/lib/hooks/useSecondaryLoginRequests";
 
 const STATUSES = ["PENDING", "APPROVED", "REJECTED"];
-const STATUS_COLOR: Record<string, "warning" | "success" | "error"> = {
-  PENDING: "warning",
-  APPROVED: "success",
-  REJECTED: "error",
-};
 
 export default function SecondaryLoginRequestsPage() {
+  const ds = useDaylightAdminSx();
   const [status, setStatus] = useState("PENDING");
   const { requests, loading, error, refetch } = useSecondaryLoginRequests(
     status ? { status } : undefined,
@@ -129,16 +135,18 @@ export default function SecondaryLoginRequestsPage() {
   };
 
   return (
-    <Box sx={{ p: 4 }}>
-      <Typography variant="h4" fontWeight={700} sx={{ mb: 1 }}>
-        Sign-in Email Requests
-      </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-        Client requests for a second sign-in email on their account. Approving
-        adds it straight away, the same as adding it from Edit Customer: the new
-        email gets a link to choose its password, and the account&apos;s primary
-        email is notified.
-      </Typography>
+    <DaylightAdminPage>
+      <DaylightPageHeader
+        title="Sign-in Email Requests"
+        description={
+          <>
+            Client requests for a second sign-in email on their account.
+            Approving adds it straight away, the same as adding it from Edit
+            Customer: the new email gets a link to choose its password, and the
+            account&apos;s primary email is notified.
+          </>
+        }
+      />
 
       <Stack direction="row" sx={{ mb: 3 }}>
         <TextField
@@ -147,7 +155,7 @@ export default function SecondaryLoginRequestsPage() {
           label="Status"
           value={status}
           onChange={(e) => setStatus(e.target.value)}
-          sx={{ minWidth: 220 }}
+          sx={{ minWidth: 220, ...ds.inputSx }}
         >
           <MenuItem value="">All statuses</MenuItem>
           {STATUSES.map((s) => (
@@ -161,7 +169,7 @@ export default function SecondaryLoginRequestsPage() {
       {notice && (
         <Alert
           severity="success"
-          sx={{ mb: 2 }}
+          sx={{ mb: 2, ...ds.alertSx("success") }}
           onClose={() => setNotice(null)}
         >
           {notice}
@@ -170,7 +178,7 @@ export default function SecondaryLoginRequestsPage() {
       {actionError && (
         <Alert
           severity="error"
-          sx={{ mb: 2 }}
+          sx={{ mb: 2, ...ds.alertSx("error") }}
           onClose={() => setActionError(null)}
         >
           {actionError}
@@ -178,17 +186,19 @@ export default function SecondaryLoginRequestsPage() {
       )}
 
       {loading ? (
-        <Box sx={{ display: "flex", justifyContent: "center", p: 4 }}>
-          <CircularProgress />
-        </Box>
+        <DaylightLoading />
       ) : error ? (
-        <Alert severity="error">{error}</Alert>
+        <Alert severity="error" sx={{ ...ds.alertSx("error") }}>
+          {error}
+        </Alert>
       ) : requests.length === 0 ? (
-        <Typography variant="body2" color="text.secondary">
-          No requests found.
-        </Typography>
+        <DaylightEmptyState>No requests found.</DaylightEmptyState>
       ) : (
-        <TableContainer component={Paper} variant="outlined">
+        <TableContainer
+          component={Paper}
+          variant="outlined"
+          sx={ds.tableCardSx}
+        >
           <Table size="small">
             <TableHead>
               <TableRow>
@@ -205,13 +215,7 @@ export default function SecondaryLoginRequestsPage() {
                 <TableRow key={req.id}>
                   <TableCell>
                     {req.user.name || req.user.email}
-                    <Typography
-                      variant="caption"
-                      color="text.secondary"
-                      display="block"
-                    >
-                      {req.user.email}
-                    </Typography>
+                    <CellNote>{req.user.email}</CellNote>
                   </TableCell>
                   <TableCell>
                     {new Date(req.createdAt).toLocaleString()}
@@ -220,29 +224,20 @@ export default function SecondaryLoginRequestsPage() {
                   <TableCell sx={{ maxWidth: 260 }}>
                     {req.reason || "—"}
                     {req.status === "REJECTED" && req.rejectionReason && (
-                      <Typography
-                        variant="caption"
-                        color="error"
-                        display="block"
-                      >
+                      <CellNote tone="danger">
                         Rejected: {req.rejectionReason}
-                      </Typography>
+                      </CellNote>
                     )}
                   </TableCell>
                   <TableCell>
-                    <Chip
-                      label={req.status}
-                      size="small"
-                      color={STATUS_COLOR[req.status]}
+                    <DaylightStatusPill
+                      label={statusLabel(req.status)}
+                      tone={requestStatusTone(req.status)}
                     />
                     {req.reviewedBy && (
-                      <Typography
-                        variant="caption"
-                        color="text.secondary"
-                        display="block"
-                      >
+                      <CellNote>
                         by {req.reviewedBy.name || req.reviewedBy.email}
-                      </Typography>
+                      </CellNote>
                     )}
                   </TableCell>
                   <TableCell align="right">
@@ -253,9 +248,9 @@ export default function SecondaryLoginRequestsPage() {
                         justifyContent="flex-end"
                       >
                         <Button
+                          sx={ds.successBtnSx}
                           size="small"
                           variant="contained"
-                          color="success"
                           onClick={() => handleApprove(req)}
                           disabled={approving || rejecting}
                           startIcon={
@@ -267,9 +262,9 @@ export default function SecondaryLoginRequestsPage() {
                           Approve
                         </Button>
                         <Button
+                          sx={ds.dangerOutlineBtnSx}
                           size="small"
                           variant="outlined"
-                          color="error"
                           onClick={() => setRejectTarget(req)}
                           disabled={approving || rejecting}
                         >
@@ -326,6 +321,6 @@ export default function SecondaryLoginRequestsPage() {
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
+    </DaylightAdminPage>
   );
 }

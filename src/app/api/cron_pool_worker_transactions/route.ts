@@ -5,6 +5,8 @@ import {
   upsertWorkerDailyMetricsForRange,
   upsertTransactionsForRange,
 } from "@/lib/services/poolWorkerAndTransactionService";
+import type { RangeResult } from "@/lib/services/poolWorkerAndTransactionService";
+import { waitForDatabase } from "@/lib/services/cronRetry";
 import { sendWorkerTransactionCronSummaryEmail } from "@/lib/email";
 
 // Matches the sibling snapshot cron's window: both source endpoints return
@@ -44,17 +46,42 @@ export async function GET(request: NextRequest) {
   const startDate = formatUtcDateKey(earliestDay);
   const endDate = formatUtcDateKey(latestDay);
 
-  // Sequential, not Promise.all: both loops hit the same shared Luxor
-  // rate-limit budget, so running them concurrently was doubling this
-  // cron's own peak request rate on top of everything else.
-  const workerResults = await upsertWorkerDailyMetricsForRange(
-    startDate,
-    endDate,
-  );
-  const transactionResults = await upsertTransactionsForRange(
-    startDate,
-    endDate,
-  );
+  let workerResults: RangeResult[] = [];
+  let transactionResults: RangeResult[] = [];
+
+  try {
+    await waitForDatabase("cron_pool_worker_transactions");
+
+    // Sequential, not Promise.all: both loops hit the same shared Luxor
+    // rate-limit budget, so running them concurrently was doubling this
+    // cron's own peak request rate on top of everything else.
+    workerResults = await upsertWorkerDailyMetricsForRange(startDate, endDate);
+    transactionResults = await upsertTransactionsForRange(startDate, endDate);
+  } catch (error) {
+    // Still email on a fatal error: before this, an unreachable database at
+    // the first query killed the run silently, and the only sign was the
+    // summary email not arriving.
+    const message = error instanceof Error ? error.message : "Unknown error";
+    console.error("[Worker/Transaction Cron] fatal -", error);
+    try {
+      await sendWorkerTransactionCronSummaryEmail({
+        startDate,
+        endDate,
+        workerResults,
+        transactionResults,
+        fatalError: message,
+      });
+    } catch (emailError) {
+      console.error(
+        "[Worker/Transaction Cron] Failed to send summary email:",
+        emailError,
+      );
+    }
+    return NextResponse.json(
+      { success: false, startDate, endDate, error: message },
+      { status: 500 },
+    );
+  }
 
   console.log(
     `[Worker/Transaction Cron] ${startDate} -> ${endDate}\n` +

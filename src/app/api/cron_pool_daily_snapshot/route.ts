@@ -4,6 +4,7 @@ import {
   upsertPoolDailySnapshotsForDate,
   PoolSnapshotUpsertResult,
 } from "@/lib/services/poolDailySnapshotService";
+import { waitForDatabase } from "@/lib/services/cronRetry";
 import { sendPoolCronSummaryEmail } from "@/lib/email";
 
 // Scheduled for 06:00 UTC, not right at midnight — moved back repeatedly
@@ -51,6 +52,15 @@ export async function GET(request: NextRequest) {
 
   const latestDay = getPreviousCompletedUtcDay();
   const dayResults: CronDayResult[] = [];
+
+  // Give a waking database time to come up. If it still can't be reached,
+  // carry on: each day below then records its own error and the summary
+  // email still goes out.
+  try {
+    await waitForDatabase("cron_pool_daily_snapshot");
+  } catch (error) {
+    console.error("[Pool Daily Snapshot Cron] database unreachable -", error);
+  }
 
   for (let daysAgo = 0; daysAgo < RETRY_WINDOW_DAYS; daysAgo++) {
     const targetDate = new Date(latestDay);

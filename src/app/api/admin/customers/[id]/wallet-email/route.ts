@@ -118,7 +118,9 @@ export async function POST(
 
   let pdfBuffer: Buffer;
   try {
-    pdfBuffer = await renderWalletSnapshotPdf(customer.id);
+    pdfBuffer = await renderWalletSnapshotPdf(customer.id, undefined, {
+      customerName: customer.name,
+    });
   } catch (error) {
     console.error("[Wallet Snapshot Email] PDF render failed:", error);
     return NextResponse.json(

@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sendCronSuccessEmailToDeveloper } from "@/lib/email";
+import {
+  sendCronFailureEmail,
+  sendCronSuccessEmailToDeveloper,
+} from "@/lib/email";
 import { runWalletPaymentEmails } from "@/lib/services/walletPaymentEmailService";
+import { waitForDatabase } from "@/lib/services/cronRetry";
 
 const CRON_NAME = "cron_wallet_payment_email";
 
@@ -50,6 +54,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    await waitForDatabase(CRON_NAME);
     const result = await runWalletPaymentEmails({
       now,
       startedAt,
@@ -88,11 +93,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: true, ...result, emailSent });
   } catch (error) {
     console.error("[Wallet Payment Email] Error:", error);
+    const message = error instanceof Error ? error.message : "Unknown error";
+    if (!dryRun) {
+      await sendCronFailureEmail(CRON_NAME, message, "developer");
+    }
     return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : "Unknown error",
-      },
+      { success: false, error: message },
       { status: 500 },
     );
   }

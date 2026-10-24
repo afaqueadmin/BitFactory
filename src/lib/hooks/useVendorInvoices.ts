@@ -22,9 +22,31 @@ export interface VendorPaymentPart {
   currency: { id: string; code: string; name: string };
 }
 
+/** A Farm Tariff / Hardware Purchase invoice's vendor. */
+export interface InvoiceVendor {
+  id: string;
+  name: string;
+  isActive: boolean;
+}
+
+/**
+ * Security deposit the vendor applied to an invoice (detail responses
+ * only). It lowers the invoice's cash due. amountUsd is a decimal string.
+ */
+export interface DepositAdjustment {
+  id: string;
+  date: string;
+  amountUsd: string;
+  note: string | null;
+}
+
 export interface VendorInvoice {
   id: string;
   invoiceNumber: string;
+  /** Optional on Farm Tariffs: older ones have none. */
+  vendorId: string | null;
+  vendor?: InvoiceVendor | null;
+  depositAdjustments?: DepositAdjustment[];
   billingDate: Date;
   paidDate: Date | null;
   dueDate: Date;
@@ -81,8 +103,13 @@ export interface VendorInvoiceSummary {
   totalOutstanding: number;
 }
 
-/** Issued Date (billingDate) range, as YYYY-MM-DD from a date input. */
+/** "none" in vendorId matches Farm Tariffs with no vendor set. */
+export const NO_VENDOR_FILTER = "none";
+
 export interface VendorInvoiceFilters {
+  /** A vendor id, or NO_VENDOR_FILTER. */
+  vendorId?: string;
+  /** Issued Date (billingDate) range, as YYYY-MM-DD from a date input. */
   startDate?: string;
   endDate?: string;
 }
@@ -103,6 +130,7 @@ export const useVendorInvoices = (
       paymentStatus,
       sortBy,
       sortOrder,
+      filters?.vendorId,
       filters?.startDate,
       filters?.endDate,
     ],
@@ -119,6 +147,7 @@ export const useVendorInvoices = (
         params.append("sortBy", sortBy);
         params.append("sortOrder", sortOrder || "asc");
       }
+      if (filters?.vendorId) params.append("vendorId", filters.vendorId);
       if (filters?.startDate) params.append("startDate", filters.startDate);
       if (filters?.endDate) params.append("endDate", filters.endDate);
 

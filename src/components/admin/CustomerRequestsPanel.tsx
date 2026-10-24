@@ -16,7 +16,6 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  Chip,
   Button,
   IconButton,
   Menu,
@@ -36,8 +35,20 @@ import {
 import CustomerRequestReviewModal, {
   type CustomerRequestRow,
 } from "./CustomerRequestReviewModal";
+import { useDaylight } from "@/lib/daylight";
+import {
+  CellNote,
+  DaylightEmptyState,
+  DaylightLoading,
+  DaylightStatusPill,
+  requestStatusTone,
+  statusLabel,
+  useDaylightAdminSx,
+} from "@/components/daylight/AdminPage";
 
 export default function CustomerRequestsPanel() {
+  const { d, fonts } = useDaylight();
+  const ds = useDaylightAdminSx();
   const [requests, setRequests] = useState<CustomerRequestRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -110,115 +121,97 @@ export default function CustomerRequestsPanel() {
   };
 
   if (loading) {
-    return (
-      <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
-        <CircularProgress />
-      </Box>
-    );
+    return <DaylightLoading />;
   }
 
   return (
     <Box>
       {error && (
-        <Alert severity="error" sx={{ mb: 3 }}>
+        <Alert severity="error" sx={{ mb: 3, ...ds.alertSx("error") }}>
           {error}
         </Alert>
       )}
 
       {requests.length === 0 ? (
-        <Paper sx={{ p: 4, textAlign: "center" }}>
-          <Typography color="text.secondary">
-            No customer requests have been submitted yet.
-          </Typography>
-        </Paper>
+        <DaylightEmptyState>
+          No customer requests have been submitted yet.
+        </DaylightEmptyState>
       ) : (
-        <TableContainer component={Paper}>
+        <TableContainer component={Paper} elevation={0} sx={ds.tableCardSx}>
           <Table>
             <TableHead>
-              <TableRow sx={{ backgroundColor: "background.default" }}>
-                <TableCell sx={{ fontWeight: "bold" }}>Customer</TableCell>
-                <TableCell sx={{ fontWeight: "bold" }}>Franchise</TableCell>
-                <TableCell sx={{ fontWeight: "bold" }}>Phone</TableCell>
-                <TableCell sx={{ fontWeight: "bold" }}>Subaccount</TableCell>
-                <TableCell sx={{ fontWeight: "bold" }}>
-                  Initial Deposit
-                </TableCell>
-                <TableCell sx={{ fontWeight: "bold" }}>Submitted</TableCell>
-                <TableCell sx={{ fontWeight: "bold" }} align="center">
-                  Status
-                </TableCell>
-                <TableCell sx={{ fontWeight: "bold" }} align="right">
-                  Actions
-                </TableCell>
+              <TableRow>
+                <TableCell>Customer</TableCell>
+                <TableCell>Franchise</TableCell>
+                <TableCell>Phone</TableCell>
+                <TableCell>Subaccount</TableCell>
+                <TableCell>Initial Deposit</TableCell>
+                <TableCell>Submitted</TableCell>
+                <TableCell align="center">Status</TableCell>
+                <TableCell align="right">Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {requests.map((r) => (
-                <TableRow
-                  key={r.id}
-                  sx={{ "&:hover": { backgroundColor: "background.default" } }}
-                >
+                <TableRow key={r.id}>
                   <TableCell>
-                    <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                    <Box component="span" sx={{ fontWeight: 650 }}>
                       {r.name}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {r.email}
-                    </Typography>
+                    </Box>
+                    <CellNote>{r.email}</CellNote>
                   </TableCell>
                   <TableCell>
-                    <Typography variant="body2">
-                      {r.franchise.businessName}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
+                    {r.franchise.businessName}
+                    <CellNote>
                       by {r.requestedBy.name || r.requestedBy.email}
-                    </Typography>
+                    </CellNote>
                   </TableCell>
-                  <TableCell>{r.phoneNumber || "-"}</TableCell>
+                  <TableCell>{r.phoneNumber || "—"}</TableCell>
                   <TableCell>
                     {r.luxorSubaccounts.length > 0
                       ? r.luxorSubaccounts.join(", ")
-                      : "-"}
+                      : "—"}
                   </TableCell>
-                  <TableCell>
-                    {r.initialDeposit ? `$${r.initialDeposit}` : "-"}
+                  <TableCell
+                    sx={{ "&&&": { fontVariantNumeric: "tabular-nums" } }}
+                  >
+                    {r.initialDeposit ? `$${r.initialDeposit}` : "—"}
                   </TableCell>
-                  <TableCell>
+                  <TableCell sx={{ "&&&": { whiteSpace: "nowrap" } }}>
                     {new Date(r.createdAt).toLocaleDateString()}
                   </TableCell>
                   <TableCell align="center">
-                    <Chip
-                      label={r.status}
-                      size="small"
-                      color={
-                        r.status === "APPROVED"
-                          ? "success"
-                          : r.status === "REJECTED"
-                            ? "error"
-                            : "warning"
-                      }
-                      variant="outlined"
+                    <DaylightStatusPill
+                      label={statusLabel(r.status)}
+                      tone={requestStatusTone(r.status)}
                     />
                   </TableCell>
-                  <TableCell align="right">
+                  <TableCell align="right" sx={{ "&&&": { py: "8px" } }}>
                     <Box
                       sx={{
                         display: "flex",
-                        gap: 1,
+                        gap: 0.5,
                         justifyContent: "flex-end",
+                        alignItems: "center",
                       }}
                     >
                       <Button
                         size="small"
                         variant="contained"
                         onClick={() => setViewingRequest(r)}
+                        sx={ds.primaryBtnSx}
                       >
                         View
                       </Button>
                       <IconButton
                         size="small"
                         onClick={(e) => handleMenuOpen(e, r)}
-                        aria-label="More options"
+                        aria-label={`More options for ${r.name}`}
+                        sx={{
+                          color: d.muted,
+                          borderRadius: "8px",
+                          "&:hover": { bgcolor: d.hover, color: d.action },
+                        }}
                       >
                         <MoreVertIcon fontSize="small" />
                       </IconButton>
@@ -245,13 +238,31 @@ export default function CustomerRequestsPanel() {
         anchorEl={menuAnchorEl}
         open={Boolean(menuAnchorEl)}
         onClose={handleMenuClose}
+        slotProps={{
+          paper: {
+            sx: {
+              minWidth: 180,
+              borderRadius: "12px",
+              border: `1px solid ${d.border}`,
+              bgcolor: d.surface,
+              backgroundImage: "none",
+              boxShadow: "0 8px 30px rgba(100,114,124,.13)",
+            },
+          },
+        }}
       >
         <MenuItem
           onClick={() => {
             setDeletingRequest(menuRequest);
             handleMenuClose();
           }}
-          sx={{ color: "error.main" }}
+          sx={{
+            minHeight: 40,
+            fontFamily: fonts.body,
+            fontSize: 13,
+            color: d.danger,
+            "&:hover": { bgcolor: d.dangerSoft },
+          }}
         >
           <DeleteIcon fontSize="small" sx={{ mr: 1 }} />
           Delete Request
@@ -307,7 +318,12 @@ export default function CustomerRequestsPanel() {
           severity={
             notification.toLowerCase().includes("fail") ? "error" : "success"
           }
-          sx={{ width: "100%" }}
+          sx={{
+            width: "100%",
+            ...ds.alertSx(
+              notification.toLowerCase().includes("fail") ? "error" : "success",
+            ),
+          }}
         >
           {notification}
         </Alert>

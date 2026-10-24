@@ -55,6 +55,10 @@ export interface DaylightPalette {
   /** Series colours for the two mining pools. */
   poolLuxor: string;
   poolBraiins: string;
+  /** Marker for values aggregated across both pools (admin dashboard). */
+  poolCombined: string;
+  /** Single-series line charts (validated against each mode's surface). */
+  chartLine: string;
 }
 
 const light: DaylightPalette = {
@@ -85,6 +89,8 @@ const light: DaylightPalette = {
   shadow: "0 4px 20px rgba(70,100,120,.035)",
   poolLuxor: "#1675A9",
   poolBraiins: "#E0A030",
+  poolCombined: "#7E62B8",
+  chartLine: "#1675A9",
 };
 
 const dark: DaylightPalette = {
@@ -115,6 +121,8 @@ const dark: DaylightPalette = {
   shadow: "0 4px 20px rgba(0,0,0,0.35)",
   poolLuxor: "#5CB8E8",
   poolBraiins: "#F0B34A",
+  poolCombined: "#B49CE8",
+  chartLine: "#3497D2",
 };
 
 export const RADIUS_CARD = "16px";

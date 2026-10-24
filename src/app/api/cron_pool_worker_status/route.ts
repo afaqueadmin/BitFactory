@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { upsertTodayWorkerStatus } from "@/lib/services/poolWorkerAndTransactionService";
 import { ensurePoolSubaccounts } from "@/lib/services/poolDailySnapshotService";
+import { waitForDatabase } from "@/lib/services/cronRetry";
 import { sendPoolCronSummaryEmail } from "@/lib/email";
 
 /**
@@ -30,13 +31,53 @@ export async function GET(request: NextRequest) {
     return new Response("Unauthorized", { status: 401 });
   }
 
+  let results: Awaited<ReturnType<typeof upsertTodayWorkerStatus>>;
   try {
-    await ensurePoolSubaccounts();
-  } catch (error) {
-    console.error("[Worker Status Cron] ensurePoolSubaccounts failed:", error);
-  }
+    await waitForDatabase("cron_pool_worker_status");
 
-  const results = await upsertTodayWorkerStatus();
+    try {
+      await ensurePoolSubaccounts();
+    } catch (error) {
+      console.error(
+        "[Worker Status Cron] ensurePoolSubaccounts failed:",
+        error,
+      );
+    }
+
+    results = await upsertTodayWorkerStatus();
+  } catch (error) {
+    // Still email on a fatal error (e.g. database unreachable), so a lost
+    // day of worker status is announced instead of silently missing.
+    const message = error instanceof Error ? error.message : "Unknown error";
+    console.error("[Worker Status Cron] fatal -", error);
+    try {
+      await sendPoolCronSummaryEmail({
+        cronName: "cron_pool_worker_status",
+        days: [
+          {
+            date: new Date().toISOString().slice(0, 10),
+            results: [
+              {
+                pool: "Luxor",
+                subaccountName: "(run failed)",
+                status: "error",
+                error: message,
+              },
+            ],
+          },
+        ],
+      });
+    } catch (emailError) {
+      console.error(
+        "[Worker Status Cron] Failed to send summary email:",
+        emailError,
+      );
+    }
+    return NextResponse.json(
+      { success: false, error: message },
+      { status: 500 },
+    );
+  }
 
   console.log(
     "[Worker Status Cron] " +

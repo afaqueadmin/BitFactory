@@ -20,7 +20,6 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
   Box,
-  Container,
   Typography,
   Button,
   Stack,
@@ -38,7 +37,6 @@ import {
   DialogContent,
   DialogActions,
   TextField,
-  Chip,
   IconButton,
   Tooltip,
   Tabs,
@@ -57,7 +55,19 @@ import {
   Close as CloseIcon,
 } from "@mui/icons-material";
 import GroupIcon from "@mui/icons-material/Group";
-import GradientStatCard from "@/components/GradientStatCard";
+import AccountTreeIcon from "@mui/icons-material/AccountTree";
+import LinkOffIcon from "@mui/icons-material/LinkOff";
+import StatCard from "@/components/daylight/StatCard";
+import { RADIUS_CARD, useDaylight } from "@/lib/daylight";
+import {
+  CellNote,
+  DaylightAdminPage,
+  DaylightEmptyState,
+  DaylightLoading,
+  DaylightPageHeader,
+  DaylightStatusPill,
+  useDaylightAdminSx,
+} from "@/components/daylight/AdminPage";
 
 /**
  * Group type matching database schema
@@ -172,6 +182,8 @@ const initialDialogState: DialogState = {
 
 export default function GroupsPage() {
   const router = useRouter();
+  const { d, fonts } = useDaylight();
+  const ds = useDaylightAdminSx();
   const [state, setState] = useState<GroupsState>({
     groups: [],
     loading: true,
@@ -798,16 +810,9 @@ export default function GroupsPage() {
 
   if (state.loading) {
     return (
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          minHeight: "100vh",
-        }}
-      >
-        <CircularProgress />
-      </Box>
+      <DaylightAdminPage>
+        <DaylightLoading />
+      </DaylightAdminPage>
     );
   }
 
@@ -815,43 +820,45 @@ export default function GroupsPage() {
     (sum, g) => sum + (g._count?.subaccounts ?? 0),
     0,
   );
+  const unassigned = state.unassignedSubaccounts ?? [];
+
+  const cardSx = {
+    bgcolor: d.surface,
+    border: `1px solid ${d.border}`,
+    borderRadius: RADIUS_CARD,
+    boxShadow: d.shadow,
+  } as const;
+
+  const sectionTitleSx = {
+    m: 0,
+    fontFamily: fonts.heading,
+    fontWeight: 700,
+    fontSize: 16,
+    color: d.text,
+  } as const;
+
+  const iconBtnSx = (tone: "action" | "danger") => ({
+    color: d.muted,
+    borderRadius: "8px",
+    "&:hover": {
+      bgcolor: tone === "danger" ? d.dangerSoft : d.hover,
+      color: tone === "danger" ? d.danger : d.action,
+    },
+  });
 
   return (
-    <Box
-      component="main"
-      sx={{ py: 4, backgroundColor: "background.default", minHeight: "100vh" }}
-    >
-      <Container maxWidth="xl">
-        {/* Page Header */}
-        <Box
-          sx={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            mb: 4,
-          }}
-        >
-          <Box>
-            <Typography
-              variant="h3"
-              component="h1"
-              sx={{
-                fontWeight: "bold",
-                color: "text.primary",
-              }}
-            >
-              Subaccount Groups
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-              Organize your subaccounts into groups for better management
-            </Typography>
-          </Box>
-          <Stack direction="row" spacing={1}>
+    <DaylightAdminPage>
+      <DaylightPageHeader
+        title="Subaccount Groups"
+        description="Organize your subaccounts into groups for better management."
+        actions={
+          <>
             <Button
               variant="outlined"
               startIcon={<RefreshIcon />}
               onClick={handleRefresh}
               disabled={isRefreshing}
+              sx={ds.outlineBtnSx}
             >
               {isRefreshing ? "Refreshing..." : "Refresh"}
             </Button>
@@ -859,706 +866,733 @@ export default function GroupsPage() {
               variant="contained"
               startIcon={<AddIcon />}
               onClick={openCreateDialog}
+              sx={ds.primaryBtnSx}
             >
               Create Group
             </Button>
-          </Stack>
-        </Box>
+          </>
+        }
+      />
 
-        {/* Error Alert */}
-        {state.error && (
-          <Alert severity="error" sx={{ mb: 3 }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: "bold" }}>
-              Error Loading Groups
-            </Typography>
-            <Typography variant="body2">{state.error}</Typography>
-          </Alert>
-        )}
+      {/* Error Alert */}
+      {state.error && (
+        <Alert severity="error" sx={{ mb: 3, ...ds.alertSx("error") }}>
+          <Box component="strong" sx={{ display: "block", mb: "2px" }}>
+            Error Loading Groups
+          </Box>
+          {state.error}
+        </Alert>
+      )}
 
-        {/* Stat Cards */}
-        <Box
-          sx={{
-            display: "grid",
-            gridTemplateColumns: {
-              xs: "1fr",
-              sm: "1fr 1fr",
-              md: "repeat(3, 1fr)",
-            },
-            gap: 3,
-            mb: 4,
-          }}
+      {/* Stat Cards */}
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns:
+            "repeat(auto-fit, minmax(min(220px, 100%), 1fr))",
+          gap: { xs: "12px", sm: "16px", md: "20px" },
+          mb: { xs: "20px", md: "24px" },
+        }}
+      >
+        <StatCard
+          title="Total Groups"
+          value={state.groups.length}
+          tone="sky"
+          icon={<GroupIcon />}
+        />
+        <StatCard
+          title="Total Subaccounts"
+          value={totalSubaccounts}
+          caption="Assigned to a group"
+          tone="mint"
+          icon={<AccountTreeIcon />}
+        />
+        <StatCard
+          title="Unassigned Subaccounts"
+          value={unassigned.length}
+          caption={unassigned.length > 0 ? "Need a group" : "All assigned"}
+          tone={unassigned.length > 0 ? "amber" : "mint"}
+          icon={<LinkOffIcon />}
+        />
+      </Box>
+
+      {/* Groups Table */}
+      {state.groups.length > 0 ? (
+        <TableContainer
+          component={Paper}
+          elevation={0}
+          sx={{ ...ds.tableCardSx, mb: { xs: "20px", md: "24px" } }}
         >
-          <Box>
-            <GradientStatCard
-              title="Total Groups"
-              value={String(state.groups.length)}
-              gradient="linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
-              icon={<GroupIcon fontSize="small" />}
-            />
-          </Box>
-
-          <Box>
-            <GradientStatCard
-              title="Total Subaccounts"
-              value={String(totalSubaccounts)}
-              gradient="linear-gradient(135deg, #f093fb 0%, #f5576c 100%)"
-              icon={<GroupIcon fontSize="small" />}
-            />
-          </Box>
-
-          <Box>
-            <GradientStatCard
-              title="Unassigned Subaccounts"
-              value={String(state.unassignedSubaccounts?.length || 0)}
-              gradient="linear-gradient(135deg, #63e6be 0%, #2dd4bf 100%)"
-              icon={<GroupIcon fontSize="small" />}
-            />
-          </Box>
-        </Box>
-
-        {/* Groups Table */}
-        {state.groups.length > 0 ? (
-          <TableContainer component={Paper} sx={{ mb: 4 }}>
-            <Table>
-              <TableHead>
-                <TableRow sx={{ backgroundColor: "background.default" }}>
-                  <TableCell sx={{ fontWeight: "bold" }}>Name</TableCell>
-                  <TableCell sx={{ fontWeight: "bold" }}>Description</TableCell>
-                  <TableCell sx={{ fontWeight: "bold" }} align="center">
-                    Status
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell>Name</TableCell>
+                <TableCell>Description</TableCell>
+                <TableCell align="center">Status</TableCell>
+                <TableCell align="right">Subaccounts</TableCell>
+                <TableCell>Created By</TableCell>
+                <TableCell align="right">Actions</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {state.groups.map((group) => (
+                <TableRow key={group.id}>
+                  <TableCell>
+                    <Box
+                      component="button"
+                      type="button"
+                      onClick={() => handleViewGroup(group.id)}
+                      sx={{
+                        p: 0,
+                        border: 0,
+                        bgcolor: "transparent",
+                        cursor: "pointer",
+                        textAlign: "left",
+                        fontFamily: fonts.body,
+                        fontSize: 13,
+                        fontWeight: 650,
+                        color: d.action,
+                        "&:hover": { textDecoration: "underline" },
+                        "&:focus-visible": {
+                          outline: `3px solid ${d.action}`,
+                          outlineOffset: "2px",
+                          borderRadius: "4px",
+                        },
+                      }}
+                    >
+                      {group.name}
+                    </Box>
+                    <CellNote>
+                      <Box
+                        component="span"
+                        sx={{
+                          fontFamily:
+                            "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+                          fontSize: 11,
+                        }}
+                      >
+                        {group.id}
+                      </Box>
+                    </CellNote>
                   </TableCell>
-                  <TableCell sx={{ fontWeight: "bold" }} align="right">
-                    Subaccounts
+                  <TableCell sx={{ "&&&": { color: d.muted } }}>
+                    {group.description || "—"}
                   </TableCell>
-                  <TableCell sx={{ fontWeight: "bold" }}>Created By</TableCell>
-                  <TableCell sx={{ fontWeight: "bold" }} align="right">
-                    Actions
+                  <TableCell align="center">
+                    <DaylightStatusPill
+                      label={group.isActive ? "Active" : "Inactive"}
+                      tone={group.isActive ? "success" : "neutral"}
+                    />
                   </TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {state.groups.map((group) => (
-                  <TableRow
-                    key={group.id}
+                  <TableCell
+                    align="right"
                     sx={{
-                      "&:hover": {
-                        backgroundColor: "background.default",
+                      "&&&": {
+                        fontWeight: 650,
+                        fontVariantNumeric: "tabular-nums",
                       },
                     }}
                   >
-                    <TableCell>
-                      <Typography
-                        variant="body2"
-                        sx={{
-                          fontWeight: 500,
-                          cursor: "pointer",
-                          color: "primary.main",
-                          "&:hover": { textDecoration: "underline" },
-                        }}
-                        onClick={() => handleViewGroup(group.id)}
-                      >
-                        {group.name}
-                      </Typography>
-                      <Typography
-                        variant="caption"
-                        color="text.secondary"
-                        sx={{ fontFamily: "monospace", fontSize: "0.7rem" }}
-                      >
-                        {group.id}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2" color="text.secondary">
-                        {group.description || "-"}
-                      </Typography>
-                    </TableCell>
-                    <TableCell align="center">
-                      <Chip
-                        label={group.isActive ? "Active" : "Inactive"}
-                        color={group.isActive ? "success" : "default"}
-                        variant="outlined"
-                        size="small"
-                      />
-                    </TableCell>
-                    <TableCell align="right">
-                      <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                        {group._count?.subaccounts ?? 0}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="caption">
-                        {group.creator?.name || group.createdBy}
-                      </Typography>
-                    </TableCell>
-                    <TableCell align="right">
-                      <Stack
-                        direction="row"
-                        spacing={1}
-                        justifyContent="flex-end"
-                      >
-                        <Tooltip title="Edit Group">
-                          <IconButton
-                            size="small"
-                            onClick={() => openEditDialog(group)}
-                            color="primary"
-                          >
-                            <EditIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Delete Group">
-                          <IconButton
-                            size="small"
-                            onClick={() => openDeleteDialog(group)}
-                            color="error"
-                          >
-                            <DeleteIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      </Stack>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        ) : (
-          <Paper sx={{ p: 4, textAlign: "center", mb: 4 }}>
-            <GroupIcon
-              sx={{
-                fontSize: 64,
-                color: "text.secondary",
-                mb: 2,
-                opacity: 0.5,
-              }}
-            />
-            <Typography variant="h6" color="text.secondary">
-              No groups created yet
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-              Click &quot;Create Group&quot; to organize your subaccounts
-            </Typography>
-          </Paper>
-        )}
-
-        {/* Unassigned Subaccounts List */}
-        <Box sx={{ mb: 4 }}>
-          <Typography variant="h6" sx={{ mb: 2, fontWeight: "bold" }}>
-            Unassigned Subaccounts ({state.unassignedSubaccounts?.length || 0})
-          </Typography>
-          {state.unassignedSubaccounts &&
-          state.unassignedSubaccounts.length > 0 ? (
-            <Paper sx={{ p: 2 }}>
-              <List>
-                {state.unassignedSubaccounts.map((sub) => (
-                  <ListItem
-                    key={sub.id}
-                    sx={{ borderBottom: "1px solid", borderColor: "divider" }}
-                  >
-                    <ListItemText
-                      primary={sub.subaccountName}
-                      secondary={`${sub.user?.name || "Unknown"} • ${sub.user?.email} • ${sub.minerCount} miners`}
-                    />
-                  </ListItem>
-                ))}
-              </List>
-            </Paper>
-          ) : (
-            <Typography variant="body2" color="text.secondary">
-              All subaccounts are assigned to groups
-            </Typography>
-          )}
-        </Box>
-
-        {/* Create/Edit/Delete Dialog */}
-        <Dialog
-          open={dialog.open}
-          onClose={closeDialog}
-          maxWidth="sm"
-          fullWidth
-        >
-          <DialogTitle
-            sx={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
-          >
-            <Box>
-              {dialog.mode === "create"
-                ? "Create New Group"
-                : dialog.mode === "edit"
-                  ? "Edit Group"
-                  : "Delete Group"}
-            </Box>
-            <IconButton onClick={closeDialog} size="small">
-              <CloseIcon />
-            </IconButton>
-          </DialogTitle>
-
-          <DialogContent
-            sx={{ pt: 2, minHeight: dialog.mode === "edit" ? "600px" : "auto" }}
-          >
-            {dialog.message && (
-              <Alert
-                severity={
-                  dialog.message.toLowerCase().includes("error")
-                    ? "error"
-                    : dialog.message.toLowerCase().includes("added") ||
-                        dialog.message.toLowerCase().includes("removed")
-                      ? "success"
-                      : "info"
-                }
-                sx={{ mb: 2 }}
-              >
-                {dialog.message}
-              </Alert>
-            )}
-
-            {dialog.mode === "delete" ? (
-              <Box>
-                <Typography variant="body1" sx={{ mb: 2 }}>
-                  Are you sure you want to delete this group?
-                </Typography>
-                <Paper sx={{ p: 2, backgroundColor: "background.default" }}>
-                  <Typography variant="body2" color="text.secondary">
-                    Group Name
-                  </Typography>
-                  <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                    {dialog.selectedGroup?.name}
-                  </Typography>
-                  {dialog.selectedGroup?.description && (
-                    <>
-                      <Typography
-                        variant="body2"
-                        color="text.secondary"
-                        sx={{ mt: 2 }}
-                      >
-                        Description
-                      </Typography>
-                      <Typography variant="body2">
-                        {dialog.selectedGroup.description}
-                      </Typography>
-                    </>
-                  )}
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    sx={{ mt: 2 }}
-                  >
-                    Subaccounts
-                  </Typography>
-                  <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                    {dialog.selectedGroup?._count?.subaccounts ?? 0}
-                  </Typography>
-                </Paper>
-                <Alert severity="warning" sx={{ mt: 2 }}>
-                  This action cannot be undone. Associated subaccounts will not
-                  be deleted, only removed from the group.
-                </Alert>
-              </Box>
-            ) : (
-              <>
-                {dialog.mode === "edit" && (
-                  <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 3 }}>
-                    <Tabs
-                      value={dialog.activeTab}
-                      onChange={(e, newValue) =>
-                        setDialog((prev) => ({
-                          ...prev,
-                          activeTab: newValue,
-                        }))
-                      }
+                    {group._count?.subaccounts ?? 0}
+                  </TableCell>
+                  <TableCell>
+                    {group.creator?.name || group.createdBy}
+                  </TableCell>
+                  <TableCell align="right" sx={{ "&&&": { py: "8px" } }}>
+                    <Stack
+                      direction="row"
+                      spacing={0.5}
+                      justifyContent="flex-end"
                     >
-                      <Tab label="Group Details" />
-                      <Tab label="Manage Subaccounts" />
-                    </Tabs>
-                  </Box>
+                      <Tooltip title="Edit Group">
+                        <IconButton
+                          size="small"
+                          aria-label={`Edit ${group.name}`}
+                          onClick={() => openEditDialog(group)}
+                          sx={iconBtnSx("action")}
+                        >
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Delete Group">
+                        <IconButton
+                          size="small"
+                          aria-label={`Delete ${group.name}`}
+                          onClick={() => openDeleteDialog(group)}
+                          sx={iconBtnSx("danger")}
+                        >
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </Stack>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      ) : (
+        <Box sx={{ mb: { xs: "20px", md: "24px" } }}>
+          <DaylightEmptyState>
+            <GroupIcon
+              sx={{ fontSize: 40, color: d.inputBorder, mb: 1 }}
+              aria-hidden
+            />
+            <Box sx={{ fontSize: 15, fontWeight: 650, color: d.text }}>
+              No groups created yet
+            </Box>
+            <Box sx={{ mt: "4px" }}>
+              Click &quot;Create Group&quot; to organize your subaccounts.
+            </Box>
+          </DaylightEmptyState>
+        </Box>
+      )}
+
+      {/* Unassigned Subaccounts List */}
+      <Box
+        component="section"
+        aria-labelledby="unassigned-heading"
+        sx={{ ...cardSx, p: { xs: "16px", sm: "20px 24px" } }}
+      >
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: 1,
+            mb: unassigned.length > 0 ? "8px" : 0,
+          }}
+        >
+          <Typography
+            id="unassigned-heading"
+            component="h2"
+            sx={sectionTitleSx}
+          >
+            Unassigned Subaccounts
+          </Typography>
+          <DaylightStatusPill
+            label={String(unassigned.length)}
+            tone={unassigned.length > 0 ? "warning" : "neutral"}
+          />
+        </Box>
+        {unassigned.length > 0 ? (
+          <Box component="ul" sx={{ listStyle: "none", m: 0, p: 0 }}>
+            {unassigned.map((sub) => (
+              <Box
+                component="li"
+                key={sub.id}
+                sx={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  alignItems: "baseline",
+                  columnGap: "12px",
+                  rowGap: "2px",
+                  py: "10px",
+                  borderBottom: `1px solid ${d.border}`,
+                  "&:last-of-type": { borderBottom: 0, pb: 0 },
+                }}
+              >
+                <Box
+                  component="span"
+                  sx={{ fontSize: 13, fontWeight: 650, color: d.text }}
+                >
+                  {sub.subaccountName}
+                </Box>
+                <Box
+                  component="span"
+                  sx={{
+                    fontSize: 12,
+                    color: d.muted,
+                    overflowWrap: "anywhere",
+                  }}
+                >
+                  {sub.user?.name || "Unknown"} · {sub.user?.email} ·{" "}
+                  {sub.minerCount} miners
+                </Box>
+              </Box>
+            ))}
+          </Box>
+        ) : (
+          <Box sx={{ mt: "6px", fontSize: 13, color: d.muted }}>
+            All subaccounts are assigned to groups.
+          </Box>
+        )}
+      </Box>
+
+      {/* Create/Edit/Delete Dialog */}
+      <Dialog open={dialog.open} onClose={closeDialog} maxWidth="sm" fullWidth>
+        <DialogTitle
+          sx={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <Box>
+            {dialog.mode === "create"
+              ? "Create New Group"
+              : dialog.mode === "edit"
+                ? "Edit Group"
+                : "Delete Group"}
+          </Box>
+          <IconButton onClick={closeDialog} size="small">
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+
+        <DialogContent
+          sx={{ pt: 2, minHeight: dialog.mode === "edit" ? "600px" : "auto" }}
+        >
+          {dialog.message && (
+            <Alert
+              severity={
+                dialog.message.toLowerCase().includes("error")
+                  ? "error"
+                  : dialog.message.toLowerCase().includes("added") ||
+                      dialog.message.toLowerCase().includes("removed")
+                    ? "success"
+                    : "info"
+              }
+              sx={{ mb: 2 }}
+            >
+              {dialog.message}
+            </Alert>
+          )}
+
+          {dialog.mode === "delete" ? (
+            <Box>
+              <Typography variant="body1" sx={{ mb: 2 }}>
+                Are you sure you want to delete this group?
+              </Typography>
+              <Paper sx={{ p: 2, backgroundColor: "background.default" }}>
+                <Typography variant="body2" color="text.secondary">
+                  Group Name
+                </Typography>
+                <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                  {dialog.selectedGroup?.name}
+                </Typography>
+                {dialog.selectedGroup?.description && (
+                  <>
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{ mt: 2 }}
+                    >
+                      Description
+                    </Typography>
+                    <Typography variant="body2">
+                      {dialog.selectedGroup.description}
+                    </Typography>
+                  </>
                 )}
-
-                {/* Tab 0: Group Details Form */}
-                {(dialog.mode !== "edit" || dialog.activeTab === 0) && (
-                  <Box
-                    sx={{ display: "flex", flexDirection: "column", gap: 2 }}
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ mt: 2 }}
+                >
+                  Subaccounts
+                </Typography>
+                <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                  {dialog.selectedGroup?._count?.subaccounts ?? 0}
+                </Typography>
+              </Paper>
+              <Alert severity="warning" sx={{ mt: 2 }}>
+                This action cannot be undone. Associated subaccounts will not be
+                deleted, only removed from the group.
+              </Alert>
+            </Box>
+          ) : (
+            <>
+              {dialog.mode === "edit" && (
+                <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 3 }}>
+                  <Tabs
+                    value={dialog.activeTab}
+                    onChange={(e, newValue) =>
+                      setDialog((prev) => ({
+                        ...prev,
+                        activeTab: newValue,
+                      }))
+                    }
                   >
-                    <TextField
-                      fullWidth
-                      label="Group Name"
-                      placeholder="Enter group name"
-                      value={dialog.formData.name}
-                      onChange={(e) =>
-                        setDialog((prev) => ({
-                          ...prev,
-                          formData: {
-                            ...prev.formData,
-                            name: e.target.value,
-                          },
-                          message: null,
-                        }))
-                      }
-                      disabled={dialog.submitting}
-                      variant="outlined"
-                      autoFocus
-                      required
-                    />
+                    <Tab label="Group Details" />
+                    <Tab label="Manage Subaccounts" />
+                  </Tabs>
+                </Box>
+              )}
 
-                    <TextField
-                      fullWidth
-                      label="Relationship Manager"
-                      placeholder="Enter relationship manager name"
-                      value={dialog.formData.relationshipManager}
-                      onChange={(e) =>
-                        setDialog((prev) => ({
-                          ...prev,
-                          formData: {
-                            ...prev.formData,
-                            relationshipManager: e.target.value,
-                          },
-                          message: null,
-                        }))
-                      }
-                      disabled={dialog.submitting}
-                      variant="outlined"
-                      required
-                    />
+              {/* Tab 0: Group Details Form */}
+              {(dialog.mode !== "edit" || dialog.activeTab === 0) && (
+                <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                  <TextField
+                    fullWidth
+                    label="Group Name"
+                    placeholder="Enter group name"
+                    value={dialog.formData.name}
+                    onChange={(e) =>
+                      setDialog((prev) => ({
+                        ...prev,
+                        formData: {
+                          ...prev.formData,
+                          name: e.target.value,
+                        },
+                        message: null,
+                      }))
+                    }
+                    disabled={dialog.submitting}
+                    variant="outlined"
+                    autoFocus
+                    required
+                  />
 
-                    <TextField
-                      fullWidth
-                      label="Email"
-                      placeholder="Enter email address"
-                      type="email"
-                      value={dialog.formData.email}
-                      onChange={(e) =>
-                        setDialog((prev) => ({
-                          ...prev,
-                          formData: {
-                            ...prev.formData,
-                            email: e.target.value,
-                          },
-                          message: null,
-                        }))
-                      }
-                      disabled={dialog.submitting}
-                      variant="outlined"
-                      required
-                    />
+                  <TextField
+                    fullWidth
+                    label="Relationship Manager"
+                    placeholder="Enter relationship manager name"
+                    value={dialog.formData.relationshipManager}
+                    onChange={(e) =>
+                      setDialog((prev) => ({
+                        ...prev,
+                        formData: {
+                          ...prev.formData,
+                          relationshipManager: e.target.value,
+                        },
+                        message: null,
+                      }))
+                    }
+                    disabled={dialog.submitting}
+                    variant="outlined"
+                    required
+                  />
 
-                    <TextField
-                      fullWidth
-                      label="Confirm Email"
-                      placeholder="Re-enter email address"
-                      type="email"
-                      value={dialog.formData.confirmEmail}
-                      onChange={(e) =>
-                        setDialog((prev) => ({
-                          ...prev,
-                          formData: {
-                            ...prev.formData,
-                            confirmEmail: e.target.value,
-                          },
-                          message: null,
-                        }))
-                      }
-                      disabled={dialog.submitting}
-                      variant="outlined"
-                      required
-                      error={
-                        !!(
-                          dialog.formData.email &&
-                          dialog.formData.confirmEmail &&
-                          dialog.formData.email !== dialog.formData.confirmEmail
-                        )
-                      }
-                      helperText={
+                  <TextField
+                    fullWidth
+                    label="Email"
+                    placeholder="Enter email address"
+                    type="email"
+                    value={dialog.formData.email}
+                    onChange={(e) =>
+                      setDialog((prev) => ({
+                        ...prev,
+                        formData: {
+                          ...prev.formData,
+                          email: e.target.value,
+                        },
+                        message: null,
+                      }))
+                    }
+                    disabled={dialog.submitting}
+                    variant="outlined"
+                    required
+                  />
+
+                  <TextField
+                    fullWidth
+                    label="Confirm Email"
+                    placeholder="Re-enter email address"
+                    type="email"
+                    value={dialog.formData.confirmEmail}
+                    onChange={(e) =>
+                      setDialog((prev) => ({
+                        ...prev,
+                        formData: {
+                          ...prev.formData,
+                          confirmEmail: e.target.value,
+                        },
+                        message: null,
+                      }))
+                    }
+                    disabled={dialog.submitting}
+                    variant="outlined"
+                    required
+                    error={
+                      !!(
                         dialog.formData.email &&
                         dialog.formData.confirmEmail &&
                         dialog.formData.email !== dialog.formData.confirmEmail
-                          ? "Emails do not match"
-                          : ""
-                      }
-                    />
+                      )
+                    }
+                    helperText={
+                      dialog.formData.email &&
+                      dialog.formData.confirmEmail &&
+                      dialog.formData.email !== dialog.formData.confirmEmail
+                        ? "Emails do not match"
+                        : ""
+                    }
+                  />
 
-                    <TextField
-                      fullWidth
-                      label="Description"
-                      placeholder="Enter group description (optional)"
-                      multiline
-                      rows={3}
-                      value={dialog.formData.description}
-                      onChange={(e) =>
-                        setDialog((prev) => ({
-                          ...prev,
-                          formData: {
-                            ...prev.formData,
-                            description: e.target.value,
-                          },
-                          message: null,
-                        }))
-                      }
-                      disabled={dialog.submitting}
-                      variant="outlined"
-                    />
-                  </Box>
-                )}
+                  <TextField
+                    fullWidth
+                    label="Description"
+                    placeholder="Enter group description (optional)"
+                    multiline
+                    rows={3}
+                    value={dialog.formData.description}
+                    onChange={(e) =>
+                      setDialog((prev) => ({
+                        ...prev,
+                        formData: {
+                          ...prev.formData,
+                          description: e.target.value,
+                        },
+                        message: null,
+                      }))
+                    }
+                    disabled={dialog.submitting}
+                    variant="outlined"
+                  />
+                </Box>
+              )}
 
-                {/* Tab 1: Manage Subaccounts */}
-                {dialog.mode === "edit" && dialog.activeTab === 1 && (
-                  <Box>
-                    {dialog.loadingSubaccounts ? (
-                      <Box
-                        sx={{ display: "flex", justifyContent: "center", p: 3 }}
-                      >
-                        <CircularProgress />
-                      </Box>
-                    ) : (
-                      <>
-                        {/* Current Subaccounts */}
-                        <Box sx={{ mb: 4 }}>
-                          <Typography
-                            variant="h6"
-                            sx={{ mb: 2, fontWeight: "bold" }}
-                          >
-                            Current Subaccounts (
-                            {dialog.currentSubaccounts.length})
+              {/* Tab 1: Manage Subaccounts */}
+              {dialog.mode === "edit" && dialog.activeTab === 1 && (
+                <Box>
+                  {dialog.loadingSubaccounts ? (
+                    <Box
+                      sx={{ display: "flex", justifyContent: "center", p: 3 }}
+                    >
+                      <CircularProgress />
+                    </Box>
+                  ) : (
+                    <>
+                      {/* Current Subaccounts */}
+                      <Box sx={{ mb: 4 }}>
+                        <Typography
+                          variant="h6"
+                          sx={{ mb: 2, fontWeight: "bold" }}
+                        >
+                          Current Subaccounts (
+                          {dialog.currentSubaccounts.length})
+                        </Typography>
+                        {dialog.currentSubaccounts.length > 0 ? (
+                          <Paper sx={{ maxHeight: "300px", overflow: "auto" }}>
+                            <List>
+                              {dialog.currentSubaccounts.map((subaccount) => (
+                                <ListItem
+                                  key={subaccount.id}
+                                  secondaryAction={
+                                    <Tooltip title="Remove from group">
+                                      <IconButton
+                                        edge="end"
+                                        color="error"
+                                        onClick={() =>
+                                          handleRemoveSubaccounts([
+                                            subaccount.id,
+                                          ])
+                                        }
+                                        disabled={dialog.submitting}
+                                      >
+                                        <DeleteIcon fontSize="small" />
+                                      </IconButton>
+                                    </Tooltip>
+                                  }
+                                  sx={{
+                                    borderBottom: "1px solid",
+                                    borderColor: "divider",
+                                  }}
+                                >
+                                  <ListItemText
+                                    primary={subaccount.subaccountName}
+                                    secondary={`${subaccount.user?.name || "Unknown"} • ${subaccount.minerCount} miners`}
+                                  />
+                                </ListItem>
+                              ))}
+                            </List>
+                          </Paper>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary">
+                            No subaccounts assigned yet
                           </Typography>
-                          {dialog.currentSubaccounts.length > 0 ? (
+                        )}
+                      </Box>
+
+                      {/* Available Subaccounts */}
+                      <Box>
+                        <Box
+                          sx={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            mb: 2,
+                          }}
+                        >
+                          <Typography variant="h6" sx={{ fontWeight: "bold" }}>
+                            Available Subaccounts (
+                            {dialog.availableSubaccounts.length})
+                          </Typography>
+                          {dialog.availableSubaccounts.length > 0 && (
+                            <Stack direction="row" spacing={1}>
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                onClick={handleSelectAllSubaccounts}
+                                disabled={
+                                  dialog.submitting ||
+                                  dialog.selectedSubaccountIds.size ===
+                                    dialog.availableSubaccounts.length
+                                }
+                              >
+                                Select All
+                              </Button>
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                onClick={handleDeselectAllSubaccounts}
+                                disabled={
+                                  dialog.submitting ||
+                                  dialog.selectedSubaccountIds.size === 0
+                                }
+                              >
+                                Deselect All
+                              </Button>
+                            </Stack>
+                          )}
+                        </Box>
+
+                        {dialog.availableSubaccounts.length > 0 ? (
+                          <>
                             <Paper
                               sx={{ maxHeight: "300px", overflow: "auto" }}
                             >
                               <List>
-                                {dialog.currentSubaccounts.map((subaccount) => (
-                                  <ListItem
-                                    key={subaccount.id}
-                                    secondaryAction={
-                                      <Tooltip title="Remove from group">
-                                        <IconButton
-                                          edge="end"
-                                          color="error"
-                                          onClick={() =>
-                                            handleRemoveSubaccounts([
-                                              subaccount.id,
-                                            ])
-                                          }
-                                          disabled={dialog.submitting}
-                                        >
-                                          <DeleteIcon fontSize="small" />
-                                        </IconButton>
-                                      </Tooltip>
-                                    }
-                                    sx={{
-                                      borderBottom: "1px solid",
-                                      borderColor: "divider",
-                                    }}
-                                  >
-                                    <ListItemText
-                                      primary={subaccount.subaccountName}
-                                      secondary={`${subaccount.user?.name || "Unknown"} • ${subaccount.minerCount} miners`}
-                                    />
-                                  </ListItem>
-                                ))}
-                              </List>
-                            </Paper>
-                          ) : (
-                            <Typography variant="body2" color="text.secondary">
-                              No subaccounts assigned yet
-                            </Typography>
-                          )}
-                        </Box>
-
-                        {/* Available Subaccounts */}
-                        <Box>
-                          <Box
-                            sx={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              alignItems: "center",
-                              mb: 2,
-                            }}
-                          >
-                            <Typography
-                              variant="h6"
-                              sx={{ fontWeight: "bold" }}
-                            >
-                              Available Subaccounts (
-                              {dialog.availableSubaccounts.length})
-                            </Typography>
-                            {dialog.availableSubaccounts.length > 0 && (
-                              <Stack direction="row" spacing={1}>
-                                <Button
-                                  size="small"
-                                  variant="outlined"
-                                  onClick={handleSelectAllSubaccounts}
-                                  disabled={
-                                    dialog.submitting ||
-                                    dialog.selectedSubaccountIds.size ===
-                                      dialog.availableSubaccounts.length
-                                  }
-                                >
-                                  Select All
-                                </Button>
-                                <Button
-                                  size="small"
-                                  variant="outlined"
-                                  onClick={handleDeselectAllSubaccounts}
-                                  disabled={
-                                    dialog.submitting ||
-                                    dialog.selectedSubaccountIds.size === 0
-                                  }
-                                >
-                                  Deselect All
-                                </Button>
-                              </Stack>
-                            )}
-                          </Box>
-
-                          {dialog.availableSubaccounts.length > 0 ? (
-                            <>
-                              <Paper
-                                sx={{ maxHeight: "300px", overflow: "auto" }}
-                              >
-                                <List>
-                                  {dialog.availableSubaccounts.map(
-                                    (subaccount) => (
-                                      <ListItem
-                                        key={subaccount.id}
-                                        disablePadding
-                                        sx={{
-                                          borderBottom: "1px solid",
-                                          borderColor: "divider",
-                                          "&:hover": {
-                                            backgroundColor: "action.hover",
-                                          },
-                                        }}
-                                      >
-                                        <ListItemIcon sx={{ minWidth: "40px" }}>
-                                          <Checkbox
-                                            edge="start"
-                                            checked={dialog.selectedSubaccountIds.has(
-                                              subaccount.id,
-                                            )}
-                                            onChange={() => {
-                                              handleSubaccountToggle(
-                                                subaccount.id,
-                                              );
-                                            }}
-                                            tabIndex={0}
-                                            disableRipple
-                                          />
-                                        </ListItemIcon>
-                                        <ListItemText
-                                          primary={subaccount.subaccountName}
-                                          secondary={`${subaccount.user?.name || "Unknown"} (${subaccount.user?.email}) • ${subaccount.minerCount} miners`}
-                                          onClick={() =>
+                                {dialog.availableSubaccounts.map(
+                                  (subaccount) => (
+                                    <ListItem
+                                      key={subaccount.id}
+                                      disablePadding
+                                      sx={{
+                                        borderBottom: "1px solid",
+                                        borderColor: "divider",
+                                        "&:hover": {
+                                          backgroundColor: "action.hover",
+                                        },
+                                      }}
+                                    >
+                                      <ListItemIcon sx={{ minWidth: "40px" }}>
+                                        <Checkbox
+                                          edge="start"
+                                          checked={dialog.selectedSubaccountIds.has(
+                                            subaccount.id,
+                                          )}
+                                          onChange={() => {
                                             handleSubaccountToggle(
                                               subaccount.id,
-                                            )
-                                          }
-                                          sx={{
-                                            cursor: "pointer",
-                                            flex: 1,
+                                            );
                                           }}
+                                          tabIndex={0}
+                                          disableRipple
                                         />
-                                      </ListItem>
-                                    ),
-                                  )}
-                                </List>
-                              </Paper>
-
-                              <Box
-                                sx={{
-                                  mt: 2,
-                                  minHeight: "80px",
-                                  p: 2,
-                                  backgroundColor:
-                                    dialog.selectedSubaccountIds.size > 0
-                                      ? "action.hover"
-                                      : "transparent",
-                                  borderRadius: 1,
-                                }}
-                              >
-                                {dialog.selectedSubaccountIds.size > 0 && (
-                                  <>
-                                    <Typography variant="body2" sx={{ mb: 2 }}>
-                                      {dialog.selectedSubaccountIds.size}{" "}
-                                      subaccount(s) selected
-                                    </Typography>
-                                    <Button
-                                      variant="contained"
-                                      color="primary"
-                                      fullWidth
-                                      onClick={handleAddSubaccounts}
-                                      disabled={dialog.submitting}
-                                    >
-                                      {dialog.submitting ? (
-                                        <CircularProgress
-                                          size={20}
-                                          sx={{ mr: 1 }}
-                                        />
-                                      ) : null}
-                                      Add Selected Subaccounts
-                                    </Button>
-                                  </>
+                                      </ListItemIcon>
+                                      <ListItemText
+                                        primary={subaccount.subaccountName}
+                                        secondary={`${subaccount.user?.name || "Unknown"} (${subaccount.user?.email}) • ${subaccount.minerCount} miners`}
+                                        onClick={() =>
+                                          handleSubaccountToggle(subaccount.id)
+                                        }
+                                        sx={{
+                                          cursor: "pointer",
+                                          flex: 1,
+                                        }}
+                                      />
+                                    </ListItem>
+                                  ),
                                 )}
-                              </Box>
-                            </>
-                          ) : (
-                            <Typography variant="body2" color="text.secondary">
-                              All subaccounts are already assigned to groups
-                            </Typography>
-                          )}
-                        </Box>
-                      </>
-                    )}
-                  </Box>
-                )}
-              </>
-            )}
-          </DialogContent>
+                              </List>
+                            </Paper>
 
-          <DialogActions sx={{ p: 2 }}>
-            <Button onClick={closeDialog} disabled={dialog.submitting}>
-              Cancel
-            </Button>
-            {dialog.mode === "edit" &&
-              dialog.activeTab === 1 &&
-              dialog.currentSubaccounts.length > 0 && (
-                <Button
-                  onClick={() => {
-                    const ids = dialog.currentSubaccounts.map((s) => s.id);
-                    handleRemoveSubaccounts(ids);
-                  }}
-                  variant="outlined"
-                  color="error"
-                  disabled={dialog.submitting}
-                >
-                  Remove All from Group
-                </Button>
+                            <Box
+                              sx={{
+                                mt: 2,
+                                minHeight: "80px",
+                                p: 2,
+                                backgroundColor:
+                                  dialog.selectedSubaccountIds.size > 0
+                                    ? "action.hover"
+                                    : "transparent",
+                                borderRadius: 1,
+                              }}
+                            >
+                              {dialog.selectedSubaccountIds.size > 0 && (
+                                <>
+                                  <Typography variant="body2" sx={{ mb: 2 }}>
+                                    {dialog.selectedSubaccountIds.size}{" "}
+                                    subaccount(s) selected
+                                  </Typography>
+                                  <Button
+                                    variant="contained"
+                                    color="primary"
+                                    fullWidth
+                                    onClick={handleAddSubaccounts}
+                                    disabled={dialog.submitting}
+                                  >
+                                    {dialog.submitting ? (
+                                      <CircularProgress
+                                        size={20}
+                                        sx={{ mr: 1 }}
+                                      />
+                                    ) : null}
+                                    Add Selected Subaccounts
+                                  </Button>
+                                </>
+                              )}
+                            </Box>
+                          </>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary">
+                            All subaccounts are already assigned to groups
+                          </Typography>
+                        )}
+                      </Box>
+                    </>
+                  )}
+                </Box>
               )}
-            <Button
-              onClick={handleDialogSubmit}
-              variant="contained"
-              disabled={
-                dialog.submitting ||
-                !dialog.formData.name?.trim() ||
-                !dialog.formData.relationshipManager?.trim() ||
-                !dialog.formData.email?.trim() ||
-                !dialog.formData.confirmEmail?.trim() ||
-                (dialog.formData.email !== dialog.formData.confirmEmail &&
-                  dialog.mode !== "delete")
-              }
-              color={dialog.mode === "delete" ? "error" : "primary"}
-            >
-              {dialog.submitting ? (
-                <CircularProgress size={20} sx={{ mr: 1 }} />
-              ) : null}
-              {dialog.mode === "create"
-                ? "Create"
-                : dialog.mode === "edit"
-                  ? "Update"
-                  : "Delete"}
-            </Button>
-          </DialogActions>
-        </Dialog>
-      </Container>
-    </Box>
+            </>
+          )}
+        </DialogContent>
+
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={closeDialog} disabled={dialog.submitting}>
+            Cancel
+          </Button>
+          {dialog.mode === "edit" &&
+            dialog.activeTab === 1 &&
+            dialog.currentSubaccounts.length > 0 && (
+              <Button
+                onClick={() => {
+                  const ids = dialog.currentSubaccounts.map((s) => s.id);
+                  handleRemoveSubaccounts(ids);
+                }}
+                variant="outlined"
+                color="error"
+                disabled={dialog.submitting}
+              >
+                Remove All from Group
+              </Button>
+            )}
+          <Button
+            onClick={handleDialogSubmit}
+            variant="contained"
+            disabled={
+              dialog.submitting ||
+              !dialog.formData.name?.trim() ||
+              !dialog.formData.relationshipManager?.trim() ||
+              !dialog.formData.email?.trim() ||
+              !dialog.formData.confirmEmail?.trim() ||
+              (dialog.formData.email !== dialog.formData.confirmEmail &&
+                dialog.mode !== "delete")
+            }
+            color={dialog.mode === "delete" ? "error" : "primary"}
+          >
+            {dialog.submitting ? (
+              <CircularProgress size={20} sx={{ mr: 1 }} />
+            ) : null}
+            {dialog.mode === "create"
+              ? "Create"
+              : dialog.mode === "edit"
+                ? "Update"
+                : "Delete"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </DaylightAdminPage>
   );
 }

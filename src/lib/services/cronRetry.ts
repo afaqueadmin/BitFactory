@@ -11,6 +11,8 @@
  * axios error shapes.
  */
 
+import { Prisma } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
 import { LuxorError } from "@/lib/luxor";
 import { BraiinsError } from "@/lib/braiins";
 
@@ -41,6 +43,39 @@ export async function withRetry<T>(
       const delayMs = RETRY_DELAYS_MS[attempt];
       console.warn(
         `[Cron Retry] ${label}: rate limited, retrying in ${delayMs}ms (attempt ${attempt + 1}/${RETRY_DELAYS_MS.length})`,
+      );
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+      attempt++;
+    }
+  }
+}
+
+const DB_RETRY_DELAYS_MS = [5000, 10000, 20000];
+
+/**
+ * Pings the database, retrying only on a connection failure
+ * (PrismaClientInitializationError). An idle Neon compute can take longer to
+ * wake than Prisma's connect timeout, so a cron's first query fails with
+ * "Can't reach database server" — cron_pool_worker_transactions died that way
+ * on every 04:00 UTC run from 2026-10-20, before writing anything or sending
+ * its summary email. Call this before a cron's first real query.
+ */
+export async function waitForDatabase(label: string): Promise<void> {
+  let attempt = 0;
+  while (true) {
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+      return;
+    } catch (error) {
+      if (
+        !(error instanceof Prisma.PrismaClientInitializationError) ||
+        attempt >= DB_RETRY_DELAYS_MS.length
+      ) {
+        throw error;
+      }
+      const delayMs = DB_RETRY_DELAYS_MS[attempt];
+      console.warn(
+        `[Cron Retry] ${label}: database unreachable, retrying in ${delayMs}ms (attempt ${attempt + 1}/${DB_RETRY_DELAYS_MS.length})`,
       );
       await new Promise((resolve) => setTimeout(resolve, delayMs));
       attempt++;

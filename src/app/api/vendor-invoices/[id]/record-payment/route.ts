@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { AuditAction } from "@prisma/client";
-import { prisma } from "@/lib/prisma";
 import { requireAccountingAdmin } from "@/lib/accounting/adminAuth";
-import { vendorPaymentInclude } from "@/lib/accounting/vendorInvoiceRules";
 import {
-  parseVendorPayment,
-  RecordVendorPaymentRequest,
-} from "@/lib/accounting/vendorPayment";
+  recordVendorSidePayment,
+  RecordVendorPaymentWithDepositRequest,
+} from "@/lib/accounting/recordVendorPayment";
 
-/** Records the payment of a Pending Farm Tariff invoice and marks it Paid. */
+/**
+ * Records the payment of a Pending Farm Tariff invoice and marks it Paid,
+ * optionally applying part of the vendor's held security deposit.
+ */
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -16,81 +16,10 @@ export async function POST(
   try {
     const auth = await requireAccountingAdmin(request);
     if ("response" in auth) return auth.response;
-    const { userId } = auth;
     const { id } = await params;
 
-    const invoice = await prisma.vendorInvoice.findUnique({ where: { id } });
-    if (!invoice) {
-      return NextResponse.json(
-        { error: "Vendor invoice not found" },
-        { status: 404 },
-      );
-    }
-    if (invoice.paymentStatus !== "Pending") {
-      return NextResponse.json(
-        {
-          error: `Cannot record payment for a ${invoice.paymentStatus.toLowerCase()} invoice`,
-        },
-        { status: 400 },
-      );
-    }
-
-    const body: RecordVendorPaymentRequest = await request.json();
-    const parsed = await parseVendorPayment(
-      body,
-      invoice.totalAmount,
-      "vendor-receipt",
-    );
-    if ("error" in parsed) {
-      return NextResponse.json({ error: parsed.error }, { status: 400 });
-    }
-
-    // Only a still-Pending invoice is updated, so two concurrent submits
-    // can't both record a payment. The status change and the currency parts
-    // are written together, or not at all.
-    const { data, parts, totalUsd, audit } = parsed;
-    const recorded = await prisma.$transaction(async (tx) => {
-      const { count } = await tx.vendorInvoice.updateMany({
-        where: { id, paymentStatus: "Pending" },
-        data: { ...data, updatedBy: userId },
-      });
-      if (count === 0) return false;
-      await tx.vendorPaymentPart.createMany({
-        data: parts.map((part) => ({ ...part, vendorInvoiceId: id })),
-      });
-      return true;
-    });
-    if (!recorded) {
-      return NextResponse.json(
-        {
-          error:
-            "This invoice was updated by someone else. Reload and try again.",
-        },
-        { status: 409 },
-      );
-    }
-
-    await prisma.auditLog.create({
-      data: {
-        action: AuditAction.VENDOR_INVOICE_PAID,
-        entityType: "VendorInvoice",
-        entityId: id,
-        userId,
-        description: `Payment of $${totalUsd.toFixed(2)} (${parts.length} currency part${parts.length === 1 ? "" : "s"}) recorded for vendor invoice ${invoice.invoiceNumber}`,
-        changes: JSON.stringify(audit),
-      },
-    });
-
-    const updated = await prisma.vendorInvoice.findUnique({
-      where: { id },
-      include: {
-        ...vendorPaymentInclude,
-        createdByUser: { select: { id: true, email: true, name: true } },
-        updatedByUser: { select: { id: true, email: true, name: true } },
-      },
-    });
-
-    return NextResponse.json({ success: true, data: updated });
+    const body: RecordVendorPaymentWithDepositRequest = await request.json();
+    return await recordVendorSidePayment("farm", id, auth.userId, body);
   } catch (error) {
     console.error("Error recording vendor invoice payment:", error);
     return NextResponse.json(

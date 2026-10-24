@@ -16,7 +16,11 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { sendCronSuccessEmailToDeveloper } from "@/lib/email";
+import { waitForDatabase } from "@/lib/services/cronRetry";
+import {
+  sendCronFailureEmail,
+  sendCronSuccessEmailToDeveloper,
+} from "@/lib/email";
 
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get("authorization");
@@ -25,6 +29,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    await waitForDatabase("cron_cleanup_token_blacklist");
     const { count } = await prisma.tokenBlacklist.deleteMany({
       where: { expiresAt: { lt: new Date() } },
     });
@@ -43,6 +48,11 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error("[Cron] Failed to purge token_blacklist:", error);
+    await sendCronFailureEmail(
+      "cron_cleanup_token_blacklist",
+      error instanceof Error ? error.message : "Unknown error",
+      "developer",
+    );
     return NextResponse.json(
       { success: false, error: "Failed to purge expired token blacklist rows" },
       { status: 500 },

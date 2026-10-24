@@ -8,9 +8,11 @@ import { deleteObject } from "@/lib/storage/r2";
  */
 
 /**
- * The payment's currency parts, in entry order, with their accounts. The
- * invoice's own single-currency payment columns are deprecated and not
- * returned as relations any more (see the schema note).
+ * The payment's currency parts, in entry order, with their accounts, plus
+ * the vendor and any security deposit the vendor applied to the invoice
+ * (which lowers the cash due). The invoice's own single-currency payment
+ * columns are deprecated and not returned as relations any more (see the
+ * schema note).
  */
 export const vendorPaymentInclude = {
   paymentParts: {
@@ -20,6 +22,11 @@ export const vendorPaymentInclude = {
       bank: { select: { id: true, name: true } },
       currency: { select: { id: true, code: true, name: true } },
     },
+  },
+  vendor: { select: { id: true, name: true, isActive: true } },
+  depositAdjustments: {
+    orderBy: { createdAt: "asc" },
+    select: { id: true, date: true, amountUsd: true, note: true },
   },
 } satisfies Prisma.VendorInvoiceInclude & Prisma.HardwarePurchaseInvoiceInclude;
 

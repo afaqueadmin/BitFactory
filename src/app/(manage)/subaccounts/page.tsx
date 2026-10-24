@@ -21,10 +21,8 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
   Box,
-  Container,
   Typography,
   Button,
-  Stack,
   Alert,
   CircularProgress,
   Paper,
@@ -54,7 +52,15 @@ import {
 } from "@mui/icons-material";
 import StorageIcon from "@mui/icons-material/Storage";
 import LocationOnIcon from "@mui/icons-material/LocationOn";
-import GradientStatCard from "@/components/GradientStatCard";
+import StatCard from "@/components/daylight/StatCard";
+import { useDaylight } from "@/lib/daylight";
+import {
+  DaylightAdminPage,
+  DaylightEmptyState,
+  DaylightLoading,
+  DaylightPageHeader,
+  useDaylightAdminSx,
+} from "@/components/daylight/AdminPage";
 import { Subaccount } from "@/lib/luxor";
 
 // ============================================================================
@@ -125,6 +131,8 @@ const initialDialogState: DialogState = {
 };
 
 export default function SubaccountsPage() {
+  const { d } = useDaylight();
+  const ds = useDaylightAdminSx();
   const [state, setState] = useState<SubaccountsState>({
     subaccounts: [],
     loading: true,
@@ -400,55 +408,29 @@ export default function SubaccountsPage() {
 
   if (state.loading) {
     return (
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          minHeight: "100vh",
-        }}
-      >
-        <CircularProgress />
-      </Box>
+      <DaylightAdminPage>
+        <DaylightLoading />
+      </DaylightAdminPage>
     );
   }
 
+  const siteCount = new Set(
+    state.subaccounts.map((subaccount) => subaccount.site?.name),
+  ).size;
+
   return (
-    <Box
-      component="main"
-      sx={{ py: 4, backgroundColor: "background.default", minHeight: "100vh" }}
-    >
-      <Container maxWidth="xl">
-        {/* Page Header */}
-        <Box
-          sx={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            mb: 4,
-          }}
-        >
-          <Box>
-            <Typography
-              variant="h3"
-              component="h1"
-              sx={{
-                fontWeight: "bold",
-                color: "text.primary",
-              }}
-            >
-              Luxor Workspace Subaccounts
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-              View all subaccounts across all workspace sites
-            </Typography>
-          </Box>
-          <Stack direction="row" spacing={1}>
+    <DaylightAdminPage>
+      <DaylightPageHeader
+        title="Luxor Workspace Subaccounts"
+        description="View all subaccounts across all workspace sites."
+        actions={
+          <>
             <Button
               variant="outlined"
               startIcon={<RefreshIcon />}
               onClick={handleRefresh}
               disabled={isRefreshing}
+              sx={ds.outlineBtnSx}
             >
               {isRefreshing ? "Refreshing..." : "Refresh"}
             </Button>
@@ -456,233 +438,220 @@ export default function SubaccountsPage() {
               variant="contained"
               startIcon={<AddIcon />}
               onClick={openAddDialog}
+              sx={ds.primaryBtnSx}
             >
               Add Subaccount
             </Button>
-          </Stack>
-        </Box>
+          </>
+        }
+      />
 
-        {/* Error Alert */}
-        {state.error && (
-          <Alert severity="error" sx={{ mb: 3 }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: "bold" }}>
-              Error
-            </Typography>
-            <Typography variant="body2">{state.error}</Typography>
-          </Alert>
-        )}
-
-        {/* Stat Cards */}
-        {state.subaccounts.length > 0 && (
-          <Box
-            sx={{
-              display: "grid",
-              gridTemplateColumns: {
-                xs: "1fr",
-                sm: "1fr 1fr",
-                md: "repeat(2, 1fr)",
-              },
-              gap: 3,
-              mb: 4,
-            }}
-          >
-            <Box>
-              <GradientStatCard
-                title="Total Subaccounts"
-                value={String(state.subaccounts.length)}
-                gradient="linear-gradient(135deg, #00C6FF 0%, #0072FF 100%)"
-                icon={<StorageIcon fontSize="small" />}
-              />
-            </Box>
+      {/* Error Alert */}
+      {state.error && (
+        <Alert severity="error" sx={{ mb: 3, ...ds.alertSx("error") }}>
+          <Box component="strong" sx={{ display: "block", mb: "2px" }}>
+            Error
           </Box>
-        )}
+          {state.error}
+        </Alert>
+      )}
 
-        {/* Subaccounts Table */}
-        {state.subaccounts.length > 0 ? (
-          <TableContainer component={Paper} sx={{ mb: 4 }}>
-            <Table>
-              <TableHead>
-                <TableRow sx={{ backgroundColor: "background.default" }}>
-                  <TableCell sx={{ fontWeight: "bold" }}>
-                    Subaccount Name
+      {/* Stat Cards */}
+      {state.subaccounts.length > 0 && (
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns:
+              "repeat(auto-fill, minmax(min(240px, 100%), 1fr))",
+            gap: { xs: "12px", sm: "16px", md: "20px" },
+            mb: { xs: "20px", md: "24px" },
+          }}
+        >
+          <StatCard
+            title="Total Subaccounts"
+            value={state.subaccounts.length}
+            tone="sky"
+            icon={<StorageIcon />}
+          />
+          <StatCard
+            title="Workspace Sites"
+            value={siteCount}
+            caption="With at least one subaccount"
+            tone="mint"
+            icon={<LocationOnIcon />}
+          />
+        </Box>
+      )}
+
+      {/* Subaccounts Table */}
+      {state.subaccounts.length > 0 ? (
+        <TableContainer
+          component={Paper}
+          elevation={0}
+          sx={{ ...ds.tableCardSx, mb: { xs: "20px", md: "24px" } }}
+        >
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell>Subaccount Name</TableCell>
+                <TableCell>ID</TableCell>
+                <TableCell>Site</TableCell>
+                <TableCell align="right">Actions</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {state.subaccounts.map((subaccount) => (
+                <TableRow key={subaccount.id}>
+                  <TableCell sx={{ "&&&": { fontWeight: 650 } }}>
+                    {subaccount.name}
                   </TableCell>
-                  <TableCell sx={{ fontWeight: "bold" }}>ID</TableCell>
-                  <TableCell sx={{ fontWeight: "bold" }}>Site</TableCell>
-                  <TableCell sx={{ fontWeight: "bold" }} align="right">
-                    Actions
+                  <TableCell
+                    sx={{
+                      "&&&": {
+                        fontFamily:
+                          "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+                        fontSize: 12,
+                        color: d.muted,
+                      },
+                    }}
+                  >
+                    {subaccount.id}
+                  </TableCell>
+                  <TableCell>{subaccount.site.name}</TableCell>
+                  <TableCell align="right" sx={{ "&&&": { py: "8px" } }}>
+                    <Tooltip title="Delete Subaccount">
+                      <IconButton
+                        size="small"
+                        aria-label={`Delete ${subaccount.name}`}
+                        onClick={() => openDeleteDialog(subaccount)}
+                        sx={{
+                          color: d.muted,
+                          borderRadius: "8px",
+                          "&:hover": {
+                            bgcolor: d.dangerSoft,
+                            color: d.danger,
+                          },
+                        }}
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
                   </TableCell>
                 </TableRow>
-              </TableHead>
-              <TableBody>
-                {state.subaccounts.map((subaccount) => {
-                  return (
-                    <TableRow
-                      key={subaccount.id}
-                      sx={{
-                        "&:hover": {
-                          backgroundColor: "background.default",
-                        },
-                      }}
-                    >
-                      <TableCell>
-                        <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                          {subaccount.name}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Typography
-                          variant="caption"
-                          sx={{ fontFamily: "monospace" }}
-                        >
-                          {subaccount.id}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2">
-                          {subaccount.site.name}
-                        </Typography>
-                      </TableCell>
-                      <TableCell align="right">
-                        <Stack
-                          direction="row"
-                          spacing={1}
-                          justifyContent="flex-end"
-                        >
-                          <Tooltip title="Delete Subaccount">
-                            <IconButton
-                              size="small"
-                              onClick={() => openDeleteDialog(subaccount)}
-                              color="error"
-                            >
-                              <DeleteIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                        </Stack>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        ) : (
-          <Paper sx={{ p: 4, textAlign: "center", mb: 4 }}>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      ) : (
+        <Box sx={{ mb: { xs: "20px", md: "24px" } }}>
+          <DaylightEmptyState>
             <StorageIcon
-              sx={{
-                fontSize: 64,
-                color: "text.secondary",
-                mb: 2,
-                opacity: 0.5,
-              }}
+              sx={{ fontSize: 40, color: d.inputBorder, mb: 1 }}
+              aria-hidden
             />
-            <Typography variant="h6" color="text.secondary">
+            <Box sx={{ fontSize: 15, fontWeight: 650, color: d.text }}>
               No subaccounts available
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-              Click &quot;Add Subaccount&quot; to create one
-            </Typography>
-          </Paper>
-        )}
+            </Box>
+            <Box sx={{ mt: "4px" }}>
+              Click &quot;Add Subaccount&quot; to create one.
+            </Box>
+          </DaylightEmptyState>
+        </Box>
+      )}
 
-        {/* Add/Delete Dialog */}
-        <Dialog
-          open={dialog.open}
-          onClose={closeDialog}
-          maxWidth="sm"
-          fullWidth
+      {/* Add/Delete Dialog */}
+      <Dialog open={dialog.open} onClose={closeDialog} maxWidth="sm" fullWidth>
+        <DialogTitle
+          sx={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
         >
-          <DialogTitle
-            sx={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
-          >
-            {dialog.mode === "add" ? "Add Subaccount" : "Delete Subaccount"}
-            <IconButton onClick={closeDialog} size="small">
-              <CloseIcon />
-            </IconButton>
-          </DialogTitle>
+          {dialog.mode === "add" ? "Add Subaccount" : "Delete Subaccount"}
+          <IconButton onClick={closeDialog} size="small">
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
 
-          <DialogContent sx={{ pt: 2 }}>
-            {dialog.message && (
-              <Alert
-                severity={
-                  dialog.message.toLowerCase().includes("error")
-                    ? "error"
-                    : "info"
-                }
-                sx={{ mb: 2 }}
-              >
-                {dialog.message}
-              </Alert>
-            )}
-
-            {dialog.mode === "delete" ? (
-              <Box>
-                <Typography variant="body1" sx={{ mb: 2 }}>
-                  Are you sure you want to delete this subaccount?
-                </Typography>
-                <Paper sx={{ p: 2, backgroundColor: "background.default" }}>
-                  <Typography variant="body2" color="text.secondary">
-                    Subaccount Name
-                  </Typography>
-                  <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                    {dialog.selectedSubaccount?.name}
-                  </Typography>
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    sx={{ mt: 2 }}
-                  >
-                    Site
-                  </Typography>
-                  <Typography variant="body2">
-                    {dialog.selectedSubaccount?.site?.name || "N/A"}
-                  </Typography>
-                </Paper>
-                <Alert severity="warning" sx={{ mt: 2 }}>
-                  This subaccount will be deleted from the workspace entirely.
-                </Alert>
-              </Box>
-            ) : (
-              <TextField
-                fullWidth
-                label="Subaccount Name"
-                placeholder="Enter subaccount name"
-                value={dialog.formData.name}
-                onChange={(e) =>
-                  setDialog((prev) => ({
-                    ...prev,
-                    formData: { name: e.target.value },
-                    message: null,
-                  }))
-                }
-                disabled={dialog.submitting}
-                variant="outlined"
-                autoFocus
-              />
-            )}
-          </DialogContent>
-
-          <DialogActions sx={{ p: 2 }}>
-            <Button onClick={closeDialog} disabled={dialog.submitting}>
-              Cancel
-            </Button>
-            <Button
-              onClick={handleDialogSubmit}
-              variant="contained"
-              disabled={dialog.submitting}
-              color={dialog.mode === "delete" ? "error" : "primary"}
+        <DialogContent sx={{ pt: 2 }}>
+          {dialog.message && (
+            <Alert
+              severity={
+                dialog.message.toLowerCase().includes("error")
+                  ? "error"
+                  : "info"
+              }
+              sx={{ mb: 2 }}
             >
-              {dialog.submitting ? (
-                <CircularProgress size={20} sx={{ mr: 1 }} />
-              ) : null}
-              {dialog.mode === "add" ? "Add" : "Delete"}
-            </Button>
-          </DialogActions>
-        </Dialog>
-      </Container>
-    </Box>
+              {dialog.message}
+            </Alert>
+          )}
+
+          {dialog.mode === "delete" ? (
+            <Box>
+              <Typography variant="body1" sx={{ mb: 2 }}>
+                Are you sure you want to delete this subaccount?
+              </Typography>
+              <Paper sx={{ p: 2, backgroundColor: "background.default" }}>
+                <Typography variant="body2" color="text.secondary">
+                  Subaccount Name
+                </Typography>
+                <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                  {dialog.selectedSubaccount?.name}
+                </Typography>
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ mt: 2 }}
+                >
+                  Site
+                </Typography>
+                <Typography variant="body2">
+                  {dialog.selectedSubaccount?.site?.name || "N/A"}
+                </Typography>
+              </Paper>
+              <Alert severity="warning" sx={{ mt: 2 }}>
+                This subaccount will be deleted from the workspace entirely.
+              </Alert>
+            </Box>
+          ) : (
+            <TextField
+              fullWidth
+              label="Subaccount Name"
+              placeholder="Enter subaccount name"
+              value={dialog.formData.name}
+              onChange={(e) =>
+                setDialog((prev) => ({
+                  ...prev,
+                  formData: { name: e.target.value },
+                  message: null,
+                }))
+              }
+              disabled={dialog.submitting}
+              variant="outlined"
+              autoFocus
+            />
+          )}
+        </DialogContent>
+
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={closeDialog} disabled={dialog.submitting}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleDialogSubmit}
+            variant="contained"
+            disabled={dialog.submitting}
+            color={dialog.mode === "delete" ? "error" : "primary"}
+          >
+            {dialog.submitting ? (
+              <CircularProgress size={20} sx={{ mr: 1 }} />
+            ) : null}
+            {dialog.mode === "add" ? "Add" : "Delete"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </DaylightAdminPage>
   );
 }

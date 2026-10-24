@@ -5,8 +5,6 @@ import {
   Alert,
   Box,
   Button,
-  Chip,
-  CircularProgress,
   Paper,
   Stack,
   Table,
@@ -15,14 +13,22 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  ToggleButton,
-  ToggleButtonGroup,
   Typography,
 } from "@mui/material";
 import { useQueryClient } from "@tanstack/react-query";
 import SimulationSettingsCard from "@/components/simulation/SimulationSettingsCard";
 import SimulatedLedgerDialog from "@/components/simulation/SimulatedLedgerDialog";
 import { formatValue } from "@/lib/helpers/formatValue";
+import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
+import Segmented from "@/components/daylight/Segmented";
+import { useDaylight } from "@/lib/daylight";
+import {
+  DaylightAdminPage,
+  DaylightLoading,
+  DaylightPageHeader,
+  DaylightStatusPill,
+  useDaylightAdminSx,
+} from "@/components/daylight/AdminPage";
 
 interface SimulatedAccount {
   id: string;
@@ -68,6 +74,8 @@ const csvCell = (value: string | null) =>
  * account's simulated cost ledger.
  */
 export default function SimulatedAccountsPage() {
+  const { d } = useDaylight();
+  const ds = useDaylightAdminSx();
   const [accounts, setAccounts] = useState<SimulatedAccount[]>([]);
   const [requests, setRequests] = useState<SimulationRequest[]>([]);
   const queryClient = useQueryClient();
@@ -237,53 +245,48 @@ export default function SimulatedAccountsPage() {
   };
 
   return (
-    <Box sx={{ p: { xs: 2, md: 3 } }}>
-      <Stack
-        direction={{ xs: "column", sm: "row" }}
-        justifyContent="space-between"
-        alignItems={{ xs: "flex-start", sm: "center" }}
-        spacing={2}
-        mb={2}
-      >
-        <Box>
-          <Typography variant="h5" fontWeight={700}>
-            Simulated Accounts
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            People trying the app with simulated data from a real BitFactory
-            miner.
-          </Typography>
-        </Box>
-        <Stack direction="row" spacing={1.5} alignItems="center">
-          <ToggleButtonGroup
-            size="small"
-            exclusive
-            value={statusFilter}
-            onChange={(_, value: StatusFilter | null) =>
-              value && setStatusFilter(value)
-            }
+    <DaylightAdminPage>
+      <DaylightPageHeader
+        title="Simulated Accounts"
+        description="People trying the app with simulated data from a real BitFactory miner."
+        actions={
+          <Stack
+            direction="row"
+            spacing={1.5}
+            alignItems="center"
+            flexWrap="wrap"
+            useFlexGap
           >
-            <ToggleButton value="all">All</ToggleButton>
-            <ToggleButton value="active">Active</ToggleButton>
-            <ToggleButton value="inactive">Inactive</ToggleButton>
-          </ToggleButtonGroup>
-          <Button
-            variant="outlined"
-            onClick={handleExport}
-            disabled={visible.length === 0}
-          >
-            Export CSV
-          </Button>
-        </Stack>
-      </Stack>
+            <Segmented
+              ariaLabel="Account status"
+              value={statusFilter}
+              onChange={setStatusFilter}
+              options={[
+                { id: "all", label: "All" },
+                { id: "active", label: "Active" },
+                { id: "inactive", label: "Inactive" },
+              ]}
+            />
+            <Button
+              variant="outlined"
+              startIcon={<FileDownloadOutlinedIcon />}
+              onClick={handleExport}
+              disabled={visible.length === 0}
+              sx={ds.outlineBtnSx}
+            >
+              Export CSV
+            </Button>
+          </Stack>
+        }
+      />
 
       {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
+        <Alert severity="error" sx={{ mb: 2, ...ds.alertSx("error") }}>
           {error}
         </Alert>
       )}
       {notice && (
-        <Alert severity="success" sx={{ mb: 2 }}>
+        <Alert severity="success" sx={{ mb: 2, ...ds.alertSx("success") }}>
           {notice}
         </Alert>
       )}
@@ -291,15 +294,21 @@ export default function SimulatedAccountsPage() {
       <SimulationSettingsCard onSaved={load} />
 
       {!loading && requests.length > 0 && (
-        <Box sx={{ mb: 3 }}>
-          <Typography variant="h6" fontWeight={700} mb={1}>
-            Requests ({requests.length})
-          </Typography>
-          <Typography variant="body2" color="text.secondary" mb={1.5}>
+        <Box component="section" sx={{ mb: { xs: "20px", md: "24px" } }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <Typography component="h2" sx={ds.sectionTitleSx}>
+              Requests
+            </Typography>
+            <DaylightStatusPill
+              label={String(requests.length)}
+              tone="warning"
+            />
+          </Box>
+          <Box sx={{ mt: "4px", mb: "12px", fontSize: 13, color: d.muted }}>
             Potential Customers asking to try a simulated account. Approving
             turns their existing account into one.
-          </Typography>
-          <TableContainer component={Paper} variant="outlined">
+          </Box>
+          <TableContainer component={Paper} elevation={0} sx={ds.tableCardSx}>
             <Table size="small">
               <TableHead>
                 <TableRow>
@@ -312,25 +321,32 @@ export default function SimulatedAccountsPage() {
               </TableHead>
               <TableBody>
                 {requests.map((r) => (
-                  <TableRow key={r.id} hover>
-                    <TableCell>{r.name || "-"}</TableCell>
+                  <TableRow key={r.id}>
+                    <TableCell sx={{ "&&&": { fontWeight: 650 } }}>
+                      {r.name || "—"}
+                    </TableCell>
                     <TableCell>{r.email}</TableCell>
-                    <TableCell>{r.phoneNumber || "-"}</TableCell>
-                    <TableCell>{formatDateTime(r.requestedAt)}</TableCell>
-                    <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
+                    <TableCell>{r.phoneNumber || "—"}</TableCell>
+                    <TableCell sx={{ "&&&": { whiteSpace: "nowrap" } }}>
+                      {formatDateTime(r.requestedAt)}
+                    </TableCell>
+                    <TableCell
+                      align="right"
+                      sx={{ "&&&": { whiteSpace: "nowrap", py: "8px" } }}
+                    >
                       <Button
                         size="small"
-                        color="success"
                         onClick={() => handleRequest(r, "approve")}
                         disabled={busyId === r.id}
+                        sx={ds.textBtnSx("success")}
                       >
                         Approve
                       </Button>
                       <Button
                         size="small"
-                        color="error"
                         onClick={() => handleRequest(r, "decline")}
                         disabled={busyId === r.id}
+                        sx={ds.textBtnSx("danger")}
                       >
                         Decline
                       </Button>
@@ -344,11 +360,9 @@ export default function SimulatedAccountsPage() {
       )}
 
       {loading ? (
-        <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
-          <CircularProgress />
-        </Box>
+        <DaylightLoading />
       ) : (
-        <TableContainer component={Paper} variant="outlined">
+        <TableContainer component={Paper} elevation={0} sx={ds.tableCardSx}>
           <Table size="small">
             <TableHead>
               <TableRow>
@@ -365,7 +379,11 @@ export default function SimulatedAccountsPage() {
             <TableBody>
               {visible.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
+                  <TableCell
+                    colSpan={8}
+                    align="center"
+                    sx={{ "&&&": { py: 5, color: d.muted } }}
+                  >
                     {accounts.length === 0
                       ? "No simulated accounts yet."
                       : "No accounts match this filter."}
@@ -373,63 +391,105 @@ export default function SimulatedAccountsPage() {
                 </TableRow>
               ) : (
                 visible.map((a) => (
-                  <TableRow key={a.id} hover>
-                    <TableCell>{a.name || "-"}</TableCell>
+                  <TableRow key={a.id}>
+                    <TableCell sx={{ "&&&": { fontWeight: 650 } }}>
+                      {a.name || "—"}
+                    </TableCell>
                     <TableCell>{a.email}</TableCell>
-                    <TableCell>{a.phoneNumber || "-"}</TableCell>
+                    <TableCell sx={{ "&&&": { whiteSpace: "nowrap" } }}>
+                      {a.phoneNumber || "—"}
+                    </TableCell>
                     <TableCell>
-                      <Chip
-                        size="small"
+                      <DaylightStatusPill
                         label={a.active ? "Active" : "Inactive"}
-                        color={a.active ? "success" : "default"}
-                        variant={a.active ? "filled" : "outlined"}
+                        tone={a.active ? "success" : "neutral"}
                       />
                     </TableCell>
-                    <TableCell>{formatDateTime(a.createdAt)}</TableCell>
-                    <TableCell>{formatDateTime(a.lastLoginAt)}</TableCell>
-                    <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
+                    <TableCell sx={{ "&&&": { whiteSpace: "nowrap" } }}>
+                      {formatDateTime(a.createdAt)}
+                    </TableCell>
+                    <TableCell
+                      sx={{
+                        "&&&": {
+                          whiteSpace: "nowrap",
+                          color: a.lastLoginAt ? d.text : d.muted,
+                        },
+                      }}
+                    >
+                      {formatDateTime(a.lastLoginAt)}
+                    </TableCell>
+                    <TableCell
+                      align="right"
+                      sx={{
+                        "&&&": {
+                          whiteSpace: "nowrap",
+                          fontVariantNumeric: "tabular-nums",
+                          fontWeight: 600,
+                        },
+                      }}
+                    >
                       {formatValue(a.balance, "currency")}
                     </TableCell>
-                    <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
-                      <Button size="small" onClick={() => setLedgerId(a.id)}>
-                        Ledger
-                      </Button>
-                      <Button
-                        size="small"
-                        href={`/customers/${a.id}/wallet-email`}
-                        target="_blank"
-                        rel="noopener"
+                    <TableCell
+                      align="right"
+                      sx={{ "&&&": { py: "6px", minWidth: 200 } }}
+                    >
+                      {/* Wraps onto a second line rather than pushing the
+                          last actions out of view. */}
+                      <Box
+                        sx={{
+                          display: "flex",
+                          flexWrap: "wrap",
+                          justifyContent: "flex-end",
+                          columnGap: 0.5,
+                        }}
                       >
-                        Email wallet
-                      </Button>
-                      {a.active && (
                         <Button
                           size="small"
-                          onClick={() => handleConvert(a)}
-                          disabled={busyId === a.id}
+                          onClick={() => setLedgerId(a.id)}
+                          sx={ds.textBtnSx()}
                         >
-                          Convert to customer
+                          Ledger
                         </Button>
-                      )}
-                      {a.active ? (
                         <Button
                           size="small"
-                          color="error"
-                          onClick={() => handleStatus(a, false)}
-                          disabled={busyId === a.id}
+                          href={`/customers/${a.id}/wallet-email`}
+                          target="_blank"
+                          rel="noopener"
+                          sx={ds.textBtnSx()}
                         >
-                          Deactivate
+                          Email wallet
                         </Button>
-                      ) : (
-                        <Button
-                          size="small"
-                          color="success"
-                          onClick={() => handleStatus(a, true)}
-                          disabled={busyId === a.id}
-                        >
-                          Activate
-                        </Button>
-                      )}
+                        {a.active && (
+                          <Button
+                            size="small"
+                            onClick={() => handleConvert(a)}
+                            disabled={busyId === a.id}
+                            sx={ds.textBtnSx()}
+                          >
+                            Convert to customer
+                          </Button>
+                        )}
+                        {a.active ? (
+                          <Button
+                            size="small"
+                            onClick={() => handleStatus(a, false)}
+                            disabled={busyId === a.id}
+                            sx={ds.textBtnSx("danger")}
+                          >
+                            Deactivate
+                          </Button>
+                        ) : (
+                          <Button
+                            size="small"
+                            onClick={() => handleStatus(a, true)}
+                            disabled={busyId === a.id}
+                            sx={ds.textBtnSx("success")}
+                          >
+                            Activate
+                          </Button>
+                        )}
+                      </Box>
                     </TableCell>
                   </TableRow>
                 ))
@@ -444,6 +504,6 @@ export default function SimulatedAccountsPage() {
         onClose={() => setLedgerId(null)}
         onChanged={load}
       />
-    </Box>
+    </DaylightAdminPage>
   );
 }

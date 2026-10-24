@@ -6,7 +6,6 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   Box,
-  Grid as MuiGrid,
   Paper,
   Typography,
   Table,
@@ -15,9 +14,7 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  Chip,
   Button,
-  CircularProgress,
   Alert,
   Menu,
   MenuItem,
@@ -42,7 +39,6 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ResponsiveContainer,
 } from "recharts";
 import {
@@ -58,6 +54,14 @@ import EditFranchiseeModal from "@/components/EditFranchiseeModal";
 import ChangePasswordModal from "@/components/ChangePasswordModal";
 import ChangeAccountTypeModal from "@/components/ChangeAccountTypeModal";
 import { canManageAccount } from "@/lib/auth/accountTiers";
+import { RADIUS_CARD, useDaylight } from "@/lib/daylight";
+import {
+  DaylightAdminPage,
+  DaylightLoading,
+  DaylightPageHeader,
+  DaylightStatusPill,
+  useDaylightAdminSx,
+} from "@/components/daylight/AdminPage";
 
 interface FetchedUser {
   id: string;
@@ -115,11 +119,9 @@ interface FranchiseData {
   };
 }
 
-// Create a Grid component that includes the 'item' prop
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const Grid = MuiGrid as React.ComponentType<any>;
-
 export default function CustomerOverviewContent() {
+  const { d, fonts } = useDaylight();
+  const ds = useDaylightAdminSx();
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editFranchiseeModalOpen, setEditFranchiseeModalOpen] = useState(false);
@@ -556,48 +558,21 @@ export default function CustomerOverviewContent() {
   };
 
   return (
-    <Box sx={{ p: 3 }}>
-      {/* Page Title with Create Button */}
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          mb: 4,
-        }}
-      >
-        <Typography
-          variant="h4"
-          sx={{
-            fontWeight: "bold",
-            color: (theme) =>
-              theme.palette.mode === "dark" ? "primary.light" : "primary.dark",
-          }}
-        >
-          Customer Overview
-        </Typography>
-
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => setCreateModalOpen(true)}
-          sx={{
-            px: 3,
-            py: 1,
-            background: (theme) =>
-              `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.primary.dark})`,
-            boxShadow: (theme) => `0 4px 20px ${theme.palette.primary.main}40`,
-            "&:hover": {
-              background: (theme) =>
-                `linear-gradient(45deg, ${theme.palette.primary.dark}, ${theme.palette.primary.main})`,
-              boxShadow: (theme) =>
-                `0 6px 25px ${theme.palette.primary.main}60`,
-            },
-          }}
-        >
-          Create User
-        </Button>
-      </Box>
+    <DaylightAdminPage>
+      <DaylightPageHeader
+        title="Customer Overview"
+        description="Every customer, franchisee and simulated account, with balances, miners and status."
+        actions={
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => setCreateModalOpen(true)}
+            sx={ds.primaryBtnSx}
+          >
+            Create User
+          </Button>
+        }
+      />
 
       {/* Create User Modal */}
       <CreateUserModal
@@ -633,7 +608,11 @@ export default function CustomerOverviewContent() {
         onClose={() => setFranchiseeLookupError("")}
         anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
       >
-        <Alert onClose={() => setFranchiseeLookupError("")} severity="error">
+        <Alert
+          onClose={() => setFranchiseeLookupError("")}
+          severity="error"
+          sx={ds.alertSx("error")}
+        >
           {franchiseeLookupError}
         </Alert>
       </Snackbar>
@@ -670,58 +649,68 @@ export default function CustomerOverviewContent() {
               ? "error"
               : "success"
           }
-          sx={{ width: "100%" }}
+          sx={{
+            width: "100%",
+            ...ds.alertSx(
+              responseNotification.toLowerCase().includes("failed")
+                ? "error"
+                : "success",
+            ),
+          }}
         >
           {responseNotification}
         </Alert>
       </Snackbar>
 
       {/* Stats Cards */}
-      <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item xs={12} sm={6} md={3}>
-          <AdminValueCard
-            title="Total Customers"
-            value={customerStats.totalCustomers}
-            type="number"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <AdminValueCard
-            title="Active Customers"
-            value={customerStats.activeCustomers}
-            type="number"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <AdminValueCard
-            title="Total Prepaid Balance Added"
-            value={customerStats.totalRevenue}
-            type="currency"
-            subtitle="USD"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <AdminValueCard
-            title="Total Miners"
-            value={customerStats.totalMiners}
-            type="number"
-          />
-        </Grid>
-      </Grid>
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns:
+            "repeat(auto-fill, minmax(max(min(240px, 100%), calc((100% - 60px) / 4)), 1fr))",
+          gap: { xs: "12px", sm: "16px", md: "20px" },
+          mb: { xs: "20px", md: "24px" },
+        }}
+      >
+        <AdminValueCard
+          daylight
+          title="Total Customers"
+          value={customerStats.totalCustomers}
+          type="number"
+        />
+        <AdminValueCard
+          daylight
+          title="Active Customers"
+          value={customerStats.activeCustomers}
+          type="number"
+        />
+        <AdminValueCard
+          daylight
+          title="Total Prepaid Balance Added"
+          value={customerStats.totalRevenue}
+          type="currency"
+          subtitle="USD"
+        />
+        <AdminValueCard
+          daylight
+          title="Total Miners"
+          value={customerStats.totalMiners}
+          type="number"
+        />
+      </Box>
 
       {/* Customer Activity */}
       <Paper
-        elevation={3}
+        elevation={0}
         sx={{
-          p: 3,
-          mb: 4,
-          borderRadius: 2,
-          background: (theme) =>
-            theme.palette.mode === "dark"
-              ? "linear-gradient(145deg, rgba(40,40,40,0.9), rgba(30,30,30,0.9))"
-              : "linear-gradient(145deg, rgba(255,255,255,0.9), rgba(250,250,250,0.9))",
-          backdropFilter: "blur(10px)",
-          border: (theme) => `1px solid ${theme.palette.divider}`,
+          p: { xs: "16px", sm: "20px 24px" },
+          mb: { xs: "20px", md: "24px" },
+          bgcolor: d.surface,
+          backgroundImage: "none",
+          border: `1px solid ${d.border}`,
+          borderRadius: RADIUS_CARD,
+          boxShadow: d.shadow,
+          fontFamily: fonts.body,
         }}
       >
         <Box
@@ -729,39 +718,60 @@ export default function CustomerOverviewContent() {
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
-            mb: 3,
+            gap: 2,
+            mb: "12px",
           }}
         >
-          <Typography variant="h6" sx={{ fontWeight: "medium" }}>
+          <Typography
+            component="h2"
+            sx={{
+              m: 0,
+              fontFamily: fonts.heading,
+              fontWeight: 700,
+              fontSize: 16,
+              color: d.text,
+            }}
+          >
             Recent Customers
           </Typography>
           <FormControlLabel
             control={
               <Checkbox
+                size="small"
                 checked={showDeleted}
                 onChange={(e) => setShowDeleted(e.target.checked)}
+                sx={{
+                  color: d.inputBorder,
+                  "&.Mui-checked": { color: d.action },
+                }}
               />
             }
             label="Show Deleted"
+            sx={{
+              mr: 0,
+              "& .MuiFormControlLabel-label": {
+                fontFamily: fonts.body,
+                fontSize: 13,
+                color: d.muted,
+              },
+            }}
           />
         </Box>
 
         {error && (
-          <Alert severity="error" sx={{ mb: 2 }}>
+          <Alert severity="error" sx={{ mb: 2, ...ds.alertSx("error") }}>
             {error}
           </Alert>
         )}
 
         {loading ? (
-          <Box sx={{ display: "flex", justifyContent: "center", p: 3 }}>
-            <CircularProgress />
-          </Box>
+          <DaylightLoading />
         ) : users.length === 0 ? (
-          <Typography color="text.secondary" sx={{ p: 2 }}>
+          <Typography sx={{ p: 2, fontSize: 13, color: d.muted }}>
             No customers found
           </Typography>
         ) : (
-          <TableContainer>
+          <TableContainer sx={ds.tableSx}>
             <Table>
               <TableHead>
                 <TableRow>
@@ -770,7 +780,7 @@ export default function CustomerOverviewContent() {
                       fontWeight: "bold",
                       cursor: "pointer",
                       userSelect: "none",
-                      "&:hover": { backgroundColor: "action.selected" },
+                      "&:hover": { backgroundColor: d.hover, color: d.text },
                       whiteSpace: "nowrap",
                     }}
                     onClick={() => handleHeaderClick("name")}
@@ -779,13 +789,11 @@ export default function CustomerOverviewContent() {
                     {sortConfig.field === "name" &&
                       (sortConfig.direction === "asc" ? (
                         <ArrowUpwardIcon
-                          fontSize="small"
-                          sx={{ verticalAlign: "middle", ml: 0.5 }}
+                          sx={{ fontSize: 13, verticalAlign: "-2px", ml: 0.5 }}
                         />
                       ) : (
                         <ArrowDownwardIcon
-                          fontSize="small"
-                          sx={{ verticalAlign: "middle", ml: 0.5 }}
+                          sx={{ fontSize: 13, verticalAlign: "-2px", ml: 0.5 }}
                         />
                       ))}
                   </TableCell>
@@ -794,7 +802,7 @@ export default function CustomerOverviewContent() {
                       fontWeight: "bold",
                       cursor: "pointer",
                       userSelect: "none",
-                      "&:hover": { backgroundColor: "action.selected" },
+                      "&:hover": { backgroundColor: d.hover, color: d.text },
                       whiteSpace: "nowrap",
                     }}
                     onClick={() => handleHeaderClick("email")}
@@ -803,13 +811,11 @@ export default function CustomerOverviewContent() {
                     {sortConfig.field === "email" &&
                       (sortConfig.direction === "asc" ? (
                         <ArrowUpwardIcon
-                          fontSize="small"
-                          sx={{ verticalAlign: "middle", ml: 0.5 }}
+                          sx={{ fontSize: 13, verticalAlign: "-2px", ml: 0.5 }}
                         />
                       ) : (
                         <ArrowDownwardIcon
-                          fontSize="small"
-                          sx={{ verticalAlign: "middle", ml: 0.5 }}
+                          sx={{ fontSize: 13, verticalAlign: "-2px", ml: 0.5 }}
                         />
                       ))}
                   </TableCell>
@@ -818,7 +824,7 @@ export default function CustomerOverviewContent() {
                       fontWeight: "bold",
                       cursor: "pointer",
                       userSelect: "none",
-                      "&:hover": { backgroundColor: "action.selected" },
+                      "&:hover": { backgroundColor: d.hover, color: d.text },
                       whiteSpace: "nowrap",
                     }}
                     onClick={() => handleHeaderClick("role")}
@@ -827,13 +833,11 @@ export default function CustomerOverviewContent() {
                     {sortConfig.field === "role" &&
                       (sortConfig.direction === "asc" ? (
                         <ArrowUpwardIcon
-                          fontSize="small"
-                          sx={{ verticalAlign: "middle", ml: 0.5 }}
+                          sx={{ fontSize: 13, verticalAlign: "-2px", ml: 0.5 }}
                         />
                       ) : (
                         <ArrowDownwardIcon
-                          fontSize="small"
-                          sx={{ verticalAlign: "middle", ml: 0.5 }}
+                          sx={{ fontSize: 13, verticalAlign: "-2px", ml: 0.5 }}
                         />
                       ))}
                   </TableCell>
@@ -842,7 +846,7 @@ export default function CustomerOverviewContent() {
                       fontWeight: "bold",
                       cursor: "pointer",
                       userSelect: "none",
-                      "&:hover": { backgroundColor: "action.selected" },
+                      "&:hover": { backgroundColor: d.hover, color: d.text },
                       whiteSpace: "nowrap",
                     }}
                     onClick={() => handleHeaderClick("segment")}
@@ -851,13 +855,11 @@ export default function CustomerOverviewContent() {
                     {sortConfig.field === "segment" &&
                       (sortConfig.direction === "asc" ? (
                         <ArrowUpwardIcon
-                          fontSize="small"
-                          sx={{ verticalAlign: "middle", ml: 0.5 }}
+                          sx={{ fontSize: 13, verticalAlign: "-2px", ml: 0.5 }}
                         />
                       ) : (
                         <ArrowDownwardIcon
-                          fontSize="small"
-                          sx={{ verticalAlign: "middle", ml: 0.5 }}
+                          sx={{ fontSize: 13, verticalAlign: "-2px", ml: 0.5 }}
                         />
                       ))}
                   </TableCell>
@@ -866,7 +868,7 @@ export default function CustomerOverviewContent() {
                       fontWeight: "bold",
                       cursor: "pointer",
                       userSelect: "none",
-                      "&:hover": { backgroundColor: "action.selected" },
+                      "&:hover": { backgroundColor: d.hover, color: d.text },
                       whiteSpace: "nowrap",
                     }}
                     onClick={() => handleHeaderClick("pools")}
@@ -875,13 +877,11 @@ export default function CustomerOverviewContent() {
                     {sortConfig.field === "pools" &&
                       (sortConfig.direction === "asc" ? (
                         <ArrowUpwardIcon
-                          fontSize="small"
-                          sx={{ verticalAlign: "middle", ml: 0.5 }}
+                          sx={{ fontSize: 13, verticalAlign: "-2px", ml: 0.5 }}
                         />
                       ) : (
                         <ArrowDownwardIcon
-                          fontSize="small"
-                          sx={{ verticalAlign: "middle", ml: 0.5 }}
+                          sx={{ fontSize: 13, verticalAlign: "-2px", ml: 0.5 }}
                         />
                       ))}
                   </TableCell>
@@ -890,7 +890,7 @@ export default function CustomerOverviewContent() {
                       fontWeight: "bold",
                       cursor: "pointer",
                       userSelect: "none",
-                      "&:hover": { backgroundColor: "action.selected" },
+                      "&:hover": { backgroundColor: d.hover, color: d.text },
                       whiteSpace: "nowrap",
                     }}
                     align="center"
@@ -900,13 +900,11 @@ export default function CustomerOverviewContent() {
                     {sortConfig.field === "miners" &&
                       (sortConfig.direction === "asc" ? (
                         <ArrowUpwardIcon
-                          fontSize="small"
-                          sx={{ verticalAlign: "middle", ml: 0.5 }}
+                          sx={{ fontSize: 13, verticalAlign: "-2px", ml: 0.5 }}
                         />
                       ) : (
                         <ArrowDownwardIcon
-                          fontSize="small"
-                          sx={{ verticalAlign: "middle", ml: 0.5 }}
+                          sx={{ fontSize: 13, verticalAlign: "-2px", ml: 0.5 }}
                         />
                       ))}
                   </TableCell>
@@ -915,7 +913,7 @@ export default function CustomerOverviewContent() {
                       fontWeight: "bold",
                       cursor: "pointer",
                       userSelect: "none",
-                      "&:hover": { backgroundColor: "action.selected" },
+                      "&:hover": { backgroundColor: d.hover, color: d.text },
                       whiteSpace: "nowrap",
                     }}
                     align="center"
@@ -925,13 +923,11 @@ export default function CustomerOverviewContent() {
                     {sortConfig.field === "status" &&
                       (sortConfig.direction === "asc" ? (
                         <ArrowUpwardIcon
-                          fontSize="small"
-                          sx={{ verticalAlign: "middle", ml: 0.5 }}
+                          sx={{ fontSize: 13, verticalAlign: "-2px", ml: 0.5 }}
                         />
                       ) : (
                         <ArrowDownwardIcon
-                          fontSize="small"
-                          sx={{ verticalAlign: "middle", ml: 0.5 }}
+                          sx={{ fontSize: 13, verticalAlign: "-2px", ml: 0.5 }}
                         />
                       ))}
                   </TableCell>
@@ -940,7 +936,7 @@ export default function CustomerOverviewContent() {
                       fontWeight: "bold",
                       cursor: "pointer",
                       userSelect: "none",
-                      "&:hover": { backgroundColor: "action.selected" },
+                      "&:hover": { backgroundColor: d.hover, color: d.text },
                       whiteSpace: "nowrap",
                     }}
                     onClick={() => handleHeaderClick("joinDate")}
@@ -949,13 +945,11 @@ export default function CustomerOverviewContent() {
                     {sortConfig.field === "joinDate" &&
                       (sortConfig.direction === "asc" ? (
                         <ArrowUpwardIcon
-                          fontSize="small"
-                          sx={{ verticalAlign: "middle", ml: 0.5 }}
+                          sx={{ fontSize: 13, verticalAlign: "-2px", ml: 0.5 }}
                         />
                       ) : (
                         <ArrowDownwardIcon
-                          fontSize="small"
-                          sx={{ verticalAlign: "middle", ml: 0.5 }}
+                          sx={{ fontSize: 13, verticalAlign: "-2px", ml: 0.5 }}
                         />
                       ))}
                   </TableCell>
@@ -964,7 +958,7 @@ export default function CustomerOverviewContent() {
                       fontWeight: "bold",
                       cursor: "pointer",
                       userSelect: "none",
-                      "&:hover": { backgroundColor: "action.selected" },
+                      "&:hover": { backgroundColor: d.hover, color: d.text },
                       whiteSpace: "nowrap",
                     }}
                     onClick={() => handleHeaderClick("balance")}
@@ -973,13 +967,11 @@ export default function CustomerOverviewContent() {
                     {sortConfig.field === "balance" &&
                       (sortConfig.direction === "asc" ? (
                         <ArrowUpwardIcon
-                          fontSize="small"
-                          sx={{ verticalAlign: "middle", ml: 0.5 }}
+                          sx={{ fontSize: 13, verticalAlign: "-2px", ml: 0.5 }}
                         />
                       ) : (
                         <ArrowDownwardIcon
-                          fontSize="small"
-                          sx={{ verticalAlign: "middle", ml: 0.5 }}
+                          sx={{ fontSize: 13, verticalAlign: "-2px", ml: 0.5 }}
                         />
                       ))}
                   </TableCell>
@@ -987,7 +979,17 @@ export default function CustomerOverviewContent() {
                     Actions
                   </TableCell>
                 </TableRow>
-                <TableRow>
+                <TableRow
+                  sx={{
+                    ...ds.inputSx,
+                    "& .MuiTableCell-head": { py: "8px" },
+                    "& .MuiOutlinedInput-root": {
+                      ...ds.inputSx["& .MuiOutlinedInput-root"],
+                      fontSize: 12.5,
+                      textTransform: "none",
+                    },
+                  }}
+                >
                   {(Object.keys(filters) as Array<keyof FilterColumns>).map(
                     (column) => (
                       <TableCell key={column}>
@@ -1021,16 +1023,16 @@ export default function CustomerOverviewContent() {
               </TableHead>
               <TableBody>
                 {sortedUsers.map((customer) => (
-                  <TableRow
-                    key={customer.id}
-                    sx={{
-                      "&:last-child td, &:last-child th": { border: 0 },
-                      "&:hover": {
-                        backgroundColor: "action.hover",
-                      },
-                    }}
-                  >
-                    <TableCell component="th" scope="row">
+                  <TableRow key={customer.id}>
+                    <TableCell
+                      component="th"
+                      scope="row"
+                      sx={{
+                        fontFamily: fonts.body,
+                        fontSize: 13,
+                        borderBottomColor: d.border,
+                      }}
+                    >
                       <Link
                         href={`/customers/${customer.id}`}
                         style={{
@@ -1041,10 +1043,10 @@ export default function CustomerOverviewContent() {
                         <Typography
                           component="span"
                           sx={{
-                            color: customer.isDeleted
-                              ? "#d32f2f"
-                              : "primary.main",
-                            fontWeight: 500,
+                            color: customer.isDeleted ? d.danger : d.action,
+                            fontFamily: fonts.body,
+                            fontSize: 13,
+                            fontWeight: 600,
                             cursor: "pointer",
                             "&:hover": {
                               textDecoration: "underline",
@@ -1059,12 +1061,9 @@ export default function CustomerOverviewContent() {
                     <TableCell>{customer.role}</TableCell>
                     <TableCell>
                       {customer.segment === "POTENTIAL_CUSTOMER" ? (
-                        <Chip
+                        <DaylightStatusPill
                           label="Potential Customer"
-                          size="small"
-                          color="secondary"
-                          variant="outlined"
-                          sx={{ fontWeight: "medium" }}
+                          tone="info"
                         />
                       ) : (
                         (customer.segment ?? "—")
@@ -1073,22 +1072,31 @@ export default function CustomerOverviewContent() {
                     <TableCell>{customer.pools || "Not Set"}</TableCell>
                     <TableCell align="center">{customer.miners}</TableCell>
                     <TableCell align="center">
-                      <Chip
-                        label={customer.status}
-                        color={
-                          customer.status === "active" ? "success" : "default"
+                      <DaylightStatusPill
+                        label={
+                          customer.status === "active" ? "Active" : "Inactive"
                         }
-                        size="small"
+                        tone={
+                          customer.status === "active" ? "success" : "neutral"
+                        }
                       />
                     </TableCell>
-                    <TableCell>{customer.joinDate}</TableCell>
+                    <TableCell sx={{ "&&&": { whiteSpace: "nowrap" } }}>
+                      {customer.joinDate}
+                    </TableCell>
                     <TableCell>
                       {customer.role === "CLIENT" ? customer.balance : "-"}
                     </TableCell>
                     <TableCell align="center">
                       <IconButton
                         size="small"
+                        aria-label={`Actions for ${customer.name}`}
                         onClick={(e) => handleMenuOpen(e, customer)}
+                        sx={{
+                          color: d.muted,
+                          borderRadius: "8px",
+                          "&:hover": { bgcolor: d.hover, color: d.action },
+                        }}
                       >
                         <MoreVertIcon />
                       </IconButton>
@@ -1106,6 +1114,27 @@ export default function CustomerOverviewContent() {
         anchorEl={anchorEl}
         open={Boolean(anchorEl)}
         onClose={handleMenuClose}
+        slotProps={{
+          paper: {
+            sx: {
+              mt: 0.5,
+              minWidth: 220,
+              borderRadius: "12px",
+              border: `1px solid ${d.border}`,
+              bgcolor: d.surface,
+              backgroundImage: "none",
+              boxShadow: "0 8px 30px rgba(100,114,124,.13)",
+              "& .MuiMenuItem-root": {
+                minHeight: 40,
+                fontFamily: fonts.body,
+                fontSize: 13,
+                fontWeight: 500,
+                color: d.text,
+                "&:hover": { bgcolor: d.hover },
+              },
+            },
+          },
+        }}
       >
         <MenuItem onClick={handleEditCustomer}>Edit Customer</MenuItem>
         <MenuItem onClick={handleChangePassword}>Change Password</MenuItem>
@@ -1141,7 +1170,7 @@ export default function CustomerOverviewContent() {
         {selectedCustomer?.isDeleted ? (
           <MenuItem
             onClick={handleRestoreCustomer}
-            sx={{ color: "success.main" }}
+            sx={{ color: `${d.success} !important` }}
             disabled={!canManage(selectedCustomer)}
           >
             Restore Customer
@@ -1149,7 +1178,7 @@ export default function CustomerOverviewContent() {
         ) : (
           <MenuItem
             onClick={handleDeleteCustomer}
-            sx={{ color: "error.main" }}
+            sx={{ color: `${d.danger} !important` }}
             disabled={!selectedCustomer || !canManage(selectedCustomer)}
           >
             Delete Customer
@@ -1159,19 +1188,27 @@ export default function CustomerOverviewContent() {
 
       {/* Activity Chart Section */}
       <Paper
-        elevation={3}
+        elevation={0}
         sx={{
-          p: 3,
-          borderRadius: 2,
-          background: (theme) =>
-            theme.palette.mode === "dark"
-              ? "linear-gradient(145deg, rgba(40,40,40,0.9), rgba(30,30,30,0.9))"
-              : "linear-gradient(145deg, rgba(255,255,255,0.9), rgba(250,250,250,0.9))",
-          backdropFilter: "blur(10px)",
-          border: (theme) => `1px solid ${theme.palette.divider}`,
+          p: { xs: "16px", sm: "20px 24px" },
+          bgcolor: d.surface,
+          backgroundImage: "none",
+          border: `1px solid ${d.border}`,
+          borderRadius: RADIUS_CARD,
+          boxShadow: d.shadow,
+          fontFamily: fonts.body,
         }}
       >
-        <Typography variant="h6" sx={{ mb: 3, fontWeight: "medium" }}>
+        <Typography
+          component="h2"
+          sx={{
+            m: "0 0 12px",
+            fontFamily: fonts.heading,
+            fontWeight: 700,
+            fontSize: 16,
+            color: d.text,
+          }}
+        >
           Customer Growth
         </Typography>
         {chartData.length === 0 ? (
@@ -1183,7 +1220,7 @@ export default function CustomerOverviewContent() {
               justifyContent: "center",
             }}
           >
-            <Typography color="text.secondary">
+            <Typography sx={{ fontSize: 13, color: d.muted }}>
               No customer data available for chart
             </Typography>
           </Box>
@@ -1193,27 +1230,48 @@ export default function CustomerOverviewContent() {
               data={chartData}
               margin={{ top: 5, right: 30, left: 0, bottom: 5 }}
             >
-              <CartesianGrid strokeDasharray="3 3" />
+              <CartesianGrid stroke={d.border} vertical={false} />
               <XAxis
                 dataKey="date"
                 angle={-45}
                 textAnchor="end"
                 height={80}
+                tick={{ fill: d.muted, fontSize: 11, fontFamily: fonts.body }}
+                tickLine={false}
+                axisLine={{ stroke: d.border }}
                 interval={
                   chartData.length > 10 ? Math.floor(chartData.length / 10) : 0
                 }
               />
-              <YAxis />
-              <Tooltip
-                formatter={(value) => `${value} customers`}
-                labelFormatter={(label) => `Date: ${label}`}
+              <YAxis
+                allowDecimals={false}
+                tick={{ fill: d.muted, fontSize: 11, fontFamily: fonts.body }}
+                tickLine={false}
+                axisLine={false}
+                width={44}
               />
-              <Legend />
+              <Tooltip
+                formatter={(value) => [`${value} customers`, "Total"]}
+                labelFormatter={(label) => `Date: ${label}`}
+                cursor={{ stroke: d.inputBorder, strokeDasharray: "3 3" }}
+                contentStyle={{
+                  background: d.surface,
+                  border: `1px solid ${d.border}`,
+                  borderRadius: 10,
+                  boxShadow: "0 8px 30px rgba(100,114,124,.13)",
+                  fontFamily: fonts.body,
+                  fontSize: 12,
+                  color: d.text,
+                }}
+                labelStyle={{ color: d.muted, marginBottom: 4 }}
+                itemStyle={{ color: d.text }}
+              />
               <Line
                 type="monotone"
                 dataKey="count"
-                stroke="#1976d2"
+                stroke={d.chartLine}
                 dot={false}
+                activeDot={{ r: 5, stroke: d.surface, strokeWidth: 2 }}
                 name="Total Customers"
                 strokeWidth={2}
                 isAnimationActive={true}
@@ -1222,6 +1280,6 @@ export default function CustomerOverviewContent() {
           </ResponsiveContainer>
         )}
       </Paper>
-    </Box>
+    </DaylightAdminPage>
   );
 }

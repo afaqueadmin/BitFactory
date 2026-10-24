@@ -373,6 +373,7 @@ export async function runWalletPaymentEmails(options: {
         const pdfBuffer = await renderWalletSnapshotPdf(
           candidate.userId,
           browser,
+          { customerName: candidate.name, payoutDate: candidate.payoutDate },
         );
         const details = {
           customerName: candidate.name || "Valued Customer",

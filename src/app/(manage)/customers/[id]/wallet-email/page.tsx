@@ -38,6 +38,7 @@ import {
 import { ThemeProvider, createTheme } from "@mui/material/styles";
 import { renderWalletSnapshotEmailHTML } from "@/lib/email-templates/wallet-snapshot-email";
 import WalletOverview from "@/components/wallet/WalletOverview";
+import WalletSnapshotHeading from "@/components/wallet/WalletSnapshotHeading";
 import { ThemeContext } from "@/app/theme-provider";
 import { useDaylight } from "@/lib/daylight";
 
@@ -67,7 +68,13 @@ const forcedLight = { darkMode: false, toggleDarkMode: () => {} };
  * scaled to fit its column. (The app is served with X-Frame-Options: DENY,
  * so the snapshot page itself can't be iframed.)
  */
-function SnapshotPreview({ customerId }: { customerId: string }) {
+function SnapshotPreview({
+  customerId,
+  customerName,
+}: {
+  customerId: string;
+  customerName: string | null;
+}) {
   const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(0.5);
@@ -104,6 +111,7 @@ function SnapshotPreview({ customerId }: { customerId: string }) {
           <SnapshotCanvas
             ref={contentRef}
             customerId={customerId}
+            customerName={customerName}
             scale={scale}
           />
         </ThemeProvider>
@@ -115,9 +123,10 @@ function SnapshotPreview({ customerId }: { customerId: string }) {
 // Inside the forced-light providers, so useDaylight() gives the light palette.
 const SnapshotCanvas = React.forwardRef<
   HTMLDivElement,
-  { customerId: string; scale: number }
->(function SnapshotCanvas({ customerId, scale }, ref) {
+  { customerId: string; customerName: string | null; scale: number }
+>(function SnapshotCanvas({ customerId, customerName, scale }, ref) {
   const { d, fonts } = useDaylight();
+  const [generatedAt] = useState(() => new Date());
   return (
     <Box
       ref={ref}
@@ -132,7 +141,17 @@ const SnapshotCanvas = React.forwardRef<
         pointerEvents: "none",
       }}
     >
-      <WalletOverview customerId={customerId} subaccountsParam="all" snapshot />
+      <WalletOverview
+        customerId={customerId}
+        subaccountsParam="all"
+        snapshot
+        heading={
+          <WalletSnapshotHeading
+            customerName={customerName}
+            generatedAt={generatedAt}
+          />
+        }
+      />
     </Box>
   );
 });
@@ -437,7 +456,10 @@ export default function WalletEmailPage() {
               Preview PDF
             </Button>
           </Box>
-          <SnapshotPreview customerId={customerId} />
+          <SnapshotPreview
+            customerId={customerId}
+            customerName={data.customer.name}
+          />
         </Paper>
       </Box>
 

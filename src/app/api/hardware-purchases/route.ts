@@ -6,9 +6,9 @@ import { Decimal } from "@prisma/client/runtime/library";
 import { AuditAction, Prisma } from "@prisma/client";
 import { verifyUploadedPdf } from "@/lib/storage/r2";
 import {
-  VENDOR_NAME_OPTIONS,
-  VendorNameValue,
-} from "@/lib/hooks/useHardwarePurchases";
+  checkVendorForInvoice,
+  vendorSelect,
+} from "@/lib/accounting/vendorRules";
 import {
   formatIsoDate,
   resolveExportTimeZone,
@@ -16,17 +16,17 @@ import {
 } from "@/lib/helpers/admin/tableExport";
 import { parseHardwarePurchaseQuery } from "./query";
 
-const VALID_VENDOR_NAMES = VENDOR_NAME_OPTIONS.map((o) => o.value);
-
 interface CreateHardwarePurchaseRequest {
   invoiceNumber: string;
-  vendorName: VendorNameValue;
+  vendorId: string;
   hardwareDescription: string;
   billingDate: string;
   dueDate: string;
   quantity: number;
   unitPrice: number;
   miscellaneousCharges: number;
+  /** Optional; part of totalAmount but not a hardware cost. */
+  securityDeposit?: number;
   totalAmount: number;
   notes?: string;
   invoicePdfKey: string;
@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
     // Validate required fields
     if (
       !body.invoiceNumber ||
-      !body.vendorName ||
+      !body.vendorId ||
       !body.hardwareDescription ||
       !body.billingDate ||
       !body.dueDate ||
@@ -73,11 +73,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!VALID_VENDOR_NAMES.includes(body.vendorName)) {
+    const vendor = await checkVendorForInvoice(body.vendorId, "hardware");
+    if ("error" in vendor) {
+      return NextResponse.json({ error: vendor.error }, { status: 400 });
+    }
+
+    const securityDeposit = Number(body.securityDeposit ?? 0);
+    if (!Number.isFinite(securityDeposit) || securityDeposit < 0) {
       return NextResponse.json(
-        {
-          error: `vendorName must be one of: ${VALID_VENDOR_NAMES.join(", ")}`,
-        },
+        { error: "Security deposit cannot be negative" },
         { status: 400 },
       );
     }
@@ -113,13 +117,14 @@ export async function POST(request: NextRequest) {
     const hardwarePurchase = await prisma.hardwarePurchaseInvoice.create({
       data: {
         invoiceNumber: body.invoiceNumber,
-        vendorName: body.vendorName,
+        vendorId: vendor.vendorId,
         hardwareDescription: body.hardwareDescription,
         billingDate: new Date(body.billingDate),
         dueDate: new Date(body.dueDate),
         quantity: body.quantity,
         unitPrice: new Decimal(body.unitPrice),
         miscellaneousCharges: new Decimal(body.miscellaneousCharges || 0),
+        securityDeposit: new Decimal(securityDeposit),
         totalAmount: new Decimal(body.totalAmount),
         paymentStatus: "Pending",
         notes: body.notes || null,
@@ -207,6 +212,7 @@ export async function GET(request: NextRequest) {
           orderBy,
           skip,
           take: limit,
+          include: { vendor: vendorSelect },
         }),
         prisma.hardwarePurchaseInvoice.count({ where }),
         prisma.hardwarePurchaseInvoice.count({ where: pendingWhere }),

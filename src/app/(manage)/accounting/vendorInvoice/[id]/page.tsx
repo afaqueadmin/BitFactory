@@ -227,6 +227,20 @@ export default function VendorInvoiceDetailPage() {
               gap: 3,
             }}
           >
+            {/* Vendor */}
+            <Box>
+              <Typography
+                variant="subtitle2"
+                color="textSecondary"
+                sx={{ fontWeight: "600", mb: 0.5 }}
+              >
+                Vendor Name
+              </Typography>
+              <Typography variant="body1">
+                {invoice.vendor?.name ?? "Not set"}
+              </Typography>
+            </Box>
+
             {/* Billing Date */}
             <Box>
               <Typography
@@ -516,6 +530,9 @@ export default function VendorInvoiceDetailPage() {
                 apiBase="/api/vendor-invoices"
                 receiptPurpose="vendor-receipt"
                 onPaid={handlePaid}
+                onUpdated={(updated) =>
+                  setInvoice(updated as VendorInvoiceDetail)
+                }
                 onCancelClick={() => setOpenCancelDialog(true)}
               />
             </Box>

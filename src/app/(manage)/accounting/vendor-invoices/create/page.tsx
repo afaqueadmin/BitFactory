@@ -21,9 +21,12 @@ import {
   PdfUploadField,
   UploadedPdf,
 } from "@/components/accounting/common/PdfUploadField";
+import { VendorSelect } from "@/components/accounting/VendorSelect";
 
 export interface VendorInvoiceFormData {
   invoiceNumber: string;
+  /** Optional; "" for none. */
+  vendorId: string;
   billingDate: string;
   dueDate: string;
   totalMiners: number | string;
@@ -36,6 +39,7 @@ export default function CreateVendorInvoicePage() {
   const router = useRouter();
   const [formData, setFormData] = useState<VendorInvoiceFormData>({
     invoiceNumber: "",
+    vendorId: "",
     billingDate: new Date().toISOString().split("T")[0],
     dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
       .toISOString()
@@ -226,6 +230,7 @@ export default function CreateVendorInvoicePage() {
         },
         body: JSON.stringify({
           invoiceNumber: formData.invoiceNumber,
+          vendorId: formData.vendorId || null,
           billingDate: formData.billingDate,
           dueDate: formData.dueDate,
           totalMiners: Number(formData.totalMiners) || 0,
@@ -311,6 +316,16 @@ export default function CreateVendorInvoicePage() {
                 }}
               />
             </Stack>
+
+            {/* Vendor (optional) */}
+            <VendorSelect
+              type="farm"
+              value={formData.vendorId}
+              onChange={(vendorId) =>
+                setFormData((prev) => ({ ...prev, vendorId }))
+              }
+              disabled={saving}
+            />
 
             {/* Row 2: Due Date and Total Miners */}
             <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>

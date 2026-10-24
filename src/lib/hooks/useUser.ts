@@ -45,7 +45,12 @@ interface UserResponse {
   recentActivities: UserActivity[];
 }
 
-export function useUser() {
+/**
+ * The signed-in user's profile. Pass `enabled: false` where no session is
+ * expected (the headless wallet snapshot PDF), so it doesn't fail the auth
+ * check and log an error.
+ */
+export function useUser({ enabled = true }: { enabled?: boolean } = {}) {
   const {
     data,
     isLoading: loading,
@@ -136,6 +141,7 @@ export function useUser() {
     },
     staleTime: 1000 * 60 * 5, // 5 minutes
     retry: 1,
+    enabled,
   });
 
   return {

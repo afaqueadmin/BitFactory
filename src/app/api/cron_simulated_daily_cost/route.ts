@@ -8,7 +8,11 @@ import {
 } from "@/lib/simulation/context";
 import { simChargeDay } from "@/lib/simulation/ledger";
 import { chargeSimDay } from "@/lib/simulation/ledgerStore";
-import { sendCronSuccessEmailToDeveloper } from "@/lib/email";
+import { waitForDatabase } from "@/lib/services/cronRetry";
+import {
+  sendCronFailureEmail,
+  sendCronSuccessEmailToDeveloper,
+} from "@/lib/email";
 
 const CRON_NAME = "cron_simulated_daily_cost";
 
@@ -29,6 +33,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    await waitForDatabase(CRON_NAME);
     const { demoMiner, ratePerKwh } = await loadSimSetup();
     const amountUsd = simDailyChargeUsd(demoMiner, ratePerKwh);
     const consumptionKwh = demoMiner.hardware.powerUsage * 24;
@@ -95,12 +100,18 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     if (error instanceof SimNotConfiguredError) {
       console.error(`[Simulated Daily Cost] ${error.message}`);
+      await sendCronFailureEmail(CRON_NAME, error.message, "developer");
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 503 },
       );
     }
     console.error("[Simulated Daily Cost] Error:", error);
+    await sendCronFailureEmail(
+      CRON_NAME,
+      error instanceof Error ? error.message : "Unknown error",
+      "developer",
+    );
     return NextResponse.json(
       { success: false, error: "Failed to charge simulated accounts" },
       { status: 500 },

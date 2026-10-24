@@ -10,9 +10,16 @@ import {
   PDF_DELETE_FAILED_MESSAGE,
   vendorPaymentInclude,
 } from "@/lib/accounting/vendorInvoiceRules";
+import { checkVendorForInvoice } from "@/lib/accounting/vendorRules";
+import {
+  adjustedOnInvoice,
+  checkInvoiceChangeWithAdjustments,
+} from "@/lib/accounting/vendorDeposit";
 
 interface UpdateVendorInvoiceRequest {
   invoiceNumber?: string;
+  /** null clears it. Can change on Paid invoices too (not an amount). */
+  vendorId?: string | null;
   billingDate?: string;
   dueDate?: string;
   totalMiners?: number;
@@ -162,6 +169,34 @@ export async function PUT(
       return NextResponse.json({ error: ruleError }, { status: 400 });
     }
 
+    const vendorChanged =
+      body.vendorId !== undefined &&
+      (body.vendorId || null) !== existingInvoice.vendorId;
+    const adjustmentError = checkInvoiceChangeWithAdjustments(
+      await adjustedOnInvoice(prisma, "farm", invoiceId),
+      {
+        cancel:
+          body.paymentStatus === "Cancelled" &&
+          existingInvoice.paymentStatus !== "Cancelled",
+        vendorChanged,
+        newTotal: body.totalAmount,
+      },
+    );
+    if (adjustmentError) {
+      return NextResponse.json({ error: adjustmentError }, { status: 400 });
+    }
+
+    if (vendorChanged && body.vendorId) {
+      const vendor = await checkVendorForInvoice(
+        body.vendorId,
+        "farm",
+        existingInvoice.vendorId,
+      );
+      if ("error" in vendor) {
+        return NextResponse.json({ error: vendor.error }, { status: 400 });
+      }
+    }
+
     // Validate required fields if they are being updated
     if (body.totalMiners !== undefined && body.totalMiners < 0) {
       return NextResponse.json(
@@ -198,6 +233,7 @@ export async function PUT(
     interface UpdateDataType {
       updatedBy: string;
       invoiceNumber?: string;
+      vendorId?: string | null;
       billingDate?: Date;
       dueDate?: Date;
       totalMiners?: number;
@@ -215,6 +251,9 @@ export async function PUT(
 
     if (body.invoiceNumber !== undefined) {
       updateData.invoiceNumber = body.invoiceNumber;
+    }
+    if (vendorChanged) {
+      updateData.vendorId = body.vendorId || null;
     }
     if (body.billingDate !== undefined) {
       updateData.billingDate = new Date(body.billingDate);
@@ -340,6 +379,14 @@ export async function DELETE(
         { error: "Paid invoices can't be deleted" },
         { status: 400 },
       );
+    }
+
+    const adjustmentError = checkInvoiceChangeWithAdjustments(
+      await adjustedOnInvoice(prisma, "farm", invoiceId),
+      { remove: true },
+    );
+    if (adjustmentError) {
+      return NextResponse.json({ error: adjustmentError }, { status: 400 });
     }
 
     // Remove its PDFs from R2 first; if that fails, keep the invoice so

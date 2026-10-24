@@ -26,6 +26,7 @@ import {
   IconButton,
   Tooltip,
   TextField,
+  MenuItem,
 } from "@mui/material";
 import Link from "next/link";
 import { useState } from "react";
@@ -39,9 +40,11 @@ import EditIcon from "@mui/icons-material/Edit";
 import DownloadIcon from "@mui/icons-material/Download";
 import { downloadExport } from "@/lib/downloadExport";
 import {
+  NO_VENDOR_FILTER,
   useVendorInvoices,
   VendorInvoice,
 } from "@/lib/hooks/useVendorInvoices";
+import { useAccountingVendors } from "@/lib/hooks/usePaymentAccounts";
 import EditVendorInvoiceModal from "@/components/accounting/EditVendorInvoiceModal";
 // import { VendorInvoice } from "@/generated/prisma";
 
@@ -65,6 +68,12 @@ export default function FarmTariffs() {
   const [exportError, setExportError] = useState<string | null>(null);
   const [startDateFilter, setStartDateFilter] = useState("");
   const [endDateFilter, setEndDateFilter] = useState("");
+  const [vendorFilter, setVendorFilter] = useState("");
+  // Every vendor that is or was used for Farm Tariffs, inactive too.
+  const { data: allVendors = [] } = useAccountingVendors();
+  const vendorOptions = allVendors.filter(
+    (v) => v.forFarmTariffs || v._count.vendorInvoices > 0,
+  );
   const {
     vendorInvoices,
     total,
@@ -73,6 +82,7 @@ export default function FarmTariffs() {
     error: invoicesError,
     refetch,
   } = useVendorInvoices(page, pageSize, undefined, sortBy, sortOrder, {
+    vendorId: vendorFilter || undefined,
     startDate: startDateFilter || undefined,
     endDate: endDateFilter || undefined,
   });
@@ -97,6 +107,7 @@ export default function FarmTariffs() {
         sortOrder,
         tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
       });
+      if (vendorFilter) params.set("vendorId", vendorFilter);
       if (startDateFilter) params.set("startDate", startDateFilter);
       if (endDateFilter) params.set("endDate", endDateFilter);
       await downloadExport(
@@ -298,6 +309,26 @@ export default function FarmTariffs() {
             }}
           >
             <TextField
+              select
+              size="small"
+              label="Filter by vendor"
+              value={vendorFilter}
+              onChange={(e) => {
+                setVendorFilter(e.target.value);
+                setPage(1);
+              }}
+              sx={{ minWidth: 180 }}
+            >
+              <MenuItem value="">All vendors</MenuItem>
+              <MenuItem value={NO_VENDOR_FILTER}>No vendor set</MenuItem>
+              {vendorOptions.map((vendor) => (
+                <MenuItem key={vendor.id} value={vendor.id}>
+                  {vendor.name}
+                  {!vendor.isActive && " (inactive)"}
+                </MenuItem>
+              ))}
+            </TextField>
+            <TextField
               label="Issued from"
               type="date"
               size="small"
@@ -378,6 +409,15 @@ export default function FarmTariffs() {
                   {/*<TableCell sx={{ fontWeight: "bold" }}>Customer</TableCell>*/}
                   <TableCell sx={{ fontWeight: "bold" }}>
                     <TableSortLabel
+                      active={sortBy === "vendorName"}
+                      direction={sortBy === "vendorName" ? sortOrder : "asc"}
+                      onClick={() => handleSort("vendorName")}
+                    >
+                      Vendor
+                    </TableSortLabel>
+                  </TableCell>
+                  <TableCell sx={{ fontWeight: "bold" }}>
+                    <TableSortLabel
                       active={sortBy === "totalAmount"}
                       direction={sortBy === "totalAmount" ? sortOrder : "asc"}
                       onClick={() => handleSort("totalAmount")}
@@ -452,6 +492,7 @@ export default function FarmTariffs() {
                       {/*    {invoice.user?.name ||*/}
                       {/*        `Customer ${invoice.userId.slice(0, 8)}`}*/}
                       {/*</TableCell>*/}
+                      <TableCell>{invoice.vendor?.name ?? "-"}</TableCell>
                       <TableCell>
                         <CurrencyDisplay value={invoice.totalAmount} />
                       </TableCell>

@@ -101,6 +101,9 @@ interface WalletOverviewProps {
   cardActions?: (settings: LuxorPaymentSettings) => WalletCardActions;
   /** Called once, when every figure on the page has finished loading. */
   onReady?: () => void;
+  /** Replaces the "Wallet" title block (the PDF's branded heading); the BTC
+   * price stays alongside it. */
+  heading?: React.ReactNode;
 }
 
 /**
@@ -228,6 +231,7 @@ export default function WalletOverview({
   snapshot = false,
   cardActions,
   onReady,
+  heading,
 }: WalletOverviewProps) {
   const { d, darkMode, fonts } = useDaylight();
   const [summary, setSummary] = useState<EarningsSummary | null>(null);
@@ -245,7 +249,9 @@ export default function WalletOverview({
   const [revenue24hError, setRevenue24hError] = useState<string | null>(null);
   const [walletError, setWalletError] = useState<string | null>(null);
 
-  const { user } = useUser();
+  // A customer's wallet (admin snapshot / PDF) never needs the signed-in
+  // user - and the PDF renderer has no session to look one up with.
+  const { user } = useUser({ enabled: !customerId });
   // The signed-in user's own wallet waits for their id; a customer's wallet
   // (admin snapshot) can load straight away.
   const ownerReady = !!customerId || !!user?.id;
@@ -451,31 +457,33 @@ export default function WalletOverview({
           mb: { xs: "20px", md: "26px" },
         }}
       >
-        <Box sx={{ minWidth: 0 }}>
-          <Typography
-            component="h1"
-            sx={{
-              fontFamily: fonts.heading,
-              fontWeight: 750,
-              fontSize: { xs: 27, md: 32 },
-              lineHeight: 1.3,
-              letterSpacing: "-.035em",
-              color: d.text,
-            }}
-          >
-            Wallet
-          </Typography>
-          <Typography
-            sx={{
-              fontSize: { xs: 12, md: 13 },
-              lineHeight: { xs: 1.7, md: 1.5 },
-              color: d.muted,
-              mt: "7px",
-            }}
-          >
-            Overview of your mining earnings, payouts, and financial records.
-          </Typography>
-        </Box>
+        {heading ?? (
+          <Box sx={{ minWidth: 0 }}>
+            <Typography
+              component="h1"
+              sx={{
+                fontFamily: fonts.heading,
+                fontWeight: 750,
+                fontSize: { xs: 27, md: 32 },
+                lineHeight: 1.3,
+                letterSpacing: "-.035em",
+                color: d.text,
+              }}
+            >
+              Wallet
+            </Typography>
+            <Typography
+              sx={{
+                fontSize: { xs: 12, md: 13 },
+                lineHeight: { xs: 1.7, md: 1.5 },
+                color: d.muted,
+                mt: "7px",
+              }}
+            >
+              Overview of your mining earnings, payouts, and financial records.
+            </Typography>
+          </Box>
+        )}
 
         <Box
           sx={{
@@ -513,6 +521,7 @@ export default function WalletOverview({
           Pending Payouts alongside it. All three share one label -> BTC ->
           USD structure, top-aligned in a grid with dividers between them. */}
       <Box
+        className="snapshot-block"
         sx={{
           display: "grid",
           gridTemplateColumns: {
@@ -610,14 +619,16 @@ export default function WalletOverview({
       )}
 
       {/* Profit & Loss Overview */}
-      <ProfitLossChart
-        daylight
-        customerId={customerId}
-        animate={!snapshot}
-        onLoaded={() => setProfitLossLoaded(true)}
-        totalEarningsBtc={getTotalEarnings()}
-        btcPriceUsd={btcPriceUsd}
-      />
+      <Box className="snapshot-block">
+        <ProfitLossChart
+          daylight
+          customerId={customerId}
+          animate={!snapshot}
+          onLoaded={() => setProfitLossLoaded(true)}
+          totalEarningsBtc={getTotalEarnings()}
+          btcPriceUsd={btcPriceUsd}
+        />
+      </Box>
     </>
   );
 }

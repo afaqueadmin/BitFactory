@@ -975,6 +975,7 @@ export default function MachinePage() {
               error={tableError}
               showDeleted={showDeleted}
               setShowDeleted={setShowDeleted}
+              csvExport
             />
           </>
         )}

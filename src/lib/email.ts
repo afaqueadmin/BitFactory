@@ -1054,6 +1054,42 @@ export const sendCronSuccessEmailToDeveloper = async (
   }
 };
 
+/**
+ * "⚠️ FAILED Cron run: <name>" email for a cron that died before finishing
+ * (e.g. database unreachable), so a failed run is announced rather than only
+ * noticed by its usual email not arriving. `recipient` matches where that
+ * cron's normal email goes: "admin" = SMTP_USER, "developer" =
+ * CRON_DEVELOPER_EMAIL.
+ */
+export const sendCronFailureEmail = async (
+  cronName: string,
+  message: string,
+  recipient: "admin" | "developer",
+) => {
+  const mailOptions = {
+    from:
+      `BitFactory Admin <${process.env.SMTP_FROM}>` || "noreply@bitfactory.com",
+    to: recipient === "admin" ? process.env.SMTP_USER : CRON_DEVELOPER_EMAIL,
+    subject: `⚠️ FAILED Cron run: ${cronName} - BitFactory`,
+    html: `
+      <h1>${cronName}</h1>
+      <p>Failed at ${new Date().toISOString()}. Nothing after this point was written.</p>
+      <p style="color:#c62828;">${message}</p>
+      <br>
+      <p>Best regards,</p>
+      <p>The BitFactory Team</p>
+    `,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    return { success: true };
+  } catch (error) {
+    console.error(`Error sending ${cronName} failure email:`, error);
+    return { success: false, error };
+  }
+};
+
 interface PoolCronDaySummary {
   date: string;
   results: Array<{
@@ -1164,8 +1200,11 @@ export const sendWorkerTransactionCronSummaryEmail = async (params: {
   endDate: string;
   workerResults: RangeCronSectionSummary[];
   transactionResults: RangeCronSectionSummary[];
+  /** Set when the run died before finishing (e.g. database unreachable). */
+  fatalError?: string;
 }) => {
-  const { startDate, endDate, workerResults, transactionResults } = params;
+  const { startDate, endDate, workerResults, transactionResults, fatalError } =
+    params;
   const date = new Date();
 
   const section = (label: string, results: RangeCronSectionSummary[]) => {
@@ -1190,10 +1229,15 @@ export const sendWorkerTransactionCronSummaryEmail = async (params: {
     from:
       `BitFactory Admin <${process.env.SMTP_FROM}>` || "noreply@bitfactory.com",
     to: process.env.SMTP_USER,
-    subject: `${hasErrors ? "⚠️ " : ""}Cron run: cron_pool_worker_transactions - BitFactory`,
+    subject: `${fatalError ? "⚠️ FAILED " : hasErrors ? "⚠️ " : ""}Cron run: cron_pool_worker_transactions - BitFactory`,
     html: `
       <h1>cron_pool_worker_transactions</h1>
       <p>Ran at ${date.toISOString()}, covering ${startDate} to ${endDate}.</p>
+      ${
+        fatalError
+          ? `<h3 style="color:#c62828;">Run failed — nothing after this point was written</h3><p style="color:#c62828;">${fatalError}</p>`
+          : ""
+      }
       ${section("Worker-level metrics", workerResults)}
       ${section("Transactions", transactionResults)}
       <br>
@@ -1458,6 +1502,9 @@ export const generatePDFFromUrl = async (
   cookies: { name: string; value: string }[],
   contentWidth: number,
   browser?: PdfBrowser,
+  /** Printed at the bottom of every page (Chrome's pageNumber/totalPages
+   * classes work in it). Not affected by `scale`, so set its font size. */
+  footerTemplate?: string,
 ): Promise<Buffer> => {
   const ownBrowser = browser ? null : await launchPdfBrowser();
   let context: Awaited<ReturnType<PdfBrowser["createBrowserContext"]>> | null =
@@ -1479,8 +1526,20 @@ export const generatePDFFromUrl = async (
     const pdfBuffer = await page.pdf({
       format: "A4",
       scale,
-      margin: { top: "0.3in", right: "0.3in", bottom: "0.3in", left: "0.3in" },
+      margin: {
+        top: "0.3in",
+        right: "0.3in",
+        bottom: footerTemplate ? "0.55in" : "0.3in",
+        left: "0.3in",
+      },
       printBackground: true,
+      ...(footerTemplate
+        ? {
+            displayHeaderFooter: true,
+            headerTemplate: "<span></span>",
+            footerTemplate,
+          }
+        : {}),
     });
     return Buffer.from(pdfBuffer);
   } finally {

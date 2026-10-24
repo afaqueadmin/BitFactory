@@ -21,10 +21,12 @@ import { Close as CloseIcon } from "@mui/icons-material";
 import SaveIcon from "@mui/icons-material/Save";
 import DeleteIcon from "@mui/icons-material/Delete";
 import {
+  InvoiceVendor,
   VendorInvoice,
   useDeleteVendorInvoice,
 } from "@/lib/hooks/useVendorInvoices";
 import { VendorInvoiceFormData } from "@/app/(manage)/accounting/vendor-invoices/create/page";
+import { VendorSelect } from "@/components/accounting/VendorSelect";
 
 // export interface VendorInvoice {
 //   id: string;
@@ -61,6 +63,7 @@ export default function EditVendorInvoiceModal({
 }: EditVendorInvoiceModalProps) {
   const [formData, setFormData] = useState<Partial<VendorInvoiceFormData>>({
     invoiceNumber: "",
+    vendorId: "",
     billingDate: "",
     dueDate: "",
     totalMiners: 0,
@@ -77,6 +80,10 @@ export default function EditVendorInvoiceModal({
   // Paid invoices keep their amounts (they must match the recorded payment)
   // and can't be deleted.
   const [isPaid, setIsPaid] = useState(false);
+  // Kept in the dropdown even if since deactivated or untagged.
+  const [currentVendor, setCurrentVendor] = useState<InvoiceVendor | null>(
+    null,
+  );
   const deleteVendorInvoice = useDeleteVendorInvoice();
 
   // Fetch invoice details when modal opens
@@ -98,8 +105,10 @@ export default function EditVendorInvoiceModal({
           const invoice = data.data;
 
           setIsPaid(invoice.paymentStatus === "Paid");
+          setCurrentVendor(invoice.vendor ?? null);
           setFormData({
             invoiceNumber: invoice.invoiceNumber,
+            vendorId: invoice.vendorId ?? "",
             billingDate: invoice.billingDate.split("T")[0],
             dueDate: new Date(invoice.dueDate).toISOString().split("T")[0],
             totalMiners: invoice.totalMiners,
@@ -124,8 +133,10 @@ export default function EditVendorInvoiceModal({
     } else if (invoiceData) {
       // Use provided invoice data
       setIsPaid(invoiceData.paymentStatus === "Paid");
+      setCurrentVendor(invoiceData.vendor ?? null);
       setFormData({
         invoiceNumber: invoiceData.invoiceNumber,
+        vendorId: invoiceData.vendorId ?? "",
         billingDate: new Date(invoiceData.billingDate)
           .toISOString()
           .split("T")[0],
@@ -233,6 +244,8 @@ export default function EditVendorInvoiceModal({
         },
         body: JSON.stringify({
           invoiceNumber: formData.invoiceNumber,
+          // Not an amount, so it can change on paid invoices too.
+          vendorId: formData.vendorId || null,
           billingDate: formData.billingDate,
           dueDate: formData.dueDate,
           // Amounts are locked on paid invoices, so they aren't sent.
@@ -357,6 +370,18 @@ export default function EditVendorInvoiceModal({
                     size="small"
                   />
                 </Stack>
+
+                {/* Vendor (optional) */}
+                <VendorSelect
+                  type="farm"
+                  value={formData.vendorId || ""}
+                  onChange={(vendorId) =>
+                    setFormData((prev) => ({ ...prev, vendorId }))
+                  }
+                  currentVendor={currentVendor}
+                  disabled={saving}
+                  size="small"
+                />
 
                 {/* Row 2: Due Date */}
                 <TextField

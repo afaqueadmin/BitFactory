@@ -45,6 +45,7 @@ import {
   Payments as PayablesIcon,
   Bolt as FarmTariffsIcon,
   ShoppingCart as HardwarePurchasesIcon,
+  Savings as SecurityDepositsIcon,
   Tune as AdjustmentsIcon,
   StickyNote2 as MemoIcon,
   RequestQuote as CreditAdjustmentsIcon,
@@ -56,6 +57,7 @@ import {
   PriceCheck as PricingIcon,
   PictureAsPdf as PdfSettingsIcon,
   AccountBalance as PaymentAccountsIcon,
+  LocalShipping as VendorsIcon,
   Timeline as CustomerPaybackIcon,
   Factory as CompanyPaybackIcon,
   History as ActivityLogIcon,
@@ -72,6 +74,7 @@ import {
   ChevronRight,
   ExpandMore,
   Lock as LockIcon,
+  LockOpen as LockOpenIcon,
   Close as CloseIcon,
 } from "@mui/icons-material";
 import Link from "next/link";
@@ -87,6 +90,7 @@ import {
 } from "@/lib/hooks";
 import { useSimulationRequestCount } from "@/lib/hooks/useSimulationRequestCount";
 import { useAdminNav } from "@/lib/contexts/admin-nav-context";
+import { focusRing, useDaylight } from "@/lib/daylight";
 
 type BadgeKey =
   | "tickets"
@@ -268,6 +272,11 @@ const sidebarSections: SidebarSection[] = [
             path: "/accounting/hardware-purchases",
             activeMatch: [/^\/accounting\/hardwarePurchase\//],
           },
+          {
+            title: "Security Deposits",
+            icon: <SecurityDepositsIcon />,
+            path: "/accounting/security-deposits",
+          },
         ],
       },
       {
@@ -320,6 +329,11 @@ const sidebarSections: SidebarSection[] = [
             title: "Entities, Banks & Currencies",
             icon: <PaymentAccountsIcon />,
             path: "/accounting/payment-accounts",
+          },
+          {
+            title: "Vendors",
+            icon: <VendorsIcon />,
+            path: "/accounting/vendors",
           },
         ],
       },
@@ -454,6 +468,7 @@ export default function AdminSidebar() {
     acknowledged: false,
   });
   const pendingSimulationRequests = useSimulationRequestCount();
+  const { d, fonts } = useDaylight();
 
   const badgeCounts: Record<BadgeKey, number> = {
     tickets: openTickets.length,
@@ -581,19 +596,25 @@ export default function AdminSidebar() {
               }}
               selected={isSelected}
               sx={{
-                borderRadius: 1.5,
-                mb: 0.25,
-                color: isActiveParent ? "primary.main" : "text.secondary",
-                minHeight: depth === 0 ? 40 : 36,
-                "&.Mui-selected": {
-                  color: "primary.main",
-                  bgcolor: "action.selected",
+                borderRadius: "9px",
+                my: "2px",
+                fontFamily: fonts.body,
+                color: isActiveParent ? d.action : d.muted,
+                minHeight: depth === 0 ? 38 : 34,
+                "&.Mui-selected, &.Mui-selected:hover": {
+                  color: d.action,
+                  bgcolor: d.skySoft,
                   "& .MuiListItemIcon-root": {
-                    color: "primary.main",
+                    color: d.action,
                   },
                 },
                 "&:hover": {
-                  bgcolor: "action.hover",
+                  bgcolor: d.hover,
+                },
+                "&.Mui-focusVisible": {
+                  ...focusRing(d.action),
+                  outlineOffset: "-3px",
+                  bgcolor: "transparent",
                 },
                 justifyContent: isExpanded ? "flex-start" : "center",
                 px: isExpanded ? 1.5 : 2,
@@ -603,21 +624,24 @@ export default function AdminSidebar() {
             >
               <ListItemIcon
                 sx={{
-                  minWidth: isExpanded ? (depth === 0 ? 40 : 34) : 0,
+                  minWidth: isExpanded ? (depth === 0 ? 32 : 28) : 0,
                   color: "inherit",
                   justifyContent: "center",
                   "& .MuiSvgIcon-root": {
-                    fontSize: depth === 0 ? "1.35rem" : "1.15rem",
+                    fontSize: depth === 0 ? 20 : 17,
                   },
                 }}
               >
                 {showBadge && !isExpanded ? (
                   <Badge
-                    color="error"
                     badgeContent={badgeCount}
                     max={99}
                     sx={{
                       "& .MuiBadge-badge": {
+                        bgcolor: d.danger,
+                        color: d.surface,
+                        fontFamily: fonts.body,
+                        fontWeight: 650,
                         fontSize: "0.65rem",
                         minWidth: 16,
                         height: 16,
@@ -645,8 +669,9 @@ export default function AdminSidebar() {
                   <ListItemText
                     primary={item.title}
                     primaryTypographyProps={{
-                      fontSize: depth === 0 ? "0.875rem" : "0.825rem",
-                      fontWeight: isSelected || isActiveParent ? 600 : 400,
+                      fontFamily: fonts.body,
+                      fontSize: depth === 0 ? 13 : 12.5,
+                      fontWeight: isSelected || isActiveParent ? 650 : 500,
                       noWrap: true,
                     }}
                     sx={{ my: 0 }}
@@ -655,14 +680,14 @@ export default function AdminSidebar() {
                     <Box
                       component="span"
                       sx={{
-                        bgcolor: "error.main",
-                        color: "error.contrastText",
-                        borderRadius: 10,
-                        px: 0.75,
+                        bgcolor: d.amber,
+                        color: d.warning,
+                        borderRadius: "999px",
+                        px: "6px",
                         minWidth: 20,
-                        lineHeight: "18px",
-                        fontSize: "0.7rem",
-                        fontWeight: 600,
+                        lineHeight: 1.6,
+                        fontSize: 10,
+                        fontWeight: 650,
                         textAlign: "center",
                         flexShrink: 0,
                       }}
@@ -712,21 +737,22 @@ export default function AdminSidebar() {
               variant="overline"
               component="div"
               sx={{
-                px: 1.5,
-                mt: 2,
-                mb: 0.5,
+                px: "12px",
+                mt: "20px",
+                mb: "6px",
                 lineHeight: 1.5,
-                fontSize: "0.68rem",
-                fontWeight: 600,
-                letterSpacing: "0.08em",
-                color: "text.disabled",
+                fontFamily: fonts.body,
+                fontSize: 10,
+                fontWeight: 700,
+                letterSpacing: ".17em",
+                color: d.muted,
                 whiteSpace: "nowrap",
               }}
             >
               {section.heading}
             </Typography>
           ) : (
-            <Divider sx={{ my: 1.25, mx: 1 }} />
+            <Divider sx={{ my: 1.25, mx: 1, borderColor: d.border }} />
           ))}
         {section.items.map((item) => renderItem(item, 0, isMobile))}
       </React.Fragment>
@@ -748,9 +774,11 @@ export default function AdminSidebar() {
           "& .MuiDrawer-paper": {
             boxSizing: "border-box",
             width: EXPANDED_WIDTH,
-            backgroundColor: "background.paper",
+            backgroundColor: d.surface,
             backgroundImage: "none",
-            p: 1.5,
+            borderRight: `1px solid ${d.border}`,
+            fontFamily: fonts.body,
+            p: "14px 12px",
           },
         }}
       >
@@ -760,19 +788,34 @@ export default function AdminSidebar() {
             alignItems: "center",
             justifyContent: "space-between",
             px: 1,
-            py: 1,
+            pb: "12px",
             mb: 1,
-            borderBottom: 1,
-            borderColor: "divider",
+            borderBottom: `1px solid ${d.border}`,
           }}
         >
-          <Typography variant="subtitle1" fontWeight="700">
+          <Typography
+            sx={{
+              fontFamily: fonts.heading,
+              fontWeight: 700,
+              fontSize: 15,
+              color: d.text,
+            }}
+          >
             Admin Navigation
           </Typography>
           <IconButton
             size="small"
             onClick={() => setMobileOpen(false)}
             aria-label="close drawer"
+            sx={{
+              width: 36,
+              height: 36,
+              border: `1px solid ${d.border}`,
+              borderRadius: "10px",
+              color: d.muted,
+              "&:hover": { bgcolor: d.hover },
+              "&:focus-visible": focusRing(d.action),
+            }}
           >
             <CloseIcon />
           </IconButton>
@@ -810,10 +853,13 @@ export default function AdminSidebar() {
             width: isDesktopExpanded ? EXPANDED_WIDTH : COLLAPSED_WIDTH,
             display: "flex",
             flexDirection: "column",
-            borderRight: 1,
-            borderColor: "divider",
-            bgcolor: "background.paper",
-            boxShadow: isHovered && !sideBarOpen ? 8 : "none",
+            borderRight: `1px solid ${d.border}`,
+            bgcolor: d.surface,
+            fontFamily: fonts.body,
+            boxShadow:
+              isHovered && !sideBarOpen
+                ? "0 8px 30px rgba(100,114,124,.18)"
+                : "none",
             overflow: "hidden",
             transition: (theme) =>
               theme.transitions.create(["width", "box-shadow"], {
@@ -822,34 +868,6 @@ export default function AdminSidebar() {
               }),
           }}
         >
-          <Box
-            sx={{
-              display: "flex",
-              justifyContent: isDesktopExpanded ? "flex-end" : "center",
-              px: 1,
-              py: 0.75,
-              borderBottom: 1,
-              borderColor: "divider",
-              flexShrink: 0,
-            }}
-          >
-            <Tooltip
-              title={sideBarOpen ? "Collapse sidebar" : "Keep sidebar open"}
-              placement="right"
-            >
-              <IconButton
-                size="small"
-                onClick={toggleCollapse}
-                aria-label={
-                  sideBarOpen ? "Collapse sidebar" : "Keep sidebar open"
-                }
-                sx={{ gap: 0.5, borderRadius: 1.5 }}
-              >
-                {sideBarOpen ? <ChevronLeft /> : <ChevronRight />}
-                {sideBarOpen && <LockIcon sx={{ fontSize: "0.75rem" }} />}
-              </IconButton>
-            </Tooltip>
-          </Box>
           <Box
             sx={{
               flex: 1,
@@ -866,11 +884,87 @@ export default function AdminSidebar() {
                 borderRadius: "2px",
               },
               "&:hover::-webkit-scrollbar-thumb": {
-                background: "rgba(0,0,0,0.3)",
+                background: d.inputBorder,
               },
             }}
           >
-            <List sx={{ px: isDesktopExpanded ? 1.5 : 1, pt: 1, pb: 2 }}>
+            <List sx={{ px: isDesktopExpanded ? "12px" : 1, pt: "8px", pb: 2 }}>
+              {/* Collapse / keep-open control: the sidebar's first row */}
+              <ListItem disablePadding>
+                <Tooltip
+                  title={isDesktopExpanded ? "" : "Keep sidebar open"}
+                  placement="right"
+                  arrow
+                >
+                  <ListItemButton
+                    onClick={toggleCollapse}
+                    aria-label={
+                      sideBarOpen ? "Collapse sidebar" : "Keep sidebar open"
+                    }
+                    sx={{
+                      borderRadius: "9px",
+                      minHeight: 38,
+                      px: isDesktopExpanded ? 1.5 : 2,
+                      justifyContent: isDesktopExpanded
+                        ? "flex-start"
+                        : "center",
+                      fontFamily: fonts.body,
+                      color: d.muted,
+                      whiteSpace: "nowrap",
+                      "&:hover": { bgcolor: d.hover, color: d.action },
+                      "&.Mui-focusVisible": {
+                        ...focusRing(d.action),
+                        outlineOffset: "-3px",
+                        bgcolor: "transparent",
+                      },
+                    }}
+                  >
+                    <ListItemIcon
+                      sx={{
+                        minWidth: isDesktopExpanded ? 32 : 0,
+                        color: "inherit",
+                        justifyContent: "center",
+                        "& .MuiSvgIcon-root": { fontSize: 20 },
+                      }}
+                    >
+                      {sideBarOpen ? <ChevronLeft /> : <ChevronRight />}
+                    </ListItemIcon>
+                    {isDesktopExpanded && (
+                      <>
+                        <ListItemText
+                          primary={
+                            sideBarOpen
+                              ? "Collapse sidebar"
+                              : "Keep sidebar open"
+                          }
+                          primaryTypographyProps={{
+                            fontFamily: fonts.body,
+                            fontSize: 13,
+                            fontWeight: 500,
+                            noWrap: true,
+                          }}
+                          sx={{ my: 0 }}
+                        />
+                        {sideBarOpen ? (
+                          <LockIcon
+                            aria-hidden
+                            sx={{
+                              fontSize: 14,
+                              color: d.action,
+                              flexShrink: 0,
+                            }}
+                          />
+                        ) : (
+                          <LockOpenIcon
+                            aria-hidden
+                            sx={{ fontSize: 14, flexShrink: 0 }}
+                          />
+                        )}
+                      </>
+                    )}
+                  </ListItemButton>
+                </Tooltip>
+              </ListItem>
               {renderSections(false)}
             </List>
           </Box>

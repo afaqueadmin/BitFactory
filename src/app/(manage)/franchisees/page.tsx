@@ -11,10 +11,8 @@ import { isStaffRole } from "@/lib/auth/staffRoles";
 import React, { useState, useEffect, useCallback } from "react";
 import {
   Box,
-  Container,
   Typography,
   Button,
-  Stack,
   Alert,
   CircularProgress,
   Paper,
@@ -24,7 +22,6 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  Chip,
   Snackbar,
   IconButton,
   Menu,
@@ -53,6 +50,16 @@ import CreateFranchiseeModal from "@/components/CreateFranchiseeModal";
 import EditFranchiseeModal from "@/components/EditFranchiseeModal";
 import CustomerRequestsPanel from "@/components/admin/CustomerRequestsPanel";
 import { useUser } from "@/lib/hooks";
+import { useDaylight } from "@/lib/daylight";
+import {
+  CellNote,
+  DaylightAdminPage,
+  DaylightEmptyState,
+  DaylightLoading,
+  DaylightPageHeader,
+  DaylightStatusPill,
+  useDaylightAdminSx,
+} from "@/components/daylight/AdminPage";
 
 interface Franchise {
   id: string;
@@ -89,6 +96,27 @@ export default function FranchiseesPage() {
   const { user } = useUser();
   const isSuperAdmin = user?.role === "SUPER_ADMIN";
   const isAdmin = isStaffRole(user?.role);
+  const { d, fonts } = useDaylight();
+  const ds = useDaylightAdminSx();
+
+  const menuPaperSx = {
+    minWidth: 200,
+    borderRadius: "12px",
+    border: `1px solid ${d.border}`,
+    bgcolor: d.surface,
+    backgroundImage: "none",
+    boxShadow: "0 8px 30px rgba(100,114,124,.13)",
+    "& .MuiMenuItem-root": {
+      minHeight: 40,
+      fontFamily: fonts.body,
+      fontSize: 13,
+      fontWeight: 500,
+      color: d.text,
+      "&:hover": { bgcolor: d.hover },
+    },
+    "& .MuiListItemText-primary": { fontFamily: fonts.body, fontSize: 13 },
+    "& .MuiListItemIcon-root": { color: d.muted, minWidth: 32 },
+  } as const;
 
   const [franchises, setFranchises] = useState<Franchise[]>([]);
   const [loading, setLoading] = useState(true);
@@ -209,49 +237,27 @@ export default function FranchiseesPage() {
 
   if (loading) {
     return (
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          minHeight: "100vh",
-        }}
-      >
-        <CircularProgress />
-      </Box>
+      <DaylightAdminPage>
+        <DaylightLoading />
+      </DaylightAdminPage>
     );
   }
 
   const activeCount = franchises.filter((f) => f.isActive).length;
 
   return (
-    <Box
-      component="main"
-      sx={{ py: 4, backgroundColor: "background.default", minHeight: "100vh" }}
-    >
-      <Container maxWidth="xl">
-        <Box
-          sx={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            mb: 4,
-          }}
-        >
-          <Box>
-            <Typography variant="h3" component="h1" sx={{ fontWeight: "bold" }}>
-              Franchisees
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-              Manage franchisees and their franchise business details
-            </Typography>
-          </Box>
-          <Stack direction="row" spacing={1}>
+    <DaylightAdminPage>
+      <DaylightPageHeader
+        title="Franchisees"
+        description="Manage franchisees and their franchise business details."
+        actions={
+          <>
             <Button
               variant="outlined"
               startIcon={<RefreshIcon />}
               onClick={handleRefresh}
               disabled={isRefreshing}
+              sx={ds.outlineBtnSx}
             >
               {isRefreshing ? "Refreshing..." : "Refresh"}
             </Button>
@@ -259,312 +265,321 @@ export default function FranchiseesPage() {
               variant="contained"
               startIcon={<AddIcon />}
               onClick={() => setCreateModalOpen(true)}
-              sx={{
-                px: 3,
-                py: 1,
-                background: (theme) =>
-                  `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.primary.dark})`,
-                "&:hover": {
-                  background: (theme) =>
-                    `linear-gradient(45deg, ${theme.palette.primary.dark}, ${theme.palette.primary.main})`,
-                },
-              }}
+              sx={ds.primaryBtnSx}
             >
               Create New Franchisee
             </Button>
-          </Stack>
-        </Box>
+          </>
+        }
+      />
 
-        <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 3 }}>
-          <Tab label="Franchisees" value="franchisees" />
-          <Tab
-            label={
-              pendingRequestCount > 0
-                ? `Customer Requests (${pendingRequestCount})`
-                : "Customer Requests"
-            }
-            value="requests"
-          />
-        </Tabs>
-
-        {tab === "requests" ? (
-          <CustomerRequestsPanel />
-        ) : (
-          <>
-            {error && (
-              <Alert severity="error" sx={{ mb: 3 }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: "bold" }}>
-                  Error Loading Franchisees
-                </Typography>
-                <Typography variant="body2">{error}</Typography>
-              </Alert>
-            )}
-
+      <Tabs
+        value={tab}
+        onChange={(_, v) => setTab(v)}
+        variant="scrollable"
+        allowScrollButtonsMobile
+        sx={{
+          mb: { xs: "20px", md: "24px" },
+          minHeight: 40,
+          borderBottom: `1px solid ${d.border}`,
+          "& .MuiTabs-indicator": { bgcolor: d.action, height: 2 },
+          "& .MuiTab-root": {
+            minHeight: 40,
+            px: "4px",
+            mr: 3,
+            minWidth: 0,
+            textTransform: "none",
+            fontFamily: fonts.body,
+            fontSize: 13,
+            fontWeight: 600,
+            color: d.muted,
+            "&.Mui-selected": { color: d.action },
+            "&:hover": { color: d.text },
+          },
+        }}
+      >
+        <Tab label="Franchisees" value="franchisees" />
+        <Tab
+          value="requests"
+          label={
             <Box
-              sx={{
-                display: "grid",
-                gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
-                gap: 3,
-                mb: 4,
-              }}
+              component="span"
+              sx={{ display: "inline-flex", alignItems: "center", gap: 1 }}
             >
-              <Box>
-                <AdminValueCard
-                  title="Total Franchisees"
-                  value={franchises.length}
+              Customer Requests
+              {pendingRequestCount > 0 && (
+                <DaylightStatusPill
+                  label={String(pendingRequestCount)}
+                  tone="warning"
                 />
-              </Box>
-              <Box>
-                <AdminValueCard title="Active Franchises" value={activeCount} />
-              </Box>
+              )}
             </Box>
+          }
+        />
+      </Tabs>
 
-            {franchises.length > 0 ? (
-              <TableContainer component={Paper} sx={{ mb: 4 }}>
-                <Table>
-                  <TableHead>
-                    <TableRow sx={{ backgroundColor: "background.default" }}>
-                      <TableCell sx={{ fontWeight: "bold" }}>
-                        Business Name
+      {tab === "requests" ? (
+        <CustomerRequestsPanel />
+      ) : (
+        <>
+          {error && (
+            <Alert severity="error" sx={{ mb: 3, ...ds.alertSx("error") }}>
+              <Box component="strong" sx={{ display: "block", mb: "2px" }}>
+                Error Loading Franchisees
+              </Box>
+              {error}
+            </Alert>
+          )}
+
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns:
+                "repeat(auto-fill, minmax(min(240px, 100%), 1fr))",
+              gap: { xs: "12px", sm: "16px", md: "20px" },
+              mb: { xs: "20px", md: "24px" },
+            }}
+          >
+            <AdminValueCard
+              daylight
+              title="Total Franchisees"
+              value={franchises.length}
+            />
+            <AdminValueCard
+              daylight
+              title="Active Franchises"
+              value={activeCount}
+            />
+          </Box>
+
+          {franchises.length > 0 ? (
+            <TableContainer
+              component={Paper}
+              elevation={0}
+              sx={{ ...ds.tableCardSx, mb: { xs: "20px", md: "24px" } }}
+            >
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Business Name</TableCell>
+                    <TableCell>Franchisee</TableCell>
+                    <TableCell>Contact</TableCell>
+                    <TableCell>Location</TableCell>
+                    <TableCell>Code</TableCell>
+                    <TableCell align="center">Status</TableCell>
+                    {isAdmin && <TableCell align="right">Actions</TableCell>}
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {franchises.map((franchise) => (
+                    <TableRow
+                      key={franchise.id}
+                      onClick={() =>
+                        router.push(`/franchisees/${franchise.id}`)
+                      }
+                      sx={{ cursor: "pointer" }}
+                    >
+                      <TableCell>
+                        <Box
+                          component="span"
+                          sx={{ fontWeight: 650, color: d.action }}
+                        >
+                          {franchise.businessName}
+                        </Box>
+                        <CellNote>{franchise.authorizedPersonName}</CellNote>
                       </TableCell>
-                      <TableCell sx={{ fontWeight: "bold" }}>
-                        Franchisee
+                      <TableCell>
+                        {franchise.franchisee?.name || "—"}
+                        <CellNote>{franchise.franchisee?.email}</CellNote>
                       </TableCell>
-                      <TableCell sx={{ fontWeight: "bold" }}>Contact</TableCell>
-                      <TableCell sx={{ fontWeight: "bold" }}>
-                        Location
+                      <TableCell>
+                        {franchise.email}
+                        <CellNote>{franchise.phoneNumber}</CellNote>
                       </TableCell>
-                      <TableCell sx={{ fontWeight: "bold" }}>Code</TableCell>
-                      <TableCell sx={{ fontWeight: "bold" }} align="center">
-                        Status
+                      <TableCell>
+                        {franchise.city}, {franchise.state}
+                      </TableCell>
+                      <TableCell
+                        sx={{
+                          "&&&": {
+                            fontFamily:
+                              "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+                            fontSize: 12,
+                          },
+                        }}
+                      >
+                        {franchise.franchiseCode}
+                      </TableCell>
+                      <TableCell align="center">
+                        <DaylightStatusPill
+                          label={franchise.isActive ? "Active" : "Inactive"}
+                          tone={franchise.isActive ? "success" : "neutral"}
+                        />
                       </TableCell>
                       {isAdmin && (
-                        <TableCell sx={{ fontWeight: "bold" }} align="right">
-                          Actions
+                        <TableCell align="right" sx={{ "&&&": { py: "8px" } }}>
+                          <IconButton
+                            size="small"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleMenuOpen(e, franchise);
+                            }}
+                            aria-label={`Actions for ${franchise.businessName}`}
+                            sx={{
+                              color: d.muted,
+                              borderRadius: "8px",
+                              "&:hover": { bgcolor: d.hover, color: d.action },
+                            }}
+                          >
+                            <MoreVertIcon fontSize="small" />
+                          </IconButton>
                         </TableCell>
                       )}
                     </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {franchises.map((franchise) => (
-                      <TableRow
-                        key={franchise.id}
-                        hover
-                        onClick={() =>
-                          router.push(`/franchisees/${franchise.id}`)
-                        }
-                        sx={{
-                          cursor: "pointer",
-                          "&:hover": { backgroundColor: "background.default" },
-                        }}
-                      >
-                        <TableCell>
-                          <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                            {franchise.businessName}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {franchise.authorizedPersonName}
-                          </Typography>
-                        </TableCell>
-                        <TableCell>
-                          <Typography variant="body2">
-                            {franchise.franchisee?.name || "-"}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {franchise.franchisee?.email}
-                          </Typography>
-                        </TableCell>
-                        <TableCell>
-                          <Typography variant="body2">
-                            {franchise.email}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {franchise.phoneNumber}
-                          </Typography>
-                        </TableCell>
-                        <TableCell>
-                          <Typography variant="body2">
-                            {franchise.city}, {franchise.state}
-                          </Typography>
-                        </TableCell>
-                        <TableCell>
-                          <Typography
-                            variant="body2"
-                            sx={{ fontFamily: "monospace" }}
-                          >
-                            {franchise.franchiseCode}
-                          </Typography>
-                        </TableCell>
-                        <TableCell align="center">
-                          <Chip
-                            label={franchise.isActive ? "Active" : "Inactive"}
-                            color={franchise.isActive ? "success" : "default"}
-                            variant="outlined"
-                            size="small"
-                          />
-                        </TableCell>
-                        {isAdmin && (
-                          <TableCell align="right">
-                            <IconButton
-                              size="small"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleMenuOpen(e, franchise);
-                              }}
-                              aria-label="Franchisee actions"
-                            >
-                              <MoreVertIcon fontSize="small" />
-                            </IconButton>
-                          </TableCell>
-                        )}
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            ) : (
-              <Paper sx={{ p: 4, textAlign: "center", mb: 4 }}>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          ) : (
+            <Box sx={{ mb: { xs: "20px", md: "24px" } }}>
+              <DaylightEmptyState>
                 <StorefrontIcon
-                  sx={{
-                    fontSize: 64,
-                    color: "text.secondary",
-                    mb: 2,
-                    opacity: 0.5,
-                  }}
+                  sx={{ fontSize: 40, color: d.inputBorder, mb: 1 }}
+                  aria-hidden
                 />
-                <Typography variant="h6" color="text.secondary">
+                <Box sx={{ fontSize: 15, fontWeight: 650, color: d.text }}>
                   No franchisees created yet
-                </Typography>
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  sx={{ mt: 1 }}
-                >
-                  Click &quot;Create New Franchisee&quot; to add one
-                </Typography>
-              </Paper>
+                </Box>
+                <Box sx={{ mt: "4px" }}>
+                  Click &quot;Create New Franchisee&quot; to add one.
+                </Box>
+              </DaylightEmptyState>
+            </Box>
+          )}
+
+          <Menu
+            anchorEl={menuAnchor}
+            open={Boolean(menuAnchor)}
+            onClose={handleMenuClose}
+            anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+            transformOrigin={{ vertical: "top", horizontal: "right" }}
+            slotProps={{ paper: { sx: menuPaperSx } }}
+          >
+            <MenuItem
+              onClick={() => {
+                setEditingFranchise(menuFranchise);
+                handleMenuClose();
+              }}
+            >
+              <ListItemIcon>
+                <EditIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText>Edit</ListItemText>
+            </MenuItem>
+            <MenuItem
+              onClick={() => {
+                if (menuFranchise) {
+                  router.push(`/franchisees/${menuFranchise.id}/incentives`);
+                }
+                handleMenuClose();
+              }}
+            >
+              <ListItemIcon>
+                <IncentivesIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText>Manage Incentives</ListItemText>
+            </MenuItem>
+            {isSuperAdmin && (
+              <MenuItem
+                onClick={() => {
+                  setDeleteError("");
+                  setDeletingFranchise(menuFranchise);
+                  handleMenuClose();
+                }}
+                sx={{
+                  "&&": { color: d.danger },
+                  "& .MuiListItemIcon-root": { color: d.danger },
+                }}
+              >
+                <ListItemIcon>
+                  <DeleteIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText>Delete</ListItemText>
+              </MenuItem>
             )}
+          </Menu>
 
-            <Menu
-              anchorEl={menuAnchor}
-              open={Boolean(menuAnchor)}
-              onClose={handleMenuClose}
-              anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-              transformOrigin={{ vertical: "top", horizontal: "right" }}
-            >
-              <MenuItem
-                onClick={() => {
-                  setEditingFranchise(menuFranchise);
-                  handleMenuClose();
-                }}
-              >
-                <ListItemIcon>
-                  <EditIcon fontSize="small" />
-                </ListItemIcon>
-                <ListItemText>Edit</ListItemText>
-              </MenuItem>
-              <MenuItem
-                onClick={() => {
-                  if (menuFranchise) {
-                    router.push(`/franchisees/${menuFranchise.id}/incentives`);
-                  }
-                  handleMenuClose();
-                }}
-              >
-                <ListItemIcon>
-                  <IncentivesIcon fontSize="small" />
-                </ListItemIcon>
-                <ListItemText>Manage Incentives</ListItemText>
-              </MenuItem>
-              {isSuperAdmin && (
-                <MenuItem
-                  onClick={() => {
-                    setDeleteError("");
-                    setDeletingFranchise(menuFranchise);
-                    handleMenuClose();
-                  }}
-                  sx={{ color: "error.main" }}
-                >
-                  <ListItemIcon>
-                    <DeleteIcon fontSize="small" color="error" />
-                  </ListItemIcon>
-                  <ListItemText>Delete</ListItemText>
-                </MenuItem>
+          <CreateFranchiseeModal
+            open={createModalOpen}
+            onClose={() => setCreateModalOpen(false)}
+            onSuccess={handleFranchiseeCreated}
+          />
+
+          <EditFranchiseeModal
+            open={Boolean(editingFranchise)}
+            onClose={() => setEditingFranchise(null)}
+            onSuccess={handleFranchiseeEdited}
+            franchise={editingFranchise}
+          />
+
+          <Dialog
+            open={Boolean(deletingFranchise)}
+            onClose={() => (deleting ? null : setDeletingFranchise(null))}
+            maxWidth="xs"
+            fullWidth
+          >
+            <DialogTitle>Delete Franchisee</DialogTitle>
+            <DialogContent>
+              <Typography variant="body2">
+                Are you sure you want to delete{" "}
+                <strong>{deletingFranchise?.businessName}</strong>? This action
+                cannot be undone.
+              </Typography>
+              {deleteError && (
+                <Alert severity="error" sx={{ mt: 2 }}>
+                  {deleteError}
+                </Alert>
               )}
-            </Menu>
-
-            <CreateFranchiseeModal
-              open={createModalOpen}
-              onClose={() => setCreateModalOpen(false)}
-              onSuccess={handleFranchiseeCreated}
-            />
-
-            <EditFranchiseeModal
-              open={Boolean(editingFranchise)}
-              onClose={() => setEditingFranchise(null)}
-              onSuccess={handleFranchiseeEdited}
-              franchise={editingFranchise}
-            />
-
-            <Dialog
-              open={Boolean(deletingFranchise)}
-              onClose={() => (deleting ? null : setDeletingFranchise(null))}
-              maxWidth="xs"
-              fullWidth
-            >
-              <DialogTitle>Delete Franchisee</DialogTitle>
-              <DialogContent>
-                <Typography variant="body2">
-                  Are you sure you want to delete{" "}
-                  <strong>{deletingFranchise?.businessName}</strong>? This
-                  action cannot be undone.
-                </Typography>
-                {deleteError && (
-                  <Alert severity="error" sx={{ mt: 2 }}>
-                    {deleteError}
-                  </Alert>
-                )}
-              </DialogContent>
-              <DialogActions sx={{ px: 3, py: 2 }}>
-                <Button
-                  onClick={() => setDeletingFranchise(null)}
-                  disabled={deleting}
-                  color="inherit"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleConfirmDelete}
-                  disabled={deleting}
-                  variant="contained"
-                  color="error"
-                >
-                  {deleting ? (
-                    <CircularProgress size={20} color="inherit" />
-                  ) : (
-                    "Delete"
-                  )}
-                </Button>
-              </DialogActions>
-            </Dialog>
-
-            <Snackbar
-              open={Boolean(notification)}
-              autoHideDuration={5000}
-              onClose={() => setNotification("")}
-              anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-            >
-              <Alert
-                onClose={() => setNotification("")}
-                severity="success"
-                sx={{ width: "100%" }}
+            </DialogContent>
+            <DialogActions sx={{ px: 3, py: 2 }}>
+              <Button
+                onClick={() => setDeletingFranchise(null)}
+                disabled={deleting}
+                color="inherit"
               >
-                {notification}
-              </Alert>
-            </Snackbar>
-          </>
-        )}
-      </Container>
-    </Box>
+                Cancel
+              </Button>
+              <Button
+                onClick={handleConfirmDelete}
+                disabled={deleting}
+                variant="contained"
+                color="error"
+              >
+                {deleting ? (
+                  <CircularProgress size={20} color="inherit" />
+                ) : (
+                  "Delete"
+                )}
+              </Button>
+            </DialogActions>
+          </Dialog>
+
+          <Snackbar
+            open={Boolean(notification)}
+            autoHideDuration={5000}
+            onClose={() => setNotification("")}
+            anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+          >
+            <Alert
+              onClose={() => setNotification("")}
+              severity="success"
+              sx={{ width: "100%", ...ds.alertSx("success") }}
+            >
+              {notification}
+            </Alert>
+          </Snackbar>
+        </>
+      )}
+    </DaylightAdminPage>
   );
 }

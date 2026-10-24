@@ -13,15 +13,21 @@ import {
 
 async function paymentReferenceCount(bankId: string): Promise<number> {
   // Farm Tariff / Hardware Purchase payment parts, and Hosting / Hardware
-  // Sales payments. The two invoice-column counts cover the deprecated
-  // single-currency columns; remove them when those columns are dropped.
-  const [parts, vendor, hardware, received] = await Promise.all([
-    prisma.vendorPaymentPart.count({ where: { bankId } }),
-    prisma.vendorInvoice.count({ where: { paymentBankId: bankId } }),
-    prisma.hardwarePurchaseInvoice.count({ where: { paymentBankId: bankId } }),
-    prisma.costPayment.count({ where: { bankId } }),
-  ]);
-  return parts + vendor + hardware + received;
+  // Sales payments, and security deposit returns. The two invoice-column
+  // counts cover the deprecated single-currency columns; remove them when
+  // those columns are dropped.
+  const [parts, vendor, hardware, received, depositReturns] = await Promise.all(
+    [
+      prisma.vendorPaymentPart.count({ where: { bankId } }),
+      prisma.vendorInvoice.count({ where: { paymentBankId: bankId } }),
+      prisma.hardwarePurchaseInvoice.count({
+        where: { paymentBankId: bankId },
+      }),
+      prisma.costPayment.count({ where: { bankId } }),
+      prisma.vendorDepositMovement.count({ where: { bankId } }),
+    ],
+  );
+  return parts + vendor + hardware + received + depositReturns;
 }
 
 export async function PUT(
