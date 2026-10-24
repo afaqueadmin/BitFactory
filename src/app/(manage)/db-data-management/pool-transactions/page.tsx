@@ -14,7 +14,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import {
   Box,
-  Container,
+  Button,
   Typography,
   Stack,
   Alert,
@@ -28,18 +28,24 @@ import {
   TableRow,
   TextField,
   IconButton,
-  Tooltip,
   FormControl,
   InputLabel,
   Select,
   MenuItem,
-  Chip,
 } from "@mui/material";
 import {
   Refresh as RefreshIcon,
   NavigateBefore,
   NavigateNext,
 } from "@mui/icons-material";
+import { useDaylight } from "@/lib/daylight";
+import {
+  DaylightAdminPage,
+  DaylightPageHeader,
+  DaylightStatusPill,
+  statusLabel,
+  useDaylightAdminSx,
+} from "@/components/daylight/AdminPage";
 
 interface SubaccountOption {
   id: string;
@@ -84,6 +90,8 @@ const fmt = (v: string | null, digits = 8) =>
     : Number(v).toLocaleString(undefined, { maximumFractionDigits: digits });
 
 export default function PoolTransactionsPage() {
+  const { d } = useDaylight();
+  const ds = useDaylightAdminSx();
   const [rows, setRows] = useState<PoolTransaction[]>([]);
   const [subaccounts, setSubaccounts] = useState<SubaccountOption[]>([]);
   const [loading, setLoading] = useState(true);
@@ -159,37 +167,30 @@ export default function PoolTransactionsPage() {
   };
 
   return (
-    <Container maxWidth="xl" sx={{ py: 4 }}>
-      <Stack
-        direction="row"
-        justifyContent="space-between"
-        alignItems="center"
-        sx={{ mb: 3 }}
-      >
-        <Box>
-          <Typography variant="h4" fontWeight="bold">
-            Pool Transactions
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Raw pool-side transaction ledger (revenue accrual, payouts, fees).
-            Deduped on (subaccount, date, category, type, amount) since Luxor
-            leaves the transaction ID blank on most accrual rows. View only.
-          </Typography>
-        </Box>
-        <Tooltip title="Refresh">
-          <IconButton onClick={handleRefresh} disabled={isRefreshing}>
-            <RefreshIcon />
-          </IconButton>
-        </Tooltip>
-      </Stack>
+    <DaylightAdminPage>
+      <DaylightPageHeader
+        title="Pool Transactions"
+        description="Raw pool-side transaction ledger (revenue accrual, payouts, fees). Deduped on (subaccount, date, category, type, amount) since Luxor leaves the transaction ID blank on most accrual rows. View only."
+        actions={
+          <Button
+            variant="outlined"
+            startIcon={<RefreshIcon />}
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            sx={ds.outlineBtnSx}
+          >
+            {isRefreshing ? "Refreshing..." : "Refresh"}
+          </Button>
+        }
+      />
 
       {error && (
-        <Alert severity="error" sx={{ mb: 3 }}>
+        <Alert severity="error" sx={{ mb: 3, ...ds.alertSx("error") }}>
           {error}
         </Alert>
       )}
 
-      <Paper elevation={1} sx={{ p: 2, mb: 2, borderRadius: 2 }}>
+      <Paper elevation={0} sx={{ ...ds.cardSx, ...ds.inputSx, mb: 2 }}>
         <Stack
           direction={{ xs: "column", sm: "row" }}
           spacing={2}
@@ -268,7 +269,7 @@ export default function PoolTransactionsPage() {
         </Stack>
       </Paper>
 
-      <Paper elevation={2} sx={{ borderRadius: 2 }}>
+      <Paper elevation={0} sx={ds.listCardSx}>
         <TableContainer>
           <Table size="small">
             <TableHead>
@@ -288,13 +289,13 @@ export default function PoolTransactionsPage() {
               {loading ? (
                 <TableRow>
                   <TableCell colSpan={9} align="center" sx={{ py: 6 }}>
-                    <CircularProgress size={28} />
+                    <CircularProgress size={28} sx={{ color: d.action }} />
                   </TableCell>
                 </TableRow>
               ) : rows.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={9} align="center" sx={{ py: 4 }}>
-                    <Typography color="text.secondary">
+                    <Typography variant="body2" sx={{ color: d.muted }}>
                       No transactions found.
                     </Typography>
                   </TableCell>
@@ -306,24 +307,23 @@ export default function PoolTransactionsPage() {
                       {new Date(row.occurredAt).toLocaleString()}
                     </TableCell>
                     <TableCell>
-                      <Chip
-                        label={row.poolSubaccount.pool.name}
-                        size="small"
-                        sx={{ mr: 1 }}
-                      />
+                      <Box component="span" sx={{ mr: 1 }}>
+                        <DaylightStatusPill
+                          label={row.poolSubaccount.pool.name}
+                          tone="neutral"
+                        />
+                      </Box>
                       {row.poolSubaccount.subaccountName}
                     </TableCell>
                     <TableCell>{row.category || "—"}</TableCell>
                     <TableCell>
-                      <Chip
-                        label={row.transactionType}
-                        size="small"
-                        color={
+                      <DaylightStatusPill
+                        label={statusLabel(row.transactionType)}
+                        tone={
                           row.transactionType === "credit"
                             ? "success"
-                            : "default"
+                            : "neutral"
                         }
-                        variant="outlined"
                       />
                     </TableCell>
                     <TableCell align="right">{fmt(row.amount)}</TableCell>
@@ -331,13 +331,27 @@ export default function PoolTransactionsPage() {
                       {fmt(row.usdEquivalent, 2)}
                     </TableCell>
                     <TableCell
-                      sx={{ fontFamily: "monospace", fontSize: "0.7rem" }}
+                      sx={{
+                        "&&&": {
+                          fontFamily:
+                            "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+                          fontSize: 11.5,
+                          color: d.muted,
+                        },
+                      }}
                     >
                       {row.addressName || "—"}
                     </TableCell>
                     <TableCell>{row.status || "—"}</TableCell>
                     <TableCell
-                      sx={{ fontFamily: "monospace", fontSize: "0.7rem" }}
+                      sx={{
+                        "&&&": {
+                          fontFamily:
+                            "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+                          fontSize: 11.5,
+                          color: d.muted,
+                        },
+                      }}
                     >
                       {row.externalTransactionId
                         ? `${row.externalTransactionId.slice(0, 10)}...`
@@ -353,9 +367,9 @@ export default function PoolTransactionsPage() {
           direction="row"
           justifyContent="space-between"
           alignItems="center"
-          sx={{ p: 2, borderTop: 1, borderColor: "divider" }}
+          sx={{ px: "16px", py: "10px", borderTop: `1px solid ${d.border}` }}
         >
-          <Typography variant="body2" color="text.secondary">
+          <Typography variant="body2" sx={{ color: d.muted }}>
             {pagination.totalCount} total rows — page {pagination.page} of{" "}
             {pagination.totalPages}
           </Typography>
@@ -379,6 +393,6 @@ export default function PoolTransactionsPage() {
           </Stack>
         </Stack>
       </Paper>
-    </Container>
+    </DaylightAdminPage>
   );
 }

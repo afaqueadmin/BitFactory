@@ -1,9 +1,9 @@
 "use client";
 
 import {
+  Typography,
   Box,
   Button,
-  Container,
   Paper,
   Table,
   TableBody,
@@ -11,7 +11,6 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  CircularProgress,
   Alert,
   Stack,
   Dialog,
@@ -28,8 +27,16 @@ import {
   PricingConfigWithDetails,
 } from "@/lib/hooks/usePricingConfigs";
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
+import { useDaylight } from "@/lib/daylight";
+import {
+  DaylightAdminPage,
+  DaylightLoading,
+  useDaylightAdminSx,
+} from "@/components/daylight/AdminPage";
 
 export default function PricingPage() {
+  const { d } = useDaylight();
+  const ds = useDaylightAdminSx();
   const [page, setPage] = useState(1);
   const { pricingConfigs, loading, error } = usePricingConfigs(page);
   const [openDialog, setOpenDialog] = useState(false);
@@ -53,42 +60,60 @@ export default function PricingPage() {
 
   if (loading) {
     return (
-      <Container maxWidth="lg">
-        <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
-          <CircularProgress />
-        </Box>
-      </Container>
+      <DaylightAdminPage>
+        <DaylightLoading />
+      </DaylightAdminPage>
     );
   }
 
   if (error) {
     return (
-      <Container maxWidth="lg">
-        <Alert severity="error">{error}</Alert>
-      </Container>
+      <DaylightAdminPage>
+        <Alert severity="error" sx={{ ...ds.alertSx("error") }}>
+          {error}
+        </Alert>
+      </DaylightAdminPage>
     );
   }
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
+    <DaylightAdminPage>
       <Box sx={{ mb: 3 }}>
-        <h1 style={{ margin: 0 }}>Pricing Configuration</h1>
-        <p style={{ margin: "8px 0 0 0", color: "#666" }}>
+        <Typography component="h1" sx={ds.pageTitleSx}>
+          Pricing Configuration
+        </Typography>
+        <Typography sx={ds.pageDescSx}>
           Manage customer-specific unit pricing and discounts
-        </p>
+        </Typography>
       </Box>
 
-      <Paper sx={{ mb: 3, p: 3, backgroundColor: "#e8f4f8" }}>
-        <h3 style={{ margin: "0 0 12px 0" }}>About Pricing</h3>
-        <p style={{ margin: 0, color: "#666" }}>
+      <Paper
+        elevation={0}
+        sx={{
+          ...ds.cardSx,
+          mb: 3,
+          bgcolor: d.skySoft,
+          borderColor: d.borderSky,
+          boxShadow: "none",
+        }}
+      >
+        <Typography
+          component="h2"
+          sx={{ ...ds.sectionTitleSx, fontSize: 14, mb: "6px" }}
+        >
+          About Pricing
+        </Typography>
+        <p
+          style={{ margin: 0, color: d.muted, fontSize: 13, lineHeight: 1.55 }}
+        >
           Define unit prices for different service types and apply
           customer-specific discounts. Changes take effect on the next invoice.
         </p>
       </Paper>
 
-      <TableContainer component={Paper}>
+      <TableContainer component={Paper} elevation={0} sx={ds.listCardSx}>
         <Table>
-          <TableHead sx={{ backgroundColor: "#f5f5f5" }}>
+          <TableHead>
             <TableRow>
               <TableCell sx={{ fontWeight: "bold" }}>Customer</TableCell>
               <TableCell sx={{ fontWeight: "bold" }}>
@@ -117,6 +142,7 @@ export default function PricingPage() {
                     variant="outlined"
                     startIcon={<EditIcon />}
                     onClick={() => handleEditClick(pricing)}
+                    sx={ds.outlineBtnSx}
                   >
                     Edit
                   </Button>
@@ -182,16 +208,19 @@ export default function PricingPage() {
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpenDialog(false)}>Cancel</Button>
+          <Button onClick={() => setOpenDialog(false)} sx={ds.textBtnSx()}>
+            Cancel
+          </Button>
           <Button
             onClick={handleSave}
             variant="contained"
             startIcon={<SaveIcon />}
+            sx={ds.primaryBtnSx}
           >
             Save Changes
           </Button>
         </DialogActions>
       </Dialog>
-    </Container>
+    </DaylightAdminPage>
   );
 }

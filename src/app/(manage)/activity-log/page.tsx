@@ -4,10 +4,6 @@ import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Box,
-  Card,
-  CardContent,
-  Chip,
-  CircularProgress,
   Alert,
   Table,
   TableBody,
@@ -17,7 +13,6 @@ import {
   TableRow,
   TablePagination,
   TextField,
-  Typography,
   Stack,
   MenuItem,
   Select,
@@ -25,10 +20,19 @@ import {
   InputLabel,
   Paper,
 } from "@mui/material";
-import { useTheme } from "@mui/material/styles";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import PeopleIcon from "@mui/icons-material/People";
 import BarChartIcon from "@mui/icons-material/BarChart";
+import StatCard from "@/components/daylight/StatCard";
+import { useDaylight } from "@/lib/daylight";
+import {
+  CellNote,
+  DaylightAdminPage,
+  DaylightLoading,
+  DaylightPageHeader,
+  DaylightStatusPill,
+  useDaylightAdminSx,
+} from "@/components/daylight/AdminPage";
 
 interface TabVisit {
   tabKey: string;
@@ -103,7 +107,8 @@ function uniqueTabs(visits: TabVisit[]): string[] {
 }
 
 export default function ActivityLogPage() {
-  const theme = useTheme();
+  const { d } = useDaylight();
+  const ds = useDaylightAdminSx();
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(20);
   const [filterUserId, setFilterUserId] = useState("");
@@ -149,70 +154,59 @@ export default function ActivityLogPage() {
     staleTime: 5 * 60 * 1000,
   });
 
-  const headerBg = theme.palette.mode === "dark" ? "grey.800" : "grey.100";
-
   return (
-    <Box sx={{ p: { xs: 2, md: 3 } }}>
-      <Typography variant="h5" fontWeight={600} mb={3}>
-        User Activity Log
-      </Typography>
+    <DaylightAdminPage>
+      <DaylightPageHeader
+        title="User Activity Log"
+        description="Client sign-in sessions, how long they lasted and which tabs were visited."
+      />
 
       {/* Stats Cards */}
       {data?.stats && (
-        <Stack direction={{ xs: "column", sm: "row" }} spacing={2} mb={3}>
-          <Card sx={{ flex: 1 }}>
-            <CardContent sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-              <PeopleIcon color="primary" fontSize="large" />
-              <Box>
-                <Typography variant="h4" fontWeight={700}>
-                  {data.stats.totalSessionsToday}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Sessions Today
-                </Typography>
-              </Box>
-            </CardContent>
-          </Card>
-
-          <Card sx={{ flex: 1 }}>
-            <CardContent sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-              <AccessTimeIcon color="secondary" fontSize="large" />
-              <Box>
-                <Typography variant="h4" fontWeight={700}>
-                  {formatDuration(data.stats.avgDurationSeconds)}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Avg Session Duration
-                </Typography>
-              </Box>
-            </CardContent>
-          </Card>
-
-          <Card sx={{ flex: 1 }}>
-            <CardContent sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-              <BarChartIcon color="success" fontSize="large" />
-              <Box>
-                <Typography variant="h6" fontWeight={700}>
-                  {data.stats.topTabs[0]?.tabName ?? "—"}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Most Visited Tab
-                  {data.stats.topTabs[0]
-                    ? ` (${data.stats.topTabs[0].count}x)`
-                    : ""}
-                </Typography>
-              </Box>
-            </CardContent>
-          </Card>
-        </Stack>
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns:
+              "repeat(auto-fit, minmax(min(220px, 100%), 1fr))",
+            gap: { xs: "12px", sm: "16px", md: "20px" },
+            mb: { xs: "20px", md: "24px" },
+          }}
+        >
+          <StatCard
+            title="Sessions Today"
+            value={data.stats.totalSessionsToday}
+            tone="sky"
+            icon={<PeopleIcon />}
+          />
+          <StatCard
+            title="Avg Session Duration"
+            value={formatDuration(data.stats.avgDurationSeconds)}
+            tone="mint"
+            icon={<AccessTimeIcon />}
+          />
+          <StatCard
+            title="Most Visited Tab"
+            value={data.stats.topTabs[0]?.tabName ?? "—"}
+            caption={
+              data.stats.topTabs[0]
+                ? `${data.stats.topTabs[0].count} visits`
+                : undefined
+            }
+            tone="amber"
+            icon={<BarChartIcon />}
+          />
+        </Box>
       )}
 
       {/* Filters */}
-      <Paper sx={{ p: 2, mb: 3 }}>
+      <Paper
+        elevation={0}
+        sx={{ ...ds.cardSx, ...ds.inputSx, mb: { xs: "20px", md: "24px" } }}
+      >
         <Stack
           direction={{ xs: "column", sm: "row" }}
           spacing={2}
-          alignItems="center"
+          alignItems={{ xs: "stretch", sm: "center" }}
         >
           <FormControl size="small" sx={{ minWidth: 200 }}>
             <InputLabel>Filter by User</InputLabel>
@@ -261,98 +255,80 @@ export default function ActivityLogPage() {
 
       {/* Table */}
       {isLoading ? (
-        <Box display="flex" justifyContent="center" py={6}>
-          <CircularProgress />
-        </Box>
+        <DaylightLoading />
       ) : error ? (
-        <Alert severity="error">
+        <Alert severity="error" sx={ds.alertSx("error")}>
           Failed to load activity log. Please try again.
         </Alert>
       ) : (
-        <>
-          <TableContainer component={Paper}>
+        <Paper elevation={0} sx={ds.listCardSx}>
+          <TableContainer>
             <Table size="small">
               <TableHead>
-                <TableRow sx={{ backgroundColor: headerBg }}>
-                  <TableCell sx={{ fontWeight: 600 }}>User</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Subaccount</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Login Time</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Logout Time</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Duration</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Tabs Visited</TableCell>
+                <TableRow>
+                  <TableCell>User</TableCell>
+                  <TableCell>Subaccount</TableCell>
+                  <TableCell>Login Time</TableCell>
+                  <TableCell>Logout Time</TableCell>
+                  <TableCell>Duration</TableCell>
+                  <TableCell>Tabs Visited</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {data?.sessions.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
-                      <Typography color="text.secondary">
-                        No sessions found
-                      </Typography>
+                    <TableCell
+                      colSpan={6}
+                      align="center"
+                      sx={{ "&&&": { py: 5, color: d.muted } }}
+                    >
+                      No sessions found
                     </TableCell>
                   </TableRow>
                 ) : (
                   data?.sessions.map((session) => (
-                    <TableRow key={session.id} hover>
+                    <TableRow key={session.id}>
                       <TableCell>
-                        <Typography variant="body2" fontWeight={500}>
+                        <Box component="span" sx={{ fontWeight: 650 }}>
                           {session.user.name ?? "—"}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {session.user.email}
-                        </Typography>
+                        </Box>
+                        <CellNote>{session.user.email}</CellNote>
                         {session.login && !session.login.isPrimary && (
-                          <Typography
-                            variant="caption"
-                            color="text.secondary"
-                            display="block"
-                          >
+                          <CellNote>
                             Signed in as {session.login.email} (second email)
-                          </Typography>
+                          </CellNote>
                         )}
                       </TableCell>
                       <TableCell>
-                        <Typography variant="body2">
-                          {session.user.luxorSubaccounts.length > 0
-                            ? session.user.luxorSubaccounts.join(", ")
-                            : "—"}
-                        </Typography>
+                        {session.user.luxorSubaccounts.length > 0
+                          ? session.user.luxorSubaccounts.join(", ")
+                          : "—"}
                       </TableCell>
-                      <TableCell>
-                        <Typography variant="body2">
-                          {formatDateTime(session.loginAt)}
-                        </Typography>
+                      <TableCell sx={{ "&&&": { whiteSpace: "nowrap" } }}>
+                        {formatDateTime(session.loginAt)}
                       </TableCell>
-                      <TableCell>
-                        <Typography variant="body2">
-                          {session.logoutAt ? (
-                            formatDateTime(session.logoutAt)
-                          ) : (
-                            <Chip label="Active" color="success" size="small" />
-                          )}
-                        </Typography>
+                      <TableCell sx={{ "&&&": { whiteSpace: "nowrap" } }}>
+                        {session.logoutAt ? (
+                          formatDateTime(session.logoutAt)
+                        ) : (
+                          <DaylightStatusPill label="Active" tone="success" />
+                        )}
                       </TableCell>
-                      <TableCell>
-                        <Typography variant="body2">
-                          {formatDuration(session.duration)}
-                        </Typography>
+                      <TableCell sx={{ "&&&": { whiteSpace: "nowrap" } }}>
+                        {formatDuration(session.duration)}
                       </TableCell>
                       <TableCell>
                         <Stack direction="row" flexWrap="wrap" gap={0.5}>
                           {uniqueTabs(session.tabVisits).length === 0 ? (
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                            >
+                            <Box component="span" sx={{ color: d.muted }}>
                               None
-                            </Typography>
+                            </Box>
                           ) : (
                             uniqueTabs(session.tabVisits).map((name) => (
-                              <Chip
+                              <DaylightStatusPill
                                 key={name}
                                 label={name}
-                                size="small"
-                                variant="outlined"
+                                tone="info"
                               />
                             ))
                           )}
@@ -364,7 +340,6 @@ export default function ActivityLogPage() {
               </TableBody>
             </Table>
           </TableContainer>
-
           <TablePagination
             component="div"
             count={data?.total ?? 0}
@@ -376,9 +351,10 @@ export default function ActivityLogPage() {
               setPage(0);
             }}
             rowsPerPageOptions={[10, 20, 50]}
+            sx={ds.paginationSx}
           />
-        </>
+        </Paper>
       )}
-    </Box>
+    </DaylightAdminPage>
   );
 }

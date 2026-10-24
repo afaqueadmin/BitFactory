@@ -1,9 +1,9 @@
 "use client";
 
 import {
+  Typography,
   Box,
   Button,
-  Container,
   Paper,
   Table,
   TableBody,
@@ -30,8 +30,16 @@ import { useRecurringInvoices } from "@/lib/hooks/useRecurringInvoices";
 import { Customer, useCustomers } from "@/lib/hooks/useInvoices";
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
 import { DateDisplay } from "@/components/accounting/common/DateDisplay";
+import { useDaylight } from "@/lib/daylight";
+import {
+  DaylightAdminPage,
+  DaylightLoading,
+  useDaylightAdminSx,
+} from "@/components/daylight/AdminPage";
 
 export default function RecurringInvoicesPage() {
+  const { d } = useDaylight();
+  const ds = useDaylightAdminSx();
   const [page, setPage] = useState(1);
   const { recurringInvoices, loading, error } = useRecurringInvoices(page);
   // Fetch customers for dropdown
@@ -140,24 +148,24 @@ export default function RecurringInvoicesPage() {
 
   if (loading) {
     return (
-      <Container maxWidth="lg">
-        <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
-          <CircularProgress />
-        </Box>
-      </Container>
+      <DaylightAdminPage>
+        <DaylightLoading />
+      </DaylightAdminPage>
     );
   }
 
   if (error) {
     return (
-      <Container maxWidth="lg">
-        <Alert severity="error">{error}</Alert>
-      </Container>
+      <DaylightAdminPage>
+        <Alert severity="error" sx={{ ...ds.alertSx("error") }}>
+          {error}
+        </Alert>
+      </DaylightAdminPage>
     );
   }
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
+    <DaylightAdminPage>
       <Box
         sx={{
           mb: 3,
@@ -167,23 +175,26 @@ export default function RecurringInvoicesPage() {
         }}
       >
         <Box>
-          <h1 style={{ margin: 0 }}>Customer Recurring Invoices</h1>
-          <p style={{ margin: "8px 0 0 0", color: "#666" }}>
+          <Typography component="h1" sx={ds.pageTitleSx}>
+            Customer Recurring Invoices
+          </Typography>
+          <Typography sx={ds.pageDescSx}>
             Manage monthly billing templates
-          </p>
+          </Typography>
         </Box>
         <Button
           variant="contained"
           startIcon={<AddIcon />}
           onClick={handleOpenDialog}
+          sx={ds.primaryBtnSx}
         >
           Create New
         </Button>
       </Box>
 
-      <TableContainer component={Paper}>
+      <TableContainer component={Paper} elevation={0} sx={ds.listCardSx}>
         <Table>
-          <TableHead sx={{ backgroundColor: "#f5f5f5" }}>
+          <TableHead>
             <TableRow>
               <TableCell sx={{ width: 50 }}>
                 <Checkbox
@@ -244,14 +255,15 @@ export default function RecurringInvoicesPage() {
                       size="small"
                       variant="outlined"
                       startIcon={<EditIcon />}
+                      sx={ds.outlineBtnSx}
                     >
                       Edit
                     </Button>
                     <Button
                       size="small"
                       variant="outlined"
-                      color="error"
                       startIcon={<DeleteIcon />}
+                      sx={ds.dangerOutlineBtnSx}
                     >
                       Delete
                     </Button>
@@ -268,14 +280,21 @@ export default function RecurringInvoicesPage() {
           sx={{
             mt: 3,
             p: 2,
-            backgroundColor: "#e8f4f8",
+            backgroundColor: d.skySoft,
+            border: `1px solid ${d.borderSky}`,
+            borderRadius: "12px",
+            boxShadow: "none",
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
           }}
         >
           <span>{selectedIds.length} selected</span>
-          <Button variant="contained" color="error" startIcon={<DeleteIcon />}>
+          <Button
+            variant="contained"
+            startIcon={<DeleteIcon />}
+            sx={ds.dangerBtnSx}
+          >
             Delete Selected
           </Button>
         </Paper>
@@ -357,12 +376,18 @@ export default function RecurringInvoicesPage() {
           </Stack>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseDialog}>Cancel</Button>
-          <Button onClick={handleSubmit} variant="contained">
+          <Button onClick={handleCloseDialog} sx={ds.textBtnSx()}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSubmit}
+            variant="contained"
+            sx={ds.primaryBtnSx}
+          >
             Create
           </Button>
         </DialogActions>
       </Dialog>
-    </Container>
+    </DaylightAdminPage>
   );
 }

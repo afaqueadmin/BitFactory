@@ -13,10 +13,8 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import {
-  Box,
-  Container,
+  Button,
   Typography,
-  Stack,
   Alert,
   CircularProgress,
   Paper,
@@ -26,11 +24,16 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  IconButton,
-  Tooltip,
-  Chip,
 } from "@mui/material";
 import { Refresh as RefreshIcon } from "@mui/icons-material";
+import { useDaylight } from "@/lib/daylight";
+import {
+  CellNote,
+  DaylightAdminPage,
+  DaylightPageHeader,
+  DaylightStatusPill,
+  useDaylightAdminSx,
+} from "@/components/daylight/AdminPage";
 
 interface PoolSubaccount {
   id: string;
@@ -61,6 +64,8 @@ interface ApiResponse<T = unknown> {
 }
 
 export default function PoolSubaccountsPage() {
+  const { d } = useDaylight();
+  const ds = useDaylightAdminSx();
   const [rows, setRows] = useState<PoolSubaccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -93,37 +98,30 @@ export default function PoolSubaccountsPage() {
   };
 
   return (
-    <Container maxWidth="xl" sx={{ py: 4 }}>
-      <Stack
-        direction="row"
-        justifyContent="space-between"
-        alignItems="center"
-        sx={{ mb: 3 }}
-      >
-        <Box>
-          <Typography variant="h4" fontWeight="bold">
-            Subaccount Records
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Our own DB record of each pool account (Luxor subaccount / Braiins
-            account) - the dimension row that daily snapshots, worker metrics
-            and transactions attach to. View only.
-          </Typography>
-        </Box>
-        <Tooltip title="Refresh">
-          <IconButton onClick={handleRefresh} disabled={isRefreshing}>
-            <RefreshIcon />
-          </IconButton>
-        </Tooltip>
-      </Stack>
+    <DaylightAdminPage>
+      <DaylightPageHeader
+        title="Subaccount Records"
+        description="Our own DB record of each pool account (Luxor subaccount / Braiins account) - the dimension row that daily snapshots, worker metrics and transactions attach to. View only."
+        actions={
+          <Button
+            variant="outlined"
+            startIcon={<RefreshIcon />}
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            sx={ds.outlineBtnSx}
+          >
+            {isRefreshing ? "Refreshing..." : "Refresh"}
+          </Button>
+        }
+      />
 
       {error && (
-        <Alert severity="error" sx={{ mb: 3 }}>
+        <Alert severity="error" sx={{ mb: 3, ...ds.alertSx("error") }}>
           {error}
         </Alert>
       )}
 
-      <Paper elevation={2} sx={{ borderRadius: 2 }}>
+      <Paper elevation={0} sx={ds.listCardSx}>
         <TableContainer>
           <Table size="small">
             <TableHead>
@@ -143,13 +141,13 @@ export default function PoolSubaccountsPage() {
               {loading ? (
                 <TableRow>
                   <TableCell colSpan={9} align="center" sx={{ py: 6 }}>
-                    <CircularProgress size={28} />
+                    <CircularProgress size={28} sx={{ color: d.action }} />
                   </TableCell>
                 </TableRow>
               ) : rows.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={9} align="center" sx={{ py: 4 }}>
-                    <Typography color="text.secondary">
+                    <Typography variant="body2" sx={{ color: d.muted }}>
                       No pool subaccounts yet.
                     </Typography>
                   </TableCell>
@@ -158,10 +156,20 @@ export default function PoolSubaccountsPage() {
                 rows.map((row) => (
                   <TableRow key={row.id} hover>
                     <TableCell>
-                      <Chip label={row.pool.name} size="small" />
+                      <DaylightStatusPill
+                        label={row.pool.name}
+                        tone="neutral"
+                      />
                     </TableCell>
                     <TableCell
-                      sx={{ fontWeight: 600, fontFamily: "monospace" }}
+                      sx={{
+                        "&&&": {
+                          fontWeight: 600,
+                          fontFamily:
+                            "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+                          fontSize: 12.5,
+                        },
+                      }}
                     >
                       {row.subaccountName}
                     </TableCell>
@@ -169,23 +177,25 @@ export default function PoolSubaccountsPage() {
                       {row.user ? (
                         <>
                           {row.user.name || "Unnamed"}
-                          <Typography
-                            variant="caption"
-                            display="block"
-                            color="text.secondary"
-                          >
-                            {row.user.email}
-                          </Typography>
+                          <CellNote>{row.user.email}</CellNote>
                         </>
                       ) : (
-                        <Typography variant="body2" color="text.secondary">
+                        <Typography variant="body2" sx={{ color: d.muted }}>
                           Unlinked
                         </Typography>
                       )}
                     </TableCell>
                     <TableCell>{row.currency}</TableCell>
                     <TableCell
-                      sx={{ fontFamily: "monospace", fontSize: "0.75rem" }}
+                      sx={{
+                        "&&&": {
+                          fontFamily:
+                            "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+                          fontSize: 12,
+                          color: d.muted,
+                          wordBreak: "break-all",
+                        },
+                      }}
                     >
                       {row.walletAddress || "—"}
                     </TableCell>
@@ -210,6 +220,6 @@ export default function PoolSubaccountsPage() {
           </Table>
         </TableContainer>
       </Paper>
-    </Container>
+    </DaylightAdminPage>
   );
 }

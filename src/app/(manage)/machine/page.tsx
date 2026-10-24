@@ -3,12 +3,9 @@
 import React, { useState, useEffect } from "react";
 import {
   Box,
-  Container,
   Typography,
   Button,
-  Stack,
   Alert,
-  CircularProgress,
   FormControl,
   InputLabel,
   Select,
@@ -22,6 +19,13 @@ import MinersTable from "@/components/admin/MinersTable";
 import { BulkEditModal } from "@/components/admin/BulkEditModal";
 import { BulkDeleteModal } from "@/components/admin/BulkDeleteModal";
 import { getWarrantyStatus, WARRANTY_EXPIRING_DAYS } from "@/lib/minerWarranty";
+import AdminValueCard from "@/components/admin/AdminValueCard";
+import {
+  DaylightAdminPage,
+  DaylightLoading,
+  DaylightPageHeader,
+  useDaylightAdminSx,
+} from "@/components/daylight/AdminPage";
 
 /**
  * User object from API
@@ -129,6 +133,7 @@ interface ApiResponse<T = unknown> {
 }
 
 export default function MachinePage() {
+  const ds = useDaylightAdminSx();
   const router = useRouter();
   const [miners, setMiners] = useState<Miner[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -632,57 +637,44 @@ export default function MachinePage() {
     });
   };
 
+  const filtered = getSortedFilteredMiners();
+  const totalHashRate = filtered.reduce(
+    (sum, m) => sum + parseFloat(String(m.hardware?.hashRate || 0)),
+    0,
+  );
+  const totalPower = filtered.reduce(
+    (sum, m) => sum + (m.hardware?.powerUsage || 0),
+    0,
+  );
+
   return (
-    <Box
-      component="main"
-      sx={{ py: 4, backgroundColor: "background.default", minHeight: "100vh" }}
-    >
-      <Container maxWidth={false}>
-        {/* Header Section */}
-        <Stack
-          direction="row"
-          justifyContent="space-between"
-          alignItems="flex-start"
-          sx={{ mb: 4 }}
-        >
-          <Box>
-            <Typography variant="h3" component="h1" sx={{ fontWeight: "bold" }}>
-              Miners Management
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-              Manage and monitor all mining machines in your system
-            </Typography>
-          </Box>
-          <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>
+    <DaylightAdminPage>
+      <DaylightPageHeader
+        title="Miners Management"
+        description="Manage and monitor all mining machines in your system."
+        actions={
+          <>
             <Button
-              variant="contained"
-              color="info"
+              variant="outlined"
               onClick={handleViewMinerList}
               disabled={loading}
-              sx={{
-                background: (theme) =>
-                  `linear-gradient(45deg, ${theme.palette.info.main}, ${theme.palette.info.dark})`,
-              }}
+              sx={ds.outlineBtnSx}
             >
               View All Hosted Miner List
             </Button>
             <Button
-              variant="contained"
-              color="warning"
+              variant="outlined"
               onClick={() => setShowBulkEditModal(true)}
-              disabled={
-                loading || formOpen || getSortedFilteredMiners().length === 0
-              }
+              disabled={loading || formOpen || filtered.length === 0}
+              sx={ds.outlineBtnSx}
             >
               Bulk Edit
             </Button>
             <Button
-              variant="contained"
-              color="error"
+              variant="outlined"
               onClick={() => setShowBulkDeleteModal(true)}
-              disabled={
-                loading || formOpen || getSortedFilteredMiners().length === 0
-              }
+              disabled={loading || formOpen || filtered.length === 0}
+              sx={ds.dangerOutlineBtnSx}
             >
               Bulk Delete
             </Button>
@@ -691,295 +683,263 @@ export default function MachinePage() {
               startIcon={<AddIcon />}
               onClick={handleCreate}
               disabled={loading || formOpen}
-              size="large"
+              sx={ds.primaryBtnSx}
             >
               Add Miner
             </Button>
-          </Stack>
-        </Stack>
+          </>
+        }
+      />
 
-        {/* Error Message */}
-        {error && (
-          <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
-            {error}
-            {error.includes("Configure this in External Resources setting") && (
-              <Button
-                size="small"
-                variant="outlined"
-                color="error"
-                sx={{ ml: 2 }}
-                onClick={() => router.push("/external-resource")}
-              >
-                Here
-              </Button>
-            )}
-          </Alert>
-        )}
+      {/* Error Message */}
+      {error && (
+        <Alert
+          severity="error"
+          sx={{ mb: 3, ...ds.alertSx("error") }}
+          onClose={() => setError(null)}
+        >
+          {error}
+          {error.includes("Configure this in External Resources setting") && (
+            <Button
+              size="small"
+              variant="outlined"
+              sx={{ ...ds.dangerOutlineBtnSx, ml: 2, minHeight: 28 }}
+              onClick={() => router.push("/external-resource")}
+            >
+              Here
+            </Button>
+          )}
+        </Alert>
+      )}
 
-        {/* Loading State */}
-        {loading ? (
+      {/* Loading State */}
+      {loading ? (
+        <DaylightLoading />
+      ) : (
+        <>
+          {/* Filter Section */}
           <Box
-            sx={{
-              display: "flex",
-              justifyContent: "center",
-              alignItems: "center",
-              minHeight: "400px",
-            }}
+            component="section"
+            aria-labelledby="miner-filters-heading"
+            sx={{ ...ds.cardSx, mb: { xs: "20px", md: "24px" } }}
           >
-            <CircularProgress />
-          </Box>
-        ) : (
-          <>
-            {/* Filter Section */}
+            <Typography
+              id="miner-filters-heading"
+              component="h2"
+              sx={{ ...ds.sectionTitleSx, fontSize: 14, mb: "12px" }}
+            >
+              Filters
+            </Typography>
             <Box
               sx={{
-                p: 2,
-                mb: 3,
-                bgcolor: "background.paper",
-                borderRadius: 1,
-                border: "1px solid",
-                borderColor: "divider",
+                display: "grid",
+                gridTemplateColumns:
+                  "repeat(auto-fill, minmax(min(200px, 100%), 1fr))",
+                gap: "12px",
+                ...ds.inputSx,
               }}
             >
-              <Typography
-                variant="body2"
-                sx={{ fontWeight: "600", mb: 2, color: "text.secondary" }}
-              >
-                Filter Options
-              </Typography>
-              <Stack
-                direction={{ xs: "column", sm: "row" }}
-                spacing={2}
-                sx={{ flexWrap: "wrap" }}
-              >
-                <FormControl sx={{ minWidth: 250 }}>
-                  <InputLabel>Filter by User</InputLabel>
-                  <Select
-                    value={selectedUserFilter}
-                    onChange={handleUserFilterChange}
-                    label="Filter by User"
-                  >
-                    <MenuItem value="">
-                      <em>All Users</em>
+              <FormControl size="small" fullWidth>
+                <InputLabel>Filter by User</InputLabel>
+                <Select
+                  value={selectedUserFilter}
+                  onChange={handleUserFilterChange}
+                  label="Filter by User"
+                >
+                  <MenuItem value="">
+                    <em>All Users</em>
+                  </MenuItem>
+                  {users.map((user) => (
+                    <MenuItem key={user.id} value={user.id}>
+                      {user.name} ({user.email})
                     </MenuItem>
-                    {users.map((user) => (
-                      <MenuItem key={user.id} value={user.id}>
-                        {user.name} ({user.email})
+                  ))}
+                </Select>
+              </FormControl>
+
+              <FormControl size="small" fullWidth>
+                <InputLabel>Filter by Space</InputLabel>
+                <Select
+                  value={selectedSpaceFilter}
+                  onChange={handleSpaceFilterChange}
+                  label="Filter by Space"
+                >
+                  <MenuItem value="">
+                    <em>All Spaces</em>
+                  </MenuItem>
+                  {spaces.map((space) => (
+                    <MenuItem key={space.id} value={space.id}>
+                      {space.name} ({space.location})
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+
+              <FormControl size="small" fullWidth>
+                <InputLabel>Filter by Model</InputLabel>
+                <Select
+                  value={selectedModelFilter}
+                  onChange={handleModelFilterChange}
+                  label="Filter by Model"
+                >
+                  <MenuItem value="">
+                    <em>All Models</em>
+                  </MenuItem>
+                  {getUniqueModels().map((model) => (
+                    <MenuItem key={model} value={model}>
+                      {model}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+
+              <FormControl size="small" fullWidth>
+                <InputLabel>Filter by Rate</InputLabel>
+                <Select
+                  value={selectedRateFilter}
+                  onChange={handleRateFilterChange}
+                  label="Filter by Rate"
+                >
+                  <MenuItem value="">
+                    <em>All Rates</em>
+                  </MenuItem>
+                  {getUniqueRates().map((rate) => (
+                    <MenuItem key={rate} value={rate}>
+                      ${parseFloat(rate).toFixed(3)}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+
+              <FormControl size="small" fullWidth>
+                <InputLabel>Filter by Benchmark</InputLabel>
+                <Select
+                  value={selectedBenchmarkFilter}
+                  onChange={handleBenchmarkFilterChange}
+                  label="Filter by Benchmark"
+                >
+                  <MenuItem value="">
+                    <em>All Benchmarks</em>
+                  </MenuItem>
+                  {getUniqueBenchmarks().map((benchmark) =>
+                    benchmark === "NO_BENCHMARK" ? (
+                      <MenuItem key={benchmark} value={benchmark}>
+                        No Benchmark
                       </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-
-                <FormControl sx={{ minWidth: 250 }}>
-                  <InputLabel>Filter by Space</InputLabel>
-                  <Select
-                    value={selectedSpaceFilter}
-                    onChange={handleSpaceFilterChange}
-                    label="Filter by Space"
-                  >
-                    <MenuItem value="">
-                      <em>All Spaces</em>
-                    </MenuItem>
-                    {spaces.map((space) => (
-                      <MenuItem key={space.id} value={space.id}>
-                        {space.name} ({space.location})
+                    ) : (
+                      <MenuItem key={benchmark} value={benchmark}>
+                        {parseFloat(benchmark).toFixed(2)} TH/s
                       </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
+                    ),
+                  )}
+                </Select>
+              </FormControl>
 
-                <FormControl sx={{ minWidth: 250 }}>
-                  <InputLabel>Filter by Model</InputLabel>
-                  <Select
-                    value={selectedModelFilter}
-                    onChange={handleModelFilterChange}
-                    label="Filter by Model"
-                  >
-                    <MenuItem value="">
-                      <em>All Models</em>
+              <FormControl size="small" fullWidth>
+                <InputLabel>Filter by Pool</InputLabel>
+                <Select
+                  value={selectedPoolFilter}
+                  onChange={handlePoolFilterChange}
+                  label="Filter by Pool"
+                >
+                  <MenuItem value="">
+                    <em>All Pools</em>
+                  </MenuItem>
+                  {getUniquePools().map((pool) => (
+                    <MenuItem key={pool.id} value={pool.id}>
+                      {pool.name}
                     </MenuItem>
-                    {getUniqueModels().map((model) => (
-                      <MenuItem key={model} value={model}>
-                        {model}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
+                  ))}
+                </Select>
+              </FormControl>
 
-                <FormControl sx={{ minWidth: 250 }}>
-                  <InputLabel>Filter by Rate</InputLabel>
-                  <Select
-                    value={selectedRateFilter}
-                    onChange={handleRateFilterChange}
-                    label="Filter by Rate"
-                  >
-                    <MenuItem value="">
-                      <em>All Rates</em>
-                    </MenuItem>
-                    {getUniqueRates().map((rate) => (
-                      <MenuItem key={rate} value={rate}>
-                        ${parseFloat(rate).toFixed(3)}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
+              <FormControl size="small" fullWidth>
+                <InputLabel>Filter by Type</InputLabel>
+                <Select
+                  value={selectedSegmentFilter}
+                  onChange={handleSegmentFilterChange}
+                  label="Filter by Type"
+                >
+                  <MenuItem value="">
+                    <em>All Types</em>
+                  </MenuItem>
+                  <MenuItem value="CORPORATE">Corporate</MenuItem>
+                  <MenuItem value="SME">SME</MenuItem>
+                  <MenuItem value="SELF_MINING">Self Mining</MenuItem>
+                  <MenuItem value="FRANCHISEE">Franchisee</MenuItem>
+                  <MenuItem value="RETAIL">Retail</MenuItem>
+                </Select>
+              </FormControl>
 
-                <FormControl sx={{ minWidth: 250 }}>
-                  <InputLabel>Filter by Benchmark</InputLabel>
-                  <Select
-                    value={selectedBenchmarkFilter}
-                    onChange={handleBenchmarkFilterChange}
-                    label="Filter by Benchmark"
-                  >
-                    <MenuItem value="">
-                      <em>All Benchmarks</em>
-                    </MenuItem>
-                    {getUniqueBenchmarks().map((benchmark) =>
-                      benchmark === "NO_BENCHMARK" ? (
-                        <MenuItem key={benchmark} value={benchmark}>
-                          No Benchmark
-                        </MenuItem>
-                      ) : (
-                        <MenuItem key={benchmark} value={benchmark}>
-                          {parseFloat(benchmark).toFixed(2)} TH/s
-                        </MenuItem>
-                      ),
-                    )}
-                  </Select>
-                </FormControl>
-
-                <FormControl sx={{ minWidth: 250 }}>
-                  <InputLabel>Filter by Pool</InputLabel>
-                  <Select
-                    value={selectedPoolFilter}
-                    onChange={handlePoolFilterChange}
-                    label="Filter by Pool"
-                  >
-                    <MenuItem value="">
-                      <em>All Pools</em>
-                    </MenuItem>
-                    {getUniquePools().map((pool) => (
-                      <MenuItem key={pool.id} value={pool.id}>
-                        {pool.name}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-
-                <FormControl sx={{ minWidth: 250 }}>
-                  <InputLabel>Filter by Type</InputLabel>
-                  <Select
-                    value={selectedSegmentFilter}
-                    onChange={handleSegmentFilterChange}
-                    label="Filter by Type"
-                  >
-                    <MenuItem value="">
-                      <em>All Types</em>
-                    </MenuItem>
-                    <MenuItem value="CORPORATE">Corporate</MenuItem>
-                    <MenuItem value="SME">SME</MenuItem>
-                    <MenuItem value="SELF_MINING">Self Mining</MenuItem>
-                    <MenuItem value="FRANCHISEE">Franchisee</MenuItem>
-                    <MenuItem value="RETAIL">Retail</MenuItem>
-                  </Select>
-                </FormControl>
-
-                <FormControl sx={{ minWidth: 250 }}>
-                  <InputLabel>Filter by Warranty</InputLabel>
-                  <Select
-                    value={selectedWarrantyFilter}
-                    onChange={handleWarrantyFilterChange}
-                    label="Filter by Warranty"
-                  >
-                    <MenuItem value="">
-                      <em>All Warranties</em>
-                    </MenuItem>
-                    <MenuItem value="ACTIVE">In warranty</MenuItem>
-                    <MenuItem value="EXPIRING">
-                      Expiring soon (≤ {WARRANTY_EXPIRING_DAYS} days)
-                    </MenuItem>
-                    <MenuItem value="EXPIRED">Expired</MenuItem>
-                    <MenuItem value="NONE">Not recorded</MenuItem>
-                  </Select>
-                </FormControl>
-              </Stack>
+              <FormControl size="small" fullWidth>
+                <InputLabel>Filter by Warranty</InputLabel>
+                <Select
+                  value={selectedWarrantyFilter}
+                  onChange={handleWarrantyFilterChange}
+                  label="Filter by Warranty"
+                >
+                  <MenuItem value="">
+                    <em>All Warranties</em>
+                  </MenuItem>
+                  <MenuItem value="ACTIVE">In warranty</MenuItem>
+                  <MenuItem value="EXPIRING">
+                    Expiring soon (≤ {WARRANTY_EXPIRING_DAYS} days)
+                  </MenuItem>
+                  <MenuItem value="EXPIRED">Expired</MenuItem>
+                  <MenuItem value="NONE">Not recorded</MenuItem>
+                </Select>
+              </FormControl>
             </Box>
+          </Box>
 
-            {/* Stats Bar */}
-            <Stack
-              direction={{ xs: "column", sm: "row" }}
-              spacing={2}
-              sx={{ mb: 3 }}
-            >
-              <Box
-                sx={{ p: 2, bgcolor: "action.hover", borderRadius: 1, flex: 1 }}
-              >
-                <Typography variant="body2" color="text.secondary">
-                  Total Miners
-                </Typography>
-                <Typography variant="h5" sx={{ fontWeight: "bold", mt: 0.5 }}>
-                  {getSortedFilteredMiners().length}
-                </Typography>
-              </Box>
-              <Box
-                sx={{ p: 2, bgcolor: "action.hover", borderRadius: 1, flex: 1 }}
-              >
-                <Typography variant="body2" color="text.secondary">
-                  Active Miners
-                </Typography>
-                <Typography variant="h5" sx={{ fontWeight: "bold", mt: 0.5 }}>
-                  {
-                    getSortedFilteredMiners().filter((m) => m.status === "AUTO")
-                      .length
-                  }
-                </Typography>
-              </Box>
-              <Box
-                sx={{ p: 2, bgcolor: "action.hover", borderRadius: 1, flex: 1 }}
-              >
-                <Typography variant="body2" color="text.secondary">
-                  Total Hash Rate
-                </Typography>
-                <Typography variant="h5" sx={{ fontWeight: "bold", mt: 0.5 }}>
-                  {getSortedFilteredMiners()
-                    .reduce(
-                      (sum, m) =>
-                        sum + parseFloat(String(m.hardware?.hashRate || 0)),
-                      0,
-                    )
-                    .toFixed(2)}{" "}
-                  TH/s
-                </Typography>
-              </Box>
-              <Box
-                sx={{ p: 2, bgcolor: "action.hover", borderRadius: 1, flex: 1 }}
-              >
-                <Typography variant="body2" color="text.secondary">
-                  Total Power Usage
-                </Typography>
-                <Typography variant="h5" sx={{ fontWeight: "bold", mt: 0.5 }}>
-                  {getSortedFilteredMiners()
-                    .reduce((sum, m) => sum + (m.hardware?.powerUsage || 0), 0)
-                    .toFixed(2)}{" "}
-                  kW
-                </Typography>
-              </Box>
-            </Stack>
-
-            {/* Miners Table */}
-            <MinersTable
-              miners={getSortedFilteredMiners()}
-              onEdit={handleEdit}
-              onDelete={handleDelete}
-              isLoading={loading}
-              error={tableError}
-              showDeleted={showDeleted}
-              setShowDeleted={setShowDeleted}
-              csvExport
+          {/* Stats */}
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns:
+                "repeat(auto-fill, minmax(max(min(200px, 100%), calc((100% - 60px) / 4)), 1fr))",
+              gap: { xs: "12px", sm: "16px", md: "20px" },
+              mb: { xs: "20px", md: "24px" },
+            }}
+          >
+            <AdminValueCard
+              daylight
+              title="Total Miners"
+              value={filtered.length}
             />
-          </>
-        )}
-      </Container>
+            <AdminValueCard
+              daylight
+              title="Active Miners"
+              value={filtered.filter((m) => m.status === "AUTO").length}
+            />
+            <AdminValueCard
+              daylight
+              title="Total Hash Rate"
+              value={totalHashRate.toFixed(2)}
+              subtitle="TH/s"
+            />
+            <AdminValueCard
+              daylight
+              title="Total Power Usage"
+              value={totalPower.toFixed(2)}
+              subtitle="kW"
+            />
+          </Box>
+
+          {/* Miners Table */}
+          <MinersTable
+            miners={filtered}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+            isLoading={loading}
+            error={tableError}
+            showDeleted={showDeleted}
+            setShowDeleted={setShowDeleted}
+            csvExport
+            daylight
+          />
+        </>
+      )}
 
       {/* Miner Form Modal */}
       <MinerFormModal
@@ -1011,6 +971,6 @@ export default function MachinePage() {
         minersPreview={getSortedFilteredMiners().slice(0, 10)}
         onSubmit={handleBulkDelete}
       />
-    </Box>
+    </DaylightAdminPage>
   );
 }

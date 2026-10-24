@@ -4,8 +4,6 @@ import React, { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Box,
-  Chip,
-  CircularProgress,
   Alert,
   Table,
   TableBody,
@@ -25,11 +23,20 @@ import {
   IconButton,
   Collapse,
 } from "@mui/material";
-import { useTheme } from "@mui/material/styles";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import { AuditAction } from "@prisma/client";
 import { AUDIT_ACTION_LABELS } from "@/lib/constants/accounting";
+import { useDaylight } from "@/lib/daylight";
+import {
+  CellNote,
+  DaylightAdminPage,
+  DaylightLoading,
+  DaylightPageHeader,
+  DaylightStatusPill,
+  type DaylightTone,
+  useDaylightAdminSx,
+} from "@/components/daylight/AdminPage";
 
 interface AuditLogActor {
   id: string;
@@ -108,6 +115,17 @@ const COLOR_KEYWORDS: [string, ChipColor][] = [
   ["RESUMED", "success"],
 ];
 
+/** MUI chip colour -> Daylight pill tone. */
+const PILL_TONE: Record<string, DaylightTone> = {
+  success: "success",
+  warning: "warning",
+  error: "danger",
+  info: "info",
+  primary: "info",
+  secondary: "neutral",
+  default: "neutral",
+};
+
 function getActionColor(action: string): ChipColor {
   for (const [keyword, color] of COLOR_KEYWORDS) {
     if (action.includes(keyword)) return color;
@@ -116,6 +134,7 @@ function getActionColor(action: string): ChipColor {
 }
 
 function AuditLogRowDetails({ log }: { log: AuditLogRow }) {
+  const { d } = useDaylight();
   const [open, setOpen] = useState(false);
   const hasDetails = !!log.changes || !!log.ipAddress || !!log.userAgent;
 
@@ -128,19 +147,16 @@ function AuditLogRowDetails({ log }: { log: AuditLogRow }) {
           </Typography>
         </TableCell>
         <TableCell>
-          <Chip
+          <DaylightStatusPill
             label={AUDIT_ACTION_LABELS[log.action as AuditAction] ?? log.action}
-            color={getActionColor(log.action)}
-            size="small"
+            tone={PILL_TONE[getActionColor(log.action)] ?? "neutral"}
           />
         </TableCell>
         <TableCell>
           <Typography variant="body2" fontWeight={500}>
             {log.user?.name ?? "—"}
           </Typography>
-          <Typography variant="caption" color="text.secondary">
-            {log.user?.email ?? "System"}
-          </Typography>
+          <CellNote>{log.user?.email ?? "System"}</CellNote>
         </TableCell>
         <TableCell>
           <Typography variant="body2">
@@ -152,7 +168,17 @@ function AuditLogRowDetails({ log }: { log: AuditLogRow }) {
         </TableCell>
         <TableCell align="right">
           {hasDetails && (
-            <IconButton size="small" onClick={() => setOpen((v) => !v)}>
+            <IconButton
+              size="small"
+              aria-label={open ? "Hide details" : "Show details"}
+              aria-expanded={open}
+              onClick={() => setOpen((v) => !v)}
+              sx={{
+                color: d.muted,
+                borderRadius: "8px",
+                "&:hover": { bgcolor: d.hover, color: d.action },
+              }}
+            >
               {open ? <ExpandLessIcon /> : <ExpandMoreIcon />}
             </IconButton>
           )}
@@ -168,12 +194,12 @@ function AuditLogRowDetails({ log }: { log: AuditLogRow }) {
               <Box sx={{ py: 2, px: 1 }}>
                 <Stack direction="row" spacing={4} flexWrap="wrap">
                   {log.ipAddress && (
-                    <Typography variant="caption" color="text.secondary">
+                    <Typography variant="caption" sx={{ color: d.muted }}>
                       IP: {log.ipAddress}
                     </Typography>
                   )}
                   {log.userAgent && (
-                    <Typography variant="caption" color="text.secondary">
+                    <Typography variant="caption" sx={{ color: d.muted }}>
                       Device: {log.userAgent}
                     </Typography>
                   )}
@@ -183,20 +209,22 @@ function AuditLogRowDetails({ log }: { log: AuditLogRow }) {
                     sx={{
                       mt: 1,
                       p: 1.5,
-                      bgcolor: "action.hover",
-                      borderRadius: 1,
-                      fontSize: "0.875rem",
+                      bgcolor: d.canvas,
+                      border: `1px solid ${d.border}`,
+                      borderRadius: "8px",
+                      fontSize: 12.5,
+                      color: d.text,
                     }}
                   >
-                    <Typography variant="caption" sx={{ fontWeight: 600 }}>
-                      Changes:
-                    </Typography>
+                    <Typography variant="caption">Changes:</Typography>
                     <pre
                       style={{
                         margin: "4px 0 0 0",
                         whiteSpace: "pre-wrap",
                         wordBreak: "break-word",
-                        fontFamily: "inherit",
+                        fontFamily:
+                          "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+                        fontSize: 12,
                       }}
                     >
                       {typeof log.changes === "string"
@@ -215,7 +243,8 @@ function AuditLogRowDetails({ log }: { log: AuditLogRow }) {
 }
 
 export default function AuditLogPage() {
-  const theme = useTheme();
+  const { d } = useDaylight();
+  const ds = useDaylightAdminSx();
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(20);
   const [action, setAction] = useState("");
@@ -281,16 +310,18 @@ export default function AuditLogPage() {
     staleTime: 5 * 60 * 1000,
   });
 
-  const headerBg = theme.palette.mode === "dark" ? "grey.800" : "grey.100";
-
   return (
-    <Box sx={{ p: { xs: 2, md: 3 } }}>
-      <Typography variant="h5" fontWeight={600} mb={3}>
-        Audit Log
-      </Typography>
+    <DaylightAdminPage>
+      <DaylightPageHeader
+        title="Audit Log"
+        description="Every staff and system action, with who did it and what changed."
+      />
 
       {/* Filters */}
-      <Paper sx={{ p: 2, mb: 3 }}>
+      <Paper
+        elevation={0}
+        sx={{ ...ds.cardSx, ...ds.inputSx, mb: { xs: "20px", md: "24px" } }}
+      >
         <Stack
           direction={{ xs: "column", sm: "row" }}
           spacing={2}
@@ -391,32 +422,30 @@ export default function AuditLogPage() {
 
       {/* Table */}
       {isLoading ? (
-        <Box display="flex" justifyContent="center" py={6}>
-          <CircularProgress />
-        </Box>
+        <DaylightLoading />
       ) : error ? (
-        <Alert severity="error">
+        <Alert severity="error" sx={ds.alertSx("error")}>
           Failed to load audit log. Please try again.
         </Alert>
       ) : (
-        <>
-          <TableContainer component={Paper}>
+        <Paper elevation={0} sx={ds.listCardSx}>
+          <TableContainer>
             <Table size="small">
               <TableHead>
-                <TableRow sx={{ backgroundColor: headerBg }}>
-                  <TableCell sx={{ fontWeight: 600 }}>Date/Time</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Action</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Actor</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Entity Type</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Description</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }} align="right" />
+                <TableRow>
+                  <TableCell>Date/Time</TableCell>
+                  <TableCell>Action</TableCell>
+                  <TableCell>Actor</TableCell>
+                  <TableCell>Entity Type</TableCell>
+                  <TableCell>Description</TableCell>
+                  <TableCell align="right" />
                 </TableRow>
               </TableHead>
               <TableBody>
                 {data?.logs.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
-                      <Typography color="text.secondary">
+                      <Typography sx={{ color: d.muted, fontSize: 13 }}>
                         No audit log entries found
                       </Typography>
                     </TableCell>
@@ -441,9 +470,10 @@ export default function AuditLogPage() {
               setPage(0);
             }}
             rowsPerPageOptions={[10, 20, 50]}
+            sx={ds.paginationSx}
           />
-        </>
+        </Paper>
       )}
-    </Box>
+    </DaylightAdminPage>
   );
 }

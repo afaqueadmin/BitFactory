@@ -1,17 +1,14 @@
 /**
  * Stats Card Component
  *
- * Reusable card for displaying accounting statistics
+ * Reusable card for displaying accounting statistics. Daylight styling: a
+ * white card with a small tone marker; only the admin accounting list pages
+ * use it.
  */
 
-import {
-  Card,
-  CardContent,
-  Box,
-  Typography,
-  CircularProgress,
-} from "@mui/material";
+import { Box, CircularProgress, Typography } from "@mui/material";
 import { CurrencyDisplay } from "../common/CurrencyDisplay";
+import { RADIUS_CARD, useDaylight } from "@/lib/daylight";
 
 interface StatsCardProps {
   label: string;
@@ -30,67 +27,86 @@ export function StatsCard({
   color = "primary",
   isCurrency = false,
 }: StatsCardProps) {
-  const colorMap = {
-    primary: "#3B82F6",
-    success: "#10B981",
-    warning: "#F59E0B",
-    error: "#EF4444",
-    info: "#06B6D4",
-  };
+  const { d, fonts } = useDaylight();
+  const tone = {
+    primary: d.action,
+    info: d.action,
+    success: d.success,
+    warning: d.warning,
+    error: d.danger,
+  }[color];
 
   return (
-    <Card
+    <Box
+      role="article"
+      aria-label={label}
       sx={{
-        background: `linear-gradient(135deg, ${colorMap[color]}15 0%, ${colorMap[color]}05 100%)`,
-        borderLeft: `4px solid ${colorMap[color]}`,
         height: "100%",
+        minWidth: 0,
+        bgcolor: d.surface,
+        border: `1px solid ${d.border}`,
+        borderRadius: RADIUS_CARD,
+        boxShadow: d.shadow,
+        p: { xs: "16px", sm: "20px" },
+        fontFamily: fonts.body,
       }}
     >
-      <CardContent>
-        <Typography
-          color="textSecondary"
-          gutterBottom
-          sx={{ fontSize: "0.875rem" }}
-        >
-          {label}
-        </Typography>
-
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
+          fontSize: { xs: 13, md: 14 },
+          fontWeight: 600,
+          color: d.muted,
+        }}
+      >
         <Box
+          aria-hidden
           sx={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            mt: 1,
+            width: 8,
+            height: 8,
+            borderRadius: "2px",
+            bgcolor: tone,
+            flexShrink: 0,
           }}
-        >
-          {loading ? (
-            <CircularProgress size={32} />
-          ) : (
-            <>
-              {isCurrency ? (
-                <CurrencyDisplay
-                  value={typeof value === "number" ? value : 0}
-                  variant="h5"
-                  fontWeight="bold"
-                  standalone={true}
-                />
-              ) : (
-                <Typography variant="h5" sx={{ fontWeight: "bold" }}>
-                  {value}
-                </Typography>
-              )}
-            </>
-          )}
-        </Box>
+        />
+        {label}
+      </Box>
 
-        {subtext && (
+      <Box sx={{ mt: "12px", minHeight: 32 }}>
+        {loading ? (
+          <CircularProgress size={28} sx={{ color: d.action }} />
+        ) : (
           <Typography
-            sx={{ fontSize: "0.75rem", color: "textSecondary", mt: 1 }}
+            component="div"
+            sx={{
+              fontFamily: fonts.heading,
+              fontWeight: 750,
+              fontSize: { xs: 22, sm: 24, lg: 26 },
+              lineHeight: 1.2,
+              letterSpacing: "-0.02em",
+              color: d.text,
+              fontVariantNumeric: "tabular-nums",
+              overflowWrap: "anywhere",
+              "& .MuiTypography-root": { font: "inherit", color: "inherit" },
+            }}
           >
-            {subtext}
+            {isCurrency ? (
+              <CurrencyDisplay
+                value={typeof value === "number" ? value : 0}
+                standalone={false}
+              />
+            ) : (
+              value
+            )}
           </Typography>
         )}
-      </CardContent>
-    </Card>
+      </Box>
+
+      {subtext && (
+        <Box sx={{ mt: "6px", fontSize: 12, color: d.muted }}>{subtext}</Box>
+      )}
+    </Box>
   );
 }

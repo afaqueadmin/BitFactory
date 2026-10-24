@@ -3,10 +3,9 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
   Box,
+  Button,
   Typography,
-  Stack,
   Alert,
-  CircularProgress,
   Paper,
   Table,
   TableBody,
@@ -15,9 +14,6 @@ import {
   TableHead,
   TableRow,
   TableSortLabel,
-  Chip,
-  IconButton,
-  Tooltip,
   FormControl,
   InputLabel,
   Select,
@@ -26,7 +22,26 @@ import {
 } from "@mui/material";
 import { Refresh as RefreshIcon } from "@mui/icons-material";
 import BuildIcon from "@mui/icons-material/Build";
-import GradientStatCard from "@/components/GradientStatCard";
+import AdminValueCard from "@/components/admin/AdminValueCard";
+import { useDaylight } from "@/lib/daylight";
+import {
+  CellNote,
+  DaylightAdminPage,
+  DaylightEmptyState,
+  DaylightLoading,
+  DaylightPageHeader,
+  DaylightStatusPill,
+  type DaylightTone,
+  useDaylightAdminSx,
+} from "@/components/daylight/AdminPage";
+
+/** MUI chip colour -> Daylight pill tone. */
+const PILL_TONE: Record<string, DaylightTone> = {
+  success: "success",
+  warning: "warning",
+  error: "danger",
+  default: "neutral",
+};
 
 interface Customer {
   id: string;
@@ -74,6 +89,8 @@ interface PageState {
 }
 
 export default function BraiinsWorkersPage() {
+  const { d, fonts } = useDaylight();
+  const ds = useDaylightAdminSx();
   const [state, setState] = useState<PageState>({
     customers: [],
     selectedCustomerId: null,
@@ -309,114 +326,86 @@ export default function BraiinsWorkersPage() {
 
   if (state.loading) {
     return (
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          minHeight: "100vh",
-        }}
-      >
-        <CircularProgress />
-      </Box>
+      <DaylightAdminPage>
+        <DaylightLoading />
+      </DaylightAdminPage>
     );
   }
 
-  return (
-    <Box sx={{ p: 3 }}>
-      {/* Page Title */}
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          mb: 4,
-        }}
-      >
-        <Typography
-          variant="h4"
-          sx={{
-            fontWeight: "bold",
-            color: (theme) =>
-              theme.palette.mode === "dark" ? "primary.light" : "primary.dark",
-          }}
-        >
-          Braiins Workers Management
-        </Typography>
+  const numSx = {
+    fontWeight: 600,
+    fontVariantNumeric: "tabular-nums",
+    whiteSpace: "nowrap",
+  } as const;
 
-        <Tooltip title="Refresh worker data">
-          <IconButton
+  return (
+    <DaylightAdminPage>
+      <DaylightPageHeader
+        title="Braiins Workers Management"
+        description="Braiins workers for the selected customer."
+        actions={
+          <Button
+            variant="outlined"
+            startIcon={<RefreshIcon />}
             onClick={handleRefresh}
             disabled={isRefreshing || !state.selectedCustomerId}
-            sx={{
-              background: (theme) =>
-                `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.primary.dark})`,
-              color: "white",
-              "&:hover": {
-                background: (theme) =>
-                  `linear-gradient(45deg, ${theme.palette.primary.dark}, ${theme.palette.primary.main})`,
-              },
-            }}
+            sx={ds.outlineBtnSx}
           >
-            <RefreshIcon />
-          </IconButton>
-        </Tooltip>
-      </Box>
+            {isRefreshing ? "Refreshing..." : "Refresh"}
+          </Button>
+        }
+      />
 
       {/* Stats Cards - Only show if workers loaded */}
       {state.selectedCustomerId && state.stats && (
-        <Box sx={{ mb: 4 }}>
-          <Typography variant="h6" sx={{ mb: 2, fontWeight: "medium" }}>
-            Worker Statistics
-          </Typography>
-          <Box
-            sx={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-              gap: 2,
-            }}
-          >
-            <GradientStatCard
-              title="Total Workers"
-              value={String(state.stats.totalWorkers)}
-            />
-            <GradientStatCard
-              title="Active Workers"
-              value={String(state.stats.activeWorkers)}
-            />
-            <GradientStatCard
-              title="Inactive Workers"
-              value={String(state.stats.inactiveWorkers)}
-            />
-            <GradientStatCard
-              title="Avg Hashrate (5M)"
-              value={`${state.stats.averageHashrate.toFixed(2)} TH/s`}
-            />
-          </Box>
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns:
+              "repeat(auto-fit, minmax(min(200px, 100%), 1fr))",
+            gap: { xs: "12px", sm: "16px", md: "20px" },
+            mb: { xs: "20px", md: "24px" },
+          }}
+        >
+          <AdminValueCard
+            daylight
+            title="Total Workers"
+            value={state.stats.totalWorkers}
+          />
+          <AdminValueCard
+            daylight
+            title="Active Workers"
+            value={state.stats.activeWorkers}
+          />
+          <AdminValueCard
+            daylight
+            title="Inactive Workers"
+            value={state.stats.inactiveWorkers}
+          />
+          <AdminValueCard
+            daylight
+            title="Avg Hashrate (5M)"
+            value={state.stats.averageHashrate.toFixed(2)}
+            subtitle="TH/s"
+          />
         </Box>
       )}
 
       {/* Customer Selection */}
-      <Paper
-        elevation={3}
-        sx={{
-          p: 3,
-          mb: 4,
-          borderRadius: 2,
-          background: (theme) =>
-            theme.palette.mode === "dark"
-              ? "linear-gradient(145deg, rgba(40,40,40,0.9), rgba(30,30,30,0.9))"
-              : "linear-gradient(145deg, rgba(255,255,255,0.9), rgba(250,250,250,0.9))",
-          backdropFilter: "blur(10px)",
-          border: (theme) => `1px solid ${theme.palette.divider}`,
-        }}
+      <Box
+        component="section"
+        aria-labelledby="braiins-customer-heading"
+        sx={{ ...ds.cardSx, mb: { xs: "20px", md: "24px" } }}
       >
-        <Typography variant="h6" sx={{ mb: 2, fontWeight: "medium" }}>
+        <Typography
+          id="braiins-customer-heading"
+          component="h2"
+          sx={{ ...ds.sectionTitleSx, fontSize: 14, mb: "12px" }}
+        >
           Select Braiins Customer
         </Typography>
-
-        <Stack spacing={2}>
-          <FormControl fullWidth>
+        <Box sx={{ maxWidth: 560, ...ds.inputSx }}>
+          <FormControl fullWidth size="small">
             <InputLabel>Braiins Customer</InputLabel>
             <Select
               value={state.selectedCustomerId || ""}
@@ -433,281 +422,170 @@ export default function BraiinsWorkersPage() {
               ))}
             </Select>
           </FormControl>
-        </Stack>
+        </Box>
 
         {state.error && (
-          <Alert severity="error" sx={{ mt: 2 }}>
+          <Alert severity="error" sx={{ mt: 2, ...ds.alertSx("error") }}>
             {state.error}
           </Alert>
         )}
-      </Paper>
+      </Box>
 
       {/* Workers Table */}
-      <Paper
-        elevation={3}
-        sx={{
-          borderRadius: 2,
-          background: (theme) =>
-            theme.palette.mode === "dark"
-              ? "linear-gradient(145deg, rgba(40,40,40,0.9), rgba(30,30,30,0.9))"
-              : "linear-gradient(145deg, rgba(255,255,255,0.9), rgba(250,250,250,0.9))",
-          backdropFilter: "blur(10px)",
-          border: (theme) => `1px solid ${theme.palette.divider}`,
-        }}
-      >
-        <Box sx={{ p: 3 }}>
-          <Typography variant="h6" sx={{ mb: 2, fontWeight: "medium" }}>
-            Workers
-          </Typography>
-
-          {!state.selectedCustomerId ? (
-            <Box sx={{ textAlign: "center", py: 4 }}>
-              <BuildIcon
-                sx={{
-                  fontSize: 64,
-                  color: "text.secondary",
-                  mb: 2,
-                  opacity: 0.5,
-                }}
-              />
-              <Typography color="text.secondary">
-                Please select a customer to view their workers
-              </Typography>
-            </Box>
-          ) : state.workers.length === 0 ? (
-            <Box sx={{ textAlign: "center", py: 4 }}>
-              <BuildIcon
-                sx={{
-                  fontSize: 64,
-                  color: "text.secondary",
-                  mb: 2,
-                  opacity: 0.5,
-                }}
-              />
-              <Typography color="text.secondary">
-                No workers found for the selected customer
-              </Typography>
-            </Box>
-          ) : (
-            <>
-              <TableContainer
-                sx={{
-                  borderRadius: 1,
-                  border: (theme) => `1px solid ${theme.palette.divider}`,
-                  overflow: "hidden",
-                  mb: 2,
-                }}
-              >
-                <Table
-                  sx={{
-                    "& .MuiTableCell-head": {
-                      backgroundColor: (theme) =>
-                        theme.palette.mode === "dark"
-                          ? "rgba(33, 150, 243, 0.15)"
-                          : "rgba(33, 150, 243, 0.08)",
-                      borderBottom: (theme) =>
-                        `2px solid ${theme.palette.primary.main}`,
-                      fontWeight: 700,
-                      fontSize: "0.875rem",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.5px",
-                      color: (theme) => theme.palette.primary.main,
-                      padding: "16px 12px",
-                    },
-                    "& .MuiTableCell-body": {
-                      padding: "14px 12px",
-                      borderBottom: (theme) =>
-                        `1px solid ${theme.palette.divider}`,
-                    },
-                    "& .MuiTableRow-root:hover": {
-                      backgroundColor: (theme) =>
-                        theme.palette.mode === "dark"
-                          ? "rgba(33, 150, 243, 0.08)"
-                          : "rgba(33, 150, 243, 0.04)",
-                      transition: "background-color 0.2s ease-in-out",
-                    },
-                    "& .MuiTableRow-root:last-child .MuiTableCell-body": {
-                      borderBottom: "none",
-                    },
-                  }}
-                >
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>
-                        <TableSortLabel
-                          active={sortField === "name"}
-                          direction={sortField === "name" ? sortOrder : "asc"}
-                          onClick={() => handleSort("name")}
-                        >
-                          Worker Name
-                        </TableSortLabel>
-                      </TableCell>
-                      <TableCell align="right">
-                        <TableSortLabel
-                          active={sortField === "hashrate"}
-                          direction={
-                            sortField === "hashrate" ? sortOrder : "asc"
-                          }
-                          onClick={() => handleSort("hashrate")}
-                        >
-                          Hashrate (5m)
-                        </TableSortLabel>
-                      </TableCell>
-                      <TableCell align="right">Hashrate (24h)</TableCell>
-                      <TableCell align="right">Shares (5m)</TableCell>
-                      <TableCell align="right">Shares (24h)</TableCell>
-                      <TableCell align="center">
-                        <TableSortLabel
-                          active={sortField === "status"}
-                          direction={sortField === "status" ? sortOrder : "asc"}
-                          onClick={() => handleSort("status")}
-                        >
-                          Status
-                        </TableSortLabel>
-                      </TableCell>
-                      <TableCell>
-                        <TableSortLabel
-                          active={sortField === "lastShare"}
-                          direction={
-                            sortField === "lastShare" ? sortOrder : "asc"
-                          }
-                          onClick={() => handleSort("lastShare")}
-                        >
-                          Last Share
-                        </TableSortLabel>
-                      </TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {getSortedWorkers()
-                      .slice(
-                        (tableCurrentPage - 1) * tableRowsPerPage,
-                        tableCurrentPage * tableRowsPerPage,
-                      )
-                      .map((worker, idx) => {
-                        const statusInfo = getStatusColor(worker.state);
-                        return (
-                          <TableRow
-                            key={worker.name}
-                            sx={{
-                              backgroundColor:
-                                idx % 2 === 0
-                                  ? "transparent"
-                                  : (theme) =>
-                                      theme.palette.mode === "dark"
-                                        ? "rgba(255, 255, 255, 0.02)"
-                                        : "rgba(0, 0, 0, 0.01)",
-                            }}
+      {!state.selectedCustomerId || state.workers.length === 0 ? (
+        <DaylightEmptyState>
+          <BuildIcon
+            sx={{ fontSize: 40, color: d.inputBorder, mb: 1 }}
+            aria-hidden
+          />
+          <Box>
+            {!state.selectedCustomerId
+              ? "Please select a customer to view their workers."
+              : "No workers found for the selected customer."}
+          </Box>
+        </DaylightEmptyState>
+      ) : (
+        <Paper elevation={0} sx={{ ...ds.tableCardSx, overflow: "hidden" }}>
+          <TableContainer sx={ds.tableSx}>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>
+                    <TableSortLabel
+                      active={sortField === "name"}
+                      direction={sortField === "name" ? sortOrder : "asc"}
+                      onClick={() => handleSort("name")}
+                    >
+                      Worker Name
+                    </TableSortLabel>
+                  </TableCell>
+                  <TableCell align="right">
+                    <TableSortLabel
+                      active={sortField === "hashrate"}
+                      direction={sortField === "hashrate" ? sortOrder : "asc"}
+                      onClick={() => handleSort("hashrate")}
+                    >
+                      Hashrate (5m)
+                    </TableSortLabel>
+                  </TableCell>
+                  <TableCell align="right">Hashrate (24h)</TableCell>
+                  <TableCell align="right">Shares (5m)</TableCell>
+                  <TableCell align="right">Shares (24h)</TableCell>
+                  <TableCell align="center">
+                    <TableSortLabel
+                      active={sortField === "status"}
+                      direction={sortField === "status" ? sortOrder : "asc"}
+                      onClick={() => handleSort("status")}
+                    >
+                      Status
+                    </TableSortLabel>
+                  </TableCell>
+                  <TableCell>
+                    <TableSortLabel
+                      active={sortField === "lastShare"}
+                      direction={sortField === "lastShare" ? sortOrder : "asc"}
+                      onClick={() => handleSort("lastShare")}
+                    >
+                      Last Share
+                    </TableSortLabel>
+                  </TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {getSortedWorkers()
+                  .slice(
+                    (tableCurrentPage - 1) * tableRowsPerPage,
+                    tableCurrentPage * tableRowsPerPage,
+                  )
+                  .map((worker) => {
+                    const statusInfo = getStatusColor(worker.state);
+                    return (
+                      <TableRow key={worker.name}>
+                        <TableCell>
+                          <Box
+                            component="span"
+                            sx={{ fontWeight: 650, color: d.action }}
                           >
-                            <TableCell>
-                              <Typography
-                                variant="body2"
-                                sx={{
-                                  fontWeight: 600,
-                                  color: (theme) => theme.palette.primary.main,
-                                }}
-                              >
-                                {worker.workerName}
-                              </Typography>
-                              <Typography
-                                variant="caption"
-                                sx={{
-                                  color: "text.secondary",
-                                }}
-                              >
-                                {worker.username}
-                              </Typography>
-                            </TableCell>
-                            <TableCell align="right">
-                              <Typography
-                                variant="body2"
-                                sx={{
-                                  fontWeight: 500,
-                                  fontFamily: "monospace",
-                                  color: (theme) => theme.palette.info.main,
-                                }}
-                              >
-                                {worker.hashrate_5m_th.toFixed(2)} TH/s
-                              </Typography>
-                            </TableCell>
-                            <TableCell align="right">
-                              <Typography
-                                variant="body2"
-                                sx={{
-                                  fontWeight: 500,
-                                  fontFamily: "monospace",
-                                  color: (theme) => theme.palette.info.main,
-                                }}
-                              >
-                                {worker.hashrate_24h_th.toFixed(2)} TH/s
-                              </Typography>
-                            </TableCell>
-                            <TableCell align="right">
-                              <Typography
-                                variant="body2"
-                                sx={{
-                                  fontFamily: "monospace",
-                                }}
-                              >
-                                {worker.shares_5m}
-                              </Typography>
-                            </TableCell>
-                            <TableCell align="right">
-                              <Typography
-                                variant="body2"
-                                sx={{
-                                  fontFamily: "monospace",
-                                }}
-                              >
-                                {worker.shares_24h}
-                              </Typography>
-                            </TableCell>
-                            <TableCell align="center">
-                              <Chip
-                                label={statusInfo.label}
-                                color={
-                                  statusInfo.color as
-                                    | "success"
-                                    | "warning"
-                                    | "error"
-                                    | "default"
-                                }
-                                variant="outlined"
-                                size="small"
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <Typography
-                                variant="body2"
-                                sx={{
-                                  color: "text.secondary",
-                                }}
-                              >
-                                {worker.last_share_formatted}
-                              </Typography>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                  </TableBody>
-                </Table>
-              </TableContainer>
+                            {worker.workerName}
+                          </Box>
+                          <CellNote>{worker.username}</CellNote>
+                        </TableCell>
+                        <TableCell align="right" sx={{ "&&&": numSx }}>
+                          {worker.hashrate_5m_th.toFixed(2)} TH/s
+                        </TableCell>
+                        <TableCell align="right" sx={{ "&&&": numSx }}>
+                          {worker.hashrate_24h_th.toFixed(2)} TH/s
+                        </TableCell>
+                        <TableCell
+                          align="right"
+                          sx={{ "&&&": { ...numSx, fontWeight: 500 } }}
+                        >
+                          {worker.shares_5m}
+                        </TableCell>
+                        <TableCell
+                          align="right"
+                          sx={{ "&&&": { ...numSx, fontWeight: 500 } }}
+                        >
+                          {worker.shares_24h}
+                        </TableCell>
+                        <TableCell align="center">
+                          <DaylightStatusPill
+                            label={statusInfo.label}
+                            tone={PILL_TONE[statusInfo.color] ?? "neutral"}
+                          />
+                        </TableCell>
+                        <TableCell
+                          sx={{
+                            "&&&": {
+                              whiteSpace: "nowrap",
+                              fontSize: 12,
+                              color: d.muted,
+                            },
+                          }}
+                        >
+                          {worker.last_share_formatted}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+              </TableBody>
+            </Table>
+          </TableContainer>
 
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <Box sx={{ display: "flex", justifyContent: "center", p: 2 }}>
-                  <Pagination
-                    count={totalPages}
-                    page={tableCurrentPage}
-                    onChange={(_e, page) => setTableCurrentPage(page)}
-                    color="primary"
-                  />
-                </Box>
-              )}
-            </>
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "center",
+                px: "16px",
+                py: "10px",
+                borderTop: `1px solid ${d.border}`,
+              }}
+            >
+              <Pagination
+                count={totalPages}
+                page={tableCurrentPage}
+                onChange={(_e, page) => setTableCurrentPage(page)}
+                size="small"
+                sx={{
+                  "& .MuiPaginationItem-root": {
+                    fontFamily: fonts.body,
+                    fontSize: 12.5,
+                    color: d.muted,
+                    borderRadius: "8px",
+                  },
+                  "& .MuiPaginationItem-root.Mui-selected": {
+                    bgcolor: d.skySoft,
+                    color: d.action,
+                    fontWeight: 650,
+                  },
+                }}
+              />
+            </Box>
           )}
-        </Box>
-      </Paper>
-    </Box>
+        </Paper>
+      )}
+    </DaylightAdminPage>
   );
 }

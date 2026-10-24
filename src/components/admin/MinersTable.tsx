@@ -59,6 +59,24 @@ import {
   WARRANTY_STATUS_LABEL,
   WarrantyStatus,
 } from "@/lib/minerWarranty";
+import { RADIUS_CARD, useDaylight } from "@/lib/daylight";
+import {
+  DaylightStatusPill,
+  type DaylightTone,
+  useDaylightAdminSx,
+} from "@/components/daylight/AdminPage";
+
+/** MUI chip colour -> Daylight pill tone. */
+const PILL_TONE: Record<string, DaylightTone> = {
+  success: "success",
+  warning: "warning",
+  error: "danger",
+  default: "neutral",
+};
+
+/** "DEPLOYMENT_IN_PROGRESS" -> "Deployment in progress". */
+const humanizeStatus = (status: string) =>
+  status.charAt(0) + status.slice(1).toLowerCase().replace(/_/g, " ");
 
 /**
  * User object from API
@@ -180,6 +198,8 @@ interface MinersTableProps {
   readOnly?: boolean;
   /** Shows a Download CSV button exporting every listed miner. */
   csvExport?: boolean;
+  /** Daylight styling (admin Miners page). Franchise keeps the MUI look. */
+  daylight?: boolean;
 }
 
 export default function MinersTable({
@@ -192,7 +212,10 @@ export default function MinersTable({
   setShowDeleted,
   readOnly = false,
   csvExport = false,
+  daylight = false,
 }: MinersTableProps) {
+  const { d, fonts } = useDaylight();
+  const ds = useDaylightAdminSx();
   const [deleteConfirm, setDeleteConfirm] = React.useState<string | null>(null);
   const [deleting, setDeleting] = React.useState(false);
   const [sortConfig, setSortConfig] = React.useState<SortConfig>({
@@ -446,7 +469,10 @@ export default function MinersTable({
       sx={{
         cursor: "pointer",
         userSelect: "none",
-        "&:hover": { backgroundColor: "action.selected" },
+        "&:hover": {
+          backgroundColor: daylight ? d.hover : "action.selected",
+          ...(daylight && { color: d.text }),
+        },
       }}
     >
       {label}
@@ -463,7 +489,11 @@ export default function MinersTable({
     </TableCell>
   );
 
-  const emptyValue = (
+  const emptyValue = daylight ? (
+    <Box component="span" sx={{ color: d.muted }}>
+      —
+    </Box>
+  ) : (
     <Typography variant="body2" color="text.secondary" component="span">
       —
     </Typography>
@@ -472,7 +502,10 @@ export default function MinersTable({
   return (
     <Box>
       {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
+        <Alert
+          severity="error"
+          sx={{ mb: 2, ...(daylight && ds.alertSx("error")) }}
+        >
           {error}
         </Alert>
       )}
@@ -493,6 +526,7 @@ export default function MinersTable({
             startIcon={<DownloadIcon />}
             onClick={handleDownloadCsv}
             disabled={isLoading || memoizedRows.length === 0}
+            sx={daylight ? ds.outlineBtnSx : undefined}
           >
             Download CSV
           </Button>
@@ -503,36 +537,113 @@ export default function MinersTable({
               size="small"
               checked={showDeleted}
               onChange={(e) => setShowDeleted(e.target.checked)}
+              sx={
+                daylight
+                  ? {
+                      color: d.inputBorder,
+                      "&.Mui-checked": { color: d.action },
+                    }
+                  : undefined
+              }
             />
           }
           label="Show Deleted"
+          sx={
+            daylight
+              ? {
+                  mr: 0,
+                  "& .MuiFormControlLabel-label": {
+                    fontFamily: fonts.body,
+                    fontSize: 13,
+                    color: d.muted,
+                  },
+                }
+              : undefined
+          }
         />
       </Box>
 
-      <Paper sx={{ width: "100%", overflow: "hidden" }}>
+      <Paper
+        elevation={daylight ? 0 : 1}
+        sx={{
+          width: "100%",
+          overflow: "hidden",
+          ...(daylight && {
+            bgcolor: d.surface,
+            backgroundImage: "none",
+            border: `1px solid ${d.border}`,
+            borderRadius: RADIUS_CARD,
+            boxShadow: d.shadow,
+          }),
+        }}
+      >
         <TableContainer sx={{ maxHeight: "calc(100vh - 260px)" }}>
           <Table
             stickyHeader
-            sx={{
-              width: "100%",
-              tableLayout: "auto",
-              "& th": {
-                fontWeight: "bold",
-                padding: "8px 6px",
-                fontSize: "0.8125rem",
-                lineHeight: 1.3,
-                verticalAlign: "bottom",
-                backgroundColor: "background.paper",
-                borderBottom: "2px solid",
-                borderBottomColor: "divider",
-              },
-              "& td": {
-                padding: "8px 6px",
-                fontSize: "0.8125rem",
-                overflowWrap: "anywhere",
-              },
-              "& td .MuiTypography-body2": { fontSize: "inherit" },
-            }}
+            sx={
+              daylight
+                ? {
+                    width: "100%",
+                    tableLayout: "auto",
+                    fontFamily: fonts.body,
+                    // Sticky header needs an opaque background.
+                    "& th": {
+                      fontFamily: fonts.body,
+                      fontWeight: 600,
+                      fontSize: 10,
+                      letterSpacing: ".015em",
+                      textTransform: "uppercase",
+                      lineHeight: 1.3,
+                      color: d.muted,
+                      padding: "12px 8px",
+                      verticalAlign: "bottom",
+                      backgroundColor: d.tableHead,
+                      borderBottom: `1px solid ${d.border}`,
+                    },
+                    "& th:first-of-type, & td:first-of-type": { pl: "16px" },
+                    "& th:last-of-type, & td:last-of-type": { pr: "16px" },
+                    "& td": {
+                      fontFamily: fonts.body,
+                      padding: "10px 8px",
+                      fontSize: 12.5,
+                      color: d.text,
+                      borderBottomColor: d.border,
+                      // Wrap at spaces only - whole words stay intact and a
+                      // wide table scrolls inside its card instead.
+                      overflowWrap: "normal",
+                    },
+                    "& td .MuiTypography-body2": {
+                      fontSize: "inherit",
+                      fontFamily: "inherit",
+                    },
+                    "& td .MuiTypography-caption": {
+                      fontFamily: "inherit",
+                      fontSize: 11,
+                      color: d.muted,
+                    },
+                    "& tbody tr:hover": { backgroundColor: d.hover },
+                  }
+                : {
+                    width: "100%",
+                    tableLayout: "auto",
+                    "& th": {
+                      fontWeight: "bold",
+                      padding: "8px 6px",
+                      fontSize: "0.8125rem",
+                      lineHeight: 1.3,
+                      verticalAlign: "bottom",
+                      backgroundColor: "background.paper",
+                      borderBottom: "2px solid",
+                      borderBottomColor: "divider",
+                    },
+                    "& td": {
+                      padding: "8px 6px",
+                      fontSize: "0.8125rem",
+                      overflowWrap: "anywhere",
+                    },
+                    "& td .MuiTypography-body2": { fontSize: "inherit" },
+                  }
+            }
             aria-label="miners table"
           >
             <TableHead>
@@ -562,13 +673,25 @@ export default function MinersTable({
               {isLoading ? (
                 <TableRow>
                   <TableCell colSpan={15} align="center" sx={{ py: 4 }}>
-                    <CircularProgress />
+                    <CircularProgress
+                      sx={daylight ? { color: d.action } : undefined}
+                    />
                   </TableCell>
                 </TableRow>
               ) : memoizedRows.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={15} align="center" sx={{ py: 4 }}>
-                    <Typography color="text.secondary">
+                    <Typography
+                      sx={
+                        daylight
+                          ? {
+                              color: d.muted,
+                              fontFamily: fonts.body,
+                              fontSize: 13,
+                            }
+                          : { color: "text.secondary" }
+                      }
+                    >
                       No miners found. Create one to get started.
                     </Typography>
                   </TableCell>
@@ -580,13 +703,19 @@ export default function MinersTable({
                     hover
                     sx={{
                       "&:nth-of-type(even)": {
-                        backgroundColor: (theme) =>
-                          alpha(theme.palette.text.primary, 0.025),
+                        backgroundColor: daylight
+                          ? d.tableHead
+                          : (theme) => alpha(theme.palette.text.primary, 0.025),
                       },
                       "&:last-child td": { border: 0 },
                     }}
                   >
-                    <TableCell sx={{ fontWeight: "500" }}>
+                    <TableCell
+                      sx={{
+                        fontWeight: "500",
+                        ...(daylight && { whiteSpace: "nowrap" }),
+                      }}
+                    >
                       <Tooltip
                         title={
                           miner.serialNumber ||
@@ -628,10 +757,16 @@ export default function MinersTable({
                               miner.warrantyExpiresAt
                                 ? "help"
                                 : "auto",
-                            color: "info.main", // Info is usually a light/sky blue in MUI
+                            color: daylight ? d.action : "info.main", // Info is usually a light/sky blue in MUI
                             textDecoration: "underline",
                             textUnderlineOffset: "3px",
-                            "&:hover": { color: "info.light" },
+                            ...(daylight && {
+                              fontWeight: 650,
+                              textDecorationColor: d.borderSky,
+                            }),
+                            "&:hover": {
+                              color: daylight ? d.actionHover : "info.light",
+                            },
                           }}
                         >
                           {miner.name}
@@ -651,6 +786,10 @@ export default function MinersTable({
                     <TableCell>
                       {miner.pool?.name ? (
                         miner.pool.name
+                      ) : daylight ? (
+                        <Box component="span" sx={{ color: d.muted }}>
+                          Unassigned
+                        </Box>
                       ) : (
                         <Typography variant="body2" color="text.secondary">
                           Unassigned
@@ -706,29 +845,47 @@ export default function MinersTable({
                             <Typography variant="body2">
                               {formatWarrantyDate(miner.warrantyExpiresAt)}
                             </Typography>
-                            <Chip
-                              label={WARRANTY_STATUS_LABEL[warrantyStatus]}
-                              color={getWarrantyColor(warrantyStatus)}
-                              size="small"
-                              variant="outlined"
-                              sx={{ mt: 0.5, height: 20, fontSize: "0.7rem" }}
-                            />
+                            {daylight ? (
+                              <Box sx={{ mt: "4px" }}>
+                                <DaylightStatusPill
+                                  label={WARRANTY_STATUS_LABEL[warrantyStatus]}
+                                  tone={
+                                    PILL_TONE[getWarrantyColor(warrantyStatus)]
+                                  }
+                                />
+                              </Box>
+                            ) : (
+                              <Chip
+                                label={WARRANTY_STATUS_LABEL[warrantyStatus]}
+                                color={getWarrantyColor(warrantyStatus)}
+                                size="small"
+                                variant="outlined"
+                                sx={{ mt: 0.5, height: 20, fontSize: "0.7rem" }}
+                              />
+                            )}
                           </Box>
                         );
                       })()}
                     </TableCell>
                     <TableCell align="center">
-                      <Chip
-                        label={miner.status}
-                        color={getStatusColor(miner.status)}
-                        size="small"
-                        variant="outlined"
-                        sx={{
-                          height: 22,
-                          fontSize: "0.7rem",
-                          "& .MuiChip-label": { px: 0.75 },
-                        }}
-                      />
+                      {daylight ? (
+                        <DaylightStatusPill
+                          label={humanizeStatus(miner.status)}
+                          tone={PILL_TONE[getStatusColor(miner.status)]}
+                        />
+                      ) : (
+                        <Chip
+                          label={miner.status}
+                          color={getStatusColor(miner.status)}
+                          size="small"
+                          variant="outlined"
+                          sx={{
+                            height: 22,
+                            fontSize: "0.7rem",
+                            "& .MuiChip-label": { px: 0.75 },
+                          }}
+                        />
+                      )}
                     </TableCell>
                     <TableCell sx={{ whiteSpace: "nowrap" }}>
                       {formatDate(miner.createdAt)}
@@ -739,6 +896,19 @@ export default function MinersTable({
                         onClick={(e) => handleMenuOpen(e, miner.id)}
                         disabled={isLoading}
                         title="Actions"
+                        aria-label={`Actions for ${miner.name}`}
+                        sx={
+                          daylight
+                            ? {
+                                color: d.muted,
+                                borderRadius: "8px",
+                                "&:hover": {
+                                  bgcolor: d.hover,
+                                  color: d.action,
+                                },
+                              }
+                            : undefined
+                        }
                       >
                         <MoreVertIcon fontSize="small" />
                       </IconButton>
@@ -746,6 +916,34 @@ export default function MinersTable({
                         anchorEl={anchorEl}
                         open={anchorEl !== null && selectedMinerId === miner.id}
                         onClose={handleMenuClose}
+                        slotProps={
+                          daylight
+                            ? {
+                                paper: {
+                                  sx: {
+                                    minWidth: 200,
+                                    borderRadius: "12px",
+                                    border: `1px solid ${d.border}`,
+                                    bgcolor: d.surface,
+                                    backgroundImage: "none",
+                                    boxShadow:
+                                      "0 8px 30px rgba(100,114,124,.13)",
+                                    "& .MuiMenuItem-root": {
+                                      minHeight: 40,
+                                      fontFamily: fonts.body,
+                                      fontSize: 13,
+                                      color: d.text,
+                                      "&:hover": { bgcolor: d.hover },
+                                    },
+                                    "& .MuiTypography-root": {
+                                      fontFamily: fonts.body,
+                                      fontSize: 13,
+                                    },
+                                  },
+                                },
+                              }
+                            : undefined
+                        }
                       >
                         {!readOnly && (
                           <MenuItem onClick={() => handleEdit(miner)}>
@@ -775,7 +973,11 @@ export default function MinersTable({
                           <MenuItem
                             disabled={miner.isDeleted}
                             onClick={() => handleDelete(miner.id)}
-                            sx={{ color: "error.main" }}
+                            sx={{
+                              color: daylight
+                                ? `${d.danger} !important`
+                                : "error.main",
+                            }}
                           >
                             <DeleteIcon fontSize="small" sx={{ mr: 1 }} />
                             Delete
@@ -802,7 +1004,14 @@ export default function MinersTable({
           }}
           sx={{
             borderTop: "1px solid",
-            borderColor: "divider",
+            borderColor: daylight ? d.border : "divider",
+            ...(daylight && {
+              color: d.muted,
+              fontFamily: fonts.body,
+              "& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows, & .MuiTablePagination-select":
+                { fontFamily: fonts.body, fontSize: 12.5 },
+              "& .MuiIconButton-root": { color: d.muted },
+            }),
             "& .MuiTablePagination-toolbar": {
               paddingLeft: { xs: 1, sm: 2 },
               paddingRight: { xs: 1, sm: 1 },

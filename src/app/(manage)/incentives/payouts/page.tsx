@@ -4,21 +4,26 @@ import React from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import {
-  Box,
-  Container,
-  Typography,
   Paper,
+  Box,
+  Typography,
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TableHead,
   TableRow,
-  CircularProgress,
   Alert,
   Button,
 } from "@mui/material";
 import { formatValue } from "@/lib/helpers/formatValue";
+import { useDaylight } from "@/lib/daylight";
+import AdminValueCard from "@/components/admin/AdminValueCard";
+import {
+  DaylightAdminPage,
+  DaylightLoading,
+  useDaylightAdminSx,
+} from "@/components/daylight/AdminPage";
 
 interface PayoutBatch {
   id: string;
@@ -33,6 +38,8 @@ interface PayoutBatch {
 }
 
 export default function IncentivePayoutsPage() {
+  const { d } = useDaylight();
+  const ds = useDaylightAdminSx();
   const router = useRouter();
 
   const { data, isLoading, error } = useQuery<{ payouts: PayoutBatch[] }>({
@@ -55,7 +62,7 @@ export default function IncentivePayoutsPage() {
       component="main"
       sx={{ py: 4, backgroundColor: "background.default", minHeight: "100vh" }}
     >
-      <Container maxWidth="xl">
+      <DaylightAdminPage>
         <Box
           sx={{
             display: "flex",
@@ -65,43 +72,42 @@ export default function IncentivePayoutsPage() {
           }}
         >
           <Box>
-            <Typography variant="h3" component="h1" sx={{ fontWeight: "bold" }}>
+            <Typography component="h1" sx={ds.pageTitleSx}>
               Incentive Payouts
             </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            <Typography sx={ds.pageDescSx}>
               All franchisee incentive payout batches across the company
             </Typography>
           </Box>
           <Button
             variant="outlined"
             onClick={() => router.push("/franchisees")}
+            sx={ds.outlineBtnSx}
           >
             Go to Franchisees
           </Button>
         </Box>
 
         {error && (
-          <Alert severity="error" sx={{ mb: 3 }}>
+          <Alert severity="error" sx={{ mb: 3, ...ds.alertSx("error") }}>
             {error instanceof Error ? error.message : "An error occurred"}
           </Alert>
         )}
 
         {isLoading ? (
-          <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
-            <CircularProgress />
-          </Box>
+          <DaylightLoading />
         ) : (
           <>
-            <Paper sx={{ p: 3, mb: 4, maxWidth: 320 }}>
-              <Typography variant="subtitle2" color="text.secondary">
-                Total Paid Out (all franchisees)
-              </Typography>
-              <Typography variant="h4" sx={{ fontWeight: 600 }}>
-                {formatValue(totalPaidOut, "currency")}
-              </Typography>
-            </Paper>
+            <Box sx={{ maxWidth: 320, mb: { xs: "20px", md: "24px" } }}>
+              <AdminValueCard
+                daylight
+                title="Total Paid Out (all franchisees)"
+                value={totalPaidOut}
+                type="currency"
+              />
+            </Box>
 
-            <TableContainer component={Paper}>
+            <TableContainer component={Paper} elevation={0} sx={ds.listCardSx}>
               <Table>
                 <TableHead>
                   <TableRow sx={{ backgroundColor: "background.default" }}>
@@ -158,8 +164,7 @@ export default function IncentivePayoutsPage() {
                       <TableCell colSpan={7} align="center">
                         <Typography
                           variant="body2"
-                          color="text.secondary"
-                          sx={{ py: 3 }}
+                          sx={{ py: 3, color: d.muted }}
                         >
                           No payouts recorded yet.
                         </Typography>
@@ -171,7 +176,7 @@ export default function IncentivePayoutsPage() {
             </TableContainer>
           </>
         )}
-      </Container>
+      </DaylightAdminPage>
     </Box>
   );
 }

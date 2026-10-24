@@ -11,7 +11,6 @@ import {
   Alert,
   Box,
   Button,
-  Container,
   CircularProgress,
   Checkbox,
   Dialog,
@@ -56,6 +55,13 @@ import AddIcon from "@mui/icons-material/Add";
 import DownloadIcon from "@mui/icons-material/Download";
 import { InvoiceStatus } from "@prisma/client";
 import { downloadExport } from "@/lib/downloadExport";
+import { useDaylight } from "@/lib/daylight";
+import {
+  DaylightAdminPage,
+  DaylightLoading,
+  DaylightPageHeader,
+  useDaylightAdminSx,
+} from "@/components/daylight/AdminPage";
 
 type SortKey =
   | "invoiceNumber"
@@ -81,6 +87,8 @@ const calculateDaysUntilDue = (dueDate: Date) => {
 };
 
 export default function AccountingDashboard() {
+  const { d } = useDaylight();
+  const ds = useDaylightAdminSx();
   const {
     dashboard,
     loading: statsLoading,
@@ -407,32 +415,34 @@ export default function AccountingDashboard() {
 
   if (loading) {
     return (
-      <Container maxWidth="lg">
-        <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
-          <CircularProgress />
-        </Box>
-      </Container>
+      <DaylightAdminPage>
+        <DaylightLoading />
+      </DaylightAdminPage>
     );
   }
 
   if (error) {
     return (
-      <Container maxWidth="lg">
-        <Alert severity="error">{error}</Alert>
-      </Container>
+      <DaylightAdminPage>
+        <Alert severity="error" sx={{ ...ds.alertSx("error") }}>
+          {error}
+        </Alert>
+      </DaylightAdminPage>
     );
   }
 
   if (!dashboard) {
     return (
-      <Container maxWidth="lg">
-        <Alert severity="warning">No data available</Alert>
-      </Container>
+      <DaylightAdminPage>
+        <Alert severity="warning" sx={{ ...ds.alertSx("warning") }}>
+          No data available
+        </Alert>
+      </DaylightAdminPage>
     );
   }
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
+    <DaylightAdminPage>
       <Dialog
         open={bulkEmailDialogOpen}
         onClose={() => {
@@ -542,6 +552,7 @@ export default function AccountingDashboard() {
               })
             }
             disabled={bulkEmailProcessing}
+            sx={ds.textBtnSx()}
           >
             No, skip them
           </Button>
@@ -551,37 +562,34 @@ export default function AccountingDashboard() {
               void handleIssueAndSendSelected({ bypassPaidCheck: true })
             }
             disabled={bulkEmailProcessing}
+            sx={ds.primaryBtnSx}
           >
             Yes, send anyway
           </Button>
         </DialogActions>
       </Dialog>
-      {/* Header */}
-      <Stack
-        direction="row"
-        justifyContent="space-between"
-        alignItems="center"
-        mb={4}
-      >
-        <div>
-          <Typography variant="h4" sx={{ fontWeight: "bold" }}>
-            Accounting Dashboard
-          </Typography>
-          <Typography color="textSecondary" sx={{ mt: 0.5 }}>
-            Overview of invoices, payments, and recurring income
-          </Typography>
-        </div>
-        <Stack direction="row" spacing={2}>
-          <Link href="/accounting/bulk-invoices">
-            <Button variant="outlined">Bulk Create Invoices</Button>
-          </Link>
-          <Link href="/accounting/create">
-            <Button variant="contained" startIcon={<AddIcon />}>
-              Create Invoice
-            </Button>
-          </Link>
-        </Stack>
-      </Stack>
+      <DaylightPageHeader
+        title="Accounting Dashboard"
+        description="Overview of invoices, payments, and recurring income"
+        actions={
+          <>
+            <Link href="/accounting/bulk-invoices">
+              <Button variant="outlined" sx={ds.outlineBtnSx}>
+                Bulk Create Invoices
+              </Button>
+            </Link>
+            <Link href="/accounting/create">
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                sx={ds.primaryBtnSx}
+              >
+                Create Invoice
+              </Button>
+            </Link>
+          </>
+        }
+      />
 
       {/* Stats Row */}
       <Box
@@ -592,8 +600,8 @@ export default function AccountingDashboard() {
             sm: "1fr 1fr",
             md: "1fr 1fr 1fr 1fr",
           },
-          gap: 3,
-          mb: 4,
+          gap: { xs: "12px", sm: "16px", md: "20px" },
+          mb: { xs: "20px", md: "24px" },
         }}
       >
         <Box>
@@ -632,8 +640,8 @@ export default function AccountingDashboard() {
         sx={{
           display: "grid",
           gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
-          gap: 3,
-          mb: 4,
+          gap: { xs: "12px", sm: "16px", md: "20px" },
+          mb: { xs: "20px", md: "24px" },
         }}
       >
         <Box>
@@ -655,7 +663,7 @@ export default function AccountingDashboard() {
 
       {/* Tables */}
       <Box sx={{ display: "grid", gridTemplateColumns: "1fr", gap: 3 }}>
-        <Paper>
+        <Paper elevation={0} sx={ds.listCardSx}>
           <Box
             sx={{
               display: "flex",
@@ -664,7 +672,7 @@ export default function AccountingDashboard() {
               p: 2,
             }}
           >
-            <Typography variant="h6" sx={{ fontWeight: "bold" }}>
+            <Typography component="h2" sx={ds.sectionTitleSx}>
               All Invoices
             </Typography>
           </Box>
@@ -739,6 +747,7 @@ export default function AccountingDashboard() {
               }
               onClick={() => void handleExport("csv")}
               disabled={exporting !== null || total === 0}
+              sx={ds.outlineBtnSx}
             >
               Download CSV
             </Button>
@@ -754,6 +763,7 @@ export default function AccountingDashboard() {
               }
               onClick={() => void handleExport("pdf")}
               disabled={exporting !== null || total === 0}
+              sx={ds.outlineBtnSx}
             >
               Download PDF
             </Button>
@@ -789,6 +799,7 @@ export default function AccountingDashboard() {
                     selectedInvoiceIds.length === 0 ||
                     bulkStatusLoading
                   }
+                  sx={ds.outlineBtnSx}
                 >
                   Apply Status
                 </Button>
@@ -799,17 +810,18 @@ export default function AccountingDashboard() {
                   disabled={
                     selectedInvoiceIds.length === 0 || bulkEmailProcessing
                   }
+                  sx={ds.primaryBtnSx}
                 >
                   Issue &amp; Send Emails
                 </Button>
                 <Button
                   variant="outlined"
-                  color="error"
                   size="small"
                   onClick={handleBulkDelete}
                   disabled={
                     selectedInvoiceIds.length === 0 || bulkDeleteLoading
                   }
+                  sx={ds.dangerOutlineBtnSx}
                 >
                   Delete Selected
                 </Button>
@@ -819,21 +831,21 @@ export default function AccountingDashboard() {
           {isAdmin &&
             (bulkError || bulkStatusHookError || bulkDeleteHookError) && (
               <Box sx={{ px: 2 }}>
-                <Alert severity="error" sx={{ mb: 1 }}>
+                <Alert severity="error" sx={{ mb: 1, ...ds.alertSx("error") }}>
                   {bulkError || bulkStatusHookError || bulkDeleteHookError}
                 </Alert>
               </Box>
             )}
           {exportError && (
             <Box sx={{ px: 2 }}>
-              <Alert severity="error" sx={{ mb: 1 }}>
+              <Alert severity="error" sx={{ mb: 1, ...ds.alertSx("error") }}>
                 {exportError}
               </Alert>
             </Box>
           )}
           <TableContainer>
             <Table>
-              <TableHead sx={{ backgroundColor: "#f5f5f5" }}>
+              <TableHead>
                 <TableRow>
                   {isAdmin && (
                     <TableCell padding="checkbox">
@@ -1013,7 +1025,11 @@ export default function AccountingDashboard() {
                       <TableCell>
                         <Link
                           href={`/accounting/${invoice.id}`}
-                          style={{ color: "#1976d2", textDecoration: "none" }}
+                          style={{
+                            color: d.action,
+                            textDecoration: "none",
+                            fontWeight: 650,
+                          }}
                         >
                           {invoice.invoiceNumber}
                         </Link>
@@ -1057,9 +1073,9 @@ export default function AccountingDashboard() {
                               px: 1,
                               py: 0.25,
                               borderRadius: "999px",
-                              backgroundColor: "#fdecea",
-                              border: "1px solid #f44336",
-                              color: "#c62828",
+                              backgroundColor: d.dangerSoft,
+                              border: `1px solid ${d.borderDanger}`,
+                              color: d.danger,
                               fontSize: "0.75rem",
                               fontWeight: 700,
                               whiteSpace: "nowrap",
@@ -1079,10 +1095,10 @@ export default function AccountingDashboard() {
                             sx={{
                               color:
                                 daysUntilDue < 0
-                                  ? "error.main"
+                                  ? d.danger
                                   : daysUntilDue < 7
-                                    ? "warning.main"
-                                    : "success.main",
+                                    ? d.warning
+                                    : d.success,
                               fontWeight: "500",
                             }}
                           >
@@ -1115,10 +1131,11 @@ export default function AccountingDashboard() {
               page={page - 1}
               onPageChange={handleChangePage}
               onRowsPerPageChange={handleChangeRowsPerPage}
+              sx={ds.paginationSx}
             />
           </TableContainer>
         </Paper>
       </Box>
-    </Container>
+    </DaylightAdminPage>
   );
 }

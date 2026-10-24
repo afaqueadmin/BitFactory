@@ -20,7 +20,6 @@ import {
   TableRow,
   IconButton,
   CircularProgress,
-  Chip,
   Menu,
   MenuItem,
   Checkbox,
@@ -34,6 +33,14 @@ import {
   MoreVert as MoreVertIcon,
 } from "@mui/icons-material";
 import { useUser } from "@/lib/hooks/useUser";
+import AdminValueCard from "@/components/admin/AdminValueCard";
+import { useDaylight } from "@/lib/daylight";
+import {
+  DaylightAdminPage,
+  DaylightPageHeader,
+  DaylightStatusPill,
+  useDaylightAdminSx,
+} from "@/components/daylight/AdminPage";
 
 interface ProcurementHistoryEntry {
   id: string;
@@ -74,6 +81,8 @@ interface ApiResponse<T = unknown> {
 }
 
 export default function HardwarePage() {
+  const { d, fonts } = useDaylight();
+  const ds = useDaylightAdminSx();
   const { user } = useUser();
   const [hardware, setHardware] = useState<Hardware[]>([]);
   const [loading, setLoading] = useState(true);
@@ -457,143 +466,165 @@ export default function HardwarePage() {
     return [`${avgPowerUsage} kW`, `${avgHashRate} TH/s`];
   }, [hardware]);
 
+  const menuPaperSx = {
+    minWidth: 220,
+    borderRadius: "12px",
+    border: `1px solid ${d.border}`,
+    bgcolor: d.surface,
+    backgroundImage: "none",
+    boxShadow: "0 8px 30px rgba(100,114,124,.13)",
+    "& .MuiMenuItem-root": {
+      minHeight: 40,
+      fontFamily: fonts.body,
+      fontSize: 13,
+      color: d.text,
+      "&:hover": { bgcolor: d.hover },
+    },
+    "& .MuiTypography-root": { fontFamily: fonts.body, fontSize: 13 },
+  } as const;
+
   return (
-    <Box sx={{ p: 3 }}>
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" fontWeight="bold" sx={{ mb: 0.5 }}>
-          Hardware Management
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          Manage mining hardware models and their specifications
-        </Typography>
-      </Box>
+    <DaylightAdminPage>
+      <DaylightPageHeader
+        title="Hardware Management"
+        description="Manage mining hardware models and their specifications."
+        actions={
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={handleCreateNew}
+            disabled={loading}
+            sx={ds.primaryBtnSx}
+          >
+            Add Hardware
+          </Button>
+        }
+      />
 
       {error && (
-        <Alert severity="error" sx={{ mb: 3 }}>
+        <Alert severity="error" sx={{ mb: 3, ...ds.alertSx("error") }}>
           {error}
         </Alert>
       )}
 
-      <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 3 }}>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={handleCreateNew}
-          disabled={loading}
-        >
-          Add Hardware
-        </Button>
-      </Box>
-
       <Box
         sx={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
-          gap: 2,
-          mb: 4,
+          gridTemplateColumns:
+            "repeat(auto-fit, minmax(min(220px, 100%), 1fr))",
+          gap: { xs: "12px", sm: "16px", md: "20px" },
+          mb: { xs: "20px", md: "24px" },
         }}
       >
-        <Paper sx={{ p: 2, textAlign: "center" }}>
-          <Typography variant="body2" color="text.secondary">
-            Total Hardware Models
-          </Typography>
-          <Typography variant="h4" sx={{ mt: 1 }}>
-            {hardware.length}
-          </Typography>
-        </Paper>
-
-        <Paper sx={{ p: 2, textAlign: "center" }}>
-          <Typography variant="body2" color="text.secondary">
-            Average Power Usage
-          </Typography>
-          <Typography variant="h4" sx={{ mt: 1 }}>
-            {averagePowerUsage}
-          </Typography>
-        </Paper>
-
-        <Paper sx={{ p: 2, textAlign: "center" }}>
-          <Typography variant="body2" color="text.secondary">
-            Average Hash Rate
-          </Typography>
-          <Typography variant="h4" sx={{ mt: 1 }}>
-            {averageHashRate}
-          </Typography>
-        </Paper>
+        <AdminValueCard
+          daylight
+          title="Total Hardware Models"
+          value={hardware.length}
+        />
+        <AdminValueCard
+          daylight
+          title="Average Power Usage"
+          value={averagePowerUsage}
+        />
+        <AdminValueCard
+          daylight
+          title="Average Hash Rate"
+          value={averageHashRate}
+        />
       </Box>
 
-      <FormControlLabel
-        control={
-          <Checkbox
-            checked={showDeleted}
-            onChange={(e) => setShowDeleted(e.target.checked)}
-          />
-        }
-        label="Show Deleted"
-      />
-      <TableContainer component={Paper}>
+      <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 1 }}>
+        <FormControlLabel
+          control={
+            <Checkbox
+              size="small"
+              checked={showDeleted}
+              onChange={(e) => setShowDeleted(e.target.checked)}
+              sx={{
+                color: d.inputBorder,
+                "&.Mui-checked": { color: d.action },
+              }}
+            />
+          }
+          label="Show Deleted"
+          sx={{
+            mr: 0,
+            "& .MuiFormControlLabel-label": {
+              fontFamily: fonts.body,
+              fontSize: 13,
+              color: d.muted,
+            },
+          }}
+        />
+      </Box>
+      <TableContainer component={Paper} elevation={0} sx={ds.tableCardSx}>
         <Table>
-          <TableHead sx={{ backgroundColor: "action.hover" }}>
+          <TableHead>
             <TableRow>
-              <TableCell sx={{ fontWeight: "bold" }}>Model</TableCell>
-              <TableCell sx={{ fontWeight: "bold" }} align="right">
-                Power Usage (kW)
-              </TableCell>
-              <TableCell sx={{ fontWeight: "bold" }} align="right">
-                Hash Rate (TH/s)
-              </TableCell>
-              <TableCell sx={{ fontWeight: "bold" }} align="center">
-                Available Quantity
-              </TableCell>
-              <TableCell sx={{ fontWeight: "bold" }}>Created</TableCell>
-              <TableCell sx={{ fontWeight: "bold" }} align="center">
-                Actions
-              </TableCell>
+              <TableCell>Model</TableCell>
+              <TableCell align="right">Power Usage (kW)</TableCell>
+              <TableCell align="right">Hash Rate (TH/s)</TableCell>
+              <TableCell align="center">Available Quantity</TableCell>
+              <TableCell>Created</TableCell>
+              <TableCell align="center">Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
-                  <CircularProgress />
+                <TableCell colSpan={6} align="center" sx={{ "&&&": { py: 4 } }}>
+                  <CircularProgress sx={{ color: d.action }} />
                 </TableCell>
               </TableRow>
             ) : hardware.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
-                  <Typography color="text.secondary">
-                    No hardware found. Create one to get started.
-                  </Typography>
+                <TableCell
+                  colSpan={6}
+                  align="center"
+                  sx={{ "&&&": { py: 5, color: d.muted } }}
+                >
+                  No hardware found. Create one to get started.
                 </TableCell>
               </TableRow>
             ) : (
               hardware.map((hw) => (
-                <TableRow
-                  key={hw.id}
-                  hover
-                  sx={{ "&:last-child td, &:last-child th": { border: 0 } }}
-                >
-                  <TableCell sx={{ fontWeight: "500" }}>{hw.model}</TableCell>
-                  <TableCell align="right">
+                <TableRow key={hw.id}>
+                  <TableCell sx={{ "&&&": { fontWeight: 650 } }}>
+                    {hw.model}
+                  </TableCell>
+                  <TableCell
+                    align="right"
+                    sx={{ "&&&": { fontVariantNumeric: "tabular-nums" } }}
+                  >
                     {parseFloat(String(hw.powerUsage)).toFixed(3)}
                   </TableCell>
-                  <TableCell align="right">
+                  <TableCell
+                    align="right"
+                    sx={{ "&&&": { fontVariantNumeric: "tabular-nums" } }}
+                  >
                     {parseFloat(String(hw.hashRate)).toFixed(2)}
                   </TableCell>
                   <TableCell align="center">
-                    <Chip
+                    <DaylightStatusPill
                       label={`${hw.quantity} unit${hw.quantity !== 1 ? "s" : ""}`}
-                      size="small"
-                      color={hw.quantity > 0 ? "success" : "default"}
-                      variant="outlined"
+                      tone={hw.quantity > 0 ? "success" : "neutral"}
                     />
                   </TableCell>
-                  <TableCell>{formatDate(hw.createdAt)}</TableCell>
-                  <TableCell align="center">
+                  <TableCell sx={{ "&&&": { whiteSpace: "nowrap" } }}>
+                    {formatDate(hw.createdAt)}
+                  </TableCell>
+                  <TableCell align="center" sx={{ "&&&": { py: "8px" } }}>
                     <IconButton
                       size="small"
                       onClick={(e) => handleMenuOpen(e, hw.id)}
                       disabled={loading}
                       title="Actions"
+                      aria-label={`Actions for ${hw.model}`}
+                      sx={{
+                        color: d.muted,
+                        borderRadius: "8px",
+                        "&:hover": { bgcolor: d.hover, color: d.action },
+                      }}
                     >
                       <MoreVertIcon fontSize="small" />
                     </IconButton>
@@ -601,6 +632,7 @@ export default function HardwarePage() {
                       anchorEl={anchorEl}
                       open={anchorEl !== null && selectedHardwareId === hw.id}
                       onClose={handleMenuClose}
+                      slotProps={{ paper: { sx: menuPaperSx } }}
                     >
                       <MenuItem onClick={() => handleEdit(hw)}>
                         <EditIcon fontSize="small" sx={{ mr: 1 }} />
@@ -622,7 +654,7 @@ export default function HardwarePage() {
                           handleMenuClose();
                           setDeleteConfirm(hw.id);
                         }}
-                        sx={{ color: "error.main" }}
+                        sx={{ "&&": { color: d.danger } }}
                       >
                         <DeleteIcon fontSize="small" sx={{ mr: 1 }} />
                         Delete
@@ -869,6 +901,6 @@ export default function HardwarePage() {
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
+    </DaylightAdminPage>
   );
 }

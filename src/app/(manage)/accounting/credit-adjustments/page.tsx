@@ -3,12 +3,10 @@
 import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
-  Container,
+  Paper,
   Box,
   Button,
   Typography,
-  Card,
-  CardContent,
   Alert,
   TextField,
   MenuItem,
@@ -28,6 +26,11 @@ import CostPaymentTransactionsTable, {
 import AddAdjustmentModal from "@/components/AddAdjustmentModal";
 import EditAdjustmentModal from "@/components/EditAdjustmentModal";
 import AdjustmentHistoryDialog from "@/components/AdjustmentHistoryDialog";
+import { useDaylight } from "@/lib/daylight";
+import {
+  DaylightAdminPage,
+  useDaylightAdminSx,
+} from "@/components/daylight/AdminPage";
 
 function LoadingFallback() {
   return (
@@ -53,6 +56,8 @@ export default function CreditAdjustmentsPage() {
 }
 
 function CreditAdjustmentsContent() {
+  const { d, fonts } = useDaylight();
+  const ds = useDaylightAdminSx();
   const searchParams = useSearchParams();
 
   const [page, setPage] = useState(0);
@@ -152,7 +157,7 @@ function CreditAdjustmentsContent() {
   };
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
+    <DaylightAdminPage>
       <Box
         sx={{
           display: "flex",
@@ -164,10 +169,10 @@ function CreditAdjustmentsContent() {
         }}
       >
         <Box>
-          <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>
+          <Typography component="h1" sx={ds.pageTitleSx}>
             Credit Adjustments
           </Typography>
-          <Typography color="textSecondary">
+          <Typography sx={ds.pageDescSx}>
             All manual balance adjustments (CostPayment rows of type ADJUSTMENT)
             across customers. Add, edit, or delete an adjustment below.
           </Typography>
@@ -176,90 +181,96 @@ function CreditAdjustmentsContent() {
           variant="contained"
           startIcon={<AddIcon />}
           onClick={() => setAddModalOpen(true)}
+          sx={ds.primaryBtnSx}
         >
           Add Adjustment
         </Button>
       </Box>
 
       {error && (
-        <Alert severity="error" sx={{ mb: 3 }}>
+        <Alert severity="error" sx={{ mb: 3, ...ds.alertSx("error") }}>
           {error}
         </Alert>
       )}
 
-      <Card sx={{ mb: 3 }}>
-        <CardContent>
-          <Typography color="textSecondary" variant="body2">
-            Total adjustments (filtered)
-          </Typography>
-          <Typography variant="h5" sx={{ fontWeight: 700 }}>
-            <CurrencyDisplay value={summary?.totalAmount ?? 0} />
-          </Typography>
-        </CardContent>
-      </Card>
+      <Paper elevation={0} sx={{ ...ds.cardSx, ...ds.inputSx, mb: 3 }}>
+        <Typography sx={{ fontSize: 13, fontWeight: 600, color: d.muted }}>
+          Total adjustments (filtered)
+        </Typography>
+        <Typography
+          sx={{
+            mt: "6px",
+            fontFamily: fonts.heading,
+            fontWeight: 750,
+            fontSize: 24,
+            letterSpacing: "-0.02em",
+            color: d.text,
+          }}
+        >
+          <CurrencyDisplay value={summary?.totalAmount ?? 0} />
+        </Typography>
+      </Paper>
 
-      <Card sx={{ mb: 3 }}>
-        <CardContent>
-          <Typography variant="h6" sx={{ mb: 2 }}>
-            Filters
-          </Typography>
-          <Box
-            sx={{
-              display: "grid",
-              gridTemplateColumns: {
-                xs: "1fr",
-                sm: "1fr 1fr",
-                md: "1fr 1fr 1fr",
-              },
-              gap: 2,
+      <Paper elevation={0} sx={{ ...ds.cardSx, ...ds.inputSx, mb: 3 }}>
+        <Typography component="h2" sx={{ ...ds.sectionTitleSx, mb: 2 }}>
+          Filters
+        </Typography>
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: {
+              xs: "1fr",
+              sm: "1fr 1fr",
+              md: "1fr 1fr 1fr",
+            },
+            gap: 2,
+          }}
+        >
+          <TextField
+            label="From date"
+            type="date"
+            size="small"
+            value={startDateFilter}
+            onChange={(e) => {
+              setStartDateFilter(e.target.value);
+              resetToFirstPage();
             }}
+            InputLabelProps={{ shrink: true }}
+            helperText="No lower bound if left blank"
+          />
+          <TextField
+            label="To date"
+            type="date"
+            size="small"
+            value={endDateFilter}
+            onChange={(e) => {
+              setEndDateFilter(e.target.value);
+              resetToFirstPage();
+            }}
+            InputLabelProps={{ shrink: true }}
+          />
+          <TextField
+            select
+            label="Customer"
+            size="small"
+            value={customerId}
+            onChange={(e) => {
+              setCustomerId(e.target.value);
+              resetToFirstPage();
+            }}
+            disabled={customersLoading}
           >
-            <TextField
-              label="From date"
-              type="date"
-              size="small"
-              value={startDateFilter}
-              onChange={(e) => {
-                setStartDateFilter(e.target.value);
-                resetToFirstPage();
-              }}
-              InputLabelProps={{ shrink: true }}
-              helperText="No lower bound if left blank"
-            />
-            <TextField
-              label="To date"
-              type="date"
-              size="small"
-              value={endDateFilter}
-              onChange={(e) => {
-                setEndDateFilter(e.target.value);
-                resetToFirstPage();
-              }}
-              InputLabelProps={{ shrink: true }}
-            />
-            <TextField
-              select
-              label="Customer"
-              size="small"
-              value={customerId}
-              onChange={(e) => {
-                setCustomerId(e.target.value);
-                resetToFirstPage();
-              }}
-              disabled={customersLoading}
-            >
-              <MenuItem value="">All customers</MenuItem>
-              {customers.map((c: Customer) => (
-                <MenuItem key={c.id} value={c.id}>
-                  {c.displayName}
-                </MenuItem>
-              ))}
-            </TextField>
-          </Box>
-        </CardContent>
-      </Card>
+            <MenuItem value="">All customers</MenuItem>
+            {customers.map((c: Customer) => (
+              <MenuItem key={c.id} value={c.id}>
+                {c.displayName}
+              </MenuItem>
+            ))}
+          </TextField>
+        </Box>
+      </Paper>
 
-      <Typography variant="h6" sx={{ mb: 2 }}>
+      <Typography component="h2" sx={{ ...ds.sectionTitleSx, mb: 2 }}>
         Adjustments ({pagination?.totalCount ?? 0})
       </Typography>
       <CostPaymentTransactionsTable
@@ -318,6 +329,6 @@ function CreditAdjustmentsContent() {
           {notification}
         </Alert>
       </Snackbar>
-    </Container>
+    </DaylightAdminPage>
   );
 }

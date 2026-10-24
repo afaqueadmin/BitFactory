@@ -25,6 +25,11 @@ import {
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
 import { DateDisplay } from "@/components/accounting/common/DateDisplay";
 import { paymentTypeLabel } from "@/lib/accounting/paymentTypes";
+import { useDaylight } from "@/lib/daylight";
+import {
+  useDaylightAdminSx,
+  useDaylightScope,
+} from "@/components/daylight/AdminPage";
 
 export interface TransactionRow {
   id: string;
@@ -88,24 +93,40 @@ export default function CostPaymentTransactionsTable({
   onViewHistory,
 }: CostPaymentTransactionsTableProps) {
   const theme = useTheme();
+  const scoped = useDaylightScope();
+  const { d, fonts } = useDaylight();
+  const ds = useDaylightAdminSx();
   const showActions = Boolean(onEdit || onDelete || onViewHistory);
 
   return (
     <Paper
-      sx={{
-        width: "100%",
-        borderRadius: 2,
-        overflow: "hidden",
-        boxShadow: theme.shadows[2],
-      }}
+      elevation={scoped ? 0 : 1}
+      sx={
+        scoped
+          ? { ...ds.listCardSx, width: "100%" }
+          : {
+              width: "100%",
+              borderRadius: 2,
+              overflow: "hidden",
+              boxShadow: theme.shadows[2],
+            }
+      }
     >
       {loading ? (
         <Box sx={{ display: "flex", justifyContent: "center", p: 4 }}>
-          <CircularProgress />
+          <CircularProgress sx={scoped ? { color: d.action } : undefined} />
         </Box>
       ) : transactions.length === 0 ? (
         <Box sx={{ p: 3, textAlign: "center" }}>
-          <Typography color="text.secondary">No transactions found</Typography>
+          <Typography
+            sx={
+              scoped
+                ? { color: d.muted, fontFamily: fonts.body, fontSize: 13 }
+                : { color: "text.secondary" }
+            }
+          >
+            No transactions found
+          </Typography>
         </Box>
       ) : (
         <>
@@ -171,8 +192,12 @@ export default function CostPaymentTransactionsTable({
                         sx={{
                           color:
                             row.amount < 0
-                              ? theme.palette.error.main
-                              : theme.palette.success.main,
+                              ? scoped
+                                ? d.danger
+                                : theme.palette.error.main
+                              : scoped
+                                ? d.success
+                                : theme.palette.success.main,
                         }}
                       >
                         <CurrencyDisplay value={row.amount} />
@@ -247,7 +272,11 @@ export default function CostPaymentTransactionsTable({
             onRowsPerPageChange={(event) => {
               onPageSizeChange(parseInt(event.target.value, 10));
             }}
-            sx={{ borderTop: `1px solid ${theme.palette.divider}` }}
+            sx={
+              scoped
+                ? ds.paginationSx
+                : { borderTop: `1px solid ${theme.palette.divider}` }
+            }
           />
         </>
       )}

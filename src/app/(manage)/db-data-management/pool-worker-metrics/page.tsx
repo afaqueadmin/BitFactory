@@ -13,7 +13,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import {
   Box,
-  Container,
+  Button,
   Typography,
   Stack,
   Alert,
@@ -27,18 +27,23 @@ import {
   TableRow,
   TextField,
   IconButton,
-  Tooltip,
   FormControl,
   InputLabel,
   Select,
   MenuItem,
-  Chip,
 } from "@mui/material";
 import {
   Refresh as RefreshIcon,
   NavigateBefore,
   NavigateNext,
 } from "@mui/icons-material";
+import { useDaylight } from "@/lib/daylight";
+import {
+  DaylightAdminPage,
+  DaylightPageHeader,
+  DaylightStatusPill,
+  useDaylightAdminSx,
+} from "@/components/daylight/AdminPage";
 
 interface SubaccountOption {
   id: string;
@@ -90,6 +95,8 @@ const fmtHashrate = (v: string | null) => {
 };
 
 export default function PoolWorkerMetricsPage() {
+  const { d } = useDaylight();
+  const ds = useDaylightAdminSx();
   const [rows, setRows] = useState<WorkerMetric[]>([]);
   const [subaccounts, setSubaccounts] = useState<SubaccountOption[]>([]);
   const [loading, setLoading] = useState(true);
@@ -162,38 +169,30 @@ export default function PoolWorkerMetricsPage() {
   };
 
   return (
-    <Container maxWidth="xl" sx={{ py: 4 }}>
-      <Stack
-        direction="row"
-        justifyContent="space-between"
-        alignItems="center"
-        sx={{ mb: 3 }}
-      >
-        <Box>
-          <Typography variant="h4" fontWeight="bold">
-            Worker Metrics
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Per-worker daily hashrate, efficiency and estimated revenue history.
-            Stale/rejected shares, firmware and status are only available from
-            the day the sync cron started (no historical endpoint exists). View
-            only.
-          </Typography>
-        </Box>
-        <Tooltip title="Refresh">
-          <IconButton onClick={handleRefresh} disabled={isRefreshing}>
-            <RefreshIcon />
-          </IconButton>
-        </Tooltip>
-      </Stack>
+    <DaylightAdminPage>
+      <DaylightPageHeader
+        title="Worker Metrics"
+        description="Per-worker daily hashrate, efficiency and estimated revenue history. Stale/rejected shares, firmware and status are only available from the day the sync cron started (no historical endpoint exists). View only."
+        actions={
+          <Button
+            variant="outlined"
+            startIcon={<RefreshIcon />}
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            sx={ds.outlineBtnSx}
+          >
+            {isRefreshing ? "Refreshing..." : "Refresh"}
+          </Button>
+        }
+      />
 
       {error && (
-        <Alert severity="error" sx={{ mb: 3 }}>
+        <Alert severity="error" sx={{ mb: 3, ...ds.alertSx("error") }}>
           {error}
         </Alert>
       )}
 
-      <Paper elevation={1} sx={{ p: 2, mb: 2, borderRadius: 2 }}>
+      <Paper elevation={0} sx={{ ...ds.cardSx, ...ds.inputSx, mb: 2 }}>
         <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
           <FormControl size="small" sx={{ minWidth: 240 }}>
             <InputLabel>Subaccount</InputLabel>
@@ -249,7 +248,7 @@ export default function PoolWorkerMetricsPage() {
         </Stack>
       </Paper>
 
-      <Paper elevation={2} sx={{ borderRadius: 2 }}>
+      <Paper elevation={0} sx={ds.listCardSx}>
         <TableContainer>
           <Table size="small">
             <TableHead>
@@ -270,13 +269,13 @@ export default function PoolWorkerMetricsPage() {
               {loading ? (
                 <TableRow>
                   <TableCell colSpan={10} align="center" sx={{ py: 6 }}>
-                    <CircularProgress size={28} />
+                    <CircularProgress size={28} sx={{ color: d.action }} />
                   </TableCell>
                 </TableRow>
               ) : rows.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={10} align="center" sx={{ py: 4 }}>
-                    <Typography color="text.secondary">
+                    <Typography variant="body2" sx={{ color: d.muted }}>
                       No worker metrics found.
                     </Typography>
                   </TableCell>
@@ -286,14 +285,23 @@ export default function PoolWorkerMetricsPage() {
                   <TableRow key={row.id} hover>
                     <TableCell>{row.date.slice(0, 10)}</TableCell>
                     <TableCell>
-                      <Chip
-                        label={row.poolSubaccount.pool.name}
-                        size="small"
-                        sx={{ mr: 1 }}
-                      />
+                      <Box component="span" sx={{ mr: 1 }}>
+                        <DaylightStatusPill
+                          label={row.poolSubaccount.pool.name}
+                          tone="neutral"
+                        />
+                      </Box>
                       {row.poolSubaccount.subaccountName}
                     </TableCell>
-                    <TableCell sx={{ fontFamily: "monospace" }}>
+                    <TableCell
+                      sx={{
+                        "&&&": {
+                          fontFamily:
+                            "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+                          fontSize: 12.5,
+                        },
+                      }}
+                    >
                       {row.workerName}
                     </TableCell>
                     <TableCell align="right">
@@ -325,9 +333,9 @@ export default function PoolWorkerMetricsPage() {
           direction="row"
           justifyContent="space-between"
           alignItems="center"
-          sx={{ p: 2, borderTop: 1, borderColor: "divider" }}
+          sx={{ px: "16px", py: "10px", borderTop: `1px solid ${d.border}` }}
         >
-          <Typography variant="body2" color="text.secondary">
+          <Typography variant="body2" sx={{ color: d.muted }}>
             {pagination.totalCount} total rows — page {pagination.page} of{" "}
             {pagination.totalPages}
           </Typography>
@@ -351,6 +359,6 @@ export default function PoolWorkerMetricsPage() {
           </Stack>
         </Stack>
       </Paper>
-    </Container>
+    </DaylightAdminPage>
   );
 }

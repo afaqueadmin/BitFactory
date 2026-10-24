@@ -26,6 +26,13 @@ import {
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
 import { DateDisplay } from "@/components/accounting/common/DateDisplay";
 import { MemoTransaction } from "@/lib/hooks/admin/useMemos";
+import { useDaylight } from "@/lib/daylight";
+import {
+  DaylightStatusPill,
+  statusLabel,
+  useDaylightAdminSx,
+  useDaylightScope,
+} from "@/components/daylight/AdminPage";
 
 const CATEGORY_LABELS: Record<string, string> = {
   HOSTING: "Hosting & Colocation",
@@ -88,24 +95,40 @@ export default function MemoTransactionsTable({
   onDownload,
 }: MemoTransactionsTableProps) {
   const theme = useTheme();
+  const scoped = useDaylightScope();
+  const { d, fonts } = useDaylight();
+  const ds = useDaylightAdminSx();
   const showActions = Boolean(onViewHistory || onVoid || onDownload);
 
   return (
     <Paper
-      sx={{
-        width: "100%",
-        borderRadius: 2,
-        overflow: "hidden",
-        boxShadow: theme.shadows[2],
-      }}
+      elevation={scoped ? 0 : 1}
+      sx={
+        scoped
+          ? { ...ds.listCardSx, width: "100%" }
+          : {
+              width: "100%",
+              borderRadius: 2,
+              overflow: "hidden",
+              boxShadow: theme.shadows[2],
+            }
+      }
     >
       {loading ? (
         <Box sx={{ display: "flex", justifyContent: "center", p: 4 }}>
-          <CircularProgress />
+          <CircularProgress sx={scoped ? { color: d.action } : undefined} />
         </Box>
       ) : transactions.length === 0 ? (
         <Box sx={{ p: 3, textAlign: "center" }}>
-          <Typography color="text.secondary">No memos found</Typography>
+          <Typography
+            sx={
+              scoped
+                ? { color: d.muted, fontFamily: fonts.body, fontSize: 13 }
+                : { color: "text.secondary" }
+            }
+          >
+            No memos found
+          </Typography>
         </Box>
       ) : (
         <>
@@ -157,7 +180,10 @@ export default function MemoTransactionsTable({
                     </TableCell>
                     <TableCell>
                       <Box sx={{ display: "flex", alignItems: "center" }}>
-                        <Typography variant="body2">
+                        <Typography
+                          variant="body2"
+                          sx={scoped ? { whiteSpace: "nowrap" } : undefined}
+                        >
                           {row.memoNumber}
                         </Typography>
                         {row.pairedMemoId ? (
@@ -194,27 +220,43 @@ export default function MemoTransactionsTable({
                         sx={{
                           color:
                             row.amount < 0
-                              ? theme.palette.error.main
-                              : theme.palette.success.main,
+                              ? scoped
+                                ? d.danger
+                                : theme.palette.error.main
+                              : scoped
+                                ? d.success
+                                : theme.palette.success.main,
                         }}
                       >
                         <CurrencyDisplay value={row.amount} />
                       </Typography>
                     </TableCell>
                     <TableCell>
-                      <Typography variant="body2">
+                      <Typography
+                        variant="body2"
+                        sx={scoped ? { whiteSpace: "nowrap" } : undefined}
+                      >
                         {row.invoice?.invoiceNumber || "—"}
                       </Typography>
                     </TableCell>
                     <TableCell>
-                      <Chip
-                        label={row.status}
-                        size="small"
-                        color={row.status === "VOIDED" ? "default" : "success"}
-                        variant={
-                          row.status === "VOIDED" ? "outlined" : "filled"
-                        }
-                      />
+                      {scoped ? (
+                        <DaylightStatusPill
+                          label={statusLabel(row.status)}
+                          tone={row.status === "VOIDED" ? "neutral" : "success"}
+                        />
+                      ) : (
+                        <Chip
+                          label={row.status}
+                          size="small"
+                          color={
+                            row.status === "VOIDED" ? "default" : "success"
+                          }
+                          variant={
+                            row.status === "VOIDED" ? "outlined" : "filled"
+                          }
+                        />
+                      )}
                     </TableCell>
                     {showActions && (
                       <TableCell align="right">
@@ -266,7 +308,11 @@ export default function MemoTransactionsTable({
             onRowsPerPageChange={(event) => {
               onPageSizeChange(parseInt(event.target.value, 10));
             }}
-            sx={{ borderTop: `1px solid ${theme.palette.divider}` }}
+            sx={
+              scoped
+                ? ds.paginationSx
+                : { borderTop: `1px solid ${theme.palette.divider}` }
+            }
           />
         </>
       )}

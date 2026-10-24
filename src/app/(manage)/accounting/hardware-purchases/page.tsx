@@ -2,11 +2,9 @@
 
 import {
   Box,
-  Container,
   CircularProgress,
   Alert,
   Button,
-  Stack,
   Typography,
   Paper,
   Table,
@@ -38,8 +36,17 @@ import {
 } from "@/lib/hooks/useHardwarePurchases";
 import { useAccountingVendors } from "@/lib/hooks/usePaymentAccounts";
 import EditHardwarePurchaseModal from "@/components/accounting/EditHardwarePurchaseModal";
+import { useDaylight } from "@/lib/daylight";
+import {
+  DaylightAdminPage,
+  DaylightLoading,
+  DaylightPageHeader,
+  useDaylightAdminSx,
+} from "@/components/daylight/AdminPage";
 
 export default function HardwarePurchases() {
+  const { d } = useDaylight();
+  const ds = useDaylightAdminSx();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [sortBy, setSortBy] = useState("createdAt");
@@ -174,45 +181,39 @@ export default function HardwarePurchases() {
 
   if (invoicesLoading) {
     return (
-      <Container maxWidth="lg">
-        <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
-          <CircularProgress />
-        </Box>
-      </Container>
+      <DaylightAdminPage>
+        <DaylightLoading />
+      </DaylightAdminPage>
     );
   }
 
   if (invoicesError) {
     return (
-      <Container maxWidth="lg">
-        <Alert severity="error">{invoicesError}</Alert>
-      </Container>
+      <DaylightAdminPage>
+        <Alert severity="error" sx={{ ...ds.alertSx("error") }}>
+          {invoicesError}
+        </Alert>
+      </DaylightAdminPage>
     );
   }
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
-      {/* Header */}
-      <Stack
-        direction="row"
-        justifyContent="space-between"
-        alignItems="center"
-        mb={4}
-      >
-        <div>
-          <Typography variant="h4" sx={{ fontWeight: "bold" }}>
-            Hardware Purchases Dashboard
-          </Typography>
-          <Typography color="textSecondary" sx={{ mt: 0.5 }}>
-            Overview of hardware purchase invoices and payments
-          </Typography>
-        </div>
-        <Link href="/accounting/hardware-purchases/create">
-          <Button variant="contained" startIcon={<AddIcon />}>
-            Record Hardware Purchase
-          </Button>
-        </Link>
-      </Stack>
+    <DaylightAdminPage>
+      <DaylightPageHeader
+        title="Hardware Purchases Dashboard"
+        description="Overview of hardware purchase invoices and payments"
+        actions={
+          <Link href="/accounting/hardware-purchases/create">
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              sx={ds.primaryBtnSx}
+            >
+              Record Hardware Purchase
+            </Button>
+          </Link>
+        }
+      />
 
       {/* Stats Row */}
       <Box
@@ -223,8 +224,8 @@ export default function HardwarePurchases() {
             sm: "1fr 1fr",
             md: "1fr 1fr 1fr 1fr",
           },
-          gap: 3,
-          mb: 4,
+          gap: { xs: "12px", sm: "16px", md: "20px" },
+          mb: { xs: "20px", md: "24px" },
         }}
       >
         <Box>
@@ -256,7 +257,7 @@ export default function HardwarePurchases() {
 
       {/* Table */}
       <Box sx={{ display: "grid", gridTemplateColumns: "1fr", gap: 3 }}>
-        <Paper>
+        <Paper elevation={0} sx={ds.listCardSx}>
           <Box
             sx={{
               display: "flex",
@@ -351,6 +352,7 @@ export default function HardwarePurchases() {
               }
               onClick={() => void handleExport("csv")}
               disabled={exporting !== null || total === 0}
+              sx={ds.outlineBtnSx}
             >
               Download CSV
             </Button>
@@ -366,20 +368,21 @@ export default function HardwarePurchases() {
               }
               onClick={() => void handleExport("pdf")}
               disabled={exporting !== null || total === 0}
+              sx={ds.outlineBtnSx}
             >
               Download PDF
             </Button>
           </Box>
           {exportError && (
             <Box sx={{ px: 2 }}>
-              <Alert severity="error" sx={{ mb: 1 }}>
+              <Alert severity="error" sx={{ mb: 1, ...ds.alertSx("error") }}>
                 {exportError}
               </Alert>
             </Box>
           )}
           <TableContainer>
             <Table>
-              <TableHead sx={{ backgroundColor: "#f5f5f5" }}>
+              <TableHead>
                 <TableRow>
                   <TableCell sx={{ fontWeight: "bold" }}>
                     <TableSortLabel
@@ -467,7 +470,11 @@ export default function HardwarePurchases() {
                       <TableCell>
                         <Link
                           href={`/accounting/hardwarePurchase/${invoice.id}`}
-                          style={{ color: "#1976d2", textDecoration: "none" }}
+                          style={{
+                            color: d.action,
+                            textDecoration: "none",
+                            fontWeight: 650,
+                          }}
                         >
                           {invoice.invoiceNumber}
                         </Link>
@@ -509,10 +516,10 @@ export default function HardwarePurchases() {
                             sx={{
                               color:
                                 daysUntilDue < 0
-                                  ? "error.main"
+                                  ? d.danger
                                   : daysUntilDue < 7
-                                    ? "warning.main"
-                                    : "success.main",
+                                    ? d.warning
+                                    : d.success,
                               fontWeight: "500",
                             }}
                           >
@@ -561,6 +568,7 @@ export default function HardwarePurchases() {
               page={page - 1}
               onPageChange={handleChangePage}
               onRowsPerPageChange={handleChangeRowsPerPage}
+              sx={ds.paginationSx}
             />
           </TableContainer>
         </Paper>
@@ -574,6 +582,6 @@ export default function HardwarePurchases() {
         invoiceId={selectedInvoiceId}
         invoiceData={selectedInvoiceData}
       />
-    </Container>
+    </DaylightAdminPage>
   );
 }

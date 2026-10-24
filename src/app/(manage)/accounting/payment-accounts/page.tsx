@@ -5,8 +5,6 @@ import {
   Autocomplete,
   Box,
   Button,
-  Chip,
-  Container,
   FormControl,
   InputLabel,
   MenuItem,
@@ -43,12 +41,18 @@ import {
   useAccountingCurrencies,
   useAccountingEntities,
 } from "@/lib/hooks/usePaymentAccounts";
+import {
+  DaylightAdminPage,
+  useDaylightAdminSx,
+  DaylightStatusPill,
+} from "@/components/daylight/AdminPage";
 
 // ---------------------------------------------------------------------------
 // Entities
 // ---------------------------------------------------------------------------
 
 function EntitiesTab() {
+  const ds = useDaylightAdminSx();
   const { data = [], isLoading, error } = useAccountingEntities();
   const editor = useRecordEditor<AccountingEntity>("entities");
   const [name, setName] = useState("");
@@ -65,12 +69,13 @@ function EntitiesTab() {
           variant="contained"
           startIcon={<AddIcon />}
           onClick={() => openForm("new")}
+          sx={ds.primaryBtnSx}
         >
           Add entity
         </Button>
       </Stack>
       {editor.pageError && (
-        <Alert severity="error" sx={{ mb: 2 }}>
+        <Alert severity="error" sx={{ mb: 2, ...ds.alertSx("error") }}>
           {editor.pageError}
         </Alert>
       )}
@@ -154,6 +159,7 @@ function EntitiesTab() {
 // ---------------------------------------------------------------------------
 
 function BanksTab() {
+  const ds = useDaylightAdminSx();
   const { data = [], isLoading, error } = useAccountingBanks();
   const { data: entities = [] } = useAccountingEntities();
   const { data: currencies = [] } = useAccountingCurrencies();
@@ -218,12 +224,13 @@ function BanksTab() {
           variant="contained"
           startIcon={<AddIcon />}
           onClick={() => openForm("new")}
+          sx={ds.primaryBtnSx}
         >
           Add bank
         </Button>
       </Stack>
       {editor.pageError && (
-        <Alert severity="error" sx={{ mb: 2 }}>
+        <Alert severity="error" sx={{ mb: 2, ...ds.alertSx("error") }}>
           {editor.pageError}
         </Alert>
       )}
@@ -260,11 +267,10 @@ function BanksTab() {
                     useFlexGap
                   >
                     {bank.currencies.map(({ currency }) => (
-                      <Chip
+                      <DaylightStatusPill
                         key={currency.id}
                         label={currency.code}
-                        size="small"
-                        variant={currency.isActive ? "filled" : "outlined"}
+                        tone={currency.isActive ? "info" : "neutral"}
                       />
                     ))}
                   </Stack>
@@ -369,6 +375,7 @@ function BanksTab() {
 // ---------------------------------------------------------------------------
 
 function CurrenciesTab() {
+  const ds = useDaylightAdminSx();
   const { data = [], isLoading, error } = useAccountingCurrencies();
   const editor = useRecordEditor<AccountingCurrency>("currencies");
   const [form, setForm] = useState({ code: "", name: "" });
@@ -389,12 +396,13 @@ function CurrenciesTab() {
           variant="contained"
           startIcon={<AddIcon />}
           onClick={() => openForm("new")}
+          sx={ds.primaryBtnSx}
         >
           Add currency
         </Button>
       </Stack>
       {editor.pageError && (
-        <Alert severity="error" sx={{ mb: 2 }}>
+        <Alert severity="error" sx={{ mb: 2, ...ds.alertSx("error") }}>
           {editor.pageError}
         </Alert>
       )}
@@ -493,25 +501,26 @@ function CurrenciesTab() {
 // ---------------------------------------------------------------------------
 
 export default function PaymentAccountsPage() {
+  const ds = useDaylightAdminSx();
   const [tab, setTab] = useState(0);
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
+    <DaylightAdminPage>
       <Box sx={{ mb: 3 }}>
-        <Typography variant="h4" sx={{ fontWeight: "bold" }}>
+        <Typography component="h1" sx={ds.pageTitleSx}>
           Entities, Banks &amp; Currencies
         </Typography>
-        <Typography color="text.secondary" sx={{ mt: 1 }}>
+        <Typography sx={ds.pageDescSx}>
           The paying and receiving accounts used when recording payments.
           Inactive records are hidden from payment forms but stay on past
           payments.
         </Typography>
       </Box>
-      <Paper sx={{ p: { xs: 2, sm: 3 } }}>
+      <Paper elevation={0} sx={{ ...ds.listCardSx, p: { xs: 2, sm: 3 } }}>
         <Tabs
           value={tab}
           onChange={(_, v) => setTab(v)}
-          sx={{ mb: 3, borderBottom: 1, borderColor: "divider" }}
+          sx={{ ...ds.tabsSx, mb: 3 }}
           variant="scrollable"
           allowScrollButtonsMobile
         >
@@ -523,6 +532,6 @@ export default function PaymentAccountsPage() {
         {tab === 1 && <BanksTab />}
         {tab === 2 && <CurrenciesTab />}
       </Paper>
-    </Container>
+    </DaylightAdminPage>
   );
 }
