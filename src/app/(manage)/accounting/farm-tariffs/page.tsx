@@ -8,11 +8,9 @@
 
 import {
   Box,
-  Container,
   CircularProgress,
   Alert,
   Button,
-  Stack,
   Typography,
   Paper,
   Table,
@@ -46,9 +44,18 @@ import {
 } from "@/lib/hooks/useVendorInvoices";
 import { useAccountingVendors } from "@/lib/hooks/usePaymentAccounts";
 import EditVendorInvoiceModal from "@/components/accounting/EditVendorInvoiceModal";
+import { useDaylight } from "@/lib/daylight";
+import {
+  DaylightAdminPage,
+  DaylightLoading,
+  DaylightPageHeader,
+  useDaylightAdminSx,
+} from "@/components/daylight/AdminPage";
 // import { VendorInvoice } from "@/generated/prisma";
 
 export default function FarmTariffs() {
+  const { d } = useDaylight();
+  const ds = useDaylightAdminSx();
   const {
     dashboard,
     loading: statsLoading,
@@ -165,53 +172,49 @@ export default function FarmTariffs() {
 
   if (loading) {
     return (
-      <Container maxWidth="lg">
-        <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
-          <CircularProgress />
-        </Box>
-      </Container>
+      <DaylightAdminPage>
+        <DaylightLoading />
+      </DaylightAdminPage>
     );
   }
 
   if (error) {
     return (
-      <Container maxWidth="lg">
-        <Alert severity="error">{error}</Alert>
-      </Container>
+      <DaylightAdminPage>
+        <Alert severity="error" sx={{ ...ds.alertSx("error") }}>
+          {error}
+        </Alert>
+      </DaylightAdminPage>
     );
   }
 
   if (!dashboard) {
     return (
-      <Container maxWidth="lg">
-        <Alert severity="warning">No data available</Alert>
-      </Container>
+      <DaylightAdminPage>
+        <Alert severity="warning" sx={{ ...ds.alertSx("warning") }}>
+          No data available
+        </Alert>
+      </DaylightAdminPage>
     );
   }
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
-      {/* Header */}
-      <Stack
-        direction="row"
-        justifyContent="space-between"
-        alignItems="center"
-        mb={4}
-      >
-        <div>
-          <Typography variant="h4" sx={{ fontWeight: "bold" }}>
-            Farm Tariffs Dashboard
-          </Typography>
-          <Typography color="textSecondary" sx={{ mt: 0.5 }}>
-            Overview of vendor invoices and payments
-          </Typography>
-        </div>
-        <Link href="/accounting/vendor-invoices/create">
-          <Button variant="contained" startIcon={<AddIcon />}>
-            Record Vendor Invoice
-          </Button>
-        </Link>
-      </Stack>
+    <DaylightAdminPage>
+      <DaylightPageHeader
+        title="Farm Tariffs Dashboard"
+        description="Overview of vendor invoices and payments"
+        actions={
+          <Link href="/accounting/vendor-invoices/create">
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              sx={ds.primaryBtnSx}
+            >
+              Record Vendor Invoice
+            </Button>
+          </Link>
+        }
+      />
 
       {/* Stats Row */}
       <Box
@@ -222,8 +225,8 @@ export default function FarmTariffs() {
             sm: "1fr 1fr",
             md: "1fr 1fr 1fr 1fr",
           },
-          gap: 3,
-          mb: 4,
+          gap: { xs: "12px", sm: "16px", md: "20px" },
+          mb: { xs: "20px", md: "24px" },
         }}
       >
         <Box>
@@ -281,7 +284,7 @@ export default function FarmTariffs() {
 
       {/* Tables */}
       <Box sx={{ display: "grid", gridTemplateColumns: "1fr", gap: 3 }}>
-        <Paper>
+        <Paper elevation={0} sx={ds.listCardSx}>
           {/*<Box*/}
           {/*    sx={{*/}
           {/*        display: "flex",*/}
@@ -290,11 +293,11 @@ export default function FarmTariffs() {
           {/*        p: 2,*/}
           {/*    }}*/}
           {/*>*/}
-          {/*    <Typography variant="h6" sx={{ fontWeight: "bold" }}>*/}
+          {/*    <Typography component="h2" sx={ds.sectionTitleSx}>*/}
           {/*        All Invoices*/}
           {/*    </Typography>*/}
           {/*    <Link href="/accounting/create">*/}
-          {/*        <Button variant="contained" startIcon={<AddIcon />}>*/}
+          {/*        <Button variant="contained" startIcon={<AddIcon />} sx={ds.primaryBtnSx}>*/}
           {/*            Create Invoice*/}
           {/*        </Button>*/}
           {/*    </Link>*/}
@@ -367,6 +370,7 @@ export default function FarmTariffs() {
               }
               onClick={() => void handleExport("csv")}
               disabled={exporting !== null || total === 0}
+              sx={ds.outlineBtnSx}
             >
               Download CSV
             </Button>
@@ -382,20 +386,21 @@ export default function FarmTariffs() {
               }
               onClick={() => void handleExport("pdf")}
               disabled={exporting !== null || total === 0}
+              sx={ds.outlineBtnSx}
             >
               Download PDF
             </Button>
           </Box>
           {exportError && (
             <Box sx={{ px: 2 }}>
-              <Alert severity="error" sx={{ mb: 1 }}>
+              <Alert severity="error" sx={{ mb: 1, ...ds.alertSx("error") }}>
                 {exportError}
               </Alert>
             </Box>
           )}
           <TableContainer>
             <Table>
-              <TableHead sx={{ backgroundColor: "#f5f5f5" }}>
+              <TableHead>
                 <TableRow>
                   <TableCell sx={{ fontWeight: "bold" }}>
                     <TableSortLabel
@@ -483,7 +488,11 @@ export default function FarmTariffs() {
                       <TableCell>
                         <Link
                           href={`/accounting/vendorInvoice/${invoice.id}`}
-                          style={{ color: "#1976d2", textDecoration: "none" }}
+                          style={{
+                            color: d.action,
+                            textDecoration: "none",
+                            fontWeight: 650,
+                          }}
                         >
                           {invoice.invoiceNumber}
                         </Link>
@@ -528,10 +537,10 @@ export default function FarmTariffs() {
                             sx={{
                               color:
                                 daysUntilDue < 0
-                                  ? "error.main"
+                                  ? d.danger
                                   : daysUntilDue < 7
-                                    ? "warning.main"
-                                    : "success.main",
+                                    ? d.warning
+                                    : d.success,
                               fontWeight: "500",
                             }}
                           >
@@ -580,6 +589,7 @@ export default function FarmTariffs() {
               page={page - 1}
               onPageChange={handleChangePage}
               onRowsPerPageChange={handleChangeRowsPerPage}
+              sx={ds.paginationSx}
             />
           </TableContainer>
         </Paper>
@@ -593,6 +603,6 @@ export default function FarmTariffs() {
         invoiceId={selectedInvoiceId}
         invoiceData={selectedInvoiceData}
       />
-    </Container>
+    </DaylightAdminPage>
   );
 }

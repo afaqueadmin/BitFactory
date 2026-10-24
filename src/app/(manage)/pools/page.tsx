@@ -10,8 +10,6 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import {
-  Box,
-  Container,
   Typography,
   Button,
   Stack,
@@ -43,6 +41,12 @@ import {
   Refresh as RefreshIcon,
   Group as GroupIcon,
 } from "@mui/icons-material";
+import { useDaylight } from "@/lib/daylight";
+import {
+  DaylightAdminPage,
+  DaylightPageHeader,
+  useDaylightAdminSx,
+} from "@/components/daylight/AdminPage";
 
 interface Pool {
   id: string;
@@ -79,6 +83,8 @@ interface ApiResponse<T = unknown> {
 const emptyPoolForm = { name: "", apiUrl: "", description: "" };
 
 export default function PoolsPage() {
+  const { d } = useDaylight();
+  const ds = useDaylightAdminSx();
   const [pools, setPools] = useState<Pool[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -417,116 +423,146 @@ export default function PoolsPage() {
       !poolAuths.some((pa) => pa.userId === c.id),
   );
 
+  const iconBtnSx = (tone: "action" | "danger" = "action") => ({
+    color: d.muted,
+    borderRadius: "8px",
+    "&:hover": {
+      bgcolor: tone === "danger" ? d.dangerSoft : d.hover,
+      color: tone === "danger" ? d.danger : d.action,
+    },
+  });
+
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
-      <Stack
-        direction="row"
-        justifyContent="space-between"
-        alignItems="center"
-        sx={{ mb: 3 }}
-      >
-        <Box>
-          <Typography variant="h4" fontWeight="bold">
-            Mining Pools
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Manage the pool catalog and each client&apos;s pool authentication
-            credential.
-          </Typography>
-        </Box>
-        <Stack direction="row" spacing={1}>
-          <Tooltip title="Refresh">
-            <IconButton onClick={handleRefresh} disabled={isRefreshing}>
-              <RefreshIcon />
-            </IconButton>
-          </Tooltip>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={openCreatePoolDialog}
-          >
-            Add Pool
-          </Button>
-        </Stack>
-      </Stack>
+    <DaylightAdminPage>
+      <DaylightPageHeader
+        title="Mining Pools"
+        description="Manage the pool catalog and each client's pool authentication credential."
+        actions={
+          <>
+            <Button
+              variant="outlined"
+              startIcon={<RefreshIcon />}
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              sx={ds.outlineBtnSx}
+            >
+              {isRefreshing ? "Refreshing..." : "Refresh"}
+            </Button>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={openCreatePoolDialog}
+              sx={ds.primaryBtnSx}
+            >
+              Add Pool
+            </Button>
+          </>
+        }
+      />
 
       {error && (
-        <Alert severity="error" sx={{ mb: 3 }}>
+        <Alert severity="error" sx={{ mb: 3, ...ds.alertSx("error") }}>
           {error}
         </Alert>
       )}
 
-      <Paper elevation={2} sx={{ borderRadius: 2 }}>
-        <TableContainer>
-          <Table>
-            <TableHead>
+      <TableContainer component={Paper} elevation={0} sx={ds.tableCardSx}>
+        <Table>
+          <TableHead>
+            <TableRow>
+              <TableCell>Name</TableCell>
+              <TableCell>API URL</TableCell>
+              <TableCell>Description</TableCell>
+              <TableCell align="right">Actions</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {loading ? (
               <TableRow>
-                <TableCell>Name</TableCell>
-                <TableCell>API URL</TableCell>
-                <TableCell>Description</TableCell>
-                <TableCell align="right">Actions</TableCell>
+                <TableCell colSpan={4} align="center" sx={{ "&&&": { py: 6 } }}>
+                  <CircularProgress size={28} sx={{ color: d.action }} />
+                </TableCell>
               </TableRow>
-            </TableHead>
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={4} align="center" sx={{ py: 6 }}>
-                    <CircularProgress size={28} />
+            ) : pools.length === 0 ? (
+              <TableRow>
+                <TableCell
+                  colSpan={4}
+                  align="center"
+                  sx={{ "&&&": { py: 5, color: d.muted } }}
+                >
+                  No pools configured yet.
+                </TableCell>
+              </TableRow>
+            ) : (
+              pools.map((pool) => (
+                <TableRow key={pool.id}>
+                  <TableCell sx={{ "&&&": { fontWeight: 650 } }}>
+                    {pool.name}
+                  </TableCell>
+                  <TableCell
+                    sx={{
+                      "&&&": {
+                        fontFamily:
+                          "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+                        fontSize: 12,
+                        color: d.muted,
+                        wordBreak: "break-all",
+                      },
+                    }}
+                  >
+                    {pool.apiUrl}
+                  </TableCell>
+                  <TableCell
+                    sx={{
+                      "&&&": { color: pool.description ? d.text : d.muted },
+                    }}
+                  >
+                    {pool.description || "—"}
+                  </TableCell>
+                  <TableCell
+                    align="right"
+                    sx={{ "&&&": { py: "8px", whiteSpace: "nowrap" } }}
+                  >
+                    <Tooltip title="Manage client credentials">
+                      <IconButton
+                        size="small"
+                        aria-label={`Manage ${pool.name} client credentials`}
+                        onClick={() => openClientsDialog(pool)}
+                        sx={iconBtnSx()}
+                      >
+                        <GroupIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Edit pool">
+                      <IconButton
+                        size="small"
+                        aria-label={`Edit ${pool.name}`}
+                        onClick={() => openEditPoolDialog(pool)}
+                        sx={iconBtnSx()}
+                      >
+                        <EditIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Delete pool">
+                      <IconButton
+                        size="small"
+                        aria-label={`Delete ${pool.name}`}
+                        onClick={() => {
+                          setDeleteError(null);
+                          setDeleteTarget(pool);
+                        }}
+                        sx={iconBtnSx("danger")}
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
                   </TableCell>
                 </TableRow>
-              ) : pools.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={4} align="center" sx={{ py: 4 }}>
-                    <Typography color="text.secondary">
-                      No pools configured yet.
-                    </Typography>
-                  </TableCell>
-                </TableRow>
-              ) : (
-                pools.map((pool) => (
-                  <TableRow key={pool.id} hover>
-                    <TableCell sx={{ fontWeight: 600 }}>{pool.name}</TableCell>
-                    <TableCell sx={{ fontFamily: "monospace" }}>
-                      {pool.apiUrl}
-                    </TableCell>
-                    <TableCell>{pool.description || "—"}</TableCell>
-                    <TableCell align="right">
-                      <Tooltip title="Manage client credentials">
-                        <IconButton
-                          size="small"
-                          onClick={() => openClientsDialog(pool)}
-                        >
-                          <GroupIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Edit pool">
-                        <IconButton
-                          size="small"
-                          onClick={() => openEditPoolDialog(pool)}
-                        >
-                          <EditIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Delete pool">
-                        <IconButton
-                          size="small"
-                          color="error"
-                          onClick={() => {
-                            setDeleteError(null);
-                            setDeleteTarget(pool);
-                          }}
-                        >
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Paper>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
 
       {/* Create/Edit Pool Dialog */}
       <Dialog
@@ -790,6 +826,6 @@ export default function PoolsPage() {
           </Button>
         </DialogActions>
       </Dialog>
-    </Container>
+    </DaylightAdminPage>
   );
 }

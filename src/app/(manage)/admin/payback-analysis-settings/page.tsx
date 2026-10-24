@@ -16,6 +16,12 @@ import {
 } from "@mui/material";
 import { Save as SaveIcon, Refresh as RefreshIcon } from "@mui/icons-material";
 import { MinerModel, MINER_LABELS } from "@/lib/helpers/paybackCalculations";
+import { useDaylight } from "@/lib/daylight";
+import {
+  DaylightAdminPage,
+  DaylightPageHeader,
+  useDaylightAdminSx,
+} from "@/components/daylight/AdminPage";
 
 interface PaybackConfig {
   id: number;
@@ -40,6 +46,8 @@ interface PaybackConfig {
 }
 
 export default function PaybackAnalysisSettingsPage() {
+  const { d } = useDaylight();
+  const ds = useDaylightAdminSx();
   const [config, setConfig] = useState<PaybackConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -176,30 +184,29 @@ export default function PaybackAnalysisSettingsPage() {
   }
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Box
-        sx={{
-          mb: 3,
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-        }}
-      >
-        <Typography variant="h4" component="h1">
-          Payback Analysis Settings
-        </Typography>
-        <Button
-          variant="outlined"
-          startIcon={<RefreshIcon />}
-          onClick={fetchConfig}
-          disabled={loading || saving}
-        >
-          Reload
-        </Button>
-      </Box>
+    <DaylightAdminPage>
+      <DaylightPageHeader
+        title="Payback Analysis Settings"
+        description="Values used by the payback analysis calculations across the platform."
+        actions={
+          <Button
+            variant="outlined"
+            sx={ds.outlineBtnSx}
+            startIcon={<RefreshIcon />}
+            onClick={fetchConfig}
+            disabled={loading || saving}
+          >
+            Reload
+          </Button>
+        }
+      />
 
       {error && (
-        <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
+        <Alert
+          severity="error"
+          sx={{ mb: 3, ...ds.alertSx("error") }}
+          onClose={() => setError(null)}
+        >
           {error}
         </Alert>
       )}
@@ -207,28 +214,28 @@ export default function PaybackAnalysisSettingsPage() {
       {success && (
         <Alert
           severity="success"
-          sx={{ mb: 3 }}
+          sx={{ mb: 3, ...ds.alertSx("success") }}
           onClose={() => setSuccess(null)}
         >
           {success}
         </Alert>
       )}
 
-      <Paper elevation={2} sx={{ p: 3 }}>
-        <Typography variant="h6" gutterBottom>
+      <Paper elevation={0} sx={{ ...ds.cardSx, ...ds.inputSx }}>
+        <Typography component="h2" sx={{ ...ds.sectionTitleSx, mb: "4px" }}>
           Configuration Parameters
         </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+        <Typography sx={{ mb: 3, fontSize: 13, color: d.muted }}>
           Edit the values below to update payback analysis calculations across
           the platform.
         </Typography>
 
-        <Divider sx={{ mb: 3 }} />
+        <Divider sx={{ mb: 3, borderColor: d.border }} />
 
-        <Typography variant="h6" gutterBottom>
+        <Typography component="h2" sx={{ ...ds.sectionTitleSx, mb: "4px" }}>
           Miner Hashrate &amp; Hosting
         </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+        <Typography sx={{ mb: 2, fontSize: 13, color: d.muted }}>
           Select a miner model to edit its hashrate, hosting, and power values.
         </Typography>
 
@@ -238,7 +245,7 @@ export default function PaybackAnalysisSettingsPage() {
             setSelectedMiner(newValue)
           }
           aria-label="Miner model selector"
-          sx={{ mb: 2, minHeight: 36 }}
+          sx={{ ...ds.tabsSx, mb: 2 }}
         >
           <Tab
             value="S21PRO"
@@ -264,7 +271,7 @@ export default function PaybackAnalysisSettingsPage() {
                   onChange={handleChange("s21proHashrateStockOs")}
                   helperText="Hashrate with stock operating system"
                   inputProps={{ step: "0.01", min: "0" }}
-                  InputLabelProps={{ sx: { color: "#1565c0" } }}
+                  InputLabelProps={{ sx: { color: `${d.action} !important` } }}
                 />
               </Grid>
               <Grid size={{ xs: 12, sm: 6, md: 3 }}>
@@ -276,7 +283,7 @@ export default function PaybackAnalysisSettingsPage() {
                   onChange={handleChange("s21proHashrateLuxos")}
                   helperText="Hashrate with LuxOS firmware"
                   inputProps={{ step: "0.01", min: "0" }}
-                  InputLabelProps={{ sx: { color: "#1565c0" } }}
+                  InputLabelProps={{ sx: { color: `${d.action} !important` } }}
                 />
               </Grid>
               <Grid size={{ xs: 12, sm: 6, md: 3 }}>
@@ -288,7 +295,7 @@ export default function PaybackAnalysisSettingsPage() {
                   onChange={handleChange("s21proHostingCharges")}
                   helperText="Cost per kilowatt-hour for hosting"
                   inputProps={{ step: "0.00001", min: "0" }}
-                  InputLabelProps={{ sx: { color: "#1565c0" } }}
+                  InputLabelProps={{ sx: { color: `${d.action} !important` } }}
                 />
               </Grid>
               <Grid size={{ xs: 12, sm: 6, md: 3 }}>
@@ -300,7 +307,7 @@ export default function PaybackAnalysisSettingsPage() {
                   onChange={handleChange("s21proMonthlyInvoicingAmount")}
                   helperText="Total monthly invoice amount"
                   inputProps={{ step: "0.01", min: "0" }}
-                  InputLabelProps={{ sx: { color: "#1565c0" } }}
+                  InputLabelProps={{ sx: { color: `${d.action} !important` } }}
                 />
               </Grid>
               <Grid size={{ xs: 12, sm: 6, md: 3 }}>
@@ -312,7 +319,7 @@ export default function PaybackAnalysisSettingsPage() {
                   onChange={handleChange("s21proPowerConsumption")}
                   helperText="Power consumption per miner"
                   inputProps={{ step: "0.0001", min: "0" }}
-                  InputLabelProps={{ sx: { color: "#1565c0" } }}
+                  InputLabelProps={{ sx: { color: `${d.action} !important` } }}
                 />
               </Grid>
             </>
@@ -329,7 +336,7 @@ export default function PaybackAnalysisSettingsPage() {
                   onChange={handleChange("s21xpHashrateStockOs")}
                   helperText="Hashrate with stock operating system"
                   inputProps={{ step: "0.01", min: "0" }}
-                  InputLabelProps={{ sx: { color: "#e65100" } }}
+                  InputLabelProps={{ sx: { color: `${d.warning} !important` } }}
                 />
               </Grid>
               <Grid size={{ xs: 12, sm: 6, md: 3 }}>
@@ -341,7 +348,7 @@ export default function PaybackAnalysisSettingsPage() {
                   onChange={handleChange("s21xpHashrateLuxos")}
                   helperText="Hashrate with LuxOS firmware"
                   inputProps={{ step: "0.01", min: "0" }}
-                  InputLabelProps={{ sx: { color: "#e65100" } }}
+                  InputLabelProps={{ sx: { color: `${d.warning} !important` } }}
                 />
               </Grid>
               <Grid size={{ xs: 12, sm: 6, md: 3 }}>
@@ -353,7 +360,7 @@ export default function PaybackAnalysisSettingsPage() {
                   onChange={handleChange("s21xpHostingCharges")}
                   helperText="Cost per kilowatt-hour for hosting"
                   inputProps={{ step: "0.00001", min: "0" }}
-                  InputLabelProps={{ sx: { color: "#e65100" } }}
+                  InputLabelProps={{ sx: { color: `${d.warning} !important` } }}
                 />
               </Grid>
               <Grid size={{ xs: 12, sm: 6, md: 3 }}>
@@ -365,7 +372,7 @@ export default function PaybackAnalysisSettingsPage() {
                   onChange={handleChange("s21xpMonthlyInvoicingAmount")}
                   helperText="Total monthly invoice amount"
                   inputProps={{ step: "0.01", min: "0" }}
-                  InputLabelProps={{ sx: { color: "#e65100" } }}
+                  InputLabelProps={{ sx: { color: `${d.warning} !important` } }}
                 />
               </Grid>
               <Grid size={{ xs: 12, sm: 6, md: 3 }}>
@@ -377,7 +384,7 @@ export default function PaybackAnalysisSettingsPage() {
                   onChange={handleChange("s21xpPowerConsumption")}
                   helperText="Power consumption per miner"
                   inputProps={{ step: "0.0001", min: "0" }}
-                  InputLabelProps={{ sx: { color: "#e65100" } }}
+                  InputLabelProps={{ sx: { color: `${d.warning} !important` } }}
                 />
               </Grid>
             </>
@@ -447,28 +454,43 @@ export default function PaybackAnalysisSettingsPage() {
             variant="outlined"
             onClick={fetchConfig}
             disabled={loading || saving}
+            sx={ds.outlineBtnSx}
           >
             Reset
           </Button>
           <Button
             variant="contained"
-            color="primary"
-            startIcon={saving ? <CircularProgress size={20} /> : <SaveIcon />}
+            startIcon={
+              saving ? (
+                <CircularProgress size={20} sx={{ color: "inherit" }} />
+              ) : (
+                <SaveIcon />
+              )
+            }
             onClick={handleSave}
             disabled={saving}
+            sx={ds.primaryBtnSx}
           >
             {saving ? "Saving..." : "Save Changes"}
           </Button>
         </Box>
 
         {config && (
-          <Box sx={{ mt: 3, p: 2, bgcolor: "grey.100", borderRadius: 1 }}>
-            <Typography variant="caption" color="text.secondary">
+          <Box
+            sx={{
+              mt: 3,
+              p: "10px 14px",
+              bgcolor: d.canvas,
+              border: `1px solid ${d.border}`,
+              borderRadius: "8px",
+            }}
+          >
+            <Typography variant="caption" sx={{ color: d.muted }}>
               Last updated: {new Date(config.updatedAt).toLocaleString()}
             </Typography>
           </Box>
         )}
       </Paper>
-    </Box>
+    </DaylightAdminPage>
   );
 }

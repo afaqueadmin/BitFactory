@@ -16,7 +16,6 @@
 import React, { useState, useEffect } from "react";
 import {
   Box,
-  Container,
   Typography,
   Paper,
   Table,
@@ -26,16 +25,13 @@ import {
   TableHead,
   TableRow,
   Button,
-  CircularProgress,
   Alert,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
-  Chip,
   TextField,
   Stack,
-  useTheme,
   TablePagination,
   IconButton,
 } from "@mui/material";
@@ -46,6 +42,17 @@ import {
   Refresh as RefreshIcon,
 } from "@mui/icons-material";
 import SpaceFormModal from "@/components/admin/SpaceFormModal";
+import { useDaylight } from "@/lib/daylight";
+import {
+  CellNote,
+  DaylightAdminPage,
+  DaylightEmptyState,
+  DaylightLoading,
+  DaylightPageHeader,
+  DaylightStatusPill,
+  statusLabel,
+  useDaylightAdminSx,
+} from "@/components/daylight/AdminPage";
 
 /**
  * Space data structure (from API)
@@ -76,7 +83,8 @@ interface DeleteConfirmState {
 }
 
 export default function SpacesPage() {
-  const theme = useTheme();
+  const { d, fonts } = useDaylight();
+  const ds = useDaylightAdminSx();
 
   // State management
   const [spaces, setSpaces] = useState<Space[]>([]);
@@ -244,78 +252,44 @@ export default function SpacesPage() {
     page * rowsPerPage + rowsPerPage,
   );
 
-  /**
-   * Get status chip color
-   */
-  const getStatusColor = (
-    status: string,
-  ): "success" | "warning" | "error" | "default" => {
-    switch (status) {
-      case "AVAILABLE":
-        return "success";
-      case "OCCUPIED":
-        return "warning";
-      default:
-        return "default";
-    }
-  };
-
   // ============================================================================
   // RENDER
   // ============================================================================
 
   if (loading) {
     return (
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          minHeight: "100vh",
-        }}
-      >
-        <CircularProgress />
-      </Box>
+      <DaylightAdminPage>
+        <DaylightLoading />
+      </DaylightAdminPage>
     );
   }
 
-  return (
-    <Box
-      component="main"
-      sx={{ py: 4, backgroundColor: "background.default", minHeight: "100vh" }}
-    >
-      <Container maxWidth="xl">
-        {/* Page Header */}
-        <Box
-          sx={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            mb: 4,
-          }}
-        >
-          <Box>
-            <Typography
-              variant="h3"
-              component="h1"
-              sx={{
-                fontWeight: "bold",
-                color: "text.primary",
-              }}
-            >
-              Mining Spaces
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-              Manage mining spaces and their capacity
-            </Typography>
-          </Box>
+  // Above 95% is critical, above 80% needs attention.
+  const capacityColor = (pct: number) =>
+    pct > 95 ? d.danger : pct > 80 ? d.warning : d.success;
 
-          <Stack direction="row" spacing={2}>
+  const iconBtnSx = (tone: "action" | "danger" = "action") => ({
+    color: d.muted,
+    borderRadius: "8px",
+    "&:hover": {
+      bgcolor: tone === "danger" ? d.dangerSoft : d.hover,
+      color: tone === "danger" ? d.danger : d.action,
+    },
+  });
+
+  return (
+    <DaylightAdminPage>
+      <DaylightPageHeader
+        title="Mining Spaces"
+        description="Manage mining spaces and their capacity."
+        actions={
+          <>
             <Button
               variant="outlined"
               startIcon={<RefreshIcon />}
               onClick={() => fetchSpaces(true)}
               disabled={refreshing}
+              sx={ds.outlineBtnSx}
             >
               {refreshing ? "Refreshing..." : "Refresh"}
             </Button>
@@ -324,286 +298,288 @@ export default function SpacesPage() {
               startIcon={<AddIcon />}
               onClick={handleCreateClick}
               disabled={loading || refreshing}
+              sx={ds.primaryBtnSx}
             >
               Add Space
             </Button>
-          </Stack>
-        </Box>
+          </>
+        }
+      />
 
-        {/* Error Alert */}
-        {error && (
-          <Alert severity="error" sx={{ mb: 3 }}>
-            {error}
-          </Alert>
-        )}
+      {/* Error Alert */}
+      {error && (
+        <Alert severity="error" sx={{ mb: 3, ...ds.alertSx("error") }}>
+          {error}
+        </Alert>
+      )}
 
-        {/* Filters */}
-        <Paper sx={{ p: 3, mb: 4, backgroundColor: "background.paper" }}>
-          <Typography
-            variant="h6"
-            sx={{
-              mb: 2,
-              fontWeight: "bold",
-              color: "text.primary",
+      {/* Filters */}
+      <Box
+        component="section"
+        aria-labelledby="space-filters-heading"
+        sx={{ ...ds.cardSx, mb: { xs: "20px", md: "24px" } }}
+      >
+        <Typography
+          id="space-filters-heading"
+          component="h2"
+          sx={{ ...ds.sectionTitleSx, fontSize: 14, mb: "12px" }}
+        >
+          Filters
+        </Typography>
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          spacing={1.5}
+          sx={ds.inputSx}
+        >
+          <TextField
+            size="small"
+            label="Search spaces"
+            placeholder="Search by name, location, or address..."
+            value={searchTerm}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setPage(0); // Reset pagination
             }}
+            sx={{ flex: 1, minWidth: 200 }}
+          />
+
+          <TextField
+            size="small"
+            label="Status"
+            select
+            value={statusFilter}
+            onChange={(e) => {
+              setStatusFilter(e.target.value as "" | "AVAILABLE" | "OCCUPIED");
+              setPage(0); // Reset pagination
+            }}
+            SelectProps={{
+              native: true,
+            }}
+            // Native select shows "All Statuses" for the empty value, so
+            // the label must stay raised or it overlaps that text.
+            InputLabelProps={{ shrink: true }}
+            sx={{ minWidth: 180 }}
           >
-            Filters
-          </Typography>
+            <option value="">All Statuses</option>
+            <option value="AVAILABLE">Available</option>
+            <option value="OCCUPIED">Occupied</option>
+          </TextField>
+        </Stack>
+      </Box>
 
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-            <TextField
-              label="Search spaces"
-              placeholder="Search by name, location, or address..."
-              value={searchTerm}
-              onChange={(e) => {
-                setSearchTerm(e.target.value);
-                setPage(0); // Reset pagination
-              }}
-              sx={{ flex: 1, minWidth: 200 }}
-            />
-
-            <TextField
-              label="Status"
-              select
-              value={statusFilter}
-              onChange={(e) => {
-                setStatusFilter(
-                  e.target.value as "" | "AVAILABLE" | "OCCUPIED",
-                );
-                setPage(0); // Reset pagination
-              }}
-              SelectProps={{
-                native: true,
-              }}
-              sx={{ minWidth: 150 }}
-            >
-              <option value="">All Statuses</option>
-              <option value="AVAILABLE">Available</option>
-              <option value="OCCUPIED">Occupied</option>
-            </TextField>
-          </Stack>
-        </Paper>
-
-        {/* Spaces Table */}
-        {filteredSpaces.length > 0 ? (
-          <Paper sx={{ overflow: "hidden" }}>
-            <TableContainer>
-              <Table>
-                <TableHead>
-                  <TableRow sx={{ backgroundColor: "background.default" }}>
-                    <TableCell sx={{ fontWeight: "bold" }}>
-                      Space Name
-                    </TableCell>
-                    <TableCell sx={{ fontWeight: "bold" }}>Location</TableCell>
-                    <TableCell sx={{ fontWeight: "bold" }}>Address</TableCell>
-                    <TableCell sx={{ fontWeight: "bold" }} align="center">
-                      Capacity
-                    </TableCell>
-                    <TableCell sx={{ fontWeight: "bold" }} align="center">
-                      Power (kW)
-                    </TableCell>
-                    <TableCell sx={{ fontWeight: "bold" }} align="center">
-                      Miners
-                    </TableCell>
-                    <TableCell sx={{ fontWeight: "bold" }} align="center">
-                      Status
-                    </TableCell>
-                    <TableCell sx={{ fontWeight: "bold" }} align="center">
-                      Actions
-                    </TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {paginatedSpaces.map((space) => (
-                    <TableRow
-                      key={space.id}
-                      sx={{
-                        "&:hover": {
-                          backgroundColor: "background.default",
-                        },
-                      }}
-                    >
-                      <TableCell>
-                        <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                          {space.name}
-                        </Typography>
+      {/* Spaces Table */}
+      {filteredSpaces.length > 0 ? (
+        <Paper elevation={0} sx={{ ...ds.tableCardSx, overflow: "hidden" }}>
+          <TableContainer sx={ds.tableSx}>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Space Name</TableCell>
+                  <TableCell>Location</TableCell>
+                  <TableCell>Address</TableCell>
+                  <TableCell align="center">Capacity</TableCell>
+                  <TableCell align="center">Power (kW)</TableCell>
+                  <TableCell align="center">Miners</TableCell>
+                  <TableCell align="center">Status</TableCell>
+                  <TableCell align="center">Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {paginatedSpaces.map((space) => {
+                  const pct = parseFloat(space.capacityPercentage || "0");
+                  return (
+                    <TableRow key={space.id}>
+                      <TableCell sx={{ "&&&": { fontWeight: 650 } }}>
+                        {space.name}
                       </TableCell>
-                      <TableCell>
-                        <Typography variant="body2">
-                          {space.location}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2" color="text.secondary">
-                          {space.address || "-"}
-                        </Typography>
+                      <TableCell>{space.location}</TableCell>
+                      <TableCell sx={{ "&&&": { color: d.muted } }}>
+                        {space.address || "—"}
                       </TableCell>
                       <TableCell align="center">
-                        <Box>
-                          <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                            {space.capacityUsed || 0}/{space.capacity}
-                          </Typography>
-                          <Typography
-                            variant="caption"
-                            color="text.secondary"
+                        <Box
+                          component="span"
+                          sx={{
+                            fontWeight: 650,
+                            fontVariantNumeric: "tabular-nums",
+                          }}
+                        >
+                          {space.capacityUsed || 0}/{space.capacity}
+                        </Box>
+                        {/* Capacity bar */}
+                        <Box
+                          role="meter"
+                          aria-label={`${space.name} capacity used`}
+                          aria-valuenow={Math.min(pct, 100)}
+                          aria-valuemin={0}
+                          aria-valuemax={100}
+                          sx={{
+                            mx: "auto",
+                            mt: "6px",
+                            width: 72,
+                            height: 4,
+                            borderRadius: "999px",
+                            bgcolor: d.border,
+                            overflow: "hidden",
+                          }}
+                        >
+                          <Box
                             sx={{
-                              display: "block",
-                              color:
-                                parseFloat(space.capacityPercentage || "0") > 80
-                                  ? theme.palette.warning.main
-                                  : parseFloat(
-                                        space.capacityPercentage || "0",
-                                      ) > 95
-                                    ? theme.palette.error.main
-                                    : undefined,
+                              width: `${Math.min(pct, 100)}%`,
+                              height: "100%",
+                              bgcolor: capacityColor(pct),
                             }}
-                          >
-                            {space.capacityPercentage || "0"}%
-                          </Typography>
+                          />
+                        </Box>
+                        <Box
+                          component="span"
+                          sx={{
+                            display: "block",
+                            mt: "2px",
+                            fontSize: 11.5,
+                            fontWeight: pct > 80 ? 650 : 500,
+                            color: pct > 80 ? capacityColor(pct) : d.muted,
+                          }}
+                        >
+                          {space.capacityPercentage || "0"}%
                         </Box>
                       </TableCell>
-                      <TableCell align="center">
-                        <Typography variant="body2">
-                          {space.powerCapacity}
-                        </Typography>
+                      <TableCell
+                        align="center"
+                        sx={{ "&&&": { fontVariantNumeric: "tabular-nums" } }}
+                      >
+                        {space.powerCapacity}
                       </TableCell>
                       <TableCell align="center">
-                        <Box>
-                          <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                            {space.minerCount || 0}
-                          </Typography>
-                          <Typography
-                            variant="caption"
-                            color="text.secondary"
-                            sx={{ display: "block" }}
-                          >
-                            {space.activeMinerCount || 0} active
-                          </Typography>
-                          <Typography
-                            variant="caption"
-                            color="text.secondary"
-                            sx={{ display: "block" }}
-                          >
-                            {space.inactiveMinerCount || 0} inactive
-                          </Typography>
+                        <Box component="span" sx={{ fontWeight: 650 }}>
+                          {space.minerCount || 0}
                         </Box>
+                        <CellNote>
+                          {space.activeMinerCount || 0} active ·{" "}
+                          {space.inactiveMinerCount || 0} inactive
+                        </CellNote>
                       </TableCell>
                       <TableCell align="center">
-                        <Chip
-                          label={space.status}
-                          color={getStatusColor(space.status)}
-                          size="small"
-                          variant="outlined"
+                        <DaylightStatusPill
+                          label={statusLabel(space.status)}
+                          tone={
+                            space.status === "AVAILABLE" ? "success" : "warning"
+                          }
                         />
                       </TableCell>
-                      <TableCell align="center">
+                      <TableCell
+                        align="center"
+                        sx={{ "&&&": { py: "8px", whiteSpace: "nowrap" } }}
+                      >
                         <IconButton
                           size="small"
                           onClick={() => handleEditClick(space)}
                           title="Edit space"
+                          aria-label={`Edit ${space.name}`}
+                          sx={iconBtnSx()}
                         >
                           <EditIcon fontSize="small" />
                         </IconButton>
                         <IconButton
                           size="small"
-                          color="error"
                           onClick={() => handleDeleteClick(space)}
                           title="Delete space"
+                          aria-label={`Delete ${space.name}`}
+                          sx={iconBtnSx("danger")}
                         >
                           <DeleteIcon fontSize="small" />
                         </IconButton>
                       </TableCell>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </TableContainer>
 
-            {/* Pagination */}
-            <TablePagination
-              rowsPerPageOptions={[
-                5,
-                10,
-                25,
-                50,
-                { value: 9999, label: "Max" },
-              ]}
-              component="div"
-              count={filteredSpaces.length}
-              rowsPerPage={rowsPerPage}
-              page={page}
-              onPageChange={(event, newPage) => setPage(newPage)}
-              onRowsPerPageChange={(event) => {
-                setRowsPerPage(parseInt(event.target.value, 10));
-                setPage(0);
-              }}
-            />
-          </Paper>
-        ) : (
-          <Paper sx={{ p: 4, textAlign: "center" }}>
-            <Typography variant="h6" color="text.secondary">
-              No spaces found
+          {/* Pagination */}
+          <TablePagination
+            rowsPerPageOptions={[5, 10, 25, 50, { value: 9999, label: "Max" }]}
+            component="div"
+            count={filteredSpaces.length}
+            rowsPerPage={rowsPerPage}
+            page={page}
+            onPageChange={(event, newPage) => setPage(newPage)}
+            onRowsPerPageChange={(event) => {
+              setRowsPerPage(parseInt(event.target.value, 10));
+              setPage(0);
+            }}
+            sx={{
+              borderTop: `1px solid ${d.border}`,
+              color: d.muted,
+              "& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows, & .MuiTablePagination-select":
+                { fontFamily: fonts.body, fontSize: 12.5 },
+              "& .MuiIconButton-root": { color: d.muted },
+            }}
+          />
+        </Paper>
+      ) : (
+        <DaylightEmptyState>
+          <Box sx={{ fontSize: 15, fontWeight: 650, color: d.text }}>
+            No spaces found
+          </Box>
+          <Box sx={{ mt: "4px" }}>
+            {spaces.length === 0
+              ? "Create your first mining space."
+              : "No spaces match your filters."}
+          </Box>
+        </DaylightEmptyState>
+      )}
+
+      {/* Space Form Modal */}
+      <SpaceFormModal
+        open={formModalOpen}
+        onClose={() => {
+          setFormModalOpen(false);
+          setSelectedSpace(null);
+        }}
+        onSuccess={handleFormSuccess}
+        space={selectedSpace}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={deleteConfirm.open}
+        onClose={() => setDeleteConfirm({ ...deleteConfirm, open: false })}
+      >
+        <DialogTitle>Delete Space</DialogTitle>
+        <DialogContent>
+          {deleteConfirm.error ? (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {deleteConfirm.error}
+            </Alert>
+          ) : (
+            <Typography>
+              Are you sure you want to delete{" "}
+              <strong>{deleteConfirm.space?.name}</strong>? This action cannot
+              be undone.
             </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-              {spaces.length === 0
-                ? "Create your first mining space"
-                : "No spaces match your filters"}
-            </Typography>
-          </Paper>
-        )}
-
-        {/* Space Form Modal */}
-        <SpaceFormModal
-          open={formModalOpen}
-          onClose={() => {
-            setFormModalOpen(false);
-            setSelectedSpace(null);
-          }}
-          onSuccess={handleFormSuccess}
-          space={selectedSpace}
-        />
-
-        {/* Delete Confirmation Dialog */}
-        <Dialog
-          open={deleteConfirm.open}
-          onClose={() => setDeleteConfirm({ ...deleteConfirm, open: false })}
-        >
-          <DialogTitle>Delete Space</DialogTitle>
-          <DialogContent>
-            {deleteConfirm.error ? (
-              <Alert severity="error" sx={{ mb: 2 }}>
-                {deleteConfirm.error}
-              </Alert>
-            ) : (
-              <Typography>
-                Are you sure you want to delete{" "}
-                <strong>{deleteConfirm.space?.name}</strong>? This action cannot
-                be undone.
-              </Typography>
-            )}
-          </DialogContent>
-          <DialogActions>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => setDeleteConfirm({ ...deleteConfirm, open: false })}
+            disabled={deleteConfirm.isDeleting}
+          >
+            Cancel
+          </Button>
+          {!deleteConfirm.error && (
             <Button
-              onClick={() =>
-                setDeleteConfirm({ ...deleteConfirm, open: false })
-              }
+              onClick={handleConfirmDelete}
+              color="error"
+              variant="contained"
               disabled={deleteConfirm.isDeleting}
             >
-              Cancel
+              {deleteConfirm.isDeleting ? "Deleting..." : "Delete"}
             </Button>
-            {!deleteConfirm.error && (
-              <Button
-                onClick={handleConfirmDelete}
-                color="error"
-                variant="contained"
-                disabled={deleteConfirm.isDeleting}
-              >
-                {deleteConfirm.isDeleting ? "Deleting..." : "Delete"}
-              </Button>
-            )}
-          </DialogActions>
-        </Dialog>
-      </Container>
-    </Box>
+          )}
+        </DialogActions>
+      </Dialog>
+    </DaylightAdminPage>
   );
 }

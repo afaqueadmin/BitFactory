@@ -4,11 +4,7 @@ import {
   Alert,
   Box,
   Button,
-  Card,
-  CardContent,
-  Chip,
   CircularProgress,
-  Container,
   LinearProgress,
   MenuItem,
   Paper,
@@ -36,6 +32,14 @@ import {
   EMAIL_RUN_SOURCE_LABELS,
   emailReportTypeLabel,
 } from "@/lib/accounting/emailReport";
+import { RADIUS_CARD, useDaylight } from "@/lib/daylight";
+import {
+  DaylightAdminPage,
+  useDaylightAdminSx,
+  CellNote,
+  DaylightStatusPill,
+  statusLabel,
+} from "@/components/daylight/AdminPage";
 
 interface EmailSendRun {
   id: string;
@@ -94,17 +98,35 @@ function KpiTile({
   value: string | number;
   color?: string;
 }) {
+  const { d, fonts } = useDaylight();
   return (
-    <Card variant="outlined">
-      <CardContent sx={{ py: 2, "&:last-child": { pb: 2 } }}>
-        <Typography variant="caption" color="text.secondary">
-          {label}
-        </Typography>
-        <Typography variant="h5" sx={{ fontWeight: 600, color }}>
-          {value}
-        </Typography>
-      </CardContent>
-    </Card>
+    <Box
+      role="article"
+      aria-label={label}
+      sx={{
+        bgcolor: d.surface,
+        border: `1px solid ${d.border}`,
+        borderRadius: RADIUS_CARD,
+        boxShadow: d.shadow,
+        p: { xs: "14px 16px", sm: "16px 20px" },
+        fontFamily: fonts.body,
+      }}
+    >
+      <Box sx={{ fontSize: 13, fontWeight: 600, color: d.muted }}>{label}</Box>
+      <Box
+        sx={{
+          mt: "6px",
+          fontFamily: fonts.heading,
+          fontWeight: 750,
+          fontSize: 24,
+          letterSpacing: "-0.02em",
+          fontVariantNumeric: "tabular-nums",
+          color: color ?? d.text,
+        }}
+      >
+        {value}
+      </Box>
+    </Box>
   );
 }
 
@@ -123,6 +145,8 @@ export default function EmailReportPage() {
 }
 
 function EmailReportContent() {
+  const { d } = useDaylight();
+  const ds = useDaylightAdminSx();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -213,7 +237,7 @@ function EmailReportContent() {
   const summary = data?.summary;
 
   return (
-    <Container maxWidth="xl" sx={{ py: 4 }}>
+    <DaylightAdminPage>
       <Stack spacing={3}>
         <Box
           display="flex"
@@ -223,10 +247,10 @@ function EmailReportContent() {
           flexWrap="wrap"
         >
           <Box>
-            <Typography variant="h4" component="h1" gutterBottom>
+            <Typography component="h1" sx={ds.pageTitleSx}>
               Email Send Reports
             </Typography>
-            <Typography variant="body2" color="text.secondary">
+            <Typography sx={ds.pageDescSx}>
               Every invoice, cancellation and customer-facing memo email sent
               from Hosting &amp; Colocation, Hardware Sales and Hardware Repair
             </Typography>
@@ -237,17 +261,19 @@ function EmailReportContent() {
             startIcon={<RefreshIcon />}
             onClick={fetchRuns}
             disabled={loading}
+            sx={ds.outlineBtnSx}
           >
             {loading ? "Refreshing..." : "Refresh"}
           </Button>
         </Box>
 
-        <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
+        <Box>
           <Tabs
             value={tab}
             onChange={(_, value) => handleTabChange(value)}
             variant="scrollable"
             allowScrollButtonsMobile
+            sx={ds.tabsSx}
           >
             <Tab value="all" label="All" />
             {EMAIL_REPORT_TYPES.map((type) => (
@@ -265,12 +291,12 @@ function EmailReportContent() {
           <KpiTile
             label="Emails sent"
             value={summary?.sent ?? "—"}
-            color="success.main"
+            color={d.success}
           />
           <KpiTile
             label="Failed"
             value={summary?.failed ?? "—"}
-            color={summary && summary.failed > 0 ? "error.main" : undefined}
+            color={summary && summary.failed > 0 ? d.danger : undefined}
           />
           <KpiTile
             label="Success rate"
@@ -280,7 +306,7 @@ function EmailReportContent() {
           />
         </Box>
 
-        <Paper variant="outlined" sx={{ p: 2 }}>
+        <Paper elevation={0} sx={{ ...ds.cardSx, ...ds.inputSx }}>
           <Box
             display="grid"
             gridTemplateColumns="repeat(auto-fit, minmax(160px, 1fr))"
@@ -364,7 +390,7 @@ function EmailReportContent() {
               }}
             />
             {hasFilters && (
-              <Button size="small" onClick={clearFilters}>
+              <Button size="small" onClick={clearFilters} sx={ds.textBtnSx()}>
                 Clear filters
               </Button>
             )}
@@ -374,8 +400,9 @@ function EmailReportContent() {
         {error && (
           <Alert
             severity="error"
+            sx={{ ...ds.alertSx("error") }}
             action={
-              <Button color="inherit" size="small" onClick={fetchRuns}>
+              <Button size="small" onClick={fetchRuns} sx={ds.textBtnSx()}>
                 Retry
               </Button>
             }
@@ -384,7 +411,7 @@ function EmailReportContent() {
           </Alert>
         )}
 
-        <TableContainer component={Paper} variant="outlined">
+        <TableContainer component={Paper} elevation={0} sx={ds.listCardSx}>
           {loading && <LinearProgress />}
           <Table size="small">
             <TableHead>
@@ -411,7 +438,7 @@ function EmailReportContent() {
               {!loading && runs.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={8} sx={{ textAlign: "center", py: 6 }}>
-                    <Typography variant="body2" color="text.secondary">
+                    <Typography variant="body2" sx={{ color: d.muted }}>
                       {hasFilters
                         ? "No email runs match these filters"
                         : "No email runs yet"}
@@ -429,44 +456,37 @@ function EmailReportContent() {
                       <TableCell>{emailReportTypeLabel(run.type)}</TableCell>
                       <TableCell>
                         <Stack direction="row" spacing={0.5}>
-                          <Chip
-                            size="small"
+                          <DaylightStatusPill
                             label={EMAIL_RUN_KIND_LABELS[run.kind] ?? run.kind}
-                            color={
-                              run.kind === "CANCELLATION"
-                                ? "warning"
-                                : "primary"
+                            tone={
+                              run.kind === "CANCELLATION" ? "warning" : "info"
                             }
-                            variant="outlined"
                           />
-                          <Chip
-                            size="small"
+                          <DaylightStatusPill
                             label={
                               EMAIL_RUN_SOURCE_LABELS[run.source] ?? run.source
                             }
-                            variant="outlined"
+                            tone="neutral"
                           />
                         </Stack>
                       </TableCell>
                       <TableCell>
-                        <Chip
-                          label={run.status.replace("_", " ")}
-                          color={
+                        <DaylightStatusPill
+                          label={statusLabel(run.status).replace("_", " ")}
+                          tone={
                             run.status === "COMPLETED"
                               ? "success"
                               : run.status === "IN_PROGRESS"
                                 ? "warning"
-                                : "error"
+                                : "danger"
                           }
-                          size="small"
-                          variant="outlined"
                         />
                       </TableCell>
                       <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
                         <Typography
                           component="span"
                           variant="body2"
-                          color="success.main"
+                          color={d.success}
                         >
                           {run.successCount}
                         </Typography>
@@ -474,11 +494,7 @@ function EmailReportContent() {
                         <Typography
                           component="span"
                           variant="body2"
-                          color={
-                            run.failureCount > 0
-                              ? "error.main"
-                              : "text.secondary"
-                          }
+                          color={run.failureCount > 0 ? d.danger : d.muted}
                         >
                           {run.failureCount}
                         </Typography>
@@ -506,9 +522,7 @@ function EmailReportContent() {
                         <Typography variant="body2">
                           {run.createdBy.name}
                         </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {run.createdBy.email}
-                        </Typography>
+                        <CellNote>{run.createdBy.email}</CellNote>
                       </TableCell>
                       <TableCell align="right">
                         <Button
@@ -516,6 +530,7 @@ function EmailReportContent() {
                           href={`/accounting/email-report/${run.id}`}
                           variant="outlined"
                           size="small"
+                          sx={ds.outlineBtnSx}
                         >
                           View
                         </Button>
@@ -537,9 +552,10 @@ function EmailReportContent() {
               setRowsPerPage(parseInt(e.target.value, 10));
               setPage(0);
             }}
+            sx={ds.paginationSx}
           />
         </TableContainer>
       </Stack>
-    </Container>
+    </DaylightAdminPage>
   );
 }

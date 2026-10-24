@@ -27,6 +27,11 @@ import ToggleOnIcon from "@mui/icons-material/ToggleOn";
 import ToggleOffIcon from "@mui/icons-material/ToggleOff";
 import { ReactNode, useState } from "react";
 import { useSavePaymentAccount } from "@/lib/hooks/usePaymentAccounts";
+import { useDaylight } from "@/lib/daylight";
+import {
+  useDaylightAdminSx,
+  useDaylightScope,
+} from "@/components/daylight/AdminPage";
 
 export const inactiveRowSx = { opacity: 0.55 };
 
@@ -166,16 +171,33 @@ export function TableState({
   empty: boolean;
   colSpan: number;
 }) {
+  // Hooks before the early return.
+  const scoped = useDaylightScope();
+  const { d } = useDaylight();
+  const ds = useDaylightAdminSx();
   if (!loading && !error && !empty) return null;
   return (
     <TableRow>
       <TableCell colSpan={colSpan} align="center" sx={{ py: 4 }}>
         {loading ? (
-          <CircularProgress size={24} />
+          <CircularProgress
+            size={24}
+            sx={scoped ? { color: d.action } : undefined}
+          />
         ) : error ? (
-          <Alert severity="error">{error.message}</Alert>
+          <Alert severity="error" sx={scoped ? ds.alertSx("error") : undefined}>
+            {error.message}
+          </Alert>
         ) : (
-          <Typography color="text.secondary">Nothing added yet</Typography>
+          <Typography
+            sx={
+              scoped
+                ? { color: d.muted, fontSize: 13 }
+                : { color: "text.secondary" }
+            }
+          >
+            Nothing added yet
+          </Typography>
         )}
       </TableCell>
     </TableRow>

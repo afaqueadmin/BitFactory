@@ -21,12 +21,9 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   Box,
-  Container,
   Typography,
   Button,
-  Stack,
   Alert,
-  CircularProgress,
   Paper,
   Table,
   TableBody,
@@ -35,9 +32,6 @@ import {
   TableHead,
   TableRow,
   TableSortLabel,
-  Chip,
-  IconButton,
-  Tooltip,
   FormControl,
   InputLabel,
   Select,
@@ -49,7 +43,17 @@ import {
 } from "@mui/material";
 import { Refresh as RefreshIcon } from "@mui/icons-material";
 import BuildIcon from "@mui/icons-material/Build";
-import GradientStatCard from "@/components/GradientStatCard";
+import AdminValueCard from "@/components/admin/AdminValueCard";
+import { useDaylight } from "@/lib/daylight";
+import {
+  DaylightAdminPage,
+  DaylightEmptyState,
+  DaylightLoading,
+  DaylightPageHeader,
+  DaylightStatusPill,
+  statusLabel,
+  useDaylightAdminSx,
+} from "@/components/daylight/AdminPage";
 import { Subaccount, WorkersResponse } from "@/lib/luxor";
 import { dedupeWorkers, workerNameKey } from "@/lib/luxorWorkerDedupe";
 
@@ -132,6 +136,8 @@ interface WorkerStats {
 }
 
 export default function WorkersPage() {
+  const { d, fonts } = useDaylight();
+  const ds = useDaylightAdminSx();
   const [state, setState] = useState<WorkersState>({
     subaccounts: [],
     workers: [],
@@ -597,119 +603,102 @@ export default function WorkersPage() {
 
   if (state.loading) {
     return (
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          minHeight: "100vh",
-        }}
-      >
-        <CircularProgress />
-      </Box>
+      <DaylightAdminPage>
+        <DaylightLoading />
+      </DaylightAdminPage>
     );
   }
 
-  return (
-    <Box sx={{ p: 3 }}>
-      {/* Page Title */}
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          mb: 4,
-        }}
-      >
-        <Typography
-          variant="h4"
-          sx={{
-            fontWeight: "bold",
-            color: (theme) =>
-              theme.palette.mode === "dark" ? "primary.light" : "primary.dark",
-          }}
-        >
-          Workers Management
-        </Typography>
+  const efficiencyColor = (pct: number) =>
+    pct >= 85 ? d.success : pct >= 75 ? d.warning : d.danger;
+  // Tabular figures keep the number columns aligned.
+  const monoSx = {
+    fontSize: 12.5,
+    fontWeight: 600,
+    fontVariantNumeric: "tabular-nums",
+  } as const;
 
-        <Tooltip title="Refresh worker data">
-          <IconButton
+  return (
+    <DaylightAdminPage>
+      <DaylightPageHeader
+        title="Workers Management"
+        description="Luxor workers across the selected subaccounts."
+        actions={
+          <Button
+            variant="outlined"
+            startIcon={<RefreshIcon />}
             onClick={handleRefresh}
             disabled={
               isRefreshing || state.selectedSubaccountNames.length === 0
             }
-            sx={{
-              background: (theme) =>
-                `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.primary.dark})`,
-              color: "white",
-              "&:hover": {
-                background: (theme) =>
-                  `linear-gradient(45deg, ${theme.palette.primary.dark}, ${theme.palette.primary.main})`,
-              },
-            }}
+            sx={ds.outlineBtnSx}
           >
-            <RefreshIcon />
-          </IconButton>
-        </Tooltip>
-      </Box>
+            {isRefreshing ? "Refreshing..." : "Refresh"}
+          </Button>
+        }
+      />
 
       {/* Stats Cards */}
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h6" sx={{ mb: 2, fontWeight: "medium" }}>
-          Worker Statistics
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns:
+            "repeat(auto-fit, minmax(min(180px, 100%), 1fr))",
+          gap: { xs: "12px", sm: "16px", md: "20px" },
+          mb: { xs: "20px", md: "24px" },
+        }}
+      >
+        <AdminValueCard
+          daylight
+          title="Total Workers"
+          value={stats.totalWorkers}
+        />
+        <AdminValueCard
+          daylight
+          title="Active Workers"
+          value={stats.activeWorkers}
+        />
+        <AdminValueCard
+          daylight
+          title="Inactive Workers"
+          value={stats.inactiveWorkers}
+        />
+        <AdminValueCard
+          daylight
+          title="Avg Hashrate"
+          value={stats.averageHashrate.toFixed(2)}
+          subtitle="TH/s"
+        />
+        <AdminValueCard
+          daylight
+          title="Avg Efficiency"
+          value={`${(stats.averageEfficiency * 100).toFixed(2)}%`}
+        />
+      </Box>
+
+      {/* Selection Filters */}
+      <Box
+        component="section"
+        aria-labelledby="worker-filters-heading"
+        sx={{ ...ds.cardSx, mb: { xs: "20px", md: "24px" } }}
+      >
+        <Typography
+          id="worker-filters-heading"
+          component="h2"
+          sx={{ ...ds.sectionTitleSx, fontSize: 14, mb: "12px" }}
+        >
+          Filters
         </Typography>
         <Box
           sx={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-            gap: 2,
+            gridTemplateColumns: { xs: "1fr", md: "2fr 1fr" },
+            gap: "12px",
+            ...ds.inputSx,
           }}
         >
-          <GradientStatCard
-            title="Total Workers"
-            value={String(stats.totalWorkers)}
-          />
-          <GradientStatCard
-            title="Active Workers"
-            value={String(stats.activeWorkers)}
-          />
-          <GradientStatCard
-            title="Inactive Workers"
-            value={String(stats.inactiveWorkers)}
-          />
-          <GradientStatCard
-            title="Avg Hashrate"
-            value={`${stats.averageHashrate.toFixed(2)} TH/s`}
-          />
-          <GradientStatCard
-            title="Avg Efficiency"
-            value={`${(stats.averageEfficiency * 100).toFixed(2)}%`}
-          />
-        </Box>
-      </Box>
-
-      {/* Selection Filters */}
-      <Paper
-        elevation={3}
-        sx={{
-          p: 3,
-          mb: 4,
-          borderRadius: 2,
-          background: (theme) =>
-            theme.palette.mode === "dark"
-              ? "linear-gradient(145deg, rgba(40,40,40,0.9), rgba(30,30,30,0.9))"
-              : "linear-gradient(145deg, rgba(255,255,255,0.9), rgba(250,250,250,0.9))",
-          backdropFilter: "blur(10px)",
-          border: (theme) => `1px solid ${theme.palette.divider}`,
-        }}
-      >
-        <Typography variant="h6" sx={{ mb: 2, fontWeight: "medium" }}>
-          Filter Options
-        </Typography>
-
-        <Stack spacing={2}>
           {/* Subaccounts Multi-Select with Checkboxes */}
-          <FormControl fullWidth>
+          <FormControl fullWidth size="small">
             <InputLabel>Select Subaccounts</InputLabel>
             <Select
               multiple
@@ -772,7 +761,7 @@ export default function WorkersPage() {
           </FormControl>
 
           {/* Status Select */}
-          <FormControl fullWidth>
+          <FormControl fullWidth size="small">
             <InputLabel>Worker Status</InputLabel>
             <Select
               value={state.statusFilter}
@@ -788,319 +777,190 @@ export default function WorkersPage() {
               <MenuItem value="INACTIVE">Inactive</MenuItem>
             </Select>
           </FormControl>
-        </Stack>
+        </Box>
 
         {state.error && (
-          <Alert severity="warning" sx={{ mt: 2 }}>
+          <Alert severity="warning" sx={{ mt: 2, ...ds.alertSx("warning") }}>
             {state.error}
           </Alert>
         )}
-      </Paper>
+      </Box>
 
       {/* Workers Table */}
-      <Paper
-        elevation={3}
-        sx={{
-          borderRadius: 2,
-          background: (theme) =>
-            theme.palette.mode === "dark"
-              ? "linear-gradient(145deg, rgba(40,40,40,0.9), rgba(30,30,30,0.9))"
-              : "linear-gradient(145deg, rgba(255,255,255,0.9), rgba(250,250,250,0.9))",
-          backdropFilter: "blur(10px)",
-          border: (theme) => `1px solid ${theme.palette.divider}`,
-        }}
-      >
-        <Box sx={{ p: 3 }}>
-          <Typography variant="h6" sx={{ mb: 2, fontWeight: "medium" }}>
-            Workers
-          </Typography>
-
-          {state.selectedSubaccountNames.length === 0 ? (
-            <Box sx={{ textAlign: "center", py: 4 }}>
-              <BuildIcon
-                sx={{
-                  fontSize: 64,
-                  color: "text.secondary",
-                  mb: 2,
-                  opacity: 0.5,
-                }}
-              />
-              <Typography color="text.secondary">
-                Please select at least one subaccount to view workers
-              </Typography>
-            </Box>
-          ) : state.workers.length === 0 ? (
-            <Box sx={{ textAlign: "center", py: 4 }}>
-              <BuildIcon
-                sx={{
-                  fontSize: 64,
-                  color: "text.secondary",
-                  mb: 2,
-                  opacity: 0.5,
-                }}
-              />
-              <Typography color="text.secondary">
-                No workers found for the selected subaccounts
-              </Typography>
-            </Box>
-          ) : (
-            <>
-              <TableContainer
-                sx={{
-                  borderRadius: 1,
-                  border: (theme) => `1px solid ${theme.palette.divider}`,
-                  overflow: "hidden",
-                }}
-              >
-                <Table
-                  sx={{
-                    "& .MuiTableCell-head": {
-                      backgroundColor: (theme) =>
-                        theme.palette.mode === "dark"
-                          ? "rgba(33, 150, 243, 0.15)"
-                          : "rgba(33, 150, 243, 0.08)",
-                      borderBottom: (theme) =>
-                        `2px solid ${theme.palette.primary.main}`,
-                      fontWeight: 700,
-                      fontSize: "0.875rem",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.5px",
-                      color: (theme) => theme.palette.primary.main,
-                      padding: "16px 12px",
-                    },
-                    "& .MuiTableCell-body": {
-                      padding: "14px 12px",
-                      borderBottom: (theme) =>
-                        `1px solid ${theme.palette.divider}`,
-                    },
-                    "& .MuiTableRow-root:hover": {
-                      backgroundColor: (theme) =>
-                        theme.palette.mode === "dark"
-                          ? "rgba(33, 150, 243, 0.08)"
-                          : "rgba(33, 150, 243, 0.04)",
-                      transition: "background-color 0.2s ease-in-out",
-                    },
-                    "& .MuiTableRow-root:last-child .MuiTableCell-body": {
-                      borderBottom: "none",
-                    },
-                  }}
-                >
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>
-                        <TableSortLabel
-                          active={sortField === "name"}
-                          direction={sortField === "name" ? sortOrder : "asc"}
-                          onClick={() => handleSort("name")}
+      {state.selectedSubaccountNames.length === 0 ||
+      state.workers.length === 0 ? (
+        <DaylightEmptyState>
+          <BuildIcon
+            sx={{ fontSize: 40, color: d.inputBorder, mb: 1 }}
+            aria-hidden
+          />
+          <Box>
+            {state.selectedSubaccountNames.length === 0
+              ? "Please select at least one subaccount to view workers."
+              : "No workers found for the selected subaccounts."}
+          </Box>
+        </DaylightEmptyState>
+      ) : (
+        <Paper elevation={0} sx={{ ...ds.tableCardSx, overflow: "hidden" }}>
+          <TableContainer sx={ds.tableSx}>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>
+                    <TableSortLabel
+                      active={sortField === "name"}
+                      direction={sortField === "name" ? sortOrder : "asc"}
+                      onClick={() => handleSort("name")}
+                    >
+                      Worker Name
+                    </TableSortLabel>
+                  </TableCell>
+                  <TableCell>
+                    <TableSortLabel
+                      active={sortField === "subaccount"}
+                      direction={sortField === "subaccount" ? sortOrder : "asc"}
+                      onClick={() => handleSort("subaccount")}
+                    >
+                      Subaccount
+                    </TableSortLabel>
+                  </TableCell>
+                  <TableCell align="right">
+                    <TableSortLabel
+                      active={sortField === "hashrate"}
+                      direction={sortField === "hashrate" ? sortOrder : "asc"}
+                      onClick={() => handleSort("hashrate")}
+                    >
+                      Hashrate (TH/s)
+                    </TableSortLabel>
+                  </TableCell>
+                  <TableCell align="right">
+                    <TableSortLabel
+                      active={sortField === "efficiency"}
+                      direction={sortField === "efficiency" ? sortOrder : "asc"}
+                      onClick={() => handleSort("efficiency")}
+                    >
+                      Efficiency (%)
+                    </TableSortLabel>
+                  </TableCell>
+                  <TableCell align="center">
+                    <TableSortLabel
+                      active={sortField === "status"}
+                      direction={sortField === "status" ? sortOrder : "asc"}
+                      onClick={() => handleSort("status")}
+                    >
+                      Status
+                    </TableSortLabel>
+                  </TableCell>
+                  <TableCell>
+                    <TableSortLabel
+                      active={sortField === "lastShare"}
+                      direction={sortField === "lastShare" ? sortOrder : "asc"}
+                      onClick={() => handleSort("lastShare")}
+                    >
+                      Last Share
+                    </TableSortLabel>
+                  </TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {getSortedWorkers()
+                  .slice(
+                    (tableCurrentPage - 1) * tableRowsPerPage,
+                    tableCurrentPage * tableRowsPerPage,
+                  )
+                  .map((worker) => {
+                    const efficiencyPct = worker.efficiency * 100;
+                    return (
+                      <TableRow key={worker.id}>
+                        <TableCell
+                          sx={{ "&&&": { fontWeight: 650, color: d.action } }}
                         >
-                          Worker Name
-                        </TableSortLabel>
-                      </TableCell>
-                      <TableCell>
-                        <TableSortLabel
-                          active={sortField === "subaccount"}
-                          direction={
-                            sortField === "subaccount" ? sortOrder : "asc"
-                          }
-                          onClick={() => handleSort("subaccount")}
-                        >
-                          Subaccount
-                        </TableSortLabel>
-                      </TableCell>
-                      <TableCell align="right">
-                        <TableSortLabel
-                          active={sortField === "hashrate"}
-                          direction={
-                            sortField === "hashrate" ? sortOrder : "asc"
-                          }
-                          onClick={() => handleSort("hashrate")}
-                        >
-                          Hashrate (TH/s)
-                        </TableSortLabel>
-                      </TableCell>
-                      <TableCell align="right">
-                        <TableSortLabel
-                          active={sortField === "efficiency"}
-                          direction={
-                            sortField === "efficiency" ? sortOrder : "asc"
-                          }
-                          onClick={() => handleSort("efficiency")}
-                        >
-                          Efficiency (%)
-                        </TableSortLabel>
-                      </TableCell>
-                      <TableCell align="center">
-                        <TableSortLabel
-                          active={sortField === "status"}
-                          direction={sortField === "status" ? sortOrder : "asc"}
-                          onClick={() => handleSort("status")}
-                        >
-                          Status
-                        </TableSortLabel>
-                      </TableCell>
-                      <TableCell>
-                        <TableSortLabel
-                          active={sortField === "lastShare"}
-                          direction={
-                            sortField === "lastShare" ? sortOrder : "asc"
-                          }
-                          onClick={() => handleSort("lastShare")}
-                        >
-                          Last Share
-                        </TableSortLabel>
-                      </TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {getSortedWorkers()
-                      .slice(
-                        (tableCurrentPage - 1) * tableRowsPerPage,
-                        tableCurrentPage * tableRowsPerPage,
-                      )
-                      .map((worker, idx) => (
-                        <TableRow
-                          key={worker.id}
+                          {worker.name}
+                        </TableCell>
+                        <TableCell sx={{ "&&&": { color: d.muted } }}>
+                          {worker.subaccount_name}
+                        </TableCell>
+                        <TableCell align="right" sx={{ "&&&": monoSx }}>
+                          {(worker.hashrate / 1000000000000).toFixed(2)}
+                        </TableCell>
+                        <TableCell
+                          align="right"
                           sx={{
-                            backgroundColor:
-                              idx % 2 === 0
-                                ? "transparent"
-                                : (theme) =>
-                                    theme.palette.mode === "dark"
-                                      ? "rgba(255, 255, 255, 0.02)"
-                                      : "rgba(0, 0, 0, 0.01)",
+                            "&&&": {
+                              ...monoSx,
+                              color: efficiencyColor(efficiencyPct),
+                            },
                           }}
                         >
-                          <TableCell>
-                            <Typography
-                              variant="body2"
-                              sx={{
-                                fontWeight: 600,
-                                color: (theme) => theme.palette.primary.main,
-                              }}
-                            >
-                              {worker.name}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography
-                              variant="body2"
-                              sx={{
-                                color: "text.secondary",
-                              }}
-                            >
-                              {worker.subaccount_name}
-                            </Typography>
-                          </TableCell>
-                          <TableCell align="right">
-                            <Typography
-                              variant="body2"
-                              sx={{
-                                fontWeight: 500,
-                                fontFamily: "monospace",
-                                color: (theme) => theme.palette.info.main,
-                              }}
-                            >
-                              {(worker.hashrate / 1000000000000).toFixed(2)}
-                            </Typography>
-                          </TableCell>
-                          <TableCell align="right">
-                            <Typography
-                              variant="body2"
-                              sx={{
-                                fontWeight: 500,
-                                fontFamily: "monospace",
-                                color:
-                                  worker.efficiency * 100 >= 85
-                                    ? (theme) => theme.palette.success.main
-                                    : worker.efficiency * 100 >= 75
-                                      ? (theme) => theme.palette.warning.main
-                                      : (theme) => theme.palette.error.main,
-                              }}
-                            >
-                              {(worker.efficiency * 100).toFixed(2)}
-                            </Typography>
-                          </TableCell>
-                          <TableCell align="center">
-                            <Chip
-                              label={worker.status}
-                              color={
-                                worker.status === "ACTIVE"
-                                  ? "success"
-                                  : "default"
-                              }
-                              variant={
-                                worker.status === "ACTIVE"
-                                  ? "filled"
-                                  : "outlined"
-                              }
-                              size="small"
-                              sx={{
-                                fontWeight: 600,
-                              }}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Typography
-                              variant="caption"
-                              sx={{
-                                color: "text.secondary",
-                                display: "block",
-                              }}
-                            >
-                              {new Date(
-                                worker.last_share_time,
-                              ).toLocaleString()}
-                            </Typography>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
+                          {efficiencyPct.toFixed(2)}
+                        </TableCell>
+                        <TableCell align="center">
+                          <DaylightStatusPill
+                            label={statusLabel(worker.status)}
+                            tone={
+                              worker.status === "ACTIVE" ? "success" : "neutral"
+                            }
+                          />
+                        </TableCell>
+                        <TableCell
+                          sx={{
+                            "&&&": {
+                              whiteSpace: "nowrap",
+                              fontSize: 12,
+                              color: d.muted,
+                            },
+                          }}
+                        >
+                          {new Date(worker.last_share_time).toLocaleString()}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+              </TableBody>
+            </Table>
+          </TableContainer>
 
-              {/* Pagination Controls */}
-              <Box
-                sx={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  mt: 2,
-                  px: 2,
-                  py: 1.5,
-                  backgroundColor: (theme) =>
-                    theme.palette.mode === "dark"
-                      ? "rgba(33, 150, 243, 0.05)"
-                      : "rgba(33, 150, 243, 0.03)",
-                  borderRadius: "0 0 4px 4px",
-                }}
-              >
-                <Typography variant="caption" color="text.secondary">
-                  Showing {Math.min(state.workers.length, tableRowsPerPage)} of{" "}
-                  {state.workers.length} workers
-                </Typography>
-
-                <Box
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 1,
-                  }}
-                >
-                  <Pagination
-                    count={Math.ceil(state.workers.length / tableRowsPerPage)}
-                    page={tableCurrentPage}
-                    onChange={(_, page) => setTableCurrentPage(page)}
-                    color="primary"
-                    size="small"
-                    showFirstButton
-                    showLastButton
-                  />
-                </Box>
-              </Box>
-            </>
-          )}
-        </Box>
-      </Paper>
-    </Box>
+          {/* Pagination Controls */}
+          <Box
+            sx={{
+              display: "flex",
+              flexWrap: "wrap",
+              justifyContent: "space-between",
+              alignItems: "center",
+              gap: 1,
+              px: "16px",
+              py: "10px",
+              borderTop: `1px solid ${d.border}`,
+            }}
+          >
+            <Box sx={{ fontSize: 12, color: d.muted }}>
+              Showing {Math.min(state.workers.length, tableRowsPerPage)} of{" "}
+              {state.workers.length} workers
+            </Box>
+            <Pagination
+              count={Math.ceil(state.workers.length / tableRowsPerPage)}
+              page={tableCurrentPage}
+              onChange={(_, page) => setTableCurrentPage(page)}
+              size="small"
+              showFirstButton
+              showLastButton
+              sx={{
+                "& .MuiPaginationItem-root": {
+                  fontFamily: fonts.body,
+                  fontSize: 12.5,
+                  color: d.muted,
+                  borderRadius: "8px",
+                },
+                "& .MuiPaginationItem-root.Mui-selected": {
+                  bgcolor: d.skySoft,
+                  color: d.action,
+                  fontWeight: 650,
+                },
+              }}
+            />
+          </Box>
+        </Paper>
+      )}
+    </DaylightAdminPage>
   );
 }

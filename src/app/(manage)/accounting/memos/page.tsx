@@ -3,12 +3,10 @@
 import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
-  Container,
+  Paper,
   Box,
   Button,
   Typography,
-  Card,
-  CardContent,
   Alert,
   TextField,
   MenuItem,
@@ -26,6 +24,11 @@ import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay"
 import MemoTransactionsTable from "@/components/admin/MemoTransactionsTable";
 import CreateMemoModal from "@/components/CreateMemoModal";
 import MemoHistoryDialog from "@/components/MemoHistoryDialog";
+import { useDaylight } from "@/lib/daylight";
+import {
+  DaylightAdminPage,
+  useDaylightAdminSx,
+} from "@/components/daylight/AdminPage";
 
 function LoadingFallback() {
   return (
@@ -51,6 +54,8 @@ export default function MemosPage() {
 }
 
 function MemosContent() {
+  const { d, fonts } = useDaylight();
+  const ds = useDaylightAdminSx();
   const searchParams = useSearchParams();
 
   const [page, setPage] = useState(0);
@@ -188,7 +193,7 @@ function MemosContent() {
   };
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
+    <DaylightAdminPage>
       <Box
         sx={{
           display: "flex",
@@ -200,10 +205,10 @@ function MemosContent() {
         }}
       >
         <Box>
-          <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>
+          <Typography component="h1" sx={ds.pageTitleSx}>
             Memos
           </Typography>
-          <Typography color="textSecondary">
+          <Typography sx={ds.pageDescSx}>
             Memos issued against Hosting & Colocation or Hardware Sales revenue,
             either sent to the customer (as a Debit or Credit Memo, depending on
             direction) or kept as an internal record only.
@@ -213,132 +218,138 @@ function MemosContent() {
           variant="contained"
           startIcon={<AddIcon />}
           onClick={() => setAddModalOpen(true)}
+          sx={ds.primaryBtnSx}
         >
           Create Memo
         </Button>
       </Box>
 
       {error && (
-        <Alert severity="error" sx={{ mb: 3 }}>
+        <Alert severity="error" sx={{ mb: 3, ...ds.alertSx("error") }}>
           {error}
         </Alert>
       )}
 
-      <Card sx={{ mb: 3 }}>
-        <CardContent>
-          <Typography color="textSecondary" variant="body2">
-            Total issued (filtered)
-          </Typography>
-          <Typography variant="h5" sx={{ fontWeight: 700 }}>
-            <CurrencyDisplay value={summary?.totalAmount ?? 0} />
-          </Typography>
-        </CardContent>
-      </Card>
+      <Paper elevation={0} sx={{ ...ds.cardSx, ...ds.inputSx, mb: 3 }}>
+        <Typography sx={{ fontSize: 13, fontWeight: 600, color: d.muted }}>
+          Total issued (filtered)
+        </Typography>
+        <Typography
+          sx={{
+            mt: "6px",
+            fontFamily: fonts.heading,
+            fontWeight: 750,
+            fontSize: 24,
+            letterSpacing: "-0.02em",
+            color: d.text,
+          }}
+        >
+          <CurrencyDisplay value={summary?.totalAmount ?? 0} />
+        </Typography>
+      </Paper>
 
-      <Card sx={{ mb: 3 }}>
-        <CardContent>
-          <Typography variant="h6" sx={{ mb: 2 }}>
-            Filters
-          </Typography>
-          <Box
-            sx={{
-              display: "grid",
-              gridTemplateColumns: {
-                xs: "1fr",
-                sm: "1fr 1fr",
-                md: "1fr 1fr 1fr",
-              },
-              gap: 2,
+      <Paper elevation={0} sx={{ ...ds.cardSx, ...ds.inputSx, mb: 3 }}>
+        <Typography component="h2" sx={{ ...ds.sectionTitleSx, mb: 2 }}>
+          Filters
+        </Typography>
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: {
+              xs: "1fr",
+              sm: "1fr 1fr",
+              md: "1fr 1fr 1fr",
+            },
+            gap: 2,
+          }}
+        >
+          <TextField
+            label="From date"
+            type="date"
+            size="small"
+            value={startDateFilter}
+            onChange={(e) => {
+              setStartDateFilter(e.target.value);
+              resetToFirstPage();
+            }}
+            InputLabelProps={{ shrink: true }}
+            helperText="No lower bound if left blank"
+          />
+          <TextField
+            label="To date"
+            type="date"
+            size="small"
+            value={endDateFilter}
+            onChange={(e) => {
+              setEndDateFilter(e.target.value);
+              resetToFirstPage();
+            }}
+            InputLabelProps={{ shrink: true }}
+          />
+          <TextField
+            select
+            label="Customer"
+            size="small"
+            value={customerId}
+            onChange={(e) => {
+              setCustomerId(e.target.value);
+              resetToFirstPage();
+            }}
+            disabled={customersLoading}
+          >
+            <MenuItem value="">All customers</MenuItem>
+            {customers.map((c: Customer) => (
+              <MenuItem key={c.id} value={c.id}>
+                {c.displayName}
+              </MenuItem>
+            ))}
+          </TextField>
+          <TextField
+            select
+            label="Category"
+            size="small"
+            value={category}
+            onChange={(e) => {
+              setCategory(e.target.value);
+              resetToFirstPage();
             }}
           >
-            <TextField
-              label="From date"
-              type="date"
-              size="small"
-              value={startDateFilter}
-              onChange={(e) => {
-                setStartDateFilter(e.target.value);
-                resetToFirstPage();
-              }}
-              InputLabelProps={{ shrink: true }}
-              helperText="No lower bound if left blank"
-            />
-            <TextField
-              label="To date"
-              type="date"
-              size="small"
-              value={endDateFilter}
-              onChange={(e) => {
-                setEndDateFilter(e.target.value);
-                resetToFirstPage();
-              }}
-              InputLabelProps={{ shrink: true }}
-            />
-            <TextField
-              select
-              label="Customer"
-              size="small"
-              value={customerId}
-              onChange={(e) => {
-                setCustomerId(e.target.value);
-                resetToFirstPage();
-              }}
-              disabled={customersLoading}
-            >
-              <MenuItem value="">All customers</MenuItem>
-              {customers.map((c: Customer) => (
-                <MenuItem key={c.id} value={c.id}>
-                  {c.displayName}
-                </MenuItem>
-              ))}
-            </TextField>
-            <TextField
-              select
-              label="Category"
-              size="small"
-              value={category}
-              onChange={(e) => {
-                setCategory(e.target.value);
-                resetToFirstPage();
-              }}
-            >
-              <MenuItem value="">All categories</MenuItem>
-              <MenuItem value="HOSTING">Hosting & Colocation</MenuItem>
-              <MenuItem value="HARDWARE">Hardware Sales</MenuItem>
-            </TextField>
-            <TextField
-              select
-              label="Memo Type"
-              size="small"
-              value={memoType}
-              onChange={(e) => {
-                setMemoType(e.target.value);
-                resetToFirstPage();
-              }}
-            >
-              <MenuItem value="">All types</MenuItem>
-              <MenuItem value="CUSTOMER_FACING">Customer-facing</MenuItem>
-              <MenuItem value="INTERNAL">Internal</MenuItem>
-            </TextField>
-            <TextField
-              select
-              label="Status"
-              size="small"
-              value={status}
-              onChange={(e) => {
-                setStatus(e.target.value);
-                resetToFirstPage();
-              }}
-            >
-              <MenuItem value="">All statuses</MenuItem>
-              <MenuItem value="ISSUED">Issued</MenuItem>
-              <MenuItem value="VOIDED">Voided</MenuItem>
-            </TextField>
-          </Box>
-        </CardContent>
-      </Card>
+            <MenuItem value="">All categories</MenuItem>
+            <MenuItem value="HOSTING">Hosting & Colocation</MenuItem>
+            <MenuItem value="HARDWARE">Hardware Sales</MenuItem>
+          </TextField>
+          <TextField
+            select
+            label="Memo Type"
+            size="small"
+            value={memoType}
+            onChange={(e) => {
+              setMemoType(e.target.value);
+              resetToFirstPage();
+            }}
+          >
+            <MenuItem value="">All types</MenuItem>
+            <MenuItem value="CUSTOMER_FACING">Customer-facing</MenuItem>
+            <MenuItem value="INTERNAL">Internal</MenuItem>
+          </TextField>
+          <TextField
+            select
+            label="Status"
+            size="small"
+            value={status}
+            onChange={(e) => {
+              setStatus(e.target.value);
+              resetToFirstPage();
+            }}
+          >
+            <MenuItem value="">All statuses</MenuItem>
+            <MenuItem value="ISSUED">Issued</MenuItem>
+            <MenuItem value="VOIDED">Voided</MenuItem>
+          </TextField>
+        </Box>
+      </Paper>
 
-      <Typography variant="h6" sx={{ mb: 2 }}>
+      <Typography component="h2" sx={{ ...ds.sectionTitleSx, mb: 2 }}>
         Memos ({pagination?.totalCount ?? 0})
       </Typography>
       <MemoTransactionsTable
@@ -378,7 +389,7 @@ function MemosContent() {
         <DialogContent>
           <Box sx={{ pt: 2, minWidth: 360 }}>
             {voidError && (
-              <Alert severity="error" sx={{ mb: 2 }}>
+              <Alert severity="error" sx={{ mb: 2, ...ds.alertSx("error") }}>
                 {voidError}
               </Alert>
             )}
@@ -405,14 +416,18 @@ function MemosContent() {
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setVoidingMemo(null)} disabled={voidLoading}>
+          <Button
+            onClick={() => setVoidingMemo(null)}
+            disabled={voidLoading}
+            sx={ds.textBtnSx()}
+          >
             Cancel
           </Button>
           <Button
             onClick={handleVoidConfirm}
             variant="contained"
-            color="error"
             disabled={voidLoading}
+            sx={ds.dangerBtnSx}
           >
             {voidLoading ? "Voiding..." : "Void Memo"}
           </Button>
@@ -435,6 +450,6 @@ function MemosContent() {
           {notification}
         </Alert>
       </Snackbar>
-    </Container>
+    </DaylightAdminPage>
   );
 }

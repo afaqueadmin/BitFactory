@@ -5,8 +5,6 @@ import {
   Box,
   Button,
   Checkbox,
-  Chip,
-  Container,
   FormControlLabel,
   FormGroup,
   FormHelperText,
@@ -36,6 +34,11 @@ import {
   AccountingVendor,
   useAccountingVendors,
 } from "@/lib/hooks/usePaymentAccounts";
+import {
+  DaylightAdminPage,
+  useDaylightAdminSx,
+  DaylightStatusPill,
+} from "@/components/daylight/AdminPage";
 
 const emptyForm = {
   name: "",
@@ -44,6 +47,7 @@ const emptyForm = {
 };
 
 export default function VendorsPage() {
+  const ds = useDaylightAdminSx();
   const { data = [], isLoading, error } = useAccountingVendors();
   const editor = useRecordEditor<AccountingVendor>("vendors");
   const [form, setForm] = useState(emptyForm);
@@ -64,29 +68,30 @@ export default function VendorsPage() {
   const hasType = form.forHardwarePurchases || form.forFarmTariffs;
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
+    <DaylightAdminPage>
       <Box sx={{ mb: 3 }}>
-        <Typography variant="h4" sx={{ fontWeight: "bold" }}>
+        <Typography component="h1" sx={ds.pageTitleSx}>
           Vendors
         </Typography>
-        <Typography color="text.secondary" sx={{ mt: 1 }}>
+        <Typography sx={ds.pageDescSx}>
           The vendors on Hardware Purchase and Farm Tariff invoices. Each form
           lists only active vendors tagged for it; inactive or untagged vendors
           stay on their existing invoices.
         </Typography>
       </Box>
-      <Paper sx={{ p: { xs: 2, sm: 3 } }}>
+      <Paper elevation={0} sx={{ ...ds.listCardSx, p: { xs: 2, sm: 3 } }}>
         <Stack direction="row" justifyContent="flex-end" sx={{ mb: 2 }}>
           <Button
             variant="contained"
             startIcon={<AddIcon />}
             onClick={() => openForm("new")}
+            sx={ds.primaryBtnSx}
           >
             Add vendor
           </Button>
         </Stack>
         {editor.pageError && (
-          <Alert severity="error" sx={{ mb: 2 }}>
+          <Alert severity="error" sx={{ mb: 2, ...ds.alertSx("error") }}>
             {editor.pageError}
           </Alert>
         )}
@@ -123,10 +128,13 @@ export default function VendorsPage() {
                       useFlexGap
                     >
                       {vendor.forHardwarePurchases && (
-                        <Chip label="Hardware Purchases" size="small" />
+                        <DaylightStatusPill
+                          label="Hardware Purchases"
+                          tone="info"
+                        />
                       )}
                       {vendor.forFarmTariffs && (
-                        <Chip label="Farm Tariffs" size="small" />
+                        <DaylightStatusPill label="Farm Tariffs" tone="info" />
                       )}
                     </Stack>
                   </TableCell>
@@ -217,6 +225,6 @@ export default function VendorsPage() {
         onCancel={editor.close}
         onConfirm={editor.remove}
       />
-    </Container>
+    </DaylightAdminPage>
   );
 }

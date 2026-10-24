@@ -1,9 +1,9 @@
 "use client";
 
 import {
+  Typography,
   Box,
   Button,
-  Container,
   Paper,
   Table,
   TableBody,
@@ -13,7 +13,6 @@ import {
   TableRow,
   TablePagination,
   TextField,
-  CircularProgress,
   Alert,
 } from "@mui/material";
 import { useState, useMemo } from "react";
@@ -22,8 +21,16 @@ import VisibilityIcon from "@mui/icons-material/Visibility";
 import { useCustomerStatements } from "@/lib/hooks/useStatements";
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
 import { DateDisplay } from "@/components/accounting/common/DateDisplay";
+import { useDaylight } from "@/lib/daylight";
+import {
+  DaylightAdminPage,
+  DaylightLoading,
+  useDaylightAdminSx,
+} from "@/components/daylight/AdminPage";
 
 export default function StatementsPage() {
+  const { d } = useDaylight();
+  const ds = useDaylightAdminSx();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [searchTerm, setSearchTerm] = useState("");
@@ -58,32 +65,34 @@ export default function StatementsPage() {
 
   if (loading) {
     return (
-      <Container maxWidth="lg">
-        <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
-          <CircularProgress />
-        </Box>
-      </Container>
+      <DaylightAdminPage>
+        <DaylightLoading />
+      </DaylightAdminPage>
     );
   }
 
   if (error) {
     return (
-      <Container maxWidth="lg">
-        <Alert severity="error">{error}</Alert>
-      </Container>
+      <DaylightAdminPage>
+        <Alert severity="error" sx={{ ...ds.alertSx("error") }}>
+          {error}
+        </Alert>
+      </DaylightAdminPage>
     );
   }
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
+    <DaylightAdminPage>
       <Box>
-        <h1 style={{ margin: 0 }}>Customer Statements</h1>
-        <p style={{ margin: "8px 0 0 0", color: "#666" }}>
+        <Typography component="h1" sx={ds.pageTitleSx}>
+          Customer Statements
+        </Typography>
+        <Typography sx={ds.pageDescSx}>
           View customer statements and payment history
-        </p>
+        </Typography>
       </Box>
 
-      <Paper sx={{ mb: 3, p: 2, mt: 3 }}>
+      <Paper elevation={0} sx={{ ...ds.cardSx, ...ds.inputSx, mb: 3, mt: 3 }}>
         <TextField
           label="Search by name, email, or company"
           value={searchTerm}
@@ -98,9 +107,9 @@ export default function StatementsPage() {
         />
       </Paper>
 
-      <TableContainer component={Paper}>
+      <TableContainer component={Paper} elevation={0} sx={ds.listCardSx}>
         <Table>
-          <TableHead sx={{ backgroundColor: "#f5f5f5" }}>
+          <TableHead>
             <TableRow>
               <TableCell sx={{ fontWeight: "bold" }}>Customer Name</TableCell>
               <TableCell sx={{ fontWeight: "bold" }}>Email</TableCell>
@@ -131,7 +140,7 @@ export default function StatementsPage() {
                     <Box
                       sx={{
                         color:
-                          customer.totalOutstanding > 0 ? "#d32f2f" : "#388e3c",
+                          customer.totalOutstanding > 0 ? d.danger : d.success,
                         fontWeight: "500",
                       }}
                     >
@@ -156,6 +165,7 @@ export default function StatementsPage() {
                         size="small"
                         variant="outlined"
                         startIcon={<VisibilityIcon />}
+                        sx={ds.outlineBtnSx}
                       >
                         View
                       </Button>
@@ -181,9 +191,10 @@ export default function StatementsPage() {
             page={page - 1}
             onPageChange={handleChangePage}
             onRowsPerPageChange={handleChangeRowsPerPage}
+            sx={ds.paginationSx}
           />
         )}
       </TableContainer>
-    </Container>
+    </DaylightAdminPage>
   );
 }

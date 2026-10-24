@@ -4,9 +4,6 @@ import {
   Alert,
   Box,
   Button,
-  Chip,
-  CircularProgress,
-  Container,
   Dialog,
   DialogActions,
   DialogContent,
@@ -54,6 +51,13 @@ import {
   useVendorDeposit,
   VendorDepositDetail,
 } from "@/lib/hooks/useSecurityDeposits";
+import { useDaylight } from "@/lib/daylight";
+import {
+  DaylightAdminPage,
+  DaylightLoading,
+  useDaylightAdminSx,
+  DaylightStatusPill,
+} from "@/components/daylight/AdminPage";
 
 const today = () => new Date().toLocaleDateString("en-CA");
 
@@ -87,27 +91,47 @@ const COLUMNS: { key: keyof DepositBalance; label: string; hint: string }[] = [
 ];
 
 function TotalsRow({ totals }: { totals: DepositBalance }) {
+  const { d, fonts } = useDaylight();
+  const ds = useDaylightAdminSx();
   return (
     <Box
       sx={{
         display: "grid",
-        gridTemplateColumns: {
-          xs: "1fr 1fr",
-          sm: "repeat(3, 1fr)",
-          md: "repeat(6, 1fr)",
-        },
-        gap: 2,
+        // As many 150px+ tiles per row as fit (6 on wide screens).
+        gridTemplateColumns: "repeat(auto-fit, minmax(min(150px, 100%), 1fr))",
+        gap: { xs: "12px", md: "16px" },
         mb: 3,
       }}
     >
       {COLUMNS.map((c) => (
-        <Paper key={c.key} variant="outlined" sx={{ p: 2 }}>
+        <Paper
+          key={c.key}
+          elevation={0}
+          sx={{ ...ds.cardSx, p: { xs: "14px 16px", sm: "16px 18px" } }}
+        >
           <Tooltip title={c.hint}>
-            <Typography variant="body2" color="text.secondary">
+            <Typography
+              sx={{
+                fontSize: 12.5,
+                fontWeight: 600,
+                color: d.muted,
+                cursor: "help",
+              }}
+            >
               {c.label}
             </Typography>
           </Tooltip>
-          <Typography variant="h6" sx={{ fontWeight: 700 }}>
+          <Typography
+            sx={{
+              mt: "6px",
+              fontFamily: fonts.heading,
+              fontWeight: 750,
+              fontSize: 20,
+              letterSpacing: "-0.02em",
+              fontVariantNumeric: "tabular-nums",
+              color: d.text,
+            }}
+          >
             <CurrencyDisplay value={totals[c.key]} />
           </Typography>
         </Paper>
@@ -435,6 +459,8 @@ function invoiceLink(m: DepositMovement) {
 }
 
 function VendorDetail({ vendorId }: { vendorId: string }) {
+  const { d } = useDaylight();
+  const ds = useDaylightAdminSx();
   const { data: detail, isLoading, error } = useVendorDeposit(vendorId);
   const remove = useSaveDepositMovement();
   const [dialog, setDialog] = useState<"return" | "adjustment" | null>(null);
@@ -442,15 +468,11 @@ function VendorDetail({ vendorId }: { vendorId: string }) {
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   if (isLoading) {
-    return (
-      <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
-        <CircularProgress />
-      </Box>
-    );
+    return <DaylightLoading />;
   }
   if (error || !detail) {
     return (
-      <Alert severity="error">
+      <Alert severity="error" sx={{ ...ds.alertSx("error") }}>
         {error?.message ?? "Failed to load vendor"}
       </Alert>
     );
@@ -477,10 +499,12 @@ function VendorDetail({ vendorId }: { vendorId: string }) {
         alignItems={{ xs: "flex-start", sm: "center" }}
         spacing={2}
       >
-        <Typography variant="h6" sx={{ fontWeight: 700 }}>
+        <Typography component="h2" sx={ds.sectionTitleSx}>
           {detail.vendor.name}
           {!detail.vendor.isActive && (
-            <Chip label="Inactive" size="small" sx={{ ml: 1 }} />
+            <Box component="span" sx={{ ml: 1 }}>
+              <DaylightStatusPill label="Inactive" tone="neutral" />
+            </Box>
           )}
         </Typography>
         <Stack direction="row" spacing={1}>
@@ -490,6 +514,7 @@ function VendorDetail({ vendorId }: { vendorId: string }) {
                 variant="outlined"
                 onClick={() => setDialog("return")}
                 disabled={noHeld}
+                sx={ds.outlineBtnSx}
               >
                 Record return
               </Button>
@@ -501,6 +526,7 @@ function VendorDetail({ vendorId }: { vendorId: string }) {
                 variant="contained"
                 onClick={() => setDialog("adjustment")}
                 disabled={noHeld}
+                sx={ds.primaryBtnSx}
               >
                 Record adjustment
               </Button>
@@ -515,7 +541,7 @@ function VendorDetail({ vendorId }: { vendorId: string }) {
         <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
           Deposits on Hardware Purchases
         </Typography>
-        <TableContainer component={Paper} variant="outlined">
+        <TableContainer component={Paper} elevation={0} sx={ds.listCardSx}>
           <Table size="small">
             <TableHead>
               <TableRow>
@@ -530,7 +556,7 @@ function VendorDetail({ vendorId }: { vendorId: string }) {
               {detail.depositInvoices.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={5} align="center" sx={{ py: 3 }}>
-                    <Typography color="text.secondary">
+                    <Typography sx={{ color: d.muted, fontSize: 13 }}>
                       No invoices with a deposit
                     </Typography>
                   </TableCell>
@@ -541,7 +567,11 @@ function VendorDetail({ vendorId }: { vendorId: string }) {
                   <TableCell>
                     <Link
                       href={`/accounting/hardwarePurchase/${i.id}`}
-                      style={{ color: "#1976d2", textDecoration: "none" }}
+                      style={{
+                        color: d.action,
+                        textDecoration: "none",
+                        fontWeight: 650,
+                      }}
                     >
                       {i.invoiceNumber}
                     </Link>
@@ -567,7 +597,7 @@ function VendorDetail({ vendorId }: { vendorId: string }) {
         <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
           Returns and adjustments
         </Typography>
-        <TableContainer component={Paper} variant="outlined">
+        <TableContainer component={Paper} elevation={0} sx={ds.listCardSx}>
           <Table size="small">
             <TableHead>
               <TableRow>
@@ -582,7 +612,7 @@ function VendorDetail({ vendorId }: { vendorId: string }) {
               {detail.movements.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={5} align="center" sx={{ py: 3 }}>
-                    <Typography color="text.secondary">
+                    <Typography sx={{ color: d.muted, fontSize: 13 }}>
                       Nothing returned or adjusted yet
                     </Typography>
                   </TableCell>
@@ -597,11 +627,9 @@ function VendorDetail({ vendorId }: { vendorId: string }) {
                       <DateDisplay date={new Date(m.date)} format="date" />
                     </TableCell>
                     <TableCell>
-                      <Chip
-                        size="small"
+                      <DaylightStatusPill
                         label={m.type === "RETURN" ? "Return" : "Adjustment"}
-                        color={m.type === "RETURN" ? "success" : "info"}
-                        variant="outlined"
+                        tone={m.type === "RETURN" ? "success" : "info"}
                       />
                     </TableCell>
                     <TableCell>
@@ -613,7 +641,7 @@ function VendorDetail({ vendorId }: { vendorId: string }) {
                           {m.currency && m.amount && (
                             <Typography
                               variant="caption"
-                              color="text.secondary"
+                              sx={{ color: d.muted }}
                             >
                               {formatCurrencyAmount(m.amount, m.currency.code)}
                               {m.currency.code !== "USD" &&
@@ -642,7 +670,11 @@ function VendorDetail({ vendorId }: { vendorId: string }) {
                       ) : link ? (
                         <Link
                           href={link.href}
-                          style={{ color: "#1976d2", textDecoration: "none" }}
+                          style={{
+                            color: d.action,
+                            textDecoration: "none",
+                            fontWeight: 650,
+                          }}
                         >
                           {link.label}
                         </Link>
@@ -650,8 +682,7 @@ function VendorDetail({ vendorId }: { vendorId: string }) {
                       {m.note && (
                         <Typography
                           variant="caption"
-                          color="text.secondary"
-                          sx={{ display: "block" }}
+                          sx={{ display: "block", color: d.muted }}
                         >
                           {m.note}
                         </Typography>
@@ -719,18 +750,26 @@ function VendorDetail({ vendorId }: { vendorId: string }) {
                 " Its receipt PDF is deleted too."}{" "}
               This can&apos;t be undone.
             </DialogContentText>
-            {deleteError && <Alert severity="error">{deleteError}</Alert>}
+            {deleteError && (
+              <Alert severity="error" sx={{ ...ds.alertSx("error") }}>
+                {deleteError}
+              </Alert>
+            )}
           </Stack>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDeleting(null)} disabled={remove.isPending}>
+          <Button
+            onClick={() => setDeleting(null)}
+            disabled={remove.isPending}
+            sx={ds.textBtnSx()}
+          >
             Cancel
           </Button>
           <Button
-            color="error"
             variant="contained"
             onClick={handleDelete}
             disabled={remove.isPending}
+            sx={ds.dangerBtnSx}
           >
             {remove.isPending ? "Deleting..." : "Delete"}
           </Button>
@@ -745,16 +784,18 @@ function VendorDetail({ vendorId }: { vendorId: string }) {
 // ---------------------------------------------------------------------------
 
 export default function SecurityDepositsPage() {
+  const { d } = useDaylight();
+  const ds = useDaylightAdminSx();
   const { data, isLoading, error } = useSecurityDeposits();
   const [selected, setSelected] = useState<string | null>(null);
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
+    <DaylightAdminPage>
       <Box sx={{ mb: 3 }}>
-        <Typography variant="h4" sx={{ fontWeight: "bold" }}>
+        <Typography component="h1" sx={ds.pageTitleSx}>
           Security Deposits
         </Typography>
-        <Typography color="text.secondary" sx={{ mt: 1 }}>
+        <Typography sx={ds.pageDescSx}>
           Deposits paid to vendors on Hardware Purchase invoices, and what the
           vendors have returned or applied to their invoices since. Select a
           vendor to see its invoices and record a return or adjustment.
@@ -762,20 +803,22 @@ export default function SecurityDepositsPage() {
       </Box>
 
       {isLoading ? (
-        <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
-          <CircularProgress />
-        </Box>
+        <DaylightLoading />
       ) : error || !data ? (
-        <Alert severity="error">
+        <Alert severity="error" sx={{ ...ds.alertSx("error") }}>
           {error?.message ?? "Failed to load security deposits"}
         </Alert>
       ) : (
         <>
           <TotalsRow totals={data.totals} />
 
-          <TableContainer component={Paper} sx={{ mb: 3 }}>
+          <TableContainer
+            component={Paper}
+            elevation={0}
+            sx={{ ...ds.listCardSx, mb: 3 }}
+          >
             <Table size="small">
-              <TableHead sx={{ backgroundColor: "#f5f5f5" }}>
+              <TableHead>
                 <TableRow>
                   <TableCell sx={{ fontWeight: "bold" }}>Vendor</TableCell>
                   {COLUMNS.map((c) => (
@@ -795,7 +838,7 @@ export default function SecurityDepositsPage() {
                 {data.vendors.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
-                      <Typography color="text.secondary">
+                      <Typography sx={{ color: d.muted, fontSize: 13 }}>
                         No security deposits recorded yet. Add one on a Hardware
                         Purchase invoice.
                       </Typography>
@@ -834,12 +877,12 @@ export default function SecurityDepositsPage() {
           </TableContainer>
 
           {selected && (
-            <Paper sx={{ p: { xs: 2, sm: 3 } }}>
+            <Paper elevation={0} sx={{ ...ds.listCardSx, p: { xs: 2, sm: 3 } }}>
               <VendorDetail key={selected} vendorId={selected} />
             </Paper>
           )}
         </>
       )}
-    </Container>
+    </DaylightAdminPage>
   );
 }

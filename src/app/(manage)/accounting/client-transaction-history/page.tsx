@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Box,
+  Button,
   Typography,
   Stack,
   Alert,
@@ -15,9 +16,6 @@ import {
   TableHead,
   TableRow,
   TableSortLabel,
-  Chip,
-  IconButton,
-  Tooltip,
   FormControl,
   InputLabel,
   Select,
@@ -33,7 +31,15 @@ import {
   Refresh as RefreshIcon,
   Receipt as ReceiptIcon,
 } from "@mui/icons-material";
-import GradientStatCard from "@/components/GradientStatCard";
+import AdminValueCard from "@/components/admin/AdminValueCard";
+import { useDaylight } from "@/lib/daylight";
+import {
+  CellNote,
+  DaylightAdminPage,
+  DaylightPageHeader,
+  DaylightStatusPill,
+  useDaylightAdminSx,
+} from "@/components/daylight/AdminPage";
 
 // Types
 interface Customer {
@@ -117,6 +123,8 @@ const addInternalReactKeys = (
 };
 
 export default function ClientTransactionHistoryPage() {
+  const { d, fonts } = useDaylight();
+  const ds = useDaylightAdminSx();
   const [state, setState] = useState<PageState>({
     customers: [],
     transactions: [],
@@ -426,12 +434,7 @@ export default function ClientTransactionHistoryPage() {
    */
   const handleSort = (
     field:
-      | "customerName"
-      | "dateTime"
-      | "pool"
-      | "type"
-      | "amount"
-      | "amountUsd",
+      "customerName" | "dateTime" | "pool" | "type" | "amount" | "amountUsd",
   ) => {
     if (sortField === field) {
       setSortOrder(sortOrder === "asc" ? "desc" : "asc");
@@ -529,90 +532,63 @@ export default function ClientTransactionHistoryPage() {
   }
 
   return (
-    <Box sx={{ p: 3 }}>
-      {/* Page Title */}
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          mb: 4,
-        }}
-      >
-        <Typography
-          variant="h4"
-          sx={{
-            fontWeight: "bold",
-            color: (theme) =>
-              theme.palette.mode === "dark" ? "primary.light" : "primary.dark",
-          }}
-        >
-          Client Transaction History
-        </Typography>
-
-        <Tooltip title="Refresh transaction data">
-          <IconButton
+    <DaylightAdminPage>
+      <DaylightPageHeader
+        title="Client Transaction History"
+        description="Pool payouts (credits) and charges (debits) for the selected customers."
+        actions={
+          <Button
+            variant="outlined"
+            startIcon={<RefreshIcon />}
             onClick={handleRefresh}
             disabled={isRefreshing || state.selectedCustomerIds.length === 0}
-            sx={{
-              background: (theme) =>
-                `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.primary.dark})`,
-              color: "white",
-              "&:hover": {
-                background: (theme) =>
-                  `linear-gradient(45deg, ${theme.palette.primary.dark}, ${theme.palette.primary.main})`,
-              },
-            }}
+            sx={ds.outlineBtnSx}
           >
-            <RefreshIcon />
-          </IconButton>
-        </Tooltip>
-      </Box>
+            {isRefreshing ? "Refreshing..." : "Refresh"}
+          </Button>
+        }
+      />
 
       {/* Stats Cards */}
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h6" sx={{ mb: 2, fontWeight: "medium" }}>
-          Transaction Summary
-        </Typography>
-        <Box
-          sx={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-            gap: 2,
-          }}
-        >
-          <GradientStatCard
-            title="Total Credits (BTC)"
-            value={`${stats.totalCredits.toFixed(8)}`}
-          />
-          <GradientStatCard
-            title="Total Debits (BTC)"
-            value={`${stats.totalDebits.toFixed(8)}`}
-          />
-          <GradientStatCard
-            title="Net Amount (BTC)"
-            value={`${stats.netAmount.toFixed(8)}`}
-          />
-        </Box>
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns:
+            "repeat(auto-fit, minmax(min(200px, 100%), 1fr))",
+          gap: { xs: "12px", sm: "16px", md: "20px" },
+          mb: { xs: "20px", md: "24px" },
+        }}
+      >
+        <AdminValueCard
+          daylight
+          title="Total Credits"
+          value={stats.totalCredits.toFixed(8)}
+          subtitle="BTC"
+        />
+        <AdminValueCard
+          daylight
+          title="Total Debits"
+          value={stats.totalDebits.toFixed(8)}
+          subtitle="BTC"
+        />
+        <AdminValueCard
+          daylight
+          title="Net Amount"
+          value={stats.netAmount.toFixed(8)}
+          subtitle="BTC"
+        />
       </Box>
 
       {/* Filter Panel */}
       <Paper
-        elevation={3}
-        sx={{
-          p: 3,
-          mb: 4,
-          borderRadius: 2,
-          background: (theme) =>
-            theme.palette.mode === "dark"
-              ? "linear-gradient(145deg, rgba(40,40,40,0.9), rgba(30,30,30,0.9))"
-              : "linear-gradient(145deg, rgba(255,255,255,0.9), rgba(250,250,250,0.9))",
-          backdropFilter: "blur(10px)",
-          border: (theme) => `1px solid ${theme.palette.divider}`,
-        }}
+        elevation={0}
+        sx={{ ...ds.cardSx, ...ds.inputSx, mb: { xs: "20px", md: "24px" } }}
       >
-        <Typography variant="h6" sx={{ mb: 2, fontWeight: "medium" }}>
-          Filter Options
+        <Typography
+          component="h2"
+          sx={{ ...ds.sectionTitleSx, fontSize: 14, mb: "12px" }}
+        >
+          Filters
         </Typography>
 
         <Stack spacing={2}>
@@ -674,7 +650,14 @@ export default function ClientTransactionHistoryPage() {
 
           {/* Pool Filter Toggle */}
           <Box>
-            <Typography variant="body2" sx={{ mb: 1, fontWeight: 500 }}>
+            <Typography
+              sx={{
+                mb: "6px",
+                fontSize: 12.5,
+                fontWeight: 600,
+                color: d.muted,
+              }}
+            >
               Pool
             </Typography>
             <ToggleButtonGroup
@@ -682,6 +665,7 @@ export default function ClientTransactionHistoryPage() {
               exclusive
               onChange={handlePoolChange}
               fullWidth
+              sx={ds.toggleGroupSx}
             >
               <ToggleButton value="all">All Pools</ToggleButton>
               <ToggleButton value="luxor">Luxor</ToggleButton>
@@ -729,100 +713,43 @@ export default function ClientTransactionHistoryPage() {
         </Stack>
 
         {state.error && (
-          <Alert severity="error" sx={{ mt: 2 }}>
+          <Alert severity="error" sx={{ mt: 2, ...ds.alertSx("error") }}>
             {state.error}
           </Alert>
         )}
       </Paper>
 
       {/* Transactions Table */}
-      <Paper
-        elevation={3}
-        sx={{
-          borderRadius: 2,
-          background: (theme) =>
-            theme.palette.mode === "dark"
-              ? "linear-gradient(145deg, rgba(40,40,40,0.9), rgba(30,30,30,0.9))"
-              : "linear-gradient(145deg, rgba(255,255,255,0.9), rgba(250,250,250,0.9))",
-          backdropFilter: "blur(10px)",
-          border: (theme) => `1px solid ${theme.palette.divider}`,
-        }}
-      >
-        <Box sx={{ p: 3 }}>
-          <Typography variant="h6" sx={{ mb: 2, fontWeight: "medium" }}>
+      <Paper elevation={0} sx={ds.listCardSx}>
+        <Box sx={{ p: { xs: "16px", sm: "20px 24px" } }}>
+          <Typography component="h2" sx={{ ...ds.sectionTitleSx, mb: "12px" }}>
             Transactions
           </Typography>
 
           {state.selectedCustomerIds.length === 0 ? (
             <Box sx={{ textAlign: "center", py: 4 }}>
               <ReceiptIcon
-                sx={{
-                  fontSize: 64,
-                  color: "text.secondary",
-                  mb: 2,
-                  opacity: 0.5,
-                }}
+                sx={{ fontSize: 40, color: d.inputBorder, mb: 1 }}
+                aria-hidden
               />
-              <Typography color="text.secondary">
+              <Typography sx={{ color: d.muted, fontSize: 13 }}>
                 Please select at least one customer to view transactions
               </Typography>
             </Box>
           ) : state.transactions.length === 0 ? (
             <Box sx={{ textAlign: "center", py: 4 }}>
               <ReceiptIcon
-                sx={{
-                  fontSize: 64,
-                  color: "text.secondary",
-                  mb: 2,
-                  opacity: 0.5,
-                }}
+                sx={{ fontSize: 40, color: d.inputBorder, mb: 1 }}
+                aria-hidden
               />
-              <Typography color="text.secondary">
+              <Typography sx={{ color: d.muted, fontSize: 13 }}>
                 No transactions found for the selected filters
               </Typography>
             </Box>
           ) : (
             <>
-              <TableContainer
-                sx={{
-                  borderRadius: 1,
-                  border: (theme) => `1px solid ${theme.palette.divider}`,
-                  overflow: "hidden",
-                }}
-              >
-                <Table
-                  sx={{
-                    "& .MuiTableCell-head": {
-                      backgroundColor: (theme) =>
-                        theme.palette.mode === "dark"
-                          ? "rgba(33, 150, 243, 0.15)"
-                          : "rgba(33, 150, 243, 0.08)",
-                      borderBottom: (theme) =>
-                        `2px solid ${theme.palette.primary.main}`,
-                      fontWeight: 700,
-                      fontSize: "0.875rem",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.5px",
-                      color: (theme) => theme.palette.primary.main,
-                      padding: "16px 12px",
-                    },
-                    "& .MuiTableCell-body": {
-                      padding: "14px 12px",
-                      borderBottom: (theme) =>
-                        `1px solid ${theme.palette.divider}`,
-                    },
-                    "& .MuiTableRow-root:hover": {
-                      backgroundColor: (theme) =>
-                        theme.palette.mode === "dark"
-                          ? "rgba(33, 150, 243, 0.08)"
-                          : "rgba(33, 150, 243, 0.04)",
-                      transition: "background-color 0.2s ease-in-out",
-                    },
-                    "& .MuiTableRow-root:last-child .MuiTableCell-body": {
-                      borderBottom: "none",
-                    },
-                  }}
-                >
+              <TableContainer>
+                <Table>
                   <TableHead>
                     <TableRow>
                       <TableCell>
@@ -890,29 +817,13 @@ export default function ClientTransactionHistoryPage() {
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {paginatedTransactions.map((tx, idx) => (
-                      <TableRow
-                        key={tx._internalReactKey}
-                        sx={{
-                          backgroundColor:
-                            idx % 2 === 0
-                              ? "transparent"
-                              : (theme) =>
-                                  theme.palette.mode === "dark"
-                                    ? "rgba(255, 255, 255, 0.02)"
-                                    : "rgba(0, 0, 0, 0.01)",
-                        }}
-                      >
+                    {paginatedTransactions.map((tx) => (
+                      <TableRow key={tx._internalReactKey}>
                         <TableCell>
                           <Typography variant="body2" sx={{ fontWeight: 600 }}>
                             {tx.customerName}
                           </Typography>
-                          <Typography
-                            variant="caption"
-                            sx={{ color: "text.secondary" }}
-                          >
-                            {tx.customerEmail}
-                          </Typography>
+                          <CellNote>{tx.customerEmail}</CellNote>
                         </TableCell>
                         <TableCell>
                           <Typography variant="body2">
@@ -920,32 +831,20 @@ export default function ClientTransactionHistoryPage() {
                           </Typography>
                         </TableCell>
                         <TableCell>
-                          <Chip
-                            label={tx.pool}
-                            size="small"
-                            variant="outlined"
-                            sx={{
-                              fontWeight: 600,
-                            }}
-                          />
+                          <DaylightStatusPill label={tx.pool} tone="neutral" />
                         </TableCell>
                         <TableCell>
-                          <Chip
+                          <DaylightStatusPill
                             label={
                               tx.transaction_type === "credit"
                                 ? "Credit"
                                 : "Debit"
                             }
-                            size="small"
-                            color={
+                            tone={
                               tx.transaction_type === "credit"
                                 ? "success"
-                                : "error"
+                                : "danger"
                             }
-                            variant="filled"
-                            sx={{
-                              fontWeight: 600,
-                            }}
                           />
                         </TableCell>
                         <TableCell>
@@ -964,8 +863,8 @@ export default function ClientTransactionHistoryPage() {
                               fontFamily: "monospace",
                               color:
                                 tx.transaction_type === "credit"
-                                  ? (theme) => theme.palette.success.main
-                                  : (theme) => theme.palette.error.main,
+                                  ? d.success
+                                  : d.danger,
                             }}
                           >
                             {tx.currency_amount.toFixed(8)}
@@ -979,8 +878,8 @@ export default function ClientTransactionHistoryPage() {
                               fontFamily: "monospace",
                               color:
                                 tx.transaction_type === "credit"
-                                  ? (theme) => theme.palette.success.main
-                                  : (theme) => theme.palette.error.main,
+                                  ? d.success
+                                  : d.danger,
                             }}
                           >
                             ${tx.usd_equivalent.toFixed(2)}
@@ -1013,19 +912,16 @@ export default function ClientTransactionHistoryPage() {
               <Box
                 sx={{
                   display: "flex",
+                  flexWrap: "wrap",
                   justifyContent: "space-between",
                   alignItems: "center",
+                  gap: 1,
                   mt: 2,
-                  px: 2,
-                  py: 1.5,
-                  backgroundColor: (theme) =>
-                    theme.palette.mode === "dark"
-                      ? "rgba(33, 150, 243, 0.05)"
-                      : "rgba(33, 150, 243, 0.03)",
-                  borderRadius: "0 0 4px 4px",
+                  pt: "10px",
+                  borderTop: `1px solid ${d.border}`,
                 }}
               >
-                <Typography variant="caption" color="text.secondary">
+                <Typography variant="caption" sx={{ color: d.muted }}>
                   Showing{" "}
                   {Math.min(state.transactions.length, tableRowsPerPage)} of{" "}
                   {state.transactions.length} transactions
@@ -1042,10 +938,22 @@ export default function ClientTransactionHistoryPage() {
                     count={totalPages}
                     page={tableCurrentPage}
                     onChange={(_, page) => setTableCurrentPage(page)}
-                    color="primary"
                     size="small"
                     showFirstButton
                     showLastButton
+                    sx={{
+                      "& .MuiPaginationItem-root": {
+                        fontFamily: fonts.body,
+                        fontSize: 12.5,
+                        color: d.muted,
+                        borderRadius: "8px",
+                      },
+                      "& .MuiPaginationItem-root.Mui-selected": {
+                        bgcolor: d.skySoft,
+                        color: d.action,
+                        fontWeight: 650,
+                      },
+                    }}
                   />
                 </Box>
               </Box>
@@ -1053,6 +961,6 @@ export default function ClientTransactionHistoryPage() {
           )}
         </Box>
       </Paper>
-    </Box>
+    </DaylightAdminPage>
   );
 }

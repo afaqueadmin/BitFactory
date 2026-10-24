@@ -9,7 +9,6 @@
 import { isStaffRole } from "@/lib/auth/staffRoles";
 import {
   Box,
-  Container,
   CircularProgress,
   Alert,
   Button,
@@ -53,6 +52,13 @@ import AddIcon from "@mui/icons-material/Add";
 import DownloadIcon from "@mui/icons-material/Download";
 import { InvoiceStatus } from "@prisma/client";
 import { downloadExport } from "@/lib/downloadExport";
+import { useDaylight } from "@/lib/daylight";
+import {
+  DaylightAdminPage,
+  DaylightLoading,
+  DaylightPageHeader,
+  useDaylightAdminSx,
+} from "@/components/daylight/AdminPage";
 
 type SortKey =
   | "invoiceNumber"
@@ -67,6 +73,8 @@ type SortKey =
 type BulkStatusType = "ISSUED" | "PAID" | "OVERDUE" | "CANCELLED" | "REFUNDED";
 
 export default function HardwareSalesDashboard() {
+  const { d } = useDaylight();
+  const ds = useDaylightAdminSx();
   const { user } = useUser();
   const isAdmin = isStaffRole(user?.role);
 
@@ -414,24 +422,24 @@ export default function HardwareSalesDashboard() {
 
   if (loading) {
     return (
-      <Container maxWidth="lg">
-        <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
-          <CircularProgress />
-        </Box>
-      </Container>
+      <DaylightAdminPage>
+        <DaylightLoading />
+      </DaylightAdminPage>
     );
   }
 
   if (error) {
     return (
-      <Container maxWidth="lg">
-        <Alert severity="error">{error}</Alert>
-      </Container>
+      <DaylightAdminPage>
+        <Alert severity="error" sx={{ ...ds.alertSx("error") }}>
+          {error}
+        </Alert>
+      </DaylightAdminPage>
     );
   }
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
+    <DaylightAdminPage>
       <Dialog
         open={bulkEmailDialogOpen}
         onClose={() => {
@@ -545,6 +553,7 @@ export default function HardwareSalesDashboard() {
               })
             }
             disabled={bulkEmailProcessing}
+            sx={ds.textBtnSx()}
           >
             No, skip them
           </Button>
@@ -554,33 +563,28 @@ export default function HardwareSalesDashboard() {
               void handleIssueAndSendSelected({ bypassPaidCheck: true })
             }
             disabled={bulkEmailProcessing}
+            sx={ds.primaryBtnSx}
           >
             Yes, send anyway
           </Button>
         </DialogActions>
       </Dialog>
 
-      {/* Header */}
-      <Stack
-        direction="row"
-        justifyContent="space-between"
-        alignItems="center"
-        mb={4}
-      >
-        <div>
-          <Typography variant="h4" sx={{ fontWeight: "bold" }}>
-            Hardware Sales Dashboard
-          </Typography>
-          <Typography color="textSecondary" sx={{ mt: 0.5 }}>
-            Overview of hardware sales invoices and payments
-          </Typography>
-        </div>
-        <Link href="/accounting/hardware-sales/create">
-          <Button variant="contained" startIcon={<AddIcon />}>
-            Create Invoice
-          </Button>
-        </Link>
-      </Stack>
+      <DaylightPageHeader
+        title="Hardware Sales Dashboard"
+        description="Overview of hardware sales invoices and payments"
+        actions={
+          <Link href="/accounting/hardware-sales/create">
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              sx={ds.primaryBtnSx}
+            >
+              Create Invoice
+            </Button>
+          </Link>
+        }
+      />
 
       {/* Stats Row */}
       <Box
@@ -591,8 +595,8 @@ export default function HardwareSalesDashboard() {
             sm: "1fr 1fr",
             md: "1fr 1fr 1fr 1fr",
           },
-          gap: 3,
-          mb: 4,
+          gap: { xs: "12px", sm: "16px", md: "20px" },
+          mb: { xs: "20px", md: "24px" },
         }}
       >
         <Box>
@@ -628,7 +632,7 @@ export default function HardwareSalesDashboard() {
 
       {/* Tables */}
       <Box sx={{ display: "grid", gridTemplateColumns: "1fr", gap: 3 }}>
-        <Paper>
+        <Paper elevation={0} sx={ds.listCardSx}>
           <Box
             sx={{
               display: "flex",
@@ -637,11 +641,15 @@ export default function HardwareSalesDashboard() {
               p: 2,
             }}
           >
-            <Typography variant="h6" sx={{ fontWeight: "bold" }}>
+            <Typography component="h2" sx={ds.sectionTitleSx}>
               All Hardware Sales Invoices
             </Typography>
             <Link href="/accounting/hardware-sales/create">
-              <Button variant="contained" startIcon={<AddIcon />}>
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                sx={ds.primaryBtnSx}
+              >
                 Create Invoice
               </Button>
             </Link>
@@ -719,6 +727,7 @@ export default function HardwareSalesDashboard() {
               }
               onClick={() => void handleExport("csv")}
               disabled={exporting !== null || total === 0}
+              sx={ds.outlineBtnSx}
             >
               Download CSV
             </Button>
@@ -734,6 +743,7 @@ export default function HardwareSalesDashboard() {
               }
               onClick={() => void handleExport("pdf")}
               disabled={exporting !== null || total === 0}
+              sx={ds.outlineBtnSx}
             >
               Download PDF
             </Button>
@@ -767,6 +777,7 @@ export default function HardwareSalesDashboard() {
                     selectedInvoiceIds.length === 0 ||
                     bulkStatusLoading
                   }
+                  sx={ds.outlineBtnSx}
                 >
                   Apply Status
                 </Button>
@@ -777,17 +788,18 @@ export default function HardwareSalesDashboard() {
                   disabled={
                     selectedInvoiceIds.length === 0 || bulkEmailProcessing
                   }
+                  sx={ds.primaryBtnSx}
                 >
                   Issue &amp; Send Emails
                 </Button>
                 <Button
                   variant="outlined"
-                  color="error"
                   size="small"
                   onClick={handleBulkDelete}
                   disabled={
                     selectedInvoiceIds.length === 0 || bulkDeleteLoading
                   }
+                  sx={ds.dangerOutlineBtnSx}
                 >
                   Delete Selected
                 </Button>
@@ -797,21 +809,21 @@ export default function HardwareSalesDashboard() {
           {isAdmin &&
             (bulkError || bulkStatusHookError || bulkDeleteHookError) && (
               <Box sx={{ px: 2 }}>
-                <Alert severity="error" sx={{ mb: 1 }}>
+                <Alert severity="error" sx={{ mb: 1, ...ds.alertSx("error") }}>
                   {bulkError || bulkStatusHookError || bulkDeleteHookError}
                 </Alert>
               </Box>
             )}
           {exportError && (
             <Box sx={{ px: 2 }}>
-              <Alert severity="error" sx={{ mb: 1 }}>
+              <Alert severity="error" sx={{ mb: 1, ...ds.alertSx("error") }}>
                 {exportError}
               </Alert>
             </Box>
           )}
           <TableContainer>
             <Table>
-              <TableHead sx={{ backgroundColor: "#f5f5f5" }}>
+              <TableHead>
                 <TableRow>
                   {isAdmin && (
                     <TableCell padding="checkbox">
@@ -926,7 +938,11 @@ export default function HardwareSalesDashboard() {
                       <TableCell>
                         <Link
                           href={`/accounting/hardware-sales/${invoice.id}`}
-                          style={{ color: "#1976d2", textDecoration: "none" }}
+                          style={{
+                            color: d.action,
+                            textDecoration: "none",
+                            fontWeight: 650,
+                          }}
                         >
                           {invoice.invoiceNumber}
                         </Link>
@@ -972,10 +988,10 @@ export default function HardwareSalesDashboard() {
                             sx={{
                               color:
                                 daysUntilDue < 0
-                                  ? "error.main"
+                                  ? d.danger
                                   : daysUntilDue < 7
-                                    ? "warning.main"
-                                    : "success.main",
+                                    ? d.warning
+                                    : d.success,
                               fontWeight: "500",
                             }}
                           >
@@ -1008,10 +1024,11 @@ export default function HardwareSalesDashboard() {
               page={page - 1}
               onPageChange={handleChangePage}
               onRowsPerPageChange={handleChangeRowsPerPage}
+              sx={ds.paginationSx}
             />
           </TableContainer>
         </Paper>
       </Box>
-    </Container>
+    </DaylightAdminPage>
   );
 }

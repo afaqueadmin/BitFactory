@@ -5,8 +5,6 @@ import { useRouter } from "next/navigation";
 import {
   Box,
   Button,
-  CircularProgress,
-  Container,
   Paper,
   TextField,
   Typography,
@@ -15,6 +13,12 @@ import {
 } from "@mui/material";
 import SaveIcon from "@mui/icons-material/Save";
 import ClearIcon from "@mui/icons-material/Clear";
+import { useDaylight } from "@/lib/daylight";
+import {
+  DaylightAdminPage,
+  useDaylightAdminSx,
+  DaylightLoading,
+} from "@/components/daylight/AdminPage";
 
 interface PaymentDetailsType {
   id: string;
@@ -44,6 +48,8 @@ interface PaymentDetailsType {
 }
 
 export default function PDFInvoiceSettingsPage() {
+  const { d } = useDaylight();
+  const ds = useDaylightAdminSx();
   const router = useRouter();
 
   const [paymentDetails, setPaymentDetails] =
@@ -159,14 +165,9 @@ export default function PDFInvoiceSettingsPage() {
 
   if (loading) {
     return (
-      <Box
-        display="flex"
-        justifyContent="center"
-        alignItems="center"
-        minHeight="100vh"
-      >
-        <CircularProgress />
-      </Box>
+      <DaylightAdminPage>
+        <DaylightLoading />
+      </DaylightAdminPage>
     );
   }
 
@@ -178,7 +179,7 @@ export default function PDFInvoiceSettingsPage() {
         alignItems="center"
         minHeight="100vh"
       >
-        <Typography variant="h6" color="textSecondary">
+        <Typography sx={{ fontSize: 15, color: d.muted }}>
           Failed to load payment details
         </Typography>
       </Box>
@@ -186,24 +187,19 @@ export default function PDFInvoiceSettingsPage() {
   }
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
-      <Box mb={4}>
-        <Typography
-          variant="h4"
-          component="h1"
-          gutterBottom
-          sx={{ fontWeight: "bold" }}
-        >
+    <DaylightAdminPage>
+      <Box sx={{ mb: { xs: "20px", md: "24px" } }}>
+        <Typography component="h1" sx={ds.pageTitleSx}>
           Invoice PDF Settings
         </Typography>
-        <Typography variant="body1" color="textSecondary">
+        <Typography sx={ds.pageDescSx}>
           Configure invoice PDF fields that will be used in generated invoices
         </Typography>
       </Box>
 
       {/* Updated By Info */}
       {paymentDetails.updatedByUser && (
-        <Alert severity="info" sx={{ mb: 3 }}>
+        <Alert severity="info" sx={{ mb: 3, ...ds.alertSx("info") }}>
           Last updated by{" "}
           <strong>
             {paymentDetails.updatedByUser.name ||
@@ -216,7 +212,11 @@ export default function PDFInvoiceSettingsPage() {
 
       {/* Error Alert */}
       {error && (
-        <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 3 }}>
+        <Alert
+          severity="error"
+          sx={{ mb: 3, ...ds.alertSx("error") }}
+          onClose={() => setError(null)}
+        >
           {error}
         </Alert>
       )}
@@ -225,8 +225,8 @@ export default function PDFInvoiceSettingsPage() {
       {success && (
         <Alert
           severity="success"
+          sx={{ mb: 3, ...ds.alertSx("success") }}
           onClose={() => setSuccess(null)}
-          sx={{ mb: 3 }}
         >
           {success}
         </Alert>
@@ -234,11 +234,11 @@ export default function PDFInvoiceSettingsPage() {
 
       <Stack spacing={3}>
         {/* Company Information Section */}
-        <Paper sx={{ p: 3 }}>
-          <Typography variant="h6" gutterBottom sx={{ fontWeight: "bold" }}>
+        <Paper elevation={0} sx={{ ...ds.cardSx, ...ds.inputSx }}>
+          <Typography component="h2" sx={ds.sectionTitleSx}>
             Company Information
           </Typography>
-          <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
+          <Typography sx={{ mt: "4px", mb: 2, fontSize: 13, color: d.muted }}>
             Basic company details for invoices
           </Typography>
 
@@ -293,8 +293,7 @@ export default function PDFInvoiceSettingsPage() {
 
             <Box>
               <Typography
-                variant="subtitle2"
-                sx={{ mb: 1, fontWeight: "bold" }}
+                sx={{ mb: "6px", fontSize: 13, fontWeight: 650, color: d.text }}
               >
                 Logo (Base64)
               </Typography>
@@ -302,7 +301,7 @@ export default function PDFInvoiceSettingsPage() {
                 variant="outlined"
                 component="label"
                 fullWidth
-                sx={{ mb: 1 }}
+                sx={{ ...ds.outlineBtnSx, mb: 1 }}
               >
                 Upload Image
                 <input
@@ -317,9 +316,9 @@ export default function PDFInvoiceSettingsPage() {
                   sx={{
                     mt: 2,
                     p: 1,
-                    border: "1px solid #ddd",
-                    borderRadius: 1,
-                    bgcolor: "#f5f5f5",
+                    border: `1px solid ${d.border}`,
+                    borderRadius: "8px",
+                    bgcolor: d.canvas,
                   }}
                 >
                   <img
@@ -338,11 +337,11 @@ export default function PDFInvoiceSettingsPage() {
         </Paper>
 
         {/* Payment Options Section */}
-        <Paper sx={{ p: 3 }}>
-          <Typography variant="h6" gutterBottom sx={{ fontWeight: "bold" }}>
+        <Paper elevation={0} sx={{ ...ds.cardSx, ...ds.inputSx }}>
+          <Typography component="h2" sx={ds.sectionTitleSx}>
             Payment Options
           </Typography>
-          <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
+          <Typography sx={{ mt: "4px", mb: 2, fontSize: 13, color: d.muted }}>
             Configure payment methods displayed in invoices
           </Typography>
 
@@ -419,11 +418,11 @@ export default function PDFInvoiceSettingsPage() {
         </Paper>
 
         {/* Contact Information Section */}
-        <Paper sx={{ p: 3 }}>
-          <Typography variant="h6" gutterBottom sx={{ fontWeight: "bold" }}>
+        <Paper elevation={0} sx={{ ...ds.cardSx, ...ds.inputSx }}>
+          <Typography component="h2" sx={ds.sectionTitleSx}>
             Contact Information
           </Typography>
-          <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
+          <Typography sx={{ mt: "4px", mb: 2, fontSize: 13, color: d.muted }}>
             Billing and support contact details
           </Typography>
 
@@ -485,6 +484,7 @@ export default function PDFInvoiceSettingsPage() {
             startIcon={<ClearIcon />}
             onClick={handleCancel}
             disabled={saving}
+            sx={ds.outlineBtnSx}
           >
             Cancel
           </Button>
@@ -493,11 +493,12 @@ export default function PDFInvoiceSettingsPage() {
             startIcon={<SaveIcon />}
             onClick={handleSave}
             disabled={saving}
+            sx={ds.primaryBtnSx}
           >
             {saving ? "Saving..." : "Save Changes"}
           </Button>
         </Box>
       </Stack>
-    </Container>
+    </DaylightAdminPage>
   );
 }

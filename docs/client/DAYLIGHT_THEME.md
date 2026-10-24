@@ -11,8 +11,12 @@ checked into this repo).
 
 **Scope discipline:** Daylight covers the client portal plus the admin
 chrome (header + sidebar), the admin dashboard, the Work Queue pages,
-Customer Overview, Subaccount Groups, Subaccounts, Franchisees and Simulated
-Accounts - see "Admin pages" below. Franchise (`(franchise)`) pages and every other admin
+Customer Overview, Subaccount Groups, Subaccounts, Franchisees, Simulated
+Accounts, the Operations pages (Miners, Luxor/Braiins Workers, Pools,
+Locations, Hardware Models) and all Finance list pages (Invoicing, Payables,
+Adjustments, Statements, Transaction History, Incentive Payouts, Email
+Reports, Finance Settings) and the System pages (Activity Log, Audit Log,
+DB Data Management x4, Payback Settings x2) - see "Admin pages" below. Franchise (`(franchise)`) pages and every other admin
 page body must stay visually unchanged. This is enforced with two patterns,
 both described below:
 1. New pages get a full rewrite (they're not shared with other roles).
@@ -82,7 +86,7 @@ Reach for these before writing new one-off styles:
 | `FactoryStatusCard` | The dashboard's "fleet health" card (status ring + legend rows + pool breakdown + "view all miners" link). |
 | `Segmented<T>` | Small track of 2-3 mutually exclusive options (e.g. Daily/Monthly). Generic over the option id type. |
 | `PillTab` | Single pill for a scrollable row of filters (pool selector, miner filter), with an optional colour dot. |
-| `AdminPage` (several exports) | Admin list-page kit: `DaylightAdminPage` (canvas + padding), `DaylightPageHeader` (title, description, `actions`), `DaylightStatusPill` + `requestStatusTone`/`statusLabel`, `CellNote` (muted line under a cell value), `DaylightLoading`, `DaylightEmptyState`, and `useDaylightAdminSx()` (`inputSx`, button sx incl. `textBtnSx(tone)` for row actions, `alertSx` (success/error/info/warning), `cardSx`, `sectionTitleSx`, `tableSx`, `tableCardSx`). Per-cell overrides inside a themed table need a tripled selector (`sx={{ "&&&": {...} }}`) to beat the table-wide cell font. `tableSx` styles an unmodified MUI table through descendant selectors. |
+| `AdminPage` (several exports) | Admin list-page kit: `DaylightAdminPage` (canvas + padding), `DaylightPageHeader` (title, description, `actions`), `DaylightStatusPill` + `requestStatusTone`/`statusLabel`, `CellNote` (muted line under a cell value), `DaylightLoading`, `DaylightEmptyState`, and `useDaylightAdminSx()` (`inputSx`, button sx incl. `textBtnSx(tone)` for row actions, `alertSx` (success/error/info/warning), `cardSx`, `sectionTitleSx`, `tableSx`, `tableCardSx`). Also `listCardSx` (a card holding filters + table + pagination; themes inputs and checkboxes inside it), `paginationSx`, `tabsSx`, `toggleGroupSx`, `pageTitleSx` / `pageDescSx` (for pages that keep their own header row) and `dangerBtnSx`. `DaylightAdminPage` also provides a scope: `useDaylightScope()` is true inside it, so shared components switch to Daylight only on themed admin pages (used by accounting `StatusBadge`, `MasterDataTable`'s `TableState`, `MemoTransactionsTable`, `CostPaymentTransactionsTable`). Per-cell overrides inside a themed table need a tripled selector (`sx={{ "&&&": {...} }}`) to beat the table-wide cell font. `tableSx` styles an unmodified MUI table through descendant selectors. |
 | `RelationshipManagerCard` | Customer's RM (name + mailto button) from `/api/user/relationship-manager`. `compact` for the sidebar/mobile drawer, full card on the Support page. Renders nothing when no RM is assigned. |
 
 ---
@@ -106,6 +110,9 @@ Components currently using this pattern:
 - `PaybackHistoryChart`
 - `TwoFactorSettings`, `PasskeySettings`
 - `tickets/TicketBadges`, `tickets/TicketListTable`, `tickets/TicketThreadView`
+- `admin/MinersTable` (shared with the franchise Miners page; the Daylight
+  variant wraps only at spaces and lets the 15-column table scroll sideways
+  inside its card)
 - `admin/AdminStatCard`, `admin/AdminValueCard` (also used by franchise
   pages and other admin pages; in Daylight mode `borderColor` renders as a
   small data-source square next to the title instead of a 6px left border)
@@ -262,7 +269,10 @@ view (the default is "Scenario Table," which is themed).
   `/firmware-change-requests`, `/secondary-login-requests`) and
   `/customers/overview`, `/groups`, `/subaccounts`, `/franchisees` (incl.
   the `CustomerRequestsPanel` tab) and `/simulated-accounts` (incl.
-  `SimulationSettingsCard`) use the `AdminPage` kit; their stat tiles use the
+  `SimulationSettingsCard`), `/machine`, `/workers`, `/braiins-workers`,
+  `/pools`, `/space`, `/hardware` and the `/accounting/*` + `/incentives/payouts`
+  Finance list pages use the `AdminPage` kit (accounting `StatsCard` was
+  restyled in place - only those pages use it); their stat tiles use the
   client `StatCard` or `AdminValueCard daylight`. Tickets reuse the client
   `daylight` variants of `TicketListTable` / `TicketThreadView`;
   `FreezeCountdown` got an opt-in `daylight` prop. Their dialogs follow the
