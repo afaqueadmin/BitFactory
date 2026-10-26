@@ -22,6 +22,7 @@ import {
 import { Close as CloseIcon, Add as AddIcon } from "@mui/icons-material";
 import { useCustomers, Customer } from "@/lib/hooks/useInvoices";
 import { useInvoices } from "@/lib/hooks/useInvoices";
+import { memoStoredAmount } from "@/lib/accounting/memoAmount";
 
 interface CreateMemoModalProps {
   open: boolean;
@@ -177,7 +178,7 @@ export default function CreateMemoModal({
             : selectedInvoiceId || undefined,
           category,
           memoType,
-          amount: memoAmount,
+          amount: memoStoredAmount(memoType, memoAmount),
           reason: reason.trim(),
           transfer: memoType === "INTERNAL" ? transferEnabled : undefined,
         }),
@@ -425,7 +426,7 @@ export default function CreateMemoModal({
                   ? "Positive: added to customer balance, deducted from this category's revenue (customer receives a Debit Memo). Negative: deducted from customer balance, added back to revenue (customer receives a Credit Memo)."
                   : transferEnabled
                     ? `Positive: added to ${CATEGORY_LABELS[category]}, deducted from ${CATEGORY_LABELS[oppositeCategory]}. Negative: reversed.`
-                    : "Positive reduces this category's revenue card; negative adds back to it."
+                    : "Positive adds to this category's revenue card; negative reduces it."
               }
             />
 

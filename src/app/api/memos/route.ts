@@ -7,6 +7,7 @@ import { generateMemoPDF, sendMemoEmail } from "@/lib/email";
 import { AuditAction, Memo, Prisma } from "@prisma/client";
 import { InvoiceEmailService } from "@/services/invoiceEmailService";
 import { recordMemoEmailRun } from "@/lib/accounting/emailRunLog";
+import { memoDisplayAmount } from "@/lib/accounting/memoAmount";
 
 /**
  * List (GET) and create (POST) memos across both the Hosting & Colocation
@@ -144,9 +145,10 @@ export async function GET(request: NextRequest) {
         : {}),
     };
 
-    const [totalCount, sumResult, memos] = await Promise.all([
+    const [totalCount, sumsByType, memos] = await Promise.all([
       prisma.memo.count({ where }),
-      prisma.memo.aggregate({
+      prisma.memo.groupBy({
+        by: ["memoType"],
         where: { ...where, status: "ISSUED" },
         _sum: { amount: true },
       }),
@@ -162,11 +164,23 @@ export async function GET(request: NextRequest) {
       }),
     ]);
 
+    // Sum in display terms so the total matches the table column: internal
+    // memos are shown as their revenue effect (sign flipped).
+    const totalAmount = sumsByType.reduce(
+      (total, row) =>
+        total +
+        memoDisplayAmount({
+          memoType: row.memoType,
+          amount: Number(row._sum.amount || 0),
+        }),
+      0,
+    );
+
     return NextResponse.json({
       success: true,
       data: {
         summary: {
-          totalAmount: Number((sumResult._sum.amount || 0).toFixed(2)),
+          totalAmount: Number(totalAmount.toFixed(2)),
         },
         memos,
       },
