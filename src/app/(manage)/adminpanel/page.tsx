@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import AdminStatCard from "@/components/admin/AdminStatCard";
 import AdminValueCard from "@/components/admin/AdminValueCard";
-import { Box, CircularProgress, Alert, Typography } from "@mui/material";
+import AdminWelcome from "@/components/admin/AdminWelcome";
+import { Box, CircularProgress, Alert } from "@mui/material";
 import Segmented from "@/components/daylight/Segmented";
 import { RADIUS_CONTROL, useDaylight } from "@/lib/daylight";
 import { useVendorInvoices } from "@/lib/hooks/useVendorInvoices";
@@ -456,25 +457,7 @@ export default function AdminDashboard() {
               mb: { xs: "20px", md: "24px" },
             }}
           >
-            <Box>
-              <Typography
-                component="h1"
-                sx={{
-                  m: 0,
-                  fontFamily: fonts.heading,
-                  fontWeight: 750,
-                  fontSize: { xs: 22, sm: 26 },
-                  letterSpacing: "-.6px",
-                  lineHeight: 1.25,
-                  color: d.text,
-                }}
-              >
-                Dashboard
-              </Typography>
-              <Box sx={{ mt: "4px", fontSize: 13, color: d.muted }}>
-                Fleet, customer and finance overview across pools
-              </Box>
-            </Box>
+            <AdminWelcome />
 
             <Box
               sx={{
