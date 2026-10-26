@@ -58,6 +58,7 @@ import CancelIcon from "@mui/icons-material/Cancel";
 import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
 import CreateMemoModal from "@/components/CreateMemoModal";
 import { useMemos } from "@/lib/hooks/admin/useMemos";
+import { memoDisplayAmount } from "@/lib/accounting/memoAmount";
 import { DaylightThemedPage } from "@/components/daylight/DaylightMuiScope";
 
 function formatAuditAction(action: string): string {
@@ -945,7 +946,7 @@ export default function InvoiceDetailPage() {
                             : "Internal"}
                         </TableCell>
                         <TableCell align="right">
-                          <CurrencyDisplay value={memo.amount} />
+                          <CurrencyDisplay value={memoDisplayAmount(memo)} />
                         </TableCell>
                         <TableCell>{memo.status}</TableCell>
                         <TableCell>{memo.reason}</TableCell>

@@ -26,6 +26,7 @@ import {
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
 import { DateDisplay } from "@/components/accounting/common/DateDisplay";
 import { MemoTransaction } from "@/lib/hooks/admin/useMemos";
+import { memoDisplayAmount } from "@/lib/accounting/memoAmount";
 import { useDaylight } from "@/lib/daylight";
 import {
   DaylightStatusPill,
@@ -219,7 +220,7 @@ export default function MemoTransactionsTable({
                         fontWeight="medium"
                         sx={{
                           color:
-                            row.amount < 0
+                            memoDisplayAmount(row) < 0
                               ? scoped
                                 ? d.danger
                                 : theme.palette.error.main
@@ -228,7 +229,7 @@ export default function MemoTransactionsTable({
                                 : theme.palette.success.main,
                         }}
                       >
-                        <CurrencyDisplay value={row.amount} />
+                        <CurrencyDisplay value={memoDisplayAmount(row)} />
                       </Typography>
                     </TableCell>
                     <TableCell>
