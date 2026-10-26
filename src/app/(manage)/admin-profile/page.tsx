@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from "react";
 import {
   Box,
-  Grid as MuiGrid,
   Paper,
   Typography,
   Table,
@@ -13,13 +12,16 @@ import {
   TableHead,
   TableRow,
   Button,
-  CircularProgress,
   Alert,
   Avatar,
 } from "@mui/material";
 import { PhotoCamera } from "@mui/icons-material";
-import { useTheme } from "@mui/material/styles";
 import AdminProfileForm from "@/components/AdminProfileForm";
+import { DaylightThemedPage } from "@/components/daylight/DaylightMuiScope";
+import {
+  DaylightLoading,
+  DaylightPageHeader,
+} from "@/components/daylight/AdminPage";
 
 interface AdminProfileData {
   id?: string;
@@ -45,11 +47,7 @@ interface UserActivity {
   createdAt: string;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const Grid = MuiGrid as React.ComponentType<any>;
-
 export default function AdminProfile() {
-  const theme = useTheme();
   const [profileData, setProfileData] = useState<AdminProfileData | null>(null);
   const [activities, setActivities] = useState<UserActivity[]>([]);
   const [loading, setLoading] = useState(true);
@@ -166,118 +164,79 @@ export default function AdminProfile() {
 
   if (loading) {
     return (
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          minHeight: "60vh",
-        }}
-      >
-        <CircularProgress />
-      </Box>
+      <DaylightThemedPage>
+        <DaylightLoading />
+      </DaylightThemedPage>
     );
   }
 
   if (!profileData) {
     return (
-      <Box sx={{ p: 3 }}>
+      <DaylightThemedPage>
         <Alert severity="error">Failed to load admin profile</Alert>
-      </Box>
+      </DaylightThemedPage>
     );
   }
 
-  return (
-    <Box
-      sx={{
-        p: { xs: 2, sm: 3 },
-        mt: { xs: 1, sm: 2 },
-        maxWidth: 1200,
-        mx: "auto",
-        minHeight: "100vh",
-        bgcolor: (theme) =>
-          theme.palette.mode === "dark" ? "background.default" : "grey.50",
-      }}
-    >
-      <Typography
-        variant="h4"
-        fontWeight="bold"
-        gutterBottom
-        sx={{
-          color: (theme) =>
-            theme.palette.mode === "dark" ? "primary.light" : "primary.dark",
-          mb: 3,
-          borderBottom: (theme) => `2px solid ${theme.palette.primary.main}`,
-          pb: 1,
-        }}
-      >
-        Admin Profile
+  const field = (label: string, value: string | null, wide = false) => (
+    <Box sx={{ minWidth: 0, ...(wide && { gridColumn: "1 / -1" }) }}>
+      <Typography variant="caption" color="text.secondary" component="div">
+        {label}
       </Typography>
-
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
-        </Alert>
-      )}
-
-      {/* Profile Information Section */}
-      <Paper
-        elevation={3}
-        sx={{
-          p: { xs: 2, sm: 4 },
-          mb: 4,
-          borderRadius: 2,
-          background: (theme) =>
-            theme.palette.mode === "dark"
-              ? "linear-gradient(145deg, rgba(40,40,40,0.9), rgba(30,30,30,0.9))"
-              : "linear-gradient(145deg, rgba(255,255,255,0.9), rgba(250,250,250,0.9))",
-          backdropFilter: "blur(10px)",
-          border: (theme) => `1px solid ${theme.palette.divider}`,
-        }}
+      <Typography
+        variant="body2"
+        sx={{ fontWeight: 600, mt: "2px", overflowWrap: "anywhere" }}
       >
-        <Grid container spacing={4}>
-          {/* Profile Photo Section */}
-          <Grid item xs={12} md={3}>
-            <Box
-              sx={{
-                textAlign: "center",
-              }}
-            >
+        {value || "N/A"}
+      </Typography>
+    </Box>
+  );
+
+  return (
+    <DaylightThemedPage>
+      <Box sx={{ maxWidth: 1200, mx: "auto" }}>
+        <DaylightPageHeader
+          title="Admin Profile"
+          description="Your account details and recent sign-in activity."
+        />
+
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error}
+          </Alert>
+        )}
+
+        {/* Profile Information Section */}
+        <Paper sx={{ p: { xs: 2, sm: 3 }, mb: 3 }}>
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", md: "180px 1fr" },
+              gap: { xs: 3, md: 4 },
+              alignItems: "start",
+            }}
+          >
+            {/* Profile Photo Section */}
+            <Box sx={{ textAlign: "center" }}>
               <Avatar
                 src={profileData.profileImage || undefined}
                 sx={{
-                  width: { xs: 100, sm: 120, md: 140 },
-                  height: { xs: 100, sm: 120, md: 140 },
+                  width: 112,
+                  height: 112,
                   mx: "auto",
                   mb: 2,
-                  bgcolor: theme.palette.primary.main,
-                  fontSize: { xs: "2.5rem", sm: "3rem", md: "3.5rem" },
-                  border: (theme) => `4px solid ${theme.palette.primary.main}`,
-                  boxShadow: (theme) =>
-                    `0 0 20px ${theme.palette.primary.main}40`,
+                  bgcolor: "primary.main",
+                  fontSize: "2.75rem",
                 }}
               >
                 {profileData.name?.charAt(0) || "A"}
               </Avatar>
               <Button
                 component="label"
-                variant="contained"
+                variant="outlined"
+                size="small"
                 startIcon={<PhotoCamera />}
                 disabled={saving}
-                sx={{
-                  mt: 1,
-                  background: (theme) =>
-                    theme.palette.mode === "dark"
-                      ? "rgba(255,255,255,0.1)"
-                      : "rgba(0,0,0,0.1)",
-                  backdropFilter: "blur(5px)",
-                  "&:hover": {
-                    background: (theme) =>
-                      theme.palette.mode === "dark"
-                        ? "rgba(255,255,255,0.2)"
-                        : "rgba(0,0,0,0.2)",
-                  },
-                }}
               >
                 {saving ? "Uploading..." : "Upload Photo"}
                 <input
@@ -289,307 +248,100 @@ export default function AdminProfile() {
                 />
               </Button>
             </Box>
-          </Grid>
 
-          {/* Profile Information Display */}
-          <Grid item xs={12} md={9}>
-            <Box>
-              <Typography variant="h6" fontWeight="bold" mb={2}>
+            {/* Profile Information Display */}
+            <Box sx={{ minWidth: 0 }}>
+              <Typography variant="h6" component="h2" sx={{ mb: 2 }}>
                 Personal Information
               </Typography>
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
+                  gap: "16px 24px",
+                }}
+              >
+                {field("Full Name", profileData.name)}
+                {field("Email", profileData.email)}
+                {field("Phone Number", profileData.phoneNumber)}
+                {field("Country", profileData.country)}
+                {field("City", profileData.city)}
+                {field("Company Name", profileData.companyName)}
+                {field("Company URL", profileData.companyUrl, true)}
+              </Box>
+              <Button
+                variant="contained"
+                onClick={() => setEditModalOpen(true)}
+                sx={{ mt: 3 }}
+              >
+                Edit Profile
+              </Button>
+            </Box>
+          </Box>
+        </Paper>
 
-              <Grid container spacing={2}>
-                <Grid item xs={12} sm={6}>
-                  <Box>
-                    <Typography variant="caption" color="textSecondary">
-                      Full Name
-                    </Typography>
-                    <Typography variant="body1" fontWeight="medium">
-                      {profileData.name || "N/A"}
-                    </Typography>
-                  </Box>
-                </Grid>
-
-                <Grid item xs={12} sm={6}>
-                  <Box>
-                    <Typography variant="caption" color="textSecondary">
-                      Email
-                    </Typography>
-                    <Typography variant="body1" fontWeight="medium">
-                      {profileData.email}
-                    </Typography>
-                  </Box>
-                </Grid>
-
-                <Grid item xs={12} sm={6}>
-                  <Box>
-                    <Typography variant="caption" color="textSecondary">
-                      Phone Number
-                    </Typography>
-                    <Typography variant="body1" fontWeight="medium">
-                      {profileData.phoneNumber || "N/A"}
-                    </Typography>
-                  </Box>
-                </Grid>
-
-                <Grid item xs={12} sm={6}>
-                  <Box>
-                    <Typography variant="caption" color="textSecondary">
-                      Country
-                    </Typography>
-                    <Typography variant="body1" fontWeight="medium">
-                      {profileData.country || "N/A"}
-                    </Typography>
-                  </Box>
-                </Grid>
-
-                <Grid item xs={12} sm={6}>
-                  <Box>
-                    <Typography variant="caption" color="textSecondary">
-                      City
-                    </Typography>
-                    <Typography variant="body1" fontWeight="medium">
-                      {profileData.city || "N/A"}
-                    </Typography>
-                  </Box>
-                </Grid>
-
-                <Grid item xs={12} sm={6}>
-                  <Box>
-                    <Typography variant="caption" color="textSecondary">
-                      Company Name
-                    </Typography>
-                    <Typography variant="body1" fontWeight="medium">
-                      {profileData.companyName || "N/A"}
-                    </Typography>
-                  </Box>
-                </Grid>
-
-                <Grid item xs={12}>
-                  <Box>
-                    <Typography variant="caption" color="textSecondary">
-                      Company URL
-                    </Typography>
-                    <Typography
-                      variant="body1"
-                      fontWeight="medium"
+        {/* Recent Activity Section */}
+        <Typography variant="h6" component="h2" sx={{ mb: 1.5 }}>
+          Recent Activity
+        </Typography>
+        <Paper sx={{ overflow: "hidden" }}>
+          <TableContainer sx={{ maxHeight: 440 }}>
+            <Table stickyHeader size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Date</TableCell>
+                  <TableCell>Activity</TableCell>
+                  <TableCell>IP Address</TableCell>
+                  <TableCell>Device</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {activities.map((activity) => (
+                  <TableRow key={activity.id} hover>
+                    <TableCell sx={{ whiteSpace: "nowrap" }}>
+                      {new Date(activity.createdAt).toLocaleString()}
+                    </TableCell>
+                    <TableCell sx={{ fontWeight: 600, whiteSpace: "nowrap" }}>
+                      {activity.type}
+                    </TableCell>
+                    <TableCell sx={{ whiteSpace: "nowrap" }}>
+                      {activity.ipAddress}
+                    </TableCell>
+                    <TableCell
                       sx={{
-                        wordBreak: "break-all",
+                        color: "text.secondary",
+                        minWidth: 240,
+                        overflowWrap: "anywhere",
                       }}
                     >
-                      {profileData.companyUrl || "N/A"}
-                    </Typography>
-                  </Box>
-                </Grid>
+                      {activity.userAgent}
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {activities.length === 0 && (
+                  <TableRow>
+                    <TableCell
+                      colSpan={4}
+                      align="center"
+                      sx={{ py: 5, color: "text.secondary" }}
+                    >
+                      No recent activity
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Paper>
 
-                <Grid item xs={12}>
-                  <Button
-                    variant="contained"
-                    onClick={() => setEditModalOpen(true)}
-                    sx={{
-                      background: (theme) =>
-                        `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.primary.dark})`,
-                      boxShadow: (theme) =>
-                        `0 4px 20px ${theme.palette.primary.main}40`,
-                      "&:hover": {
-                        background: (theme) =>
-                          `linear-gradient(45deg, ${theme.palette.primary.dark}, ${theme.palette.primary.main})`,
-                        boxShadow: (theme) =>
-                          `0 6px 25px ${theme.palette.primary.main}60`,
-                      },
-                    }}
-                  >
-                    Edit Profile
-                  </Button>
-                </Grid>
-              </Grid>
-            </Box>
-          </Grid>
-        </Grid>
-      </Paper>
-
-      {/* Recent Activity Section */}
-      <Typography
-        variant="h5"
-        fontWeight="bold"
-        gutterBottom
-        sx={{
-          color: (theme) =>
-            theme.palette.mode === "dark" ? "primary.light" : "primary.dark",
-          borderBottom: (theme) => `2px solid ${theme.palette.primary.main}`,
-          pb: 1,
-          mb: 3,
-          mt: 4,
-        }}
-      >
-        Recent Activity
-      </Typography>
-      <Paper
-        elevation={3}
-        sx={{
-          width: "100%",
-          overflow: "hidden",
-          borderRadius: 2,
-          background: (theme) =>
-            theme.palette.mode === "dark"
-              ? "linear-gradient(145deg, rgba(40,40,40,0.9), rgba(30,30,30,0.9))"
-              : "linear-gradient(145deg, rgba(255,255,255,0.9), rgba(250,250,250,0.9))",
-          backdropFilter: "blur(10px)",
-          border: (theme) => `1px solid ${theme.palette.divider}`,
-        }}
-      >
-        <TableContainer
-          sx={{
-            maxHeight: 440,
-            "&::-webkit-scrollbar": {
-              width: "8px",
-              height: "8px",
-            },
-            "&::-webkit-scrollbar-track": {
-              background: "transparent",
-            },
-            "&::-webkit-scrollbar-thumb": {
-              background: (theme) =>
-                theme.palette.mode === "dark"
-                  ? "rgba(255,255,255,0.2)"
-                  : "rgba(0,0,0,0.2)",
-              borderRadius: "4px",
-              "&:hover": {
-                background: (theme) =>
-                  theme.palette.mode === "dark"
-                    ? "rgba(255,255,255,0.3)"
-                    : "rgba(0,0,0,0.3)",
-              },
-            },
-          }}
-        >
-          <Table stickyHeader>
-            <TableHead>
-              <TableRow>
-                <TableCell
-                  sx={{
-                    fontWeight: "bold",
-                    background: (theme) =>
-                      theme.palette.mode === "dark"
-                        ? "rgba(0,0,0,0.5)"
-                        : "rgba(255,255,255,0.9)",
-                    color: (theme) => theme.palette.primary.main,
-                  }}
-                >
-                  Date
-                </TableCell>
-                <TableCell
-                  sx={{
-                    fontWeight: "bold",
-                    background: (theme) =>
-                      theme.palette.mode === "dark"
-                        ? "rgba(0,0,0,0.5)"
-                        : "rgba(255,255,255,0.9)",
-                    color: (theme) => theme.palette.primary.main,
-                  }}
-                >
-                  Activity
-                </TableCell>
-                <TableCell
-                  sx={{
-                    fontWeight: "bold",
-                    background: (theme) =>
-                      theme.palette.mode === "dark"
-                        ? "rgba(0,0,0,0.5)"
-                        : "rgba(255,255,255,0.9)",
-                    color: (theme) => theme.palette.primary.main,
-                  }}
-                >
-                  IP Address
-                </TableCell>
-                <TableCell
-                  sx={{
-                    fontWeight: "bold",
-                    background: (theme) =>
-                      theme.palette.mode === "dark"
-                        ? "rgba(0,0,0,0.5)"
-                        : "rgba(255,255,255,0.9)",
-                    color: (theme) => theme.palette.primary.main,
-                  }}
-                >
-                  Device
-                </TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {activities.map((activity) => (
-                <TableRow
-                  key={activity.id}
-                  hover
-                  sx={{
-                    transition: "background-color 0.2s",
-                    "&:hover": {
-                      backgroundColor: (theme) =>
-                        theme.palette.mode === "dark"
-                          ? "rgba(255,255,255,0.05)"
-                          : "rgba(0,0,0,0.05)",
-                    },
-                  }}
-                >
-                  <TableCell
-                    sx={{
-                      color: (theme) => theme.palette.text.secondary,
-                    }}
-                  >
-                    {new Date(activity.createdAt).toLocaleString()}
-                  </TableCell>
-                  <TableCell
-                    sx={{
-                      color: (theme) => theme.palette.primary.main,
-                      fontWeight: "medium",
-                    }}
-                  >
-                    {activity.type}
-                  </TableCell>
-                  <TableCell
-                    sx={{
-                      color: (theme) => theme.palette.text.secondary,
-                    }}
-                  >
-                    {activity.ipAddress}
-                  </TableCell>
-                  <TableCell
-                    sx={{
-                      color: (theme) => theme.palette.text.secondary,
-                    }}
-                  >
-                    {activity.userAgent}
-                  </TableCell>
-                </TableRow>
-              ))}
-              {activities.length === 0 && (
-                <TableRow>
-                  <TableCell
-                    colSpan={4}
-                    align="center"
-                    sx={{
-                      py: 6,
-                      color: (theme) => theme.palette.text.secondary,
-                      fontStyle: "italic",
-                      fontSize: "0.95rem",
-                    }}
-                  >
-                    No recent activity
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Paper>
-
-      {/* Admin Profile Form Modal */}
-      <AdminProfileForm
-        open={editModalOpen}
-        onClose={handleModalClose}
-        onSuccess={handleProfileUpdated}
-        initialData={profileData}
-      />
-    </Box>
+        {/* Admin Profile Form Modal */}
+        <AdminProfileForm
+          open={editModalOpen}
+          onClose={handleModalClose}
+          onSuccess={handleProfileUpdated}
+          initialData={profileData}
+        />
+      </Box>
+    </DaylightThemedPage>
   );
 }

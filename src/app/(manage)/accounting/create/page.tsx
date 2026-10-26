@@ -40,6 +40,7 @@ import {
   newLineItemKey,
 } from "@/components/accounting/invoices/LineItemsEditor";
 import { LocationsMultiSelect } from "@/components/accounting/invoices/LocationsMultiSelect";
+import { DaylightThemedPage } from "@/components/daylight/DaylightMuiScope";
 
 export default function CreateInvoicePage() {
   const router = useRouter();
@@ -295,311 +296,331 @@ export default function CreateInvoicePage() {
   };
 
   return (
-    <Container maxWidth="md" sx={{ py: 4 }}>
-      <Stack direction="row" spacing={2} sx={{ mb: 4 }}>
-        <Link href="/accounting/Hosting-and-Colocation">
-          <Button startIcon={<ArrowBackIcon />}>
-            Back to Accounting Dashboard
-          </Button>
-        </Link>
-        <Box flex={1}>
-          <h1 style={{ margin: 0 }}>Create New Invoice</h1>
-          <p style={{ margin: "8px 0 0 0", color: "#666" }}>
-            Create a new invoice and send it to a customer
-          </p>
-        </Box>
-      </Stack>
+    <DaylightThemedPage>
+      <Container maxWidth="md" disableGutters>
+        <Stack spacing={1} sx={{ mb: 4, alignItems: "flex-start" }}>
+          <Link href="/accounting/Hosting-and-Colocation">
+            <Button startIcon={<ArrowBackIcon />}>
+              Back to Accounting Dashboard
+            </Button>
+          </Link>
+          <Box flex={1}>
+            <h1 style={{ margin: 0 }}>Create New Invoice</h1>
+            <p style={{ margin: "8px 0 0 0", color: "var(--dl-muted, #666)" }}>
+              Create a new invoice and send it to a customer
+            </p>
+          </Box>
+        </Stack>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 3 }}>
-          {error}
-        </Alert>
-      )}
-      {createError && (
-        <Alert severity="error" sx={{ mb: 3 }}>
-          {createError}
-        </Alert>
-      )}
+        {error && (
+          <Alert severity="error" sx={{ mb: 3 }}>
+            {error}
+          </Alert>
+        )}
+        {createError && (
+          <Alert severity="error" sx={{ mb: 3 }}>
+            {createError}
+          </Alert>
+        )}
 
-      <Paper sx={{ p: 4 }}>
-        <form onSubmit={handleSubmit}>
-          <Stack spacing={3}>
-            {/* Customer Information */}
-            <Box>
-              <h3 style={{ marginTop: 0, marginBottom: 16 }}>
-                Customer Information
-              </h3>
-              <Stack spacing={2}>
-                <TextField
-                  select
-                  label="Select Customer"
-                  name="customerId"
-                  value={formData.customerId}
-                  onChange={handleCustomerChange}
-                  fullWidth
-                  helperText="Select a customer with their subaccount (shown as: Name (Subaccount))"
-                  disabled={customersLoading}
-                  required
-                >
-                  <MenuItem value="">-- Select a Customer --</MenuItem>
-                  {customers.map((customer: Customer) => (
-                    <MenuItem key={customer.id} value={customer.id}>
-                      {customer.displayName}
-                    </MenuItem>
-                  ))}
-                </TextField>
-                {customersLoading && (
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                    <CircularProgress size={20} />
-                    <span>Loading customers...</span>
-                  </Box>
-                )}
-
-                {/* Relationship Manager Info Section */}
-                {formData.customerId && (
-                  <Box
-                    sx={{
-                      p: 2,
-                      backgroundColor: "#f5f5f5",
-                      borderRadius: 1,
-                      mt: 2,
-                    }}
-                  >
-                    <Typography sx={{ fontWeight: 600, mb: 1.5 }}>
-                      💼 Relationship Manager Information
-                    </Typography>
-                    <Box sx={{ ml: 1 }}>
-                      {groupLoading ? (
-                        <Box
-                          sx={{ display: "flex", alignItems: "center", gap: 1 }}
-                        >
-                          <CircularProgress size={16} />
-                          <Typography variant="body2">
-                            Loading RM details...
-                          </Typography>
-                        </Box>
-                      ) : groupInfo ? (
-                        <Box>
-                          <Typography variant="body2" sx={{ mb: 0.5 }}>
-                            <strong>Name:</strong>{" "}
-                            {groupInfo.relationshipManager}
-                          </Typography>
-                          <Typography variant="body2" sx={{ mb: 0.5 }}>
-                            <strong>Email:</strong> {groupInfo.email}
-                          </Typography>
-                          <Typography variant="body2">
-                            <strong>Group:</strong> {groupInfo.name}
-                          </Typography>
-                        </Box>
-                      ) : (
-                        <Typography variant="body2" sx={{ color: "#d32f2f" }}>
-                          ⚠️ No RM assigned to this customer&apos;s group
-                        </Typography>
-                      )}
-                    </Box>
-                  </Box>
-                )}
-              </Stack>
-            </Box>
-
-            {/* Invoice Details */}
-            <Box>
-              <h3 style={{ marginTop: 0, marginBottom: 16 }}>
-                Invoice Details
-              </h3>
-              <Stack spacing={2}>
-                <Typography variant="body2" color="textSecondary">
-                  {!formData.customerId
-                    ? "Select a customer first to auto-load their miners, grouped by model and priced from the hosting rate formula."
-                    : minersLoading
-                      ? "Loading miners (status=AUTO) for selected customer..."
-                      : "Auto-loaded from this customer's AUTO miners. Adjust quantities/prices or add/remove lines as needed. Use the tag icon to add a discount under a line."}
-                </Typography>
-                <LineItemsEditor
-                  lineItems={lineItems}
-                  onChange={setLineItems}
-                  hardwareList={hardwareList}
-                  disabled={minersLoading}
-                  enableDiscounts
-                />
-
-                <Box
-                  sx={{ mt: 1, display: "flex", alignItems: "center", gap: 1 }}
-                >
-                  <Switch
-                    checked={confirmoEnabled}
-                    onChange={async (_e, checked) => {
-                      setConfirmoError(null);
-                      setConfirmoLoading(true);
-                      try {
-                        const res = await fetch("/api/settings/payment", {
-                          method: "PUT",
-                          credentials: "include",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ confirmoEnabled: checked }),
-                        });
-                        if (!res.ok) {
-                          const err = await res.json();
-                          const msg =
-                            err?.error ||
-                            err?.message ||
-                            "Failed to update setting";
-                          setConfirmoError(msg);
-                          throw new Error(msg);
-                        }
-                        const data = await res.json();
-                        setConfirmoEnabled(!!data?.data?.confirmoEnabled);
-                      } catch (err) {
-                        console.error("Failed to update confirmo setting", err);
-                      } finally {
-                        setConfirmoLoading(false);
-                      }
-                    }}
-                    disabled={confirmoLoading}
-                  />
-                  <Typography variant="body2" sx={{ color: "#666" }}>
-                    Enable payment via crypto (Confirmo)
-                  </Typography>
-                </Box>
-                {confirmoError && (
-                  <Alert severity="error" sx={{ mt: 2 }}>
-                    {confirmoError}
-                  </Alert>
-                )}
-              </Stack>
-            </Box>
-
-            {/* Due Date */}
-            <Box>
-              <h3 style={{ marginTop: 0, marginBottom: 16 }}>
-                Additional Information
-              </h3>
-              <Stack spacing={2}>
-                <Stack direction="row" spacing={2}>
+        <Paper sx={{ p: 4 }}>
+          <form onSubmit={handleSubmit}>
+            <Stack spacing={3}>
+              {/* Customer Information */}
+              <Box>
+                <h3 style={{ marginTop: 0, marginBottom: 16 }}>
+                  Customer Information
+                </h3>
+                <Stack spacing={2}>
                   <TextField
                     select
-                    label="Billing Month"
-                    value={formData.billingMonth}
-                    onChange={(e) => {
-                      const selectedMonth = Number(e.target.value);
-                      setFormData((prev) => ({
-                        ...prev,
-                        billingMonth: selectedMonth,
-                      }));
-                    }}
+                    label="Select Customer"
+                    name="customerId"
+                    value={formData.customerId}
+                    onChange={handleCustomerChange}
                     fullWidth
-                    helperText={`Year: ${formData.billingYear}`}
+                    helperText="Select a customer with their subaccount (shown as: Name (Subaccount))"
+                    disabled={customersLoading}
                     required
                   >
-                    <MenuItem value={0}>January</MenuItem>
-                    <MenuItem value={1}>February</MenuItem>
-                    <MenuItem value={2}>March</MenuItem>
-                    <MenuItem value={3}>April</MenuItem>
-                    <MenuItem value={4}>May</MenuItem>
-                    <MenuItem value={5}>June</MenuItem>
-                    <MenuItem value={6}>July</MenuItem>
-                    <MenuItem value={7}>August</MenuItem>
-                    <MenuItem value={8}>September</MenuItem>
-                    <MenuItem value={9}>October</MenuItem>
-                    <MenuItem value={10}>November</MenuItem>
-                    <MenuItem value={11}>December</MenuItem>
+                    <MenuItem value="">-- Select a Customer --</MenuItem>
+                    {customers.map((customer: Customer) => (
+                      <MenuItem key={customer.id} value={customer.id}>
+                        {customer.displayName}
+                      </MenuItem>
+                    ))}
                   </TextField>
+                  {customersLoading && (
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                      <CircularProgress size={20} />
+                      <span>Loading customers...</span>
+                    </Box>
+                  )}
+
+                  {/* Relationship Manager Info Section */}
+                  {formData.customerId && (
+                    <Box
+                      sx={{
+                        p: 2,
+                        backgroundColor: "var(--dl-canvas, #f5f5f5)",
+                        borderRadius: 1,
+                        mt: 2,
+                      }}
+                    >
+                      <Typography sx={{ fontWeight: 600, mb: 1.5 }}>
+                        💼 Relationship Manager Information
+                      </Typography>
+                      <Box sx={{ ml: 1 }}>
+                        {groupLoading ? (
+                          <Box
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 1,
+                            }}
+                          >
+                            <CircularProgress size={16} />
+                            <Typography variant="body2">
+                              Loading RM details...
+                            </Typography>
+                          </Box>
+                        ) : groupInfo ? (
+                          <Box>
+                            <Typography variant="body2" sx={{ mb: 0.5 }}>
+                              <strong>Name:</strong>{" "}
+                              {groupInfo.relationshipManager}
+                            </Typography>
+                            <Typography variant="body2" sx={{ mb: 0.5 }}>
+                              <strong>Email:</strong> {groupInfo.email}
+                            </Typography>
+                            <Typography variant="body2">
+                              <strong>Group:</strong> {groupInfo.name}
+                            </Typography>
+                          </Box>
+                        ) : (
+                          <Typography
+                            variant="body2"
+                            sx={{ color: "var(--dl-danger, #d32f2f)" }}
+                          >
+                            ⚠️ No RM assigned to this customer&apos;s group
+                          </Typography>
+                        )}
+                      </Box>
+                    </Box>
+                  )}
                 </Stack>
-                <TextField
-                  label="Due Date"
-                  name="dueDate"
-                  type="date"
-                  value={formData.dueDate}
-                  onChange={handleDueDateChange}
-                  fullWidth
-                  InputLabelProps={{ shrink: true }}
-                  helperText="Select the due date for this invoice"
-                  required
-                />
-                <TextField
-                  select
-                  label="Hardware Model (for Hardware Sales invoices)"
-                  name="hardwareId"
-                  value={formData.hardwareId}
-                  onChange={handleInputChange}
-                  fullWidth
-                  helperText="Select hardware model for Hardware Sales invoice type"
+              </Box>
+
+              {/* Invoice Details */}
+              <Box>
+                <h3 style={{ marginTop: 0, marginBottom: 16 }}>
+                  Invoice Details
+                </h3>
+                <Stack spacing={2}>
+                  <Typography variant="body2" color="textSecondary">
+                    {!formData.customerId
+                      ? "Select a customer first to auto-load their miners, grouped by model and priced from the hosting rate formula."
+                      : minersLoading
+                        ? "Loading miners (status=AUTO) for selected customer..."
+                        : "Auto-loaded from this customer's AUTO miners. Adjust quantities/prices or add/remove lines as needed. Use the tag icon to add a discount under a line."}
+                  </Typography>
+                  <LineItemsEditor
+                    lineItems={lineItems}
+                    onChange={setLineItems}
+                    hardwareList={hardwareList}
+                    disabled={minersLoading}
+                    enableDiscounts
+                  />
+
+                  <Box
+                    sx={{
+                      mt: 1,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 1,
+                    }}
+                  >
+                    <Switch
+                      checked={confirmoEnabled}
+                      onChange={async (_e, checked) => {
+                        setConfirmoError(null);
+                        setConfirmoLoading(true);
+                        try {
+                          const res = await fetch("/api/settings/payment", {
+                            method: "PUT",
+                            credentials: "include",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ confirmoEnabled: checked }),
+                          });
+                          if (!res.ok) {
+                            const err = await res.json();
+                            const msg =
+                              err?.error ||
+                              err?.message ||
+                              "Failed to update setting";
+                            setConfirmoError(msg);
+                            throw new Error(msg);
+                          }
+                          const data = await res.json();
+                          setConfirmoEnabled(!!data?.data?.confirmoEnabled);
+                        } catch (err) {
+                          console.error(
+                            "Failed to update confirmo setting",
+                            err,
+                          );
+                        } finally {
+                          setConfirmoLoading(false);
+                        }
+                      }}
+                      disabled={confirmoLoading}
+                    />
+                    <Typography
+                      variant="body2"
+                      sx={{ color: "var(--dl-muted, #666)" }}
+                    >
+                      Enable payment via crypto (Confirmo)
+                    </Typography>
+                  </Box>
+                  {confirmoError && (
+                    <Alert severity="error" sx={{ mt: 2 }}>
+                      {confirmoError}
+                    </Alert>
+                  )}
+                </Stack>
+              </Box>
+
+              {/* Due Date */}
+              <Box>
+                <h3 style={{ marginTop: 0, marginBottom: 16 }}>
+                  Additional Information
+                </h3>
+                <Stack spacing={2}>
+                  <Stack direction="row" spacing={2}>
+                    <TextField
+                      select
+                      label="Billing Month"
+                      value={formData.billingMonth}
+                      onChange={(e) => {
+                        const selectedMonth = Number(e.target.value);
+                        setFormData((prev) => ({
+                          ...prev,
+                          billingMonth: selectedMonth,
+                        }));
+                      }}
+                      fullWidth
+                      helperText={`Year: ${formData.billingYear}`}
+                      required
+                    >
+                      <MenuItem value={0}>January</MenuItem>
+                      <MenuItem value={1}>February</MenuItem>
+                      <MenuItem value={2}>March</MenuItem>
+                      <MenuItem value={3}>April</MenuItem>
+                      <MenuItem value={4}>May</MenuItem>
+                      <MenuItem value={5}>June</MenuItem>
+                      <MenuItem value={6}>July</MenuItem>
+                      <MenuItem value={7}>August</MenuItem>
+                      <MenuItem value={8}>September</MenuItem>
+                      <MenuItem value={9}>October</MenuItem>
+                      <MenuItem value={10}>November</MenuItem>
+                      <MenuItem value={11}>December</MenuItem>
+                    </TextField>
+                  </Stack>
+                  <TextField
+                    label="Due Date"
+                    name="dueDate"
+                    type="date"
+                    value={formData.dueDate}
+                    onChange={handleDueDateChange}
+                    fullWidth
+                    InputLabelProps={{ shrink: true }}
+                    helperText="Select the due date for this invoice"
+                    required
+                  />
+                  <TextField
+                    select
+                    label="Hardware Model (for Hardware Sales invoices)"
+                    name="hardwareId"
+                    value={formData.hardwareId}
+                    onChange={handleInputChange}
+                    fullWidth
+                    helperText="Select hardware model for Hardware Sales invoice type"
+                    disabled={
+                      hardwareLoading ||
+                      formData.invoiceType === "ELECTRICITY_CHARGES"
+                    }
+                  >
+                    <MenuItem value="">-- No Hardware --</MenuItem>
+                    {hardwareList.map((hw) => (
+                      <MenuItem key={hw.id} value={hw.id}>
+                        {hw.model}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                  <LocationsMultiSelect
+                    value={formData.machineHostingLocation}
+                    onChange={(locations) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        machineHostingLocation: locations,
+                      }))
+                    }
+                    options={spaceLocations}
+                    disabled={spaceLocationsLoading}
+                  />
+                  {/* Status is automatically set to DRAFT when creating invoices */}
+                </Stack>
+              </Box>
+
+              {/* Actions */}
+              <Stack direction="row" spacing={2} sx={{ pt: 2 }}>
+                <Button variant="outlined" onClick={() => router.back()}>
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  variant="contained"
+                  startIcon={
+                    loading ? <CircularProgress size={20} /> : <SaveIcon />
+                  }
                   disabled={
-                    hardwareLoading ||
-                    formData.invoiceType === "ELECTRICITY_CHARGES"
+                    loading ||
+                    !formData.customerId ||
+                    lineItems.length === 0 ||
+                    !formData.dueDate
                   }
                 >
-                  <MenuItem value="">-- No Hardware --</MenuItem>
-                  {hardwareList.map((hw) => (
-                    <MenuItem key={hw.id} value={hw.id}>
-                      {hw.model}
-                    </MenuItem>
-                  ))}
-                </TextField>
-                <LocationsMultiSelect
-                  value={formData.machineHostingLocation}
-                  onChange={(locations) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      machineHostingLocation: locations,
-                    }))
-                  }
-                  options={spaceLocations}
-                  disabled={spaceLocationsLoading}
-                />
-                {/* Status is automatically set to DRAFT when creating invoices */}
+                  {loading ? "Creating..." : "Create Invoice"}
+                </Button>
               </Stack>
-            </Box>
-
-            {/* Actions */}
-            <Stack direction="row" spacing={2} sx={{ pt: 2 }}>
-              <Button variant="outlined" onClick={() => router.back()}>
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                variant="contained"
-                startIcon={
-                  loading ? <CircularProgress size={20} /> : <SaveIcon />
-                }
-                disabled={
-                  loading ||
-                  !formData.customerId ||
-                  lineItems.length === 0 ||
-                  !formData.dueDate
-                }
-              >
-                {loading ? "Creating..." : "Create Invoice"}
-              </Button>
             </Stack>
-          </Stack>
-        </form>
-      </Paper>
+          </form>
+        </Paper>
 
-      <Dialog
-        open={pastDueDateWarningOpen}
-        onClose={() => setPastDueDateWarningOpen(false)}
-      >
-        <DialogTitle>Due Date is in the Past</DialogTitle>
-        <DialogContent>
-          <Typography>
-            The due date you selected is in the past. Do you want to reselect a
-            due date, or continue anyway?
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleReselectDueDate}>Reselect Due Date</Button>
-          <Button
-            variant="contained"
-            onClick={() => {
-              setPastDueDateWarningOpen(false);
-              void submitInvoice();
-            }}
-          >
-            Continue
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </Container>
+        <Dialog
+          open={pastDueDateWarningOpen}
+          onClose={() => setPastDueDateWarningOpen(false)}
+        >
+          <DialogTitle>Due Date is in the Past</DialogTitle>
+          <DialogContent>
+            <Typography>
+              The due date you selected is in the past. Do you want to reselect
+              a due date, or continue anyway?
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleReselectDueDate}>Reselect Due Date</Button>
+            <Button
+              variant="contained"
+              onClick={() => {
+                setPastDueDateWarningOpen(false);
+                void submitInvoice();
+              }}
+            >
+              Continue
+            </Button>
+          </DialogActions>
+        </Dialog>
+      </Container>
+    </DaylightThemedPage>
   );
 }

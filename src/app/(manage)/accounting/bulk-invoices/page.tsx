@@ -41,6 +41,7 @@ import {
 import { LocationsMultiSelect } from "@/components/accounting/invoices/LocationsMultiSelect";
 import { getMinerLocations } from "@/lib/utils/minerLocation";
 import { useSpaceLocations } from "@/lib/hooks/useSpaceLocations";
+import { DaylightThemedPage } from "@/components/daylight/DaylightMuiScope";
 
 interface CustomerLineItemsState {
   lineItems: LineItem[];
@@ -439,418 +440,424 @@ export default function BulkInvoicesPage() {
   };
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
-      <Stack direction="row" spacing={2} sx={{ mb: 4 }}>
-        <Link href="/accounting/Hosting-and-Colocation">
-          <Button startIcon={<ArrowBackIcon />}>
-            Back to Accounting Dashboard
-          </Button>
-        </Link>
-        <Box flex={1}>
-          <Typography variant="h4" sx={{ fontWeight: "bold" }}>
-            Bulk Create Invoices
-          </Typography>
-          <Typography color="textSecondary" sx={{ mt: 0.5 }}>
-            Create draft electricity invoices for multiple customers at once.
-          </Typography>
-        </Box>
-      </Stack>
+    <DaylightThemedPage>
+      <Container maxWidth="lg" disableGutters>
+        <Stack spacing={1} sx={{ mb: 4, alignItems: "flex-start" }}>
+          <Link href="/accounting/Hosting-and-Colocation">
+            <Button startIcon={<ArrowBackIcon />}>
+              Back to Accounting Dashboard
+            </Button>
+          </Link>
+          <Box flex={1}>
+            <Typography variant="h4" sx={{ fontWeight: "bold" }}>
+              Bulk Create Invoices
+            </Typography>
+            <Typography color="textSecondary" sx={{ mt: 0.5 }}>
+              Create draft electricity invoices for multiple customers at once.
+            </Typography>
+          </Box>
+        </Stack>
 
-      {submitError && (
-        <Alert severity="error" sx={{ mb: 3 }}>
-          {submitError}
-        </Alert>
-      )}
-      {createError && (
-        <Alert severity="error" sx={{ mb: 3 }}>
-          {createError}
-        </Alert>
-      )}
-      {submitSuccess && (
-        <Alert severity="success" sx={{ mb: 3 }}>
-          {submitSuccess}
-        </Alert>
-      )}
+        {submitError && (
+          <Alert severity="error" sx={{ mb: 3 }}>
+            {submitError}
+          </Alert>
+        )}
+        {createError && (
+          <Alert severity="error" sx={{ mb: 3 }}>
+            {createError}
+          </Alert>
+        )}
+        {submitSuccess && (
+          <Alert severity="success" sx={{ mb: 3 }}>
+            {submitSuccess}
+          </Alert>
+        )}
 
-      <Paper sx={{ p: 4 }}>
-        <form onSubmit={handleSubmit}>
-          <Stack spacing={4}>
-            {/* Customer selection */}
-            <Box>
-              <Typography variant="h6" sx={{ mb: 1 }}>
-                Select Customers
-              </Typography>
-              <Stack
-                direction="row"
-                spacing={2.5}
-                flexWrap="wrap"
-                sx={{ mb: 2 }}
-              >
-                {(
-                  [
-                    ["success", "Balance covers monthly bill"],
-                    ["warning", "Balance below monthly bill"],
-                    ["error", "Negative balance"],
-                  ] as const
-                ).map(([color, label]) => (
-                  <Stack
-                    key={color}
-                    direction="row"
-                    spacing={0.75}
-                    alignItems="center"
-                  >
-                    <Box
-                      sx={{
-                        width: 10,
-                        height: 10,
-                        borderRadius: "50%",
-                        backgroundColor: `${color}.main`,
-                      }}
-                    />
-                    <Typography variant="caption" color="textSecondary">
-                      {label}
-                    </Typography>
-                  </Stack>
-                ))}
-              </Stack>
-              {customersLoading ? (
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  <CircularProgress size={20} />
-                  <Typography variant="body2">Loading customers...</Typography>
-                </Box>
-              ) : (
-                <FormGroup>
-                  <FormControlLabel
-                    control={
-                      <Checkbox
-                        checked={allSelected}
-                        indeterminate={
-                          selectedCustomerIds.length > 0 && !allSelected
-                        }
-                        onChange={handleToggleAll}
+        <Paper sx={{ p: 4 }}>
+          <form onSubmit={handleSubmit}>
+            <Stack spacing={4}>
+              {/* Customer selection */}
+              <Box>
+                <Typography variant="h6" sx={{ mb: 1 }}>
+                  Select Customers
+                </Typography>
+                <Stack
+                  direction="row"
+                  spacing={2.5}
+                  flexWrap="wrap"
+                  sx={{ mb: 2 }}
+                >
+                  {(
+                    [
+                      ["success", "Balance covers monthly bill"],
+                      ["warning", "Balance below monthly bill"],
+                      ["error", "Negative balance"],
+                    ] as const
+                  ).map(([color, label]) => (
+                    <Stack
+                      key={color}
+                      direction="row"
+                      spacing={0.75}
+                      alignItems="center"
+                    >
+                      <Box
+                        sx={{
+                          width: 10,
+                          height: 10,
+                          borderRadius: "50%",
+                          backgroundColor: `${color}.main`,
+                        }}
                       />
-                    }
-                    label="Select all customers"
-                  />
-                  {customers.map((customer: Customer) => {
-                    const lineItemsState = customerLineItems[customer.id];
-                    const isSelected = selectedCustomerIds.includes(
-                      customer.id,
-                    );
-
-                    return (
-                      <Box key={customer.id} sx={{ mb: isSelected ? 2 : 0 }}>
-                        <FormControlLabel
-                          control={
-                            <Checkbox
-                              checked={isSelected}
-                              onChange={() => handleToggleCustomer(customer.id)}
-                            />
+                      <Typography variant="caption" color="textSecondary">
+                        {label}
+                      </Typography>
+                    </Stack>
+                  ))}
+                </Stack>
+                {customersLoading ? (
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                    <CircularProgress size={20} />
+                    <Typography variant="body2">
+                      Loading customers...
+                    </Typography>
+                  </Box>
+                ) : (
+                  <FormGroup>
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          checked={allSelected}
+                          indeterminate={
+                            selectedCustomerIds.length > 0 && !allSelected
                           }
-                          label={
-                            <Stack
-                              direction="row"
-                              spacing={1}
-                              alignItems="baseline"
-                            >
-                              <Typography variant="body2">
-                                {customer.displayName}
-                              </Typography>
-                              <Typography
-                                variant="caption"
-                                color="textSecondary"
-                              >
-                                Balance:{" "}
-                                <CurrencyDisplay
-                                  value={balances[customer.id] ?? 0}
-                                  color={getBalanceColor(
-                                    balances[customer.id] ?? 0,
-                                    monthlyBills[customer.id] ?? 0,
-                                  )}
-                                  fontWeight="bold"
-                                  variant="caption"
-                                  standalone
-                                />
-                              </Typography>
-                            </Stack>
-                          }
+                          onChange={handleToggleAll}
                         />
-                        {isSelected && (
-                          <Box sx={{ ml: 4, mt: 0.5 }}>
-                            {lineItemsState?.loading ? (
-                              <Typography
-                                variant="caption"
-                                color="textSecondary"
+                      }
+                      label="Select all customers"
+                    />
+                    {customers.map((customer: Customer) => {
+                      const lineItemsState = customerLineItems[customer.id];
+                      const isSelected = selectedCustomerIds.includes(
+                        customer.id,
+                      );
+
+                      return (
+                        <Box key={customer.id} sx={{ mb: isSelected ? 2 : 0 }}>
+                          <FormControlLabel
+                            control={
+                              <Checkbox
+                                checked={isSelected}
+                                onChange={() =>
+                                  handleToggleCustomer(customer.id)
+                                }
+                              />
+                            }
+                            label={
+                              <Stack
+                                direction="row"
+                                spacing={1}
+                                alignItems="baseline"
                               >
-                                Loading miners (status=AUTO)...
-                              </Typography>
-                            ) : lineItemsState?.error ? (
-                              <Typography variant="caption" color="error">
-                                Error: {lineItemsState.error}
-                              </Typography>
-                            ) : (
-                              <>
-                                <LineItemsEditor
-                                  lineItems={lineItemsState?.lineItems ?? []}
-                                  onChange={(items) =>
-                                    setCustomerLineItems((prev) => ({
-                                      ...prev,
-                                      [customer.id]: {
-                                        ...prev[customer.id],
-                                        lineItems: items,
-                                        loading: false,
-                                        error: null,
-                                      },
-                                    }))
-                                  }
-                                  hardwareList={hardwareList}
-                                />
-                                <Box sx={{ mt: 1 }}>
-                                  <LocationsMultiSelect
-                                    value={
-                                      lineItemsState?.machineHostingLocation ??
-                                      []
-                                    }
-                                    onChange={(locations) =>
+                                <Typography variant="body2">
+                                  {customer.displayName}
+                                </Typography>
+                                <Typography
+                                  variant="caption"
+                                  color="textSecondary"
+                                >
+                                  Balance:{" "}
+                                  <CurrencyDisplay
+                                    value={balances[customer.id] ?? 0}
+                                    color={getBalanceColor(
+                                      balances[customer.id] ?? 0,
+                                      monthlyBills[customer.id] ?? 0,
+                                    )}
+                                    fontWeight="bold"
+                                    variant="caption"
+                                    standalone
+                                  />
+                                </Typography>
+                              </Stack>
+                            }
+                          />
+                          {isSelected && (
+                            <Box sx={{ ml: 4, mt: 0.5 }}>
+                              {lineItemsState?.loading ? (
+                                <Typography
+                                  variant="caption"
+                                  color="textSecondary"
+                                >
+                                  Loading miners (status=AUTO)...
+                                </Typography>
+                              ) : lineItemsState?.error ? (
+                                <Typography variant="caption" color="error">
+                                  Error: {lineItemsState.error}
+                                </Typography>
+                              ) : (
+                                <>
+                                  <LineItemsEditor
+                                    lineItems={lineItemsState?.lineItems ?? []}
+                                    onChange={(items) =>
                                       setCustomerLineItems((prev) => ({
                                         ...prev,
                                         [customer.id]: {
                                           ...prev[customer.id],
-                                          machineHostingLocation: locations,
+                                          lineItems: items,
+                                          loading: false,
+                                          error: null,
                                         },
                                       }))
                                     }
-                                    options={spaceLocations}
+                                    hardwareList={hardwareList}
                                   />
-                                </Box>
-                              </>
-                            )}
-                          </Box>
-                        )}
-                      </Box>
-                    );
-                  })}
-                </FormGroup>
-              )}
-            </Box>
+                                  <Box sx={{ mt: 1 }}>
+                                    <LocationsMultiSelect
+                                      value={
+                                        lineItemsState?.machineHostingLocation ??
+                                        []
+                                      }
+                                      onChange={(locations) =>
+                                        setCustomerLineItems((prev) => ({
+                                          ...prev,
+                                          [customer.id]: {
+                                            ...prev[customer.id],
+                                            machineHostingLocation: locations,
+                                          },
+                                        }))
+                                      }
+                                      options={spaceLocations}
+                                    />
+                                  </Box>
+                                </>
+                              )}
+                            </Box>
+                          )}
+                        </Box>
+                      );
+                    })}
+                  </FormGroup>
+                )}
+              </Box>
 
-            {/* Invoice configuration */}
-            <Box>
-              <Typography variant="h6" sx={{ mb: 2 }}>
-                Invoice Configuration
-              </Typography>
-              <Stack spacing={2}>
-                <TextField
-                  select
-                  label="Billing Month"
-                  value={billingMonth}
-                  onChange={(e) => {
-                    const selected = Number(e.target.value);
-                    setBillingMonth(selected);
-                  }}
-                  fullWidth
-                  helperText={`Year: ${billingYear}`}
-                  required
+              {/* Invoice configuration */}
+              <Box>
+                <Typography variant="h6" sx={{ mb: 2 }}>
+                  Invoice Configuration
+                </Typography>
+                <Stack spacing={2}>
+                  <TextField
+                    select
+                    label="Billing Month"
+                    value={billingMonth}
+                    onChange={(e) => {
+                      const selected = Number(e.target.value);
+                      setBillingMonth(selected);
+                    }}
+                    fullWidth
+                    helperText={`Year: ${billingYear}`}
+                    required
+                  >
+                    {MONTH_NAMES.map((name, idx) => (
+                      <MenuItem key={idx} value={idx}>
+                        {name}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                  <TextField
+                    label="Due Date"
+                    type="date"
+                    value={dueDate}
+                    onChange={handleDueDateChange}
+                    fullWidth
+                    InputLabelProps={{ shrink: true }}
+                    helperText="Select the due date for these invoices"
+                    required
+                  />
+                </Stack>
+              </Box>
+
+              {/* Summary */}
+              <Box
+                sx={{
+                  p: 2,
+                  backgroundColor: "var(--dl-canvas, #f5f5f5)",
+                  borderRadius: 1,
+                }}
+              >
+                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                  Summary
+                </Typography>
+                <Typography variant="body2">
+                  Selected customers: {totalInvoices}
+                </Typography>
+                <Typography variant="body2">
+                  Total AUTO miners across selected customers:{" "}
+                  {totalMinersAllSelected}
+                </Typography>
+                <Typography variant="body2">
+                  Estimated total invoice amount (all customers): $
+                  {estimatedTotalAmount.toFixed(2)}
+                </Typography>
+                <Typography variant="caption" color="textSecondary">
+                  Invoices are created with status DRAFT. You can review and
+                  issue them individually from the Accounting Dashboard.
+                </Typography>
+              </Box>
+
+              {/* Actions */}
+              <Stack direction="row" spacing={2} sx={{ pt: 2 }}>
+                <Button variant="outlined" onClick={() => router.back()}>
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  variant="contained"
+                  startIcon={
+                    creating ? <CircularProgress size={20} /> : <SaveIcon />
+                  }
+                  disabled={
+                    creating ||
+                    customersLoading ||
+                    selectedCustomerIds.length === 0 ||
+                    !dueDate
+                  }
                 >
-                  {MONTH_NAMES.map((name, idx) => (
-                    <MenuItem key={idx} value={idx}>
-                      {name}
-                    </MenuItem>
-                  ))}
-                </TextField>
-                <TextField
-                  label="Due Date"
-                  type="date"
-                  value={dueDate}
-                  onChange={handleDueDateChange}
-                  fullWidth
-                  InputLabelProps={{ shrink: true }}
-                  helperText="Select the due date for these invoices"
-                  required
-                />
+                  {creating ? "Creating Invoices..." : "Create Draft Invoices"}
+                </Button>
               </Stack>
-            </Box>
+            </Stack>
+          </form>
+        </Paper>
 
-            {/* Summary */}
-            <Box
-              sx={{
-                p: 2,
-                backgroundColor: "#f5f5f5",
-                borderRadius: 1,
+        <Dialog
+          open={confirmZeroMinersOpen}
+          onClose={() => setConfirmZeroMinersOpen(false)}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle>Some customers have no AUTO miners</DialogTitle>
+          <DialogContent>
+            <Typography variant="body2" sx={{ mb: 1 }}>
+              The following customers currently have no miners with status=
+              <strong>AUTO</strong>:
+            </Typography>
+            <Box component="ul" sx={{ pl: 3, mb: 2 }}>
+              {customersWithNoMinersNames.map((name) => (
+                <li key={name}>
+                  <Typography variant="body2">{name}</Typography>
+                </li>
+              ))}
+            </Box>
+            <Typography variant="body2">
+              If you continue, invoices will still be created for these
+              customers with a default miner count of <strong>0</strong>.
+            </Typography>
+            <Typography variant="body2" sx={{ mt: 1 }}>
+              Do you want to proceed?
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button
+              onClick={() => {
+                setConfirmZeroMinersOpen(false);
+                setExcludedCustomerIds([]);
               }}
             >
-              <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                Summary
-              </Typography>
-              <Typography variant="body2">
-                Selected customers: {totalInvoices}
-              </Typography>
-              <Typography variant="body2">
-                Total AUTO miners across selected customers:{" "}
-                {totalMinersAllSelected}
-              </Typography>
-              <Typography variant="body2">
-                Estimated total invoice amount (all customers): $
-                {estimatedTotalAmount.toFixed(2)}
-              </Typography>
-              <Typography variant="caption" color="textSecondary">
-                Invoices are created with status DRAFT. You can review and issue
-                them individually from the Accounting Dashboard.
-              </Typography>
+              Cancel
+            </Button>
+            <Button
+              variant="contained"
+              onClick={() =>
+                void submitBulkInvoices({
+                  allowZeroMiners: true,
+                  bypassPaidCheck: true,
+                })
+              }
+              disabled={creating}
+            >
+              {creating ? "Creating Invoices..." : "Proceed"}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog
+          open={confirmAlreadyPaidOpen}
+          onClose={() => setConfirmAlreadyPaidOpen(false)}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle>Some customers have already paid in advance</DialogTitle>
+          <DialogContent>
+            <Typography variant="body2" sx={{ mb: 1 }}>
+              The following customers have already paid in advance:
+            </Typography>
+            <Box component="ul" sx={{ pl: 3, mb: 2 }}>
+              {alreadyPaidCustomers.map(({ id, name }) => (
+                <li key={id}>
+                  <Typography variant="body2">{name}</Typography>
+                </li>
+              ))}
             </Box>
+            <Typography variant="body2">
+              Do you still want to send them an invoice?
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button
+              onClick={() => {
+                const idsToExclude = alreadyPaidCustomers.map((c) => c.id);
+                setExcludedCustomerIds(idsToExclude);
+                void submitBulkInvoices({
+                  bypassPaidCheck: true,
+                  excludeCustomerIds: idsToExclude,
+                });
+              }}
+              disabled={creating}
+            >
+              No, skip them
+            </Button>
+            <Button
+              variant="contained"
+              onClick={() => {
+                setExcludedCustomerIds([]);
+                void submitBulkInvoices({
+                  bypassPaidCheck: true,
+                  excludeCustomerIds: [],
+                });
+              }}
+              disabled={creating}
+            >
+              {creating ? "Creating Invoices..." : "Yes, send anyway"}
+            </Button>
+          </DialogActions>
+        </Dialog>
 
-            {/* Actions */}
-            <Stack direction="row" spacing={2} sx={{ pt: 2 }}>
-              <Button variant="outlined" onClick={() => router.back()}>
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                variant="contained"
-                startIcon={
-                  creating ? <CircularProgress size={20} /> : <SaveIcon />
-                }
-                disabled={
-                  creating ||
-                  customersLoading ||
-                  selectedCustomerIds.length === 0 ||
-                  !dueDate
-                }
-              >
-                {creating ? "Creating Invoices..." : "Create Draft Invoices"}
-              </Button>
-            </Stack>
-          </Stack>
-        </form>
-      </Paper>
-
-      <Dialog
-        open={confirmZeroMinersOpen}
-        onClose={() => setConfirmZeroMinersOpen(false)}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>Some customers have no AUTO miners</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" sx={{ mb: 1 }}>
-            The following customers currently have no miners with status=
-            <strong>AUTO</strong>:
-          </Typography>
-          <Box component="ul" sx={{ pl: 3, mb: 2 }}>
-            {customersWithNoMinersNames.map((name) => (
-              <li key={name}>
-                <Typography variant="body2">{name}</Typography>
-              </li>
-            ))}
-          </Box>
-          <Typography variant="body2">
-            If you continue, invoices will still be created for these customers
-            with a default miner count of <strong>0</strong>.
-          </Typography>
-          <Typography variant="body2" sx={{ mt: 1 }}>
-            Do you want to proceed?
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button
-            onClick={() => {
-              setConfirmZeroMinersOpen(false);
-              setExcludedCustomerIds([]);
-            }}
-          >
-            Cancel
-          </Button>
-          <Button
-            variant="contained"
-            onClick={() =>
-              void submitBulkInvoices({
-                allowZeroMiners: true,
-                bypassPaidCheck: true,
-              })
-            }
-            disabled={creating}
-          >
-            {creating ? "Creating Invoices..." : "Proceed"}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      <Dialog
-        open={confirmAlreadyPaidOpen}
-        onClose={() => setConfirmAlreadyPaidOpen(false)}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>Some customers have already paid in advance</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" sx={{ mb: 1 }}>
-            The following customers have already paid in advance:
-          </Typography>
-          <Box component="ul" sx={{ pl: 3, mb: 2 }}>
-            {alreadyPaidCustomers.map(({ id, name }) => (
-              <li key={id}>
-                <Typography variant="body2">{name}</Typography>
-              </li>
-            ))}
-          </Box>
-          <Typography variant="body2">
-            Do you still want to send them an invoice?
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button
-            onClick={() => {
-              const idsToExclude = alreadyPaidCustomers.map((c) => c.id);
-              setExcludedCustomerIds(idsToExclude);
-              void submitBulkInvoices({
-                bypassPaidCheck: true,
-                excludeCustomerIds: idsToExclude,
-              });
-            }}
-            disabled={creating}
-          >
-            No, skip them
-          </Button>
-          <Button
-            variant="contained"
-            onClick={() => {
-              setExcludedCustomerIds([]);
-              void submitBulkInvoices({
-                bypassPaidCheck: true,
-                excludeCustomerIds: [],
-              });
-            }}
-            disabled={creating}
-          >
-            {creating ? "Creating Invoices..." : "Yes, send anyway"}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      <Dialog
-        open={pastDueDateWarningOpen}
-        onClose={() => setPastDueDateWarningOpen(false)}
-      >
-        <DialogTitle>Due Date is in the Past</DialogTitle>
-        <DialogContent>
-          <Typography>
-            The due date you selected is in the past. Do you want to reselect a
-            due date, or continue anyway?
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleReselectDueDate}>Reselect Due Date</Button>
-          <Button
-            variant="contained"
-            onClick={() => {
-              setPastDueDateWarningOpen(false);
-              void submitBulkInvoices();
-            }}
-          >
-            Continue
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </Container>
+        <Dialog
+          open={pastDueDateWarningOpen}
+          onClose={() => setPastDueDateWarningOpen(false)}
+        >
+          <DialogTitle>Due Date is in the Past</DialogTitle>
+          <DialogContent>
+            <Typography>
+              The due date you selected is in the past. Do you want to reselect
+              a due date, or continue anyway?
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleReselectDueDate}>Reselect Due Date</Button>
+            <Button
+              variant="contained"
+              onClick={() => {
+                setPastDueDateWarningOpen(false);
+                void submitBulkInvoices();
+              }}
+            >
+              Continue
+            </Button>
+          </DialogActions>
+        </Dialog>
+      </Container>
+    </DaylightThemedPage>
   );
 }

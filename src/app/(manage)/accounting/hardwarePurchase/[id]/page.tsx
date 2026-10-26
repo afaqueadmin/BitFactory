@@ -30,6 +30,7 @@ import {
   VendorPaymentSection,
   VendorSideInvoice,
 } from "@/components/accounting/common/VendorPaymentSection";
+import { DaylightThemedPage } from "@/components/daylight/DaylightMuiScope";
 
 interface HardwarePurchaseDetail extends VendorSideInvoice {
   id: string;
@@ -153,471 +154,482 @@ export default function HardwarePurchaseDetailPage() {
 
   if (loading) {
     return (
-      <Container maxWidth="md">
-        <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
-          <CircularProgress />
-        </Box>
-      </Container>
+      <DaylightThemedPage>
+        <Container maxWidth="md" disableGutters>
+          <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
+            <CircularProgress />
+          </Box>
+        </Container>
+      </DaylightThemedPage>
     );
   }
 
   if (error && !invoice) {
     return (
-      <Container maxWidth="md">
-        <Box sx={{ py: 4 }}>
-          <Alert severity="error">{error}</Alert>
-          <Button
-            startIcon={<ArrowBackIcon />}
-            onClick={() => router.push("/accounting/hardware-purchases")}
-            sx={{ mt: 2 }}
-          >
-            Back to Hardware Purchases
-          </Button>
-        </Box>
-      </Container>
+      <DaylightThemedPage>
+        <Container maxWidth="md" disableGutters>
+          <Box sx={{ py: 4 }}>
+            <Alert severity="error">{error}</Alert>
+            <Button
+              startIcon={<ArrowBackIcon />}
+              onClick={() => router.push("/accounting/hardware-purchases")}
+              sx={{ mt: 2 }}
+            >
+              Back to Hardware Purchases
+            </Button>
+          </Box>
+        </Container>
+      </DaylightThemedPage>
     );
   }
 
   if (!invoice) {
     return (
-      <Container maxWidth="md">
-        <Box sx={{ py: 4 }}>
-          <Alert severity="warning">Invoice not found</Alert>
-          <Button
-            startIcon={<ArrowBackIcon />}
-            onClick={() => router.push("/accounting/hardware-purchases")}
-            sx={{ mt: 2 }}
-          >
-            Back to Hardware Purchases
-          </Button>
-        </Box>
-      </Container>
+      <DaylightThemedPage>
+        <Container maxWidth="md" disableGutters>
+          <Box sx={{ py: 4 }}>
+            <Alert severity="warning">Invoice not found</Alert>
+            <Button
+              startIcon={<ArrowBackIcon />}
+              onClick={() => router.push("/accounting/hardware-purchases")}
+              sx={{ mt: 2 }}
+            >
+              Back to Hardware Purchases
+            </Button>
+          </Box>
+        </Container>
+      </DaylightThemedPage>
     );
   }
 
   const unitTotal = invoice.quantity * invoice.unitPrice;
 
   return (
-    <Container maxWidth="md" sx={{ py: 4 }}>
-      <Stack direction="row" spacing={2} sx={{ mb: 4 }}>
-        <Link href="/accounting/hardware-purchases">
-          <Button startIcon={<ArrowBackIcon />}>Back</Button>
-        </Link>
-      </Stack>
+    <DaylightThemedPage>
+      <Container maxWidth="md" disableGutters>
+        <Stack spacing={1} sx={{ mb: 4, alignItems: "flex-start" }}>
+          <Link href="/accounting/hardware-purchases">
+            <Button startIcon={<ArrowBackIcon />}>Back</Button>
+          </Link>
+        </Stack>
 
-      <Paper sx={{ p: 4 }}>
-        <Stack spacing={3}>
-          {/* Header */}
-          <Box>
-            <Typography variant="h4" sx={{ fontWeight: "bold", mb: 1 }}>
-              {invoice.invoiceNumber}
-            </Typography>
-            <StatusBadge status={invoice.paymentStatus} />
-          </Box>
-
-          {error && <Alert severity="error">{error}</Alert>}
-
-          {successMessage && <Alert severity="success">{successMessage}</Alert>}
-
-          <Divider />
-
-          {/* Invoice Details Grid */}
-          <Box
-            sx={{
-              display: "grid",
-              gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
-              gap: 3,
-            }}
-          >
-            {/* Vendor Name */}
+        <Paper sx={{ p: 4 }}>
+          <Stack spacing={3}>
+            {/* Header */}
             <Box>
-              <Typography
-                variant="subtitle2"
-                color="textSecondary"
-                sx={{ fontWeight: "600", mb: 0.5 }}
-              >
-                Vendor Name
+              <Typography variant="h4" sx={{ fontWeight: "bold", mb: 1 }}>
+                {invoice.invoiceNumber}
               </Typography>
-              <Typography variant="body1">
-                {invoice.vendor?.name ?? "-"}
-              </Typography>
+              <StatusBadge status={invoice.paymentStatus} />
             </Box>
 
-            {/* Hardware Description */}
-            <Box>
-              <Typography
-                variant="subtitle2"
-                color="textSecondary"
-                sx={{ fontWeight: "600", mb: 0.5 }}
-              >
-                Hardware Description
-              </Typography>
-              <Typography variant="body1">
-                {invoice.hardwareDescription}
-              </Typography>
-            </Box>
+            {error && <Alert severity="error">{error}</Alert>}
 
-            {/* Billing Date */}
-            <Box>
-              <Typography
-                variant="subtitle2"
-                color="textSecondary"
-                sx={{ fontWeight: "600", mb: 0.5 }}
-              >
-                Billing Date
-              </Typography>
-              <Typography variant="body1">
-                <DateDisplay
-                  date={new Date(invoice.billingDate)}
-                  format="date"
-                />
-              </Typography>
-            </Box>
+            {successMessage && (
+              <Alert severity="success">{successMessage}</Alert>
+            )}
 
-            {/* Due Date */}
-            <Box>
-              <Typography
-                variant="subtitle2"
-                color="textSecondary"
-                sx={{ fontWeight: "600", mb: 0.5 }}
-              >
-                Due Date
-              </Typography>
-              <Typography variant="body1">
-                <DateDisplay date={new Date(invoice.dueDate)} format="date" />
-              </Typography>
-            </Box>
+            <Divider />
 
-            {/* Quantity */}
-            <Box>
-              <Typography
-                variant="subtitle2"
-                color="textSecondary"
-                sx={{ fontWeight: "600", mb: 0.5 }}
-              >
-                Quantity
-              </Typography>
-              <Typography variant="body1">{invoice.quantity}</Typography>
-            </Box>
-
-            {/* Unit Price */}
-            <Box>
-              <Typography
-                variant="subtitle2"
-                color="textSecondary"
-                sx={{ fontWeight: "600", mb: 0.5 }}
-              >
-                Unit Price
-              </Typography>
-              <Typography variant="body1">
-                <CurrencyDisplay value={invoice.unitPrice} />
-              </Typography>
-            </Box>
-
-            {/* Miscellaneous Charges */}
-            <Box>
-              <Typography
-                variant="subtitle2"
-                color="textSecondary"
-                sx={{ fontWeight: "600", mb: 0.5 }}
-              >
-                Miscellaneous Charges
-              </Typography>
-              <Typography variant="body1">
-                <CurrencyDisplay value={invoice.miscellaneousCharges} />
-              </Typography>
-            </Box>
-
-            {/* Security Deposit */}
-            <Box>
-              <Typography
-                variant="subtitle2"
-                color="textSecondary"
-                sx={{ fontWeight: "600", mb: 0.5 }}
-              >
-                Security Deposit
-              </Typography>
-              <Typography variant="body1">
-                <CurrencyDisplay value={invoice.securityDeposit} />
-              </Typography>
-            </Box>
-
-            {/* Unit Total */}
-            <Box>
-              <Typography
-                variant="subtitle2"
-                color="textSecondary"
-                sx={{ fontWeight: "600", mb: 0.5 }}
-              >
-                Unit Total
-              </Typography>
-              <Typography variant="body1">
-                <CurrencyDisplay value={unitTotal} />
-              </Typography>
-            </Box>
-
-            {/* Vendor Invoice PDF */}
-            <Box>
-              <Typography
-                variant="subtitle2"
-                color="textSecondary"
-                sx={{ fontWeight: "600", mb: 0.5 }}
-              >
-                Vendor Invoice PDF
-              </Typography>
-              <Typography variant="body1">
-                {invoice.invoicePdfKey ? (
-                  <MuiLink
-                    href={`/api/hardware-purchases/${invoice.id}/documents/invoice`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    sx={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 0.5,
-                    }}
-                  >
-                    <PictureAsPdfIcon fontSize="small" /> View invoice PDF
-                  </MuiLink>
-                ) : (
-                  "No PDF"
-                )}
-              </Typography>
-            </Box>
-          </Box>
-
-          <Divider />
-
-          {/* Amount Summary */}
-          <Box
-            sx={{
-              p: 3,
-              backgroundColor: "#f5f5f5",
-              borderRadius: 1,
-              border: "1px solid #e0e0e0",
-            }}
-          >
-            <Stack spacing={2}>
-              <Box sx={{ display: "flex", justifyContent: "space-between" }}>
-                <Typography variant="body1" sx={{ fontWeight: "500" }}>
-                  Unit Total:
+            {/* Invoice Details Grid */}
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
+                gap: 3,
+              }}
+            >
+              {/* Vendor Name */}
+              <Box>
+                <Typography
+                  variant="subtitle2"
+                  color="textSecondary"
+                  sx={{ fontWeight: "600", mb: 0.5 }}
+                >
+                  Vendor Name
                 </Typography>
                 <Typography variant="body1">
-                  <CurrencyDisplay value={unitTotal} />
+                  {invoice.vendor?.name ?? "-"}
                 </Typography>
               </Box>
-              <Box sx={{ display: "flex", justifyContent: "space-between" }}>
-                <Typography variant="body1" sx={{ fontWeight: "500" }}>
-                  Miscellaneous:
+
+              {/* Hardware Description */}
+              <Box>
+                <Typography
+                  variant="subtitle2"
+                  color="textSecondary"
+                  sx={{ fontWeight: "600", mb: 0.5 }}
+                >
+                  Hardware Description
+                </Typography>
+                <Typography variant="body1">
+                  {invoice.hardwareDescription}
+                </Typography>
+              </Box>
+
+              {/* Billing Date */}
+              <Box>
+                <Typography
+                  variant="subtitle2"
+                  color="textSecondary"
+                  sx={{ fontWeight: "600", mb: 0.5 }}
+                >
+                  Billing Date
+                </Typography>
+                <Typography variant="body1">
+                  <DateDisplay
+                    date={new Date(invoice.billingDate)}
+                    format="date"
+                  />
+                </Typography>
+              </Box>
+
+              {/* Due Date */}
+              <Box>
+                <Typography
+                  variant="subtitle2"
+                  color="textSecondary"
+                  sx={{ fontWeight: "600", mb: 0.5 }}
+                >
+                  Due Date
+                </Typography>
+                <Typography variant="body1">
+                  <DateDisplay date={new Date(invoice.dueDate)} format="date" />
+                </Typography>
+              </Box>
+
+              {/* Quantity */}
+              <Box>
+                <Typography
+                  variant="subtitle2"
+                  color="textSecondary"
+                  sx={{ fontWeight: "600", mb: 0.5 }}
+                >
+                  Quantity
+                </Typography>
+                <Typography variant="body1">{invoice.quantity}</Typography>
+              </Box>
+
+              {/* Unit Price */}
+              <Box>
+                <Typography
+                  variant="subtitle2"
+                  color="textSecondary"
+                  sx={{ fontWeight: "600", mb: 0.5 }}
+                >
+                  Unit Price
+                </Typography>
+                <Typography variant="body1">
+                  <CurrencyDisplay value={invoice.unitPrice} />
+                </Typography>
+              </Box>
+
+              {/* Miscellaneous Charges */}
+              <Box>
+                <Typography
+                  variant="subtitle2"
+                  color="textSecondary"
+                  sx={{ fontWeight: "600", mb: 0.5 }}
+                >
+                  Miscellaneous Charges
                 </Typography>
                 <Typography variant="body1">
                   <CurrencyDisplay value={invoice.miscellaneousCharges} />
                 </Typography>
               </Box>
-              <Box sx={{ display: "flex", justifyContent: "space-between" }}>
-                <Typography variant="body1" sx={{ fontWeight: "500" }}>
-                  Security Deposit:
+
+              {/* Security Deposit */}
+              <Box>
+                <Typography
+                  variant="subtitle2"
+                  color="textSecondary"
+                  sx={{ fontWeight: "600", mb: 0.5 }}
+                >
+                  Security Deposit
                 </Typography>
                 <Typography variant="body1">
                   <CurrencyDisplay value={invoice.securityDeposit} />
                 </Typography>
               </Box>
-              <Box
-                sx={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  pt: 2,
-                  borderTop: "2px solid #d0d0d0",
-                }}
-              >
-                <Typography variant="h6" sx={{ fontWeight: "bold" }}>
-                  Total Amount:
-                </Typography>
-                <Typography
-                  variant="h6"
-                  sx={{ fontWeight: "bold", color: "primary.main" }}
-                >
-                  <CurrencyDisplay value={invoice.totalAmount} />
-                </Typography>
-              </Box>
-            </Stack>
-          </Box>
 
-          <Divider />
-
-          {/* Notes */}
-          {invoice.notes && (
-            <>
+              {/* Unit Total */}
               <Box>
                 <Typography
                   variant="subtitle2"
                   color="textSecondary"
-                  sx={{ fontWeight: "600", mb: 1 }}
+                  sx={{ fontWeight: "600", mb: 0.5 }}
                 >
-                  Notes
+                  Unit Total
                 </Typography>
-                <Typography
-                  variant="body2"
-                  sx={{
-                    whiteSpace: "pre-wrap",
-                    p: 2,
-                    backgroundColor: "#fafafa",
-                    borderRadius: 1,
-                    border: "1px solid #e0e0e0",
-                  }}
-                >
-                  {invoice.notes}
+                <Typography variant="body1">
+                  <CurrencyDisplay value={unitTotal} />
                 </Typography>
               </Box>
-              <Divider />
-            </>
-          )}
 
-          {/* Metadata */}
-          <Box
-            sx={{
-              display: "grid",
-              gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
-              gap: 3,
-              p: 2,
-              backgroundColor: "#fafafa",
-              borderRadius: 1,
-              fontSize: "0.875rem",
-            }}
-          >
-            <Box>
-              <Typography
-                variant="caption"
-                color="textSecondary"
-                sx={{ fontWeight: "600" }}
-              >
-                Created By
-              </Typography>
-              <Typography variant="body2">
-                {invoice.createdByUser?.name ||
-                  invoice.createdByUser?.email ||
-                  "System"}
-              </Typography>
+              {/* Vendor Invoice PDF */}
+              <Box>
+                <Typography
+                  variant="subtitle2"
+                  color="textSecondary"
+                  sx={{ fontWeight: "600", mb: 0.5 }}
+                >
+                  Vendor Invoice PDF
+                </Typography>
+                <Typography variant="body1">
+                  {invoice.invoicePdfKey ? (
+                    <MuiLink
+                      href={`/api/hardware-purchases/${invoice.id}/documents/invoice`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      sx={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 0.5,
+                      }}
+                    >
+                      <PictureAsPdfIcon fontSize="small" /> View invoice PDF
+                    </MuiLink>
+                  ) : (
+                    "No PDF"
+                  )}
+                </Typography>
+              </Box>
             </Box>
-            <Box>
-              <Typography
-                variant="caption"
-                color="textSecondary"
-                sx={{ fontWeight: "600" }}
-              >
-                Created At
-              </Typography>
-              <Typography variant="body2">
-                <DateDisplay
-                  date={new Date(invoice.createdAt)}
-                  format="datetime"
-                />
-              </Typography>
-            </Box>
-            {invoice.updatedByUser && (
-              <>
-                <Box>
-                  <Typography
-                    variant="caption"
-                    color="textSecondary"
-                    sx={{ fontWeight: "600" }}
-                  >
-                    Last Updated By
-                  </Typography>
-                  <Typography variant="body2">
-                    {invoice.updatedByUser.name || invoice.updatedByUser.email}
-                  </Typography>
-                </Box>
-                <Box>
-                  <Typography
-                    variant="caption"
-                    color="textSecondary"
-                    sx={{ fontWeight: "600" }}
-                  >
-                    Last Updated At
-                  </Typography>
-                  <Typography variant="body2">
-                    <DateDisplay
-                      date={new Date(invoice.updatedAt)}
-                      format="datetime"
-                    />
-                  </Typography>
-                </Box>
-              </>
-            )}
-          </Box>
 
-          <Divider />
+            <Divider />
 
-          {/* Payment Section - Only show if not Cancelled */}
-          {invoice.paymentStatus !== "Cancelled" && (
+            {/* Amount Summary */}
             <Box
               sx={{
                 p: 3,
-                backgroundColor: "#e3f2fd",
+                backgroundColor: "var(--dl-canvas, #f5f5f5)",
                 borderRadius: 1,
-                border: "1px solid #bbdefb",
+                border: "1px solid var(--dl-border, #e0e0e0)",
               }}
             >
-              <Typography variant="h6" sx={{ fontWeight: "bold", mb: 2 }}>
-                Payment Information
-              </Typography>
-
-              <VendorPaymentSection
-                invoice={invoice}
-                apiBase="/api/hardware-purchases"
-                receiptPurpose="hardware-purchase-receipt"
-                onPaid={handlePaid}
-                onUpdated={(updated) =>
-                  setInvoice(updated as HardwarePurchaseDetail)
-                }
-                onCancelClick={() => setOpenCancelDialog(true)}
-              />
+              <Stack spacing={2}>
+                <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                  <Typography variant="body1" sx={{ fontWeight: "500" }}>
+                    Unit Total:
+                  </Typography>
+                  <Typography variant="body1">
+                    <CurrencyDisplay value={unitTotal} />
+                  </Typography>
+                </Box>
+                <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                  <Typography variant="body1" sx={{ fontWeight: "500" }}>
+                    Miscellaneous:
+                  </Typography>
+                  <Typography variant="body1">
+                    <CurrencyDisplay value={invoice.miscellaneousCharges} />
+                  </Typography>
+                </Box>
+                <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                  <Typography variant="body1" sx={{ fontWeight: "500" }}>
+                    Security Deposit:
+                  </Typography>
+                  <Typography variant="body1">
+                    <CurrencyDisplay value={invoice.securityDeposit} />
+                  </Typography>
+                </Box>
+                <Box
+                  sx={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    pt: 2,
+                    borderTop: "2px solid var(--dl-border, #d0d0d0)",
+                  }}
+                >
+                  <Typography variant="h6" sx={{ fontWeight: "bold" }}>
+                    Total Amount:
+                  </Typography>
+                  <Typography
+                    variant="h6"
+                    sx={{ fontWeight: "bold", color: "primary.main" }}
+                  >
+                    <CurrencyDisplay value={invoice.totalAmount} />
+                  </Typography>
+                </Box>
+              </Stack>
             </Box>
-          )}
 
-          {/* Cancelled Invoice Message */}
-          {invoice.paymentStatus === "Cancelled" && (
-            <Alert severity="warning">
-              This invoice has been cancelled and cannot be modified.
-            </Alert>
-          )}
-        </Stack>
-      </Paper>
+            <Divider />
 
-      {/* Cancel Confirmation Dialog */}
-      <Dialog
-        open={openCancelDialog}
-        onClose={() => setOpenCancelDialog(false)}
-      >
-        <DialogTitle>Cancel Invoice</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            Are you sure you want to cancel invoice{" "}
-            <strong>{invoice.invoiceNumber}</strong>? This action cannot be
-            undone.
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button
-            onClick={() => setOpenCancelDialog(false)}
-            disabled={cancelLoading}
-          >
-            Keep Invoice
-          </Button>
-          <Button
-            onClick={handleCancelInvoice}
-            color="error"
-            variant="contained"
-            disabled={cancelLoading}
-            startIcon={
-              cancelLoading ? <CircularProgress size={20} /> : <CancelIcon />
-            }
-          >
-            {cancelLoading ? "Cancelling..." : "Cancel Invoice"}
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </Container>
+            {/* Notes */}
+            {invoice.notes && (
+              <>
+                <Box>
+                  <Typography
+                    variant="subtitle2"
+                    color="textSecondary"
+                    sx={{ fontWeight: "600", mb: 1 }}
+                  >
+                    Notes
+                  </Typography>
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      whiteSpace: "pre-wrap",
+                      p: 2,
+                      backgroundColor: "var(--dl-table-head, #fafafa)",
+                      borderRadius: 1,
+                      border: "1px solid var(--dl-border, #e0e0e0)",
+                    }}
+                  >
+                    {invoice.notes}
+                  </Typography>
+                </Box>
+                <Divider />
+              </>
+            )}
+
+            {/* Metadata */}
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
+                gap: 3,
+                p: 2,
+                backgroundColor: "var(--dl-table-head, #fafafa)",
+                borderRadius: 1,
+                fontSize: "0.875rem",
+              }}
+            >
+              <Box>
+                <Typography
+                  variant="caption"
+                  color="textSecondary"
+                  sx={{ fontWeight: "600" }}
+                >
+                  Created By
+                </Typography>
+                <Typography variant="body2">
+                  {invoice.createdByUser?.name ||
+                    invoice.createdByUser?.email ||
+                    "System"}
+                </Typography>
+              </Box>
+              <Box>
+                <Typography
+                  variant="caption"
+                  color="textSecondary"
+                  sx={{ fontWeight: "600" }}
+                >
+                  Created At
+                </Typography>
+                <Typography variant="body2">
+                  <DateDisplay
+                    date={new Date(invoice.createdAt)}
+                    format="datetime"
+                  />
+                </Typography>
+              </Box>
+              {invoice.updatedByUser && (
+                <>
+                  <Box>
+                    <Typography
+                      variant="caption"
+                      color="textSecondary"
+                      sx={{ fontWeight: "600" }}
+                    >
+                      Last Updated By
+                    </Typography>
+                    <Typography variant="body2">
+                      {invoice.updatedByUser.name ||
+                        invoice.updatedByUser.email}
+                    </Typography>
+                  </Box>
+                  <Box>
+                    <Typography
+                      variant="caption"
+                      color="textSecondary"
+                      sx={{ fontWeight: "600" }}
+                    >
+                      Last Updated At
+                    </Typography>
+                    <Typography variant="body2">
+                      <DateDisplay
+                        date={new Date(invoice.updatedAt)}
+                        format="datetime"
+                      />
+                    </Typography>
+                  </Box>
+                </>
+              )}
+            </Box>
+
+            <Divider />
+
+            {/* Payment Section - Only show if not Cancelled */}
+            {invoice.paymentStatus !== "Cancelled" && (
+              <Box
+                sx={{
+                  p: 3,
+                  backgroundColor: "var(--dl-sky-soft, #e3f2fd)",
+                  borderRadius: 1,
+                  border: "1px solid var(--dl-border-sky, #bbdefb)",
+                }}
+              >
+                <Typography variant="h6" sx={{ fontWeight: "bold", mb: 2 }}>
+                  Payment Information
+                </Typography>
+
+                <VendorPaymentSection
+                  invoice={invoice}
+                  apiBase="/api/hardware-purchases"
+                  receiptPurpose="hardware-purchase-receipt"
+                  onPaid={handlePaid}
+                  onUpdated={(updated) =>
+                    setInvoice(updated as HardwarePurchaseDetail)
+                  }
+                  onCancelClick={() => setOpenCancelDialog(true)}
+                />
+              </Box>
+            )}
+
+            {/* Cancelled Invoice Message */}
+            {invoice.paymentStatus === "Cancelled" && (
+              <Alert severity="warning">
+                This invoice has been cancelled and cannot be modified.
+              </Alert>
+            )}
+          </Stack>
+        </Paper>
+
+        {/* Cancel Confirmation Dialog */}
+        <Dialog
+          open={openCancelDialog}
+          onClose={() => setOpenCancelDialog(false)}
+        >
+          <DialogTitle>Cancel Invoice</DialogTitle>
+          <DialogContent>
+            <DialogContentText>
+              Are you sure you want to cancel invoice{" "}
+              <strong>{invoice.invoiceNumber}</strong>? This action cannot be
+              undone.
+            </DialogContentText>
+          </DialogContent>
+          <DialogActions>
+            <Button
+              onClick={() => setOpenCancelDialog(false)}
+              disabled={cancelLoading}
+            >
+              Keep Invoice
+            </Button>
+            <Button
+              onClick={handleCancelInvoice}
+              color="error"
+              variant="contained"
+              disabled={cancelLoading}
+              startIcon={
+                cancelLoading ? <CircularProgress size={20} /> : <CancelIcon />
+              }
+            >
+              {cancelLoading ? "Cancelling..." : "Cancel Invoice"}
+            </Button>
+          </DialogActions>
+        </Dialog>
+      </Container>
+    </DaylightThemedPage>
   );
 }

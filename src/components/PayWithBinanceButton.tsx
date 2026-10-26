@@ -18,6 +18,7 @@ import {
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import confetti from "canvas-confetti";
+import { useDaylight } from "@/lib/daylight";
 import { useQueryClient } from "@tanstack/react-query";
 
 const POLL_INTERVAL_MS = 10_000;
@@ -44,6 +45,7 @@ export default function PayWithBinanceButton({
   invoiceId,
   disabled,
 }: PayWithBinanceButtonProps) {
+  const { d, fonts } = useDaylight();
   const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -134,10 +136,28 @@ export default function PayWithBinanceButton({
   return (
     <>
       <Button
-        variant="outlined"
+        variant="contained"
         onClick={handleClick}
         disabled={disabled || loading}
-        startIcon={loading ? <CircularProgress size={16} /> : undefined}
+        startIcon={
+          loading ? (
+            <CircularProgress size={16} sx={{ color: "inherit" }} />
+          ) : undefined
+        }
+        sx={{
+          textTransform: "none",
+          fontFamily: fonts.body,
+          fontWeight: 650,
+          fontSize: 13,
+          minHeight: 42,
+          px: "18px",
+          borderRadius: "8px",
+          boxShadow: "none",
+          bgcolor: d.action,
+          color: d.surface,
+          "&:hover": { bgcolor: d.actionHover, boxShadow: "none" },
+          "&.Mui-disabled": { bgcolor: d.border, color: d.muted },
+        }}
       >
         Pay with Binance
       </Button>

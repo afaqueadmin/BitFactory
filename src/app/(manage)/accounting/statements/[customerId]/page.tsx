@@ -42,6 +42,7 @@ import Link from "next/link";
 import { calculateDaysUntilDue } from "@/lib/mocks/invoiceMocks";
 import { INVOICE_TYPE_LABELS } from "@/lib/constants/accounting";
 import type { InvoiceType } from "@prisma/client";
+import { DaylightThemedPage } from "@/components/daylight/DaylightMuiScope";
 
 // Email templates for different tones
 const EMAIL_TEMPLATES = {
@@ -305,410 +306,436 @@ export default function CustomerStatementPage() {
 
   if (loading) {
     return (
-      <Container maxWidth="lg">
-        <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
-          <CircularProgress />
-        </Box>
-      </Container>
+      <DaylightThemedPage>
+        <Container maxWidth="lg" disableGutters>
+          <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
+            <CircularProgress />
+          </Box>
+        </Container>
+      </DaylightThemedPage>
     );
   }
 
   if (error) {
     return (
-      <Container maxWidth="lg">
-        <Alert severity="error">{error}</Alert>
-      </Container>
+      <DaylightThemedPage>
+        <Container maxWidth="lg" disableGutters>
+          <Alert severity="error">{error}</Alert>
+        </Container>
+      </DaylightThemedPage>
     );
   }
 
   if (!customer) {
     return (
-      <Container maxWidth="lg">
-        <Alert severity="warning">Customer not found</Alert>
-      </Container>
+      <DaylightThemedPage>
+        <Container maxWidth="lg" disableGutters>
+          <Alert severity="warning">Customer not found</Alert>
+        </Container>
+      </DaylightThemedPage>
     );
   }
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
-      <Stack
-        direction="row"
-        justifyContent="space-between"
-        alignItems="center"
-        sx={{ mb: 4 }}
-      >
-        <Box>
-          <h1 style={{ margin: 0 }}>{customer.name} - Statement</h1>
-        </Box>
-        <Stack direction="row" spacing={1}>
-          <Button
-            variant="outlined"
-            startIcon={<DownloadIcon />}
-            onClick={handleDownloadPDF}
-            disabled={downloadLoading}
-          >
-            {downloadLoading ? "Downloading..." : "Download Statement"}
-          </Button>
-          <Button
-            variant="outlined"
-            startIcon={<PrintIcon />}
-            onClick={handlePrint}
-            disabled={printLoading}
-          >
-            {printLoading ? "Loading..." : "Print"}
-          </Button>
-          <Button
-            variant="outlined"
-            startIcon={<SendIcon />}
-            onClick={() => setEmailDialogOpen(true)}
-            disabled={emailLoading}
-          >
-            Send Email
-          </Button>
-        </Stack>
-      </Stack>
-
-      <Stack direction="row" spacing={2} sx={{ mb: 4 }}>
-        <Card sx={{ flex: 1 }}>
-          <CardContent>
-            <Typography color="textSecondary" gutterBottom>
-              Total Invoices
-            </Typography>
-            <Typography variant="h5">{invoices.length}</Typography>
-          </CardContent>
-        </Card>
-        <Card sx={{ flex: 1 }}>
-          <CardContent>
-            <Typography color="textSecondary" gutterBottom>
-              Total Amount
-            </Typography>
-            <Typography variant="h5">
-              <CurrencyDisplay value={totals?.totalAmount || 0} />
-            </Typography>
-          </CardContent>
-        </Card>
-        <Card sx={{ flex: 1 }}>
-          <CardContent>
-            <Typography color="textSecondary" gutterBottom>
-              Total Paid
-            </Typography>
-            <Typography variant="h5">
-              <CurrencyDisplay value={totals?.totalPaid || 0} />
-            </Typography>
-          </CardContent>
-        </Card>
-        <Card sx={{ flex: 1 }}>
-          <CardContent>
-            <Typography color="textSecondary" gutterBottom>
-              Outstanding
-            </Typography>
-            <Typography variant="h5" sx={{ color: "#d32f2f" }}>
-              <CurrencyDisplay value={totals?.totalPending || 0} />
-            </Typography>
-          </CardContent>
-        </Card>
-      </Stack>
-
-      <Box sx={{ mb: 2 }}>
-        <h2 style={{ marginTop: 0 }}>Invoice History</h2>
-      </Box>
-
-      <TableContainer component={Paper}>
-        <Table>
-          <TableHead sx={{ backgroundColor: "#f5f5f5" }}>
-            <TableRow>
-              <TableCell sx={{ fontWeight: "bold" }}>
-                <TableSortLabel
-                  active={sortBy === "invoiceNumber"}
-                  direction={sortDirection}
-                  onClick={() => handleRequestSort("invoiceNumber")}
-                >
-                  Invoice #
-                </TableSortLabel>
-              </TableCell>
-              <TableCell sx={{ fontWeight: "bold" }}>
-                <TableSortLabel
-                  active={sortBy === "issuedDate"}
-                  direction={sortDirection}
-                  onClick={() => handleRequestSort("issuedDate")}
-                >
-                  Issued Date
-                </TableSortLabel>
-              </TableCell>
-              <TableCell sx={{ fontWeight: "bold" }}>
-                <TableSortLabel
-                  active={sortBy === "dueDate"}
-                  direction={sortDirection}
-                  onClick={() => handleRequestSort("dueDate")}
-                >
-                  Due Date
-                </TableSortLabel>
-              </TableCell>
-              <TableCell sx={{ fontWeight: "bold" }}>Type</TableCell>
-              <TableCell sx={{ fontWeight: "bold" }}>
-                <TableSortLabel
-                  active={sortBy === "amount"}
-                  direction={sortDirection}
-                  onClick={() => handleRequestSort("amount")}
-                >
-                  Amount
-                </TableSortLabel>
-              </TableCell>
-              <TableCell sx={{ fontWeight: "bold" }}>
-                <TableSortLabel
-                  active={sortBy === "paidDate"}
-                  direction={sortDirection}
-                  onClick={() => handleRequestSort("paidDate")}
-                >
-                  Paid
-                </TableSortLabel>
-              </TableCell>
-              <TableCell sx={{ fontWeight: "bold" }}>Outstanding</TableCell>
-              <TableCell sx={{ fontWeight: "bold" }}>
-                <TableSortLabel
-                  active={sortBy === "status"}
-                  direction={sortDirection}
-                  onClick={() => handleRequestSort("status")}
-                >
-                  Status
-                </TableSortLabel>
-              </TableCell>
-              <TableCell sx={{ fontWeight: "bold" }}>Paid Past Due</TableCell>
-              <TableCell sx={{ fontWeight: "bold" }}>
-                <TableSortLabel
-                  active={sortBy === "daysUntilDue"}
-                  direction={sortDirection}
-                  onClick={() => handleRequestSort("daysUntilDue")}
-                >
-                  Days Until Due
-                </TableSortLabel>
-              </TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {sortedInvoices.map((invoice) => {
-              const daysUntilDue = calculateDaysUntilDue(
-                new Date(invoice.dueDate),
-              );
-              return (
-                <TableRow key={invoice.id} hover>
-                  <TableCell sx={{ fontWeight: "bold" }}>
-                    <Link
-                      href={`/accounting/${invoice.id}`}
-                      style={{ color: "#1976d2", textDecoration: "none" }}
-                    >
-                      {invoice.invoiceNumber}
-                    </Link>
-                  </TableCell>
-                  <TableCell>
-                    <DateDisplay
-                      date={invoice.issuedDate || invoice.invoiceGeneratedDate}
-                      format="date"
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <DateDisplay date={invoice.dueDate} format="date" />
-                  </TableCell>
-                  <TableCell>
-                    {INVOICE_TYPE_LABELS[invoice.invoiceType as InvoiceType] ??
-                      invoice.invoiceType}
-                  </TableCell>
-                  <TableCell>
-                    <CurrencyDisplay value={invoice.totalAmount} />
-                  </TableCell>
-                  <TableCell>
-                    <CurrencyDisplay
-                      value={invoice.status === "PAID" ? invoice.paidAmount : 0}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <CurrencyDisplay
-                      value={
-                        invoice.status === "ISSUED" ||
-                        invoice.status === "OVERDUE"
-                          ? Math.max(
-                              0,
-                              invoice.totalAmount - invoice.paidAmount,
-                            )
-                          : 0
-                      }
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <StatusBadge status={invoice.status} />
-                  </TableCell>
-                  <TableCell>
-                    {invoice.status === "PAID" &&
-                    invoice.paidDate &&
-                    invoice.dueDate ? (
-                      <Box
-                        sx={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          px: 1,
-                          py: 0.25,
-                          borderRadius: "999px",
-                          backgroundColor: "#fdecea",
-                          border: "1px solid #f44336",
-                          color: "#c62828",
-                          fontSize: "0.75rem",
-                          fontWeight: 700,
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {Math.max(
-                          0,
-                          Math.ceil(
-                            (new Date(invoice.paidDate).getTime() -
-                              new Date(invoice.dueDate).getTime()) /
-                              (1000 * 60 * 60 * 24),
-                          ),
-                        )}{" "}
-                        days
-                      </Box>
-                    ) : (
-                      "-"
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {invoice.status === "PAID" ? (
-                      "-"
-                    ) : (
-                      <Typography
-                        sx={{
-                          color:
-                            daysUntilDue < 0
-                              ? "error.main"
-                              : daysUntilDue < 7
-                                ? "warning.main"
-                                : "success.main",
-                          fontWeight: "500",
-                        }}
-                      >
-                        {daysUntilDue === 0
-                          ? "Today"
-                          : daysUntilDue === 1
-                            ? "1 day"
-                            : daysUntilDue < 0
-                              ? `${Math.abs(daysUntilDue)} ${Math.abs(daysUntilDue) === 1 ? "day" : "days"} overdue`
-                              : `${daysUntilDue} ${daysUntilDue === 1 ? "day" : "days"}`}
-                      </Typography>
-                    )}
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </TableContainer>
-
-      {invoices.length === 0 && (
-        <Box sx={{ textAlign: "center", py: 4 }}>
-          <p style={{ color: "#999" }}>No invoices found for this customer</p>
-        </Box>
-      )}
-
-      {/* Send Email Dialog */}
-      <Dialog
-        open={emailDialogOpen}
-        onClose={() => setEmailDialogOpen(false)}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>Send Statement Email</DialogTitle>
-        <DialogContent sx={{ pt: 2 }}>
-          {emailError && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {emailError}
-            </Alert>
-          )}
-          <Alert severity="info" sx={{ mb: 2 }}>
-            📧 Send this customer statement to {customer?.email}
-          </Alert>
-
-          <FormControl fullWidth sx={{ mb: 3 }}>
-            <FormLabel sx={{ mb: 2, fontWeight: 600 }}>Email Tone</FormLabel>
-            <RadioGroup
-              value={emailTone}
-              onChange={(e) =>
-                setEmailTone(e.target.value as "normal" | "reminder" | "final")
-              }
+    <DaylightThemedPage>
+      <Container maxWidth="lg" disableGutters>
+        <Stack
+          direction="row"
+          justifyContent="space-between"
+          alignItems="center"
+          sx={{ mb: 4 }}
+        >
+          <Box>
+            <h1 style={{ margin: 0 }}>{customer.name} - Statement</h1>
+          </Box>
+          <Stack direction="row" spacing={1}>
+            <Button
+              variant="outlined"
+              startIcon={<DownloadIcon />}
+              onClick={handleDownloadPDF}
+              disabled={downloadLoading}
             >
-              <FormControlLabel
-                value="normal"
-                control={<Radio />}
-                label="Statement Email (Normal Tone)"
-              />
-              <Typography
-                variant="caption"
-                sx={{ ml: 4, mb: 1, color: "#666" }}
-              >
-                Professional and standard statement notification
+              {downloadLoading ? "Downloading..." : "Download Statement"}
+            </Button>
+            <Button
+              variant="outlined"
+              startIcon={<PrintIcon />}
+              onClick={handlePrint}
+              disabled={printLoading}
+            >
+              {printLoading ? "Loading..." : "Print"}
+            </Button>
+            <Button
+              variant="outlined"
+              startIcon={<SendIcon />}
+              onClick={() => setEmailDialogOpen(true)}
+              disabled={emailLoading}
+            >
+              Send Email
+            </Button>
+          </Stack>
+        </Stack>
+
+        <Stack direction="row" spacing={2} sx={{ mb: 4 }}>
+          <Card sx={{ flex: 1 }}>
+            <CardContent>
+              <Typography color="textSecondary" gutterBottom>
+                Total Invoices
               </Typography>
-
-              <FormControlLabel
-                value="reminder"
-                control={<Radio />}
-                label="Reminder/Warning Email (Moderate Tone)"
-              />
-              <Typography
-                variant="caption"
-                sx={{ ml: 4, mb: 1, color: "#666" }}
-              >
-                Payment reminder with moderate urgency
+              <Typography variant="h5">{invoices.length}</Typography>
+            </CardContent>
+          </Card>
+          <Card sx={{ flex: 1 }}>
+            <CardContent>
+              <Typography color="textSecondary" gutterBottom>
+                Total Amount
               </Typography>
-
-              <FormControlLabel
-                value="final"
-                control={<Radio />}
-                label="Final Notice Email (Hard Tone)"
-              />
-              <Typography
-                variant="caption"
-                sx={{ ml: 4, mb: 2, color: "#666" }}
-              >
-                Urgent final notice requiring immediate action
+              <Typography variant="h5">
+                <CurrencyDisplay value={totals?.totalAmount || 0} />
               </Typography>
-            </RadioGroup>
-          </FormControl>
+            </CardContent>
+          </Card>
+          <Card sx={{ flex: 1 }}>
+            <CardContent>
+              <Typography color="textSecondary" gutterBottom>
+                Total Paid
+              </Typography>
+              <Typography variant="h5">
+                <CurrencyDisplay value={totals?.totalPaid || 0} />
+              </Typography>
+            </CardContent>
+          </Card>
+          <Card sx={{ flex: 1 }}>
+            <CardContent>
+              <Typography color="textSecondary" gutterBottom>
+                Outstanding
+              </Typography>
+              <Typography
+                variant="h5"
+                sx={{ color: "var(--dl-danger, #d32f2f)" }}
+              >
+                <CurrencyDisplay value={totals?.totalPending || 0} />
+              </Typography>
+            </CardContent>
+          </Card>
+        </Stack>
 
-          <TextField
-            fullWidth
-            multiline
-            rows={6}
-            label="Email Message"
-            placeholder="Enter your message here..."
-            value={emailBody}
-            onChange={(e) => setEmailBody(e.target.value)}
-            variant="outlined"
-            helperText="This message will be included in the email along with the statement PDF"
-          />
+        <Box sx={{ mb: 2 }}>
+          <h2 style={{ marginTop: 0 }}>Invoice History</h2>
+        </Box>
 
-          <Alert severity="success" sx={{ mt: 2 }}>
-            ✅ Statement PDF will be automatically attached to the email
-          </Alert>
-        </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          <Button
-            onClick={() => {
-              setEmailDialogOpen(false);
-              setEmailBody("");
-              setEmailError(null);
-            }}
-            disabled={emailLoading}
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleSendEmail}
-            variant="contained"
-            startIcon={<SendIcon />}
-            disabled={emailLoading || !emailBody.trim()}
-          >
-            {emailLoading ? "Sending..." : "Send Email"}
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </Container>
+        <TableContainer component={Paper}>
+          <Table>
+            <TableHead
+              sx={{ backgroundColor: "var(--dl-table-head, #f5f5f5)" }}
+            >
+              <TableRow>
+                <TableCell sx={{ fontWeight: "bold" }}>
+                  <TableSortLabel
+                    active={sortBy === "invoiceNumber"}
+                    direction={sortDirection}
+                    onClick={() => handleRequestSort("invoiceNumber")}
+                  >
+                    Invoice #
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell sx={{ fontWeight: "bold" }}>
+                  <TableSortLabel
+                    active={sortBy === "issuedDate"}
+                    direction={sortDirection}
+                    onClick={() => handleRequestSort("issuedDate")}
+                  >
+                    Issued Date
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell sx={{ fontWeight: "bold" }}>
+                  <TableSortLabel
+                    active={sortBy === "dueDate"}
+                    direction={sortDirection}
+                    onClick={() => handleRequestSort("dueDate")}
+                  >
+                    Due Date
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell sx={{ fontWeight: "bold" }}>Type</TableCell>
+                <TableCell sx={{ fontWeight: "bold" }}>
+                  <TableSortLabel
+                    active={sortBy === "amount"}
+                    direction={sortDirection}
+                    onClick={() => handleRequestSort("amount")}
+                  >
+                    Amount
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell sx={{ fontWeight: "bold" }}>
+                  <TableSortLabel
+                    active={sortBy === "paidDate"}
+                    direction={sortDirection}
+                    onClick={() => handleRequestSort("paidDate")}
+                  >
+                    Paid
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell sx={{ fontWeight: "bold" }}>Outstanding</TableCell>
+                <TableCell sx={{ fontWeight: "bold" }}>
+                  <TableSortLabel
+                    active={sortBy === "status"}
+                    direction={sortDirection}
+                    onClick={() => handleRequestSort("status")}
+                  >
+                    Status
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell sx={{ fontWeight: "bold" }}>Paid Past Due</TableCell>
+                <TableCell sx={{ fontWeight: "bold" }}>
+                  <TableSortLabel
+                    active={sortBy === "daysUntilDue"}
+                    direction={sortDirection}
+                    onClick={() => handleRequestSort("daysUntilDue")}
+                  >
+                    Days Until Due
+                  </TableSortLabel>
+                </TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {sortedInvoices.map((invoice) => {
+                const daysUntilDue = calculateDaysUntilDue(
+                  new Date(invoice.dueDate),
+                );
+                return (
+                  <TableRow key={invoice.id} hover>
+                    <TableCell sx={{ fontWeight: "bold" }}>
+                      <Link
+                        href={`/accounting/${invoice.id}`}
+                        style={{
+                          color: "var(--dl-action, #1976d2)",
+                          textDecoration: "none",
+                        }}
+                      >
+                        {invoice.invoiceNumber}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <DateDisplay
+                        date={
+                          invoice.issuedDate || invoice.invoiceGeneratedDate
+                        }
+                        format="date"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <DateDisplay date={invoice.dueDate} format="date" />
+                    </TableCell>
+                    <TableCell>
+                      {INVOICE_TYPE_LABELS[
+                        invoice.invoiceType as InvoiceType
+                      ] ?? invoice.invoiceType}
+                    </TableCell>
+                    <TableCell>
+                      <CurrencyDisplay value={invoice.totalAmount} />
+                    </TableCell>
+                    <TableCell>
+                      <CurrencyDisplay
+                        value={
+                          invoice.status === "PAID" ? invoice.paidAmount : 0
+                        }
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <CurrencyDisplay
+                        value={
+                          invoice.status === "ISSUED" ||
+                          invoice.status === "OVERDUE"
+                            ? Math.max(
+                                0,
+                                invoice.totalAmount - invoice.paidAmount,
+                              )
+                            : 0
+                        }
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <StatusBadge status={invoice.status} />
+                    </TableCell>
+                    <TableCell>
+                      {invoice.status === "PAID" &&
+                      invoice.paidDate &&
+                      invoice.dueDate ? (
+                        <Box
+                          sx={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            px: 1,
+                            py: 0.25,
+                            borderRadius: "999px",
+                            backgroundColor: "var(--dl-danger-soft, #fdecea)",
+                            border:
+                              "1px solid var(--dl-border-danger, #f44336)",
+                            color: "var(--dl-danger, #c62828)",
+                            fontSize: "0.75rem",
+                            fontWeight: 700,
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {Math.max(
+                            0,
+                            Math.ceil(
+                              (new Date(invoice.paidDate).getTime() -
+                                new Date(invoice.dueDate).getTime()) /
+                                (1000 * 60 * 60 * 24),
+                            ),
+                          )}{" "}
+                          days
+                        </Box>
+                      ) : (
+                        "-"
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {invoice.status === "PAID" ? (
+                        "-"
+                      ) : (
+                        <Typography
+                          sx={{
+                            color:
+                              daysUntilDue < 0
+                                ? "error.main"
+                                : daysUntilDue < 7
+                                  ? "warning.main"
+                                  : "success.main",
+                            fontWeight: "500",
+                          }}
+                        >
+                          {daysUntilDue === 0
+                            ? "Today"
+                            : daysUntilDue === 1
+                              ? "1 day"
+                              : daysUntilDue < 0
+                                ? `${Math.abs(daysUntilDue)} ${Math.abs(daysUntilDue) === 1 ? "day" : "days"} overdue`
+                                : `${daysUntilDue} ${daysUntilDue === 1 ? "day" : "days"}`}
+                        </Typography>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </TableContainer>
+
+        {invoices.length === 0 && (
+          <Box sx={{ textAlign: "center", py: 4 }}>
+            <p style={{ color: "var(--dl-muted, #999)" }}>
+              No invoices found for this customer
+            </p>
+          </Box>
+        )}
+
+        {/* Send Email Dialog */}
+        <Dialog
+          open={emailDialogOpen}
+          onClose={() => setEmailDialogOpen(false)}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle>Send Statement Email</DialogTitle>
+          <DialogContent sx={{ pt: 2 }}>
+            {emailError && (
+              <Alert severity="error" sx={{ mb: 2 }}>
+                {emailError}
+              </Alert>
+            )}
+            <Alert severity="info" sx={{ mb: 2 }}>
+              📧 Send this customer statement to {customer?.email}
+            </Alert>
+
+            <FormControl fullWidth sx={{ mb: 3 }}>
+              <FormLabel sx={{ mb: 2, fontWeight: 600 }}>Email Tone</FormLabel>
+              <RadioGroup
+                value={emailTone}
+                onChange={(e) =>
+                  setEmailTone(
+                    e.target.value as "normal" | "reminder" | "final",
+                  )
+                }
+              >
+                <FormControlLabel
+                  value="normal"
+                  control={<Radio />}
+                  label="Statement Email (Normal Tone)"
+                />
+                <Typography
+                  variant="caption"
+                  sx={{ ml: 4, mb: 1, color: "var(--dl-muted, #666)" }}
+                >
+                  Professional and standard statement notification
+                </Typography>
+
+                <FormControlLabel
+                  value="reminder"
+                  control={<Radio />}
+                  label="Reminder/Warning Email (Moderate Tone)"
+                />
+                <Typography
+                  variant="caption"
+                  sx={{ ml: 4, mb: 1, color: "var(--dl-muted, #666)" }}
+                >
+                  Payment reminder with moderate urgency
+                </Typography>
+
+                <FormControlLabel
+                  value="final"
+                  control={<Radio />}
+                  label="Final Notice Email (Hard Tone)"
+                />
+                <Typography
+                  variant="caption"
+                  sx={{ ml: 4, mb: 2, color: "var(--dl-muted, #666)" }}
+                >
+                  Urgent final notice requiring immediate action
+                </Typography>
+              </RadioGroup>
+            </FormControl>
+
+            <TextField
+              fullWidth
+              multiline
+              rows={6}
+              label="Email Message"
+              placeholder="Enter your message here..."
+              value={emailBody}
+              onChange={(e) => setEmailBody(e.target.value)}
+              variant="outlined"
+              helperText="This message will be included in the email along with the statement PDF"
+            />
+
+            <Alert severity="success" sx={{ mt: 2 }}>
+              ✅ Statement PDF will be automatically attached to the email
+            </Alert>
+          </DialogContent>
+          <DialogActions sx={{ p: 2 }}>
+            <Button
+              onClick={() => {
+                setEmailDialogOpen(false);
+                setEmailBody("");
+                setEmailError(null);
+              }}
+              disabled={emailLoading}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSendEmail}
+              variant="contained"
+              startIcon={<SendIcon />}
+              disabled={emailLoading || !emailBody.trim()}
+            >
+              {emailLoading ? "Sending..." : "Send Email"}
+            </Button>
+          </DialogActions>
+        </Dialog>
+      </Container>
+    </DaylightThemedPage>
   );
 }

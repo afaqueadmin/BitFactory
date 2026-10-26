@@ -67,9 +67,14 @@ export default function PayWithBitcoinButton({
         }
         sx={{
           bgcolor: "#f7931a", // Bitcoin orange
-          "&:hover": { bgcolor: "#e0850e" },
+          "&:hover": { bgcolor: "#e0850e", boxShadow: "none" },
           textTransform: "none",
-          fontWeight: 600,
+          fontWeight: 650,
+          fontSize: 13,
+          minHeight: 42,
+          px: "18px",
+          borderRadius: "8px",
+          boxShadow: "none",
         }}
       >
         {loading ? "Preparing invoice..." : "Pay with Bitcoin"}

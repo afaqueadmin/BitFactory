@@ -41,6 +41,7 @@ import AdminValueCard from "@/components/admin/AdminValueCard";
 import EditFranchiseeModal from "@/components/EditFranchiseeModal";
 import { useUser } from "@/lib/hooks";
 import { formatValue } from "@/lib/helpers/formatValue";
+import { DaylightThemedPage } from "@/components/daylight/DaylightMuiScope";
 
 interface Franchise {
   id: string;
@@ -231,11 +232,8 @@ export default function FranchiseDetailsPage() {
   };
 
   return (
-    <Box
-      component="main"
-      sx={{ py: 4, backgroundColor: "background.default", minHeight: "100vh" }}
-    >
-      <Container maxWidth="xl">
+    <DaylightThemedPage>
+      <Container maxWidth="xl" disableGutters>
         <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 3 }}>
           <IconButton onClick={() => router.push("/franchisees")} size="small">
             <ArrowBackIcon />
@@ -401,16 +399,19 @@ export default function FranchiseDetailsPage() {
               }}
             >
               <AdminValueCard
+                daylight
                 title="Associated Customers"
                 value={franchise._count?.users ?? customers.length}
               />
               <AdminValueCard
+                daylight
                 title="Unpaid Incentives"
                 borderColor="#FF9800"
                 value={entriesLoading ? 0 : totalUnpaid}
                 type="currency"
               />
               <AdminValueCard
+                daylight
                 title="Unpaid Incentive Entries"
                 borderColor="#FF9800"
                 value={entriesLoading ? 0 : unpaidEntries.length}
@@ -581,6 +582,6 @@ export default function FranchiseDetailsPage() {
           </Alert>
         </Snackbar>
       </Container>
-    </Box>
+    </DaylightThemedPage>
   );
 }

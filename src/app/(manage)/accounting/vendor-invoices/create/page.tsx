@@ -22,6 +22,7 @@ import {
   UploadedPdf,
 } from "@/components/accounting/common/PdfUploadField";
 import { VendorSelect } from "@/components/accounting/VendorSelect";
+import { DaylightThemedPage } from "@/components/daylight/DaylightMuiScope";
 
 export interface VendorInvoiceFormData {
   invoiceNumber: string;
@@ -261,236 +262,240 @@ export default function CreateVendorInvoicePage() {
   const totalAmount = calculateTotalAmount();
 
   return (
-    <Container maxWidth="md" sx={{ py: 4 }}>
-      <Stack direction="row" spacing={2} sx={{ mb: 4 }}>
-        <Link href="/accounting/farm-tariffs">
-          <Button startIcon={<ArrowBackIcon />}>Back</Button>
-        </Link>
-      </Stack>
+    <DaylightThemedPage>
+      <Container maxWidth="md" disableGutters>
+        <Stack spacing={1} sx={{ mb: 4, alignItems: "flex-start" }}>
+          <Link href="/accounting/farm-tariffs">
+            <Button startIcon={<ArrowBackIcon />}>Back</Button>
+          </Link>
+        </Stack>
 
-      <Paper sx={{ p: 4 }}>
-        <Typography variant="h4" sx={{ fontWeight: "bold", mb: 1 }}>
-          Record Vendor Invoice
-        </Typography>
-        <Typography color="textSecondary" sx={{ mb: 3 }}>
-          Add a new vendor invoice entry for farm tariffs
-        </Typography>
+        <Paper sx={{ p: 4 }}>
+          <Typography variant="h4" sx={{ fontWeight: "bold", mb: 1 }}>
+            Record Vendor Invoice
+          </Typography>
+          <Typography color="textSecondary" sx={{ mb: 3 }}>
+            Add a new vendor invoice entry for farm tariffs
+          </Typography>
 
-        {error && (
-          <Alert severity="error" sx={{ mb: 3 }}>
-            {error}
-          </Alert>
-        )}
+          {error && (
+            <Alert severity="error" sx={{ mb: 3 }}>
+              {error}
+            </Alert>
+          )}
 
-        {success && (
-          <Alert severity="success" sx={{ mb: 3 }}>
-            Vendor invoice created successfully! Redirecting...
-          </Alert>
-        )}
+          {success && (
+            <Alert severity="success" sx={{ mb: 3 }}>
+              Vendor invoice created successfully! Redirecting...
+            </Alert>
+          )}
 
-        <form onSubmit={handleSubmit}>
-          <Stack spacing={3}>
-            {/* Row 1: Invoice Number and Billing Date */}
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-              <TextField
-                fullWidth
-                label="Invoice Number"
-                name="invoiceNumber"
-                value={formData.invoiceNumber}
-                onChange={handleInputChange}
-                placeholder="e.g., VI-2026-001"
-                required
+          <form onSubmit={handleSubmit}>
+            <Stack spacing={3}>
+              {/* Row 1: Invoice Number and Billing Date */}
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                <TextField
+                  fullWidth
+                  label="Invoice Number"
+                  name="invoiceNumber"
+                  value={formData.invoiceNumber}
+                  onChange={handleInputChange}
+                  placeholder="e.g., VI-2026-001"
+                  required
+                  disabled={saving}
+                />
+                <TextField
+                  fullWidth
+                  label="Billing Date (Issued Date)"
+                  name="billingDate"
+                  type="date"
+                  value={formData.billingDate}
+                  onChange={handleInputChange}
+                  required
+                  disabled={saving}
+                  slotProps={{
+                    inputLabel: { shrink: true },
+                  }}
+                />
+              </Stack>
+
+              {/* Vendor (optional) */}
+              <VendorSelect
+                type="farm"
+                value={formData.vendorId}
+                onChange={(vendorId) =>
+                  setFormData((prev) => ({ ...prev, vendorId }))
+                }
                 disabled={saving}
               />
+
+              {/* Row 2: Due Date and Total Miners */}
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                <TextField
+                  fullWidth
+                  label="Due Date"
+                  name="dueDate"
+                  type="date"
+                  value={formData.dueDate}
+                  onChange={handleInputChange}
+                  required
+                  disabled={saving}
+                  slotProps={{
+                    inputLabel: { shrink: true },
+                  }}
+                />
+                <TextField
+                  fullWidth
+                  label="Total Miners"
+                  name="totalMiners"
+                  type="number"
+                  value={formData.totalMiners}
+                  onChange={handleInputChange}
+                  slotProps={{
+                    htmlInput: { min: 0, step: 1 },
+                  }}
+                  required
+                  disabled={saving}
+                />
+              </Stack>
+
+              {/* Row 3: Unit Price and Miscellaneous Charges */}
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                <TextField
+                  fullWidth
+                  label="Unit Price"
+                  name="unitPrice"
+                  type="number"
+                  value={formData.unitPrice}
+                  onChange={handleInputChange}
+                  slotProps={{
+                    htmlInput: { min: 0, step: 0.01 },
+                    input: {
+                      startAdornment: "$",
+                    },
+                  }}
+                  required
+                  disabled={saving}
+                />
+                <TextField
+                  fullWidth
+                  label="Miscellaneous Charges"
+                  name="miscellaneousCharges"
+                  type="number"
+                  value={formData.miscellaneousCharges}
+                  onChange={handleInputChange}
+                  slotProps={{
+                    htmlInput: { step: 0.01 },
+                    input: {
+                      startAdornment: "$",
+                    },
+                  }}
+                  disabled={saving}
+                />
+              </Stack>
+
+              {/* Row 4: Notes */}
               <TextField
                 fullWidth
-                label="Billing Date (Issued Date)"
-                name="billingDate"
-                type="date"
-                value={formData.billingDate}
+                label="Notes"
+                name="notes"
+                value={formData.notes}
                 onChange={handleInputChange}
+                multiline
+                rows={4}
+                placeholder="Add any additional notes or comments..."
+                disabled={saving}
+              />
+
+              {/* Row 5: Vendor invoice PDF (required) */}
+              <PdfUploadField
+                label="Vendor Invoice PDF"
+                purpose="vendor-invoice"
+                value={invoicePdf}
+                onChange={setInvoicePdf}
+                onUploadingChange={setPdfUploading}
                 required
                 disabled={saving}
-                slotProps={{
-                  inputLabel: { shrink: true },
-                }}
               />
             </Stack>
 
-            {/* Vendor (optional) */}
-            <VendorSelect
-              type="farm"
-              value={formData.vendorId}
-              onChange={(vendorId) =>
-                setFormData((prev) => ({ ...prev, vendorId }))
-              }
-              disabled={saving}
-            />
-
-            {/* Row 2: Due Date and Total Miners */}
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-              <TextField
-                fullWidth
-                label="Due Date"
-                name="dueDate"
-                type="date"
-                value={formData.dueDate}
-                onChange={handleInputChange}
-                required
-                disabled={saving}
-                slotProps={{
-                  inputLabel: { shrink: true },
-                }}
-              />
-              <TextField
-                fullWidth
-                label="Total Miners"
-                name="totalMiners"
-                type="number"
-                value={formData.totalMiners}
-                onChange={handleInputChange}
-                slotProps={{
-                  htmlInput: { min: 0, step: 1 },
-                }}
-                required
-                disabled={saving}
-              />
-            </Stack>
-
-            {/* Row 3: Unit Price and Miscellaneous Charges */}
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-              <TextField
-                fullWidth
-                label="Unit Price"
-                name="unitPrice"
-                type="number"
-                value={formData.unitPrice}
-                onChange={handleInputChange}
-                slotProps={{
-                  htmlInput: { min: 0, step: 0.01 },
-                  input: {
-                    startAdornment: "$",
-                  },
-                }}
-                required
-                disabled={saving}
-              />
-              <TextField
-                fullWidth
-                label="Miscellaneous Charges"
-                name="miscellaneousCharges"
-                type="number"
-                value={formData.miscellaneousCharges}
-                onChange={handleInputChange}
-                slotProps={{
-                  htmlInput: { step: 0.01 },
-                  input: {
-                    startAdornment: "$",
-                  },
-                }}
-                disabled={saving}
-              />
-            </Stack>
-
-            {/* Row 4: Notes */}
-            <TextField
-              fullWidth
-              label="Notes"
-              name="notes"
-              value={formData.notes}
-              onChange={handleInputChange}
-              multiline
-              rows={4}
-              placeholder="Add any additional notes or comments..."
-              disabled={saving}
-            />
-
-            {/* Row 5: Vendor invoice PDF (required) */}
-            <PdfUploadField
-              label="Vendor Invoice PDF"
-              purpose="vendor-invoice"
-              value={invoicePdf}
-              onChange={setInvoicePdf}
-              onUploadingChange={setPdfUploading}
-              required
-              disabled={saving}
-            />
-          </Stack>
-
-          {/* Total Amount Summary */}
-          <Box
-            sx={{
-              mt: 4,
-              p: 3,
-              backgroundColor: "#f5f5f5",
-              borderRadius: 1,
-              border: "1px solid #e0e0e0",
-            }}
-          >
-            <Stack spacing={2}>
-              <Box sx={{ display: "flex", justifyContent: "space-between" }}>
-                <Typography variant="body1" sx={{ fontWeight: "500" }}>
-                  Unit Total:
-                </Typography>
-                <Typography variant="body1">
-                  $
-                  {(
-                    (Number(formData.totalMiners) || 0) *
-                    (Number(formData.unitPrice) || 0)
-                  ).toFixed(2)}
-                </Typography>
-              </Box>
-              <Box sx={{ display: "flex", justifyContent: "space-between" }}>
-                <Typography variant="body1" sx={{ fontWeight: "500" }}>
-                  Miscellaneous:
-                </Typography>
-                <Typography variant="body1">
-                  ${(Number(formData.miscellaneousCharges) || 0).toFixed(2)}
-                </Typography>
-              </Box>
-              <Box
-                sx={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  pt: 2,
-                  borderTop: "2px solid #d0d0d0",
-                }}
-              >
-                <Typography variant="h6" sx={{ fontWeight: "bold" }}>
-                  Total Amount:
-                </Typography>
-                <Typography
-                  variant="h6"
-                  sx={{ fontWeight: "bold", color: "primary.main" }}
-                >
-                  ${totalAmount.toFixed(2)}
-                </Typography>
-              </Box>
-            </Stack>
-          </Box>
-
-          {/* Action Buttons */}
-          <Stack
-            direction="row"
-            spacing={2}
-            sx={{ mt: 4, justifyContent: "flex-end" }}
-          >
-            <Link href="/accounting/farm-tariffs">
-              <Button variant="outlined" disabled={saving}>
-                Cancel
-              </Button>
-            </Link>
-            <Button
-              type="submit"
-              variant="contained"
-              startIcon={saving ? <CircularProgress size={20} /> : <SaveIcon />}
-              disabled={saving || pdfUploading || !invoicePdf}
+            {/* Total Amount Summary */}
+            <Box
+              sx={{
+                mt: 4,
+                p: 3,
+                backgroundColor: "var(--dl-canvas, #f5f5f5)",
+                borderRadius: 1,
+                border: "1px solid var(--dl-border, #e0e0e0)",
+              }}
             >
-              {saving ? "Recording..." : "Record Vendor Invoice"}
-            </Button>
-          </Stack>
-        </form>
-      </Paper>
-    </Container>
+              <Stack spacing={2}>
+                <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                  <Typography variant="body1" sx={{ fontWeight: "500" }}>
+                    Unit Total:
+                  </Typography>
+                  <Typography variant="body1">
+                    $
+                    {(
+                      (Number(formData.totalMiners) || 0) *
+                      (Number(formData.unitPrice) || 0)
+                    ).toFixed(2)}
+                  </Typography>
+                </Box>
+                <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                  <Typography variant="body1" sx={{ fontWeight: "500" }}>
+                    Miscellaneous:
+                  </Typography>
+                  <Typography variant="body1">
+                    ${(Number(formData.miscellaneousCharges) || 0).toFixed(2)}
+                  </Typography>
+                </Box>
+                <Box
+                  sx={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    pt: 2,
+                    borderTop: "2px solid var(--dl-border, #d0d0d0)",
+                  }}
+                >
+                  <Typography variant="h6" sx={{ fontWeight: "bold" }}>
+                    Total Amount:
+                  </Typography>
+                  <Typography
+                    variant="h6"
+                    sx={{ fontWeight: "bold", color: "primary.main" }}
+                  >
+                    ${totalAmount.toFixed(2)}
+                  </Typography>
+                </Box>
+              </Stack>
+            </Box>
+
+            {/* Action Buttons */}
+            <Stack
+              direction="row"
+              spacing={2}
+              sx={{ mt: 4, justifyContent: "flex-end" }}
+            >
+              <Link href="/accounting/farm-tariffs">
+                <Button variant="outlined" disabled={saving}>
+                  Cancel
+                </Button>
+              </Link>
+              <Button
+                type="submit"
+                variant="contained"
+                startIcon={
+                  saving ? <CircularProgress size={20} /> : <SaveIcon />
+                }
+                disabled={saving || pdfUploading || !invoicePdf}
+              >
+                {saving ? "Recording..." : "Record Vendor Invoice"}
+              </Button>
+            </Stack>
+          </form>
+        </Paper>
+      </Container>
+    </DaylightThemedPage>
   );
 }

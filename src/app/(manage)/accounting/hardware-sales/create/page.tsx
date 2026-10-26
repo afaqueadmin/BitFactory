@@ -34,6 +34,7 @@ import {
   lineItemTotals,
 } from "@/components/accounting/invoices/LineItemsEditor";
 import { LocationsMultiSelect } from "@/components/accounting/invoices/LocationsMultiSelect";
+import { DaylightThemedPage } from "@/components/daylight/DaylightMuiScope";
 
 export default function CreateHardwareSalesInvoicePage() {
   const router = useRouter();
@@ -200,202 +201,211 @@ export default function CreateHardwareSalesInvoicePage() {
   };
 
   return (
-    <Container maxWidth="md" sx={{ py: 4 }}>
-      <Stack direction="row" spacing={2} sx={{ mb: 4 }}>
-        <Link href="/accounting/hardware-sales">
-          <Button startIcon={<ArrowBackIcon />}>
-            Back to Hardware Sales Dashboard
-          </Button>
-        </Link>
-        <Box flex={1}>
-          <h1 style={{ margin: 0 }}>Create New Hardware Sales Invoice</h1>
-          <p style={{ margin: "8px 0 0 0", color: "#666" }}>
-            Create a new hardware sales invoice and send it to a customer
-          </p>
-        </Box>
-      </Stack>
+    <DaylightThemedPage>
+      <Container maxWidth="md" disableGutters>
+        <Stack spacing={1} sx={{ mb: 4, alignItems: "flex-start" }}>
+          <Link href="/accounting/hardware-sales">
+            <Button startIcon={<ArrowBackIcon />}>
+              Back to Hardware Sales Dashboard
+            </Button>
+          </Link>
+          <Box flex={1}>
+            <h1 style={{ margin: 0 }}>Create New Hardware Sales Invoice</h1>
+            <p style={{ margin: "8px 0 0 0", color: "var(--dl-muted, #666)" }}>
+              Create a new hardware sales invoice and send it to a customer
+            </p>
+          </Box>
+        </Stack>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 3 }}>
-          {error}
-        </Alert>
-      )}
-      {createError && (
-        <Alert severity="error" sx={{ mb: 3 }}>
-          {createError}
-        </Alert>
-      )}
+        {error && (
+          <Alert severity="error" sx={{ mb: 3 }}>
+            {error}
+          </Alert>
+        )}
+        {createError && (
+          <Alert severity="error" sx={{ mb: 3 }}>
+            {createError}
+          </Alert>
+        )}
 
-      <Paper sx={{ p: 4 }}>
-        <form onSubmit={handleSubmit}>
-          <Stack spacing={3}>
-            {/* Customer Information */}
-            <Box>
-              <h3 style={{ marginTop: 0, marginBottom: 16 }}>
-                Customer Information
-              </h3>
-              <Stack spacing={2}>
-                <TextField
-                  select
-                  label="Select Customer"
-                  name="customerId"
-                  value={formData.customerId}
-                  onChange={handleCustomerChange}
-                  fullWidth
-                  helperText="Select a customer with their subaccount (shown as: Name (Subaccount))"
-                  disabled={customersLoading}
-                  required
-                >
-                  <MenuItem value="">-- Select a Customer --</MenuItem>
-                  {customers.map((customer: Customer) => (
-                    <MenuItem key={customer.id} value={customer.id}>
-                      {customer.displayName}
-                    </MenuItem>
-                  ))}
-                </TextField>
-                {customersLoading && (
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                    <CircularProgress size={20} />
-                    <span>Loading customers...</span>
-                  </Box>
-                )}
-
-                {/* Relationship Manager Info Section */}
-                {formData.customerId && (
-                  <Box
-                    sx={{
-                      p: 2,
-                      backgroundColor: "#f5f5f5",
-                      borderRadius: 1,
-                      mt: 2,
-                    }}
+        <Paper sx={{ p: 4 }}>
+          <form onSubmit={handleSubmit}>
+            <Stack spacing={3}>
+              {/* Customer Information */}
+              <Box>
+                <h3 style={{ marginTop: 0, marginBottom: 16 }}>
+                  Customer Information
+                </h3>
+                <Stack spacing={2}>
+                  <TextField
+                    select
+                    label="Select Customer"
+                    name="customerId"
+                    value={formData.customerId}
+                    onChange={handleCustomerChange}
+                    fullWidth
+                    helperText="Select a customer with their subaccount (shown as: Name (Subaccount))"
+                    disabled={customersLoading}
+                    required
                   >
-                    <Typography sx={{ fontWeight: 600, mb: 1.5 }}>
-                      💼 Relationship Manager Information
-                    </Typography>
-                    <Box sx={{ ml: 1 }}>
-                      {groupLoading ? (
-                        <Box
-                          sx={{ display: "flex", alignItems: "center", gap: 1 }}
-                        >
-                          <CircularProgress size={16} />
-                          <Typography variant="body2">
-                            Loading RM details...
-                          </Typography>
-                        </Box>
-                      ) : groupInfo ? (
-                        <Box>
-                          <Typography variant="body2" sx={{ mb: 0.5 }}>
-                            <strong>Name:</strong>{" "}
-                            {groupInfo.relationshipManager}
-                          </Typography>
-                          <Typography variant="body2" sx={{ mb: 0.5 }}>
-                            <strong>Email:</strong> {groupInfo.email}
-                          </Typography>
-                          <Typography variant="body2">
-                            <strong>Group:</strong> {groupInfo.name}
-                          </Typography>
-                        </Box>
-                      ) : (
-                        <Typography variant="body2" sx={{ color: "#d32f2f" }}>
-                          ⚠️ No RM assigned to this customer&apos;s group
-                        </Typography>
-                      )}
+                    <MenuItem value="">-- Select a Customer --</MenuItem>
+                    {customers.map((customer: Customer) => (
+                      <MenuItem key={customer.id} value={customer.id}>
+                        {customer.displayName}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                  {customersLoading && (
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                      <CircularProgress size={20} />
+                      <span>Loading customers...</span>
                     </Box>
-                  </Box>
-                )}
-              </Stack>
-            </Box>
+                  )}
 
-            {/* Invoice Details */}
-            <Box>
-              <h3 style={{ marginTop: 0, marginBottom: 16 }}>
-                Invoice Details
-              </h3>
-              <Stack spacing={2}>
-                <Typography variant="body2" color="textSecondary">
-                  Add each hardware model being sold, with its quantity and unit
-                  price. Optionally add Hosting & Colocation charges for the
-                  added models - pick a start month and how many months to bill,
-                  and each month gets its own row per model. Use the tag icon to
-                  add a discount under any line.
-                </Typography>
-                <LineItemsEditor
-                  lineItems={lineItems}
-                  onChange={setLineItems}
-                  hardwareList={hardwareList}
-                  disabled={hardwareLoading}
-                  excludeUsedModels
-                  enableHostingColocation
-                  enableDiscounts
-                />
-              </Stack>
-            </Box>
+                  {/* Relationship Manager Info Section */}
+                  {formData.customerId && (
+                    <Box
+                      sx={{
+                        p: 2,
+                        backgroundColor: "var(--dl-canvas, #f5f5f5)",
+                        borderRadius: 1,
+                        mt: 2,
+                      }}
+                    >
+                      <Typography sx={{ fontWeight: 600, mb: 1.5 }}>
+                        💼 Relationship Manager Information
+                      </Typography>
+                      <Box sx={{ ml: 1 }}>
+                        {groupLoading ? (
+                          <Box
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 1,
+                            }}
+                          >
+                            <CircularProgress size={16} />
+                            <Typography variant="body2">
+                              Loading RM details...
+                            </Typography>
+                          </Box>
+                        ) : groupInfo ? (
+                          <Box>
+                            <Typography variant="body2" sx={{ mb: 0.5 }}>
+                              <strong>Name:</strong>{" "}
+                              {groupInfo.relationshipManager}
+                            </Typography>
+                            <Typography variant="body2" sx={{ mb: 0.5 }}>
+                              <strong>Email:</strong> {groupInfo.email}
+                            </Typography>
+                            <Typography variant="body2">
+                              <strong>Group:</strong> {groupInfo.name}
+                            </Typography>
+                          </Box>
+                        ) : (
+                          <Typography
+                            variant="body2"
+                            sx={{ color: "var(--dl-danger, #d32f2f)" }}
+                          >
+                            ⚠️ No RM assigned to this customer&apos;s group
+                          </Typography>
+                        )}
+                      </Box>
+                    </Box>
+                  )}
+                </Stack>
+              </Box>
 
-            {/* Due Date */}
-            <Box>
-              <h3 style={{ marginTop: 0, marginBottom: 16 }}>
-                Additional Information
-              </h3>
-              <Stack spacing={2}>
-                <TextField
-                  label="Issue Date"
-                  name="issueDate"
-                  type="date"
-                  value={formData.issueDate}
-                  onChange={handleInputChange}
-                  fullWidth
-                  InputLabelProps={{ shrink: true }}
-                  helperText="When the invoice was issued (defaults to today)"
-                  required
-                />
-                <TextField
-                  label="Due Date"
-                  name="dueDate"
-                  type="date"
-                  value={formData.dueDate}
-                  onChange={handleInputChange}
-                  fullWidth
-                  InputLabelProps={{ shrink: true }}
-                  helperText="When payment is due (defaults to 30 days from today)"
-                  required
-                />
-                <LocationsMultiSelect
-                  value={formData.machineHostingLocation}
-                  onChange={(locations) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      machineHostingLocation: locations,
-                    }))
+              {/* Invoice Details */}
+              <Box>
+                <h3 style={{ marginTop: 0, marginBottom: 16 }}>
+                  Invoice Details
+                </h3>
+                <Stack spacing={2}>
+                  <Typography variant="body2" color="textSecondary">
+                    Add each hardware model being sold, with its quantity and
+                    unit price. Optionally add Hosting & Colocation charges for
+                    the added models - pick a start month and how many months to
+                    bill, and each month gets its own row per model. Use the tag
+                    icon to add a discount under any line.
+                  </Typography>
+                  <LineItemsEditor
+                    lineItems={lineItems}
+                    onChange={setLineItems}
+                    hardwareList={hardwareList}
+                    disabled={hardwareLoading}
+                    excludeUsedModels
+                    enableHostingColocation
+                    enableDiscounts
+                  />
+                </Stack>
+              </Box>
+
+              {/* Due Date */}
+              <Box>
+                <h3 style={{ marginTop: 0, marginBottom: 16 }}>
+                  Additional Information
+                </h3>
+                <Stack spacing={2}>
+                  <TextField
+                    label="Issue Date"
+                    name="issueDate"
+                    type="date"
+                    value={formData.issueDate}
+                    onChange={handleInputChange}
+                    fullWidth
+                    InputLabelProps={{ shrink: true }}
+                    helperText="When the invoice was issued (defaults to today)"
+                    required
+                  />
+                  <TextField
+                    label="Due Date"
+                    name="dueDate"
+                    type="date"
+                    value={formData.dueDate}
+                    onChange={handleInputChange}
+                    fullWidth
+                    InputLabelProps={{ shrink: true }}
+                    helperText="When payment is due (defaults to 30 days from today)"
+                    required
+                  />
+                  <LocationsMultiSelect
+                    value={formData.machineHostingLocation}
+                    onChange={(locations) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        machineHostingLocation: locations,
+                      }))
+                    }
+                    options={spaceLocations}
+                    disabled={spaceLocationsLoading}
+                  />
+                  {/* Status is automatically set to DRAFT when creating invoices */}
+                </Stack>
+              </Box>
+
+              {/* Actions */}
+              <Stack direction="row" spacing={2} sx={{ pt: 2 }}>
+                <Button variant="outlined" onClick={() => router.back()}>
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  variant="contained"
+                  startIcon={
+                    loading ? <CircularProgress size={20} /> : <SaveIcon />
                   }
-                  options={spaceLocations}
-                  disabled={spaceLocationsLoading}
-                />
-                {/* Status is automatically set to DRAFT when creating invoices */}
+                  disabled={
+                    loading || !formData.customerId || lineItems.length === 0
+                  }
+                >
+                  {loading ? "Creating..." : "Create Invoice"}
+                </Button>
               </Stack>
-            </Box>
-
-            {/* Actions */}
-            <Stack direction="row" spacing={2} sx={{ pt: 2 }}>
-              <Button variant="outlined" onClick={() => router.back()}>
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                variant="contained"
-                startIcon={
-                  loading ? <CircularProgress size={20} /> : <SaveIcon />
-                }
-                disabled={
-                  loading || !formData.customerId || lineItems.length === 0
-                }
-              >
-                {loading ? "Creating..." : "Create Invoice"}
-              </Button>
             </Stack>
-          </Stack>
-        </form>
-      </Paper>
-    </Container>
+          </form>
+        </Paper>
+      </Container>
+    </DaylightThemedPage>
   );
 }

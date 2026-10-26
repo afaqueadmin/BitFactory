@@ -59,6 +59,7 @@ import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
 import CreateMemoModal from "@/components/CreateMemoModal";
 import { useMemos } from "@/lib/hooks/admin/useMemos";
 import { memoDisplayAmount } from "@/lib/accounting/memoAmount";
+import { DaylightThemedPage } from "@/components/daylight/DaylightMuiScope";
 
 function formatAuditAction(action: string): string {
   const actionMap: { [key: string]: string } = {
@@ -352,1040 +353,1095 @@ export default function InvoiceDetailPage() {
 
   if (loading) {
     return (
-      <Container sx={{ py: 4, display: "flex", justifyContent: "center" }}>
-        <CircularProgress />
-      </Container>
+      <DaylightThemedPage>
+        <Container
+          sx={{ display: "flex", justifyContent: "center" }}
+          disableGutters
+        >
+          <CircularProgress />
+        </Container>
+      </DaylightThemedPage>
     );
   }
 
   if (error) {
     return (
-      <Container sx={{ py: 4 }}>
-        <Alert severity="error">{error}</Alert>
-      </Container>
+      <DaylightThemedPage>
+        <Container disableGutters>
+          <Alert severity="error">{error}</Alert>
+        </Container>
+      </DaylightThemedPage>
     );
   }
 
   if (!invoice) {
     return (
-      <Container sx={{ py: 4 }}>
-        <Alert severity="warning">Invoice not found</Alert>
-      </Container>
+      <DaylightThemedPage>
+        <Container disableGutters>
+          <Alert severity="warning">Invoice not found</Alert>
+        </Container>
+      </DaylightThemedPage>
     );
   }
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          mb: 3,
-        }}
-      >
-        <Box>
-          <Button
-            startIcon={<ArrowBackIcon />}
-            variant="text"
-            onClick={() => router.push("/accounting/Hosting-and-Colocation")}
-            sx={{ mb: 2 }}
-          >
-            Back to Invoices
-          </Button>
-          <Typography variant="h4" sx={{ fontWeight: 700 }}>
-            {invoice.invoiceNumber}
-          </Typography>
-          <Typography color="textSecondary">
-            Invoice Details & Payment Tracking
-          </Typography>
-        </Box>
-        <Stack direction="row" spacing={2}>
-          <Button
-            startIcon={<EditIcon />}
-            variant="outlined"
-            disabled={invoice.status !== "DRAFT"}
-            onClick={() => router.push(`/accounting/${invoice.id}/edit`)}
-          >
-            Edit
-          </Button>
-          {isAdmin && invoice.status === "DRAFT" && (
+    <DaylightThemedPage>
+      <Container maxWidth="lg" disableGutters>
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "flex-end",
+            flexWrap: "wrap",
+            gap: 2,
+            mb: 3,
+          }}
+        >
+          <Box>
             <Button
-              startIcon={<CheckCircleIcon />}
+              startIcon={<ArrowBackIcon />}
+              variant="text"
+              onClick={() => router.push("/accounting/Hosting-and-Colocation")}
+              sx={{ mb: 2 }}
+            >
+              Back to Invoices
+            </Button>
+            <Typography variant="h4" sx={{ fontWeight: 700 }}>
+              {invoice.invoiceNumber}
+            </Typography>
+            <Typography color="textSecondary">
+              Invoice Details & Payment Tracking
+            </Typography>
+          </Box>
+          <Stack direction="row" spacing={2}>
+            <Button
+              startIcon={<EditIcon />}
+              variant="outlined"
+              disabled={invoice.status !== "DRAFT"}
+              onClick={() => router.push(`/accounting/${invoice.id}/edit`)}
+            >
+              Edit
+            </Button>
+            {isAdmin && invoice.status === "DRAFT" && (
+              <Button
+                startIcon={<CheckCircleIcon />}
+                variant="contained"
+                color="success"
+                onClick={handleOpenIssueDialog}
+              >
+                Issue Invoice
+              </Button>
+            )}
+            {isAdmin &&
+              (invoice.status === "DRAFT" ||
+                invoice.status === "CANCELLED") && (
+                <Button
+                  startIcon={<DeleteIcon />}
+                  variant="outlined"
+                  color="error"
+                  onClick={() => setDeleteDialogOpen(true)}
+                >
+                  Delete
+                </Button>
+              )}
+            {invoice.status === "ISSUED" && (
+              <Button
+                startIcon={<EmailIcon />}
+                variant="outlined"
+                onClick={() => setEmailDialogOpen(true)}
+              >
+                Resend Email
+              </Button>
+            )}
+            {invoice.status === "ISSUED" && (
+              <Button
+                startIcon={<CancelIcon />}
+                variant="outlined"
+                color="warning"
+                onClick={() => setCancelDialogOpen(true)}
+              >
+                Cancel Invoice
+              </Button>
+            )}
+            {isAdmin &&
+              (invoice.status === "ISSUED" ||
+                invoice.status === "OVERDUE" ||
+                invoice.status === "PAID") && (
+                <Button
+                  startIcon={<ReceiptLongIcon />}
+                  variant="outlined"
+                  onClick={() => setMemoModalOpen(true)}
+                >
+                  Create Memo
+                </Button>
+              )}
+            <Button
+              startIcon={<DownloadIcon />}
               variant="contained"
-              color="success"
-              onClick={handleOpenIssueDialog}
+              onClick={handleDownload}
+              disabled={downloadLoading}
             >
-              Issue Invoice
+              {downloadLoading ? "Downloading..." : "Download"}
             </Button>
-          )}
-          {isAdmin &&
-            (invoice.status === "DRAFT" || invoice.status === "CANCELLED") && (
-              <Button
-                startIcon={<DeleteIcon />}
-                variant="outlined"
-                color="error"
-                onClick={() => setDeleteDialogOpen(true)}
-              >
-                Delete
-              </Button>
+          </Stack>
+        </Box>
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: { xs: "1fr", md: "2fr 1fr" },
+            gap: 3,
+            "& > *": { minWidth: 0 },
+          }}
+        >
+          {/* Main Details */}
+          <Box>
+            <Card>
+              <CardHeader title="Invoice Details" />
+              <Divider />
+              <CardContent>
+                <Box
+                  sx={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: 3,
+                  }}
+                >
+                  {/* Invoice Number */}
+                  <Box>
+                    <Typography color="textSecondary" variant="body2">
+                      Invoice Number
+                    </Typography>
+                    <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
+                      {invoice.invoiceNumber}
+                    </Typography>
+                  </Box>
+
+                  {/* Status */}
+                  <Box>
+                    <Typography color="textSecondary" variant="body2">
+                      Status
+                    </Typography>
+                    <Box sx={{ mt: 0.5 }}>
+                      <StatusBadge status={invoice.status} />
+                    </Box>
+                  </Box>
+
+                  {/* Total Miners */}
+                  <Box>
+                    <Typography color="textSecondary" variant="body2">
+                      Total Miners
+                    </Typography>
+                    <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
+                      {invoice.totalMiners} units
+                    </Typography>
+                  </Box>
+
+                  {/* Unit Price */}
+                  <Box>
+                    <Typography color="textSecondary" variant="body2">
+                      Unit Price
+                    </Typography>
+                    <Box sx={{ mt: 0.5 }}>
+                      <CurrencyDisplay
+                        value={invoice.unitPrice}
+                        fontWeight="bold"
+                      />
+                    </Box>
+                  </Box>
+
+                  {/* Generated Date */}
+                  <Box>
+                    <Typography color="textSecondary" variant="body2">
+                      Generated Date
+                    </Typography>
+                    <Typography
+                      component="div"
+                      sx={{ fontWeight: 600, mt: 0.5 }}
+                    >
+                      <DateDisplay
+                        date={invoice.invoiceGeneratedDate}
+                        format="datetime"
+                      />
+                    </Typography>
+                  </Box>
+
+                  {/* Issued Date */}
+                  <Box>
+                    <Typography color="textSecondary" variant="body2">
+                      Issued Date
+                    </Typography>
+                    <Typography
+                      component="div"
+                      sx={{ fontWeight: 600, mt: 0.5 }}
+                    >
+                      {invoice.issuedDate ? (
+                        <DateDisplay
+                          date={invoice.issuedDate}
+                          format="datetime"
+                        />
+                      ) : (
+                        <span style={{ color: "var(--dl-muted, #666)" }}>
+                          Not yet issued
+                        </span>
+                      )}
+                    </Typography>
+                  </Box>
+
+                  {/* Due Date */}
+                  <Box>
+                    <Typography color="textSecondary" variant="body2">
+                      Due Date
+                    </Typography>
+                    <Typography
+                      component="div"
+                      sx={{ fontWeight: 600, mt: 0.5 }}
+                    >
+                      <DateDisplay date={invoice.dueDate} />
+                    </Typography>
+                  </Box>
+
+                  {/* Paid Date */}
+                  <Box>
+                    <Typography color="textSecondary" variant="body2">
+                      Paid Date
+                    </Typography>
+                    <Typography
+                      component="div"
+                      sx={{ fontWeight: 600, mt: 0.5 }}
+                    >
+                      {invoice.paidDate ? (
+                        <DateDisplay date={invoice.paidDate} />
+                      ) : (
+                        <span style={{ color: "var(--dl-muted, #666)" }}>
+                          Not yet paid
+                        </span>
+                      )}
+                    </Typography>
+                  </Box>
+
+                  {/* Paid Past Due */}
+                  {invoice.status === "PAID" &&
+                  invoice.paidDate &&
+                  invoice.dueDate ? (
+                    <Box>
+                      <Typography color="textSecondary" variant="body2">
+                        Paid Past Due
+                      </Typography>
+                      <Box sx={{ mt: 0.5 }}>
+                        <Box
+                          sx={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            px: 1.5,
+                            py: 0.4,
+                            borderRadius: "999px",
+                            backgroundColor: "var(--dl-danger-soft, #fdecea)",
+                            border:
+                              "1px solid var(--dl-border-danger, #f44336)",
+                            color: "var(--dl-danger, #c62828)",
+                            fontSize: "0.8rem",
+                            fontWeight: 700,
+                          }}
+                        >
+                          {Math.max(
+                            0,
+                            Math.ceil(
+                              (new Date(invoice.paidDate).getTime() -
+                                new Date(invoice.dueDate).getTime()) /
+                                (1000 * 60 * 60 * 24),
+                            ),
+                          )}{" "}
+                          days
+                        </Box>
+                      </Box>
+                    </Box>
+                  ) : null}
+
+                  {/* Billing Month */}
+                  <Box>
+                    <Typography color="textSecondary" variant="body2">
+                      Billing Month
+                    </Typography>
+                    <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
+                      {invoice.billingMonth
+                        ? new Date(invoice.billingMonth).toLocaleDateString(
+                            "en-US",
+                            { timeZone: "UTC", year: "numeric", month: "long" },
+                          )
+                        : "N/A"}
+                    </Typography>
+                  </Box>
+                </Box>
+              </CardContent>
+            </Card>
+
+            {/* Line Items */}
+            {invoice.lineItems && invoice.lineItems.length > 0 && (
+              <Card sx={{ mt: 3 }}>
+                <CardHeader title="Line Items" />
+                <Divider />
+                <CardContent>
+                  <InvoiceLineItemsTable
+                    lineItems={invoice.lineItems}
+                    quantityLabel="Number of Miners"
+                  />
+                </CardContent>
+              </Card>
             )}
-          {invoice.status === "ISSUED" && (
-            <Button
-              startIcon={<EmailIcon />}
-              variant="outlined"
-              onClick={() => setEmailDialogOpen(true)}
-            >
-              Resend Email
-            </Button>
-          )}
-          {invoice.status === "ISSUED" && (
-            <Button
-              startIcon={<CancelIcon />}
-              variant="outlined"
-              color="warning"
-              onClick={() => setCancelDialogOpen(true)}
-            >
-              Cancel Invoice
-            </Button>
-          )}
-          {isAdmin &&
-            (invoice.status === "ISSUED" ||
-              invoice.status === "OVERDUE" ||
-              invoice.status === "PAID") && (
-              <Button
-                startIcon={<ReceiptLongIcon />}
-                variant="outlined"
-                onClick={() => setMemoModalOpen(true)}
-              >
-                Create Memo
-              </Button>
-            )}
-          <Button
-            startIcon={<DownloadIcon />}
-            variant="contained"
-            onClick={handleDownload}
-            disabled={downloadLoading}
-          >
-            {downloadLoading ? "Downloading..." : "Download"}
-          </Button>
-        </Stack>
-      </Box>
-      <Box
-        sx={{
-          display: "grid",
-          gridTemplateColumns: { xs: "1fr", md: "2fr 1fr" },
-          gap: 3,
-        }}
-      >
-        {/* Main Details */}
-        <Box>
+          </Box>
+
+          {/* Summary Sidebar */}
+          <Box>
+            <Card>
+              <CardHeader title="Summary" />
+              <Divider />
+              <CardContent>
+                <Stack spacing={2}>
+                  <Box
+                    sx={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
+                    <Typography color="textSecondary">Subtotal:</Typography>
+                    <CurrencyDisplay
+                      value={invoice.totalAmount}
+                      fontWeight="bold"
+                    />
+                  </Box>
+
+                  <Box
+                    sx={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
+                    <Typography color="textSecondary">Tax:</Typography>
+                    <Typography sx={{ fontWeight: 600 }}>$0.00</Typography>
+                  </Box>
+
+                  <Divider sx={{ my: 1 }} />
+
+                  <Box
+                    sx={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
+                    <Typography sx={{ fontWeight: 600, fontSize: "1.1rem" }}>
+                      Total Due:
+                    </Typography>
+                    <CurrencyDisplay
+                      value={invoice.totalAmount}
+                      variant="h6"
+                      fontWeight="bold"
+                    />
+                  </Box>
+
+                  <Divider sx={{ my: 1 }} />
+
+                  {invoice.paidDate && (
+                    <Alert severity="success" sx={{ my: 1 }}>
+                      Invoice has been paid
+                    </Alert>
+                  )}
+
+                  {invoice.status === "OVERDUE" && (
+                    <Alert severity="error" sx={{ my: 1 }}>
+                      Invoice is overdue
+                    </Alert>
+                  )}
+
+                  <Button
+                    sx={{ displayPrint: "none" }}
+                    variant="contained"
+                    fullWidth
+                    size="large"
+                    onClick={() =>
+                      router.push(`/accounting/${invoice.id}/record-payment`)
+                    }
+                    disabled={
+                      invoice.status === "PAID" ||
+                      invoice.status === "CANCELLED"
+                    }
+                  >
+                    Record Payment
+                  </Button>
+
+                  {isSuperAdmin && invoice.status === "PAID" && (
+                    <Button
+                      sx={{ displayPrint: "none" }}
+                      variant="outlined"
+                      color="warning"
+                      fullWidth
+                      size="large"
+                      onClick={() => {
+                        setUnpaidDialogError(null);
+                        setUnpaidDialogOpen(true);
+                      }}
+                    >
+                      Mark as Unpaid
+                    </Button>
+                  )}
+                </Stack>
+              </CardContent>
+            </Card>
+          </Box>
+        </Box>
+        {/* Payments (every non-voided payment, with its receiving account) */}
+        <InvoicePaymentsCard
+          payments={invoice.costPayments}
+          invoiceType={invoice.invoiceType}
+          btcpayStatus={invoice.btcpayStatus}
+          btcpaySettledAt={invoice.btcpaySettledAt}
+        />
+        {/* Customer & Relationship Manager Information Section */}
+        <Box sx={{ mt: 4 }}>
           <Card>
-            <CardHeader title="Invoice Details" />
+            <CardHeader title="Customer & Relationship Manager Information" />
             <Divider />
             <CardContent>
               <Box
                 sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 3 }}
               >
-                {/* Invoice Number */}
+                {/* Customer Name */}
                 <Box>
                   <Typography color="textSecondary" variant="body2">
-                    Invoice Number
+                    Customer Name
                   </Typography>
                   <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
-                    {invoice.invoiceNumber}
+                    {invoice.user?.name || "N/A"}
                   </Typography>
                 </Box>
 
-                {/* Status */}
+                {/* Customer Email */}
                 <Box>
                   <Typography color="textSecondary" variant="body2">
-                    Status
-                  </Typography>
-                  <Box sx={{ mt: 0.5 }}>
-                    <StatusBadge status={invoice.status} />
-                  </Box>
-                </Box>
-
-                {/* Total Miners */}
-                <Box>
-                  <Typography color="textSecondary" variant="body2">
-                    Total Miners
+                    Customer Email
                   </Typography>
                   <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
-                    {invoice.totalMiners} units
+                    {invoice.user?.email || "N/A"}
                   </Typography>
                 </Box>
 
-                {/* Unit Price */}
+                {/* Relationship Manager Name */}
                 <Box>
                   <Typography color="textSecondary" variant="body2">
-                    Unit Price
+                    Relationship Manager
                   </Typography>
-                  <Box sx={{ mt: 0.5 }}>
-                    <CurrencyDisplay
-                      value={invoice.unitPrice}
-                      fontWeight="bold"
-                    />
-                  </Box>
-                </Box>
-
-                {/* Generated Date */}
-                <Box>
-                  <Typography color="textSecondary" variant="body2">
-                    Generated Date
-                  </Typography>
-                  <Typography component="div" sx={{ fontWeight: 600, mt: 0.5 }}>
-                    <DateDisplay
-                      date={invoice.invoiceGeneratedDate}
-                      format="datetime"
-                    />
-                  </Typography>
-                </Box>
-
-                {/* Issued Date */}
-                <Box>
-                  <Typography color="textSecondary" variant="body2">
-                    Issued Date
-                  </Typography>
-                  <Typography component="div" sx={{ fontWeight: 600, mt: 0.5 }}>
-                    {invoice.issuedDate ? (
-                      <DateDisplay
-                        date={invoice.issuedDate}
-                        format="datetime"
-                      />
-                    ) : (
-                      <span style={{ color: "#666" }}>Not yet issued</span>
-                    )}
-                  </Typography>
-                </Box>
-
-                {/* Due Date */}
-                <Box>
-                  <Typography color="textSecondary" variant="body2">
-                    Due Date
-                  </Typography>
-                  <Typography component="div" sx={{ fontWeight: 600, mt: 0.5 }}>
-                    <DateDisplay date={invoice.dueDate} />
-                  </Typography>
-                </Box>
-
-                {/* Paid Date */}
-                <Box>
-                  <Typography color="textSecondary" variant="body2">
-                    Paid Date
-                  </Typography>
-                  <Typography component="div" sx={{ fontWeight: 600, mt: 0.5 }}>
-                    {invoice.paidDate ? (
-                      <DateDisplay date={invoice.paidDate} />
-                    ) : (
-                      <span style={{ color: "#666" }}>Not yet paid</span>
-                    )}
-                  </Typography>
-                </Box>
-
-                {/* Paid Past Due */}
-                {invoice.status === "PAID" &&
-                invoice.paidDate &&
-                invoice.dueDate ? (
-                  <Box>
-                    <Typography color="textSecondary" variant="body2">
-                      Paid Past Due
-                    </Typography>
-                    <Box sx={{ mt: 0.5 }}>
-                      <Box
-                        sx={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          px: 1.5,
-                          py: 0.4,
-                          borderRadius: "999px",
-                          backgroundColor: "#fdecea",
-                          border: "1px solid #f44336",
-                          color: "#c62828",
-                          fontSize: "0.8rem",
-                          fontWeight: 700,
-                        }}
-                      >
-                        {Math.max(
-                          0,
-                          Math.ceil(
-                            (new Date(invoice.paidDate).getTime() -
-                              new Date(invoice.dueDate).getTime()) /
-                              (1000 * 60 * 60 * 24),
-                          ),
-                        )}{" "}
-                        days
-                      </Box>
-                    </Box>
-                  </Box>
-                ) : null}
-
-                {/* Billing Month */}
-                <Box>
-                  <Typography color="textSecondary" variant="body2">
-                    Billing Month
-                  </Typography>
-                  <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
-                    {invoice.billingMonth
-                      ? new Date(invoice.billingMonth).toLocaleDateString(
-                          "en-US",
-                          { timeZone: "UTC", year: "numeric", month: "long" },
-                        )
-                      : "N/A"}
-                  </Typography>
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
-
-          {/* Line Items */}
-          {invoice.lineItems && invoice.lineItems.length > 0 && (
-            <Card sx={{ mt: 3 }}>
-              <CardHeader title="Line Items" />
-              <Divider />
-              <CardContent>
-                <InvoiceLineItemsTable
-                  lineItems={invoice.lineItems}
-                  quantityLabel="Number of Miners"
-                />
-              </CardContent>
-            </Card>
-          )}
-        </Box>
-
-        {/* Summary Sidebar */}
-        <Box>
-          <Card>
-            <CardHeader title="Summary" />
-            <Divider />
-            <CardContent>
-              <Stack spacing={2}>
-                <Box
-                  sx={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                  }}
-                >
-                  <Typography color="textSecondary">Subtotal:</Typography>
-                  <CurrencyDisplay
-                    value={invoice.totalAmount}
-                    fontWeight="bold"
-                  />
-                </Box>
-
-                <Box
-                  sx={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                  }}
-                >
-                  <Typography color="textSecondary">Tax:</Typography>
-                  <Typography sx={{ fontWeight: 600 }}>$0.00</Typography>
-                </Box>
-
-                <Divider sx={{ my: 1 }} />
-
-                <Box
-                  sx={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                  }}
-                >
-                  <Typography sx={{ fontWeight: 600, fontSize: "1.1rem" }}>
-                    Total Due:
-                  </Typography>
-                  <CurrencyDisplay
-                    value={invoice.totalAmount}
-                    variant="h6"
-                    fontWeight="bold"
-                  />
-                </Box>
-
-                <Divider sx={{ my: 1 }} />
-
-                {invoice.paidDate && (
-                  <Alert severity="success" sx={{ my: 1 }}>
-                    Invoice has been paid
-                  </Alert>
-                )}
-
-                {invoice.status === "OVERDUE" && (
-                  <Alert severity="error" sx={{ my: 1 }}>
-                    Invoice is overdue
-                  </Alert>
-                )}
-
-                <Button
-                  sx={{ displayPrint: "none" }}
-                  variant="contained"
-                  fullWidth
-                  size="large"
-                  onClick={() =>
-                    router.push(`/accounting/${invoice.id}/record-payment`)
-                  }
-                  disabled={
-                    invoice.status === "PAID" || invoice.status === "CANCELLED"
-                  }
-                >
-                  Record Payment
-                </Button>
-
-                {isSuperAdmin && invoice.status === "PAID" && (
-                  <Button
-                    sx={{ displayPrint: "none" }}
-                    variant="outlined"
-                    color="warning"
-                    fullWidth
-                    size="large"
-                    onClick={() => {
-                      setUnpaidDialogError(null);
-                      setUnpaidDialogOpen(true);
-                    }}
-                  >
-                    Mark as Unpaid
-                  </Button>
-                )}
-              </Stack>
-            </CardContent>
-          </Card>
-        </Box>
-      </Box>
-      {/* Payments (every non-voided payment, with its receiving account) */}
-      <InvoicePaymentsCard
-        payments={invoice.costPayments}
-        invoiceType={invoice.invoiceType}
-        btcpayStatus={invoice.btcpayStatus}
-        btcpaySettledAt={invoice.btcpaySettledAt}
-      />
-      {/* Customer & Relationship Manager Information Section */}
-      <Box sx={{ mt: 4 }}>
-        <Card>
-          <CardHeader title="Customer & Relationship Manager Information" />
-          <Divider />
-          <CardContent>
-            <Box
-              sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 3 }}
-            >
-              {/* Customer Name */}
-              <Box>
-                <Typography color="textSecondary" variant="body2">
-                  Customer Name
-                </Typography>
-                <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
-                  {invoice.user?.name || "N/A"}
-                </Typography>
-              </Box>
-
-              {/* Customer Email */}
-              <Box>
-                <Typography color="textSecondary" variant="body2">
-                  Customer Email
-                </Typography>
-                <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
-                  {invoice.user?.email || "N/A"}
-                </Typography>
-              </Box>
-
-              {/* Relationship Manager Name */}
-              <Box>
-                <Typography color="textSecondary" variant="body2">
-                  Relationship Manager
-                </Typography>
-                {groupLoading ? (
-                  <Box
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 1,
-                      mt: 0.5,
-                    }}
-                  >
-                    <CircularProgress size={16} />
-                    <Typography variant="body2">Loading...</Typography>
-                  </Box>
-                ) : (
-                  <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
-                    {groupInfo?.relationshipManager || "Not assigned"}
-                  </Typography>
-                )}
-              </Box>
-
-              {/* Relationship Manager Email */}
-              <Box>
-                <Typography color="textSecondary" variant="body2">
-                  RM Email
-                </Typography>
-                {groupLoading ? (
-                  <Box
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 1,
-                      mt: 0.5,
-                    }}
-                  >
-                    <CircularProgress size={16} />
-                    <Typography variant="body2">Loading...</Typography>
-                  </Box>
-                ) : (
-                  <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
-                    {groupInfo?.email || "Not assigned"}
-                  </Typography>
-                )}
-              </Box>
-
-              {/* Group Name */}
-              <Box>
-                <Typography color="textSecondary" variant="body2">
-                  Group Name
-                </Typography>
-                {groupLoading ? (
-                  <Box
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 1,
-                      mt: 0.5,
-                    }}
-                  >
-                    <CircularProgress size={16} />
-                    <Typography variant="body2">Loading...</Typography>
-                  </Box>
-                ) : (
-                  <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
-                    {groupInfo?.name || "No group assigned"}
-                  </Typography>
-                )}
-              </Box>
-            </Box>
-          </CardContent>
-        </Card>
-      </Box>
-      {/* Memos Section */}
-      <Box sx={{ mt: 4 }}>
-        <Card>
-          <CardHeader title="Memos" />
-          <Divider />
-          <CardContent>
-            {memoNotification && (
-              <Alert
-                severity="success"
-                sx={{ mb: 2 }}
-                onClose={() => setMemoNotification("")}
-              >
-                {memoNotification}
-              </Alert>
-            )}
-            {memosLoading ? (
-              <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}>
-                <CircularProgress size={30} />
-              </Box>
-            ) : linkedMemos.length === 0 ? (
-              <Typography color="textSecondary">
-                No memos issued against this invoice
-              </Typography>
-            ) : (
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Memo #</TableCell>
-                    <TableCell>Type</TableCell>
-                    <TableCell align="right">Amount</TableCell>
-                    <TableCell>Status</TableCell>
-                    <TableCell>Reason</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {linkedMemos.map((memo) => (
-                    <TableRow key={memo.id}>
-                      <TableCell>{memo.memoNumber}</TableCell>
-                      <TableCell>
-                        {memo.memoType === "CUSTOMER_FACING"
-                          ? "Customer-facing"
-                          : "Internal"}
-                      </TableCell>
-                      <TableCell align="right">
-                        <CurrencyDisplay value={memoDisplayAmount(memo)} />
-                      </TableCell>
-                      <TableCell>{memo.status}</TableCell>
-                      <TableCell>{memo.reason}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
-      </Box>
-      {/* Audit Trail Section */}
-      <Box sx={{ mt: 4 }}>
-        <Card>
-          <CardHeader title="Audit Trail & History" />
-          <Divider />
-          <CardContent>
-            {auditLoading ? (
-              <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}>
-                <CircularProgress size={30} />
-              </Box>
-            ) : auditLogs.length === 0 ? (
-              <Typography color="textSecondary">
-                No activity recorded yet
-              </Typography>
-            ) : (
-              <Stack spacing={2}>
-                {auditLogs.map((log: AuditLogWithUser, index: number) => (
-                  <Box
-                    key={log.id}
-                    sx={{
-                      pb: 2,
-                      borderBottom:
-                        index < auditLogs.length - 1
-                          ? "1px solid #eee"
-                          : "none",
-                    }}
-                  >
+                  {groupLoading ? (
                     <Box
                       sx={{
                         display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "flex-start",
-                        mb: 1,
+                        alignItems: "center",
+                        gap: 1,
+                        mt: 0.5,
                       }}
                     >
-                      <Box>
-                        <Typography sx={{ fontWeight: 600 }}>
-                          {formatAuditAction(log.action)}
-                        </Typography>
-                        <Typography color="textSecondary" variant="body2">
-                          {log.user?.name || log.user?.email || "System"}
-                        </Typography>
-                      </Box>
-                      <Typography color="textSecondary" variant="body2">
-                        {new Date(log.createdAt).toLocaleString()}
-                      </Typography>
+                      <CircularProgress size={16} />
+                      <Typography variant="body2">Loading...</Typography>
                     </Box>
-                    <Typography variant="body2" sx={{ mt: 1 }}>
-                      {log.description}
+                  ) : (
+                    <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
+                      {groupInfo?.relationshipManager || "Not assigned"}
                     </Typography>
-                    {log.changes && (
+                  )}
+                </Box>
+
+                {/* Relationship Manager Email */}
+                <Box>
+                  <Typography color="textSecondary" variant="body2">
+                    RM Email
+                  </Typography>
+                  {groupLoading ? (
+                    <Box
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1,
+                        mt: 0.5,
+                      }}
+                    >
+                      <CircularProgress size={16} />
+                      <Typography variant="body2">Loading...</Typography>
+                    </Box>
+                  ) : (
+                    <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
+                      {groupInfo?.email || "Not assigned"}
+                    </Typography>
+                  )}
+                </Box>
+
+                {/* Group Name */}
+                <Box>
+                  <Typography color="textSecondary" variant="body2">
+                    Group Name
+                  </Typography>
+                  {groupLoading ? (
+                    <Box
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1,
+                        mt: 0.5,
+                      }}
+                    >
+                      <CircularProgress size={16} />
+                      <Typography variant="body2">Loading...</Typography>
+                    </Box>
+                  ) : (
+                    <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
+                      {groupInfo?.name || "No group assigned"}
+                    </Typography>
+                  )}
+                </Box>
+              </Box>
+            </CardContent>
+          </Card>
+        </Box>
+        {/* Memos Section */}
+        <Box sx={{ mt: 4 }}>
+          <Card>
+            <CardHeader title="Memos" />
+            <Divider />
+            <CardContent>
+              {memoNotification && (
+                <Alert
+                  severity="success"
+                  sx={{ mb: 2 }}
+                  onClose={() => setMemoNotification("")}
+                >
+                  {memoNotification}
+                </Alert>
+              )}
+              {memosLoading ? (
+                <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}>
+                  <CircularProgress size={30} />
+                </Box>
+              ) : linkedMemos.length === 0 ? (
+                <Typography color="textSecondary">
+                  No memos issued against this invoice
+                </Typography>
+              ) : (
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Memo #</TableCell>
+                      <TableCell>Type</TableCell>
+                      <TableCell align="right">Amount</TableCell>
+                      <TableCell>Status</TableCell>
+                      <TableCell>Reason</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {linkedMemos.map((memo) => (
+                      <TableRow key={memo.id}>
+                        <TableCell>{memo.memoNumber}</TableCell>
+                        <TableCell>
+                          {memo.memoType === "CUSTOMER_FACING"
+                            ? "Customer-facing"
+                            : "Internal"}
+                        </TableCell>
+                        <TableCell align="right">
+                          <CurrencyDisplay value={memoDisplayAmount(memo)} />
+                        </TableCell>
+                        <TableCell>{memo.status}</TableCell>
+                        <TableCell>{memo.reason}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </Box>
+        {/* Audit Trail Section */}
+        <Box sx={{ mt: 4 }}>
+          <Card>
+            <CardHeader title="Audit Trail & History" />
+            <Divider />
+            <CardContent>
+              {auditLoading ? (
+                <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}>
+                  <CircularProgress size={30} />
+                </Box>
+              ) : auditLogs.length === 0 ? (
+                <Typography color="textSecondary">
+                  No activity recorded yet
+                </Typography>
+              ) : (
+                <Stack spacing={2}>
+                  {auditLogs.map((log: AuditLogWithUser, index: number) => (
+                    <Box
+                      key={log.id}
+                      sx={{
+                        pb: 2,
+                        borderBottom:
+                          index < auditLogs.length - 1
+                            ? "1px solid #eee"
+                            : "none",
+                      }}
+                    >
                       <Box
                         sx={{
-                          mt: 1,
-                          p: 1.5,
-                          bgcolor: "#f5f5f5",
-                          borderRadius: 1,
-                          fontSize: "0.875rem",
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "flex-start",
+                          mb: 1,
                         }}
                       >
-                        <Typography variant="caption" sx={{ fontWeight: 600 }}>
-                          Changes:
+                        <Box>
+                          <Typography sx={{ fontWeight: 600 }}>
+                            {formatAuditAction(log.action)}
+                          </Typography>
+                          <Typography color="textSecondary" variant="body2">
+                            {log.user?.name || log.user?.email || "System"}
+                          </Typography>
+                        </Box>
+                        <Typography color="textSecondary" variant="body2">
+                          {new Date(log.createdAt).toLocaleString()}
                         </Typography>
-                        <pre
-                          style={{
-                            margin: "8px 0 0 0",
-                            overflow: "auto",
-                            fontSize: "12px",
+                      </Box>
+                      <Typography variant="body2" sx={{ mt: 1 }}>
+                        {log.description}
+                      </Typography>
+                      {log.changes && (
+                        <Box
+                          sx={{
+                            mt: 1,
+                            p: 1.5,
+                            bgcolor: "var(--dl-canvas, #f5f5f5)",
+                            borderRadius: 1,
+                            fontSize: "0.875rem",
                           }}
                         >
-                          {typeof log.changes === "string"
-                            ? log.changes
-                            : JSON.stringify(log.changes, null, 2)}
-                        </pre>
-                      </Box>
-                    )}
-                  </Box>
-                ))}
-              </Stack>
-            )}
-          </CardContent>
-        </Card>
-      </Box>
-      {/* Issue Invoice Dialog */}
-      <Dialog
-        open={statusDialogOpen}
-        onClose={() => {
-          if (!issueLoading) setStatusDialogOpen(false);
-        }}
-      >
-        <DialogTitle>Issue Invoice</DialogTitle>
-        <DialogContent>
-          <Box sx={{ pt: 2 }}>
-            {issueSuccess ? (
-              <Alert severity="success" sx={{ mb: 2 }}>
-                <Typography sx={{ fontWeight: 600, mb: 1 }}>
-                  ✅ Invoice Issued Successfully!
-                </Typography>
-                <Typography variant="body2" sx={{ mb: 1 }}>
-                  {issueSuccess.message}
-                </Typography>
-                {issueSuccess.emailSent ? (
-                  <>
-                    <Typography variant="body2" sx={{ fontWeight: 500, mt: 1 }}>
-                      Email Details:
-                    </Typography>
-                    <Typography variant="body2" sx={{ ml: 1, mt: 0.5 }}>
-                      To: {issueSuccess.sentTo}
-                    </Typography>
-                    <Typography variant="body2" sx={{ ml: 1 }}>
-                      {issueSuccess.ccDescription}
-                    </Typography>
-                  </>
-                ) : (
-                  <Typography variant="body2" sx={{ fontWeight: 500, mt: 1 }}>
-                    Email was not sent (Do not send email was checked).
-                  </Typography>
-                )}
-              </Alert>
-            ) : statusDialogError && !issueLoading ? (
-              <Alert severity="error" sx={{ mb: 2 }}>
-                {statusDialogError}
-              </Alert>
-            ) : (
-              <>
-                <Typography sx={{ fontWeight: 600, mb: 2 }}>
-                  Are you sure you want to issue this invoice? This will:
-                </Typography>
-                <ul style={{ marginTop: 0, marginBottom: 16 }}>
-                  <li>Change the status from DRAFT to ISSUED</li>
-                  <li>
-                    Set the issued date to{" "}
-                    {issuedDateInput
-                      ? new Date(issuedDateInput).toLocaleDateString()
-                      : "(select a date below)"}
-                  </li>
-                  <li>Make the invoice available for payment</li>
-                  <li>
-                    {skipEmailChecked
-                      ? "Not send an email to the customer"
-                      : "Automatically send an email to the customer"}
-                  </li>
-                </ul>
-
-                <TextField
-                  label="Issue Date"
-                  type="date"
-                  value={issuedDateInput}
-                  onChange={handleIssuedDateChange}
-                  fullWidth
-                  InputLabelProps={{ shrink: true }}
-                  helperText="Defaults to today; can be backdated"
-                  required
-                  sx={{ mb: 2 }}
-                />
-
-                <FormControlLabel
-                  sx={{ mb: 2 }}
-                  control={
-                    <Checkbox
-                      checked={skipEmailChecked}
-                      onChange={(e) => setSkipEmailChecked(e.target.checked)}
-                    />
-                  }
-                  label="Do not send email"
-                />
-
-                {/* Email Details Section */}
-                {!skipEmailChecked && (
-                  <Box
-                    sx={{
-                      mb: 2,
-                      p: 2,
-                      backgroundColor: "#f5f5f5",
-                      borderRadius: 1,
-                    }}
-                  >
-                    <Typography sx={{ fontWeight: 600, mb: 1.5 }}>
-                      📧 Email will be sent to:
-                    </Typography>
-                    <Box sx={{ ml: 1 }}>
-                      <Typography variant="body2" sx={{ mb: 1 }}>
-                        <strong>To:</strong> {invoice?.user?.email}
-                      </Typography>
-                      {groupLoading ? (
-                        <Box
-                          sx={{ display: "flex", alignItems: "center", gap: 1 }}
-                        >
-                          <CircularProgress size={16} />
-                          <Typography variant="body2">
-                            Loading CC details...
+                          <Typography
+                            variant="caption"
+                            sx={{ fontWeight: 600 }}
+                          >
+                            Changes:
                           </Typography>
+                          <pre
+                            style={{
+                              margin: "8px 0 0 0",
+                              overflow: "auto",
+                              fontSize: "12px",
+                            }}
+                          >
+                            {typeof log.changes === "string"
+                              ? log.changes
+                              : JSON.stringify(log.changes, null, 2)}
+                          </pre>
                         </Box>
-                      ) : groupInfo ? (
-                        <Box>
-                          <Typography variant="body2" sx={{ mb: 0.5 }}>
-                            <strong>CC:</strong> {groupInfo.relationshipManager}{" "}
-                            ({groupInfo.email})
-                          </Typography>
-                          <Typography variant="body2">
-                            <strong>CC:</strong> invoices@bitfactory.ae
-                          </Typography>
-                        </Box>
-                      ) : (
-                        <Typography variant="body2" sx={{ color: "#d32f2f" }}>
-                          <strong>CC:</strong> invoices@bitfactory.ae{" "}
-                          <em>(No RM assigned to this customer)</em>
-                        </Typography>
                       )}
                     </Box>
-                  </Box>
-                )}
+                  ))}
+                </Stack>
+              )}
+            </CardContent>
+          </Card>
+        </Box>
+        {/* Issue Invoice Dialog */}
+        <Dialog
+          open={statusDialogOpen}
+          onClose={() => {
+            if (!issueLoading) setStatusDialogOpen(false);
+          }}
+        >
+          <DialogTitle>Issue Invoice</DialogTitle>
+          <DialogContent>
+            <Box sx={{ pt: 2 }}>
+              {issueSuccess ? (
+                <Alert severity="success" sx={{ mb: 2 }}>
+                  <Typography sx={{ fontWeight: 600, mb: 1 }}>
+                    ✅ Invoice Issued Successfully!
+                  </Typography>
+                  <Typography variant="body2" sx={{ mb: 1 }}>
+                    {issueSuccess.message}
+                  </Typography>
+                  {issueSuccess.emailSent ? (
+                    <>
+                      <Typography
+                        variant="body2"
+                        sx={{ fontWeight: 500, mt: 1 }}
+                      >
+                        Email Details:
+                      </Typography>
+                      <Typography variant="body2" sx={{ ml: 1, mt: 0.5 }}>
+                        To: {issueSuccess.sentTo}
+                      </Typography>
+                      <Typography variant="body2" sx={{ ml: 1 }}>
+                        {issueSuccess.ccDescription}
+                      </Typography>
+                    </>
+                  ) : (
+                    <Typography variant="body2" sx={{ fontWeight: 500, mt: 1 }}>
+                      Email was not sent (Do not send email was checked).
+                    </Typography>
+                  )}
+                </Alert>
+              ) : statusDialogError && !issueLoading ? (
+                <Alert severity="error" sx={{ mb: 2 }}>
+                  {statusDialogError}
+                </Alert>
+              ) : (
+                <>
+                  <Typography sx={{ fontWeight: 600, mb: 2 }}>
+                    Are you sure you want to issue this invoice? This will:
+                  </Typography>
+                  <ul style={{ marginTop: 0, marginBottom: 16 }}>
+                    <li>Change the status from DRAFT to ISSUED</li>
+                    <li>
+                      Set the issued date to{" "}
+                      {issuedDateInput
+                        ? new Date(issuedDateInput).toLocaleDateString()
+                        : "(select a date below)"}
+                    </li>
+                    <li>Make the invoice available for payment</li>
+                    <li>
+                      {skipEmailChecked
+                        ? "Not send an email to the customer"
+                        : "Automatically send an email to the customer"}
+                    </li>
+                  </ul>
+
+                  <TextField
+                    label="Issue Date"
+                    type="date"
+                    value={issuedDateInput}
+                    onChange={handleIssuedDateChange}
+                    fullWidth
+                    InputLabelProps={{ shrink: true }}
+                    helperText="Defaults to today; can be backdated"
+                    required
+                    sx={{ mb: 2 }}
+                  />
+
+                  <FormControlLabel
+                    sx={{ mb: 2 }}
+                    control={
+                      <Checkbox
+                        checked={skipEmailChecked}
+                        onChange={(e) => setSkipEmailChecked(e.target.checked)}
+                      />
+                    }
+                    label="Do not send email"
+                  />
+
+                  {/* Email Details Section */}
+                  {!skipEmailChecked && (
+                    <Box
+                      sx={{
+                        mb: 2,
+                        p: 2,
+                        backgroundColor: "var(--dl-canvas, #f5f5f5)",
+                        borderRadius: 1,
+                      }}
+                    >
+                      <Typography sx={{ fontWeight: 600, mb: 1.5 }}>
+                        📧 Email will be sent to:
+                      </Typography>
+                      <Box sx={{ ml: 1 }}>
+                        <Typography variant="body2" sx={{ mb: 1 }}>
+                          <strong>To:</strong> {invoice?.user?.email}
+                        </Typography>
+                        {groupLoading ? (
+                          <Box
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 1,
+                            }}
+                          >
+                            <CircularProgress size={16} />
+                            <Typography variant="body2">
+                              Loading CC details...
+                            </Typography>
+                          </Box>
+                        ) : groupInfo ? (
+                          <Box>
+                            <Typography variant="body2" sx={{ mb: 0.5 }}>
+                              <strong>CC:</strong>{" "}
+                              {groupInfo.relationshipManager} ({groupInfo.email}
+                              )
+                            </Typography>
+                            <Typography variant="body2">
+                              <strong>CC:</strong> invoices@bitfactory.ae
+                            </Typography>
+                          </Box>
+                        ) : (
+                          <Typography
+                            variant="body2"
+                            sx={{ color: "var(--dl-danger, #d32f2f)" }}
+                          >
+                            <strong>CC:</strong> invoices@bitfactory.ae{" "}
+                            <em>(No RM assigned to this customer)</em>
+                          </Typography>
+                        )}
+                      </Box>
+                    </Box>
+                  )}
+                </>
+              )}
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            {!issueSuccess && statusDialogError && !issueLoading && (
+              <Button
+                onClick={() => {
+                  setStatusDialogOpen(false);
+                  setStatusDialogError(null);
+                  setIssueSuccess(null);
+                }}
+              >
+                Close
+              </Button>
+            )}
+            {!issueSuccess && !statusDialogError && (
+              <>
+                <Button
+                  onClick={() => setStatusDialogOpen(false)}
+                  disabled={issueLoading}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleIssueInvoice}
+                  variant="contained"
+                  color="success"
+                  disabled={issueLoading || !issuedDateInput}
+                >
+                  {issueLoading
+                    ? skipEmailChecked
+                      ? "Issuing..."
+                      : "Issuing & Sending..."
+                    : "Issue Invoice"}
+                </Button>
               </>
             )}
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          {!issueSuccess && statusDialogError && !issueLoading && (
-            <Button
-              onClick={() => {
-                setStatusDialogOpen(false);
-                setStatusDialogError(null);
-                setIssueSuccess(null);
-              }}
-            >
-              Close
-            </Button>
-          )}
-          {!issueSuccess && !statusDialogError && (
-            <>
+            {issueSuccess && (
               <Button
-                onClick={() => setStatusDialogOpen(false)}
-                disabled={issueLoading}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleIssueInvoice}
+                onClick={() => {
+                  setStatusDialogOpen(false);
+                  setIssueSuccess(null);
+                }}
                 variant="contained"
-                color="success"
-                disabled={issueLoading || !issuedDateInput}
               >
-                {issueLoading
-                  ? skipEmailChecked
-                    ? "Issuing..."
-                    : "Issuing & Sending..."
-                  : "Issue Invoice"}
+                Close
               </Button>
-            </>
-          )}
-          {issueSuccess && (
+            )}
+          </DialogActions>
+        </Dialog>
+        {/* Issue Date in the Past Warning Dialog */}
+        <Dialog
+          open={pastIssueDateWarningOpen}
+          onClose={() => setPastIssueDateWarningOpen(false)}
+        >
+          <DialogTitle>Issue Date is in the Past</DialogTitle>
+          <DialogContent>
+            <Typography>
+              The issue date you selected is in the past. Do you want to
+              reselect a date, or continue anyway?
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleReselectIssuedDate}>Reselect Date</Button>
             <Button
-              onClick={() => {
-                setStatusDialogOpen(false);
-                setIssueSuccess(null);
-              }}
               variant="contained"
+              onClick={() => {
+                setPastIssueDateWarningOpen(false);
+                void issueInvoiceNow();
+              }}
             >
-              Close
+              Continue
             </Button>
-          )}
-        </DialogActions>
-      </Dialog>
-      {/* Issue Date in the Past Warning Dialog */}
-      <Dialog
-        open={pastIssueDateWarningOpen}
-        onClose={() => setPastIssueDateWarningOpen(false)}
-      >
-        <DialogTitle>Issue Date is in the Past</DialogTitle>
-        <DialogContent>
-          <Typography>
-            The issue date you selected is in the past. Do you want to reselect
-            a date, or continue anyway?
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleReselectIssuedDate}>Reselect Date</Button>
-          <Button
-            variant="contained"
-            onClick={() => {
-              setPastIssueDateWarningOpen(false);
-              void issueInvoiceNow();
-            }}
-          >
-            Continue
-          </Button>
-        </DialogActions>
-      </Dialog>
-      {/* Delete Invoice Dialog */}
-      <Dialog
-        open={deleteDialogOpen}
-        onClose={() => setDeleteDialogOpen(false)}
-      >
-        <DialogTitle>Delete Invoice</DialogTitle>
-        <DialogContent>
-          <Box sx={{ pt: 2 }}>
-            {deleteDialogError && (
-              <Alert severity="error" sx={{ mb: 2 }}>
-                {deleteDialogError}
+          </DialogActions>
+        </Dialog>
+        {/* Delete Invoice Dialog */}
+        <Dialog
+          open={deleteDialogOpen}
+          onClose={() => setDeleteDialogOpen(false)}
+        >
+          <DialogTitle>Delete Invoice</DialogTitle>
+          <DialogContent>
+            <Box sx={{ pt: 2 }}>
+              {deleteDialogError && (
+                <Alert severity="error" sx={{ mb: 2 }}>
+                  {deleteDialogError}
+                </Alert>
+              )}
+              <Alert severity="warning" sx={{ mb: 2 }}>
+                ⚠️ This action cannot be undone!
               </Alert>
-            )}
-            <Alert severity="warning" sx={{ mb: 2 }}>
-              ⚠️ This action cannot be undone!
-            </Alert>
-            <Typography>
-              Are you sure you want to delete this invoice? This will:
-            </Typography>
-            <ul style={{ marginTop: 12 }}>
-              <li>Permanently cancel the invoice</li>
-              <li>Change the status from DRAFT to CANCELLED</li>
-              <li>Remove it from active invoices</li>
-              <li>Log this action in the audit trail</li>
-            </ul>
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button
-            onClick={() => setDeleteDialogOpen(false)}
-            disabled={deleteLoading}
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleDeleteInvoice}
-            variant="contained"
-            color="error"
-            disabled={deleteLoading}
-          >
-            {deleteLoading ? "Deleting..." : "Delete Invoice"}
-          </Button>
-        </DialogActions>
-      </Dialog>
-      {/* Send Email Dialog */}
-      <Dialog open={emailDialogOpen} onClose={() => setEmailDialogOpen(false)}>
-        <DialogTitle>Send Invoice Email</DialogTitle>
-        <DialogContent>
-          <Box sx={{ pt: 2 }}>
-            {emailDialogError && (
-              <Alert severity="error" sx={{ mb: 2 }}>
-                {emailDialogError}
+              <Typography>
+                Are you sure you want to delete this invoice? This will:
+              </Typography>
+              <ul style={{ marginTop: 12 }}>
+                <li>Permanently cancel the invoice</li>
+                <li>Change the status from DRAFT to CANCELLED</li>
+                <li>Remove it from active invoices</li>
+                <li>Log this action in the audit trail</li>
+              </ul>
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button
+              onClick={() => setDeleteDialogOpen(false)}
+              disabled={deleteLoading}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleDeleteInvoice}
+              variant="contained"
+              color="error"
+              disabled={deleteLoading}
+            >
+              {deleteLoading ? "Deleting..." : "Delete Invoice"}
+            </Button>
+          </DialogActions>
+        </Dialog>
+        {/* Send Email Dialog */}
+        <Dialog
+          open={emailDialogOpen}
+          onClose={() => setEmailDialogOpen(false)}
+        >
+          <DialogTitle>Send Invoice Email</DialogTitle>
+          <DialogContent>
+            <Box sx={{ pt: 2 }}>
+              {emailDialogError && (
+                <Alert severity="error" sx={{ mb: 2 }}>
+                  {emailDialogError}
+                </Alert>
+              )}
+              <Alert severity="info" sx={{ mb: 2 }}>
+                📧 Send this invoice to the customer
               </Alert>
-            )}
-            <Alert severity="info" sx={{ mb: 2 }}>
-              📧 Send this invoice to the customer
-            </Alert>
-            <Typography>
-              This will send the invoice to the customer&apos;s email address.
-              This will:
-            </Typography>
-            <ul style={{ marginTop: 12 }}>
-              <li>
-                Send invoice {invoice?.invoiceNumber} to {invoice?.user?.email}
-              </li>
-              <li>Include invoice details and due date</li>
-              <li>Log this action in the audit trail</li>
-            </ul>
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button
-            onClick={() => setEmailDialogOpen(false)}
-            disabled={emailLoading}
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleSendEmail}
-            variant="contained"
-            disabled={emailLoading}
-          >
-            {emailLoading ? "Sending..." : "Send Email"}
-          </Button>
-        </DialogActions>
-      </Dialog>
-      {/* Cancel Invoice Confirmation Dialog */}
-      <Dialog
-        open={cancelDialogOpen}
-        onClose={() => setCancelDialogOpen(false)}
-      >
-        <DialogTitle>Cancel Invoice</DialogTitle>
-        <DialogContent>
-          <Box sx={{ pt: 2 }}>
-            {cancelDialogError && (
-              <Alert severity="error" sx={{ mb: 2 }}>
-                {cancelDialogError}
-              </Alert>
-            )}
-            <Typography sx={{ mb: 2 }}>
-              Are you sure you want to cancel this invoice? The invoice status
-              will be changed to &quot;Cancelled&quot; and a cancellation
-              notification will be sent to the customer. No payment will be
-              required.
-            </Typography>
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button
-            onClick={() => setCancelDialogOpen(false)}
-            disabled={cancelLoading}
-          >
-            Keep Invoice
-          </Button>
-          <Button
-            onClick={handleCancelInvoice}
-            variant="contained"
-            color="warning"
-            disabled={cancelLoading}
-          >
-            {cancelLoading ? "Cancelling..." : "Cancel Invoice"}
-          </Button>
-        </DialogActions>
-      </Dialog>
-      {/* Mark as Unpaid Confirmation Dialog */}
-      <Dialog
-        open={unpaidDialogOpen}
-        onClose={() => setUnpaidDialogOpen(false)}
-      >
-        <DialogTitle>Mark Invoice as Unpaid</DialogTitle>
-        <DialogContent>
-          <Box sx={{ pt: 2 }}>
-            {unpaidDialogError && (
-              <Alert severity="error" sx={{ mb: 2 }}>
-                {unpaidDialogError}
-              </Alert>
-            )}
-            <Typography sx={{ mb: 2 }}>
-              Are you sure you want to mark this invoice as unpaid? The invoice
-              status will be changed back to &quot;Issued&quot;, its paid date
-              will be cleared and all payments recorded against it will be
-              removed.
-            </Typography>
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button
-            onClick={() => setUnpaidDialogOpen(false)}
-            disabled={unpaidLoading}
-          >
-            Keep as Paid
-          </Button>
-          <Button
-            onClick={handleMarkUnpaid}
-            variant="contained"
-            color="warning"
-            disabled={unpaidLoading}
-          >
-            {unpaidLoading ? "Updating..." : "Mark as Unpaid"}
-          </Button>
-        </DialogActions>
-      </Dialog>{" "}
-      <CreateMemoModal
-        open={memoModalOpen}
-        onClose={() => setMemoModalOpen(false)}
-        onSuccess={(text) => {
-          setMemoNotification(text);
-          refetchMemos();
-        }}
-        invoiceId={invoice?.id || null}
-        invoiceNumber={invoice?.invoiceNumber || null}
-        customerId={invoice?.user?.id || null}
-        customerName={invoice?.user?.name || invoice?.user?.email || null}
-        category={
-          invoice?.invoiceType === "HARDWARE_SALES" ? "HARDWARE" : "HOSTING"
-        }
-      />
-    </Container>
+              <Typography>
+                This will send the invoice to the customer&apos;s email address.
+                This will:
+              </Typography>
+              <ul style={{ marginTop: 12 }}>
+                <li>
+                  Send invoice {invoice?.invoiceNumber} to{" "}
+                  {invoice?.user?.email}
+                </li>
+                <li>Include invoice details and due date</li>
+                <li>Log this action in the audit trail</li>
+              </ul>
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button
+              onClick={() => setEmailDialogOpen(false)}
+              disabled={emailLoading}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSendEmail}
+              variant="contained"
+              disabled={emailLoading}
+            >
+              {emailLoading ? "Sending..." : "Send Email"}
+            </Button>
+          </DialogActions>
+        </Dialog>
+        {/* Cancel Invoice Confirmation Dialog */}
+        <Dialog
+          open={cancelDialogOpen}
+          onClose={() => setCancelDialogOpen(false)}
+        >
+          <DialogTitle>Cancel Invoice</DialogTitle>
+          <DialogContent>
+            <Box sx={{ pt: 2 }}>
+              {cancelDialogError && (
+                <Alert severity="error" sx={{ mb: 2 }}>
+                  {cancelDialogError}
+                </Alert>
+              )}
+              <Typography sx={{ mb: 2 }}>
+                Are you sure you want to cancel this invoice? The invoice status
+                will be changed to &quot;Cancelled&quot; and a cancellation
+                notification will be sent to the customer. No payment will be
+                required.
+              </Typography>
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button
+              onClick={() => setCancelDialogOpen(false)}
+              disabled={cancelLoading}
+            >
+              Keep Invoice
+            </Button>
+            <Button
+              onClick={handleCancelInvoice}
+              variant="contained"
+              color="warning"
+              disabled={cancelLoading}
+            >
+              {cancelLoading ? "Cancelling..." : "Cancel Invoice"}
+            </Button>
+          </DialogActions>
+        </Dialog>
+        {/* Mark as Unpaid Confirmation Dialog */}
+        <Dialog
+          open={unpaidDialogOpen}
+          onClose={() => setUnpaidDialogOpen(false)}
+        >
+          <DialogTitle>Mark Invoice as Unpaid</DialogTitle>
+          <DialogContent>
+            <Box sx={{ pt: 2 }}>
+              {unpaidDialogError && (
+                <Alert severity="error" sx={{ mb: 2 }}>
+                  {unpaidDialogError}
+                </Alert>
+              )}
+              <Typography sx={{ mb: 2 }}>
+                Are you sure you want to mark this invoice as unpaid? The
+                invoice status will be changed back to &quot;Issued&quot;, its
+                paid date will be cleared and all payments recorded against it
+                will be removed.
+              </Typography>
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button
+              onClick={() => setUnpaidDialogOpen(false)}
+              disabled={unpaidLoading}
+            >
+              Keep as Paid
+            </Button>
+            <Button
+              onClick={handleMarkUnpaid}
+              variant="contained"
+              color="warning"
+              disabled={unpaidLoading}
+            >
+              {unpaidLoading ? "Updating..." : "Mark as Unpaid"}
+            </Button>
+          </DialogActions>
+        </Dialog>{" "}
+        <CreateMemoModal
+          open={memoModalOpen}
+          onClose={() => setMemoModalOpen(false)}
+          onSuccess={(text) => {
+            setMemoNotification(text);
+            refetchMemos();
+          }}
+          invoiceId={invoice?.id || null}
+          invoiceNumber={invoice?.invoiceNumber || null}
+          customerId={invoice?.user?.id || null}
+          customerName={invoice?.user?.name || invoice?.user?.email || null}
+          category={
+            invoice?.invoiceType === "HARDWARE_SALES" ? "HARDWARE" : "HOSTING"
+          }
+        />
+      </Container>
+    </DaylightThemedPage>
   );
 }

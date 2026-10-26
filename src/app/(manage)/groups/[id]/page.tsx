@@ -55,6 +55,8 @@ import {
   Checkbox,
 } from "@mui/material";
 import GradientStatCard from "@/components/GradientStatCard";
+import { DaylightThemedPage } from "@/components/daylight/DaylightMuiScope";
+import { DaylightLoading } from "@/components/daylight/AdminPage";
 
 /**
  * Group type
@@ -481,23 +483,16 @@ export default function GroupDetailPage() {
 
   if (state.loading) {
     return (
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          minHeight: "100vh",
-        }}
-      >
-        <CircularProgress />
-      </Box>
+      <DaylightThemedPage>
+        <DaylightLoading />
+      </DaylightThemedPage>
     );
   }
 
   if (!state.group) {
     return (
-      <Box component="main" sx={{ py: 4 }}>
-        <Container maxWidth="xl">
+      <DaylightThemedPage>
+        <Container maxWidth="xl" disableGutters>
           <Alert severity="error">Group not found</Alert>
           <Button
             startIcon={<ArrowBackIcon />}
@@ -507,16 +502,13 @@ export default function GroupDetailPage() {
             Go Back
           </Button>
         </Container>
-      </Box>
+      </DaylightThemedPage>
     );
   }
 
   return (
-    <Box
-      component="main"
-      sx={{ py: 4, backgroundColor: "background.default", minHeight: "100vh" }}
-    >
-      <Container maxWidth="xl">
+    <DaylightThemedPage>
+      <Container maxWidth="xl" disableGutters>
         {/* Page Header */}
         <Box sx={{ mb: 4 }}>
           <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
@@ -977,6 +969,6 @@ export default function GroupDetailPage() {
           </DialogActions>
         </Dialog>
       </Container>
-    </Box>
+    </DaylightThemedPage>
   );
 }

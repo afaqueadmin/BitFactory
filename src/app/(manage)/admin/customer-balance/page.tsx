@@ -24,6 +24,7 @@ import {
 import { useCustomers, Customer } from "@/lib/hooks/useInvoices";
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
 import CostPaymentTransactionsTable from "@/components/admin/CostPaymentTransactionsTable";
+import { DaylightThemedPage } from "@/components/daylight/DaylightMuiScope";
 
 export default function CustomerBalanceDetailPage() {
   const router = useRouter();
@@ -110,217 +111,225 @@ export default function CustomerBalanceDetailPage() {
   };
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
-      <Button
-        startIcon={<ArrowBackIcon />}
-        variant="text"
-        onClick={() => router.push("/adminpanel")}
-        sx={{ mb: 2 }}
-      >
-        Back to Dashboard
-      </Button>
-
-      <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>
-        Total Customer Balance
-      </Typography>
-      <Typography color="textSecondary" sx={{ mb: 3 }}>
-        All-time net sum of CostPayment rows (every type except HARDWARE_SALES
-        and HARDWARE_REPAIR) for hosted customers — a net ledger balance, not a
-        revenue figure, so no sign flip is applied. Excludes customers with
-        segment = SELF_MINING.
-      </Typography>
-
-      {error && (
-        <Alert severity="error" sx={{ mb: 3 }}>
-          {error}
-        </Alert>
-      )}
-      {downloadError && (
-        <Alert severity="error" sx={{ mb: 3 }}>
-          {downloadError}
-        </Alert>
-      )}
-
-      <Card sx={{ mb: 4 }}>
-        <CardContent>
-          <Typography variant="h6" sx={{ mb: 2 }}>
-            Calculation
-          </Typography>
-          <Box
-            sx={{
-              display: "grid",
-              gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr 1fr" },
-              gap: 2,
-            }}
-          >
-            <Box>
-              <Typography color="textSecondary" variant="body2">
-                Payments (sum)
-              </Typography>
-              <Typography sx={{ fontWeight: 600 }}>
-                <CurrencyDisplay value={summary?.sumPayment ?? 0} />
-              </Typography>
-            </Box>
-            <Box>
-              <Typography color="textSecondary" variant="body2">
-                Hosting & Colocation (sum)
-              </Typography>
-              <Typography sx={{ fontWeight: 600 }}>
-                <CurrencyDisplay value={summary?.sumElectricityCharges ?? 0} />
-              </Typography>
-            </Box>
-            <Box>
-              <Typography color="textSecondary" variant="body2">
-                Adjustments (sum)
-              </Typography>
-              <Typography sx={{ fontWeight: 600 }}>
-                <CurrencyDisplay value={summary?.sumAdjustment ?? 0} />
-              </Typography>
-            </Box>
-          </Box>
-
-          <Divider sx={{ my: 2 }} />
-
-          <Box>
-            <Typography color="textSecondary" variant="body2">
-              Total (sum of the three buckets above)
-            </Typography>
-            <Typography variant="h5" sx={{ fontWeight: 700 }}>
-              <CurrencyDisplay value={summary?.displayTotal ?? 0} />
-            </Typography>
-          </Box>
-
-          <Typography
-            variant="caption"
-            color="textSecondary"
-            sx={{ mt: 2, display: "block" }}
-          >
-            {isFiltered
-              ? "These 4 numbers are recalculated from the filtered transactions below — they no longer match the dashboard card while a filter is active."
-              : "No filters applied — this covers every CostPayment row ever created (HARDWARE_SALES and HARDWARE_REPAIR excluded) and matches the dashboard card exactly."}
-          </Typography>
-        </CardContent>
-      </Card>
-
-      <Card sx={{ mb: 3 }}>
-        <CardContent>
-          <Typography variant="h6" sx={{ mb: 2 }}>
-            Filters
-          </Typography>
-          <Box
-            sx={{
-              display: "grid",
-              gridTemplateColumns: {
-                xs: "1fr",
-                sm: "1fr 1fr",
-                md: "1fr 1fr 1fr 1fr",
-              },
-              gap: 2,
-            }}
-          >
-            <TextField
-              label="From date"
-              type="date"
-              size="small"
-              value={startDateFilter}
-              onChange={(e) => {
-                setStartDateFilter(e.target.value);
-                resetToFirstPage();
-              }}
-              InputLabelProps={{ shrink: true }}
-              helperText="No lower bound if left blank"
-            />
-            <TextField
-              label="To date"
-              type="date"
-              size="small"
-              value={endDateFilter}
-              onChange={(e) => {
-                setEndDateFilter(e.target.value);
-                resetToFirstPage();
-              }}
-              InputLabelProps={{ shrink: true }}
-            />
-            <TextField
-              select
-              label="Customer"
-              size="small"
-              value={customerId}
-              onChange={(e) => {
-                setCustomerId(e.target.value);
-                resetToFirstPage();
-              }}
-              disabled={customersLoading}
-            >
-              <MenuItem value="">All customers</MenuItem>
-              {customers.map((c: Customer) => (
-                <MenuItem key={c.id} value={c.id}>
-                  {c.displayName}
-                </MenuItem>
-              ))}
-            </TextField>
-            <TextField
-              select
-              label="Type"
-              size="small"
-              value={typeFilter}
-              onChange={(e) => {
-                setTypeFilter(
-                  e.target.value as
-                    "" | "PAYMENT" | "ELECTRICITY_CHARGES" | "ADJUSTMENT",
-                );
-                resetToFirstPage();
-              }}
-            >
-              <MenuItem value="">All</MenuItem>
-              <MenuItem value="PAYMENT">Payment</MenuItem>
-              <MenuItem value="ELECTRICITY_CHARGES">
-                Hosting & Colocation
-              </MenuItem>
-              <MenuItem value="ADJUSTMENT">Adjustment</MenuItem>
-            </TextField>
-          </Box>
-        </CardContent>
-      </Card>
-
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          mb: 2,
-        }}
-      >
-        <Typography variant="h6">
-          Transactions ({pagination?.totalCount ?? 0})
-        </Typography>
+    <DaylightThemedPage>
+      <Container maxWidth="lg" disableGutters>
         <Button
-          startIcon={
-            downloadLoading ? <CircularProgress size={16} /> : <DownloadIcon />
-          }
-          variant="outlined"
-          onClick={handleDownloadPdf}
-          disabled={downloadLoading}
+          startIcon={<ArrowBackIcon />}
+          variant="text"
+          onClick={() => router.push("/adminpanel")}
+          sx={{ mb: 2 }}
         >
-          {downloadLoading ? "Generating PDF..." : "Download PDF"}
+          Back to Dashboard
         </Button>
-      </Box>
-      <CostPaymentTransactionsTable
-        transactions={transactions}
-        loading={loading}
-        page={page}
-        pageSize={pageSize}
-        totalCount={pagination?.totalCount ?? 0}
-        onPageChange={setPage}
-        onPageSizeChange={(newSize) => {
-          setPageSize(newSize);
-          setPage(0);
-        }}
-        rowsPerPageOptions={[10, 25, 50, 100, { value: 9999, label: "Max" }]}
-        sortBy={sortBy}
-        sortOrder={sortOrder}
-        onSortChange={handleSortChange}
-      />
-    </Container>
+
+        <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>
+          Total Customer Balance
+        </Typography>
+        <Typography color="textSecondary" sx={{ mb: 3 }}>
+          All-time net sum of CostPayment rows (every type except HARDWARE_SALES
+          and HARDWARE_REPAIR) for hosted customers — a net ledger balance, not
+          a revenue figure, so no sign flip is applied. Excludes customers with
+          segment = SELF_MINING.
+        </Typography>
+
+        {error && (
+          <Alert severity="error" sx={{ mb: 3 }}>
+            {error}
+          </Alert>
+        )}
+        {downloadError && (
+          <Alert severity="error" sx={{ mb: 3 }}>
+            {downloadError}
+          </Alert>
+        )}
+
+        <Card sx={{ mb: 4 }}>
+          <CardContent>
+            <Typography variant="h6" sx={{ mb: 2 }}>
+              Calculation
+            </Typography>
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr 1fr" },
+                gap: 2,
+              }}
+            >
+              <Box>
+                <Typography color="textSecondary" variant="body2">
+                  Payments (sum)
+                </Typography>
+                <Typography sx={{ fontWeight: 600 }}>
+                  <CurrencyDisplay value={summary?.sumPayment ?? 0} />
+                </Typography>
+              </Box>
+              <Box>
+                <Typography color="textSecondary" variant="body2">
+                  Hosting & Colocation (sum)
+                </Typography>
+                <Typography sx={{ fontWeight: 600 }}>
+                  <CurrencyDisplay
+                    value={summary?.sumElectricityCharges ?? 0}
+                  />
+                </Typography>
+              </Box>
+              <Box>
+                <Typography color="textSecondary" variant="body2">
+                  Adjustments (sum)
+                </Typography>
+                <Typography sx={{ fontWeight: 600 }}>
+                  <CurrencyDisplay value={summary?.sumAdjustment ?? 0} />
+                </Typography>
+              </Box>
+            </Box>
+
+            <Divider sx={{ my: 2 }} />
+
+            <Box>
+              <Typography color="textSecondary" variant="body2">
+                Total (sum of the three buckets above)
+              </Typography>
+              <Typography variant="h5" sx={{ fontWeight: 700 }}>
+                <CurrencyDisplay value={summary?.displayTotal ?? 0} />
+              </Typography>
+            </Box>
+
+            <Typography
+              variant="caption"
+              color="textSecondary"
+              sx={{ mt: 2, display: "block" }}
+            >
+              {isFiltered
+                ? "These 4 numbers are recalculated from the filtered transactions below — they no longer match the dashboard card while a filter is active."
+                : "No filters applied — this covers every CostPayment row ever created (HARDWARE_SALES and HARDWARE_REPAIR excluded) and matches the dashboard card exactly."}
+            </Typography>
+          </CardContent>
+        </Card>
+
+        <Card sx={{ mb: 3 }}>
+          <CardContent>
+            <Typography variant="h6" sx={{ mb: 2 }}>
+              Filters
+            </Typography>
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: {
+                  xs: "1fr",
+                  sm: "1fr 1fr",
+                  md: "1fr 1fr 1fr 1fr",
+                },
+                gap: 2,
+              }}
+            >
+              <TextField
+                label="From date"
+                type="date"
+                size="small"
+                value={startDateFilter}
+                onChange={(e) => {
+                  setStartDateFilter(e.target.value);
+                  resetToFirstPage();
+                }}
+                InputLabelProps={{ shrink: true }}
+                helperText="No lower bound if left blank"
+              />
+              <TextField
+                label="To date"
+                type="date"
+                size="small"
+                value={endDateFilter}
+                onChange={(e) => {
+                  setEndDateFilter(e.target.value);
+                  resetToFirstPage();
+                }}
+                InputLabelProps={{ shrink: true }}
+              />
+              <TextField
+                select
+                label="Customer"
+                size="small"
+                value={customerId}
+                onChange={(e) => {
+                  setCustomerId(e.target.value);
+                  resetToFirstPage();
+                }}
+                disabled={customersLoading}
+              >
+                <MenuItem value="">All customers</MenuItem>
+                {customers.map((c: Customer) => (
+                  <MenuItem key={c.id} value={c.id}>
+                    {c.displayName}
+                  </MenuItem>
+                ))}
+              </TextField>
+              <TextField
+                select
+                label="Type"
+                size="small"
+                value={typeFilter}
+                onChange={(e) => {
+                  setTypeFilter(
+                    e.target.value as
+                      "" | "PAYMENT" | "ELECTRICITY_CHARGES" | "ADJUSTMENT",
+                  );
+                  resetToFirstPage();
+                }}
+              >
+                <MenuItem value="">All</MenuItem>
+                <MenuItem value="PAYMENT">Payment</MenuItem>
+                <MenuItem value="ELECTRICITY_CHARGES">
+                  Hosting & Colocation
+                </MenuItem>
+                <MenuItem value="ADJUSTMENT">Adjustment</MenuItem>
+              </TextField>
+            </Box>
+          </CardContent>
+        </Card>
+
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            mb: 2,
+          }}
+        >
+          <Typography variant="h6">
+            Transactions ({pagination?.totalCount ?? 0})
+          </Typography>
+          <Button
+            startIcon={
+              downloadLoading ? (
+                <CircularProgress size={16} />
+              ) : (
+                <DownloadIcon />
+              )
+            }
+            variant="outlined"
+            onClick={handleDownloadPdf}
+            disabled={downloadLoading}
+          >
+            {downloadLoading ? "Generating PDF..." : "Download PDF"}
+          </Button>
+        </Box>
+        <CostPaymentTransactionsTable
+          transactions={transactions}
+          loading={loading}
+          page={page}
+          pageSize={pageSize}
+          totalCount={pagination?.totalCount ?? 0}
+          onPageChange={setPage}
+          onPageSizeChange={(newSize) => {
+            setPageSize(newSize);
+            setPage(0);
+          }}
+          rowsPerPageOptions={[10, 25, 50, 100, { value: 9999, label: "Max" }]}
+          sortBy={sortBy}
+          sortOrder={sortOrder}
+          onSortChange={handleSortChange}
+        />
+      </Container>
+    </DaylightThemedPage>
   );
 }

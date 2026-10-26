@@ -10,6 +10,7 @@ import {
   getWarrantyStatus,
   WARRANTY_STATUS_LABEL,
 } from "@/lib/minerWarranty";
+import { useDaylight } from "@/lib/daylight";
 
 /**
  * Serial No., Name, Model and Location of the miner on a repair invoice.
@@ -19,10 +20,14 @@ import {
 export function RepairMinerDetails({
   miner,
   showWarranty = false,
+  daylight = false,
 }: {
   miner: RepairMiner;
   showWarranty?: boolean;
+  /** Daylight styling (client invoice page); admin keeps the MUI look. */
+  daylight?: boolean;
 }) {
+  const { d, fonts } = useDaylight();
   const fields: Array<[string, string]> = [
     ["Serial No.", miner.serialNumber || "—"],
     ["Name", miner.name],
@@ -54,8 +59,12 @@ export function RepairMinerDetails({
       <Box
         sx={{
           p: 2,
-          backgroundColor: "#f5f5f5",
-          borderRadius: 1,
+          backgroundColor: daylight ? d.canvas : "#f5f5f5",
+          borderRadius: daylight ? "10px" : 1,
+          ...(daylight && {
+            border: `1px solid ${d.border}`,
+            fontFamily: fonts.body,
+          }),
           display: "grid",
           gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
           gap: 1.5,
@@ -63,10 +72,27 @@ export function RepairMinerDetails({
       >
         {fields.map(([label, value]) => (
           <Box key={label}>
-            <Typography variant="caption" color="textSecondary">
+            <Typography
+              variant="caption"
+              sx={
+                daylight
+                  ? { fontFamily: fonts.body, fontSize: 12, color: d.muted }
+                  : { color: "text.secondary" }
+              }
+            >
               {label}
             </Typography>
-            <Typography sx={{ fontWeight: 500, wordBreak: "break-word" }}>
+            <Typography
+              sx={{
+                fontWeight: daylight ? 600 : 500,
+                wordBreak: "break-word",
+                ...(daylight && {
+                  fontFamily: fonts.body,
+                  fontSize: 14,
+                  color: d.text,
+                }),
+              }}
+            >
               {value}
             </Typography>
           </Box>

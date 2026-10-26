@@ -35,11 +35,10 @@ import {
 } from "@mui/icons-material";
 import AdminValueCard from "@/components/admin/AdminValueCard";
 import { formatValue } from "@/lib/helpers/formatValue";
+import { DaylightThemedPage } from "@/components/daylight/DaylightMuiScope";
 
 type IncentiveType =
-  | "HARDWARE_SALE"
-  | "OWN_MACHINE_HOSTING_REBATE"
-  | "CLIENT_HOSTING_COMMISSION";
+  "HARDWARE_SALE" | "OWN_MACHINE_HOSTING_REBATE" | "CLIENT_HOSTING_COMMISSION";
 
 const TYPE_LABELS: Record<IncentiveType, string> = {
   HARDWARE_SALE: "Hardware Sale",
@@ -260,11 +259,8 @@ export default function FranchiseIncentivesAdminPage() {
   const loading = ratesLoading || entriesLoading;
 
   return (
-    <Box
-      component="main"
-      sx={{ py: 4, backgroundColor: "background.default", minHeight: "100vh" }}
-    >
-      <Container maxWidth="xl">
+    <DaylightThemedPage>
+      <Container maxWidth="xl" disableGutters>
         <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
           <IconButton onClick={() => router.push("/franchisees")} size="small">
             <ArrowBackIcon />
@@ -295,12 +291,14 @@ export default function FranchiseIncentivesAdminPage() {
               }}
             >
               <AdminValueCard
+                daylight
                 title="Unpaid Incentives"
                 borderColor="#FF9800"
                 value={totalUnpaid}
                 type="currency"
               />
               <AdminValueCard
+                daylight
                 title="Unpaid Entries"
                 borderColor="#FF9800"
                 value={unpaidEntries.length}
@@ -608,8 +606,7 @@ export default function FranchiseIncentivesAdminPage() {
                     setRateForm((f) => ({
                       ...f,
                       rateBasis: e.target.value as
-                        | "FLAT_PER_UNIT"
-                        | "PERCENTAGE",
+                        "FLAT_PER_UNIT" | "PERCENTAGE",
                     }))
                   }
                   fullWidth
@@ -658,7 +655,10 @@ export default function FranchiseIncentivesAdminPage() {
                 type="date"
                 value={rateForm.effectiveFrom}
                 onChange={(e) =>
-                  setRateForm((f) => ({ ...f, effectiveFrom: e.target.value }))
+                  setRateForm((f) => ({
+                    ...f,
+                    effectiveFrom: e.target.value,
+                  }))
                 }
                 InputLabelProps={{ shrink: true }}
                 fullWidth
@@ -737,6 +737,6 @@ export default function FranchiseIncentivesAdminPage() {
           </Alert>
         </Snackbar>
       </Container>
-    </Box>
+    </DaylightThemedPage>
   );
 }
