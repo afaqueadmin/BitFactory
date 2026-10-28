@@ -7,6 +7,7 @@ import { INVOICE_TYPE_LABELS } from "@/lib/constants/accounting";
 import { readFileSync } from "fs";
 import { join } from "path";
 import nodemailer from "nodemailer";
+import { withEmailSafety } from "@/lib/emailSafety";
 import { InvoiceEmailService } from "@/services/invoiceEmailService";
 
 export async function POST(
@@ -266,16 +267,18 @@ export async function POST(
     const ccEmails = await InvoiceEmailService.buildCCList(customerId);
 
     // Create nodemailer transporter
-    const transporter = nodemailer.createTransport({
-      service: process.env.EMAIL_SERVICE,
-      host: process.env.SMTP_HOST,
-      port: parseInt(process.env.SMTP_PORT || "587"),
-      secure: process.env.SMTP_SECURE === "true",
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASSWORD,
-      },
-    });
+    const transporter = withEmailSafety(
+      nodemailer.createTransport({
+        service: process.env.EMAIL_SERVICE,
+        host: process.env.SMTP_HOST,
+        port: parseInt(process.env.SMTP_PORT || "587"),
+        secure: process.env.SMTP_SECURE === "true",
+        auth: {
+          user: process.env.SMTP_USER,
+          pass: process.env.SMTP_PASSWORD,
+        },
+      }),
+    );
 
     // Process email body: extract link and format as HTML
     const emailBodyLines = emailBody

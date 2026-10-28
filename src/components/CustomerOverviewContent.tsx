@@ -55,6 +55,7 @@ import ChangePasswordModal from "@/components/ChangePasswordModal";
 import ChangeAccountTypeModal from "@/components/ChangeAccountTypeModal";
 import { canManageAccount } from "@/lib/auth/accountTiers";
 import { RADIUS_CARD, useDaylight } from "@/lib/daylight";
+import { actsAsClient, isGuildRole } from "@/lib/customerRoles";
 import {
   DaylightAdminPage,
   DaylightLoading,
@@ -215,21 +216,24 @@ export default function CustomerOverviewContent() {
 
     let filteredUsers = usersData.users;
 
-    // ADMIN (and ACCOUNTING) can see CLIENT and FRANCHISEE users
+    // ADMIN (and ACCOUNTING) can see CLIENT, FRANCHISEE and guild users
     if (currentUserRole === "ADMIN" || currentUserRole === "ACCOUNTING") {
       filteredUsers = usersData.users.filter(
         (user: FetchedUser) =>
-          user.role === "CLIENT" || user.role === "FRANCHISEE",
+          user.role === "CLIENT" ||
+          user.role === "FRANCHISEE" ||
+          isGuildRole(user.role),
       );
     }
-    // SUPER_ADMIN can see CLIENT, ADMIN, ACCOUNTING, and FRANCHISEE users
+    // SUPER_ADMIN also sees ADMIN and ACCOUNTING users
     else if (currentUserRole === "SUPER_ADMIN") {
       filteredUsers = usersData.users.filter(
         (user: FetchedUser) =>
           user.role === "CLIENT" ||
           user.role === "ADMIN" ||
           user.role === "ACCOUNTING" ||
-          user.role === "FRANCHISEE",
+          user.role === "FRANCHISEE" ||
+          isGuildRole(user.role),
       );
     }
 
@@ -1065,6 +1069,8 @@ export default function CustomerOverviewContent() {
                           label="Potential Customer"
                           tone="info"
                         />
+                      ) : customer.segment === "GUILDMASTER" ? (
+                        "Guildmaster"
                       ) : (
                         (customer.segment ?? "—")
                       )}
@@ -1085,7 +1091,7 @@ export default function CustomerOverviewContent() {
                       {customer.joinDate}
                     </TableCell>
                     <TableCell>
-                      {customer.role === "CLIENT" ? customer.balance : "-"}
+                      {actsAsClient(customer.role) ? customer.balance : "-"}
                     </TableCell>
                     <TableCell align="center">
                       <IconButton

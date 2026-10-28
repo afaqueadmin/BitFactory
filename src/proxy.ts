@@ -70,6 +70,27 @@ const clientDynamicPatterns = [
   prefixPattern("/support"),
 ];
 
+// Guildmember: view-only, so the client pages minus support and anything
+// that only exists to change things. Plus /guild for both guild roles.
+const guildMemberPaths = [
+  "/account-settings",
+  "/btc-price-forecast",
+  "/btc-price-history",
+  "/btc-price-predictor",
+  "/clientworkers",
+  "/dashboard",
+  "/faq",
+  "/guild",
+  "/hashprice-history",
+  "/invoices",
+  "/luxor",
+  "/miners",
+  "/payback-analysis",
+  "/security-setting",
+  "/transaction",
+  "/wallet",
+];
+
 const securePaths = {
   CLIENT: new Set<string>(clientPaths),
   ADMIN: new Set<string>([
@@ -107,6 +128,8 @@ const securePaths = {
     "/secondary-login-requests",
     "/hashrate-alerts",
     "/simulated-accounts",
+    "/guilds",
+    "/guild-requests",
     // Add admin-specific public paths if any
   ]),
   // Franchisee: their own dashboard/account/customers/miners pages under
@@ -126,6 +149,9 @@ const securePaths = {
   ]),
   // Simulated accounts see the full client app (with simulated data).
   SIMULATED: new Set<string>(clientPaths),
+  // A Guildmaster is a client for the guild's miners, plus the guild page.
+  GUILDMASTER: new Set<string>([...clientPaths, "/guild"]),
+  GUILDMEMBER: new Set<string>(guildMemberPaths),
 }; // Add admin-specific public paths if any
 
 const dynamicPatternsPaths = {
@@ -141,9 +167,13 @@ const dynamicPatternsPaths = {
         /^\/franchisees\/[^/]+\/incentives$/.test(pathname),
     },
     prefixPattern("/tickets"),
+    singleSegmentPattern("/guilds"),
   ],
   FRANCHISEE: [...clientDynamicPatterns, prefixPattern("/franchise/support")],
   SIMULATED: clientDynamicPatterns,
+  GUILDMASTER: clientDynamicPatterns,
+  // Invoice detail pages only - no support.
+  GUILDMEMBER: [prefixPattern("/invoices")],
 };
 
 // Role-based default redirects
@@ -155,6 +185,8 @@ const getDefaultPathForRole = (role: string) => {
       return "/adminpanel";
     case "CLIENT":
     case "SIMULATED":
+    case "GUILDMASTER":
+    case "GUILDMEMBER":
       return "/dashboard";
     case "FRANCHISEE":
       return "/franchise/dashboard";
@@ -164,10 +196,7 @@ const getDefaultPathForRole = (role: string) => {
 };
 
 // Check if a path is inside a route group folder like (auth) or (manage)
-const isInRouteGroup = (
-  pathname: string,
-  role: "CLIENT" | "ADMIN" | "FRANCHISEE" | "SIMULATED",
-) => {
+const isInRouteGroup = (pathname: string, role: keyof typeof securePaths) => {
   return (
     securePaths[role].has(pathname) ||
     dynamicPatternsPaths[role].some((p) => p.test(pathname))
@@ -254,7 +283,11 @@ export async function proxy(request: NextRequest) {
       }
     }
 
-    if (userRole === "SIMULATED") {
+    if (
+      userRole === "SIMULATED" ||
+      userRole === "GUILDMASTER" ||
+      userRole === "GUILDMEMBER"
+    ) {
       if (!isInRouteGroup(pathname, userRole)) {
         return NextResponse.redirect(new URL("/dashboard", request.url));
       }

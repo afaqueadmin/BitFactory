@@ -2,6 +2,7 @@ import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
+import { resolveDataOwnerId } from "@/lib/guildScope";
 import { AuditAction, InvoiceStatus } from "@prisma/client";
 import { isSimulatedRole } from "@/lib/simulation/config";
 import { simRoute } from "@/lib/simulation/context";
@@ -135,6 +136,9 @@ export async function GET(
       const allowed =
         invoice.status !== InvoiceStatus.DRAFT &&
         (invoice.userId === requesterId ||
+          // A Guildmember may view the guild's (the Guildmaster's) invoices.
+          (requester.role === "GUILDMEMBER" &&
+            invoice.userId === (await resolveDataOwnerId(decoded))) ||
           (requester.role === "FRANCHISEE" &&
             (await assertFranchiseeOwnsCustomer(requesterId, invoice.userId))));
       if (!allowed) {

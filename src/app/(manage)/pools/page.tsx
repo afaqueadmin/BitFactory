@@ -285,7 +285,9 @@ export default function PoolsPage() {
             .filter(
               (u: { role: string; isDeleted: boolean }) =>
                 !u.isDeleted &&
-                (u.role === "CLIENT" || u.role === "FRANCHISEE"),
+                (u.role === "CLIENT" ||
+                  u.role === "FRANCHISEE" ||
+                  u.role === "GUILDMASTER"),
             )
             .map(
               (u: {

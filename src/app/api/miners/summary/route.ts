@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyJwtToken } from "@/lib/jwt";
+import { resolveDataOwnerId } from "@/lib/guildScope";
 import { prisma } from "@/lib/prisma";
 import { createLuxorClient, LuxorError } from "@/lib/luxor";
 import { createBraiinsClient } from "@/lib/braiins";
@@ -38,7 +39,8 @@ export async function GET(request: NextRequest) {
     let decoded;
     try {
       decoded = await verifyJwtToken(token);
-      userId = decoded.userId;
+      // A Guildmember sees the guild's (the Guildmaster's) data.
+      userId = await resolveDataOwnerId(decoded);
     } catch (error) {
       console.error("[Miners Summary API] Token verification failed:", error);
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });

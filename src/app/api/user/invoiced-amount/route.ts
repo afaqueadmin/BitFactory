@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyJwtToken } from "@/lib/jwt";
+import { actsAsClient } from "@/lib/customerRoles";
 import { prisma } from "@/lib/prisma";
 import { Decimal } from "@prisma/client/runtime/library";
 
@@ -32,8 +33,8 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
 
-    // Only CLIENT users can update their invoiced amount
-    if (userRole !== "CLIENT") {
+    // Only clients (and Guildmasters, for the guild) can update it
+    if (!actsAsClient(userRole)) {
       return NextResponse.json(
         { error: "Only clients can update invoiced amount" },
         { status: 403 },

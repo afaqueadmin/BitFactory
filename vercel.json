@@ -39,6 +39,10 @@
     {
       "path": "/api/cron_cleanup_token_blacklist",
       "schedule": "30 3 * * *"
+    },
+    {
+      "path": "/api/cron_guild_distribution",
+      "schedule": "0 7 * * *"
     }
   ],
   "$schema": "https://openapi.vercel.sh/vercel.json",

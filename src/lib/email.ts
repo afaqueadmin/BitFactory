@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import { withEmailSafety } from "@/lib/emailSafety";
 import { readFileSync } from "fs";
 import { join } from "path";
 import puppeteerCore from "puppeteer-core";
@@ -77,22 +78,24 @@ export const renderInvoiceTemplate = (
   return html;
 };
 
-// Create a transporter using SMTP
-const transporter = nodemailer.createTransport({
-  service: process.env.EMAIL_SERVICE,
-  host: process.env.SMTP_HOST,
-  port: parseInt(process.env.SMTP_PORT || "587"),
-  secure: process.env.SMTP_SECURE === "true",
-  // Nodemailer's defaults (2 min connect, 10 min socket) let a stuck SMTP
-  // server hold a request far past the platform's time limit.
-  connectionTimeout: 10_000,
-  greetingTimeout: 10_000,
-  socketTimeout: 20_000,
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASSWORD,
-  },
-});
+// Create a transporter using SMTP. Outside production, mail is redirected (see emailSafety).
+const transporter = withEmailSafety(
+  nodemailer.createTransport({
+    service: process.env.EMAIL_SERVICE,
+    host: process.env.SMTP_HOST,
+    port: parseInt(process.env.SMTP_PORT || "587"),
+    secure: process.env.SMTP_SECURE === "true",
+    // Nodemailer's defaults (2 min connect, 10 min socket) let a stuck SMTP
+    // server hold a request far past the platform's time limit.
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 20_000,
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASSWORD,
+    },
+  }),
+);
 
 // CC email for all invoice communications
 const CC_INVOICE_EMAIL =
@@ -2427,3 +2430,125 @@ export const sendMemoVoidEmail = async (
     return { success: false as const, error, ccEmails: normalizedCcEmails };
   }
 };
+
+// ── Guilds ─────────────────────────────────────────────────────────────────
+
+const sendGuildMail = async (
+  to: string | undefined,
+  subject: string,
+  body: string,
+  label: string,
+) => {
+  if (!to) return { success: false, error: "No recipient" };
+  try {
+    await transporter.sendMail({
+      from:
+        `BitFactory Admin <${process.env.SMTP_FROM}>` ||
+        "noreply@bitfactory.com",
+      to,
+      subject,
+      html: `${body}<br><p>Best regards,</p><p>The BitFactory Team</p>`,
+    });
+    return { success: true };
+  } catch (error) {
+    console.error(`Error sending ${label} email:`, error);
+    return { success: false, error };
+  }
+};
+
+/** To the Guildmaster: their wallet or split change request was received. */
+export const sendGuildRequestSubmittedEmail = (
+  email: string,
+  summary: string,
+) =>
+  sendGuildMail(
+    email,
+    "Guild Change Request Received - BitFactory",
+    `<h1>Guild Change Request Received</h1>
+     <p>We've received your request: ${escapeHtml(summary)}.</p>
+     <p>Our team will contact you to confirm it before it takes effect.</p>
+     <p><strong>If you did not make this request, please contact our support team immediately.</strong></p>`,
+    "guild request submitted",
+  );
+
+/** To the Guildmaster: their request was approved or rejected. */
+export const sendGuildRequestReviewedEmail = (
+  email: string,
+  summary: string,
+  approved: boolean,
+  rejectionReason?: string | null,
+) =>
+  sendGuildMail(
+    email,
+    `Guild Change Request ${approved ? "Approved" : "Rejected"} - BitFactory`,
+    approved
+      ? `<h1>Guild Change Request Approved</h1>
+         <p>Your request has been approved: ${escapeHtml(summary)}.</p>
+         <p>For security, the next reward distribution waits 24 hours after this change.</p>`
+      : `<h1>Guild Change Request Rejected</h1>
+         <p>Your request was not approved: ${escapeHtml(summary)}.</p>
+         ${rejectionReason ? `<p><strong>Reason:</strong> ${escapeHtml(rejectionReason)}</p>` : ""}`,
+    "guild request reviewed",
+  );
+
+/**
+ * A guild's monthly reward didn't cover its hosting. Goes to the admin inbox
+ * (pass no email) and to the Guildmaster.
+ */
+export const sendGuildShortfallEmail = (params: {
+  email?: string;
+  guildName: string;
+  rewardMonth: string;
+  hostingDueUsd: number;
+  paidUsd: number;
+  shortfallUsd: number;
+}) =>
+  sendGuildMail(
+    params.email ?? process.env.SMTP_USER,
+    `⚠️ Guild reward below hosting: ${params.guildName} - BitFactory`,
+    `<h1>Reward didn't cover hosting</h1>
+     <p>The ${escapeHtml(params.rewardMonth)} reward for <strong>${escapeHtml(params.guildName)}</strong> was less than the hosting it owes.</p>
+     <p><strong>Hosting owed:</strong> $${params.hostingDueUsd.toFixed(2)}<br>
+        <strong>Paid from the reward:</strong> $${params.paidUsd.toFixed(2)}<br>
+        <strong>Still owed:</strong> $${params.shortfallUsd.toFixed(2)}</p>
+     <p>The whole reward went toward hosting, so no shares were paid this month. What's still owed is taken first from next month's reward.</p>`,
+    "guild shortfall",
+  );
+
+/**
+ * To each guild member once a month's payout is confirmed: what they were
+ * sent (their share plus anything carried in), or why it was carried.
+ */
+export const sendGuildShareSentEmail = (params: {
+  email: string;
+  name: string | null;
+  guildName: string;
+  rewardMonth: string;
+  percent: number;
+  shareBtc: number;
+  paidBtc: number;
+  carriedOutBtc: number;
+  carryReason: string | null;
+  walletAddress: string | null;
+  txUrl: string | null;
+}) =>
+  sendGuildMail(
+    params.email,
+    `Your ${params.rewardMonth} guild reward - BitFactory`,
+    `<h1>${params.paidBtc > 0 ? "Your guild reward has been sent" : "Your guild reward is being carried forward"}</h1>
+     <p>Hello ${escapeHtml(params.name || "there")},</p>
+     <p>Your ${params.percent}% share of the ${escapeHtml(params.rewardMonth)} reward for <strong>${escapeHtml(params.guildName)}</strong> was ${params.shareBtc.toFixed(8)} BTC.</p>
+     ${
+       params.paidBtc > 0
+         ? `<p><strong>Sent:</strong> ${params.paidBtc.toFixed(8)} BTC<br>
+            <strong>To:</strong> ${escapeHtml(params.walletAddress || "-")}
+            ${params.txUrl ? `<br><a href="${escapeHtml(params.txUrl)}">View the transaction</a>` : ""}</p>`
+         : ""
+     }
+     ${
+       params.carriedOutBtc > 0
+         ? `<p><strong>Carried to next month:</strong> ${params.carriedOutBtc.toFixed(8)} BTC${params.carryReason ? ` (${escapeHtml(params.carryReason)})` : ""}.</p>`
+         : ""
+     }`,
+    "guild share sent",
+  );

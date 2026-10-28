@@ -2,6 +2,7 @@ import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
+import { resolveDataOwnerId } from "@/lib/guildScope";
 import { simRoute } from "@/lib/simulation/context";
 import { simMinerView } from "@/lib/simulation/views";
 
@@ -19,7 +20,8 @@ export async function GET(request: NextRequest) {
     let decoded;
     try {
       decoded = await verifyJwtToken(token);
-      userId = decoded.userId;
+      // A Guildmember sees the guild's (the Guildmaster's) data.
+      userId = await resolveDataOwnerId(decoded);
       userRole = decoded.role;
     } catch (error) {
       console.error("Token verification failed:", error);

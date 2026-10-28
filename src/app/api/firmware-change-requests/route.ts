@@ -126,7 +126,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (auth.decoded.role !== "CLIENT" && auth.decoded.role !== "FRANCHISEE") {
+    if (
+      auth.decoded.role !== "CLIENT" &&
+      auth.decoded.role !== "FRANCHISEE" &&
+      auth.decoded.role !== "GUILDMASTER"
+    ) {
       return NextResponse.json(
         {
           success: false,

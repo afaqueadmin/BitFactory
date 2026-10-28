@@ -43,6 +43,7 @@ export default function AuthLayout({
     pathname === "/security-setting" ||
     pathname === "/support" ||
     pathname === "/faq" ||
+    pathname === "/guild" ||
     (pathname?.startsWith("/support/") ?? false) ||
     (pathname?.startsWith("/invoices/") ?? false);
 

@@ -4,7 +4,8 @@ import { canonicalEmail } from "@/lib/auth/emailIdentity";
 /**
  * Logins (UserLogin): the emails an account can be signed into with, each
  * with its own password, 2FA and passkeys. Every account has one primary
- * login, whose email is also User.email. A CLIENT account may have one more,
+ * login, whose email is also User.email. A CLIENT account (or a guild
+ * account, GUILDMASTER / GUILDMEMBER) may have one more,
  * a secondary login added by an admin for a second person (an accountant, a
  * partner) - same account, same access, separate credentials.
  *
@@ -15,7 +16,12 @@ import { canonicalEmail } from "@/lib/auth/emailIdentity";
 export const MAX_LOGINS_PER_ACCOUNT = 2;
 
 /** Roles whose accounts may have a secondary login. */
-export const MULTI_LOGIN_ROLES: ReadonlySet<string> = new Set(["CLIENT"]);
+export const MULTI_LOGIN_ROLES: ReadonlySet<string> = new Set([
+  "CLIENT",
+  "GUILDMASTER",
+  "GUILDMEMBER",
+]);
+const MULTI_LOGIN_ROLE_LIST = ["CLIENT", "GUILDMASTER", "GUILDMEMBER"] as const;
 
 /**
  * Who may add or remove a secondary login.
@@ -30,13 +36,17 @@ export const LOGIN_MANAGER_ROLES: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * A secondary login only signs in while its account is a CLIENT one - if
+ * A secondary login only signs in while its account has a MULTI_LOGIN_ROLES
+ * role - if
  * the account's role changes, the secondary stops working until it's
  * changed back (or the login is removed).
  */
 const USABLE_LOGIN = {
   user: { isDeleted: false },
-  OR: [{ isPrimary: true }, { user: { role: "CLIENT" as const } }],
+  OR: [
+    { isPrimary: true },
+    { user: { role: { in: [...MULTI_LOGIN_ROLE_LIST] } } },
+  ],
 };
 
 /**
@@ -124,7 +134,11 @@ export async function primaryLoginId(userId: string): Promise<string | null> {
  */
 export async function secondaryLoginEmails(userId: string): Promise<string[]> {
   const logins = await prisma.userLogin.findMany({
-    where: { userId, isPrimary: false, user: { role: "CLIENT" } },
+    where: {
+      userId,
+      isPrimary: false,
+      user: { role: { in: [...MULTI_LOGIN_ROLE_LIST] } },
+    },
     select: { email: true },
     orderBy: { createdAt: "asc" },
   });

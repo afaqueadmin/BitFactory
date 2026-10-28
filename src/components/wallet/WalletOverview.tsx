@@ -24,6 +24,8 @@ import { LuxorPaymentSettings } from "@/lib/types/wallet";
 import { useBitcoinLivePrice } from "@/components/useBitcoinLivePrice";
 import BtcPriceLabel from "@/components/BtcPriceLabel";
 import WalletSubaccountCards from "@/components/wallet/WalletSubaccountCards";
+import GuildRewardWalletCard from "@/components/wallet/GuildRewardWalletCard";
+import { isGuildRole } from "@/lib/customerRoles";
 import Segmented, { SegmentedOption } from "@/components/daylight/Segmented";
 import { RADIUS_CARD, useDaylight } from "@/lib/daylight";
 
@@ -596,6 +598,10 @@ export default function WalletOverview({
                 Loading wallet settings...
               </Typography>
             </Box>
+          ) : !customerId && !snapshot && isGuildRole(user?.role) ? (
+            // Luxor pays the guild to a Higgs wallet - show the member's
+            // own reward wallet instead of the Luxor payout settings.
+            <GuildRewardWalletCard />
           ) : walletError ? (
             <Alert severity="error" sx={{ gridColumn: "1 / -1" }}>
               {walletError}

@@ -1,6 +1,7 @@
 import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { verifyJwtToken } from "@/lib/jwt";
+import { resolveDataOwnerId } from "@/lib/guildScope";
 import { prisma } from "@/lib/prisma";
 import { generateMemoPDF } from "@/lib/email";
 
@@ -38,7 +39,7 @@ export async function GET(
     });
 
     const isAdmin = isStaffRole(requester?.role);
-    const isOwnMemo = memo.userId === decoded.userId;
+    const isOwnMemo = memo.userId === (await resolveDataOwnerId(decoded));
 
     if (!isAdmin && !isOwnMemo) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });

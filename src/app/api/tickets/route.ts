@@ -31,6 +31,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { AuditAction, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { rejectReadOnly } from "@/lib/guildScope";
 import { verifyJwtToken } from "@/lib/jwt";
 import {
   ticketListWhereForUser,
@@ -159,6 +160,8 @@ export async function POST(request: NextRequest) {
         { status: auth.status },
       );
     }
+    const readOnly = rejectReadOnly(auth.decoded.role);
+    if (readOnly) return readOnly;
 
     if (
       !isCustomerRole(auth.decoded.role) &&

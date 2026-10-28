@@ -1,6 +1,7 @@
 import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { BILLED_CUSTOMER_ROLES } from "@/lib/customerRoles";
 import { verifyJwtToken } from "@/lib/jwt";
 import { franchiseeUserFilter } from "@/lib/franchiseeScope";
 import { hostingEligibleUserFilter } from "@/lib/hostingEligibility";
@@ -41,10 +42,14 @@ export async function GET(request: NextRequest) {
     const includeSimulated =
       searchParams.get("includeSimulated") === "1" && isStaffRole(user.role);
 
-    // Fetch all customers (users with role CLIENT, plus SIMULATED on request)
+    // Fetch all customers (CLIENT and GUILDMASTER, plus SIMULATED on request)
     const customers = await prisma.user.findMany({
       where: {
-        role: includeSimulated ? { in: ["CLIENT", "SIMULATED"] } : "CLIENT",
+        role: {
+          in: includeSimulated
+            ? [...BILLED_CUSTOMER_ROLES, "SIMULATED"]
+            : BILLED_CUSTOMER_ROLES,
+        },
         isDeleted: false,
         ...franchiseeUserFilter(user),
         // Simulated accounts have no segment but can still be billed hosting.

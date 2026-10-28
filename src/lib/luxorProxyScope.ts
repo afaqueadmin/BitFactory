@@ -10,6 +10,7 @@
 import { isStaffRole } from "@/lib/auth/staffRoles";
 import { prisma } from "@/lib/prisma";
 import { franchiseeUserFilter } from "@/lib/franchiseeScope";
+import { resolveDataOwnerId } from "@/lib/guildScope";
 
 export function isAdminRole(role: string): boolean {
   return isStaffRole(role);
@@ -57,16 +58,22 @@ export async function franchiseeCustomerSubaccountNames(
 
 /**
  * Subaccount names the caller may query, or null for unrestricted (admins).
- *   CLIENT     -> their own subaccounts
- *   FRANCHISEE -> their own + their customers' subaccounts
- *   any other  -> none
+ *   CLIENT / GUILDMASTER -> their own subaccounts
+ *   GUILDMEMBER          -> their guild's (the Guildmaster's) subaccounts
+ *   FRANCHISEE           -> their own + their customers' subaccounts
+ *   any other            -> none
  */
 export async function resolveAllowedSubaccounts(user: {
   userId: string;
   role: string;
 }): Promise<string[] | null> {
   if (isAdminRole(user.role)) return null;
-  if (user.role === "CLIENT") return ownLuxorSubaccountNames(user.userId);
+  if (user.role === "CLIENT" || user.role === "GUILDMASTER") {
+    return ownLuxorSubaccountNames(user.userId);
+  }
+  if (user.role === "GUILDMEMBER") {
+    return ownLuxorSubaccountNames(await resolveDataOwnerId(user));
+  }
   if (user.role === "FRANCHISEE") {
     const [own, customers] = await Promise.all([
       ownLuxorSubaccountNames(user.userId),

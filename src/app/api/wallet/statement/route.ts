@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyJwtToken } from "@/lib/jwt";
+import { resolveDataOwnerId } from "@/lib/guildScope";
 import { prisma } from "@/lib/prisma";
 import { generatePDFFromHTML } from "@/lib/email";
 import { paymentTypeLabel } from "@/lib/accounting/paymentTypes";
@@ -41,7 +42,8 @@ export async function GET(request: NextRequest) {
     }
 
     const jwtPayload = await verifyJwtToken(token);
-    const userId = jwtPayload.userId;
+    // A Guildmember sees the guild's (the Guildmaster's) data.
+    const userId = await resolveDataOwnerId(jwtPayload);
 
     // Get query parameters
     const searchParams = request.nextUrl.searchParams;

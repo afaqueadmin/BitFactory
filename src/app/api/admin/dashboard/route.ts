@@ -1,6 +1,7 @@
 import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { BILLED_CUSTOMER_ROLES } from "@/lib/customerRoles";
 import { NON_BALANCE_PAYMENT_TYPES } from "@/lib/accounting/paymentTypes";
 import { verifyJwtToken } from "@/lib/jwt";
 import {
@@ -870,10 +871,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Fetch customers (users with role CLIENT) statistics
+    // Fetch customers (CLIENT and GUILDMASTER) statistics
     const totalCustomers = await prisma.user.findMany({
       where: {
-        role: "CLIENT",
+        role: { in: BILLED_CUSTOMER_ROLES },
         isDeleted: false,
         poolAuths: { none: { authKey: { contains: "_test" } } },
         ...franchiseeUserFilter(user),

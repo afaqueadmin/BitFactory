@@ -2,6 +2,8 @@ import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
+import { isGuildRole } from "@/lib/customerRoles";
+import { resolveDataOwnerId } from "@/lib/guildScope";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,7 +21,8 @@ export async function GET(
     }
 
     const decoded = await verifyJwtToken(token);
-    if (!isStaffRole(decoded.role) && decoded.role !== "CLIENT") {
+    const isCustomer = decoded.role === "CLIENT" || isGuildRole(decoded.role);
+    if (!isStaffRole(decoded.role) && !isCustomer) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
     const { id: minerId } = await params;
@@ -30,13 +33,14 @@ export async function GET(
       );
     }
 
-    // Clients may only read notes for their own miners.
-    if (decoded.role === "CLIENT") {
+    // Clients may only read notes for their own miners (a Guildmember: the
+    // guild's).
+    if (isCustomer) {
       const miner = await prisma.miner.findUnique({
         where: { id: minerId },
         select: { userId: true },
       });
-      if (!miner || miner.userId !== decoded.userId) {
+      if (!miner || miner.userId !== (await resolveDataOwnerId(decoded))) {
         return NextResponse.json({ error: "Miner not found" }, { status: 404 });
       }
     }

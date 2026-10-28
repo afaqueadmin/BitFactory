@@ -28,7 +28,9 @@ interface UserData {
     | "ACCOUNTING"
     | "CLIENT"
     | "FRANCHISEE"
-    | "SIMULATED";
+    | "SIMULATED"
+    | "GUILDMASTER"
+    | "GUILDMEMBER";
   twoFactorEnabled: boolean;
   /** ISO date by which this account must enable 2FA; null if not needed. */
   twoFactorRequiredBy?: string | null;

@@ -1,6 +1,7 @@
 import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { BILLED_CUSTOMER_ROLES } from "@/lib/customerRoles";
 import { verifyJwtToken } from "@/lib/jwt";
 import { franchiseeUserFilter } from "@/lib/franchiseeScope";
 
@@ -33,7 +34,7 @@ export async function GET(request: NextRequest) {
     const skip = (page - 1) * pageSize;
 
     const customerWhere = {
-      role: "CLIENT" as const,
+      role: { in: BILLED_CUSTOMER_ROLES },
       ...franchiseeUserFilter(user),
     };
 

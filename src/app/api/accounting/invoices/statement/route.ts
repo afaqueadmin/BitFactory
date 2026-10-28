@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyJwtToken } from "@/lib/jwt";
+import { resolveDataOwnerId } from "@/lib/guildScope";
 import { prisma } from "@/lib/prisma";
 import { generatePDFFromHTML, renderInvoiceTemplate } from "@/lib/email";
 import { INVOICE_TYPE_LABELS } from "@/lib/constants/accounting";
@@ -34,7 +35,8 @@ export async function GET(request: NextRequest) {
     }
 
     const jwtPayload = await verifyJwtToken(token);
-    const userId = jwtPayload.userId;
+    // A Guildmember gets the guild's (the Guildmaster's) statement.
+    const userId = await resolveDataOwnerId(jwtPayload);
 
     const user = await prisma.user.findUnique({
       where: { id: userId },

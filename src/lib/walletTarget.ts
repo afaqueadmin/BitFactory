@@ -2,6 +2,7 @@ import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken, verifyWalletSnapshotTicket } from "@/lib/jwt";
+import { resolveDataOwnerId } from "@/lib/guildScope";
 
 /** The account whose wallet data a request should load. */
 export interface WalletTarget {
@@ -19,13 +20,19 @@ export const WALLET_SNAPSHOT_TICKET_COOKIE = "wallet_snapshot_ticket";
  * Resolves `?customerId=` for the wallet routes: the caller themselves when
  * absent; otherwise any user for ADMIN/SUPER_ADMIN/ACCOUNTING, or one of their
  * own customers for a FRANCHISEE. The target's own role is returned so a
- * simulated customer viewed by an admin still gets simulated data.
+ * simulated customer viewed by an admin still gets simulated data. A
+ * Guildmember's own wallet is the guild's (the Guildmaster's).
  */
 export async function resolveWalletTarget(
   decoded: { userId: string; role: string },
   customerId: string | null,
 ): Promise<WalletTarget | NextResponse> {
-  if (!customerId) return { userId: decoded.userId, role: decoded.role };
+  if (!customerId || customerId === decoded.userId) {
+    if (decoded.role === "GUILDMEMBER") {
+      return { userId: await resolveDataOwnerId(decoded), role: "GUILDMASTER" };
+    }
+    return { userId: decoded.userId, role: decoded.role };
+  }
 
   const isAdmin = isStaffRole(decoded.role);
   if (!isAdmin && decoded.role !== "FRANCHISEE") {

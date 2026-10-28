@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyJwtToken } from "@/lib/jwt";
 import { ConfirmoPaymentService } from "@/services/confirmoPaymentService";
+import { rejectReadOnly } from "@/lib/guildScope";
 
 /**
  * POST /api/invoices/[id]/confirmo-payment
@@ -32,6 +33,8 @@ export async function POST(
     if (!decoded?.userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const readOnly = rejectReadOnly(decoded.role);
+    if (readOnly) return readOnly;
 
     console.log("Creating Confirmo payment for invoice:", id);
 

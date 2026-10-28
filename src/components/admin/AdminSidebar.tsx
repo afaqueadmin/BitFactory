@@ -30,6 +30,8 @@ import {
   AccountTree as SubaccountsIcon,
   Storefront as FranchiseesIcon,
   Science as SimulatedAccountsIcon,
+  Diversity3 as GuildsIcon,
+  HowToReg as GuildRequestsIcon,
   Dns as MinersIcon,
   Hub as PoolWorkersIcon,
   Lan as LuxorWorkersIcon,
@@ -168,6 +170,11 @@ const sidebarSections: SidebarSection[] = [
         path: "/secondary-login-requests",
         badgeKey: "logins",
       },
+      {
+        title: "Guild Requests",
+        icon: <GuildRequestsIcon />,
+        path: "/guild-requests",
+      },
     ],
   },
   {
@@ -186,6 +193,12 @@ const sidebarSections: SidebarSection[] = [
       },
       { title: "Subaccounts", icon: <SubaccountsIcon />, path: "/subaccounts" },
       { title: "Franchisees", icon: <FranchiseesIcon />, path: "/franchisees" },
+      {
+        title: "Guilds",
+        icon: <GuildsIcon />,
+        path: "/guilds",
+        activeMatch: [/^\/guilds\//],
+      },
       {
         title: "Simulated Accounts",
         icon: <SimulatedAccountsIcon />,

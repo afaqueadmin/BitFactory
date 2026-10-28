@@ -2,9 +2,10 @@ import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
-
-const HOURS_PER_DAY = 24;
-const AVG_DAYS_PER_MONTH = 365 / 12;
+import {
+  latestRateByMiner,
+  minerMonthlyHostingUsd,
+} from "@/lib/accounting/minerMonthlyHosting";
 
 /**
  * GET /api/accounting/customers/monthly-bill
@@ -46,25 +47,13 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    const rateHistories = await prisma.minerRateHistory.findMany({
-      where: { minerId: { in: autoMiners.map((m) => m.id) } },
-      orderBy: { createdAt: "desc" },
-      select: { minerId: true, rate_per_kwh: true },
-    });
-
-    const latestRateByMiner = new Map<string, number>();
-    for (const rh of rateHistories) {
-      if (!latestRateByMiner.has(rh.minerId)) {
-        latestRateByMiner.set(rh.minerId, Number(rh.rate_per_kwh));
-      }
-    }
+    const rates = await latestRateByMiner(autoMiners.map((m) => m.id));
 
     const monthlyBills: Record<string, number> = {};
     for (const miner of autoMiners) {
       const powerUsageKw = miner.hardware?.powerUsage || 0;
-      const ratePerKwh = latestRateByMiner.get(miner.id) || 0;
-      const monthlyCost =
-        powerUsageKw * ratePerKwh * HOURS_PER_DAY * AVG_DAYS_PER_MONTH;
+      const ratePerKwh = rates.get(miner.id) || 0;
+      const monthlyCost = minerMonthlyHostingUsd(ratePerKwh, powerUsageKw);
 
       monthlyBills[miner.userId] =
         (monthlyBills[miner.userId] || 0) + monthlyCost;

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyJwtToken } from "@/lib/jwt";
+import { resolveDataOwnerId } from "@/lib/guildScope";
 import { prisma } from "@/lib/prisma";
 import {
   getOrCreatePaybackConfig,
@@ -29,7 +30,8 @@ export async function GET(request: NextRequest) {
     let userRole: string;
     try {
       const decoded = await verifyJwtToken(token);
-      userId = decoded.userId;
+      // A Guildmember sees the guild's (the Guildmaster's) data.
+      userId = await resolveDataOwnerId(decoded);
       userRole = decoded.role;
     } catch (error) {
       console.error("[Payback Config API] Token verification failed:", error);

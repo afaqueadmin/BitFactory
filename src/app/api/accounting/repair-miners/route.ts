@@ -1,6 +1,7 @@
 import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { BILLED_CUSTOMER_ROLES } from "@/lib/customerRoles";
 import { verifyJwtToken } from "@/lib/jwt";
 import { REPAIR_MINER_SELECT } from "@/lib/accounting/hardwareRepair";
 
@@ -44,7 +45,10 @@ export async function GET(request: NextRequest) {
     const miners = await prisma.miner.findMany({
       where: customerId
         ? { userId: customerId, isDeleted: false }
-        : { isDeleted: false, user: { role: "CLIENT", isDeleted: false } },
+        : {
+            isDeleted: false,
+            user: { role: { in: BILLED_CUSTOMER_ROLES }, isDeleted: false },
+          },
       select: {
         ...REPAIR_MINER_SELECT,
         status: true,

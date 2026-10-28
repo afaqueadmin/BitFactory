@@ -4,6 +4,7 @@ vi.mock("@/lib/prisma", () => ({
   prisma: {
     poolAuth: { findMany: vi.fn() },
     user: { findMany: vi.fn() },
+    guildMembership: { findFirst: vi.fn() },
   },
 }));
 
@@ -18,6 +19,7 @@ import {
 
 const poolAuth = vi.mocked(prisma.poolAuth);
 const users = vi.mocked(prisma.user);
+const memberships = vi.mocked(prisma.guildMembership);
 
 const authKeys = (...names: string[]) =>
   names.map((authKey) => ({ authKey })) as never;
@@ -72,6 +74,44 @@ describe("resolveAllowedSubaccounts", () => {
     expect(
       await resolveAllowedSubaccounts({ userId: "f1", role: "FRANCHISEE" }),
     ).toEqual(["fr_own", "shared", "cust_a", "cust_b"]);
+  });
+
+  it("gives a Guildmaster their own (the guild's) subaccounts", async () => {
+    poolAuth.findMany.mockResolvedValue(authKeys("guild_1"));
+    expect(
+      await resolveAllowedSubaccounts({ userId: "gm", role: "GUILDMASTER" }),
+    ).toEqual(["guild_1"]);
+    expect(poolAuth.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { userId: "gm", pool: { name: "Luxor" } },
+      }),
+    );
+  });
+
+  it("gives a Guildmember their guild's (the Guildmaster's) subaccounts", async () => {
+    memberships.findFirst.mockResolvedValue({
+      guild: { guildmasterId: "gm" },
+    } as never);
+    poolAuth.findMany.mockResolvedValue(authKeys("guild_1"));
+    expect(
+      await resolveAllowedSubaccounts({ userId: "m1", role: "GUILDMEMBER" }),
+    ).toEqual(["guild_1"]);
+    expect(poolAuth.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { userId: "gm", pool: { name: "Luxor" } },
+      }),
+    );
+  });
+
+  it("gives a Guildmember who left their guild nothing of the guild's", async () => {
+    memberships.findFirst.mockResolvedValue(null);
+    poolAuth.findMany.mockResolvedValue([] as never);
+    await resolveAllowedSubaccounts({ userId: "m1", role: "GUILDMEMBER" });
+    expect(poolAuth.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { userId: "m1", pool: { name: "Luxor" } },
+      }),
+    );
   });
 
   it("gives any other role nothing", async () => {

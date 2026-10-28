@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { NON_BALANCE_PAYMENT_TYPES } from "@/lib/accounting/paymentTypes";
 import { verifyJwtToken } from "@/lib/jwt";
+import { resolveDataOwnerId } from "@/lib/guildScope";
 import { simRoute } from "@/lib/simulation/context";
 import { loadSimLedger } from "@/lib/simulation/ledgerStore";
 import { ledgerBalance } from "@/lib/simulation/ledger";
@@ -21,7 +22,8 @@ export async function GET(request: NextRequest) {
     let decoded;
     try {
       decoded = await verifyJwtToken(token);
-      userId = decoded.userId;
+      // A Guildmember sees the guild's (the Guildmaster's) data.
+      userId = await resolveDataOwnerId(decoded);
       userRole = decoded.role;
     } catch (error) {
       console.error("Token verification failed:", error);

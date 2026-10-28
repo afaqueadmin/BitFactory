@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyJwtToken } from "@/lib/jwt";
+import { resolveDataOwnerId } from "@/lib/guildScope";
 import { createLuxorClient } from "@/lib/luxor";
 import { createBraiinsClient } from "@/lib/braiins";
 import {
@@ -40,9 +41,12 @@ export async function GET(
       );
     }
 
+    // A Guildmember sees the guild's (the Guildmaster's) data.
+    const ownerId = await resolveDataOwnerId(decoded);
+
     // Get user's miners
     const miners = await prisma.miner.findMany({
-      where: { userId: decoded.userId },
+      where: { userId: ownerId },
       include: {
         pool: { select: { id: true, name: true } },
       },
@@ -69,7 +73,7 @@ export async function GET(
 
     // Get PoolAuth entries for this user (contains API keys)
     const poolAuths = await prisma.poolAuth.findMany({
-      where: { userId: decoded.userId },
+      where: { userId: ownerId },
       include: { pool: { select: { id: true, name: true } } },
     });
 

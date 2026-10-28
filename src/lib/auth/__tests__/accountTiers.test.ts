@@ -5,19 +5,31 @@ const ROLES = [
   "CLIENT",
   "FRANCHISEE",
   "SIMULATED",
+  "GUILDMASTER",
+  "GUILDMEMBER",
   "ADMIN",
   "ACCOUNTING",
   "SUPER_ADMIN",
 ] as const;
+
+const CUSTOMERS = [
+  "CLIENT",
+  "FRANCHISEE",
+  "SIMULATED",
+  "GUILDMASTER",
+  "GUILDMEMBER",
+];
 
 // actor → targets it may manage (N-8)
 const ALLOWED: Record<string, string[]> = {
   CLIENT: [],
   FRANCHISEE: [],
   SIMULATED: [],
-  ADMIN: ["CLIENT", "FRANCHISEE", "SIMULATED"],
-  ACCOUNTING: ["CLIENT", "FRANCHISEE", "SIMULATED"],
-  SUPER_ADMIN: ["CLIENT", "FRANCHISEE", "SIMULATED", "ADMIN", "ACCOUNTING"],
+  GUILDMASTER: [],
+  GUILDMEMBER: [],
+  ADMIN: CUSTOMERS,
+  ACCOUNTING: CUSTOMERS,
+  SUPER_ADMIN: [...CUSTOMERS, "ADMIN", "ACCOUNTING"],
 };
 
 describe("canManageAccount", () => {

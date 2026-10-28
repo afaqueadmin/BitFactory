@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { verifyJwtToken } from "@/lib/jwt";
 import { prisma } from "@/lib/prisma";
+import { BILLED_CUSTOMER_ROLES } from "@/lib/customerRoles";
 import { createLuxorClient, Transaction } from "@/lib/luxor";
 import { createBraiinsClient } from "@/lib/braiins";
 import { franchiseeUserFilter } from "@/lib/franchiseeScope";
@@ -136,7 +137,7 @@ export async function GET(request: NextRequest) {
 
     // Fetch all customers (or filter to specific IDs)
     const customerWhere: Prisma.UserWhereInput = {
-      role: "CLIENT",
+      role: { in: BILLED_CUSTOMER_ROLES },
       ...franchiseeUserFilter({ id: decoded.userId, role: userRole }),
     };
     if (customerIdsParam) {

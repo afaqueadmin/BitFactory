@@ -8,6 +8,7 @@ import {
 } from "@/lib/hostingEligibility";
 import { InvoiceStatus, AuditAction } from "@prisma/client";
 import { assertFranchiseeOwnsCustomer } from "@/lib/franchiseeScope";
+import { resolveDataOwnerId } from "@/lib/guildScope";
 import { costPaymentAccountOmit } from "@/lib/accounting/costPaymentAccounts";
 import {
   validateStandardLineItems,
@@ -51,9 +52,16 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const customerId = searchParams.get("customerId");
     const decoded = await verifyJwtToken(token);
     const userRole = decoded.role;
+
+    // The account whose invoices count as the caller's own: a Guildmember
+    // gets the guild's (the Guildmaster's), view-only.
+    const selfId = await resolveDataOwnerId(decoded);
+    if (searchParams.get("customerId") === decoded.userId) {
+      searchParams.set("customerId", selfId);
+    }
+    const customerId = searchParams.get("customerId");
 
     // Anyone who isn't staff or a franchisee (clients, simulated accounts, any
     // future role) may only ask for their own invoices.
@@ -61,7 +69,7 @@ export async function GET(request: NextRequest) {
       customerId &&
       !isStaffRole(userRole) &&
       userRole !== "FRANCHISEE" &&
-      customerId !== decoded.userId
+      customerId !== selfId
     ) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

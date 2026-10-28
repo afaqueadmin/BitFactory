@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
 import { resolveLuxorSubaccounts } from "@/lib/luxorSubaccounts";
+import { resolveDataOwnerId } from "@/lib/guildScope";
 import { canonicalEmail } from "@/lib/auth/emailIdentity";
 import { secondaryLoginEmails } from "@/lib/auth/loginIdentity";
 import { Prisma } from "@prisma/client";
@@ -141,8 +142,12 @@ export async function GET(request: NextRequest) {
 
     // Every Luxor subaccount this user has, for the client-side subaccount
     // filter. Cheap enough to resolve unconditionally rather than special
-    // casing by role.
-    const luxorSubaccounts = await resolveLuxorSubaccounts(userId);
+    // casing by role. A Guildmember gets the guild's (the Guildmaster's).
+    const luxorSubaccounts = await resolveLuxorSubaccounts(
+      userRole === "GUILDMEMBER"
+        ? await resolveDataOwnerId({ userId, role: userRole })
+        : userId,
+    );
 
     // The account's second sign-in email(s), shown read-only in Account
     // Settings. Empty unless it's a CLIENT account.

@@ -29,6 +29,8 @@ import PayWithBinanceButton from "@/components/PayWithBinanceButton";
 import { RepairMinerDetails } from "@/components/accounting/invoices/RepairMinerDetails";
 import { SIM_INVOICE_ID } from "@/lib/simulation/config";
 import { RADIUS_CARD, useDaylight } from "@/lib/daylight";
+import { useUser } from "@/lib/hooks/useUser";
+import { isReadOnlyRole } from "@/lib/customerRoles";
 
 type RepairLineRow = {
   id: string;
@@ -46,6 +48,9 @@ export default function CustomerInvoiceDetailPage() {
   // A simulated account's simulated invoice is view only: it can't be paid.
   // Real invoices issued to them are paid like anyone else's.
   const isSimulated = params.id === SIM_INVOICE_ID;
+  // Guildmembers see the guild's invoices but the Guildmaster pays them.
+  const { user } = useUser();
+  const isViewOnly = isReadOnlyRole(user?.role);
   const [downloadLoading, setDownloadLoading] = useState(false);
   const [memoDownloadingId, setMemoDownloadingId] = useState<string | null>(
     null,
@@ -346,6 +351,10 @@ export default function CustomerInvoiceDetailPage() {
           {isSimulated ? (
             <Box sx={{ fontSize: 12, color: d.muted, textAlign: "right" }}>
               Simulated invoice - view only
+            </Box>
+          ) : isViewOnly ? (
+            <Box sx={{ fontSize: 12, color: d.muted, textAlign: "right" }}>
+              Guild invoice - your Guildmaster pays it
             </Box>
           ) : (
             <>

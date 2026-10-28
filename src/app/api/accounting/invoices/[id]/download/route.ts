@@ -1,6 +1,7 @@
 import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { verifyJwtToken } from "@/lib/jwt";
+import { resolveDataOwnerId } from "@/lib/guildScope";
 import { prisma } from "@/lib/prisma";
 import { InvoiceStatus } from "@prisma/client";
 import { REPAIR_MINER_SELECT } from "@/lib/accounting/hardwareRepair";
@@ -111,7 +112,8 @@ export async function GET(
     // Check if user has permission to download this invoice
     // Users can download their own invoices, admins can download any invoice
     const isAdmin = isStaffRole(user.role);
-    const isOwnInvoice = invoice.userId === userId.userId;
+    // A Guildmember's own invoices are the guild's (the Guildmaster's).
+    const isOwnInvoice = invoice.userId === (await resolveDataOwnerId(userId));
 
     if (!isAdmin && !isOwnInvoice) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });

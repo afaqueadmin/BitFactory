@@ -20,6 +20,8 @@ const REQUIRED_ROLES = new Set([
   "FRANCHISEE",
   "CLIENT",
   "SIMULATED",
+  "GUILDMASTER",
+  "GUILDMEMBER",
 ]);
 
 export function twoFactorEnforceFrom(): Date {

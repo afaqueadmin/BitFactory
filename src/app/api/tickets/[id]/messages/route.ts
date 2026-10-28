@@ -31,6 +31,7 @@ import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { AuditAction } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { rejectReadOnly } from "@/lib/guildScope";
 import { verifyJwtToken } from "@/lib/jwt";
 import { assertCanAccessTicket } from "@/lib/ticketScope";
 
@@ -57,6 +58,8 @@ export async function POST(
         { status: auth.status },
       );
     }
+    const readOnly = rejectReadOnly(auth.decoded.role);
+    if (readOnly) return readOnly;
 
     const { id } = await params;
     const ticket = await prisma.supportTicket.findUnique({ where: { id } });

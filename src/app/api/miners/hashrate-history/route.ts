@@ -1,6 +1,7 @@
 import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { verifyJwtToken } from "@/lib/jwt";
+import { resolveDataOwnerId } from "@/lib/guildScope";
 import { prisma } from "@/lib/prisma";
 import { LuxorError } from "@/lib/luxor";
 import { poolDataCache } from "@/lib/cache";
@@ -53,7 +54,8 @@ export async function GET(request: NextRequest) {
     let decoded;
     try {
       decoded = await verifyJwtToken(token);
-      callerId = decoded.userId;
+      // A Guildmember sees the guild's (the Guildmaster's) data.
+      callerId = await resolveDataOwnerId(decoded);
       callerRole = decoded.role;
     } catch (error) {
       console.error("[Hashrate History API] Token verification failed:", error);
@@ -129,7 +131,12 @@ export async function GET(request: NextRequest) {
     const requestedUserId = searchParams.get("userId");
     let targetUserId = callerId;
 
-    if (requestedUserId && requestedUserId !== callerId) {
+    // A Guildmember naming themselves means the guild (callerId).
+    if (
+      requestedUserId &&
+      requestedUserId !== callerId &&
+      requestedUserId !== decoded.userId
+    ) {
       if (isStaffRole(callerRole)) {
         targetUserId = requestedUserId;
       } else if (callerRole === "FRANCHISEE") {

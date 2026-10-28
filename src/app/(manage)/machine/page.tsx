@@ -206,7 +206,11 @@ export default function MachinePage() {
         if (usersData.success && usersData.users) {
           // Transform users data to match our User interface
           const transformedUsers: User[] = usersData.users
-            .filter((user: User) => user.role === "CLIENT")
+            // Guildmasters hold their guild's miners.
+            .filter(
+              (user: User) =>
+                user.role === "CLIENT" || user.role === "GUILDMASTER",
+            )
             .map((user: User) => ({
               id: user.id,
               name: user.name,
@@ -868,6 +872,7 @@ export default function MachinePage() {
                   <MenuItem value="SELF_MINING">Self Mining</MenuItem>
                   <MenuItem value="FRANCHISEE">Franchisee</MenuItem>
                   <MenuItem value="RETAIL">Retail</MenuItem>
+                  <MenuItem value="GUILDMASTER">Guildmaster</MenuItem>
                 </Select>
               </FormControl>
 

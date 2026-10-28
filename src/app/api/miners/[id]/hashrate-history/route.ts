@@ -1,6 +1,7 @@
 import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { verifyJwtToken } from "@/lib/jwt";
+import { resolveDataOwnerId } from "@/lib/guildScope";
 import { prisma } from "@/lib/prisma";
 import { LuxorError } from "@/lib/luxor";
 import { assertFranchiseeOwnsCustomer } from "@/lib/franchiseeScope";
@@ -54,7 +55,8 @@ export async function GET(
     let decoded;
     try {
       decoded = await verifyJwtToken(token);
-      callerId = decoded.userId;
+      // A Guildmember sees the guild's (the Guildmaster's) data.
+      callerId = await resolveDataOwnerId(decoded);
       callerRole = decoded.role;
     } catch (error) {
       console.error(

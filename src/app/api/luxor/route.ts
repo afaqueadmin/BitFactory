@@ -29,6 +29,8 @@ import { prisma } from "@/lib/prisma";
 import { isSimulatedRole } from "@/lib/simulation/config";
 import { simRoute } from "@/lib/simulation/context";
 import { loadSimLiveWorker, simWorkerForDisplay } from "@/lib/simulation/data";
+import { resolveDataOwnerId } from "@/lib/guildScope";
+import { isGuildRole } from "@/lib/customerRoles";
 import {
   joinSubaccountNames,
   selectRequestedSubaccounts,
@@ -190,9 +192,10 @@ async function extractUserFromToken(request: NextRequest) {
   try {
     const decoded = await verifyJwtToken(token);
 
-    // Fetch user from database to get their Luxor subaccounts (PoolAuth)
+    // Fetch user from database to get their Luxor subaccounts (PoolAuth).
+    // A Guildmember uses the guild's (the Guildmaster's).
     const user = await prisma.user.findUnique({
-      where: { id: decoded.userId },
+      where: { id: await resolveDataOwnerId(decoded) },
       select: {
         id: true,
         role: true,
@@ -747,7 +750,8 @@ export async function GET(
           );
           data = await luxorClient.getWorkers(currency, {
             subaccount_names:
-              user.role === "CLIENT" && clientSelectedSubaccounts
+              (user.role === "CLIENT" || isGuildRole(user.role)) &&
+              clientSelectedSubaccounts
                 ? clientSelectedSubaccounts
                 : user.role === "FRANCHISEE"
                   ? joinSubaccountNames(

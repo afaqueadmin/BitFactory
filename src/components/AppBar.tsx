@@ -47,6 +47,8 @@ import SavingsOutlinedIcon from "@mui/icons-material/SavingsOutlined";
 import SupportAgentOutlinedIcon from "@mui/icons-material/SupportAgentOutlined";
 import HelpOutlineRoundedIcon from "@mui/icons-material/HelpOutlineRounded";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
+import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
+import { isGuildRole, isReadOnlyRole } from "@/lib/customerRoles";
 import RelationshipManagerCard from "@/components/daylight/RelationshipManagerCard";
 import { useRelationshipManager } from "@/lib/hooks/useRelationshipManager";
 import { useAuth } from "@/lib/contexts/auth-context";
@@ -139,7 +141,14 @@ const toolLinks: NavLink[] = [
   { href: "/faq", label: "FAQ", icon: <HelpOutlineRoundedIcon /> },
 ];
 
-const allLinks = [...mainLinks, ...toolLinks];
+// Guild accounts get a "Guild" entry (members, split, reward wallets).
+const guildLink: NavLink = {
+  href: "/guild",
+  label: "Guild",
+  icon: <GroupsOutlinedIcon />,
+};
+
+const allLinks = [...mainLinks, guildLink, ...toolLinks];
 
 // Primary destinations for the mobile bottom navigation; everything else is
 // reachable through the "Menu" tab, which opens the full drawer.
@@ -256,6 +265,11 @@ export default function AppBarComponent() {
     allLinks.find((l) => isActive(l.href))?.label ?? "Dashboard";
 
   const initials = getInitials(user?.name);
+  const menuLinks = isGuildRole(user?.role)
+    ? [...mainLinks, guildLink]
+    : mainLinks;
+  // Guildmembers are view-only: no support tickets.
+  const canUseSupport = !isReadOnlyRole(user?.role);
 
   /** "Invoices" unpaid counter - soft amber pill (guide: amber = attention). */
   const countChip = () => (
@@ -419,7 +433,7 @@ export default function AppBarComponent() {
   }) => (
     <>
       {navLabel("Menu", true)}
-      {mainLinks.map((l) => navItem(l, opts))}
+      {menuLinks.map((l) => navItem(l, opts))}
       {navLabel("Market & tools")}
       {toolLinks.map((l) => navItem(l, opts))}
     </>
@@ -557,78 +571,80 @@ export default function AppBarComponent() {
         {/* RM card + support button + footer */}
         <Box sx={{ mt: "auto", pt: "14px", [SHORT]: { pt: "10px" } }}>
           <RelationshipManagerCard compact />
-          <ButtonBase
-            component={Link}
-            href="/support"
-            aria-current={isActive("/support") ? "page" : undefined}
-            onClick={() => trackTab("/support", "Support")}
-            sx={{
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-              width: "calc(100% - 8px)",
-              minHeight: 44,
-              m: "0 4px 12px",
-              pl: "8px",
-              pr: "10px",
-              py: "6px",
-              [SHORT]: { mb: "8px", minHeight: 40 },
-              fontFamily: fonts.body,
-              fontSize: 12.5,
-              fontWeight: 650,
-              lineHeight: 1.25,
-              textAlign: "left",
-              color: d.action,
-              bgcolor: d.skySoft,
-              border: `1px solid ${d.borderSky}`,
-              borderRadius: "10px",
-              transition: "border-color .15s, box-shadow .15s",
-              "&:hover": {
-                borderColor: d.action,
-                boxShadow: "0 2px 8px rgba(20, 90, 140, .08)",
-                "& .support-arrow": { transform: "translateX(3px)" },
-              },
-              "&:focus-visible": focusRing(d.action),
-            }}
-          >
-            <Box
-              aria-hidden
+          {canUseSupport && (
+            <ButtonBase
+              component={Link}
+              href="/support"
+              aria-current={isActive("/support") ? "page" : undefined}
+              onClick={() => trackTab("/support", "Support")}
               sx={{
-                display: "grid",
-                placeItems: "center",
-                flexShrink: 0,
-                width: 26,
-                height: 26,
-                borderRadius: "8px",
-                bgcolor: d.surface,
-                "& > svg": { fontSize: 17 },
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                width: "calc(100% - 8px)",
+                minHeight: 44,
+                m: "0 4px 12px",
+                pl: "8px",
+                pr: "10px",
+                py: "6px",
+                [SHORT]: { mb: "8px", minHeight: 40 },
+                fontFamily: fonts.body,
+                fontSize: 12.5,
+                fontWeight: 650,
+                lineHeight: 1.25,
+                textAlign: "left",
+                color: d.action,
+                bgcolor: d.skySoft,
+                border: `1px solid ${d.borderSky}`,
+                borderRadius: "10px",
+                transition: "border-color .15s, box-shadow .15s",
+                "&:hover": {
+                  borderColor: d.action,
+                  boxShadow: "0 2px 8px rgba(20, 90, 140, .08)",
+                  "& .support-arrow": { transform: "translateX(3px)" },
+                },
+                "&:focus-visible": focusRing(d.action),
               }}
             >
-              <SupportAgentOutlinedIcon />
-            </Box>
-            <Box
-              component="span"
-              sx={{
-                flex: 1,
-                minWidth: 0,
-                // Wraps onto a second line on narrow sidebars rather than
-                // cutting the label off.
-                overflowWrap: "break-word",
-              }}
-            >
-              Contact support
-            </Box>
-            <ChevronRightRoundedIcon
-              className="support-arrow"
-              aria-hidden
-              sx={{
-                fontSize: 18,
-                flexShrink: 0,
-                transition: "transform .15s",
-                [MQ.compact]: { display: "none" },
-              }}
-            />
-          </ButtonBase>
+              <Box
+                aria-hidden
+                sx={{
+                  display: "grid",
+                  placeItems: "center",
+                  flexShrink: 0,
+                  width: 26,
+                  height: 26,
+                  borderRadius: "8px",
+                  bgcolor: d.surface,
+                  "& > svg": { fontSize: 17 },
+                }}
+              >
+                <SupportAgentOutlinedIcon />
+              </Box>
+              <Box
+                component="span"
+                sx={{
+                  flex: 1,
+                  minWidth: 0,
+                  // Wraps onto a second line on narrow sidebars rather than
+                  // cutting the label off.
+                  overflowWrap: "break-word",
+                }}
+              >
+                Contact support
+              </Box>
+              <ChevronRightRoundedIcon
+                className="support-arrow"
+                aria-hidden
+                sx={{
+                  fontSize: 18,
+                  flexShrink: 0,
+                  transition: "transform .15s",
+                  [MQ.compact]: { display: "none" },
+                }}
+              />
+            </ButtonBase>
+          )}
           <Box sx={{ px: "12px", fontSize: 10, color: d.muted }}>
             © {new Date().getFullYear()} BitFactory
           </Box>
@@ -838,9 +854,11 @@ export default function AppBarComponent() {
             >
               Security Settings
             </MenuItem>
-            <MenuItem component={Link} href="/support" onClick={handleClose}>
-              Support
-            </MenuItem>
+            {canUseSupport && (
+              <MenuItem component={Link} href="/support" onClick={handleClose}>
+                Support
+              </MenuItem>
+            )}
             <MenuItem
               onClick={handleLogout}
               disabled={isLoggingOut}

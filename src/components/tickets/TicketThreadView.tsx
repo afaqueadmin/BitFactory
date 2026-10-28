@@ -42,7 +42,9 @@ interface TicketThreadViewProps {
     | "ACCOUNTING"
     | "CLIENT"
     | "FRANCHISEE"
-    | "SIMULATED";
+    | "SIMULATED"
+    | "GUILDMASTER"
+    | "GUILDMEMBER";
   /** Extra content rendered above the thread (e.g. an assignment control, admin-only). */
   headerExtra?: React.ReactNode;
   daylight?: boolean;

@@ -125,6 +125,21 @@ model User {
   simulatedCostPaymentsCreated            SimulatedCostPayment[]          @relation("simulatedCostPaymentsCreated")
   walletPaymentEmails                     WalletPaymentEmail[]
   simulationSettingsUpdated               SimulationSettings[]            @relation("simulationSettingsUpdated")
+  guildMastered                           Guild?                          @relation("guildsMastered")
+  guildsCreated                           Guild[]                         @relation("guildsCreated")
+  guildMembership                         GuildMembership?                @relation("guildMembership")
+  guildWalletRequests                     GuildWalletChangeRequest[]      @relation("guildWalletRequests")
+  guildWalletRequestsConfirmed            GuildWalletChangeRequest[]      @relation("guildWalletRequestsConfirmed")
+  guildWalletRequestsReviewed             GuildWalletChangeRequest[]      @relation("guildWalletRequestsReviewed")
+  guildSplitRequests                      GuildSplitChangeRequest[]       @relation("guildSplitRequests")
+  guildSplitRequestsConfirmed             GuildSplitChangeRequest[]       @relation("guildSplitRequestsConfirmed")
+  guildSplitRequestsReviewed              GuildSplitChangeRequest[]       @relation("guildSplitRequestsReviewed")
+  guildMemberRequests                     GuildMemberChangeRequest[]      @relation("guildMemberRequests")
+  guildMemberRequestsConfirmed            GuildMemberChangeRequest[]      @relation("guildMemberRequestsConfirmed")
+  guildMemberRequestsReviewed             GuildMemberChangeRequest[]      @relation("guildMemberRequestsReviewed")
+  guildPayoutBatchesCreated               GuildPayoutBatch[]              @relation("guildPayoutBatchesCreated")
+  guildPayoutSettingsUpdated              GuildPayoutSettings[]           @relation("guildPayoutSettingsUpdated")
+  guildDistributionLines                  GuildDistributionLine[]         @relation("guildDistributionLines")
 
   @@index([isDeleted])
   @@index([franchiseeId])
@@ -385,6 +400,413 @@ model SecondaryLoginRequest {
   @@index([userId])
   @@index([status])
   @@map("secondary_login_requests")
+}
+
+// ============================================================================
+// Guilds: a group that jointly owns the miners in one Luxor subaccount. The
+// Guildmaster is the point of contact; Guildmembers have view-only access to
+// the whole guild. ("Guild", not "pool" - pool means Luxor/Braiins here.)
+//
+// The guild's miners, subaccount, invoices and ledger sit on the current
+// Guildmaster's account so billing stays per-user; a handover moves them all
+// to the new Guildmaster (src/lib/guilds/handover.ts). Luxor pays the guild's
+// reward monthly to a Higgs wallet; GuildDistribution records how each payout
+// is split (src/lib/guilds/distribution.ts).
+// ============================================================================
+
+model Guild {
+  id                   String                     @id @default(cuid())
+  name                 String
+  guildmasterId        String                     @unique
+  guildmaster          User                       @relation("guildsMastered", fields: [guildmasterId], references: [id])
+  /// The guild's Luxor subaccount (a PoolAuth on the Guildmaster's account).
+  poolAuthId           String?                    @unique
+  poolAuth             PoolAuth?                  @relation(fields: [poolAuthId], references: [id], onDelete: SetNull)
+  isActive             Boolean                    @default(true)
+  /// When an approved split change last took effect - distributions wait
+  /// out the 24h freeze after it.
+  splitUpdatedAt       DateTime?
+  /// The guild's own receiving address - set as its Luxor subaccount's
+  /// payout address. Typed in by an admin for now; derived from the payout
+  /// wallet (payoutAddressIndex) once multisig payouts are live.
+  payoutAddress        String?                    @unique
+  payoutAddressIndex   Int?                       @unique
+  /// How this guild is paid; null = GuildPayoutSettings.defaultPayoutMethod.
+  /// Lets a new method be trialled on one guild.
+  payoutMethod         GuildPayoutMethod?
+  createdById          String
+  createdBy            User                       @relation("guildsCreated", fields: [createdById], references: [id])
+  createdAt            DateTime                   @default(now())
+  updatedAt            DateTime                   @updatedAt
+  deletedAt            DateTime?
+  memberships          GuildMembership[]
+  walletChangeRequests GuildWalletChangeRequest[]
+  splitChangeRequests  GuildSplitChangeRequest[]
+  memberChangeRequests GuildMemberChangeRequest[]
+  distributions        GuildDistribution[]
+
+  @@index([isActive])
+  @@map("guilds")
+}
+
+// One row per person in a guild, the Guildmaster included, so the reward
+// split and wallets live in one place. Active rows (leftAt null) sum to 100%.
+// userId is unique: a person belongs to at most one guild, ever.
+model GuildMembership {
+  id                 String                         @id @default(cuid())
+  guildId            String
+  guild              Guild                          @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  userId             String                         @unique
+  user               User                           @relation("guildMembership", fields: [userId], references: [id])
+  isGuildmaster      Boolean                        @default(false)
+  rewardPercent      Decimal                        @db.Decimal(7, 4)
+  /// Where this person's share is sent. Saved here, not on Luxor - Luxor
+  /// pays the whole guild reward to a Higgs wallet.
+  walletAddress      String?
+  /// Which chain walletAddress is on (src/lib/guilds/walletNetworks.ts).
+  /// Only "BTC" today; a string so another chain needs no schema change.
+  walletNetwork      String                         @default("BTC")
+  /// When an approved wallet change last took effect (24h freeze).
+  walletUpdatedAt    DateTime?
+  /// Earned but not yet sent: small shares wait until they reach
+  /// GuildPayoutSettings.minPayoutSats, and a share is held back while its
+  /// wallet is missing or in its 24h freeze. Updated when a payout settles.
+  carriedBtc         Decimal                        @default(0) @db.Decimal(20, 8)
+  joinedAt           DateTime                       @default(now())
+  leftAt             DateTime?
+  walletRequests     GuildWalletChangeRequest[]
+  splitRequestLines  GuildSplitChangeRequestLine[]
+  memberRequests     GuildMemberChangeRequest[]     @relation("guildMemberRequestTarget")
+  memberRequestAdded GuildMemberChangeRequest?      @relation("guildMemberRequestCreated")
+  memberRequestLines GuildMemberChangeRequestLine[]
+  distributionLines  GuildDistributionLine[]
+
+  @@index([guildId])
+  @@map("guild_memberships")
+}
+
+// The Guildmaster's request to change one member's (or their own) reward
+// wallet. Same confirm -> approve review as WalletChangeRequest; approval
+// writes the wallet to GuildMembership and starts its 24h freeze.
+model GuildWalletChangeRequest {
+  id                   String          @id @default(cuid())
+  guildId              String
+  guild                Guild           @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  membershipId         String
+  membership           GuildMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  requestedById        String
+  requestedBy          User            @relation("guildWalletRequests", fields: [requestedById], references: [id])
+  /// Who submitted it - see WalletChangeRequest.requestedByEmail.
+  requestedByEmail     String?
+  requestedBySecondary Boolean         @default(false)
+  network              String          @default("BTC")
+  currentAddress       String?
+  requestedAddress     String
+  reason               String?         @db.Text
+  status               RequestStatus   @default(PENDING)
+  rejectionReason      String?
+  confirmedById        String?
+  confirmedBy          User?           @relation("guildWalletRequestsConfirmed", fields: [confirmedById], references: [id])
+  confirmedAt          DateTime?
+  confirmationMethod   String?
+  confirmationContact  String?
+  confirmationNote     String?         @db.Text
+  reviewedById         String?
+  reviewedBy           User?           @relation("guildWalletRequestsReviewed", fields: [reviewedById], references: [id])
+  reviewedAt           DateTime?
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+
+  @@index([guildId])
+  @@index([membershipId])
+  @@index([status])
+  @@map("guild_wallet_change_requests")
+}
+
+// The Guildmaster's request for a new reward split: one line per active
+// member (themselves included), requested percentages summing to 100.
+// Same confirm -> approve review; approval writes every line's percent.
+model GuildSplitChangeRequest {
+  id                   String                        @id @default(cuid())
+  guildId              String
+  guild                Guild                         @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  requestedById        String
+  requestedBy          User                          @relation("guildSplitRequests", fields: [requestedById], references: [id])
+  requestedByEmail     String?
+  requestedBySecondary Boolean                       @default(false)
+  reason               String?                       @db.Text
+  status               RequestStatus                 @default(PENDING)
+  rejectionReason      String?
+  confirmedById        String?
+  confirmedBy          User?                         @relation("guildSplitRequestsConfirmed", fields: [confirmedById], references: [id])
+  confirmedAt          DateTime?
+  confirmationMethod   String?
+  confirmationContact  String?
+  confirmationNote     String?                       @db.Text
+  reviewedById         String?
+  reviewedBy           User?                         @relation("guildSplitRequestsReviewed", fields: [reviewedById], references: [id])
+  reviewedAt           DateTime?
+  createdAt            DateTime                      @default(now())
+  updatedAt            DateTime                      @updatedAt
+  lines                GuildSplitChangeRequestLine[]
+
+  @@index([guildId])
+  @@index([status])
+  @@map("guild_split_change_requests")
+}
+
+model GuildSplitChangeRequestLine {
+  id               String                  @id @default(cuid())
+  requestId        String
+  request          GuildSplitChangeRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  membershipId     String
+  membership       GuildMembership         @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  currentPercent   Decimal                 @db.Decimal(7, 4)
+  requestedPercent Decimal                 @db.Decimal(7, 4)
+
+  @@unique([requestId, membershipId])
+  @@index([membershipId])
+  @@map("guild_split_change_request_lines")
+}
+
+// The Guildmaster's request to add a member (with their reward %) or remove
+// one. lines give the new split for everyone who stays (every active member
+// for ADD; everyone but the leaver for REMOVE), summing to 100 with the new
+// person's percent. Same confirm -> approve review as the other guild
+// requests; the account is created (and its welcome email sent) or closed
+// only on approval (src/lib/guilds/members.ts).
+model GuildMemberChangeRequest {
+  id                   String                         @id @default(cuid())
+  guildId              String
+  guild                Guild                          @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  action               GuildMemberChangeAction
+  /// ADD: the person to add.
+  newName              String?
+  newEmail             String?
+  newPhoneNumber       String?
+  newPercent           Decimal?                       @db.Decimal(7, 4)
+  newWalletAddress     String?
+  newWalletNetwork     String                         @default("BTC")
+  /// ADD: the membership created on approval.
+  createdMembershipId  String?                        @unique
+  createdMembership    GuildMembership?               @relation("guildMemberRequestCreated", fields: [createdMembershipId], references: [id], onDelete: SetNull)
+  /// REMOVE: the member leaving.
+  membershipId         String?
+  membership           GuildMembership?               @relation("guildMemberRequestTarget", fields: [membershipId], references: [id], onDelete: Cascade)
+  requestedById        String
+  requestedBy          User                           @relation("guildMemberRequests", fields: [requestedById], references: [id])
+  requestedByEmail     String?
+  requestedBySecondary Boolean                        @default(false)
+  reason               String?                        @db.Text
+  status               RequestStatus                  @default(PENDING)
+  rejectionReason      String?
+  confirmedById        String?
+  confirmedBy          User?                          @relation("guildMemberRequestsConfirmed", fields: [confirmedById], references: [id])
+  confirmedAt          DateTime?
+  confirmationMethod   String?
+  confirmationContact  String?
+  confirmationNote     String?                        @db.Text
+  reviewedById         String?
+  reviewedBy           User?                          @relation("guildMemberRequestsReviewed", fields: [reviewedById], references: [id])
+  reviewedAt           DateTime?
+  createdAt            DateTime                       @default(now())
+  updatedAt            DateTime                       @updatedAt
+  lines                GuildMemberChangeRequestLine[]
+
+  @@index([guildId])
+  @@index([membershipId])
+  @@index([status])
+  @@map("guild_member_change_requests")
+}
+
+model GuildMemberChangeRequestLine {
+  id               String                   @id @default(cuid())
+  requestId        String
+  request          GuildMemberChangeRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  membershipId     String
+  membership       GuildMembership          @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  currentPercent   Decimal                  @db.Decimal(7, 4)
+  requestedPercent Decimal                  @db.Decimal(7, 4)
+
+  @@unique([requestId, membershipId])
+  @@index([membershipId])
+  @@map("guild_member_change_request_lines")
+}
+
+enum GuildMemberChangeAction {
+  ADD
+  REMOVE
+}
+
+enum GuildDistributionStatus {
+  /// Calculated and ready to send.
+  CALCULATED
+  /// Can't be sent as it stands (bad split, split freeze, received amount
+  /// doesn't match Luxor) - see holdReason.
+  HELD
+  /// Picked up by a payout batch that hasn't been sent yet.
+  QUEUED
+  /// Sent, waiting for enough confirmations.
+  BROADCAST
+  /// Confirmed: hosting payments recorded, members paid, carried updated.
+  SETTLED
+  FAILED
+}
+
+enum GuildPayoutMethod {
+  /// An admin sends the BTC and records the reference.
+  MANUAL
+  /// The app builds and broadcasts a 2-of-3 multisig batch (Phase 2b).
+  MULTISIG_BTC
+}
+
+enum GuildFeePayer {
+  /// Out of the company output; hosting invoices are still credited in full.
+  HIGGS
+  /// Out of the company output, and the hosting credit is reduced by it.
+  HOSTING_SHARE
+  /// Out of the guild's reward before the split.
+  GUILD_REWARD
+}
+
+enum GuildPayoutBatchStatus {
+  BUILDING
+  BROADCAST
+  CONFIRMED
+  FAILED
+}
+
+/// Payout settings for every guild. One row (id = 1).
+model GuildPayoutSettings {
+  id                   Int               @id @default(1)
+  feePayer             GuildFeePayer     @default(HIGGS)
+  /// A member's payable amount below this stays carried.
+  minPayoutSats        Int               @default(10000)
+  minConfirmations     Int               @default(3)
+  defaultPayoutMethod  GuildPayoutMethod @default(MANUAL)
+  /// Send automatically once calculated (multisig only).
+  autoExecute          Boolean           @default(false)
+  /// Where the hosting (company) share goes.
+  companyWalletAddress String?
+  /// Public descriptor of the 2-of-3 payout wallet - watch-only, no keys.
+  walletDescriptor     String?
+  network              String            @default("mainnet")
+  /// Next derivation index for a guild receiving address.
+  nextAddressIndex     Int               @default(0)
+  updatedById          String?
+  updatedBy            User?             @relation("guildPayoutSettingsUpdated", fields: [updatedById], references: [id])
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+
+  @@map("guild_payout_settings")
+}
+
+// One payout run: a single transfer (one Bitcoin transaction in multisig
+// mode, or what an admin sent by hand) covering one or more guilds'
+// distributions.
+model GuildPayoutBatch {
+  id            String                 @id @default(cuid())
+  method        GuildPayoutMethod
+  status        GuildPayoutBatchStatus @default(BUILDING)
+  /// The Bitcoin transaction id; in manual mode, the reference the admin
+  /// recorded.
+  txid          String?                @unique
+  feeBtc        Decimal                @default(0) @db.Decimal(20, 8)
+  feeRateSatVb  Decimal?               @db.Decimal(10, 2)
+  confirmations Int                    @default(0)
+  companyBtc    Decimal                @db.Decimal(20, 8)
+  paidBtc       Decimal                @db.Decimal(20, 8)
+  error         String?
+  createdById   String?
+  createdBy     User?                  @relation("guildPayoutBatchesCreated", fields: [createdById], references: [id])
+  broadcastAt   DateTime?
+  confirmedAt   DateTime?
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+  distributions GuildDistribution[]
+
+  @@index([status])
+  @@map("guild_payout_batches")
+}
+
+// One monthly Luxor payout to a guild and how it is split: the hosting
+// invoices it pays (company share) and each person's share of the rest.
+// Amounts and wallets are snapshots taken when it was calculated.
+model GuildDistribution {
+  id                  String                  @id @default(cuid())
+  guildId             String
+  guild               Guild                   @relation(fields: [guildId], references: [id], onDelete: Restrict)
+  /// The month the reward was earned (first day, UTC). Luxor pays it early
+  /// the following month.
+  rewardMonth         DateTime                @db.Date
+  /// The Luxor "Payment" debit this splits.
+  payoutTransactionId String?                 @unique
+  payoutTransaction   PoolTransaction?        @relation(fields: [payoutTransactionId], references: [id], onDelete: SetNull)
+  payoutOccurredAt    DateTime
+  luxorPayoutBtc      Decimal                 @db.Decimal(20, 8)
+  /// The coin that payout left at the guild's address (multisig mode).
+  receivedTxid        String?
+  receivedVout        Int?
+  receivedBtc         Decimal?                @db.Decimal(20, 8)
+  btcUsdRate          Decimal                 @db.Decimal(12, 2)
+  rateSource          String
+  /// Unpaid guild hosting invoices at calculation time, USD.
+  hostingDueUsd       Decimal                 @db.Decimal(12, 2)
+  companyBtc          Decimal                 @db.Decimal(20, 8)
+  companyUsd          Decimal                 @db.Decimal(12, 2)
+  netBtc              Decimal                 @db.Decimal(20, 8)
+  /// This guild's part of the payout transaction's network fee.
+  networkFeeBtc       Decimal                 @default(0) @db.Decimal(20, 8)
+  /// Hosting left unpaid after this payout, USD (0 when fully covered).
+  shortfallUsd        Decimal                 @default(0) @db.Decimal(12, 2)
+  /// [{ invoiceId, invoiceNumber, amountUsd }] - which invoices companyUsd pays.
+  hostingAllocations  Json
+  status              GuildDistributionStatus @default(CALCULATED)
+  holdReason          String?
+  shortfallNotifiedAt DateTime?
+  payoutBatchId       String?
+  payoutBatch         GuildPayoutBatch?       @relation(fields: [payoutBatchId], references: [id], onDelete: SetNull)
+  settledAt           DateTime?
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+  lines               GuildDistributionLine[]
+
+  @@unique([guildId, rewardMonth])
+  @@unique([receivedTxid, receivedVout])
+  @@index([status])
+  @@index([payoutBatchId])
+  @@map("guild_distributions")
+}
+
+model GuildDistributionLine {
+  id              String            @id @default(cuid())
+  distributionId  String
+  distribution    GuildDistribution @relation(fields: [distributionId], references: [id], onDelete: Cascade)
+  membershipId    String
+  membership      GuildMembership   @relation(fields: [membershipId], references: [id], onDelete: Restrict)
+  userId          String
+  user            User              @relation("guildDistributionLines", fields: [userId], references: [id])
+  nameSnapshot    String
+  isGuildmaster   Boolean
+  percentSnapshot Decimal           @db.Decimal(7, 4)
+  walletSnapshot  String?
+  networkSnapshot String            @default("BTC")
+  /// This month's share of the reward.
+  btcAmount       Decimal           @db.Decimal(20, 8)
+  /// Carried from earlier months, added to this month's share.
+  carriedInBtc    Decimal           @default(0) @db.Decimal(20, 8)
+  /// Actually sent this month (share + carried in, or 0 if carried).
+  paidBtc         Decimal           @default(0) @db.Decimal(20, 8)
+  /// Carried to next month.
+  carriedOutBtc   Decimal           @default(0) @db.Decimal(20, 8)
+  /// Why it was carried (below the minimum, no wallet, wallet freeze).
+  carryReason     String?
+  /// This member's output in the payout transaction (multisig mode).
+  payoutVout      Int?
+
+  @@unique([distributionId, membershipId])
+  @@index([userId])
+  @@map("guild_distribution_lines")
 }
 
 model TokenBlacklist {
@@ -725,6 +1147,7 @@ model PoolAuth {
   user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   groupSubaccounts GroupSubaccount[]
   poolSubaccounts  PoolSubaccount[]
+  guild            Guild?
 
   // One subaccount/token belongs to exactly one user per pool. A user can
   // still hold several rows per pool (multiple Luxor subaccounts).
@@ -852,8 +1275,9 @@ model PoolTransaction {
 
   createdAt DateTime @default(now())
 
-  pool           Pool           @relation(fields: [poolId], references: [id], onDelete: Cascade)
-  poolSubaccount PoolSubaccount @relation(fields: [poolSubaccountId], references: [id], onDelete: Cascade)
+  pool              Pool               @relation(fields: [poolId], references: [id], onDelete: Cascade)
+  poolSubaccount    PoolSubaccount     @relation(fields: [poolSubaccountId], references: [id], onDelete: Cascade)
+  guildDistribution GuildDistribution?
 
   @@unique([poolSubaccountId, occurredAt, category, transactionType, amount])
   @@index([poolId])
@@ -1775,6 +2199,13 @@ enum Role {
   SIMULATED
   /// Staff account with the same privileges as ADMIN (src/lib/auth/staffRoles).
   ACCOUNTING
+  /// Point of contact for a Guild: treated like a CLIENT (the guild's miners,
+  /// subaccount and invoices sit on this account) but changes reward wallets
+  /// and the split only through guild requests (src/lib/guilds).
+  GUILDMASTER
+  /// View-only member of a Guild: sees the Guildmaster's (the guild's) data,
+  /// can't change anything but their own login security.
+  GUILDMEMBER
 }
 
 enum Segment {
@@ -1784,6 +2215,9 @@ enum Segment {
   FRANCHISEE
   RETAIL
   POTENTIAL_CUSTOMER
+  /// A Guild's Guildmaster (the guild's billed account). Guildmembers have
+  /// no segment, like simulated accounts.
+  GUILDMASTER
 }
 
 enum PaymentType {
@@ -1974,6 +2408,31 @@ enum AuditAction {
   MINER_RESTARTED
   SECONDARY_LOGIN_REQUESTED
   SECONDARY_LOGIN_REQUEST_REJECTED
+  GUILD_CREATED
+  GUILD_UPDATED
+  GUILD_MEMBER_ADDED
+  GUILD_MEMBER_REMOVED
+  GUILD_HANDOVER
+  GUILD_WALLET_CHANGE_REQUESTED
+  GUILD_WALLET_CHANGE_CONFIRMED
+  GUILD_WALLET_CHANGE_APPROVED
+  GUILD_WALLET_CHANGE_REJECTED
+  GUILD_SPLIT_CHANGE_REQUESTED
+  GUILD_SPLIT_CHANGE_CONFIRMED
+  GUILD_SPLIT_CHANGE_APPROVED
+  GUILD_SPLIT_CHANGE_REJECTED
+  GUILD_MEMBER_ADD_REQUESTED
+  GUILD_MEMBER_ADD_CONFIRMED
+  GUILD_MEMBER_ADD_APPROVED
+  GUILD_MEMBER_ADD_REJECTED
+  GUILD_MEMBER_REMOVE_REQUESTED
+  GUILD_MEMBER_REMOVE_CONFIRMED
+  GUILD_MEMBER_REMOVE_APPROVED
+  GUILD_MEMBER_REMOVE_REJECTED
+  GUILD_DISTRIBUTION_CALCULATED
+  GUILD_DISTRIBUTION_SETTLED
+  GUILD_PAYOUT_SETTINGS_UPDATED
+  GUILD_PAYOUT_BATCH_CREATED
 }
 
 enum NotificationType {

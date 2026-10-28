@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
 import { isCustomerRole } from "@/lib/customerRoles";
+import { resolveDataOwnerId } from "@/lib/guildScope";
 import { generateMemoPDF, sendMemoEmail } from "@/lib/email";
 import { AuditAction, Memo, Prisma } from "@prisma/client";
 import { InvoiceEmailService } from "@/services/invoiceEmailService";
@@ -52,7 +53,8 @@ export async function GET(request: NextRequest) {
     let userRole: string;
     try {
       const decoded = await verifyJwtToken(token);
-      userId = decoded.userId;
+      // A Guildmember sees the guild's (the Guildmaster's) memos.
+      userId = await resolveDataOwnerId(decoded);
       userRole = decoded.role;
     } catch (error) {
       console.error("[Memos] Token verification failed:", error);
