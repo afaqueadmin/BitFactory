@@ -811,6 +811,7 @@ function PayoutSettingsCard() {
           onChange={(e) =>
             setForm({ ...form, companyWalletAddress: e.target.value })
           }
+          helperText="One wallet for all guilds. Receives the part of each guild's reward that pays its hosting invoice; it's the first line when you send payouts. Not the guild receiving address (that's set per guild, on Luxor)."
           sx={ds.inputSx}
         />
         <TextField

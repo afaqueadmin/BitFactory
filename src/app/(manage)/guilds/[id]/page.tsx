@@ -1119,7 +1119,7 @@ function PayoutSetup({
           label="Guild receiving address"
           value={address}
           onChange={(e) => setAddress(e.target.value)}
-          helperText="Set this as the payout address of the guild's Luxor subaccount. Luxor pays it monthly."
+          helperText="This guild's own address: set it as the payout address of its Luxor subaccount, and Luxor pays the whole monthly reward here. From it you send the hosting share to the company wallet (Payout settings on Guilds) and each member's share to their wallet."
           sx={ds.inputSx}
         />
         <Button
