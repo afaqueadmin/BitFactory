@@ -13,7 +13,7 @@
  * The current bucket is truncated at "now"; older buckets are whole.
  */
 
-export const PERIODS = ["1D", "1W", "1M", "3M", "1Y", "ALL"] as const;
+export const PERIODS = ["1D", "1W", "1M", "3M", "YTD", "ALL"] as const;
 export type Period = (typeof PERIODS)[number];
 
 export type TickSize = "5m" | "1h" | "1d";
@@ -81,7 +81,7 @@ export function bucketWindow(
       bucketEnd = new Date(start.getFullYear(), start.getMonth() + 3, 1);
       break;
     }
-    case "1Y": {
+    case "YTD": {
       start = new Date(now.getFullYear() - offset, 0, 1);
       bucketEnd = new Date(start.getFullYear() + 1, 0, 1);
       break;
