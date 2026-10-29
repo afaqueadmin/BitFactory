@@ -26,6 +26,7 @@ import Link from "next/link";
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
 import { DateDisplay } from "@/components/accounting/common/DateDisplay";
 import { StatusBadge } from "@/components/accounting/common/StatusBadge";
+import { useUser } from "@/lib/hooks/useUser";
 import {
   VendorPaymentSection,
   VendorSideInvoice,
@@ -74,6 +75,10 @@ export default function HardwarePurchaseDetailPage() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [openCancelDialog, setOpenCancelDialog] = useState(false);
   const [cancelLoading, setCancelLoading] = useState(false);
+  const [openUnpaidDialog, setOpenUnpaidDialog] = useState(false);
+  const [unpaidLoading, setUnpaidLoading] = useState(false);
+  const { user } = useUser();
+  const isSuperAdmin = user?.role === "SUPER_ADMIN";
 
   // Fetch invoice details
   useEffect(() => {
@@ -149,6 +154,41 @@ export default function HardwarePurchaseDetailPage() {
       setError(err instanceof Error ? err.message : "Failed to cancel invoice");
     } finally {
       setCancelLoading(false);
+    }
+  };
+
+  // Revert a Paid invoice to Pending and remove its payment (SUPER_ADMIN only)
+  const handleMarkUnpaid = async () => {
+    setUnpaidLoading(true);
+    setError(null);
+    setSuccessMessage(null);
+
+    try {
+      const response = await fetch(
+        `/api/hardware-purchases/${invoiceId}/mark-unpaid`,
+        {
+          method: "POST",
+        },
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        setError(errorData.error || "Failed to mark invoice as unpaid");
+        setOpenUnpaidDialog(false);
+        return;
+      }
+
+      const data = await response.json();
+      setInvoice(data.data);
+      setSuccessMessage("Invoice marked as unpaid successfully!");
+      setOpenUnpaidDialog(false);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to mark invoice as unpaid",
+      );
+      setOpenUnpaidDialog(false);
+    } finally {
+      setUnpaidLoading(false);
     }
   };
 
@@ -584,6 +624,18 @@ export default function HardwarePurchaseDetailPage() {
                   }
                   onCancelClick={() => setOpenCancelDialog(true)}
                 />
+
+                {isSuperAdmin && invoice.paymentStatus === "Paid" && (
+                  <Button
+                    variant="outlined"
+                    color="warning"
+                    fullWidth
+                    sx={{ mt: 2 }}
+                    onClick={() => setOpenUnpaidDialog(true)}
+                  >
+                    Mark as Unpaid
+                  </Button>
+                )}
               </Box>
             )}
 
@@ -626,6 +678,38 @@ export default function HardwarePurchaseDetailPage() {
               }
             >
               {cancelLoading ? "Cancelling..." : "Cancel Invoice"}
+            </Button>
+          </DialogActions>
+        </Dialog>
+        {/* Mark as Unpaid Confirmation Dialog */}
+        <Dialog
+          open={openUnpaidDialog}
+          onClose={() => setOpenUnpaidDialog(false)}
+        >
+          <DialogTitle>Mark Invoice as Unpaid</DialogTitle>
+          <DialogContent>
+            <DialogContentText>
+              Are you sure you want to mark invoice{" "}
+              <strong>{invoice.invoiceNumber}</strong> as unpaid? The status
+              will be changed back to Pending, its paid date and receipt will be
+              cleared and the recorded payment will be removed.
+            </DialogContentText>
+          </DialogContent>
+          <DialogActions>
+            <Button
+              onClick={() => setOpenUnpaidDialog(false)}
+              disabled={unpaidLoading}
+            >
+              Keep as Paid
+            </Button>
+            <Button
+              onClick={handleMarkUnpaid}
+              color="warning"
+              variant="contained"
+              disabled={unpaidLoading}
+              startIcon={unpaidLoading ? <CircularProgress size={20} /> : null}
+            >
+              {unpaidLoading ? "Updating..." : "Mark as Unpaid"}
             </Button>
           </DialogActions>
         </Dialog>
