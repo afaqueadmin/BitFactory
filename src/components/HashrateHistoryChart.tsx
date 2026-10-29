@@ -348,6 +348,38 @@ export default function HashrateHistoryChart({
   }, [chartData, showLuxorLine, showBraiinsLine]);
 
   /**
+   * Summary card values for the whole selected window. Each is a mean over
+   * that series' own non-null rows, so rows carrying only another series
+   * (uptime's daily rows among hourly hashrate, or today's partial-day point
+   * that has no uptime yet) don't drag it down or blank it.
+   */
+  const summary = useMemo(() => {
+    const mean = (values: (number | null)[]) => {
+      const present = values.filter((v): v is number => v != null);
+      return present.length
+        ? present.reduce((sum, v) => sum + v, 0) / present.length
+        : null;
+    };
+    const peak = Math.max(
+      0,
+      ...chartData.flatMap((r) => [r.luxor || 0, r.braiins || 0]),
+    );
+    // Averaged per pool, then summed, so the total-mode figure is the
+    // combined average rather than a mix of the two pools' samples.
+    const avgHashrate =
+      (mean(chartData.map((r) => r.luxor)) ?? 0) +
+      (mean(chartData.map((r) => r.braiins)) ?? 0);
+    return {
+      peak,
+      avgHashrate,
+      avgEfficiency: mean(chartData.map((r) => r.efficiency)),
+      avgUptime: mean(chartData.map((r) => r.uptime)),
+    };
+  }, [chartData]);
+
+  const summaryCardCount = 2 + (hasEfficiency ? 1 : 0) + (hasUptime ? 1 : 0);
+
+  /**
    * The table lists every column the data supports; the legend toggle is a
    * chart control, so hiding a line there must not drop it from the table or
    * the CSV export. Hence its own availability-based single-series check.
@@ -956,14 +988,14 @@ export default function HashrateHistoryChart({
         </Box>
       )}
 
-      {/* Quick Summary KPIs for Hashrate and Efficiency */}
+      {/* Quick Summary KPIs: period peak and means of hashrate, efficiency, uptime */}
       {!isLoading && !isError && hasData && (
         <Box
           sx={{
             display: "grid",
             gridTemplateColumns: {
               xs: "1fr 1fr",
-              sm: hasPercentAxis ? "repeat(3, 1fr)" : "repeat(2, 1fr)",
+              sm: `repeat(${summaryCardCount}, 1fr)`,
             },
             gap: { xs: 1, sm: 1.5 },
             mb: { xs: 1.75, sm: 2 },
@@ -1006,12 +1038,7 @@ export default function HashrateHistoryChart({
                 ...(daylight && { fontFamily: fonts.body }),
               }}
             >
-              {(() => {
-                const maxVal = Math.max(
-                  ...chartData.flatMap((r) => [r.luxor || 0, r.braiins || 0]),
-                );
-                return `${(maxVal / unit.divisor).toFixed(2)} ${unit.label}`;
-              })()}
+              {`${(summary.peak / unit.divisor).toFixed(2)} ${unit.label}`}
             </Typography>
           </Box>
 
@@ -1037,57 +1064,54 @@ export default function HashrateHistoryChart({
                 ...(daylight && { fontFamily: fonts.body }),
               }}
             >
-              {(() => {
-                // Averaged per pool over its own non-null samples, then
-                // summed — a row missing one pool's tick (e.g. Braiins'
-                // daily point sharing rows with Luxor's 5-minute ticks)
-                // must not zero-fill and drag that pool's average down.
-                const mean = (values: number[]) =>
-                  values.length
-                    ? values.reduce((sum, v) => sum + v, 0) / values.length
-                    : 0;
-                const luxorAvg = mean(
-                  chartData
-                    .map((r) => r.luxor)
-                    .filter((v): v is number => v != null),
-                );
-                const braiinsAvg = mean(
-                  chartData
-                    .map((r) => r.braiins)
-                    .filter((v): v is number => v != null),
-                );
-                const val = luxorAvg + braiinsAvg;
-                return `${(val / unit.divisor).toFixed(2)} ${unit.label}`;
-              })()}
+              {`${(summary.avgHashrate / unit.divisor).toFixed(2)} ${unit.label}`}
             </Typography>
           </Box>
 
-          {hasPercentAxis && (
-            <Box sx={{ display: { xs: "none", sm: "block" } }}>
+          {(
+            [
+              hasEfficiency && {
+                label: "Shares Efficiency",
+                value: summary.avgEfficiency,
+                color: EFFICIENCY_COLOR,
+              },
+              hasUptime && {
+                label: "Uptime",
+                value: summary.avgUptime,
+                color: UPTIME_COLOR,
+              },
+            ].filter(Boolean) as {
+              label: string;
+              value: number | null;
+              color: string;
+            }[]
+          ).map((card) => (
+            <Box key={card.label}>
               <Typography
                 variant="caption"
                 color="text.secondary"
-                sx={{ fontSize: "0.75rem", fontWeight: 500, display: "block" }}
+                sx={{
+                  fontSize: { xs: "0.68rem", sm: "0.75rem" },
+                  fontWeight: 500,
+                  display: "block",
+                }}
               >
-                {hasEfficiency ? "Shares Efficiency" : "Uptime"}
+                {card.label}
               </Typography>
               <Typography
                 variant="body2"
                 sx={{
                   fontWeight: 700,
-                  fontSize: "0.95rem",
-                  color: hasEfficiency ? EFFICIENCY_COLOR : UPTIME_COLOR,
+                  fontSize: { xs: "0.85rem", sm: "0.95rem" },
+                  color: card.color,
                   mt: 0.25,
+                  ...(daylight && { fontFamily: fonts.body }),
                 }}
               >
-                {(() => {
-                  const latest = chartData[chartData.length - 1];
-                  const eff = latest?.efficiency ?? latest?.uptime;
-                  return eff != null ? `${eff.toFixed(2)} %` : "—";
-                })()}
+                {card.value != null ? `${card.value.toFixed(2)} %` : "—"}
               </Typography>
             </Box>
-          )}
+          ))}
         </Box>
       )}
 

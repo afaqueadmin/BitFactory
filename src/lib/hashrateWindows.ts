@@ -109,14 +109,39 @@ const preferredTick = (period: Period | null, spanDays: number): TickSize => {
 };
 
 /**
- * Max age (days) of a window START for each tick. Verified against Luxor:
- * a start_date exactly 7 days old was REJECTED for 5m, so these sit one day
- * inside the documented boundary.
+ * Exclusive age limit (days) of the start_date Luxor receives, per tick.
+ * Verified against Luxor: a start_date exactly 7 days old was REJECTED for
+ * 5m, so the documented 7/30-day windows are exclusive bounds.
  */
-const TICK_MAX_AGE_DAYS: Record<TickSize, number> = {
-  "5m": 6,
-  "1h": 29,
+const TICK_AGE_LIMIT_DAYS: Record<TickSize, number> = {
+  "5m": 7,
+  "1h": 30,
   "1d": Infinity,
+};
+
+/**
+ * Age in whole days of the start_date Luxor will actually be sent.
+ *
+ * The fetchers pad the window start back a day and truncate it to a UTC
+ * date (see fetchLuxorSeriesLive), and a local-midnight start for a GMT+
+ * viewer is already the previous UTC day. Measuring the raw window start
+ * instead under-counted by up to two days, so the live 1M view asked for
+ * 1h data 30 days back and Luxor rejected it.
+ */
+const requestedStartAgeDays = (window: Window, now: Date): number => {
+  const from = window.start < DATA_FLOOR ? DATA_FLOOR : window.start;
+  const padded = new Date(from.getTime() - DAY_MS);
+  const startUtcDay = Date.UTC(
+    padded.getUTCFullYear(),
+    padded.getUTCMonth(),
+    padded.getUTCDate(),
+  );
+  const todayUtcDay = Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate(),
+  );
+  return Math.round((todayUtcDay - startUtcDay) / DAY_MS);
 };
 
 /**
@@ -129,14 +154,14 @@ export function pickTick(
   now: Date = new Date(),
 ): { tick: TickSize; downgradedFrom?: TickSize } {
   const spanDays = (window.end.getTime() - window.start.getTime()) / DAY_MS;
-  const ageDays = (now.getTime() - window.start.getTime()) / DAY_MS;
+  const ageDays = requestedStartAgeDays(window, now);
 
   const preferred = preferredTick(period, spanDays);
   const order: TickSize[] = ["5m", "1h", "1d"];
   const startIndex = order.indexOf(preferred);
 
   for (let i = startIndex; i < order.length; i++) {
-    if (ageDays <= TICK_MAX_AGE_DAYS[order[i]]) {
+    if (ageDays < TICK_AGE_LIMIT_DAYS[order[i]]) {
       return {
         tick: order[i],
         downgradedFrom: i === startIndex ? undefined : preferred,
@@ -167,15 +192,15 @@ const preferredWorkerTick = (
 };
 
 /**
- * Max age (days) of a window START for the worker-level 1h tick. Verified
- * live 2026-08-17 by binary search: a start_date 92 days back still worked,
- * 93 days back was rejected with "The time range for 1h tick size must be
- * within the last 3 months" — one day inside that boundary, matching the
- * safety margin the subaccount-level table already uses.
+ * Exclusive age limit (days) of the worker-level start_date Luxor receives.
+ * Verified live 2026-08-17 by binary search: a start_date 92 days back still
+ * worked, 93 days back was rejected with "The time range for 1h tick size
+ * must be within the last 3 months". Kept one day inside that boundary,
+ * matching the safety margin used when this was first measured.
  */
-const WORKER_TICK_MAX_AGE_DAYS: Record<TickSize, number> = {
+const WORKER_TICK_AGE_LIMIT_DAYS: Record<TickSize, number> = {
   "5m": -1, // never selected for a worker; excluded from the fallback order
-  "1h": 91,
+  "1h": 92,
   "1d": Infinity,
 };
 
@@ -189,14 +214,14 @@ export function pickWorkerTick(
   now: Date = new Date(),
 ): { tick: TickSize; downgradedFrom?: TickSize } {
   const spanDays = (window.end.getTime() - window.start.getTime()) / DAY_MS;
-  const ageDays = (now.getTime() - window.start.getTime()) / DAY_MS;
+  const ageDays = requestedStartAgeDays(window, now);
 
   const preferred = preferredWorkerTick(period, spanDays);
   const order: TickSize[] = ["1h", "1d"];
   const startIndex = order.indexOf(preferred);
 
   for (let i = startIndex; i < order.length; i++) {
-    if (ageDays <= WORKER_TICK_MAX_AGE_DAYS[order[i]]) {
+    if (ageDays < WORKER_TICK_AGE_LIMIT_DAYS[order[i]]) {
       return {
         tick: order[i],
         downgradedFrom: i === startIndex ? undefined : preferred,

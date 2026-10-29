@@ -159,17 +159,6 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Cache the built payload. The live window's `end` moves continuously, so
-    // it is rounded down to the tick for the key — otherwise every poll would
-    // miss, and Luxor rate-limits.
-    const ttl = cacheTtlForTick(tick);
-    const roundedEnd = Math.floor(end.getTime() / (ttl * 1000)) * (ttl * 1000);
-    const cacheKey = `hashrate_history_${targetUserId}_${start.getTime()}_${roundedEnd}_${tick}`;
-    const cached = poolDataCache.get(cacheKey);
-    if (cached) {
-      return NextResponse.json(cached);
-    }
-
     const poolAuths = await prisma.poolAuth.findMany({
       where: { userId: targetUserId },
       include: { pool: { select: { id: true, name: true } } },
@@ -193,6 +182,22 @@ export async function GET(request: NextRequest) {
     const braiinsAuth = poolAuths.find((auth) =>
       auth.pool.name.toLowerCase().includes("braiins"),
     );
+
+    // Cache the built payload. The live window's `end` moves continuously, so
+    // it is rounded down to the tick for the key — otherwise every poll would
+    // miss, and Luxor rate-limits. The subaccount selection is part of the
+    // key, or switching the picker would serve the previous selection.
+    const ttl = cacheTtlForTick(tick);
+    const roundedEnd = Math.floor(end.getTime() / (ttl * 1000)) * (ttl * 1000);
+    const subaccountKey = selectedLuxorAuths
+      .map((a) => a.authKey)
+      .sort()
+      .join(",");
+    const cacheKey = `hashrate_history_${targetUserId}_${subaccountKey}_${start.getTime()}_${roundedEnd}_${tick}`;
+    const cached = poolDataCache.get(cacheKey);
+    if (cached) {
+      return NextResponse.json(cached);
+    }
 
     const activePoolNames: string[] = [];
     if (luxorAuth) activePoolNames.push("Luxor");
