@@ -314,7 +314,10 @@ export async function POST(
             };
           } else {
             const r = loaded.req;
-            const split = await checkMemberRequestStillValid(tx, r);
+            // The email was checked before the account was created for it.
+            const split = await checkMemberRequestStillValid(tx, r, {
+              checkEmail: false,
+            });
             const before = await snapshotMembers(tx, r.guildId);
             if (r.action === "ADD") {
               const membership = await addMember(tx, {

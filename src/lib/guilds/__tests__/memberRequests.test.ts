@@ -200,6 +200,15 @@ describe("checkMemberRequestStillValid", () => {
     ).rejects.toThrow("already in use now");
   });
 
+  it("skips the email check once the account was created for it", async () => {
+    taken.mockResolvedValue(true);
+    await expect(
+      checkMemberRequestStillValid(db(active), addRequest, {
+        checkEmail: false,
+      }),
+    ).resolves.toHaveLength(3);
+  });
+
   it("refuses a removal when the member already left", async () => {
     await expect(
       checkMemberRequestStillValid(db(active.slice(0, 2)), removeRequest),

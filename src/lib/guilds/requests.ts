@@ -148,7 +148,9 @@ const STALE = "reject this request and ask the Guildmaster for a new one";
 /**
  * Re-checks a member request when it's approved: the guild may have changed
  * since it was submitted. Throws a GuildInputError saying why it no longer
- * applies; returns the split to write.
+ * applies; returns the split to write. `checkEmail: false` skips the
+ * new-email check - for the re-check run after the account was created for
+ * that email, which would otherwise find its own account.
  */
 export async function checkMemberRequestStillValid(
   db: Tx,
@@ -160,6 +162,7 @@ export async function checkMemberRequestStillValid(
     membershipId: string | null;
     lines: { membershipId: string; requestedPercent: Prisma.Decimal }[];
   },
+  { checkEmail = true }: { checkEmail?: boolean } = {},
 ): Promise<SplitLineInput[]> {
   const active = await db.guildMembership.findMany({
     where: { guildId: request.guildId, leftAt: null },
@@ -181,7 +184,7 @@ export async function checkMemberRequestStillValid(
       );
     }
     staying = staying.filter((id) => id !== target.id);
-  } else if (request.newEmail) {
+  } else if (checkEmail && request.newEmail) {
     try {
       await assertEmailsAvailable([request.newEmail]);
     } catch {
