@@ -7,7 +7,6 @@ import {
   Paper,
   Stack,
   CircularProgress,
-  Link as MuiLink,
   Alert,
   Typography,
   Divider,
@@ -21,7 +20,6 @@ import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import CancelIcon from "@mui/icons-material/Cancel";
-import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
 import Link from "next/link";
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
 import { DateDisplay } from "@/components/accounting/common/DateDisplay";
@@ -32,10 +30,14 @@ import {
   VendorSideInvoice,
 } from "@/components/accounting/common/VendorPaymentSection";
 import { DaylightThemedPage } from "@/components/daylight/DaylightMuiScope";
+import { InvoiceDocuments } from "@/components/accounting/common/InvoiceDocuments";
 
 interface HardwarePurchaseDetail extends VendorSideInvoice {
   id: string;
   invoicePdfKey: string | null;
+  invoicePdfName: string | null;
+  invoiceSheetKey: string | null;
+  invoiceSheetName: string | null;
   invoiceNumber: string;
   hardwareDescription: string;
   billingDate: string;
@@ -406,34 +408,16 @@ export default function HardwarePurchaseDetailPage() {
                 </Typography>
               </Box>
 
-              {/* Vendor Invoice PDF */}
-              <Box>
-                <Typography
-                  variant="subtitle2"
-                  color="textSecondary"
-                  sx={{ fontWeight: "600", mb: 0.5 }}
-                >
-                  Vendor Invoice PDF
-                </Typography>
-                <Typography variant="body1">
-                  {invoice.invoicePdfKey ? (
-                    <MuiLink
-                      href={`/api/hardware-purchases/${invoice.id}/documents/invoice`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      sx={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 0.5,
-                      }}
-                    >
-                      <PictureAsPdfIcon fontSize="small" /> View invoice PDF
-                    </MuiLink>
-                  ) : (
-                    "No PDF"
-                  )}
-                </Typography>
-              </Box>
+              {/* Vendor Invoice PDF + Excel / CSV */}
+              <InvoiceDocuments
+                type="hardware"
+                invoice={invoice}
+                onChanged={(patch, message) => {
+                  setInvoice((prev) => (prev ? { ...prev, ...patch } : prev));
+                  setError(null);
+                  setSuccessMessage(message);
+                }}
+              />
             </Box>
 
             <Divider />

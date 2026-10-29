@@ -1718,6 +1718,12 @@ model VendorInvoice {
   // R2 object key of the vendor's invoice PDF. Null on invoices recorded
   // before PDF uploads existed.
   invoicePdfKey        String?
+  // Original filename of the uploaded PDF, for display and downloads.
+  invoicePdfName       String?
+  // Optional Excel/CSV sheet the vendor sent with the invoice (R2 key
+  // under the purpose's *-sheets/ prefix) and its original filename.
+  invoiceSheetKey      String?
+  invoiceSheetName     String?
   // DEPRECATED (2026-10-20): the single-currency payment columns below
   // (paymentEntityId .. transactionFee) are no longer written or read. A
   // payment is now one or more VendorPaymentPart rows (paymentParts), and
@@ -1789,6 +1795,12 @@ model HardwarePurchaseInvoice {
   // Same PDF and payment columns as VendorInvoice; set by
   // POST /api/hardware-purchases/[id]/record-payment.
   invoicePdfKey        String?
+  // Original filename of the uploaded PDF, for display and downloads.
+  invoicePdfName       String?
+  // Optional Excel/CSV sheet the vendor sent with the invoice (R2 key
+  // under the purpose's *-sheets/ prefix) and its original filename.
+  invoiceSheetKey      String?
+  invoiceSheetName     String?
   // DEPRECATED (2026-10-20): same as on VendorInvoice - paymentEntityId ..
   // transactionFee are no longer written or read; the payment lives in
   // paymentParts (backfilled by 20261020130000_vendor_payment_parts).

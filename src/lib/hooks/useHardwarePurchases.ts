@@ -29,6 +29,9 @@ export interface HardwarePurchaseInvoice {
   paymentStatus: "Paid" | "Pending" | "Cancelled";
   notes: string | null;
   invoicePdfKey: string | null;
+  invoicePdfName: string | null;
+  invoiceSheetKey: string | null;
+  invoiceSheetName: string | null;
   // DEPRECATED (2026-10-20): single-currency payment columns, no longer
   // written or read (the payment lives in paymentParts). TODO: remove
   // with the columns after 2026-11-19.
@@ -171,6 +174,9 @@ export const useCreateHardwarePurchase = () => {
       totalAmount: number;
       notes?: string;
       invoicePdfKey: string;
+      invoicePdfName?: string;
+      invoiceSheetKey?: string | null;
+      invoiceSheetName?: string;
     }) => {
       const response = await fetch("/api/hardware-purchases", {
         method: "POST",

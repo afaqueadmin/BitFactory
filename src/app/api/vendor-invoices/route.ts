@@ -4,7 +4,11 @@ import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
 import { Decimal } from "@prisma/client/runtime/library";
 import { AuditAction, Prisma } from "@prisma/client";
-import { verifyUploadedPdf } from "@/lib/storage/r2";
+import {
+  cleanFileName,
+  verifyUploadedPdf,
+  verifyUploadedSheet,
+} from "@/lib/storage/r2";
 import {
   formatIsoDate,
   resolveExportTimeZone,
@@ -28,6 +32,11 @@ interface CreateVendorInvoiceRequest {
   totalAmount: number;
   notes?: string;
   invoicePdfKey: string;
+  /** Original filename of the PDF. */
+  invoicePdfName?: string;
+  /** Optional Excel/CSV sheet sent with the invoice, and its filename. */
+  invoiceSheetKey?: string | null;
+  invoiceSheetName?: string;
 }
 
 export async function POST(request: NextRequest) {
@@ -101,6 +110,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: pdf.error }, { status: 400 });
     }
 
+    let sheetKey: string | null = null;
+    if (body.invoiceSheetKey) {
+      const sheet = await verifyUploadedSheet(
+        body.invoiceSheetKey,
+        "vendor-invoice-sheet",
+      );
+      if (!sheet.ok) {
+        return NextResponse.json({ error: sheet.error }, { status: 400 });
+      }
+      sheetKey = sheet.key;
+    }
+
     // Create the vendor invoice. New invoices always start Pending; they
     // become Paid only through the record-payment route.
     const vendorInvoice = await prisma.vendorInvoice.create({
@@ -116,6 +137,11 @@ export async function POST(request: NextRequest) {
         paymentStatus: "Pending",
         notes: body.notes || null,
         invoicePdfKey: pdf.key,
+        invoicePdfName: cleanFileName(body.invoicePdfName),
+        invoiceSheetKey: sheetKey,
+        invoiceSheetName: sheetKey
+          ? cleanFileName(body.invoiceSheetName)
+          : null,
         createdBy: userId,
       },
     });
