@@ -1,13 +1,15 @@
 /**
  * GET /api/guild-requests - admin only. Every guild wallet, split and member
  * (add / remove) change request, newest first, optionally
- * ?status=PENDING|CONFIRMED|APPROVED|REJECTED.
+ * ?status=PENDING|CONFIRMED|APPROVED|REJECTED, or OPEN for both still in
+ * review (PENDING and CONFIRMED).
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { RequestStatus } from "@prisma/client";
+import { Prisma, RequestStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireStaff, jsonError } from "@/lib/guilds/routeAuth";
+import { OPEN_REQUEST } from "@/lib/guilds/requests";
 
 const userSelect = { select: { id: true, name: true, email: true } };
 
@@ -22,7 +24,12 @@ export async function GET(request: NextRequest) {
     )
       ? (statusParam as RequestStatus)
       : undefined;
-    const where = status ? { status } : {};
+    const where: { status?: RequestStatus | Prisma.EnumRequestStatusFilter } =
+      statusParam === "OPEN"
+        ? { status: OPEN_REQUEST }
+        : status
+          ? { status }
+          : {};
 
     const [wallet, split, member] = await Promise.all([
       prisma.guildWalletChangeRequest.findMany({

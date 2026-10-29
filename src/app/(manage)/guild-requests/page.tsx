@@ -40,6 +40,13 @@ import {
 import { useStepUp } from "@/components/StepUpDialog";
 
 const STATUSES = ["PENDING", "CONFIRMED", "APPROVED", "REJECTED"];
+// Pending and Confirmed together: everything still needing an admin step.
+const OPEN = "OPEN";
+const DONE_NOTICE = {
+  confirm: "Confirmed - it still needs Approve before the change applies",
+  approve: "Approved - the change has been applied",
+  reject: "Rejected - the Guildmaster has been emailed",
+};
 
 type Person = { id: string; name: string | null; email: string };
 type Line = {
@@ -88,10 +95,13 @@ const mono = {
 export default function GuildRequestsPage() {
   const ds = useDaylightAdminSx();
   const { withStepUp, stepUpDialog } = useStepUp();
-  const [status, setStatus] = useState("PENDING");
+  // All statuses by default, so a request never drops out of view after an
+  // action (a confirmed one still needs Approve).
+  const [status, setStatus] = useState("");
   const [requests, setRequests] = useState<GuildRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const [confirmTarget, setConfirmTarget] = useState<GuildRequest | null>(null);
@@ -130,6 +140,7 @@ export default function GuildRequestsPage() {
   ) => {
     setBusy(true);
     setError(null);
+    setNotice(null);
     try {
       const res = await withStepUp((creds) =>
         fetch(`/api/guild-requests/${req.kind}/${req.id}/${action}`, {
@@ -143,6 +154,7 @@ export default function GuildRequestsPage() {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || "Failed to update the request");
       }
+      setNotice(DONE_NOTICE[action]);
       await load();
       return true;
     } catch (e) {
@@ -170,6 +182,7 @@ export default function GuildRequestsPage() {
           sx={{ minWidth: 220, ...ds.inputSx }}
         >
           <MenuItem value="">All statuses</MenuItem>
+          <MenuItem value={OPEN}>Waiting for review</MenuItem>
           {STATUSES.map((s) => (
             <MenuItem key={s} value={s}>
               {statusLabel(s)}
@@ -185,6 +198,15 @@ export default function GuildRequestsPage() {
           onClose={() => setError(null)}
         >
           {error}
+        </Alert>
+      )}
+      {notice && (
+        <Alert
+          severity="success"
+          sx={{ ...ds.alertSx("success"), mb: 2 }}
+          onClose={() => setNotice(null)}
+        >
+          {notice}
         </Alert>
       )}
 
