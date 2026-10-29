@@ -382,6 +382,7 @@ export async function DELETE(
     try {
       await deleteInvoicePdfs([
         existingInvoice.invoicePdfKey,
+        existingInvoice.invoiceSheetKey,
         existingInvoice.paymentReceiptKey,
       ]);
     } catch (error) {
@@ -403,6 +404,7 @@ export async function DELETE(
         description: `Hardware purchase invoice ${existingInvoice.invoiceNumber} deleted`,
         changes: JSON.stringify({
           invoicePdfKey: existingInvoice.invoicePdfKey,
+          invoiceSheetKey: existingInvoice.invoiceSheetKey,
           paymentReceiptKey: existingInvoice.paymentReceiptKey,
         }),
       },

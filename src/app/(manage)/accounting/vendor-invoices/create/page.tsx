@@ -56,6 +56,8 @@ export default function CreateVendorInvoicePage() {
   const [success, setSuccess] = useState(false);
   const [invoicePdf, setInvoicePdf] = useState<UploadedPdf | null>(null);
   const [pdfUploading, setPdfUploading] = useState(false);
+  const [invoiceSheet, setInvoiceSheet] = useState<UploadedPdf | null>(null);
+  const [sheetUploading, setSheetUploading] = useState(false);
 
   // Fetch machines using TanStack Query
   const { data: machines } = useQuery({
@@ -240,6 +242,9 @@ export default function CreateVendorInvoicePage() {
           totalAmount: totalAmount,
           notes: formData.notes || null,
           invoicePdfKey: invoicePdf.key,
+          invoicePdfName: invoicePdf.fileName,
+          invoiceSheetKey: invoiceSheet?.key ?? null,
+          invoiceSheetName: invoiceSheet?.fileName,
         }),
       });
 
@@ -417,6 +422,17 @@ export default function CreateVendorInvoicePage() {
                 required
                 disabled={saving}
               />
+
+              {/* Row 6: Vendor invoice Excel / CSV (optional) */}
+              <PdfUploadField
+                label="Vendor Invoice Excel / CSV (optional)"
+                fileKind="sheet"
+                purpose="vendor-invoice-sheet"
+                value={invoiceSheet}
+                onChange={setInvoiceSheet}
+                onUploadingChange={setSheetUploading}
+                disabled={saving}
+              />
             </Stack>
 
             {/* Total Amount Summary */}
@@ -488,7 +504,9 @@ export default function CreateVendorInvoicePage() {
                 startIcon={
                   saving ? <CircularProgress size={20} /> : <SaveIcon />
                 }
-                disabled={saving || pdfUploading || !invoicePdf}
+                disabled={
+                  saving || pdfUploading || sheetUploading || !invoicePdf
+                }
               >
                 {saving ? "Recording..." : "Record Vendor Invoice"}
               </Button>

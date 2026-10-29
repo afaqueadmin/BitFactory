@@ -1,38 +1,28 @@
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { requireAccountingAdmin } from "@/lib/accounting/adminAuth";
-import { presignDownload } from "@/lib/storage/r2";
+import { NextRequest } from "next/server";
+import {
+  openInvoiceDocument,
+  removeInvoiceSheet,
+  replaceInvoiceDocument,
+} from "@/lib/accounting/invoiceDocuments";
 
-/** Opens a hardware purchase invoice's stored PDF: kind = invoice | receipt. */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string; kind: string }> },
-) {
-  try {
-    const auth = await requireAccountingAdmin(request);
-    if ("response" in auth) return auth.response;
-    const { id, kind } = await params;
+/**
+ * Hardware purchase invoice documents: kind = invoice | sheet | receipt.
+ * GET opens one; PUT attaches/replaces the invoice PDF or sheet; DELETE
+ * removes the sheet. Changes are allowed on Pending invoices only.
+ */
+type Params = { params: Promise<{ id: string; kind: string }> };
 
-    if (kind !== "invoice" && kind !== "receipt") {
-      return NextResponse.json({ error: "Unknown document" }, { status: 404 });
-    }
+export async function GET(request: NextRequest, { params }: Params) {
+  const { id, kind } = await params;
+  return openInvoiceDocument(request, "hardware", id, kind);
+}
 
-    const invoice = await prisma.hardwarePurchaseInvoice.findUnique({
-      where: { id },
-      select: { invoicePdfKey: true, paymentReceiptKey: true },
-    });
-    const key =
-      kind === "invoice" ? invoice?.invoicePdfKey : invoice?.paymentReceiptKey;
-    if (!key) {
-      return NextResponse.json({ error: "No PDF on file" }, { status: 404 });
-    }
+export async function PUT(request: NextRequest, { params }: Params) {
+  const { id, kind } = await params;
+  return replaceInvoiceDocument(request, "hardware", id, kind);
+}
 
-    return NextResponse.redirect(await presignDownload(key), 302);
-  } catch (error) {
-    console.error("Error opening hardware purchase document:", error);
-    return NextResponse.json(
-      { error: "Failed to open the PDF" },
-      { status: 500 },
-    );
-  }
+export async function DELETE(request: NextRequest, { params }: Params) {
+  const { id, kind } = await params;
+  return removeInvoiceSheet(request, "hardware", id, kind);
 }

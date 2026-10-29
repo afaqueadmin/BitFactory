@@ -59,6 +59,8 @@ export default function CreateHardwarePurchasePage() {
   const [success, setSuccess] = useState(false);
   const [invoicePdf, setInvoicePdf] = useState<UploadedPdf | null>(null);
   const [pdfUploading, setPdfUploading] = useState(false);
+  const [invoiceSheet, setInvoiceSheet] = useState<UploadedPdf | null>(null);
+  const [sheetUploading, setSheetUploading] = useState(false);
   const createHardwarePurchase = useCreateHardwarePurchase();
 
   // Total = hardware cost (quantity x unit price + misc) + security deposit
@@ -156,6 +158,9 @@ export default function CreateHardwarePurchasePage() {
         totalAmount: totalAmount,
         notes: formData.notes || undefined,
         invoicePdfKey: invoicePdf.key,
+        invoicePdfName: invoicePdf.fileName,
+        invoiceSheetKey: invoiceSheet?.key ?? null,
+        invoiceSheetName: invoiceSheet?.fileName,
       });
 
       setSuccess(true);
@@ -363,6 +368,17 @@ export default function CreateHardwarePurchasePage() {
                 required
                 disabled={saving}
               />
+
+              {/* Row 8: Vendor invoice Excel / CSV (optional) */}
+              <PdfUploadField
+                label="Vendor Invoice Excel / CSV (optional)"
+                fileKind="sheet"
+                purpose="hardware-purchase-sheet"
+                value={invoiceSheet}
+                onChange={setInvoiceSheet}
+                onUploadingChange={setSheetUploading}
+                disabled={saving}
+              />
             </Stack>
 
             {/* Total Amount Summary */}
@@ -442,7 +458,9 @@ export default function CreateHardwarePurchasePage() {
                 startIcon={
                   saving ? <CircularProgress size={20} /> : <SaveIcon />
                 }
-                disabled={saving || pdfUploading || !invoicePdf}
+                disabled={
+                  saving || pdfUploading || sheetUploading || !invoicePdf
+                }
               >
                 {saving ? "Recording..." : "Record Hardware Purchase"}
               </Button>
