@@ -116,9 +116,11 @@ interface GuildDetail {
   walletChangeRequests: { id: string }[];
   splitChangeRequests: { id: string }[];
   memberChangeRequests: { id: string }[];
-  unpaidInvoices: {
+  hostingInvoices: {
     invoiceId: string;
     invoiceNumber: string;
+    unpaidUsd: number;
+    reserved: { rewardMonth: string; amountUsd: number }[];
     outstandingUsd: number;
   }[];
 }
@@ -212,7 +214,8 @@ export default function GuildDetailPage() {
   }
 
   const active = guild.memberships.filter((m) => !m.leftAt);
-  const owed = guild.unpaidInvoices.reduce((s, i) => s + i.outstandingUsd, 0);
+  // Not yet reserved by any distribution; reserved amounts show per invoice.
+  const owed = guild.hostingInvoices.reduce((s, i) => s + i.outstandingUsd, 0);
   const openRequests =
     guild.walletChangeRequests.length +
     guild.splitChangeRequests.length +
@@ -409,14 +412,18 @@ export default function GuildDetailPage() {
           >
             Hosting owed: {owed > 0 ? formatUsd(owed) : "nothing"}
           </Typography>
-          {guild.unpaidInvoices.length > 0 && (
+          {guild.hostingInvoices.length > 0 && (
             <Stack spacing={0.5}>
-              {guild.unpaidInvoices.map((i) => (
+              {guild.hostingInvoices.map((i) => (
                 <Typography key={i.invoiceId} sx={{ fontSize: 13 }}>
                   <Link href={`/accounting/${i.invoiceId}`}>
                     {i.invoiceNumber}
                   </Link>{" "}
-                  — {formatUsd(i.outstandingUsd)} unpaid
+                  — {formatUsd(i.unpaidUsd)} unpaid
+                  {i.reserved.map(
+                    (r) =>
+                      `, ${formatUsd(r.amountUsd)} reserved by ${formatMonth(r.rewardMonth)} (not sent yet)`,
+                  )}
                 </Typography>
               ))}
             </Stack>

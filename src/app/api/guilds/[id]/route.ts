@@ -14,7 +14,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { AuditAction, GuildPayoutMethod, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireStaff, jsonError } from "@/lib/guilds/routeAuth";
-import { loadUnpaidHostingInvoices } from "@/lib/guilds/hostingInvoice";
+import { loadGuildHostingInvoices } from "@/lib/guilds/hostingInvoice";
 import { GuildInputError, parseWalletAddress } from "@/lib/guilds/accounts";
 import {
   AVAILABLE_PAYOUT_METHODS,
@@ -80,7 +80,7 @@ export async function GET(
     });
     if (!guild) return jsonError("Guild not found", 404);
 
-    const unpaidInvoices = await loadUnpaidHostingInvoices({
+    const hostingInvoices = await loadGuildHostingInvoices({
       guildId: guild.id,
       guildmasterId: guild.guildmasterId,
     });
@@ -91,7 +91,7 @@ export async function GET(
       success: true,
       data: {
         ...guild,
-        unpaidInvoices,
+        hostingInvoices,
         payoutSettings: {
           defaultPayoutMethod: settings.defaultPayoutMethod,
           minPayoutSats: settings.minPayoutSats,

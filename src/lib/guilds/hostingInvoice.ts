@@ -102,16 +102,44 @@ export async function ensureMonthHostingInvoice(params: {
   return invoice;
 }
 
+export interface GuildHostingInvoice {
+  invoiceId: string;
+  invoiceNumber: string;
+  /** Total less what's been paid. */
+  unpaidUsd: number;
+  /** Earmarked by not-yet-settled distributions, per reward month. */
+  reserved: { rewardMonth: Date; amountUsd: number }[];
+  /** Unpaid less reserved: what no distribution has claimed yet. */
+  outstandingUsd: number;
+}
+
 /**
  * The guild's unpaid hosting invoices, oldest first, with what's still owed
  * on each. Amounts already earmarked by another not-yet-settled distribution
  * of this guild are taken off, so two months can't both claim them.
  */
-export async function loadUnpaidHostingInvoices(params: {
+export async function loadUnpaidHostingInvoices(
+  params: Parameters<typeof loadGuildHostingInvoices>[0],
+): Promise<UnpaidHostingInvoice[]> {
+  return (await loadGuildHostingInvoices(params))
+    .filter((i) => i.outstandingUsd > 0)
+    .map(({ invoiceId, invoiceNumber, outstandingUsd }) => ({
+      invoiceId,
+      invoiceNumber,
+      outstandingUsd,
+    }));
+}
+
+/**
+ * Every unpaid hosting invoice of the guild, oldest first, with what the
+ * not-yet-settled distributions have reserved of it - an invoice fully
+ * reserved by an unsent month is still unpaid and still listed.
+ */
+export async function loadGuildHostingInvoices(params: {
   guildId: string;
   guildmasterId: string;
   excludeDistributionId?: string;
-}): Promise<UnpaidHostingInvoice[]> {
+}): Promise<GuildHostingInvoice[]> {
   const invoices = await prisma.invoice.findMany({
     where: {
       userId: params.guildmasterId,
@@ -133,30 +161,36 @@ export async function loadUnpaidHostingInvoices(params: {
         ? { id: { not: params.excludeDistributionId } }
         : {}),
     },
-    select: { hostingAllocations: true },
+    select: { rewardMonth: true, hostingAllocations: true },
+    orderBy: { rewardMonth: "asc" },
   });
-  const earmarked = new Map<string, number>();
+  const earmarked = new Map<string, GuildHostingInvoice["reserved"]>();
   for (const d of pending) {
     for (const a of parseAllocations(d.hostingAllocations)) {
-      earmarked.set(
-        a.invoiceId,
-        (earmarked.get(a.invoiceId) ?? 0) + a.amountUsd,
-      );
+      earmarked.set(a.invoiceId, [
+        ...(earmarked.get(a.invoiceId) ?? []),
+        { rewardMonth: d.rewardMonth, amountUsd: a.amountUsd },
+      ]);
     }
   }
 
+  const cents = (usd: number) => Math.round(usd * 100) / 100;
   return invoices
     .map((invoice) => {
       const paid = invoice.costPayments.reduce((sum, p) => sum + p.amount, 0);
-      const outstanding =
-        Number(invoice.totalAmount) - paid - (earmarked.get(invoice.id) ?? 0);
+      const unpaid = Number(invoice.totalAmount) - paid;
+      const reserved = earmarked.get(invoice.id) ?? [];
       return {
         invoiceId: invoice.id,
         invoiceNumber: invoice.invoiceNumber,
-        outstandingUsd: Math.round(outstanding * 100) / 100,
+        unpaidUsd: cents(unpaid),
+        reserved,
+        outstandingUsd: cents(
+          unpaid - reserved.reduce((sum, r) => sum + r.amountUsd, 0),
+        ),
       };
     })
-    .filter((i) => i.outstandingUsd > 0);
+    .filter((i) => i.unpaidUsd > 0);
 }
 
 /** GuildDistribution.hostingAllocations, read back safely. */
