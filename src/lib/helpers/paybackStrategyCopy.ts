@@ -1,5 +1,5 @@
 export type PaybackStrategyKey =
-  "STRATEGY_0" | "STRATEGY_1" | "STRATEGY_2" | "STRATEGY_3";
+  "STRATEGY_0" | "STRATEGY_1A" | "STRATEGY_1B" | "STRATEGY_2" | "STRATEGY_3";
 
 export interface PaybackStrategyCopy {
   /** One-line statement of what the strategy actually does. */
@@ -14,18 +14,23 @@ export interface PaybackStrategyCopy {
  */
 export const STRATEGY_COPY: Record<PaybackStrategyKey, PaybackStrategyCopy> = {
   STRATEGY_0: {
-    headline: "Auto-deduction",
+    headline: "No Accumulation (Stable) - Sell all BTC, hold USDT",
     detail:
-      "Hosting and co-location charges are auto-deducted from your BTC mining rewards earned by your machines. Hence, only net rewards are transferred to your wallet automatically.",
+      "The miner receives the full BTC mining rewards directly from their machines into their wallet. Thereafter, the miner sells all of their mined Bitcoin, pays for the hosting and co-location charges in USD each month, and holds the balance in USDT instead of Bitcoin.",
   },
-  STRATEGY_1: {
-    headline: "The machines pay for its own bills",
+  STRATEGY_1A: {
+    headline: "Auto Deduct Hybrid Accumulation",
+    detail:
+      "Hosting and co-location charges are auto-deducted from your BTC mining rewards earned by your machines. Hence, only net rewards in BTC are transferred to your wallet automatically.",
+  },
+  STRATEGY_1B: {
+    headline: "Hybrid Accumulation",
     detail:
       "The miner receives the full BTC mining rewards directly from their machines into their wallet. Thereafter, the miner pays for the hosting and co-location charges in USD each month, by selling a portion of their mined Bitcoin.",
   },
   STRATEGY_2: {
     headline:
-      "Accumulation strategy - keep the Bitcoin, fund the bills separately",
+      "Accumulation strategy (intermediate) - keep the Bitcoin, fund the bills separately",
     detail:
       "The miner receives the full BTC mining rewards directly from their machines into their wallet. Nothing mined is ever sold by the miner. The monthly bill is settled from another source and the full Bitcoin stack is held for the machine's life.",
   },

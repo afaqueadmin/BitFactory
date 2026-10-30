@@ -77,7 +77,8 @@ const VIEW_OPTIONS: SegmentedOption<ViewMode>[] = [
 
 const STRATEGY_OPTIONS: SegmentedOption<PaybackStrategy>[] = [
   { id: "STRATEGY_0", label: "Strategy 0" },
-  { id: "STRATEGY_1", label: "Strategy 1" },
+  { id: "STRATEGY_1A", label: "Strategy 1A" },
+  { id: "STRATEGY_1B", label: "Strategy 1B" },
   { id: "STRATEGY_2", label: "Strategy 2" },
   { id: "STRATEGY_3", label: "Strategy 3" },
 ];
@@ -185,12 +186,14 @@ export default function PaybackAnalysisCompanyPage() {
 
   // Strategy selector state
   const [selectedStrategy, setSelectedStrategy] =
-    useState<PaybackStrategy>("STRATEGY_1");
+    useState<PaybackStrategy>("STRATEGY_1B");
 
-  // Adds monthly depreciation, net profit and ROI rows (Strategy 0 & 1 only)
+  // Adds monthly depreciation, net profit and ROI rows (Strategy 0, 1A & 1B only)
   const [includeDepreciation, setIncludeDepreciation] = useState(false);
   const supportsDepreciation =
-    selectedStrategy === "STRATEGY_0" || selectedStrategy === "STRATEGY_1";
+    selectedStrategy === "STRATEGY_0" ||
+    selectedStrategy === "STRATEGY_1A" ||
+    selectedStrategy === "STRATEGY_1B";
   const showDepreciationRows = supportsDepreciation && includeDepreciation;
 
   // OS selector state
@@ -484,11 +487,13 @@ export default function PaybackAnalysisCompanyPage() {
   const activeHashrateStockOs = activeSpec.hashrateStock;
   const activeHashrateLuxos = activeSpec.hashrateLux;
 
-  // Strategy 0 & 1 add a "cost incl. depreciation" line to the history chart.
+  // Strategy 0, 1A & 1B add a "cost incl. depreciation" line to the history chart.
   const chartDepreciation =
     includeDepreciation &&
     config &&
-    (selectedStrategy === "STRATEGY_0" || selectedStrategy === "STRATEGY_1")
+    (selectedStrategy === "STRATEGY_0" ||
+      selectedStrategy === "STRATEGY_1A" ||
+      selectedStrategy === "STRATEGY_1B")
       ? {
           monthlyDepreciation: machineCost / (MACHINE_LIFE_YEARS * 12),
           hashrateTh:
