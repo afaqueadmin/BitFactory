@@ -7,6 +7,7 @@ vi.mock("@/lib/prisma", () => ({
 import { Decimal } from "@prisma/client/runtime/library";
 import { prisma } from "@/lib/prisma";
 import {
+  feesUsdUnrounded,
   matchesInvoiceTotal,
   MAX_PAYMENT_PARTS,
   parseDecimal,
@@ -97,6 +98,46 @@ describe("matchesInvoiceTotal with several currency parts", () => {
     // 1 / 3 = 0.333.. each; three parts are 1.00 USD, not 3 x 0.33.
     const third = { amount: d("1"), rate: d("3") };
     expect(matchesInvoiceTotal([third, third, third], d("1"))).toBe(true);
+  });
+});
+
+describe("vendor-side payments: amount paid includes the fee", () => {
+  it("1000 USD due + 25 AED fee at 3.6725 needs 3697.50 AED", () => {
+    const rate = d("3.6725");
+    const target = d("1000").plus(feesUsdUnrounded([{ fee: d("25"), rate }]));
+    expect(matchesInvoiceTotal([{ amount: d("3697.50"), rate }], target)).toBe(
+      true,
+    );
+    expect(matchesInvoiceTotal([{ amount: d("3672.50"), rate }], target)).toBe(
+      false,
+    );
+  });
+
+  it("converts each part's fee at that part's rate", () => {
+    // 10 USD due: 5 USD + 1 USD fee, and 10 AED + 2 AED fee at 2 (= 1 USD).
+    const fees = feesUsdUnrounded([
+      { fee: d("1"), rate: d("1") },
+      { fee: d("2"), rate: d("2") },
+    ]);
+    expect(fees.toString()).toBe("2");
+    expect(
+      matchesInvoiceTotal(
+        [
+          { amount: d("6"), rate: d("1") },
+          { amount: d("12"), rate: d("2") },
+        ],
+        d("10").plus(fees),
+      ),
+    ).toBe(true);
+  });
+
+  it("a fee of 0 leaves the target at the cash due", () => {
+    const target = d("100").plus(
+      feesUsdUnrounded([{ fee: d("0"), rate: d("3.6") }]),
+    );
+    expect(
+      matchesInvoiceTotal([{ amount: d("360"), rate: d("3.6") }], target),
+    ).toBe(true);
   });
 });
 

@@ -4,7 +4,8 @@
  * The currency parts of a payment. A payment can be split across
  * currencies (e.g. 5 USD + 10 AED at 2 for a 10 USD invoice); each part has
  * its own Entity -> Bank -> Currency and rate (PaymentAccountFields), an
- * amount in that currency and, on vendor-side payments, a transaction fee.
+ * amount in that currency and, on vendor-side payments, a transaction fee
+ * that the amount must include.
  * Shows each part's USD value, the USD total and what is still to be
  * entered, in the last part's currency, so the admin can settle exactly.
  */
@@ -67,6 +68,16 @@ export function partUsd(part: PaymentPartValue): number {
   const rate = parseExchangeRate(part);
   return rate ? toNumber(part.amount) / rate : 0;
 }
+
+/** The part's fee in USD at its rate (0 without a valid rate). */
+export function partFeeUsd(part: PaymentPartValue): number {
+  const rate = parseExchangeRate(part);
+  return rate ? toNumber(part.transactionFee) / rate : 0;
+}
+
+/** Unrounded USD total of the parts' fees. */
+export const partsFeesUsd = (parts: PaymentPartValue[]) =>
+  parts.reduce((sum, p) => sum + partFeeUsd(p), 0);
 
 /** Unrounded USD total of the parts. */
 export const partsTotalUsd = (parts: PaymentPartValue[]) =>
@@ -201,7 +212,7 @@ export function PaymentPartsFields({
                     part.transactionFee.trim() !== "" &&
                     !(Number(part.transactionFee) >= 0)
                   }
-                  helperText="Enter 0 if there was no fee. For reference only."
+                  helperText="Enter 0 if there was no fee. Amount Paid must include it."
                   slotProps={{
                     htmlInput: { min: 0, step: "0.01" },
                     ...currencyAdornment,

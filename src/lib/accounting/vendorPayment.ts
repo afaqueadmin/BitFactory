@@ -1,6 +1,7 @@
 import { Decimal } from "@prisma/client/runtime/library";
 import {
   auditPart,
+  feesUsdUnrounded,
   matchesInvoiceTotal,
   parseDecimal,
   parsePaymentParts,
@@ -47,8 +48,8 @@ export interface VendorPaymentPartData {
  * Validates a vendor-side payment against its invoice and builds the
  * invoice update plus its VendorPaymentPart rows. Every field is required.
  * The parts' amounts converted at their rates must together equal the USD
- * invoice total within $0.01 (D8); fees are stored for reference only and
- * aren't part of that check.
+ * invoice total plus the fees (each converted at its part's rate) within
+ * $0.01 (D8): the amount paid includes the transaction fee.
  *
  * Payment details live only in the parts. The invoice's single-currency
  * payment columns (paymentEntityId .. transactionFee) are deprecated and
@@ -93,13 +94,18 @@ export async function parseVendorPayment(
     fees.push(fee);
   }
 
-  if (!matchesInvoiceTotal(parts, invoiceTotalUsd)) {
-    const enteredUsd = partsUsdUnrounded(parts).toDecimalPlaces(
-      2,
-      Decimal.ROUND_HALF_UP,
-    );
+  // The amount paid covers the invoice and the fees on top of it.
+  const feesUsd = feesUsdUnrounded(
+    parts.map((p, i) => ({ fee: fees[i], rate: p.rate })),
+  );
+  const targetUsd = invoiceTotalUsd.plus(feesUsd);
+  if (!matchesInvoiceTotal(parts, targetUsd)) {
+    const cents = (v: Decimal) =>
+      v.toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toFixed(2);
     return {
-      error: `The amount paid must match the invoice total within $0.01: ${enteredUsd.toFixed(2)} USD entered, ${invoiceTotalUsd.toFixed(2)} USD due`,
+      error: feesUsd.isZero()
+        ? `The amount paid must match the invoice total within $0.01: ${cents(partsUsdUnrounded(parts))} USD entered, ${cents(invoiceTotalUsd)} USD due`
+        : `The amount paid must equal the cash due plus transaction fees within $0.01: ${cents(partsUsdUnrounded(parts))} USD entered, ${cents(invoiceTotalUsd)} USD due + ${cents(feesUsd)} USD fees = ${cents(targetUsd)} USD`,
     };
   }
 
@@ -138,6 +144,7 @@ export async function parseVendorPayment(
         transactionFee: fees[i].toString(),
       })),
       totalUsd: totalUsd.toString(),
+      feesUsd: feesUsd.toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toString(),
       paymentReceiptKey: receipt.key,
     },
   };

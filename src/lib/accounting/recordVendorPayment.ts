@@ -57,7 +57,8 @@ class Rollback extends Error {
  * and marks it Paid.
  *
  * Cash due = total - deposit already applied - depositAdjustment. The
- * currency parts must match the cash due (D8). When the deposit covers the
+ * currency parts must match the cash due plus their transaction fees (D8).
+ * When the deposit covers the
  * whole total there is no cash payment, so no parts or receipt are needed.
  */
 export async function recordVendorSidePayment(

@@ -1919,13 +1919,15 @@ model VendorPaymentPart {
   entityId           String
   bankId             String
   currencyId         String
-  /// In the part's currency.
+  /// In the part's currency. Includes transactionFee (payments recorded
+  /// before 2026-10-30 didn't).
   amount             Decimal  @db.Decimal(18, 2)
   /// 1 USD = exchangeRate currency.
   exchangeRate       Decimal  @db.Decimal(18, 8)
   /// amount / exchangeRate, rounded to cents.
   amountUsd          Decimal  @db.Decimal(12, 2)
-  /// In the part's currency; for reference only, not part of the D8 check.
+  /// In the part's currency. D8: the parts' amounts must equal the cash due
+  /// plus the parts' fees (each fee / its part's exchangeRate).
   transactionFee     Decimal  @db.Decimal(18, 2)
   /// Order the parts were entered in.
   sortOrder          Int      @default(0)

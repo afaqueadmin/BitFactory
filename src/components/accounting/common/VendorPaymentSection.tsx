@@ -10,8 +10,9 @@
  * Security deposit: the vendor may apply part of the deposit it holds to
  * the invoice. Adjustments recorded earlier (Security Deposits page) and
  * the optional "Apply from deposit" amount lower the cash due, which the
- * currency parts must then match. If the deposit covers the whole total,
- * no cash parts or receipt are needed.
+ * currency parts must then match, plus their transaction fees (the amount
+ * paid includes the fee). If the deposit covers the whole total, no cash
+ * parts or receipt are needed.
  */
 
 import {
@@ -41,6 +42,7 @@ import {
   PaymentPartsFields,
   isPartComplete,
   newPaymentPart,
+  partsFeesUsd,
   partsPayload,
   partsTotalUsd,
 } from "@/components/accounting/common/PaymentPartsFields";
@@ -80,7 +82,10 @@ export interface VendorSideInvoice {
   depositAdjustments?: DepositAdjustment[];
 }
 
-/** D8, mirrored from the server: converted amount within $0.01 of the total. */
+/**
+ * D8, mirrored from the server: converted amount within $0.01 of the cash
+ * due plus fees.
+ */
 const TOLERANCE_USD = 0.01;
 
 /** Gaps under half a cent count as settled. */
@@ -184,6 +189,9 @@ function PaidSummary({
   const adjustments = invoice.depositAdjustments ?? [];
   const multi = parts.length > 1;
   const totalUsd = parts.reduce((sum, p) => sum + Number(p.amountUsd), 0);
+  const feeUsd = (p: VendorPaymentPart) =>
+    Number(p.transactionFee) / Number(p.exchangeRate);
+  const totalFeesUsd = parts.reduce((sum, p) => sum + feeUsd(p), 0);
 
   return (
     <Stack spacing={2}>
@@ -236,6 +244,9 @@ function PaidSummary({
                     part.currency.code,
                   )}
                 </SummaryRow>
+                <SummaryRow label="Fee (USD)">
+                  <CurrencyDisplay value={feeUsd(part)} />
+                </SummaryRow>
               </Box>
               {multi && <Divider sx={{ mt: 2 }} />}
             </Box>
@@ -250,6 +261,11 @@ function PaidSummary({
             {multi && (
               <SummaryRow label="Total Paid (USD)">
                 <CurrencyDisplay value={totalUsd} />
+              </SummaryRow>
+            )}
+            {multi && (
+              <SummaryRow label="Total Fees (USD)">
+                <CurrencyDisplay value={totalFeesUsd} />
               </SummaryRow>
             )}
             <SummaryRow label="Payment Receipt">
@@ -341,12 +357,14 @@ export function VendorPaymentSection({
   const noCash = cashDueUsd < CENT_EPSILON;
 
   const enteredUsd = partsTotalUsd(parts);
+  // The amount paid covers the cash due and the fees on top of it.
+  const feesUsd = noCash ? 0 : partsFeesUsd(parts);
+  const targetUsd = cashDueUsd + feesUsd;
   const partsComplete = parts.every((p) =>
     isPartComplete(p, { withFee: true }),
   );
   // Small epsilon so float division can't flip an exact match.
-  const matchesTotal =
-    Math.abs(enteredUsd - cashDueUsd) <= TOLERANCE_USD + 1e-9;
+  const matchesTotal = Math.abs(enteredUsd - targetUsd) <= TOLERANCE_USD + 1e-9;
 
   const canSubmit =
     !!paidDate &&
@@ -455,7 +473,7 @@ export function VendorPaymentSection({
           onChange={setParts}
           disabled={saving}
           withFee
-          targetUsd={cashDueUsd}
+          targetUsd={targetUsd}
         />
       )}
 
@@ -503,15 +521,35 @@ export function VendorPaymentSection({
             </Stack>
           </>
         )}
+        {feesUsd > 0 && (
+          <>
+            <Stack direction="row" justifyContent="space-between">
+              <Typography color="textSecondary">
+                Transaction fees (USD)
+              </Typography>
+              <Typography sx={{ fontWeight: 600 }}>
+                + <CurrencyDisplay value={feesUsd} />
+              </Typography>
+            </Stack>
+            <Stack direction="row" justifyContent="space-between">
+              <Typography color="textSecondary">Total to pay (USD)</Typography>
+              <Typography sx={{ fontWeight: 600 }}>
+                <CurrencyDisplay value={targetUsd} />
+              </Typography>
+            </Stack>
+          </>
+        )}
         {!noCash && parts.length === 1 && (
-          <AmountDueInCurrency usd={cashDueUsd} account={parts[0]} compact />
+          <AmountDueInCurrency usd={targetUsd} account={parts[0]} compact />
         )}
         {!noCash && enteredUsd > 0 && !matchesTotal && (
           <Alert severity="warning" sx={{ mt: 1.5 }}>
-            The amount paid must match the cash due within $0.01.{" "}
-            {enteredUsd < cashDueUsd
-              ? `$${(cashDueUsd - enteredUsd).toFixed(2)} USD is still to be entered.`
-              : `The parts are $${(enteredUsd - cashDueUsd).toFixed(2)} USD over.`}
+            {feesUsd > 0
+              ? "The amount paid must match the cash due plus transaction fees within $0.01."
+              : "The amount paid must match the cash due within $0.01."}{" "}
+            {enteredUsd < targetUsd
+              ? `$${(targetUsd - enteredUsd).toFixed(2)} USD is still to be entered.`
+              : `The parts are $${(enteredUsd - targetUsd).toFixed(2)} USD over.`}
           </Alert>
         )}
       </Box>

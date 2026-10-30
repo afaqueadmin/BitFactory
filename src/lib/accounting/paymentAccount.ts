@@ -102,6 +102,20 @@ export function partsUsdUnrounded(
 }
 
 /**
+ * Σ fee ÷ rate over the parts, unrounded. Vendor-side fees are in each
+ * part's currency and must be covered by its amount, so they add to the
+ * USD the parts have to reach.
+ */
+export function feesUsdUnrounded(
+  parts: { fee: Decimal; rate: Decimal }[],
+): Decimal {
+  return parts.reduce(
+    (sum, p) => sum.plus(p.fee.dividedBy(p.rate)),
+    new Decimal(0),
+  );
+}
+
+/**
  * D8: the payment, converted to USD, must equal the invoice total within
  * $0.01. A multi-currency payment is checked on the sum of its parts.
  * Compares the unrounded conversion so rounding can't hide a gap.
