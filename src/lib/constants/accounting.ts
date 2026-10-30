@@ -347,6 +347,10 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   [AuditAction.GUILD_DISTRIBUTION_SETTLED]: "Guild Distribution Settled",
   [AuditAction.GUILD_PAYOUT_SETTINGS_UPDATED]: "Guild Payout Settings Updated",
   [AuditAction.GUILD_PAYOUT_BATCH_CREATED]: "Guild Payout Batch Created",
+  [AuditAction.REPAIR_CHARGE_CREATED]: "Repair Charge Created",
+  [AuditAction.REPAIR_CHARGE_UPDATED]: "Repair Charge Updated",
+  [AuditAction.REPAIR_CHARGE_DELETED]: "Repair Charge Deleted",
+  [AuditAction.REPAIR_SITE_SETTING_UPDATED]: "Repair Site Settings Updated",
 };
 
 // ============================================================================

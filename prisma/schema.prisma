@@ -2447,6 +2447,10 @@ enum AuditAction {
   GUILD_DISTRIBUTION_SETTLED
   GUILD_PAYOUT_SETTINGS_UPDATED
   GUILD_PAYOUT_BATCH_CREATED
+  REPAIR_CHARGE_CREATED
+  REPAIR_CHARGE_UPDATED
+  REPAIR_CHARGE_DELETED
+  REPAIR_SITE_SETTING_UPDATED
 }
 
 enum NotificationType {
@@ -2677,6 +2681,55 @@ model MinerRepairNote {
   @@index([minerId])
   @@index([createdById])
   @@map("miner_repair_notes")
+}
+
+// Hosting sites with a published repair price list (/repair-charges).
+enum RepairSite {
+  BRAZIL
+  ETHIOPIA
+}
+
+// FIXED: amount. RANGE: amount - amountMax. EXTERNAL: no amount, priced on
+// the manufacturer's website (linkUrl, else the site's partsUrl).
+enum RepairPriceType {
+  FIXED
+  RANGE
+  EXTERNAL
+}
+
+// One line of a site's repair price list, admin-managed at
+// /admin/repair-charges and shown to clients at /repair-charges. Display
+// only - Hardware Repair invoices keep their own line items, so changing a
+// price here never touches an issued invoice. isActive=false hides the row
+// from clients.
+model RepairCharge {
+  id         String          @id @default(cuid())
+  site       RepairSite
+  repairType String
+  priceType  RepairPriceType @default(FIXED)
+  amount     Decimal?        @db.Decimal(12, 2)
+  amountMax  Decimal?        @db.Decimal(12, 2)
+  note       String?
+  linkUrl    String?
+  sortOrder  Int             @default(0)
+  isActive   Boolean         @default(true)
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+
+  @@unique([site, repairType])
+  @@index([site, sortOrder])
+  @@map("repair_charges")
+}
+
+// Per-site values that apply to every repair: the flat hands & eyes fee, and
+// the parts shop link shown with the site's price list.
+model RepairSiteSetting {
+  site            RepairSite @id
+  handsAndEyesFee Decimal    @db.Decimal(12, 2)
+  partsUrl        String?
+  updatedAt       DateTime   @updatedAt
+
+  @@map("repair_site_settings")
 }
 
 // A support ticket raised by a CLIENT or FRANCHISEE (acting for their own

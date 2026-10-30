@@ -334,6 +334,11 @@ const sidebarSections: SidebarSection[] = [
             path: "/accounting/pricing",
           },
           {
+            title: "Repair Charges",
+            icon: <HardwareRepairIcon />,
+            path: "/admin/repair-charges",
+          },
+          {
             title: "Invoice PDF Settings",
             icon: <PdfSettingsIcon />,
             path: "/accounting/pdf-invoice-settings",

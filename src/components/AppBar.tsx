@@ -44,6 +44,7 @@ import InsightsOutlinedIcon from "@mui/icons-material/InsightsOutlined";
 import TrendingUpOutlinedIcon from "@mui/icons-material/TrendingUpOutlined";
 import ShowChartOutlinedIcon from "@mui/icons-material/ShowChartOutlined";
 import SavingsOutlinedIcon from "@mui/icons-material/SavingsOutlined";
+import BuildOutlinedIcon from "@mui/icons-material/BuildOutlined";
 import SupportAgentOutlinedIcon from "@mui/icons-material/SupportAgentOutlined";
 import HelpOutlineRoundedIcon from "@mui/icons-material/HelpOutlineRounded";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
@@ -137,6 +138,11 @@ const toolLinks: NavLink[] = [
     href: "/payback-analysis",
     label: "Payback Analysis",
     icon: <SavingsOutlinedIcon />,
+  },
+  {
+    href: "/repair-charges",
+    label: "Repair Charges",
+    icon: <BuildOutlinedIcon />,
   },
   { href: "/faq", label: "FAQ", icon: <HelpOutlineRoundedIcon /> },
 ];

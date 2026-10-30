@@ -36,6 +36,7 @@ export {
   useFirmwareOptions,
   useManageFirmwareOptions,
 } from "./useFirmwareOptions";
+export { useRepairCharges, useManageRepairCharges } from "./useRepairCharges";
 export {
   useSecondaryLoginRequests,
   useCreateSecondaryLoginRequest,
