@@ -69,8 +69,8 @@ export default function RepairChargesPage() {
             mt: "7px",
           }}
         >
-          Repair prices at each hosting site, in USD. A fixed hands &amp; eyes
-          fee is added to every repair.
+          Repair prices in USD at each hosting site. A fixed hands &amp; eyes
+          fee is added to each repair.
         </Typography>
       </Box>
 

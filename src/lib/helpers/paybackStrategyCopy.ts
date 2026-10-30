@@ -14,12 +14,12 @@ export interface PaybackStrategyCopy {
  */
 export const STRATEGY_COPY: Record<PaybackStrategyKey, PaybackStrategyCopy> = {
   STRATEGY_0: {
-    headline: "No Accumulation (Stable) - Sell all BTC, hold USDT",
+    headline: "No Accumulation (Stable) - Sell all BTC, hold USD",
     detail:
-      "The miner receives the full BTC mining rewards directly from their machines into their wallet. Thereafter, the miner sells all of their mined Bitcoin, pays for the hosting and co-location charges in USD each month, and holds the balance in USDT instead of Bitcoin.",
+      "The miner receives the full BTC mining rewards directly from their machines into their wallet. Thereafter, the miner sells all of their mined Bitcoin, pays for the hosting and co-location charges in USD each month, and holds the balance in USD instead of Bitcoin.",
   },
   STRATEGY_1A: {
-    headline: "Auto Deduct Hybrid Accumulation",
+    headline: "Auto Deduct, Hybrid Accumulation",
     detail:
       "Hosting and co-location charges are auto-deducted from your BTC mining rewards earned by your machines. Hence, only net rewards in BTC are transferred to your wallet automatically.",
   },
