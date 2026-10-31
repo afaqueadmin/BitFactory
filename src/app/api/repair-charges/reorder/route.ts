@@ -8,7 +8,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { isRepairSite } from "@/lib/repairCharges";
-import { requireRepairChargesUser } from "@/lib/repairChargesServer";
+import {
+  requireRepairChargesUser,
+  touchRepairSite,
+} from "@/lib/repairChargesServer";
 
 export async function PUT(request: NextRequest) {
   try {
@@ -65,6 +68,7 @@ export async function PUT(request: NextRequest) {
         }),
       ),
     );
+    await touchRepairSite(body.site);
 
     return NextResponse.json({ success: true });
   } catch (error) {

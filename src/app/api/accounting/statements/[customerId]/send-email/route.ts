@@ -301,7 +301,7 @@ export async function POST(
     // Send email
     const mailOptions = {
       from:
-        `BitFactory Accounts <${process.env.SMTP_FROM}>` ||
+        `Bitfactory Admin <${process.env.SMTP_FROM}>` ||
         "noreply@bitfactory.com",
       to: customer.email,
       cc: ccEmails.join(","),

@@ -49,31 +49,33 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch payment details
-    let paymentDetails = await prisma.paymentDetails.findFirst();
-
-    // If no payment details exist, create default ones
+    const paymentDetails = await prisma.paymentDetails.findFirst();
     if (!paymentDetails) {
-      paymentDetails = await prisma.paymentDetails.create({
-        data: {
-          companyName: "BitFactory.AE",
-          companyLegalName: "Higgs Computing Limited",
-          companyLocation: "Ras Al Khaimah, UAE",
-          machineHostingLocation: "Addis Ababa, Ethiopia",
-          paymentOption1Title: "OPTION 1:",
-          paymentOption1Details:
-            "USDT (Tron): TLNjcYnokhA1UcVsYVKjdeh9HzMS6GQJNe",
-          paymentOption2Title: "OPTION 2:",
-          paymentOption2Details:
-            "USDC (ETH): 0x722460E434013075E8cF8dd42c8854424aFa336E",
-          paymentOption3Title: "OPTION 3:",
-          paymentOption3Details: "",
-          billingInquiriesEmail: "invoices@bitfactory.ae",
-          billingInquiriesWhatsApp: "+971-52-6062903",
-          supportEmail: "support@bitfactory.ae",
-          supportWhatsApp: "+971-52-6062903",
-        },
-      });
+      return NextResponse.json({ error: "Payment details not found" });
     }
+    // // If no payment details exist, create default ones
+    // if (!paymentDetails) {
+    //   paymentDetails = await prisma.paymentDetails.create({
+    //     data: {
+    //       companyName: "BitFactory.AE",
+    //       companyLegalName: "Higgs Computing Limited",
+    //       companyLocation: "Ras Al Khaimah, UAE",
+    //       machineHostingLocation: "Addis Ababa, Ethiopia",
+    //       paymentOption1Title: "OPTION 1:",
+    //       paymentOption1Details:
+    //         "USDT (Tron): TLNjcYnokhA1UcVsYVKjdeh9HzMS6GQJNe",
+    //       paymentOption2Title: "OPTION 2:",
+    //       paymentOption2Details:
+    //         "USDC (ETH): 0x722460E434013075E8cF8dd42c8854424aFa336E",
+    //       paymentOption3Title: "OPTION 3:",
+    //       paymentOption3Details: "",
+    //       billingInquiriesEmail: "invoices@bitfactory.ae",
+    //       billingInquiriesWhatsApp: "+971-52-6062903",
+    //       supportEmail: "support@bitfactory.ae",
+    //       supportWhatsApp: "+971-52-6062903",
+    //     },
+    //   });
+    // }
 
     // Fetch updated user info if updatedBy is set
     let updatedByUser = null;
@@ -144,88 +146,90 @@ export async function PUT(req: NextRequest) {
     }
 
     // Get existing payment details
-    let existingDetails = await prisma.paymentDetails.findFirst();
-
-    if (!existingDetails) {
-      // Create if doesn't exist
-      existingDetails = await prisma.paymentDetails.create({
-        data: {
-          companyName: body.companyName || "BitFactory.AE",
-          companyLegalName: body.companyLegalName || "Higgs Computing Limited",
-          companyLocation: body.companyLocation || "Ras Al Khaimah, UAE",
-          machineHostingLocation:
-            body.machineHostingLocation || "Addis Ababa, Ethiopia",
-          paymentOption1Title: body.paymentOption1Title || "OPTION 1:",
-          paymentOption1Details:
-            body.paymentOption1Details ||
-            "USDT (Tron): TLNjcYnokhA1UcVsYVKjdeh9HzMS6GQJNe",
-          paymentOption2Title: body.paymentOption2Title || "OPTION 2:",
-          paymentOption2Details:
-            body.paymentOption2Details ||
-            "USDC (ETH): 0x722460E434013075E8cF8dd42c8854424aFa336E",
-          paymentOption3Title: body.paymentOption3Title || "OPTION 3:",
-          paymentOption3Details: body.paymentOption3Details || "",
-          billingInquiriesEmail:
-            body.billingInquiriesEmail || "invoices@bitfactory.ae",
-          billingInquiriesWhatsApp:
-            body.billingInquiriesWhatsApp || "+971-52-6062903",
-          supportEmail: body.supportEmail || "support@bitfactory.ae",
-          supportWhatsApp: body.supportWhatsApp || "+971-52-6062903",
-          updatedBy: userId,
-        },
-      });
-    } else {
-      // Update existing
-      existingDetails = await prisma.paymentDetails.update({
-        where: { id: existingDetails.id },
-        data: {
-          ...(body.companyName !== undefined && {
-            companyName: body.companyName,
-          }),
-          ...(body.companyLegalName !== undefined && {
-            companyLegalName: body.companyLegalName,
-          }),
-          ...(body.companyLocation !== undefined && {
-            companyLocation: body.companyLocation,
-          }),
-          ...(body.machineHostingLocation !== undefined && {
-            machineHostingLocation: body.machineHostingLocation,
-          }),
-          ...(body.logoBase64 !== undefined && { logoBase64: body.logoBase64 }),
-          ...(body.paymentOption1Title !== undefined && {
-            paymentOption1Title: body.paymentOption1Title,
-          }),
-          ...(body.paymentOption1Details !== undefined && {
-            paymentOption1Details: body.paymentOption1Details,
-          }),
-          ...(body.paymentOption2Title !== undefined && {
-            paymentOption2Title: body.paymentOption2Title,
-          }),
-          ...(body.paymentOption2Details !== undefined && {
-            paymentOption2Details: body.paymentOption2Details,
-          }),
-          ...(body.paymentOption3Title !== undefined && {
-            paymentOption3Title: body.paymentOption3Title,
-          }),
-          ...(body.paymentOption3Details !== undefined && {
-            paymentOption3Details: body.paymentOption3Details,
-          }),
-          ...(body.billingInquiriesEmail !== undefined && {
-            billingInquiriesEmail: body.billingInquiriesEmail,
-          }),
-          ...(body.billingInquiriesWhatsApp !== undefined && {
-            billingInquiriesWhatsApp: body.billingInquiriesWhatsApp,
-          }),
-          ...(body.supportEmail !== undefined && {
-            supportEmail: body.supportEmail,
-          }),
-          ...(body.supportWhatsApp !== undefined && {
-            supportWhatsApp: body.supportWhatsApp,
-          }),
-          updatedBy: userId,
-        },
-      });
+    let paymentDetails = await prisma.paymentDetails.findFirst();
+    if (!paymentDetails) {
+      return NextResponse.json({ error: "Payment details not found" });
     }
+    // if (!paymentDetails) {
+    //   // Create if doesn't exist
+    //   paymentDetails = await prisma.paymentDetails.create({
+    //     data: {
+    //       companyName: body.companyName || "BitFactory.AE",
+    //       companyLegalName: body.companyLegalName || "Higgs Computing Limited",
+    //       companyLocation: body.companyLocation || "Ras Al Khaimah, UAE",
+    //       machineHostingLocation:
+    //         body.machineHostingLocation || "Addis Ababa, Ethiopia",
+    //       paymentOption1Title: body.paymentOption1Title || "OPTION 1:",
+    //       paymentOption1Details:
+    //         body.paymentOption1Details ||
+    //         "USDT (Tron): TLNjcYnokhA1UcVsYVKjdeh9HzMS6GQJNe",
+    //       paymentOption2Title: body.paymentOption2Title || "OPTION 2:",
+    //       paymentOption2Details:
+    //         body.paymentOption2Details ||
+    //         "USDC (ETH): 0x722460E434013075E8cF8dd42c8854424aFa336E",
+    //       paymentOption3Title: body.paymentOption3Title || "OPTION 3:",
+    //       paymentOption3Details: body.paymentOption3Details || "",
+    //       billingInquiriesEmail:
+    //         body.billingInquiriesEmail || "invoices@bitfactory.ae",
+    //       billingInquiriesWhatsApp:
+    //         body.billingInquiriesWhatsApp || "+971-52-6062903",
+    //       supportEmail: body.supportEmail || "support@bitfactory.ae",
+    //       supportWhatsApp: body.supportWhatsApp || "+971-52-6062903",
+    //       updatedBy: userId,
+    //     },
+    //   });
+    // } else {
+    // Update existing
+    paymentDetails = await prisma.paymentDetails.update({
+      where: { id: paymentDetails.id },
+      data: {
+        ...(body.companyName !== undefined && {
+          companyName: body.companyName,
+        }),
+        ...(body.companyLegalName !== undefined && {
+          companyLegalName: body.companyLegalName,
+        }),
+        ...(body.companyLocation !== undefined && {
+          companyLocation: body.companyLocation,
+        }),
+        ...(body.machineHostingLocation !== undefined && {
+          machineHostingLocation: body.machineHostingLocation,
+        }),
+        ...(body.logoBase64 !== undefined && { logoBase64: body.logoBase64 }),
+        ...(body.paymentOption1Title !== undefined && {
+          paymentOption1Title: body.paymentOption1Title,
+        }),
+        ...(body.paymentOption1Details !== undefined && {
+          paymentOption1Details: body.paymentOption1Details,
+        }),
+        ...(body.paymentOption2Title !== undefined && {
+          paymentOption2Title: body.paymentOption2Title,
+        }),
+        ...(body.paymentOption2Details !== undefined && {
+          paymentOption2Details: body.paymentOption2Details,
+        }),
+        ...(body.paymentOption3Title !== undefined && {
+          paymentOption3Title: body.paymentOption3Title,
+        }),
+        ...(body.paymentOption3Details !== undefined && {
+          paymentOption3Details: body.paymentOption3Details,
+        }),
+        ...(body.billingInquiriesEmail !== undefined && {
+          billingInquiriesEmail: body.billingInquiriesEmail,
+        }),
+        ...(body.billingInquiriesWhatsApp !== undefined && {
+          billingInquiriesWhatsApp: body.billingInquiriesWhatsApp,
+        }),
+        ...(body.supportEmail !== undefined && {
+          supportEmail: body.supportEmail,
+        }),
+        ...(body.supportWhatsApp !== undefined && {
+          supportWhatsApp: body.supportWhatsApp,
+        }),
+        updatedBy: userId,
+      },
+    });
+    // }
 
     // Fetch updated user info
     const updatedByUser = await prisma.user.findUnique({
@@ -237,7 +241,7 @@ export async function PUT(req: NextRequest) {
       success: true,
       message: "Payment details updated successfully",
       data: {
-        ...existingDetails,
+        ...paymentDetails,
         updatedByUser,
       },
     });

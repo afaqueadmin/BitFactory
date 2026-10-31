@@ -46,6 +46,11 @@ export interface RepairSiteSettingItem {
   partsUrl: string | null;
 }
 
+/** GET shape: updatedAt is the site's last price-list or settings change (ISO). */
+export interface RepairSiteSettingView extends RepairSiteSettingItem {
+  updatedAt: string;
+}
+
 export const isRepairSite = (v: unknown): v is RepairSite =>
   typeof v === "string" && (REPAIR_SITES as readonly string[]).includes(v);
 

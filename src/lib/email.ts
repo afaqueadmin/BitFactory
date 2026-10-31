@@ -1435,7 +1435,7 @@ export const sendInvoiceEmailWithPDF = async (
         : CC_INVOICE_EMAIL || "invoices@bitfactory.ae";
     const mailOptions = {
       from:
-        `BitFactory Accounts <${process.env.SMTP_FROM}>` ||
+        `Bitfactory Admin <${process.env.SMTP_FROM}>` ||
         "noreply@bitfactory.com",
       replyTo: REPLY_TO_EMAILS,
       to: email,
@@ -2313,7 +2313,7 @@ export const sendMemoEmail = async (
 
     const mailOptions = {
       from:
-        `BitFactory Accounts <${process.env.SMTP_FROM}>` ||
+        `Bitfactory Admin <${process.env.SMTP_FROM}>` ||
         "noreply@bitfactory.com",
       replyTo: REPLY_TO_EMAILS,
       to: email,
@@ -2357,7 +2357,7 @@ export const sendWalletSnapshotEmail = async (params: {
 
     await transporter.sendMail({
       from:
-        `BitFactory Accounts <${process.env.SMTP_FROM}>` ||
+        `Bitfactory Admin <${process.env.SMTP_FROM}>` ||
         "noreply@bitfactory.com",
       replyTo: REPLY_TO_EMAILS,
       to: params.email,
@@ -2409,7 +2409,7 @@ export const sendMemoVoidEmail = async (
 
     await transporter.sendMail({
       from:
-        `BitFactory Accounts <${process.env.SMTP_FROM}>` ||
+        `Bitfactory Admin <${process.env.SMTP_FROM}>` ||
         "noreply@bitfactory.com",
       replyTo: REPLY_TO_EMAILS,
       to: email,
