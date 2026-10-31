@@ -26,6 +26,7 @@ import {
   requireRepairChargesUser,
   serializeRepairCharge,
   serializeRepairSiteSetting,
+  touchRepairSite,
 } from "@/lib/repairChargesServer";
 
 export async function GET(request: NextRequest) {
@@ -93,6 +94,7 @@ export async function POST(request: NextRequest) {
     const charge = await prisma.repairCharge.create({
       data: { ...parsed, sortOrder: (last._max.sortOrder ?? 0) + 1 },
     });
+    await touchRepairSite(parsed.site);
 
     await prisma.auditLog.create({
       data: {

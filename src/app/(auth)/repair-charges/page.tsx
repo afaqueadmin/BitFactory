@@ -39,9 +39,23 @@ import {
   formatRepairUsd,
 } from "@/lib/repairCharges";
 
+// "31 Oct 2026"
+const formatUpdatedDate = (iso: string) =>
+  new Date(iso).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+
 export default function RepairChargesPage() {
   const { d, fonts } = useDaylight();
   const { charges, settings, loading, error } = useRepairCharges();
+  // One date for the page: the latest change at any site (every admin edit
+  // stamps its site's settings row - see touchRepairSite).
+  const lastUpdated = settings.reduce<string | null>(
+    (latest, s) => (!latest || s.updatedAt > latest ? s.updatedAt : latest),
+    null,
+  );
 
   return (
     <Box
@@ -72,6 +86,13 @@ export default function RepairChargesPage() {
           Repair prices in USD at each hosting site. A fixed hands &amp; eyes
           fee is added to each repair.
         </Typography>
+        {lastUpdated && (
+          <Typography
+            sx={{ fontSize: 12, color: d.muted, mt: "4px", fontWeight: 600 }}
+          >
+            Last updated: {formatUpdatedDate(lastUpdated)}
+          </Typography>
+        )}
       </Box>
 
       {loading ? (

@@ -21,6 +21,7 @@ import {
 import {
   requireRepairChargesUser,
   serializeRepairCharge,
+  touchRepairSite,
 } from "@/lib/repairChargesServer";
 
 export async function PUT(
@@ -66,6 +67,7 @@ export async function PUT(
       where: { id },
       data: parsed,
     });
+    await touchRepairSite(existing.site);
 
     await prisma.auditLog.create({
       data: {
@@ -123,6 +125,7 @@ export async function DELETE(
     }
 
     await prisma.repairCharge.delete({ where: { id } });
+    await touchRepairSite(existing.site);
 
     await prisma.auditLog.create({
       data: {
