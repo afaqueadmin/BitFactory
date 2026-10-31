@@ -366,7 +366,7 @@ export default function PDFInvoiceSettingsPage() {
               onChange={(e) =>
                 handleInputChange("paymentOption1Details", e.target.value)
               }
-              placeholder="e.g., USDT (Tron): TLNjcYnokhA1UcVsYVKjdeh9HzMS6GQJNe"
+              placeholder="e.g., USDT (Tron):"
             />
 
             {/* Option 2 */}
@@ -389,7 +389,7 @@ export default function PDFInvoiceSettingsPage() {
               onChange={(e) =>
                 handleInputChange("paymentOption2Details", e.target.value)
               }
-              placeholder="e.g., USDC (ETH): 0x722460E434013075E8cF8dd42c8854424aFa336E"
+              placeholder="e.g., USDC (ETH):"
             />
 
             {/* Option 3 */}

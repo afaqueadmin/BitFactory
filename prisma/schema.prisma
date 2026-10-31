@@ -2495,10 +2495,10 @@ model PaymentDetails {
 
   // Payment Options
   paymentOption1Title   String @default("OPTION 1:")
-  paymentOption1Details String @default("USDT (Tron): TLNjcYnokhA1UcVsYVKjdeh9HzMS6GQJNe")
+  paymentOption1Details String @default("USDT (Tron):")
 
   paymentOption2Title   String @default("OPTION 2:")
-  paymentOption2Details String @default("USDC (ETH): 0x722460E434013075E8cF8dd42c8854424aFa336E")
+  paymentOption2Details String @default("USDC (ETH):")
 
   paymentOption3Title   String @default("OPTION 3:")
   paymentOption3Details String // Bank details (multiline)
