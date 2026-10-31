@@ -4,6 +4,7 @@ import type {
   RepairPriceType,
   RepairSite,
   RepairSiteSettingItem,
+  RepairSiteSettingView,
 } from "@/lib/repairCharges";
 
 const QUERY_KEY = "repair-charges";
@@ -29,7 +30,7 @@ export function useRepairCharges(filters?: { includeInactive?: boolean }) {
 
   return {
     charges: (data?.data?.charges as RepairChargeItem[]) || [],
-    settings: (data?.data?.settings as RepairSiteSettingItem[]) || [],
+    settings: (data?.data?.settings as RepairSiteSettingView[]) || [],
     loading: isLoading,
     error: error instanceof Error ? error.message : null,
     refetch,

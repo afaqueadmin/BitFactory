@@ -4,12 +4,17 @@
  */
 
 import { NextRequest } from "next/server";
-import type { RepairCharge, RepairSiteSetting } from "@prisma/client";
+import type {
+  RepairCharge,
+  RepairSite,
+  RepairSiteSetting,
+} from "@prisma/client";
 import { isStaffRole } from "@/lib/auth/staffRoles";
 import { verifyJwtToken } from "@/lib/jwt";
+import { prisma } from "@/lib/prisma";
 import type {
   RepairChargeItem,
-  RepairSiteSettingItem,
+  RepairSiteSettingView,
 } from "@/lib/repairCharges";
 
 export async function requireRepairChargesUser(
@@ -49,10 +54,24 @@ export function serializeRepairCharge(row: RepairCharge): RepairChargeItem {
 
 export function serializeRepairSiteSetting(
   row: RepairSiteSetting,
-): RepairSiteSettingItem {
+): RepairSiteSettingView {
   return {
     site: row.site,
     handsAndEyesFee: row.handsAndEyesFee.toNumber(),
     partsUrl: row.partsUrl,
+    updatedAt: row.updatedAt.toISOString(),
   };
+}
+
+/**
+ * Stamps the site's RepairSiteSetting.updatedAt; the latest across sites is
+ * the "last updated" date on the client page. Called after every charge change (add,
+ * edit, hide, delete, reorder) - a delete leaves no row behind to carry the
+ * date, so the site row does.
+ */
+export async function touchRepairSite(site: RepairSite) {
+  await prisma.repairSiteSetting.updateMany({
+    where: { site },
+    data: { updatedAt: new Date() },
+  });
 }
