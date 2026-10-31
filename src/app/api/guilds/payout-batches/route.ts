@@ -23,6 +23,8 @@ import {
   effectivePayoutMethod,
   getPayoutSettings,
 } from "@/lib/guilds/payoutSettings";
+import { payoutTxUrl } from "@/lib/guilds/walletNetworks";
+import { payoutNetwork } from "@/lib/guilds/multisig/network";
 
 export async function GET(request: NextRequest) {
   const auth = await requireStaff(request);
@@ -114,7 +116,17 @@ export async function GET(request: NextRequest) {
           btc: Number(o.btc.toFixed(8)),
           names: [...o.names],
         })),
-        batches,
+        batches: batches.map((b) => ({
+          ...b,
+          // A multisig batch is on the payout network; manual ones on
+          // mainnet (or a reference with no link).
+          txUrl: payoutTxUrl(
+            b.txid,
+            b.method === "MULTISIG_BTC" ? payoutNetwork().walletNetwork : "BTC",
+          ),
+          // Never sent to the browser.
+          psbt: undefined,
+        })),
       },
     });
   } catch (error) {

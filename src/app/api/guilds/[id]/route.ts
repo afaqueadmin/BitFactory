@@ -17,10 +17,24 @@ import { requireStaff, jsonError } from "@/lib/guilds/routeAuth";
 import { loadGuildHostingInvoices } from "@/lib/guilds/hostingInvoice";
 import { GuildInputError, parseWalletAddress } from "@/lib/guilds/accounts";
 import {
-  AVAILABLE_PAYOUT_METHODS,
+  availablePayoutMethods,
   getPayoutSettings,
 } from "@/lib/guilds/payoutSettings";
 import { requestMeta } from "@/lib/guilds/audit";
+import {
+  isMultisigEnabled,
+  payoutNetwork,
+} from "@/lib/guilds/multisig/network";
+import {
+  appKeyFingerprint,
+  walletFromSettings,
+} from "@/lib/guilds/multisig/wallet";
+import {
+  CHANGE,
+  RECEIVE,
+  deriveAddress,
+  scriptKeyOrder,
+} from "@/lib/guilds/multisig/descriptor";
 
 const userSelect = { select: { id: true, name: true, email: true } };
 
@@ -87,6 +101,23 @@ export async function GET(
 
     const settings = await getPayoutSettings();
 
+    // Multisig: the guild's two addresses and the coins at them.
+    const network = payoutNetwork();
+    let wallet = null;
+    try {
+      wallet = isMultisigEnabled() ? walletFromSettings(settings) : null;
+    } catch {
+      wallet = null;
+    }
+    const index = guild.payoutAddressIndex;
+    const coins =
+      index === null
+        ? []
+        : await prisma.guildWalletCoin.findMany({
+            where: { guildId: guild.id, status: { not: "SPENT" } },
+            orderBy: { createdAt: "asc" },
+          });
+
     return NextResponse.json({
       success: true,
       data: {
@@ -95,7 +126,41 @@ export async function GET(
         payoutSettings: {
           defaultPayoutMethod: settings.defaultPayoutMethod,
           minPayoutSats: settings.minPayoutSats,
-          availableMethods: AVAILABLE_PAYOUT_METHODS,
+          availableMethods: availablePayoutMethods(),
+        },
+        multisig: {
+          enabled: isMultisigEnabled(),
+          network: network.name,
+          walletNetwork: network.walletNetwork,
+          walletReady: !!wallet && !!settings.appKeyEncrypted,
+          receiveAddress:
+            wallet && index !== null
+              ? deriveAddress(wallet, RECEIVE, index).address
+              : null,
+          changeAddress:
+            wallet && index !== null
+              ? deriveAddress(wallet, CHANGE, index).address
+              : null,
+          // For "Show on Trezor": the keys in the receiving script's order.
+          receiveKeys:
+            wallet && index !== null
+              ? scriptKeyOrder(wallet, RECEIVE, index)
+              : [],
+          walletKeys:
+            wallet?.keys.map((k) => ({
+              fingerprint: k.fingerprint,
+              originPath: k.originPath,
+              xpub: k.xpub,
+            })) ?? [],
+          appKeyFingerprint: appKeyFingerprint(settings),
+          coins: coins.map((c) => ({
+            txid: c.txid,
+            vout: c.vout,
+            sats: Number(c.sats),
+            branch: c.branch,
+            source: c.source,
+            status: c.status,
+          })),
         },
       },
     });
@@ -137,11 +202,18 @@ export async function PATCH(
     if (body.payoutAddress !== undefined) {
       data.payoutAddress = parseWalletAddress(body.payoutAddress);
     }
-    // null = the default method. Only methods that can send today.
+    // null = the default method. Only methods that can send here; multisig
+    // goes through /api/guilds/[id]/multisig, which also gives the guild its
+    // address.
     if (body.payoutMethod !== undefined) {
+      if (body.payoutMethod === "MULTISIG_BTC") {
+        throw new GuildInputError(
+          "Use Switch to multisig, which also gives the guild its address",
+        );
+      }
       if (
         body.payoutMethod !== null &&
-        !AVAILABLE_PAYOUT_METHODS.includes(
+        !availablePayoutMethods().includes(
           body.payoutMethod as GuildPayoutMethod,
         )
       ) {
@@ -158,9 +230,20 @@ export async function PATCH(
         isActive: true,
         payoutAddress: true,
         payoutMethod: true,
+        payoutAddressIndex: true,
       },
     });
     if (!before) return jsonError("Guild not found", 404);
+    // A multisig guild's address comes from the wallet, and Luxor pays its
+    // reward there - so neither can be changed by hand.
+    if (
+      before.payoutAddressIndex !== null &&
+      (data.payoutAddress !== undefined || data.payoutMethod !== undefined)
+    ) {
+      throw new GuildInputError(
+        "This guild is paid from the multisig wallet; its address and payout method can't be changed here",
+      );
+    }
 
     let guild;
     try {

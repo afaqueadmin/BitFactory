@@ -16,7 +16,7 @@ import {
 } from "@/lib/auth/emailIdentity";
 import { generateTempPassword } from "@/lib/helpers/generateTempPassword";
 import { getOrCreatePaybackConfig } from "@/lib/paybackConfigHelpers";
-import { DEFAULT_WALLET_NETWORK, WALLET_NETWORKS } from "./walletNetworks";
+import { WALLET_NETWORKS, defaultWalletNetwork } from "./walletNetworks";
 
 export interface NewGuildPerson {
   name: string;
@@ -34,7 +34,7 @@ export class GuildInputError extends Error {}
  */
 export function parseWalletAddress(
   value: unknown,
-  network: string = DEFAULT_WALLET_NETWORK,
+  network: string = defaultWalletNetwork(),
 ): string | null {
   if (value === undefined || value === null || value === "") return null;
   if (typeof value !== "string") {

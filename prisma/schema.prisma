@@ -139,6 +139,10 @@ model User {
   guildMemberRequestsReviewed             GuildMemberChangeRequest[]      @relation("guildMemberRequestsReviewed")
   guildPayoutBatchesCreated               GuildPayoutBatch[]              @relation("guildPayoutBatchesCreated")
   guildPayoutSettingsUpdated              GuildPayoutSettings[]           @relation("guildPayoutSettingsUpdated")
+  guildPayoutBatchesSigned                GuildPayoutBatch[]              @relation("guildPayoutBatchesSigned")
+  guildPayoutBatchesCancelled             GuildPayoutBatch[]              @relation("guildPayoutBatchesCancelled")
+  guildPayoutApprover                     GuildPayoutApprover?            @relation("guildPayoutApprover")
+  guildPayoutApproversAdded               GuildPayoutApprover[]           @relation("guildPayoutApproversAdded")
   guildDistributionLines                  GuildDistributionLine[]         @relation("guildDistributionLines")
 
   @@index([isDeleted])
@@ -444,6 +448,8 @@ model Guild {
   splitChangeRequests  GuildSplitChangeRequest[]
   memberChangeRequests GuildMemberChangeRequest[]
   distributions        GuildDistribution[]
+  walletCoins          GuildWalletCoin[]
+  payoutBatches        GuildPayoutBatch[]
 
   @@index([isActive])
   @@map("guilds")
@@ -671,9 +677,32 @@ enum GuildFeePayer {
 
 enum GuildPayoutBatchStatus {
   BUILDING
+  /// Multisig: built and signed with the app key (psbt), waiting for the
+  /// approver's Trezor signature.
+  AWAITING_SIGNATURE
   BROADCAST
   CONFIRMED
   FAILED
+  /// Multisig: cancelled before it was signed; nothing went out.
+  CANCELLED
+}
+
+enum GuildWalletCoinSource {
+  /// A Luxor payout to the guild's receiving address.
+  LUXOR
+  /// Change from one of our own payout transactions (carried shares).
+  CHANGE
+  /// Anything else that arrived at a guild address.
+  OTHER
+}
+
+enum GuildWalletCoinStatus {
+  /// Seen, not confirmed yet.
+  UNCONFIRMED
+  AVAILABLE
+  /// An input of a prepared payout that isn't broadcast yet.
+  RESERVED
+  SPENT
 }
 
 /// Payout settings for every guild. One row (id = 1).
@@ -693,6 +722,11 @@ model GuildPayoutSettings {
   network              String            @default("mainnet")
   /// Next derivation index for a guild receiving address.
   nextAddressIndex     Int               @default(0)
+  /// Key A (the app's key), encrypted with GUILD_APP_KEY_SECRET. Its public
+  /// key is one of the descriptor's three.
+  appKeyEncrypted      String?           @db.Text
+  /// Fee rate cap for a multisig payout, sat/vB.
+  maxFeeRateSatVb      Int               @default(50)
   updatedById          String?
   updatedBy            User?             @relation("guildPayoutSettingsUpdated", fields: [updatedById], references: [id])
   createdAt            DateTime          @default(now())
@@ -719,14 +753,77 @@ model GuildPayoutBatch {
   error         String?
   createdById   String?
   createdBy     User?                  @relation("guildPayoutBatchesCreated", fields: [createdById], references: [id])
+  /// Multisig: the one guild this transaction pays.
+  guildId       String?
+  guild         Guild?                 @relation(fields: [guildId], references: [id], onDelete: Restrict)
+  /// Multisig: the transaction as a PSBT (base64) - signed by the app key
+  /// once prepared, then by the approver's key.
+  psbt          String?                @db.Text
+  signedById    String?
+  signedBy      User?                  @relation("guildPayoutBatchesSigned", fields: [signedById], references: [id])
+  signedAt      DateTime?
+  /// What signed for the approver: Trezor model and firmware, or the
+  /// testnet software stand-in.
+  signerDevice  String?
+  cancelledById String?
+  cancelledBy   User?                  @relation("guildPayoutBatchesCancelled", fields: [cancelledById], references: [id])
+  cancelledAt   DateTime?
   broadcastAt   DateTime?
   confirmedAt   DateTime?
   createdAt     DateTime               @default(now())
   updatedAt     DateTime               @updatedAt
   distributions GuildDistribution[]
+  coinsReserved GuildWalletCoin[]      @relation("guildCoinsReserved")
+  coinsSpent    GuildWalletCoin[]      @relation("guildCoinsSpent")
 
   @@index([status])
+  @@index([guildId])
   @@map("guild_payout_batches")
+}
+
+// A coin (unspent output) at one of the payout wallet's addresses. Each
+// address belongs to one guild: its receiving address (branch 0) or its
+// change address (branch 1), both at the guild's payoutAddressIndex.
+model GuildWalletCoin {
+  id                String                @id @default(cuid())
+  guildId           String
+  guild             Guild                 @relation(fields: [guildId], references: [id], onDelete: Restrict)
+  txid              String
+  vout              Int
+  sats              BigInt
+  address           String
+  branch            Int
+  addressIndex      Int
+  source            GuildWalletCoinSource
+  status            GuildWalletCoinStatus @default(UNCONFIRMED)
+  blockHeight       Int?
+  confirmedAt       DateTime?
+  /// The Luxor "Payment" row this came from (source LUXOR).
+  poolTransactionId String?
+  poolTransaction   PoolTransaction?      @relation(fields: [poolTransactionId], references: [id], onDelete: SetNull)
+  reservedByBatchId String?
+  reservedByBatch   GuildPayoutBatch?     @relation("guildCoinsReserved", fields: [reservedByBatchId], references: [id], onDelete: SetNull)
+  spentByBatchId    String?
+  spentByBatch      GuildPayoutBatch?     @relation("guildCoinsSpent", fields: [spentByBatchId], references: [id], onDelete: SetNull)
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  @@unique([txid, vout])
+  @@index([guildId, status])
+  @@map("guild_wallet_coins")
+}
+
+// Who may prepare and sign multisig guild payouts (the Trezor holder and a
+// stand-in).
+model GuildPayoutApprover {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation("guildPayoutApprover", fields: [userId], references: [id], onDelete: Cascade)
+  addedById String
+  addedBy   User     @relation("guildPayoutApproversAdded", fields: [addedById], references: [id])
+  createdAt DateTime @default(now())
+
+  @@map("guild_payout_approvers")
 }
 
 // One monthly Luxor payout to a guild and how it is split: the hosting
@@ -1278,6 +1375,7 @@ model PoolTransaction {
   pool              Pool               @relation(fields: [poolId], references: [id], onDelete: Cascade)
   poolSubaccount    PoolSubaccount     @relation(fields: [poolSubaccountId], references: [id], onDelete: Cascade)
   guildDistribution GuildDistribution?
+  guildWalletCoins  GuildWalletCoin[]
 
   @@unique([poolSubaccountId, occurredAt, category, transactionType, amount])
   @@index([poolId])
@@ -2447,6 +2545,12 @@ enum AuditAction {
   GUILD_DISTRIBUTION_SETTLED
   GUILD_PAYOUT_SETTINGS_UPDATED
   GUILD_PAYOUT_BATCH_CREATED
+  GUILD_PAYOUT_WALLET_CONFIGURED
+  GUILD_PAYOUT_APPROVERS_UPDATED
+  GUILD_PAYOUT_PREPARED
+  GUILD_PAYOUT_SIGNED
+  GUILD_PAYOUT_BROADCAST
+  GUILD_PAYOUT_CANCELLED
   REPAIR_CHARGE_CREATED
   REPAIR_CHARGE_UPDATED
   REPAIR_CHARGE_DELETED

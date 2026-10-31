@@ -12,19 +12,20 @@ import { prisma } from "@/lib/prisma";
 import { requireStaff, jsonError } from "@/lib/guilds/routeAuth";
 import { GuildInputError, parseWalletAddress } from "@/lib/guilds/accounts";
 import {
-  AVAILABLE_PAYOUT_METHODS,
+  availablePayoutMethods,
   MIN_PAYOUT_FLOOR_SATS,
   getPayoutSettings,
+  publicPayoutSettings,
 } from "@/lib/guilds/payoutSettings";
 
 export async function GET(request: NextRequest) {
   const auth = await requireStaff(request);
   if ("error" in auth) return auth.error;
   try {
-    const settings = await getPayoutSettings();
+    const settings = publicPayoutSettings(await getPayoutSettings());
     return NextResponse.json({
       success: true,
-      data: { ...settings, availableMethods: AVAILABLE_PAYOUT_METHODS },
+      data: { ...settings, availableMethods: availablePayoutMethods() },
     });
   } catch (error) {
     console.error("[Guild Payout Settings API] GET error:", error);
@@ -96,7 +97,11 @@ export async function PATCH(request: NextRequest) {
         }),
       },
     });
-    return NextResponse.json({ success: true, data: after });
+    const saved = publicPayoutSettings(after);
+    return NextResponse.json({
+      success: true,
+      data: { ...saved, availableMethods: availablePayoutMethods() },
+    });
   } catch (error) {
     if (error instanceof GuildInputError) return jsonError(error.message);
     console.error("[Guild Payout Settings API] PATCH error:", error);

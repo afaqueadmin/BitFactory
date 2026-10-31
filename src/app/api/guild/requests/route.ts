@@ -35,7 +35,7 @@ import {
 import { isEmailTaken } from "@/lib/auth/emailIdentity";
 import { requestMeta } from "@/lib/guilds/audit";
 import {
-  DEFAULT_WALLET_NETWORK,
+  defaultWalletNetwork,
   isWalletNetwork,
 } from "@/lib/guilds/walletNetworks";
 import { sendGuildRequestSubmittedEmail } from "@/lib/email";
@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
       const target = members.find((m) => m.id === body.membershipId);
       if (!target) throw new GuildInputError("Choose a guild member");
       const network =
-        body.network === undefined ? DEFAULT_WALLET_NETWORK : body.network;
+        body.network === undefined ? defaultWalletNetwork() : body.network;
       if (!isWalletNetwork(network)) {
         throw new GuildInputError("Unsupported wallet network");
       }

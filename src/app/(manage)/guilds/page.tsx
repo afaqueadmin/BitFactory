@@ -41,6 +41,7 @@ import {
   formatUsd,
 } from "@/lib/guilds/format";
 import { useStepUp } from "@/components/StepUpDialog";
+import PayoutWalletCard from "@/components/guilds/PayoutWalletCard";
 import { payoutTxUrl } from "@/lib/guilds/walletNetworks";
 
 interface GuildRow {
@@ -188,6 +189,7 @@ export default function GuildsPage() {
 
       <SendPayoutsPanel onSent={load} />
       <PayoutSettingsCard />
+      <PayoutWalletCard />
 
       <CreateGuildDialog
         open={createOpen}
@@ -470,6 +472,8 @@ interface PayoutQueue {
     method: string;
     status: string;
     txid: string | null;
+    /** Explorer link, worked out on the server (it knows the network). */
+    txUrl: string | null;
     createdAt: string;
     createdBy: { name: string | null; email: string } | null;
     distributions: { rewardMonth: string; guild: { name: string } }[];
@@ -589,7 +593,7 @@ function SendPayoutsPanel({ onSent }: { onSent: () => void }) {
             Recent payouts
           </Typography>
           {queue.batches.map((b) => {
-            const url = payoutTxUrl(b.txid);
+            const url = b.txUrl ?? payoutTxUrl(b.txid);
             return (
               <Typography key={b.id} sx={{ fontSize: 12.5 }}>
                 {new Date(b.createdAt).toLocaleDateString()} ·{" "}
@@ -695,6 +699,7 @@ interface PayoutSettingsData {
   companyWalletAddress: string | null;
   defaultPayoutMethod: string;
   autoExecute: boolean;
+  availableMethods?: string[];
 }
 
 const FEE_PAYERS = [
@@ -828,9 +833,11 @@ function PayoutSettingsCard() {
           size="small"
           label="Payout method"
           value={
-            form.defaultPayoutMethod === "MANUAL"
-              ? "Manual - automatic multisig coming soon"
-              : form.defaultPayoutMethod
+            form.defaultPayoutMethod !== "MANUAL"
+              ? form.defaultPayoutMethod
+              : form.availableMethods?.includes("MULTISIG_BTC")
+                ? "Manual - switch a guild to multisig on its page"
+                : "Manual - automatic multisig coming soon"
           }
           disabled
           sx={ds.inputSx}

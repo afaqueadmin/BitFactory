@@ -13,8 +13,13 @@ import { fetchLiveBtcPrice } from "@/lib/services/btcPriceService";
 import { DEFAULT_PAYOUT_CATEGORIES } from "@/lib/simulation/payouts";
 import { startOfBillingMonth } from "@/lib/accounting/hostingMonths";
 import { sendGuildShortfallEmail } from "@/lib/email";
-import { getPayoutSettings } from "./payoutSettings";
-import { calculateDistribution } from "./distribution";
+import { effectivePayoutMethod, getPayoutSettings } from "./payoutSettings";
+import {
+  calculateDistribution,
+  type DistributionInput,
+  type DistributionResult,
+} from "./distribution";
+import { syncGuildCoins } from "./multisig/coins";
 import {
   ensureMonthHostingInvoice,
   loadUnpaidHostingInvoices,
@@ -24,7 +29,12 @@ export type RunDistributionResult =
   | { outcome: "no-subaccount" }
   | { outcome: "no-payout" }
   | { outcome: "already-sent"; distributionId: string }
-  | { outcome: "saved"; distributionId: string; status: string };
+  | {
+      outcome: "saved";
+      distributionId: string;
+      status: string;
+      calculation: DistributionResult;
+    };
 
 const nextMonth = (month: Date) =>
   new Date(Date.UTC(month.getUTCFullYear(), month.getUTCMonth() + 1, 1));
@@ -43,6 +53,12 @@ export async function runGuildDistribution(params: {
   /** Staff member running it; the cron passes none. */
   actorId?: string;
   now?: Date;
+  /**
+   * Preparing a multisig payout: keep the rate the month was calculated at,
+   * and charge the transaction's real fee.
+   */
+  btcUsdRate?: number;
+  networkFeeBtc?: number;
 }): Promise<RunDistributionResult> {
   const now = params.now ?? new Date();
   const rewardMonth = startOfBillingMonth(params.rewardMonth);
@@ -113,9 +129,46 @@ export async function runGuildDistribution(params: {
   });
 
   const settings = await getPayoutSettings();
-  const btcUsdRate = (await fetchLiveBtcPrice()).price;
+  const btcUsdRate = params.btcUsdRate ?? (await fetchLiveBtcPrice()).price;
+  const multisig = effectivePayoutMethod(guild, settings) === "MULTISIG_BTC";
 
-  const result = calculateDistribution({
+  // Multisig: the month is paid from the coins Luxor's payouts left at the
+  // guild's address, so they must be there and confirmed.
+  let receivedBtc = existing?.receivedBtc ? Number(existing.receivedBtc) : null;
+  let receivedCoin: { txid: string; vout: number } | null = null;
+  const multisigHolds: string[] = [];
+  if (multisig) {
+    try {
+      await syncGuildCoins(guild.id);
+    } catch (error) {
+      multisigHolds.push(
+        `Couldn't check the guild's address: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+    const coins = await prisma.guildWalletCoin.findMany({
+      where: {
+        poolTransactionId: { in: payouts.map((p) => p.id) },
+        status: { in: ["AVAILABLE", "RESERVED"] },
+      },
+      orderBy: { createdAt: "asc" },
+    });
+    if (
+      multisigHolds.length === 0 &&
+      payouts.some((p) => !coins.some((c) => c.poolTransactionId === p.id))
+    ) {
+      multisigHolds.push(
+        "Waiting for Luxor's payment to confirm at the guild's address",
+      );
+    }
+    receivedBtc = multisigHolds.length
+      ? null
+      : coins.reduce((s, c) => s + Number(c.sats), 0) / 100_000_000;
+    receivedCoin = coins[0]
+      ? { txid: coins[0].txid, vout: coins[0].vout }
+      : null;
+  }
+
+  const input: DistributionInput = {
     payoutBtc,
     btcUsdRate,
     unpaidInvoices,
@@ -134,24 +187,52 @@ export async function runGuildDistribution(params: {
     now,
     minPayoutSats: settings.minPayoutSats,
     feePayer: settings.feePayer,
-    // Sent by hand there's no network fee to share out; the multisig batch
-    // (Phase 2b) recalculates with its real fee.
-    networkFeeBtc: 0,
-    receivedBtc: existing?.receivedBtc ? Number(existing.receivedBtc) : null,
-    externalHolds: earlierUnsent
-      ? [
-          `Waiting for the ${formatRewardMonth(earlierUnsent.rewardMonth)} distribution to be sent first`,
-        ]
-      : [],
-  });
+    // Sent by hand there's no network fee to share out; preparing a
+    // multisig payout recalculates with its real fee.
+    networkFeeBtc: params.networkFeeBtc ?? 0,
+    receivedBtc,
+    externalHolds: [
+      ...(earlierUnsent
+        ? [
+            `Waiting for the ${formatRewardMonth(earlierUnsent.rewardMonth)} distribution to be sent first`,
+          ]
+        : []),
+      ...multisigHolds,
+    ],
+  };
+  let result = calculateDistribution(input);
+  // Multisig: the fee comes out of the company output; if that can't cover
+  // it, hold rather than have Higgs top it up from elsewhere.
+  if (multisig && result.feeTopUpBtc > 0 && result.holdReasons.length === 0) {
+    result = calculateDistribution({
+      ...input,
+      externalHolds: [
+        ...(input.externalHolds ?? []),
+        `The network fee (${result.networkFeeBtc.toFixed(8)} BTC) is more than the hosting share can cover`,
+      ],
+    });
+  }
 
   const status = result.holdReasons.length > 0 ? "HELD" : "CALCULATED";
   const data = {
     payoutTransactionId: payouts[0].id,
     payoutOccurredAt: payouts[0].occurredAt,
     luxorPayoutBtc: new Prisma.Decimal(payoutBtc.toFixed(8)),
+    ...(multisig
+      ? {
+          receivedBtc:
+            receivedBtc === null
+              ? null
+              : new Prisma.Decimal(receivedBtc.toFixed(8)),
+          receivedTxid: receivedCoin?.txid ?? null,
+          receivedVout: receivedCoin?.vout ?? null,
+        }
+      : {}),
     btcUsdRate: new Prisma.Decimal(btcUsdRate.toFixed(2)),
-    rateSource: "live BTCUSDT (btcPriceService)",
+    rateSource:
+      params.btcUsdRate !== undefined && existing
+        ? existing.rateSource
+        : "live BTCUSDT (btcPriceService)",
     hostingDueUsd: new Prisma.Decimal(result.hostingDueUsd.toFixed(2)),
     companyBtc: new Prisma.Decimal(result.companyBtc.toFixed(8)),
     companyUsd: new Prisma.Decimal(result.companyUsd.toFixed(2)),
@@ -232,5 +313,10 @@ export async function runGuildDistribution(params: {
     });
   }
 
-  return { outcome: "saved", distributionId: distribution.id, status };
+  return {
+    outcome: "saved",
+    distributionId: distribution.id,
+    status,
+    calculation: result,
+  };
 }

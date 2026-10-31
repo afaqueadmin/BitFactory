@@ -24,9 +24,23 @@ export const WALLET_NETWORKS: Record<string, WalletNetwork> = {
     txUrl: (txid) =>
       TXID.test(txid) ? `https://mempool.space/tx/${txid}` : null,
   },
+  // Testnet4, for trying multisig payouts with worthless coins.
+  BTC_TESTNET: {
+    label: "Bitcoin testnet",
+    parse: (address) => (validate(address, Network.testnet) ? address : null),
+    txUrl: (txid) =>
+      TXID.test(txid) ? `https://mempool.space/testnet4/tx/${txid}` : null,
+  },
 };
 
-export const DEFAULT_WALLET_NETWORK = "BTC";
+/**
+ * The network new wallets are on: Bitcoin, or testnet4 where guild payouts
+ * are being tried on testnet (GUILD_PAYOUT_NETWORK=testnet, never set on
+ * production).
+ */
+export function defaultWalletNetwork(): string {
+  return process.env.GUILD_PAYOUT_NETWORK === "testnet" ? "BTC_TESTNET" : "BTC";
+}
 
 export function isWalletNetwork(value: unknown): value is string {
   return typeof value === "string" && value in WALLET_NETWORKS;
@@ -35,7 +49,7 @@ export function isWalletNetwork(value: unknown): value is string {
 /** Explorer link for a payout transaction, or null (e.g. a manual reference). */
 export function payoutTxUrl(
   txid: string | null | undefined,
-  network: string = DEFAULT_WALLET_NETWORK,
+  network: string = defaultWalletNetwork(),
 ): string | null {
   if (!txid) return null;
   return WALLET_NETWORKS[network]?.txUrl(txid) ?? null;

@@ -30,7 +30,12 @@ function originOf(url: string | undefined): string | null {
  * production.
  */
 function contentSecurityPolicy(): string {
-  const frames = ["'self'", "https://embed.polymarket.com"];
+  const frames = [
+    "'self'",
+    "https://embed.polymarket.com",
+    // Trezor Connect's iframe, for signing guild payouts with a Trezor
+    "https://connect.trezor.io",
+  ];
   const btcpay = originOf(process.env.BTCPAY_URL);
   if (btcpay) frames.push(btcpay);
   // Accounting PDFs upload from the browser straight to R2 (src/lib/storage/r2.ts)
@@ -64,6 +69,7 @@ function contentSecurityPolicy(): string {
       "https://api.kraken.com",
       "https://api.coingecko.com",
       "https://mempool.space",
+      "https://connect.trezor.io",
       ...(r2 ? [r2] : []),
       ...(isDev ? ["ws:", "wss:"] : []),
     ],

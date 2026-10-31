@@ -29,6 +29,7 @@ import {
 import { isFullSplit } from "@/lib/guilds/distribution";
 import { loadUnpaidHostingInvoices } from "@/lib/guilds/hostingInvoice";
 import { requestMeta } from "@/lib/guilds/audit";
+import { defaultWalletNetwork } from "@/lib/guilds/walletNetworks";
 import {
   SUBACCOUNT_TX_OPTIONS,
   findLuxorSubaccountConflicts,
@@ -178,6 +179,7 @@ export async function POST(request: NextRequest) {
               isGuildmaster,
               rewardPercent: new Prisma.Decimal(person.percent.toFixed(4)),
               walletAddress: person.walletAddress,
+              walletNetwork: defaultWalletNetwork(),
               walletUpdatedAt: person.walletAddress ? now : null,
             })),
           },

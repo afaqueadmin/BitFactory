@@ -347,6 +347,14 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   [AuditAction.GUILD_DISTRIBUTION_SETTLED]: "Guild Distribution Settled",
   [AuditAction.GUILD_PAYOUT_SETTINGS_UPDATED]: "Guild Payout Settings Updated",
   [AuditAction.GUILD_PAYOUT_BATCH_CREATED]: "Guild Payout Batch Created",
+  [AuditAction.GUILD_PAYOUT_WALLET_CONFIGURED]:
+    "Guild Payout Wallet Configured",
+  [AuditAction.GUILD_PAYOUT_APPROVERS_UPDATED]:
+    "Guild Payout Approvers Updated",
+  [AuditAction.GUILD_PAYOUT_PREPARED]: "Guild Payout Prepared",
+  [AuditAction.GUILD_PAYOUT_SIGNED]: "Guild Payout Signed",
+  [AuditAction.GUILD_PAYOUT_BROADCAST]: "Guild Payout Broadcast",
+  [AuditAction.GUILD_PAYOUT_CANCELLED]: "Guild Payout Cancelled",
   [AuditAction.REPAIR_CHARGE_CREATED]: "Repair Charge Created",
   [AuditAction.REPAIR_CHARGE_UPDATED]: "Repair Charge Updated",
   [AuditAction.REPAIR_CHARGE_DELETED]: "Repair Charge Deleted",

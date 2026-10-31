@@ -38,6 +38,7 @@ import {
   useDaylightAdminSx,
 } from "@/components/daylight/AdminPage";
 import { useStepUp } from "@/components/StepUpDialog";
+import MultisigSignDialog from "@/components/guilds/MultisigSignDialog";
 import {
   distributionStatusLabel,
   distributionTone,
@@ -105,11 +106,31 @@ interface GuildDetail {
   guildmaster: { id: string; name: string | null; email: string };
   poolAuth: { authKey: string } | null;
   payoutAddress: string | null;
+  payoutAddressIndex: number | null;
   payoutMethod: string | null;
   payoutSettings: {
     defaultPayoutMethod: string;
     minPayoutSats: number;
     availableMethods: string[];
+  };
+  multisig: {
+    enabled: boolean;
+    network: "mainnet" | "testnet";
+    walletNetwork: string;
+    walletReady: boolean;
+    receiveAddress: string | null;
+    changeAddress: string | null;
+    receiveKeys: { xpub: string; branch: number; index: number }[];
+    walletKeys: { fingerprint: string; originPath: string; xpub: string }[];
+    appKeyFingerprint: string | null;
+    coins: {
+      txid: string;
+      vout: number;
+      sats: number;
+      branch: number;
+      source: string;
+      status: string;
+    }[];
   };
   memberships: Member[];
   distributions: Distribution[];
@@ -154,6 +175,7 @@ export default function GuildDetailPage() {
   const [removeTarget, setRemoveTarget] = useState<Member | null>(null);
   const [handoverTarget, setHandoverTarget] = useState<Member | null>(null);
   const [settleTarget, setSettleTarget] = useState<Distribution | null>(null);
+  const [signBatchId, setSignBatchId] = useState<string | null>(null);
   const [runMonth, setRunMonth] = useState(previousMonthKey());
   const [busy, setBusy] = useState(false);
   // Bumped on every reload, so the change history refreshes after an action.
@@ -402,6 +424,21 @@ export default function GuildDetailPage() {
           onSave={(body, done) =>
             act(() => postJson(`/api/guilds/${guild.id}`, body, "PATCH"), done)
           }
+          onSwitchToMultisig={() => {
+            if (
+              !window.confirm(
+                `Switch ${guild.name} to multisig payouts? It gets its own address from the payout wallet, and this can't be undone here.`,
+              )
+            )
+              return;
+            act(
+              () =>
+                withStepUp((creds) =>
+                  postJson(`/api/guilds/${guild.id}/multisig`, creds),
+                ),
+              "Switched to multisig - check the address with Show on Trezor, then set it as the Luxor payout address",
+            );
+          }}
         />
 
         {/* Hosting owed */}
@@ -609,30 +646,93 @@ export default function GuildDetailPage() {
                       ))}
                     </TableBody>
                   </Table>
-                  {d.payoutBatch ? (
-                    <Typography
-                      sx={{ fontSize: 12, color: "text.secondary", mt: 1 }}
+                  {d.payoutBatch?.status === "AWAITING_SIGNATURE" ? (
+                    <Stack
+                      direction={{ xs: "column", sm: "row" }}
+                      spacing={1}
+                      sx={{ mt: 1.5 }}
+                      justifyContent="space-between"
+                      alignItems={{ sm: "center" }}
                     >
-                      {d.status === "SETTLED" ? "Sent" : "Sending"}
-                      {d.settledAt &&
-                        ` ${new Date(d.settledAt).toLocaleString()}`}
-                      {d.payoutBatch.createdBy &&
-                        ` by ${d.payoutBatch.createdBy.name || d.payoutBatch.createdBy.email}`}
-                      {" · "}
-                      {payoutTxUrl(d.payoutBatch.txid) ? (
-                        <a
-                          href={payoutTxUrl(d.payoutBatch.txid)!}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          View transaction
-                        </a>
-                      ) : (
-                        `Ref ${d.payoutBatch.txid}`
-                      )}
+                      <Typography sx={{ fontSize: 13 }}>
+                        Prepared and signed by the app key
+                        {d.payoutBatch.createdBy &&
+                          ` (${d.payoutBatch.createdBy.name || d.payoutBatch.createdBy.email})`}
+                        {d.payoutBatch.txid
+                          ? " · signed, waiting to be seen on the network"
+                          : " · waiting for the approver's Trezor"}
+                      </Typography>
+                      <Button
+                        variant="contained"
+                        sx={ds.successBtnSx}
+                        disabled={busy}
+                        onClick={() => setSignBatchId(d.payoutBatch!.id)}
+                      >
+                        Review and sign
+                      </Button>
+                    </Stack>
+                  ) : d.payoutBatch ? (
+                    <Stack
+                      direction="row"
+                      spacing={1}
+                      sx={{ mt: 1 }}
+                      justifyContent="space-between"
+                      alignItems="center"
+                    >
+                      <Typography
+                        sx={{ fontSize: 12, color: "text.secondary" }}
+                      >
+                        {d.status === "SETTLED" ? "Sent" : "Sending"}
+                        {d.settledAt &&
+                          ` ${new Date(d.settledAt).toLocaleString()}`}
+                        {d.payoutBatch.createdBy &&
+                          ` by ${d.payoutBatch.createdBy.name || d.payoutBatch.createdBy.email}`}
+                        {" · "}
+                        {payoutTxUrl(
+                          d.payoutBatch.txid,
+                          d.payoutBatch.method === "MULTISIG_BTC"
+                            ? guild.multisig.walletNetwork
+                            : undefined,
+                        ) ? (
+                          <a
+                            href={payoutTxUrl(
+                              d.payoutBatch.txid,
+                              d.payoutBatch.method === "MULTISIG_BTC"
+                                ? guild.multisig.walletNetwork
+                                : undefined,
+                            )!}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            View transaction
+                          </a>
+                        ) : (
+                          `Ref ${d.payoutBatch.txid}`
+                        )}
+                        {d.status === "BROADCAST" &&
+                          ` · ${d.payoutBatch.confirmations} confirmation(s)`}
+                      </Typography>
                       {d.status === "BROADCAST" &&
-                        ` · ${d.payoutBatch.confirmations} confirmation(s)`}
-                    </Typography>
+                        d.payoutBatch.method === "MULTISIG_BTC" && (
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            sx={ds.outlineBtnSx}
+                            disabled={busy}
+                            onClick={() =>
+                              act(
+                                () =>
+                                  postJson("/api/guilds/multisig-payouts", {
+                                    action: "check",
+                                  }),
+                                "Checked - it settles once it has enough confirmations",
+                              )
+                            }
+                          >
+                            Check now
+                          </Button>
+                        )}
+                    </Stack>
                   ) : (
                     <Stack
                       direction="row"
@@ -661,14 +761,37 @@ export default function GuildDetailPage() {
                       >
                         Recalculate
                       </Button>
-                      <Button
-                        variant="contained"
-                        sx={ds.successBtnSx}
-                        disabled={busy || d.status !== "CALCULATED"}
-                        onClick={() => setSettleTarget(d)}
-                      >
-                        Mark as sent
-                      </Button>
+                      {guild.payoutAddressIndex !== null ? (
+                        <Button
+                          variant="contained"
+                          sx={ds.successBtnSx}
+                          disabled={busy || d.status !== "CALCULATED"}
+                          onClick={() =>
+                            act(
+                              () =>
+                                withStepUp((creds) =>
+                                  postJson("/api/guilds/multisig-payouts", {
+                                    action: "prepare",
+                                    distributionId: d.id,
+                                    ...creds,
+                                  }),
+                                ),
+                              "Payout prepared and signed by the app key - review and sign it with the Trezor",
+                            )
+                          }
+                        >
+                          Prepare payout
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="contained"
+                          sx={ds.successBtnSx}
+                          disabled={busy || d.status !== "CALCULATED"}
+                          onClick={() => setSettleTarget(d)}
+                        >
+                          Mark as sent
+                        </Button>
+                      )}
                     </Stack>
                   )}
                 </Paper>
@@ -777,6 +900,17 @@ export default function GuildDetailPage() {
             "Recorded as sent - hosting paid and members emailed",
           );
           if (ok) setSettleTarget(null);
+        }}
+      />
+      <MultisigSignDialog
+        batchId={signBatchId}
+        withStepUp={withStepUp}
+        onClose={() => setSignBatchId(null)}
+        onDone={async (message) => {
+          setSignBatchId(null);
+          setError(null);
+          setNotice(message);
+          await load();
         }}
       />
       {stepUpDialog}
@@ -1098,15 +1232,21 @@ function PayoutSetup({
   guild,
   busy,
   onSave,
+  onSwitchToMultisig,
 }: {
   guild: GuildDetail;
   busy: boolean;
   onSave: (body: Record<string, unknown>, done: string) => void;
+  onSwitchToMultisig: () => void;
 }) {
   const ds = useDaylightAdminSx();
   const [address, setAddress] = useState(guild.payoutAddress ?? "");
   useEffect(() => setAddress(guild.payoutAddress ?? ""), [guild.payoutAddress]);
   const { defaultPayoutMethod, availableMethods } = guild.payoutSettings;
+
+  if (guild.payoutAddressIndex !== null) {
+    return <MultisigPayoutBox guild={guild} />;
+  }
 
   return (
     <Box>
@@ -1163,14 +1303,166 @@ function PayoutSetup({
             <MenuItem
               key={value}
               value={value}
-              disabled={!availableMethods.includes(value)}
+              // Multisig is chosen with Switch to multisig, below.
+              disabled={
+                value === "MULTISIG_BTC" || !availableMethods.includes(value)
+              }
             >
               {label}
-              {availableMethods.includes(value) ? "" : " (coming soon)"}
+              {!availableMethods.includes(value)
+                ? " (coming soon)"
+                : value === "MULTISIG_BTC"
+                  ? " (use Switch to multisig)"
+                  : ""}
             </MenuItem>
           ))}
         </TextField>
       </Box>
+      {guild.multisig.enabled && (
+        <Alert severity="info" sx={{ ...ds.alertSx("info"), mt: 1.5 }}>
+          {guild.multisig.walletReady ? (
+            <>
+              Multisig payouts ({guild.multisig.network}) are available.
+              Switching gives this guild its own address from the 2-of-3 wallet;
+              set it on Luxor afterwards. It needs every distribution sent
+              first, and anything carried for members must be sent to the
+              guild&apos;s change address before the first multisig payout.{" "}
+              <Button
+                size="small"
+                variant="outlined"
+                sx={ds.outlineBtnSx}
+                disabled={busy}
+                onClick={onSwitchToMultisig}
+              >
+                Switch to multisig
+              </Button>
+            </>
+          ) : (
+            "Multisig payouts are switched on, but the payout wallet isn't set up yet (Guilds page → Multisig payout wallet)."
+          )}
+        </Alert>
+      )}
+    </Box>
+  );
+}
+
+/** A multisig guild's two addresses and the coins at them. */
+function MultisigPayoutBox({ guild }: { guild: GuildDetail }) {
+  const ds = useDaylightAdminSx();
+  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(
+    null,
+  );
+  const m = guild.multisig;
+  const mono = {
+    fontFamily: "monospace",
+    fontSize: 12,
+    wordBreak: "break-all",
+  };
+  const sum = (
+    filter: (c: GuildDetail["multisig"]["coins"][number]) => boolean,
+  ) => m.coins.filter(filter).reduce((s, c) => s + c.sats, 0) / 1e8;
+
+  const showOnTrezor = async () => {
+    setMessage(null);
+    try {
+      const client = await import("@/lib/guilds/multisig/trezorClient");
+      const originPath = m.walletKeys[0]?.originPath;
+      if (!originPath) throw new Error("The wallet isn't set up");
+      const device = await client.readTrezorKey({
+        network: m.network,
+        originPath,
+      });
+      const mine = m.walletKeys.find(
+        (k) =>
+          k.fingerprint !== m.appKeyFingerprint &&
+          k.fingerprint === device.fingerprint,
+      );
+      if (!mine) throw new Error("This Trezor holds none of the wallet's keys");
+      const shown = await client.showAddressOnTrezor({
+        network: m.network,
+        keys: m.walletKeys,
+        approverFingerprint: mine.fingerprint,
+        sortedKeys: m.receiveKeys,
+        branch: 0,
+        index: guild.payoutAddressIndex!,
+      });
+      setMessage(
+        shown === m.receiveAddress
+          ? { ok: true, text: `The Trezor derived the same address: ${shown}` }
+          : {
+              ok: false,
+              text: `The Trezor derived a DIFFERENT address: ${shown}. Don't use this address.`,
+            },
+      );
+    } catch (e) {
+      setMessage({
+        ok: false,
+        text: e instanceof Error ? e.message : "Couldn't reach the Trezor",
+      });
+    }
+  };
+
+  return (
+    <Box>
+      <Typography component="h2" sx={{ fontWeight: 650, fontSize: 16, mb: 1 }}>
+        Payout: multisig ({m.network})
+      </Typography>
+      {message && (
+        <Alert
+          severity={message.ok ? "success" : "error"}
+          sx={{ ...ds.alertSx(message.ok ? "success" : "error"), mb: 1 }}
+          onClose={() => setMessage(null)}
+        >
+          {message.text}
+        </Alert>
+      )}
+      <Paper variant="outlined" sx={{ ...ds.cardSx, p: 2 }}>
+        <Box
+          sx={{
+            display: "grid",
+            gap: 1.5,
+            gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
+            fontSize: 13,
+          }}
+        >
+          <Box>
+            Receiving address (set it on Luxor)
+            <Box sx={mono}>{m.receiveAddress ?? guild.payoutAddress}</Box>
+            <CellNote>Luxor pays the monthly reward here.</CellNote>
+          </Box>
+          <Box>
+            Change address
+            <Box sx={mono}>{m.changeAddress ?? "—"}</Box>
+            <CellNote>
+              Holds what&apos;s carried for members between payouts.
+            </CellNote>
+          </Box>
+          <Box>
+            Available
+            <CellNote>
+              {formatBtc(sum((c) => c.status === "AVAILABLE"))}
+              {sum((c) => c.status === "UNCONFIRMED") > 0 &&
+                ` · ${formatBtc(sum((c) => c.status === "UNCONFIRMED"))} confirming`}
+              {sum((c) => c.status === "RESERVED") > 0 &&
+                ` · ${formatBtc(sum((c) => c.status === "RESERVED"))} in a prepared payout`}
+            </CellNote>
+          </Box>
+          <Box>
+            <Button
+              size="small"
+              variant="outlined"
+              sx={ds.outlineBtnSx}
+              onClick={showOnTrezor}
+            >
+              Show on Trezor
+            </Button>
+            <CellNote>
+              Checks the receiving address on the device before you set it on
+              Luxor.
+            </CellNote>
+          </Box>
+        </Box>
+      </Paper>
     </Box>
   );
 }
