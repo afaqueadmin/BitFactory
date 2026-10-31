@@ -358,12 +358,14 @@ export default function CustomerInvoiceDetailPage() {
             </Box>
           ) : (
             <>
-              <PayWithBinanceButton
-                invoiceId={invoice.id}
-                disabled={
-                  invoice.status === "PAID" || invoice.status === "CANCELLED"
-                }
-              />
+              {process.env.NEXT_PUBLIC_PAY_WITH_BINANCE_ENABLED === "true" && (
+                <PayWithBinanceButton
+                  invoiceId={invoice.id}
+                  disabled={
+                    invoice.status === "PAID" || invoice.status === "CANCELLED"
+                  }
+                />
+              )}
               {process.env.NEXT_PUBLIC_BTCPAY_ENABLED === "true" &&
                 ["sonofaunali@gmail.com", "hamzanajeebmusic@gmail.com"] //@TODO: remove this condition when feature is ready
                   .includes(invoice.user.email) && (
