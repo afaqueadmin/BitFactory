@@ -87,11 +87,6 @@ function latestPayoutPerSubaccount(
 }
 
 const formatBtc = (btc: number) => `₿ ${btc.toFixed(8)}`;
-const formatUsd = (usd: number) =>
-  `$${usd.toLocaleString("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
 
 const COLUMNS: { label: string; align?: "right" }[] = [
   { label: "Date" },
@@ -100,7 +95,6 @@ const COLUMNS: { label: string; align?: "right" }[] = [
   { label: "Category" },
   { label: "Type" },
   { label: "Amount (BTC)", align: "right" },
-  { label: "Amount (USD)", align: "right" },
   { label: "Transaction ID" },
 ];
 
@@ -157,17 +151,6 @@ export default function WalletSnapshotTransactions({
   }, [customerId, payoutDate]);
 
   const rows = transactions ?? [];
-  // Every row is a payment, so "Total paid" matches the payout amount stated
-  // in the email.
-  const payments = rows;
-  const totalBtc = payments.reduce(
-    (s, tx) => s + Math.abs(tx.currency_amount),
-    0,
-  );
-  const totalUsd = payments.reduce(
-    (s, tx) => s + Math.abs(tx.usd_equivalent),
-    0,
-  );
 
   const headCellSx = {
     fontFamily: fonts.body,
@@ -290,12 +273,6 @@ export default function WalletSnapshotTransactions({
                   {formatBtc(Math.abs(tx.currency_amount))}
                 </TableCell>
                 <TableCell
-                  align="right"
-                  sx={{ ...cellSx, fontVariantNumeric: "tabular-nums" }}
-                >
-                  {formatUsd(Math.abs(tx.usd_equivalent))}
-                </TableCell>
-                <TableCell
                   sx={{ ...cellSx, fontSize: 11, fontFamily: "monospace" }}
                 >
                   {tx.transaction_id ? (
@@ -313,37 +290,6 @@ export default function WalletSnapshotTransactions({
                 </TableCell>
               </TableRow>
             ))}
-            <TableRow sx={{ bgcolor: d.hover }}>
-              <TableCell
-                colSpan={5}
-                sx={{ ...cellSx, fontWeight: 700, borderBottom: 0 }}
-              >
-                Total paid
-              </TableCell>
-              <TableCell
-                align="right"
-                sx={{
-                  ...cellSx,
-                  fontWeight: 750,
-                  fontVariantNumeric: "tabular-nums",
-                  borderBottom: 0,
-                }}
-              >
-                {formatBtc(totalBtc)}
-              </TableCell>
-              <TableCell
-                align="right"
-                sx={{
-                  ...cellSx,
-                  fontWeight: 700,
-                  fontVariantNumeric: "tabular-nums",
-                  borderBottom: 0,
-                }}
-              >
-                {formatUsd(totalUsd)}
-              </TableCell>
-              <TableCell sx={{ ...cellSx, borderBottom: 0 }} />
-            </TableRow>
           </TableBody>
         </Table>
       ) : null}
