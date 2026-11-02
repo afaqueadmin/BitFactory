@@ -1496,8 +1496,10 @@ export type PdfBrowser = Awaited<ReturnType<typeof launchPdfBrowser>>;
  * PDF is scaled so it fits the A4 width.
  *
  * Pass `browser` to reuse one browser across several PDFs (the caller closes
- * it); each PDF still gets its own isolated context, so cookies never carry
- * over from one page to the next.
+ * it), one PDF at a time. Pages share the default context: Vercel's Chromium
+ * runs with --single-process, which crashes on a new browser context
+ * (Target.createTarget: Target closed). The cookies are removed again after
+ * each PDF so they never carry over to the next page.
  */
 export const generatePDFFromUrl = async (
   url: string,
@@ -1509,11 +1511,9 @@ export const generatePDFFromUrl = async (
   footerTemplate?: string,
 ): Promise<Buffer> => {
   const ownBrowser = browser ? null : await launchPdfBrowser();
-  let context: Awaited<ReturnType<PdfBrowser["createBrowserContext"]>> | null =
-    null;
+  let page: Awaited<ReturnType<PdfBrowser["newPage"]>> | null = null;
   try {
-    context = await (browser ?? ownBrowser!).createBrowserContext();
-    const page = await context.newPage();
+    page = await (browser ?? ownBrowser!).newPage();
     await page.setViewport({ width: contentWidth, height: 900 });
     await page.setCookie(...cookies.map((c) => ({ ...c, url })));
     await page.goto(url, { waitUntil: "networkidle0", timeout: 60_000 });
@@ -1545,7 +1545,10 @@ export const generatePDFFromUrl = async (
     });
     return Buffer.from(pdfBuffer);
   } finally {
-    await context?.close().catch(() => {});
+    await page
+      ?.deleteCookie(...cookies.map((c) => ({ name: c.name, url })))
+      .catch(() => {});
+    await page?.close().catch(() => {});
     await ownBrowser?.close();
   }
 };
