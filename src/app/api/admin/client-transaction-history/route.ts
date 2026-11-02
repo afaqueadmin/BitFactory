@@ -501,8 +501,9 @@ export async function GET(request: NextRequest) {
           );
 
           for (const payout of allPayouts) {
-            // Apply type filter (Braiins payouts are always credits)
-            if (typeFilter === "debit") {
+            // Apply type filter. A payout leaves the pool balance, so it's a
+            // debit - the same as Luxor's "Payment" rows.
+            if (typeFilter === "credit") {
               continue;
             }
 
@@ -521,10 +522,10 @@ export async function GET(request: NextRequest) {
               customerEmail: customer.email,
               pool: "Braiins",
               date_time: payoutDate,
-              transaction_type: "credit",
+              transaction_type: "debit",
               currency_amount: btcAmount,
               usd_equivalent: 0, // Braiins API doesn't provide USD equivalent
-              transaction_category: "payout",
+              transaction_category: "Payment",
               transaction_id: payout.tx_id || "pending",
               subaccount_name: auth.authKey,
             };
@@ -536,14 +537,14 @@ export async function GET(request: NextRequest) {
 
             allTransactions.push(clientTx);
 
-            // Update summary stats (Braiins payouts are always credits)
-            summaryStats.totalCredits += btcAmount;
-            statsIncludedTracker["credit_braiins"] =
-              (statsIncludedTracker["credit_braiins"] || 0) + 1;
+            // Update summary stats (Braiins payouts are always debits)
+            summaryStats.totalDebits += btcAmount;
+            statsIncludedTracker["debit_braiins"] =
+              (statsIncludedTracker["debit_braiins"] || 0) + 1;
 
             // Update pool-specific stats
             poolStats.braiins.count++;
-            poolStats.braiins.totalCredits += btcAmount;
+            poolStats.braiins.totalDebits += btcAmount;
           }
         } catch (error) {
           console.error(
