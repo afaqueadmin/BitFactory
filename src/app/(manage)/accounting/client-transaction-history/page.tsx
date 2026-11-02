@@ -578,12 +578,6 @@ export default function ClientTransactionHistoryPage() {
           value={stats.totalDebits.toFixed(8)}
           subtitle="BTC"
         />
-        <AdminValueCard
-          daylight
-          title="Net Amount"
-          value={stats.netAmount.toFixed(8)}
-          subtitle="BTC"
-        />
       </Box>
 
       {/* Filter Panel */}
