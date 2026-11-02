@@ -7,7 +7,8 @@
  * page to the PDF that's emailed to the customer.
  *
  * Query: `name` (customer name for the heading) and, for the payout email,
- * `payoutDate` (YYYY-MM-DD, UTC) to list that day's payout transactions.
+ * `payoutDate` (YYYY-MM-DD, UTC): the latest payouts listed are those up to
+ * that day. Without it, each subaccount's latest payout to date.
  *
  * Sets body[data-snapshot-ready="true"] once every figure has loaded - the
  * PDF renderer waits for it.
@@ -39,7 +40,7 @@ function WalletSnapshot() {
   const { d, fonts } = useDaylight();
   const [generatedAt] = useState(() => new Date());
   const [overviewReady, setOverviewReady] = useState(false);
-  const [transactionsReady, setTransactionsReady] = useState(!payoutDate);
+  const [transactionsReady, setTransactionsReady] = useState(false);
 
   const handleOverviewReady = useCallback(() => setOverviewReady(true), []);
   const handleTransactionsLoaded = useCallback(
@@ -80,13 +81,11 @@ function WalletSnapshot() {
             />
           }
         />
-        {payoutDate && (
-          <WalletSnapshotTransactions
-            customerId={customerId}
-            payoutDate={payoutDate}
-            onLoaded={handleTransactionsLoaded}
-          />
-        )}
+        <WalletSnapshotTransactions
+          customerId={customerId}
+          payoutDate={payoutDate}
+          onLoaded={handleTransactionsLoaded}
+        />
         <Typography
           className="snapshot-block"
           sx={{
