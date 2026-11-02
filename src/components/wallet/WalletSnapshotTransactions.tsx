@@ -2,8 +2,8 @@
 
 /**
  * Latest payouts in the wallet snapshot PDF (admin send and payout cron):
- * for each of the customer's subaccounts, the debits (payment and its
- * transaction fee) on that subaccount's most recent payout day, laid out
+ * for each of the customer's subaccounts, the payment(s) on that
+ * subaccount's most recent payout day (no transaction fees), laid out
  * like the /transaction page. With `payoutDate` (the cron), only payouts up
  * to that day count. Transaction IDs link to mempool.space - Chrome keeps
  * the links clickable in the printed PDF.
@@ -56,7 +56,7 @@ const PAYMENT_CATEGORIES = new Set([
 ]);
 
 /**
- * Each subaccount's debits on its most recent payout day, newest payout
+ * Each subaccount's payment(s) on its most recent payout day, newest payout
  * first. Subaccounts that have never been paid out are left out.
  */
 function latestPayoutPerSubaccount(
@@ -64,6 +64,7 @@ function latestPayoutPerSubaccount(
 ): SnapshotTransaction[] {
   const bySubaccount = new Map<string, SnapshotTransaction[]>();
   for (const tx of debits) {
+    if (!PAYMENT_CATEGORIES.has(tx.transaction_category)) continue;
     const key = `${tx.pool}|${tx.subaccount_name}`;
     const list = bySubaccount.get(key) ?? [];
     list.push(tx);
@@ -72,11 +73,9 @@ function latestPayoutPerSubaccount(
 
   const groups: { day: string; rows: SnapshotTransaction[] }[] = [];
   for (const rows of bySubaccount.values()) {
-    const paymentDays = rows
-      .filter((tx) => PAYMENT_CATEGORIES.has(tx.transaction_category))
-      .map((tx) => utcDayKey(tx.date_time));
-    if (paymentDays.length === 0) continue;
-    const day = paymentDays.reduce((a, b) => (a > b ? a : b));
+    const day = rows
+      .map((tx) => utcDayKey(tx.date_time))
+      .reduce((a, b) => (a > b ? a : b));
     groups.push({
       day,
       rows: rows.filter((tx) => utcDayKey(tx.date_time) === day),
@@ -158,11 +157,9 @@ export default function WalletSnapshotTransactions({
   }, [customerId, payoutDate]);
 
   const rows = transactions ?? [];
-  // "Total paid" counts payments only (fees are listed but not added), so it
-  // matches the payout amount stated in the email.
-  const payments = rows.filter((tx) =>
-    PAYMENT_CATEGORIES.has(tx.transaction_category),
-  );
+  // Every row is a payment, so "Total paid" matches the payout amount stated
+  // in the email.
+  const payments = rows;
   const totalBtc = payments.reduce(
     (s, tx) => s + Math.abs(tx.currency_amount),
     0,
@@ -214,9 +211,8 @@ export default function WalletSnapshotTransactions({
           Latest Payouts
         </Typography>
         <Typography sx={{ fontSize: 12, color: d.muted, mt: "4px" }}>
-          The most recent payout of each subaccount (payment and transaction
-          fee, dates in UTC). Click a transaction ID to view it on
-          mempool.space.
+          The most recent payout of each subaccount (dates in UTC). Click a
+          transaction ID to view it on mempool.space.
         </Typography>
       </Box>
 
