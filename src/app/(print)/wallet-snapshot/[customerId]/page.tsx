@@ -97,7 +97,7 @@ function WalletSnapshot() {
             color: d.muted,
           }}
         >
-          View your live wallet at any time:{" "}
+          View your wallet summary at any time:{" "}
           <a href={LIVE_WALLET_URL} style={{ color: d.action }}>
             {LIVE_WALLET_URL.replace("https://", "")}
           </a>
