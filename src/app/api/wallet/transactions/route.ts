@@ -575,6 +575,10 @@ export async function GET(request: NextRequest) {
         ];
 
         for (const payout of allPayouts) {
+          // A payout leaves the pool balance, so it's a debit - the same as
+          // Luxor's "Payment" rows (and the stored Braiins rows).
+          if (transactionType === "credit") continue;
+
           const btcAmount = payout.amount_sats / 100_000_000;
           const payoutDate = new Date(
             payout.resolved_at_ts * 1000,
@@ -586,11 +590,11 @@ export async function GET(request: NextRequest) {
             date_time: payoutDate,
             address_name: payout.destination || "N/A",
             subaccount_name: authKey,
-            transaction_category: "payout",
+            transaction_category: "Payment",
             currency_amount: btcAmount,
             usd_equivalent: 0,
             transaction_id: payout.tx_id || "",
-            transaction_type: "credit",
+            transaction_type: "debit",
           };
           allTransactions.push(wallet);
           accumulate(braiinsStats, wallet);
