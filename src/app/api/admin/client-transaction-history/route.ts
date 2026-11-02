@@ -38,6 +38,14 @@ interface SubaccountCustomerMap {
   [subaccountName: string]: string; // Maps subaccount_name to customerId
 }
 
+/** The pool API's own message (e.g. Luxor's "[permission_denied] ..."). */
+function poolErrorMessage(error: unknown): string {
+  const data = (error as { response?: { data?: { message?: unknown } } })
+    ?.response?.data;
+  if (typeof data?.message === "string") return data.message;
+  return error instanceof Error ? error.message : String(error);
+}
+
 /**
  * GET /api/admin/client-transaction-history
  *
@@ -241,6 +249,9 @@ export async function GET(request: NextRequest) {
     });
 
     const allTransactions: ClientTransaction[] = [];
+    // Pool fetches that failed, shown above the table so a missing pool
+    // isn't mistaken for "no transactions".
+    const warnings: string[] = [];
 
     // Debug tracking
     const transactionTypeTracker: Record<string, number> = {};
@@ -293,48 +304,70 @@ export async function GET(request: NextRequest) {
         const luxorClient = createLuxorClient(luxorPoolId);
 
         // Fetch ALL pages to avoid data loss (Luxor API returns pagination info)
-        let allLuxorTransactions: Transaction[] = [];
-        let currentPage = 1;
-        let hasMorePages = true;
+        const fetchLuxorPages = async (
+          subaccountNames: string[],
+        ): Promise<Transaction[]> => {
+          let transactions: Transaction[] = [];
+          let currentPage = 1;
+          let hasMorePages = true;
 
-        while (hasMorePages) {
-          const luxorParams: Record<string, string | number> = {
-            subaccount_names: luxorSubaccountNames.join(","),
-            start_date: startDateParam,
-            end_date: endDateParam,
-            page_number: currentPage,
-            page_size: 500,
-          };
+          while (hasMorePages) {
+            const luxorParams: Record<string, string | number> = {
+              subaccount_names: subaccountNames.join(","),
+              start_date: startDateParam,
+              end_date: endDateParam,
+              page_number: currentPage,
+              page_size: 500,
+            };
 
-          if (typeFilter !== "all") {
-            luxorParams.transaction_type = typeFilter;
+            if (typeFilter !== "all") {
+              luxorParams.transaction_type = typeFilter;
+            }
+
+            const luxorResponse = await luxorClient.getTransactions(
+              "BTC",
+              luxorParams as Record<string, unknown>,
+            );
+
+            transactions = transactions.concat(luxorResponse.transactions);
+
+            // Check if there are more pages (Luxor returns pagination info)
+            hasMorePages = Boolean(luxorResponse.pagination?.next_page_url);
+            currentPage++;
           }
+          return transactions;
+        };
 
-          console.log(
-            `[Client Transaction History API] Fetching Luxor page ${currentPage}...`,
+        // One call for every subaccount. Luxor rejects the whole call (403)
+        // if any name isn't in our Luxor account, so on failure fetch each
+        // subaccount alone and skip only the ones that fail.
+        let allLuxorTransactions: Transaction[] = [];
+        try {
+          allLuxorTransactions = await fetchLuxorPages(luxorSubaccountNames);
+        } catch (batchError) {
+          console.error(
+            `[Client Transaction History API] Batched Luxor fetch failed, retrying per subaccount:`,
+            batchError,
           );
-
-          const luxorResponse = await luxorClient.getTransactions(
-            "BTC",
-            luxorParams as Record<string, unknown>,
-          );
-
-          allLuxorTransactions = allLuxorTransactions.concat(
-            luxorResponse.transactions,
-          );
-
-          // Check if there are more pages (Luxor returns pagination info)
-          const paginationInfo = luxorResponse.pagination;
-          hasMorePages = Boolean(paginationInfo?.next_page_url);
-          currentPage++;
-
-          console.log(
-            `[Client Transaction History API] Got ${luxorResponse.transactions.length} transactions on page ${currentPage - 1}. Total so far: ${allLuxorTransactions.length}`,
-          );
+          for (const name of luxorSubaccountNames) {
+            try {
+              allLuxorTransactions = allLuxorTransactions.concat(
+                await fetchLuxorPages([name]),
+              );
+            } catch (error) {
+              console.error(
+                `[Client Transaction History API] Luxor fetch failed for subaccount ${name}:`,
+                error,
+              );
+              warnings.push(
+                `Luxor subaccount "${name}" (${customerMap.get(subaccountToCustomer[name])?.email ?? "unknown customer"}) could not be loaded: ${poolErrorMessage(error)}`,
+              );
+            }
+          }
         }
 
         console.log(
-          `[Client Transaction History API] Fetched ${allLuxorTransactions.length} total Luxor transactions across ${currentPage - 1} pages`,
+          `[Client Transaction History API] Fetched ${allLuxorTransactions.length} total Luxor transactions`,
         );
 
         // Process Luxor transactions
@@ -419,6 +452,9 @@ export async function GET(request: NextRequest) {
         console.error(
           `[Client Transaction History API] Error fetching Luxor transactions:`,
           error,
+        );
+        warnings.push(
+          `Luxor transactions could not be loaded: ${poolErrorMessage(error)}`,
         );
       }
     }
@@ -514,6 +550,9 @@ export async function GET(request: NextRequest) {
             `[Client Transaction History API] Error fetching Braiins payouts for customer ${auth.userId}:`,
             error,
           );
+          warnings.push(
+            `Braiins payouts for ${customerMap.get(auth.userId)?.email ?? auth.userId} could not be loaded: ${poolErrorMessage(error)}`,
+          );
           // Continue with next customer instead of failing
         }
       }
@@ -571,6 +610,7 @@ export async function GET(request: NextRequest) {
           summary: summaryStats,
           poolBreakdown: poolStats,
           customers,
+          warnings,
         },
         timestamp: new Date().toISOString(),
       },
