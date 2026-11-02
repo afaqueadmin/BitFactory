@@ -1467,18 +1467,17 @@ export const launchPdfBrowser = async () => {
   // 🔑 Required for PDFs (typings are wrong, runtime is correct)
   // await (chromium as unknown as { fonts: () => Promise<void> }).fonts();
   if (process.env.NODE_ENV === "production") {
+    // The pack must match the installed @sparticuz/chromium-min version: an
+    // older Chromium crashes under this puppeteer-core as soon as a page is
+    // opened in a new browser context (Target.createTarget: Target closed).
     return puppeteerCore.launch({
-      headless: true,
-      args: chromium.args,
-      //
-      //   args: [
-      //   "--no-sandbox",
-      //   "--disable-setuid-sandbox",
-      //   "--disable-dev-shm-usage",
-      //   "--disable-gpu",
-      // ],
+      headless: "shell",
+      args: puppeteerCore.defaultArgs({
+        args: chromium.args,
+        headless: "shell",
+      }),
       executablePath: await chromium.executablePath(
-        `https://github.com/Sparticuz/chromium/releases/download/v121.0.0/chromium-v121.0.0-pack.tar`, //.br
+        `https://github.com/Sparticuz/chromium/releases/download/v143.0.4/chromium-v143.0.4-pack.x64.tar`,
       ),
     });
   }
