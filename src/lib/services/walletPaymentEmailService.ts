@@ -51,8 +51,6 @@ const FALLBACK_BUDGET_MS = 90_000;
 /** Lookback used to tell a subaccount the nightly sync missed apart from
  * one that simply never has transactions (no miners). */
 const ACTIVE_LOOKBACK_DAYS = 7;
-/** Copied on every automatic payout email. */
-const DEVELOPER_CC = "webdeveloper.sas@gmail.com";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const PAYMENT_CATEGORY = DEFAULT_PAYOUT_CATEGORIES.payment;
@@ -356,13 +354,13 @@ export async function runWalletPaymentEmails(options: {
         continue;
       }
 
+      // Only the customer's own sign-in emails: primary as To, secondary as CC.
       const to = testTo ?? candidate.email;
       const cc = testTo
         ? []
-        : [
-            ...(await secondaryLoginEmails(candidate.userId)),
-            DEVELOPER_CC,
-          ].filter((e) => e.toLowerCase() !== to.toLowerCase());
+        : (await secondaryLoginEmails(candidate.userId)).filter(
+            (e) => e.toLowerCase() !== to.toLowerCase(),
+          );
 
       let error: string | null = null;
       try {
