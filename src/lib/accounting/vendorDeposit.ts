@@ -141,6 +141,51 @@ export async function adjustedOnInvoice(
 }
 
 /**
+ * Cash still due on Pending invoices: each invoice's total less the deposit
+ * already applied to it (never below zero), summed in USD. The list pages'
+ * Total Outstanding card.
+ */
+export async function sumCashDue(
+  kind: DepositInvoiceKind,
+  invoices: { id: string; totalAmount: Decimal }[],
+): Promise<number> {
+  const ids = invoices.map((inv) => inv.id);
+  const adjusted = new Map<string, Decimal>();
+  if (ids.length > 0) {
+    if (kind === "hardware") {
+      const rows = await prisma.vendorDepositMovement.groupBy({
+        by: ["hardwarePurchaseId"],
+        where: { type: "ADJUSTMENT", hardwarePurchaseId: { in: ids } },
+        _sum: { amountUsd: true },
+      });
+      for (const r of rows) {
+        if (r.hardwarePurchaseId) {
+          adjusted.set(r.hardwarePurchaseId, r._sum.amountUsd ?? ZERO);
+        }
+      }
+    } else {
+      const rows = await prisma.vendorDepositMovement.groupBy({
+        by: ["vendorInvoiceId"],
+        where: { type: "ADJUSTMENT", vendorInvoiceId: { in: ids } },
+        _sum: { amountUsd: true },
+      });
+      for (const r of rows) {
+        if (r.vendorInvoiceId) {
+          adjusted.set(r.vendorInvoiceId, r._sum.amountUsd ?? ZERO);
+        }
+      }
+    }
+  }
+  const total = invoices.reduce((sum, inv) => {
+    const due = new Decimal(inv.totalAmount).minus(
+      adjusted.get(inv.id) ?? ZERO,
+    );
+    return sum.plus(Decimal.max(due, ZERO));
+  }, ZERO);
+  return total.toNumber();
+}
+
+/**
  * Checks a new deposit adjustment against its invoice and the vendor's held
  * deposit. Pure, so the rules are unit-tested.
  */

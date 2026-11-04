@@ -28,7 +28,6 @@ import {
 } from "@mui/material";
 import Link from "next/link";
 import { useState } from "react";
-import { useDashboardStats } from "@/lib/hooks/useDashboard";
 import { StatsCard } from "@/components/accounting/dashboard/StatsCard";
 import { StatusBadge } from "@/components/accounting/common/StatusBadge";
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
@@ -56,11 +55,6 @@ import {
 export default function FarmTariffs() {
   const { d } = useDaylight();
   const ds = useDaylightAdminSx();
-  const {
-    dashboard,
-    loading: statsLoading,
-    error: statsError,
-  } = useDashboardStats();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [sortBy, setSortBy] = useState("createdAt");
@@ -167,8 +161,8 @@ export default function FarmTariffs() {
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   };
 
-  const loading = statsLoading || invoicesLoading;
-  const error = statsError || invoicesError;
+  const loading = invoicesLoading;
+  const error = invoicesError;
 
   if (loading) {
     return (
@@ -183,16 +177,6 @@ export default function FarmTariffs() {
       <DaylightAdminPage>
         <Alert severity="error" sx={{ ...ds.alertSx("error") }}>
           {error}
-        </Alert>
-      </DaylightAdminPage>
-    );
-  }
-
-  if (!dashboard) {
-    return (
-      <DaylightAdminPage>
-        <Alert severity="warning" sx={{ ...ds.alertSx("warning") }}>
-          No data available
         </Alert>
       </DaylightAdminPage>
     );
