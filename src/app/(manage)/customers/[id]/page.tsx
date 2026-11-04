@@ -218,6 +218,7 @@ export default function CustomerDetailPage() {
     queryClient.invalidateQueries({
       queryKey: ["earningsSummary", customerId],
     });
+    queryClient.invalidateQueries({ queryKey: ["revenue24h", customerId] });
   };
 
   // Fetch balance
@@ -313,6 +314,29 @@ export default function CustomerDetailPage() {
     staleTime: 1000 * 60 * 5, // 5 minutes
     enabled: !!customerId,
   });
+
+  // Revenue over the last 24 hours (Luxor's rolling revenue_24h), same
+  // figure as the client's wallet page.
+  const {
+    data: revenue24h,
+    isLoading: revenue24hLoading,
+    error: revenue24hError,
+  } = useQuery<{ revenue24h: { btc: number } }>({
+    queryKey: ["revenue24h", customerId, subaccountsParam],
+    queryFn: async () => {
+      const response = await fetch(
+        `/api/wallet/earnings-24h?customerId=${customerId}&subaccounts=${encodeURIComponent(subaccountsParam)}`,
+      );
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to fetch 24h revenue");
+      }
+      return response.json();
+    },
+    staleTime: 1000 * 60 * 5, // 5 minutes
+    enabled: !!customerId,
+  });
+  const revenue24hBtc = revenue24h?.revenue24h.btc ?? 0;
 
   // Fetch wallet settings - one entry per Luxor subaccount in view, since
   // payout frequency/schedule is configured per subaccount in Luxor.
@@ -641,6 +665,51 @@ export default function CustomerDetailPage() {
                         ? (
                             summary.totalEarnings.btc * btcLiveData.price
                           ).toFixed(2)
+                        : "0.00"}
+                    </Typography>
+                  </Box>
+                )}
+              </Paper>
+            </Box>
+
+            <Box>
+              <Paper sx={toneCardSx("mint")}>
+                <Typography component="div" sx={cardLabelSx}>
+                  Revenue (24h)
+                </Typography>
+                {revenue24hLoading ? (
+                  <Box
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 1,
+                      mt: 1,
+                    }}
+                  >
+                    <CircularProgress size={20} color="inherit" />
+                    <Typography variant="body2">Loading...</Typography>
+                  </Box>
+                ) : revenue24hError ? (
+                  <Typography variant="body2" sx={{ mt: 1 }}>
+                    Unable to load
+                  </Typography>
+                ) : (
+                  <Box
+                    sx={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      columnGap: 2,
+                      justifyContent: "space-between",
+                      alignItems: "baseline",
+                    }}
+                  >
+                    <Typography variant="h5" fontWeight="bold">
+                      ₿ {revenue24hBtc.toFixed(8)}
+                    </Typography>
+                    <Typography variant="h5" fontWeight="bold">
+                      $
+                      {revenue24hBtc && btcLiveData?.price
+                        ? (revenue24hBtc * btcLiveData.price).toFixed(2)
                         : "0.00"}
                     </Typography>
                   </Box>
