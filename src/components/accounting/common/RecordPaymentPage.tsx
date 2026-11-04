@@ -238,6 +238,19 @@ export default function RecordPaymentPage({
     );
   }
 
+  if (invoice.status === "DRAFT") {
+    return (
+      <DaylightThemedPage>
+        <Container disableGutters>
+          <Alert severity="warning">
+            Cannot record payment for a draft invoice. Issue it first (Issue
+            Invoice, optionally without email).
+          </Alert>
+        </Container>
+      </DaylightThemedPage>
+    );
+  }
+
   if (invoice.status === "PAID" || invoice.status === "CANCELLED") {
     return (
       <DaylightThemedPage>

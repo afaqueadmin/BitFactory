@@ -304,8 +304,9 @@ export default function WalletOverview({
         );
 
         if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
           throw new Error(
-            `Failed to fetch 24h revenue: ${response.statusText}`,
+            data.error || `Failed to fetch 24h revenue: ${response.statusText}`,
           );
         }
 

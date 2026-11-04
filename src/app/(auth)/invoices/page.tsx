@@ -419,9 +419,9 @@ export default function InvoicesPage() {
                           color: d.text,
                         }}
                       >
-                        {formatDate(
-                          invoice.issuedDate || invoice.invoiceGeneratedDate,
-                        )}
+                        {invoice.issuedDate
+                          ? formatDate(invoice.issuedDate)
+                          : "-"}
                       </TableCell>
                       <TableCell
                         sx={{

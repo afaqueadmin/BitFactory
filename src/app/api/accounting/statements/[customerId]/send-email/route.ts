@@ -118,7 +118,7 @@ export async function POST(
       .map((invoice) => {
         const issuedDateStr = invoice.issuedDate
           ? formatDateShort(new Date(invoice.issuedDate))
-          : formatDateShort(new Date(invoice.invoiceGeneratedDate));
+          : "-";
 
         const dueDate = formatDateShort(new Date(invoice.dueDate));
 

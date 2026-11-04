@@ -764,6 +764,7 @@ export default function InvoiceDetailPage() {
                       router.push(`/accounting/${invoice.id}/record-payment`)
                     }
                     disabled={
+                      invoice.status === "DRAFT" ||
                       invoice.status === "PAID" ||
                       invoice.status === "CANCELLED"
                     }

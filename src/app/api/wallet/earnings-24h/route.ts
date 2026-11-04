@@ -10,11 +10,24 @@ import { simRoute } from "@/lib/simulation/context";
 import { loadSimPoolLedger } from "@/lib/simulation/data";
 import { authenticateWalletRequest } from "@/lib/walletTarget";
 
+/** BTC revenue_24h from Luxor's summary, summed over every revenue type. */
+async function luxorRevenue24h(names: string[]): Promise<number> {
+  const subaccountNames = joinSubaccountNames(names);
+  const summary = await createLuxorClient(subaccountNames).getSummary("BTC", {
+    subaccount_names: subaccountNames,
+  });
+  return (summary.revenue_24h ?? [])
+    .filter((r) => r.currency_type === "BTC")
+    .reduce((sum, r) => sum + (Number(r.revenue) || 0), 0);
+}
+
 /**
  * GET /api/wallet/earnings-24h
  *
- * Fetches 24-hour earnings (revenue) from Luxor API
- * Returns aggregated data across all subaccounts for the last 24 hours
+ * Revenue over the last 24 hours. Luxor: the summary's rolling revenue_24h,
+ * the figure Luxor's own dashboard shows (not posted credits, which land a
+ * day late and left the card at 0 every UTC morning). Braiins: daily
+ * rewards for yesterday and today.
  *
  * Response:
  * {
@@ -23,6 +36,9 @@ import { authenticateWalletRequest } from "@/lib/walletTarget";
  *   timestamp: string,
  *   dataSource: "luxor"
  * }
+ *
+ * usd covers simulated accounts only; Luxor's summary has no USD figure and
+ * the wallet converts BTC at the live price itself.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -108,39 +124,24 @@ export async function GET(request: NextRequest) {
     const formatDate = (date: Date) => date.toISOString().split("T")[0];
 
     let totalRevenueBtc = 0;
-    let totalRevenueUsd = 0;
     let luxorRevenueBtc = 0;
-    let luxorRevenueUsd = 0;
     let braiinsRevenueBtc = 0;
 
-    // Fetch from Luxor
+    // Fetch from Luxor: one call for every selected subaccount. If it fails
+    // (a single unknown name fails the whole call), show an error - never a
+    // partial sum or a false 0.
     if (selectedLuxorAuths.length > 0) {
+      const names = selectedLuxorAuths.map((a) => a.authKey);
       try {
-        const authKey = joinSubaccountNames(
-          selectedLuxorAuths.map((a) => a.authKey),
-        );
-        console.log(
-          `[24h Revenue API] Fetching Luxor transactions for auth key(s): ${authKey}`,
-        );
-        const client = createLuxorClient(authKey);
-        const transactions = await client.getTransactions("BTC", {
-          transaction_type: "credit",
-          start_date: formatDate(startDate),
-          end_date: formatDate(endDate),
-          subaccount_names: authKey,
-          page_size: 1000,
-        });
-
-        if (transactions.transactions) {
-          for (const tx of transactions.transactions) {
-            luxorRevenueBtc += tx.currency_amount;
-            luxorRevenueUsd += tx.usd_equivalent;
-          }
-        }
+        luxorRevenueBtc = await luxorRevenue24h(names);
       } catch (error) {
         console.error(
-          `[24h Revenue API] Error fetching Luxor transactions:`,
+          `[24h Revenue API] Luxor summary failed for ${names.join(",")}:`,
           error,
+        );
+        return NextResponse.json(
+          { error: "Couldn't load 24-hour revenue from Luxor" },
+          { status: 502 },
         );
       }
     }
@@ -172,7 +173,6 @@ export async function GET(request: NextRequest) {
     }
 
     totalRevenueBtc = luxorRevenueBtc + braiinsRevenueBtc;
-    totalRevenueUsd = luxorRevenueUsd;
 
     // Determine which pools have a configured account
     const activePoolNames = [];
@@ -182,7 +182,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       revenue24h: {
         btc: Number(totalRevenueBtc.toFixed(8)),
-        usd: Number(totalRevenueUsd.toFixed(2)),
+        usd: 0,
       },
       currency: "BTC",
       timestamp: new Date().toISOString(),
@@ -196,7 +196,7 @@ export async function GET(request: NextRequest) {
       poolBreakdown: {
         luxor: {
           btc: Number(luxorRevenueBtc.toFixed(8)),
-          usd: Number(luxorRevenueUsd.toFixed(2)),
+          usd: 0,
         },
         braiins: {
           btc: Number(braiinsRevenueBtc.toFixed(8)),

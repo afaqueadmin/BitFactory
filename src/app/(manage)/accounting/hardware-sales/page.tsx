@@ -246,6 +246,21 @@ export default function HardwareSalesDashboard() {
   const handleApplyBulkStatus = async () => {
     if (!bulkStatus || selectedInvoiceIds.length === 0) return;
     setBulkError(null);
+    // A draft must be issued first; check up front so nothing is half-applied.
+    if (bulkStatus === "PAID" || bulkStatus === "OVERDUE") {
+      const drafts = invoices.filter(
+        (inv: InvoiceWithDetails) =>
+          selectedInvoiceIds.includes(inv.id) && inv.status === "DRAFT",
+      );
+      if (drafts.length > 0) {
+        setBulkError(
+          `Issue these draft invoices first (Issue Invoice, optionally without email): ${drafts
+            .map((inv: InvoiceWithDetails) => inv.invoiceNumber)
+            .join(", ")}`,
+        );
+        return;
+      }
+    }
     try {
       for (const id of selectedInvoiceIds) {
         await changeStatus(id, bulkStatus as BulkStatusType);

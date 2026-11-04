@@ -250,8 +250,12 @@ export default function CustomerStatementPage() {
           compareB = b.invoiceNumber || "";
           break;
         case "issuedDate":
-          compareA = new Date(a.issuedDate || a.invoiceGeneratedDate).getTime();
-          compareB = new Date(b.issuedDate || b.invoiceGeneratedDate).getTime();
+          // Never-issued invoices have no date: keep them last either way.
+          if (!a.issuedDate || !b.issuedDate) {
+            return a.issuedDate ? -1 : b.issuedDate ? 1 : 0;
+          }
+          compareA = new Date(a.issuedDate).getTime();
+          compareB = new Date(b.issuedDate).getTime();
           break;
         case "dueDate":
           compareA = new Date(a.dueDate).getTime();
@@ -517,12 +521,11 @@ export default function CustomerStatementPage() {
                       </Link>
                     </TableCell>
                     <TableCell>
-                      <DateDisplay
-                        date={
-                          invoice.issuedDate || invoice.invoiceGeneratedDate
-                        }
-                        format="date"
-                      />
+                      {invoice.issuedDate ? (
+                        <DateDisplay date={invoice.issuedDate} format="date" />
+                      ) : (
+                        "-"
+                      )}
                     </TableCell>
                     <TableCell>
                       <DateDisplay date={invoice.dueDate} format="date" />

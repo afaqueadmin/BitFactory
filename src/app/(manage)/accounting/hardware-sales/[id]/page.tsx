@@ -683,6 +683,7 @@ export default function InvoiceDetailPage() {
                       )
                     }
                     disabled={
+                      invoice.status === "DRAFT" ||
                       invoice.status === "PAID" ||
                       invoice.status === "CANCELLED"
                     }
