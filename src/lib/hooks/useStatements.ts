@@ -5,7 +5,6 @@ export interface InvoiceStatement {
   id: string;
   invoiceNumber: string;
   invoiceDate: string;
-  invoiceGeneratedDate: string;
   dueDate: string;
   totalAmount: number;
   paidAmount: number;

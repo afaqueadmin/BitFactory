@@ -86,7 +86,17 @@ export async function POST(
       return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
     }
 
-    // Validate invoice can accept payment
+    // Validate invoice can accept payment. A draft must be issued first
+    // (with or without email), so it always has an issue date.
+    if (invoice.status === "DRAFT") {
+      return NextResponse.json(
+        {
+          error:
+            "Cannot record payment for a draft invoice. Issue it first (Issue Invoice, optionally without email).",
+        },
+        { status: 400 },
+      );
+    }
     if (invoice.status === "PAID" || invoice.status === "CANCELLED") {
       return NextResponse.json(
         {

@@ -388,6 +388,20 @@ export async function PUT(
       return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
     }
 
+    // A draft must be issued (with or without email) before it can be paid
+    // or overdue, so it always has an issue date.
+    if (
+      currentInvoice.status === "DRAFT" &&
+      (status === "PAID" || status === "OVERDUE")
+    ) {
+      return NextResponse.json(
+        {
+          error: `Invoice ${currentInvoice.invoiceNumber} is a draft. Issue it first (Issue Invoice, optionally without email).`,
+        },
+        { status: 400 },
+      );
+    }
+
     const updateData: Record<string, unknown> = { updatedBy: userId };
     const changes: Record<string, unknown> = {};
 
