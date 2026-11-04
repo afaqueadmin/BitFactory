@@ -115,11 +115,13 @@ export default function HardwareSalesDashboard() {
     startDate: startDateFilter || undefined,
     endDate: endDateFilter || undefined,
     keepPrevious: true,
+    includeSummary: true,
   };
 
   const {
     invoices,
     total,
+    summary,
     loading: invoicesLoading,
     error: invoicesError,
   } = useInvoices(
@@ -130,24 +132,6 @@ export default function HardwareSalesDashboard() {
     "HARDWARE_SALES",
     sortBy,
     sortDirection,
-    true,
-    listOptions,
-  );
-
-  // Fetch the full filtered set (independent of table pagination) so the
-  // summary cards reflect the selected filters across all matching invoices.
-  const {
-    invoices: statsInvoices,
-    total: statsTotal,
-    loading: statsLoading,
-  } = useInvoices(
-    1,
-    9999,
-    customerFilter || undefined,
-    statusFilter ? (statusFilter as InvoiceStatus) : undefined,
-    "HARDWARE_SALES",
-    undefined,
-    undefined,
     true,
     listOptions,
   );
@@ -395,29 +379,15 @@ export default function HardwareSalesDashboard() {
     return diffDays;
   };
 
-  // Calculate stats from the full filtered set of invoices
-  const totalInvoices = statsTotal;
-  const unpaidInvoices = statsInvoices.filter(
-    (inv: InvoiceWithDetails) => inv.status !== "PAID",
-  ).length;
-  const now = new Date();
-  const overdueInvoices = statsInvoices.filter(
-    (inv: InvoiceWithDetails) =>
-      inv.status !== "PAID" && new Date(inv.dueDate) < now,
-  ).length;
-  const totalOutstanding = statsInvoices
-    .filter(
-      (inv: InvoiceWithDetails) =>
-        inv.status !== "PAID" &&
-        inv.status !== "CANCELLED" &&
-        inv.status !== "REFUNDED",
-    )
-    .reduce(
-      (sum: number, inv: InvoiceWithDetails) => sum + Number(inv.totalAmount),
-      0,
-    );
+  // Stat cards cover every invoice matching the filters (computed server-side).
+  const totalInvoices = total;
+  const {
+    unpaidCount: unpaidInvoices,
+    overdueCount: overdueInvoices,
+    totalOutstanding,
+  } = summary;
 
-  const loading = invoicesLoading || statsLoading;
+  const loading = invoicesLoading;
   const error = invoicesError;
 
   if (loading) {

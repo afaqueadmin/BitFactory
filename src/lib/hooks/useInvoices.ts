@@ -86,7 +86,22 @@ export interface InvoiceListOptions {
    * pickers like CreateMemoModal must not show the previous customer's rows.
    */
   keepPrevious?: boolean;
+  /** Admin list pages: also return the stat-card summary for the filters. */
+  includeSummary?: boolean;
 }
+
+/** Stat cards over every invoice matching the list's filters. */
+export interface InvoiceListSummary {
+  unpaidCount: number;
+  overdueCount: number;
+  totalOutstanding: number;
+}
+
+const EMPTY_SUMMARY: InvoiceListSummary = {
+  unpaidCount: 0,
+  overdueCount: 0,
+  totalOutstanding: 0,
+};
 
 export function useInvoices(
   page: number = 1,
@@ -113,6 +128,7 @@ export function useInvoices(
       includeDrafts,
       options?.startDate,
       options?.endDate,
+      options?.includeSummary,
     ],
     queryFn: async () => {
       const params = new URLSearchParams();
@@ -124,9 +140,11 @@ export function useInvoices(
       if (sortBy) params.append("sortBy", sortBy);
       if (sortDirection) params.append("sortDirection", sortDirection);
       if (includeDrafts) params.append("includeDrafts", "true");
-      if (options?.startDate || options?.endDate) {
-        if (options.startDate) params.append("startDate", options.startDate);
-        if (options.endDate) params.append("endDate", options.endDate);
+      if (options?.startDate) params.append("startDate", options.startDate);
+      if (options?.endDate) params.append("endDate", options.endDate);
+      if (options?.includeSummary) params.append("includeSummary", "true");
+      // Date bounds and the overdue cut-off are the viewer's calendar days.
+      if (options?.startDate || options?.endDate || options?.includeSummary) {
         params.append("tz", Intl.DateTimeFormat().resolvedOptions().timeZone);
       }
 
@@ -148,6 +166,7 @@ export function useInvoices(
   return {
     invoices: data?.invoices || [],
     total: data?.pagination?.total || 0,
+    summary: (data?.summary as InvoiceListSummary | undefined) ?? EMPTY_SUMMARY,
     loading: isLoading,
     error: error instanceof Error ? error.message : null,
   };

@@ -30,6 +30,8 @@ import {
   parseInvoiceListSort,
   sortInvoicesInMemory,
 } from "./query";
+import { computeInvoiceSummary } from "./summary";
+import { resolveExportTimeZone } from "@/lib/helpers/admin/tableExport";
 
 function normalizeBillingMonth(billingMonth: string | Date): Date {
   const parsedBillingMonth = new Date(billingMonth);
@@ -135,6 +137,18 @@ export async function GET(request: NextRequest) {
       include.createdByUser = { select: { id: true, email: true, name: true } };
     }
 
+    // Admin list pages' stat cards, over the same filters as the table.
+    const summaryPromise =
+      isStaffRole(userRole) && searchParams.get("includeSummary") === "true"
+        ? computeInvoiceSummary(
+            where,
+            resolveExportTimeZone(searchParams.get("tz")),
+          )
+        : null;
+    // Awaited below; this only stops a rejection going unhandled if the
+    // list queries throw first.
+    summaryPromise?.catch(() => {});
+
     let invoices;
     let total;
 
@@ -166,6 +180,8 @@ export async function GET(request: NextRequest) {
       ]);
     }
 
+    const summary = summaryPromise ? await summaryPromise : undefined;
+
     return NextResponse.json({
       invoices,
       pagination: {
@@ -174,6 +190,7 @@ export async function GET(request: NextRequest) {
         total,
         pages: Math.ceil(total / limit),
       },
+      ...(summary ? { summary } : {}),
     });
   } catch (error) {
     console.error("Get invoices error:", error);

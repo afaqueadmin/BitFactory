@@ -18,6 +18,7 @@ import {
   checkVendorForInvoice,
   vendorSelect,
 } from "@/lib/accounting/vendorRules";
+import { sumCashDue } from "@/lib/accounting/vendorDeposit";
 import { parseVendorInvoiceQuery } from "./query";
 
 interface CreateVendorInvoiceRequest {
@@ -204,8 +205,9 @@ export async function GET(request: NextRequest) {
     const skip = (page - 1) * limit;
 
     // Stat cards cover the whole filtered set, not just this page. Only
-    // Pending invoices are owed; dueDate is stored at UTC midnight, so it's
-    // overdue once it falls before today's calendar date in the viewer's tz.
+    // Pending invoices are owed, less any deposit already applied to them;
+    // dueDate is stored at UTC midnight, so it's overdue once it falls
+    // before today's calendar date in the viewer's tz.
     const tz = resolveExportTimeZone(searchParams.get("tz"));
     const todayStart = utcDayStart(formatIsoDate(new Date(), tz));
     const pendingWhere: Prisma.VendorInvoiceWhereInput = {
@@ -234,10 +236,12 @@ export async function GET(request: NextRequest) {
         prisma.vendorInvoice.count({
           where: { AND: [pendingWhere, { dueDate: { lt: todayStart } }] },
         }),
-        prisma.vendorInvoice.aggregate({
-          where: pendingWhere,
-          _sum: { totalAmount: true },
-        }),
+        prisma.vendorInvoice
+          .findMany({
+            where: pendingWhere,
+            select: { id: true, totalAmount: true },
+          })
+          .then((pending) => sumCashDue("farm", pending)),
       ]);
 
     return NextResponse.json(
@@ -251,7 +255,7 @@ export async function GET(request: NextRequest) {
         summary: {
           unpaidCount,
           overdueCount,
-          totalOutstanding: Number(outstanding._sum.totalAmount ?? 0),
+          totalOutstanding: outstanding,
         },
       },
       { status: 200 },
