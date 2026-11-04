@@ -89,8 +89,9 @@ export async function readTrezorKey(params: {
       bundle: [
         { path: params.originPath, coin },
         // Its parent is the master key, so its fingerprint is the master
-        // fingerprint the descriptor needs.
-        { path: params.originPath.split("/").slice(0, 2).join("/"), coin },
+        // fingerprint the descriptor needs. No coin: with one, Connect
+        // refuses any path shorter than three levels.
+        { path: params.originPath.split("/").slice(0, 2).join("/") },
       ],
     }),
   );
