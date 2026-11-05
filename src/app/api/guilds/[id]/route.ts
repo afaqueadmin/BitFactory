@@ -21,6 +21,10 @@ import {
   getPayoutSettings,
 } from "@/lib/guilds/payoutSettings";
 import { requestMeta } from "@/lib/guilds/audit";
+import {
+  isTrezorPayoutEnabled,
+  payoutNetwork,
+} from "@/lib/guilds/trezor/network";
 
 const userSelect = { select: { id: true, name: true, email: true } };
 
@@ -87,6 +91,16 @@ export async function GET(
 
     const settings = await getPayoutSettings();
 
+    // Trezor: the guild's account, and the coins in it.
+    const network = payoutNetwork();
+    const coins =
+      guild.trezorAccount === null
+        ? []
+        : await prisma.guildWalletCoin.findMany({
+            where: { guildId: guild.id },
+            orderBy: { createdAt: "asc" },
+          });
+
     return NextResponse.json({
       success: true,
       data: {
@@ -96,6 +110,36 @@ export async function GET(
           defaultPayoutMethod: settings.defaultPayoutMethod,
           minPayoutSats: settings.minPayoutSats,
           availableMethods: AVAILABLE_PAYOUT_METHODS,
+        },
+        trezor: {
+          enabled: isTrezorPayoutEnabled(),
+          network: network.name,
+          coinType: network.coinType,
+          walletNetwork: network.walletNetwork,
+          deviceConnected:
+            !!settings.deviceFingerprint &&
+            settings.deviceNetwork === network.name,
+          fingerprint: settings.deviceFingerprint,
+          coins: coins
+            .filter((c) => c.status !== "SPENT")
+            .map((c) => ({
+              txid: c.txid,
+              vout: c.vout,
+              sats: Number(c.sats),
+              branch: c.branch,
+              index: c.addressIndex,
+              source: c.source,
+              status: c.status,
+            })),
+          // Coins that left the account without a payout from the app.
+          unexpectedSpends: coins
+            .filter((c) => c.status === "SPENT" && !c.spentByBatchId)
+            .map((c) => ({
+              txid: c.txid,
+              vout: c.vout,
+              sats: Number(c.sats),
+              updatedAt: c.updatedAt,
+            })),
         },
       },
     });
@@ -139,6 +183,11 @@ export async function PATCH(
     }
     // null = the default method. Only methods that can send today.
     if (body.payoutMethod !== undefined) {
+      if (body.payoutMethod === "TREZOR_BTC") {
+        throw new GuildInputError(
+          "Use Set up Trezor wallet, which also gives the guild its own account",
+        );
+      }
       if (
         body.payoutMethod !== null &&
         !AVAILABLE_PAYOUT_METHODS.includes(
@@ -158,9 +207,20 @@ export async function PATCH(
         isActive: true,
         payoutAddress: true,
         payoutMethod: true,
+        trezorAccount: true,
       },
     });
     if (!before) return jsonError("Guild not found", 404);
+    // A Trezor guild's address is its account's, and Luxor pays there - so
+    // neither can be changed by hand.
+    if (
+      before.trezorAccount !== null &&
+      (data.payoutAddress !== undefined || data.payoutMethod !== undefined)
+    ) {
+      throw new GuildInputError(
+        "This guild is paid from its Trezor wallet; its address and payout method can't be changed here",
+      );
+    }
 
     let guild;
     try {

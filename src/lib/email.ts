@@ -1093,6 +1093,40 @@ export const sendCronFailureEmail = async (
   }
 };
 
+/**
+ * "⚠️ Guild payout alert" to the admin inbox (SMTP_USER): something about a
+ * Trezor guild payout needs a person to look - a signed payout the server
+ * refused, or coins that left a guild's Trezor account without a payout
+ * from the app.
+ */
+export const sendGuildPayoutAlertEmail = async (params: {
+  title: string;
+  details: string[];
+}) => {
+  const escape = (s: string) =>
+    s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const mailOptions = {
+    from:
+      `BitFactory Admin <${process.env.SMTP_FROM}>` || "noreply@bitfactory.com",
+    to: process.env.SMTP_USER,
+    subject: `⚠️ Guild payout alert: ${params.title} - BitFactory`,
+    html: `
+      <h2>${escape(params.title)}</h2>
+      <ul>${params.details.map((d) => `<li>${escape(d)}</li>`).join("")}</ul>
+      <p>Open the guild's page in the admin panel, and check the guild's account in Trezor Suite.</p>
+      <br>
+      <p>The BitFactory Team</p>
+    `,
+  };
+  try {
+    await transporter.sendMail(mailOptions);
+    return { success: true };
+  } catch (error) {
+    console.error("Error sending guild payout alert email:", error);
+    return { success: false, error };
+  }
+};
+
 interface PoolCronDaySummary {
   date: string;
   results: Array<{

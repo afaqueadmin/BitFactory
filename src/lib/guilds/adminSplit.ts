@@ -2,6 +2,7 @@
 
 import { Prisma } from "@prisma/client";
 import { GuildInputError } from "./accounts";
+import { assertNoPayoutAwaitingSignature } from "./payoutLock";
 
 /** `split` from a request body: every listed membership once, 0-100 each. */
 export function parseSplitBody(value: unknown, expectedIds: string[]) {
@@ -38,6 +39,7 @@ export async function applyAdminSplit(
   split: { membershipId: string; percent: number }[],
   now: Date,
 ) {
+  await assertNoPayoutAwaitingSignature(tx, guildId);
   for (const line of split) {
     await tx.guildMembership.update({
       where: { id: line.membershipId },

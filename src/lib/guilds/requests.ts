@@ -7,6 +7,7 @@
 
 import { Prisma } from "@prisma/client";
 import { isFullSplit } from "./distribution";
+import { assertNoPayoutAwaitingSignature } from "./payoutLock";
 import {
   GuildInputError,
   assertEmailsAvailable,
@@ -202,18 +203,31 @@ export async function checkMemberRequestStillValid(
   }
 }
 
-/** Approving a wallet request: the member's reward wallet changes now. */
+/**
+ * Approving a wallet request: the member's reward wallet changes now. Its
+ * Trezor seal named the old address, so it's cleared - a Trezor payout
+ * needs the new one sealed first.
+ */
 export async function applyWalletRequest(
   tx: Tx,
   request: { membershipId: string; requestedAddress: string; network: string },
   now: Date,
 ) {
+  const membership = await tx.guildMembership.findUniqueOrThrow({
+    where: { id: request.membershipId },
+    select: { guildId: true },
+  });
+  await assertNoPayoutAwaitingSignature(tx, membership.guildId);
   await tx.guildMembership.update({
     where: { id: request.membershipId },
     data: {
       walletAddress: request.requestedAddress,
       walletNetwork: request.network,
       walletUpdatedAt: now,
+      walletSealMessage: null,
+      walletSealSignature: null,
+      walletSealedAt: null,
+      walletSealedById: null,
     },
   });
 }
@@ -231,6 +245,7 @@ export async function applySplitRequest(
   },
   now: Date,
 ) {
+  await assertNoPayoutAwaitingSignature(tx, request.guildId);
   const active = await tx.guildMembership.findMany({
     where: { guildId: request.guildId, leftAt: null },
     select: { id: true },

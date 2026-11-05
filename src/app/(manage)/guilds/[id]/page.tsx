@@ -47,6 +47,10 @@ import {
   previousMonthKey,
 } from "@/lib/guilds/format";
 import { payoutTxUrl } from "@/lib/guilds/walletNetworks";
+import GuildTrezorWallet, {
+  type GuildTrezorInfo,
+} from "@/components/guilds/GuildTrezorWallet";
+import TrezorSignDialog from "@/components/guilds/TrezorSignDialog";
 
 interface Member {
   id: string;
@@ -106,6 +110,8 @@ interface GuildDetail {
   poolAuth: { authKey: string } | null;
   payoutAddress: string | null;
   payoutMethod: string | null;
+  trezorAccount: number | null;
+  trezor: GuildTrezorInfo;
   payoutSettings: {
     defaultPayoutMethod: string;
     minPayoutSats: number;
@@ -154,6 +160,7 @@ export default function GuildDetailPage() {
   const [removeTarget, setRemoveTarget] = useState<Member | null>(null);
   const [handoverTarget, setHandoverTarget] = useState<Member | null>(null);
   const [settleTarget, setSettleTarget] = useState<Distribution | null>(null);
+  const [signBatchId, setSignBatchId] = useState<string | null>(null);
   const [runMonth, setRunMonth] = useState(previousMonthKey());
   const [busy, setBusy] = useState(false);
   // Bumped on every reload, so the change history refreshes after an action.
@@ -195,6 +202,15 @@ export default function GuildDetailPage() {
       setBusy(false);
     }
   };
+
+  // A Trezor payout is on the payout network; manual ones on mainnet.
+  const txLink = (b: { txid: string | null; method: string }) =>
+    payoutTxUrl(
+      b.txid,
+      b.method === "TREZOR_BTC" && guild
+        ? guild.trezor.walletNetwork
+        : undefined,
+    );
 
   if (loading) {
     return (
@@ -396,13 +412,47 @@ export default function GuildDetailPage() {
           </Typography>
         </Box>
 
-        <PayoutSetup
-          guild={guild}
-          busy={busy}
-          onSave={(body, done) =>
-            act(() => postJson(`/api/guilds/${guild.id}`, body, "PATCH"), done)
-          }
-        />
+        {guild.trezorAccount !== null ? (
+          <GuildTrezorWallet
+            guildId={guild.id}
+            guildName={guild.name}
+            trezorAccount={guild.trezorAccount}
+            payoutAddress={guild.payoutAddress}
+            trezor={guild.trezor}
+            withStepUp={withStepUp}
+            onDone={async (message) => {
+              setError(null);
+              setNotice(message);
+              await load();
+            }}
+          />
+        ) : (
+          <Box>
+            <PayoutSetup
+              guild={guild}
+              busy={busy}
+              onSave={(body, done) =>
+                act(
+                  () => postJson(`/api/guilds/${guild.id}`, body, "PATCH"),
+                  done,
+                )
+              }
+            />
+            <GuildTrezorWallet
+              guildId={guild.id}
+              guildName={guild.name}
+              trezorAccount={null}
+              payoutAddress={guild.payoutAddress}
+              trezor={guild.trezor}
+              withStepUp={withStepUp}
+              onDone={async (message) => {
+                setError(null);
+                setNotice(message);
+                await load();
+              }}
+            />
+          </Box>
+        )}
 
         {/* Hosting owed */}
         <Box>
@@ -609,30 +659,104 @@ export default function GuildDetailPage() {
                       ))}
                     </TableBody>
                   </Table>
-                  {d.payoutBatch ? (
-                    <Typography
-                      sx={{ fontSize: 12, color: "text.secondary", mt: 1 }}
+                  {d.payoutBatch?.status === "AWAITING_SIGNATURE" ? (
+                    <Stack
+                      direction={{ xs: "column", sm: "row" }}
+                      spacing={1}
+                      sx={{ mt: 1.5 }}
+                      justifyContent="space-between"
+                      alignItems={{ sm: "center" }}
                     >
-                      {d.status === "SETTLED" ? "Sent" : "Sending"}
-                      {d.settledAt &&
-                        ` ${new Date(d.settledAt).toLocaleString()}`}
-                      {d.payoutBatch.createdBy &&
-                        ` by ${d.payoutBatch.createdBy.name || d.payoutBatch.createdBy.email}`}
-                      {" · "}
-                      {payoutTxUrl(d.payoutBatch.txid) ? (
-                        <a
-                          href={payoutTxUrl(d.payoutBatch.txid)!}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                      <Typography sx={{ fontSize: 13 }}>
+                        Payout prepared
+                        {d.payoutBatch.createdBy &&
+                          ` by ${d.payoutBatch.createdBy.name || d.payoutBatch.createdBy.email}`}
+                        {d.payoutBatch.txid
+                          ? " · signed, waiting to be seen on the network"
+                          : " · waiting for the payout Trezor"}
+                      </Typography>
+                      <Stack direction="row" spacing={1}>
+                        {d.payoutBatch.txid && (
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            sx={ds.outlineBtnSx}
+                            disabled={busy}
+                            onClick={() =>
+                              act(
+                                () =>
+                                  postJson("/api/guilds/trezor-payouts", {
+                                    action: "check",
+                                  }),
+                                "Checked - it settles once it has enough confirmations",
+                              )
+                            }
+                          >
+                            Check now
+                          </Button>
+                        )}
+                        <Button
+                          variant="contained"
+                          sx={ds.successBtnSx}
+                          disabled={busy}
+                          onClick={() => setSignBatchId(d.payoutBatch!.id)}
                         >
-                          View transaction
-                        </a>
-                      ) : (
-                        `Ref ${d.payoutBatch.txid}`
-                      )}
+                          Review and sign
+                        </Button>
+                      </Stack>
+                    </Stack>
+                  ) : d.payoutBatch ? (
+                    <Stack
+                      direction="row"
+                      spacing={1}
+                      sx={{ mt: 1 }}
+                      justifyContent="space-between"
+                      alignItems="center"
+                    >
+                      <Typography
+                        sx={{ fontSize: 12, color: "text.secondary" }}
+                      >
+                        {d.status === "SETTLED" ? "Sent" : "Sending"}
+                        {d.settledAt &&
+                          ` ${new Date(d.settledAt).toLocaleString()}`}
+                        {d.payoutBatch.createdBy &&
+                          ` by ${d.payoutBatch.createdBy.name || d.payoutBatch.createdBy.email}`}
+                        {" · "}
+                        {txLink(d.payoutBatch) ? (
+                          <a
+                            href={txLink(d.payoutBatch)!}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            View transaction
+                          </a>
+                        ) : (
+                          `Ref ${d.payoutBatch.txid}`
+                        )}
+                        {d.status === "BROADCAST" &&
+                          ` · ${d.payoutBatch.confirmations} confirmation(s)`}
+                      </Typography>
                       {d.status === "BROADCAST" &&
-                        ` · ${d.payoutBatch.confirmations} confirmation(s)`}
-                    </Typography>
+                        d.payoutBatch.method === "TREZOR_BTC" && (
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            sx={ds.outlineBtnSx}
+                            disabled={busy}
+                            onClick={() =>
+                              act(
+                                () =>
+                                  postJson("/api/guilds/trezor-payouts", {
+                                    action: "check",
+                                  }),
+                                "Checked - it settles once it has enough confirmations",
+                              )
+                            }
+                          >
+                            Check now
+                          </Button>
+                        )}
+                    </Stack>
                   ) : (
                     <Stack
                       direction="row"
@@ -661,14 +785,37 @@ export default function GuildDetailPage() {
                       >
                         Recalculate
                       </Button>
-                      <Button
-                        variant="contained"
-                        sx={ds.successBtnSx}
-                        disabled={busy || d.status !== "CALCULATED"}
-                        onClick={() => setSettleTarget(d)}
-                      >
-                        Mark as sent
-                      </Button>
+                      {guild.trezorAccount !== null ? (
+                        <Button
+                          variant="contained"
+                          sx={ds.successBtnSx}
+                          disabled={busy || d.status !== "CALCULATED"}
+                          onClick={() =>
+                            act(
+                              () =>
+                                withStepUp((creds) =>
+                                  postJson("/api/guilds/trezor-payouts", {
+                                    action: "prepare",
+                                    distributionId: d.id,
+                                    ...creds,
+                                  }),
+                                ),
+                              "Payout prepared - click Review and sign, and sign it on the payout Trezor",
+                            )
+                          }
+                        >
+                          Prepare payout
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="contained"
+                          sx={ds.successBtnSx}
+                          disabled={busy || d.status !== "CALCULATED"}
+                          onClick={() => setSettleTarget(d)}
+                        >
+                          Mark as sent
+                        </Button>
+                      )}
                     </Stack>
                   )}
                 </Paper>
@@ -777,6 +924,17 @@ export default function GuildDetailPage() {
             "Recorded as sent - hosting paid and members emailed",
           );
           if (ok) setSettleTarget(null);
+        }}
+      />
+      <TrezorSignDialog
+        batchId={signBatchId}
+        withStepUp={withStepUp}
+        onClose={() => setSignBatchId(null)}
+        onDone={async (message) => {
+          setSignBatchId(null);
+          setError(null);
+          setNotice(message);
+          await load();
         }}
       />
       {stepUpDialog}
@@ -1090,7 +1248,7 @@ function SettleDialog({
 
 const METHOD_LABELS: Record<string, string> = {
   MANUAL: "Manual (admin sends the BTC)",
-  MULTISIG_BTC: "Automatic multisig BTC",
+  TREZOR_BTC: "Trezor wallet (set it up below)",
 };
 
 /** The guild's receiving address (set it on Luxor) and how it's paid. */
@@ -1163,10 +1321,15 @@ function PayoutSetup({
             <MenuItem
               key={value}
               value={value}
-              disabled={!availableMethods.includes(value)}
+              // Trezor is chosen with Set up Trezor wallet, below.
+              disabled={
+                value === "TREZOR_BTC" || !availableMethods.includes(value)
+              }
             >
               {label}
-              {availableMethods.includes(value) ? "" : " (coming soon)"}
+              {value === "TREZOR_BTC" || availableMethods.includes(value)
+                ? ""
+                : " (coming soon)"}
             </MenuItem>
           ))}
         </TextField>
