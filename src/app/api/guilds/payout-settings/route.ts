@@ -2,8 +2,9 @@
  * /api/guilds/payout-settings - admin only. GET / PATCH the one row of
  * GuildPayoutSettings:
  *   { feePayer?, minPayoutSats?, minConfirmations?, companyWalletAddress? }
- * The payout method and auto-run stay locked to manual until multisig
- * payouts exist (Phase 2b).
+ * The default payout method and auto-run stay locked to manual; a guild
+ * moves to Trezor payouts on its own page. Changing the company wallet
+ * clears its Trezor seal - it has to be sealed again.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -16,6 +17,7 @@ import {
   MIN_PAYOUT_FLOOR_SATS,
   getPayoutSettings,
 } from "@/lib/guilds/payoutSettings";
+import { isTrezorPayoutEnabled } from "@/lib/guilds/trezor/network";
 
 export async function GET(request: NextRequest) {
   const auth = await requireStaff(request);
@@ -24,7 +26,11 @@ export async function GET(request: NextRequest) {
     const settings = await getPayoutSettings();
     return NextResponse.json({
       success: true,
-      data: { ...settings, availableMethods: AVAILABLE_PAYOUT_METHODS },
+      data: {
+        ...settings,
+        availableMethods: AVAILABLE_PAYOUT_METHODS,
+        trezorEnabled: isTrezorPayoutEnabled(),
+      },
     });
   } catch (error) {
     console.error("[Guild Payout Settings API] GET error:", error);
@@ -74,6 +80,16 @@ export async function PATCH(request: NextRequest) {
       throw new GuildInputError("Nothing to change");
 
     const before = await getPayoutSettings();
+    if (
+      data.companyWalletAddress !== undefined &&
+      data.companyWalletAddress !== before.companyWalletAddress
+    ) {
+      // A seal names one address; a new one needs the Trezor again.
+      data.companyWalletSealMessage = null;
+      data.companyWalletSealSignature = null;
+      data.companyWalletSealedAt = null;
+      data.companyWalletSealedBy = { disconnect: true };
+    }
     const after = await prisma.guildPayoutSettings.update({
       where: { id: 1 },
       data: { ...data, updatedBy: { connect: { id: auth.decoded.userId } } },
@@ -96,7 +112,14 @@ export async function PATCH(request: NextRequest) {
         }),
       },
     });
-    return NextResponse.json({ success: true, data: after });
+    return NextResponse.json({
+      success: true,
+      data: {
+        ...after,
+        availableMethods: AVAILABLE_PAYOUT_METHODS,
+        trezorEnabled: isTrezorPayoutEnabled(),
+      },
+    });
   } catch (error) {
     if (error instanceof GuildInputError) return jsonError(error.message);
     console.error("[Guild Payout Settings API] PATCH error:", error);

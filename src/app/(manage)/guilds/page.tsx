@@ -41,6 +41,7 @@ import {
   formatUsd,
 } from "@/lib/guilds/format";
 import { useStepUp } from "@/components/StepUpDialog";
+import PayoutTrezorCard from "@/components/guilds/PayoutTrezorCard";
 import { payoutTxUrl } from "@/lib/guilds/walletNetworks";
 
 interface GuildRow {
@@ -188,6 +189,7 @@ export default function GuildsPage() {
 
       <SendPayoutsPanel onSent={load} />
       <PayoutSettingsCard />
+      <PayoutTrezorCard />
 
       <CreateGuildDialog
         open={createOpen}
@@ -695,6 +697,7 @@ interface PayoutSettingsData {
   companyWalletAddress: string | null;
   defaultPayoutMethod: string;
   autoExecute: boolean;
+  trezorEnabled?: boolean;
 }
 
 const FEE_PAYERS = [
@@ -829,7 +832,9 @@ function PayoutSettingsCard() {
           label="Payout method"
           value={
             form.defaultPayoutMethod === "MANUAL"
-              ? "Manual - automatic multisig coming soon"
+              ? form.trezorEnabled
+                ? "Manual - switch a guild to Trezor payouts on its page"
+                : "Manual - Trezor payouts coming soon"
               : form.defaultPayoutMethod
           }
           disabled

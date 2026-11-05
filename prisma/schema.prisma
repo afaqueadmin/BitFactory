@@ -140,6 +140,14 @@ model User {
   guildPayoutBatchesCreated               GuildPayoutBatch[]              @relation("guildPayoutBatchesCreated")
   guildPayoutSettingsUpdated              GuildPayoutSettings[]           @relation("guildPayoutSettingsUpdated")
   guildDistributionLines                  GuildDistributionLine[]         @relation("guildDistributionLines")
+  guildPayoutBatchesSigned                GuildPayoutBatch[]              @relation("guildPayoutBatchesSigned")
+  guildPayoutBatchesCancelled             GuildPayoutBatch[]              @relation("guildPayoutBatchesCancelled")
+  guildPayoutApprover                     GuildPayoutApprover?            @relation("guildPayoutApprover")
+  guildPayoutApproversAdded               GuildPayoutApprover[]           @relation("guildPayoutApproversAdded")
+  guildTrezorWalletsSetUp                 Guild[]                         @relation("guildTrezorWalletsSetUp")
+  guildWalletsSealed                      GuildMembership[]               @relation("guildWalletsSealed")
+  guildPayoutTrezorsConnected             GuildPayoutSettings[]           @relation("guildPayoutTrezorConnected")
+  guildCompanyWalletsSealed               GuildPayoutSettings[]           @relation("guildCompanyWalletSealed")
 
   @@index([isDeleted])
   @@index([franchiseeId])
@@ -434,6 +442,16 @@ model Guild {
   /// How this guild is paid; null = GuildPayoutSettings.defaultPayoutMethod.
   /// Lets a new method be trialled on one guild.
   payoutMethod         GuildPayoutMethod?
+  /// TREZOR_BTC: the guild's own account on the payout Trezor - Native
+  /// SegWit m/84'/coin'/trezorAccount'. payoutAddress is its 0/0 address;
+  /// each payout sends what's carried to the next 1/k change address.
+  trezorAccount        Int?                       @unique
+  /// That account's public key (watch-only, can't spend).
+  accountXpub          String?
+  nextChangeIndex      Int                        @default(0)
+  walletSetUpAt        DateTime?
+  walletSetUpById      String?
+  walletSetUpBy        User?                      @relation("guildTrezorWalletsSetUp", fields: [walletSetUpById], references: [id])
   createdById          String
   createdBy            User                       @relation("guildsCreated", fields: [createdById], references: [id])
   createdAt            DateTime                   @default(now())
@@ -444,6 +462,8 @@ model Guild {
   splitChangeRequests  GuildSplitChangeRequest[]
   memberChangeRequests GuildMemberChangeRequest[]
   distributions        GuildDistribution[]
+  walletCoins          GuildWalletCoin[]
+  payoutBatches        GuildPayoutBatch[]
 
   @@index([isActive])
   @@map("guilds")
@@ -453,33 +473,42 @@ model Guild {
 // split and wallets live in one place. Active rows (leftAt null) sum to 100%.
 // userId is unique: a person belongs to at most one guild, ever.
 model GuildMembership {
-  id                 String                         @id @default(cuid())
-  guildId            String
-  guild              Guild                          @relation(fields: [guildId], references: [id], onDelete: Cascade)
-  userId             String                         @unique
-  user               User                           @relation("guildMembership", fields: [userId], references: [id])
-  isGuildmaster      Boolean                        @default(false)
-  rewardPercent      Decimal                        @db.Decimal(7, 4)
+  id                  String                         @id @default(cuid())
+  guildId             String
+  guild               Guild                          @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  userId              String                         @unique
+  user                User                           @relation("guildMembership", fields: [userId], references: [id])
+  isGuildmaster       Boolean                        @default(false)
+  rewardPercent       Decimal                        @db.Decimal(7, 4)
   /// Where this person's share is sent. Saved here, not on Luxor - Luxor
   /// pays the whole guild reward to a Higgs wallet.
-  walletAddress      String?
+  walletAddress       String?
   /// Which chain walletAddress is on (src/lib/guilds/walletNetworks.ts).
   /// Only "BTC" today; a string so another chain needs no schema change.
-  walletNetwork      String                         @default("BTC")
+  walletNetwork       String                         @default("BTC")
   /// When an approved wallet change last took effect (24h freeze).
-  walletUpdatedAt    DateTime?
+  walletUpdatedAt     DateTime?
+  /// The payout Trezor's seal on walletAddress: a message naming the guild,
+  /// member and address, signed on the device after the approver checked
+  /// the address on its screen. A Trezor payout refuses an unsealed wallet.
+  /// Cleared whenever the wallet changes.
+  walletSealMessage   String?                        @db.Text
+  walletSealSignature String?
+  walletSealedAt      DateTime?
+  walletSealedById    String?
+  walletSealedBy      User?                          @relation("guildWalletsSealed", fields: [walletSealedById], references: [id])
   /// Earned but not yet sent: small shares wait until they reach
   /// GuildPayoutSettings.minPayoutSats, and a share is held back while its
   /// wallet is missing or in its 24h freeze. Updated when a payout settles.
-  carriedBtc         Decimal                        @default(0) @db.Decimal(20, 8)
-  joinedAt           DateTime                       @default(now())
-  leftAt             DateTime?
-  walletRequests     GuildWalletChangeRequest[]
-  splitRequestLines  GuildSplitChangeRequestLine[]
-  memberRequests     GuildMemberChangeRequest[]     @relation("guildMemberRequestTarget")
-  memberRequestAdded GuildMemberChangeRequest?      @relation("guildMemberRequestCreated")
-  memberRequestLines GuildMemberChangeRequestLine[]
-  distributionLines  GuildDistributionLine[]
+  carriedBtc          Decimal                        @default(0) @db.Decimal(20, 8)
+  joinedAt            DateTime                       @default(now())
+  leftAt              DateTime?
+  walletRequests      GuildWalletChangeRequest[]
+  splitRequestLines   GuildSplitChangeRequestLine[]
+  memberRequests      GuildMemberChangeRequest[]     @relation("guildMemberRequestTarget")
+  memberRequestAdded  GuildMemberChangeRequest?      @relation("guildMemberRequestCreated")
+  memberRequestLines  GuildMemberChangeRequestLine[]
+  distributionLines   GuildDistributionLine[]
 
   @@index([guildId])
   @@map("guild_memberships")
@@ -657,7 +686,11 @@ enum GuildPayoutMethod {
   /// An admin sends the BTC and records the reference.
   MANUAL
   /// The app builds and broadcasts a 2-of-3 multisig batch (Phase 2b).
+  /// Not used: replaced by TREZOR_BTC.
   MULTISIG_BTC
+  /// The guild's own account on the payout Trezor: the app builds the
+  /// payout, the Trezor alone signs it, the app checks and broadcasts it.
+  TREZOR_BTC
 }
 
 enum GuildFeePayer {
@@ -671,32 +704,77 @@ enum GuildFeePayer {
 
 enum GuildPayoutBatchStatus {
   BUILDING
+  /// Trezor: built (psbt, unsigned), waiting for the approver's Trezor.
+  AWAITING_SIGNATURE
   BROADCAST
   CONFIRMED
   FAILED
+  /// Trezor: cancelled before it was signed; nothing went out.
+  CANCELLED
+}
+
+enum GuildWalletCoinSource {
+  /// A Luxor payout to the guild's receiving address.
+  LUXOR
+  /// Change from one of our own payout transactions (carried shares).
+  CHANGE
+  /// Anything else that arrived at a guild address.
+  OTHER
+}
+
+enum GuildWalletCoinStatus {
+  /// Seen, not confirmed yet.
+  UNCONFIRMED
+  AVAILABLE
+  /// An input of a prepared payout that isn't broadcast yet.
+  RESERVED
+  SPENT
 }
 
 /// Payout settings for every guild. One row (id = 1).
 model GuildPayoutSettings {
-  id                   Int               @id @default(1)
-  feePayer             GuildFeePayer     @default(HIGGS)
+  id                         Int               @id @default(1)
+  feePayer                   GuildFeePayer     @default(HIGGS)
   /// A member's payable amount below this stays carried.
-  minPayoutSats        Int               @default(10000)
-  minConfirmations     Int               @default(3)
-  defaultPayoutMethod  GuildPayoutMethod @default(MANUAL)
+  minPayoutSats              Int               @default(10000)
+  minConfirmations           Int               @default(3)
+  defaultPayoutMethod        GuildPayoutMethod @default(MANUAL)
   /// Send automatically once calculated (multisig only).
-  autoExecute          Boolean           @default(false)
+  autoExecute                Boolean           @default(false)
   /// Where the hosting (company) share goes.
-  companyWalletAddress String?
+  companyWalletAddress       String?
   /// Public descriptor of the 2-of-3 payout wallet - watch-only, no keys.
-  walletDescriptor     String?
-  network              String            @default("mainnet")
+  walletDescriptor           String?
+  network                    String            @default("mainnet")
   /// Next derivation index for a guild receiving address.
-  nextAddressIndex     Int               @default(0)
-  updatedById          String?
-  updatedBy            User?             @relation("guildPayoutSettingsUpdated", fields: [updatedById], references: [id])
-  createdAt            DateTime          @default(now())
-  updatedAt            DateTime          @updatedAt
+  nextAddressIndex           Int               @default(0)
+  /// Fee rate cap for a Trezor payout, sat/vB.
+  maxFeeRateSatVb            Int               @default(50)
+  /// The payout Trezor (Connect payout Trezor). Its master fingerprint -
+  /// any other device, or a passphrase wallet, is refused.
+  deviceFingerprint          String?
+  /// e.g. "Trezor Safe 5, firmware 2.12.3".
+  deviceLabel                String?
+  /// The network the Trezor was connected for ("mainnet" | "testnet").
+  deviceNetwork              String?
+  deviceConnectedAt          DateTime?
+  deviceConnectedById        String?
+  deviceConnectedBy          User?             @relation("guildPayoutTrezorConnected", fields: [deviceConnectedById], references: [id])
+  /// The key wallet seals are signed with (m/84'/coin'/100'/0/0, never
+  /// used for funds): its address, which a seal signature must recover to.
+  sealAddress                String?
+  /// The account number the next guild's Trezor wallet gets.
+  nextTrezorAccount          Int               @default(0)
+  /// The payout Trezor's seal on companyWalletAddress.
+  companyWalletSealMessage   String?           @db.Text
+  companyWalletSealSignature String?
+  companyWalletSealedAt      DateTime?
+  companyWalletSealedById    String?
+  companyWalletSealedBy      User?             @relation("guildCompanyWalletSealed", fields: [companyWalletSealedById], references: [id])
+  updatedById                String?
+  updatedBy                  User?             @relation("guildPayoutSettingsUpdated", fields: [updatedById], references: [id])
+  createdAt                  DateTime          @default(now())
+  updatedAt                  DateTime          @updatedAt
 
   @@map("guild_payout_settings")
 }
@@ -719,14 +797,76 @@ model GuildPayoutBatch {
   error         String?
   createdById   String?
   createdBy     User?                  @relation("guildPayoutBatchesCreated", fields: [createdById], references: [id])
+  /// Trezor: the one guild this transaction pays.
+  guildId       String?
+  guild         Guild?                 @relation(fields: [guildId], references: [id], onDelete: Restrict)
+  /// Trezor: the unsigned transaction as a PSBT (base64).
+  psbt          String?                @db.Text
+  /// Trezor: the change address it sends what's carried to (1/changeIndex).
+  changeIndex   Int?
+  signedById    String?
+  signedBy      User?                  @relation("guildPayoutBatchesSigned", fields: [signedById], references: [id])
+  signedAt      DateTime?
+  /// e.g. "Trezor Safe 5, firmware 2.12.3".
+  signerDevice  String?
+  cancelledById String?
+  cancelledBy   User?                  @relation("guildPayoutBatchesCancelled", fields: [cancelledById], references: [id])
+  cancelledAt   DateTime?
   broadcastAt   DateTime?
   confirmedAt   DateTime?
   createdAt     DateTime               @default(now())
   updatedAt     DateTime               @updatedAt
   distributions GuildDistribution[]
+  coinsReserved GuildWalletCoin[]      @relation("guildCoinsReserved")
+  coinsSpent    GuildWalletCoin[]      @relation("guildCoinsSpent")
 
   @@index([status])
+  @@index([guildId])
   @@map("guild_payout_batches")
+}
+
+// A coin (unspent output) in a guild's Trezor account: at its receiving
+// address (branch 0, index 0) or one of its change addresses (branch 1).
+model GuildWalletCoin {
+  id                String                @id @default(cuid())
+  guildId           String
+  guild             Guild                 @relation(fields: [guildId], references: [id], onDelete: Restrict)
+  txid              String
+  vout              Int
+  sats              BigInt
+  address           String
+  branch            Int
+  addressIndex      Int
+  source            GuildWalletCoinSource
+  status            GuildWalletCoinStatus @default(UNCONFIRMED)
+  blockHeight       Int?
+  confirmedAt       DateTime?
+  /// The Luxor "Payment" row this came from (source LUXOR).
+  poolTransactionId String?
+  poolTransaction   PoolTransaction?      @relation(fields: [poolTransactionId], references: [id], onDelete: SetNull)
+  reservedByBatchId String?
+  reservedByBatch   GuildPayoutBatch?     @relation("guildCoinsReserved", fields: [reservedByBatchId], references: [id], onDelete: SetNull)
+  spentByBatchId    String?
+  spentByBatch      GuildPayoutBatch?     @relation("guildCoinsSpent", fields: [spentByBatchId], references: [id], onDelete: SetNull)
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  @@unique([txid, vout])
+  @@index([guildId, status])
+  @@map("guild_wallet_coins")
+}
+
+// Who may prepare, sign and cancel Trezor guild payouts (the Trezor holder
+// and a stand-in).
+model GuildPayoutApprover {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation("guildPayoutApprover", fields: [userId], references: [id], onDelete: Cascade)
+  addedById String
+  addedBy   User     @relation("guildPayoutApproversAdded", fields: [addedById], references: [id])
+  createdAt DateTime @default(now())
+
+  @@map("guild_payout_approvers")
 }
 
 // One monthly Luxor payout to a guild and how it is split: the hosting
@@ -1278,6 +1418,7 @@ model PoolTransaction {
   pool              Pool               @relation(fields: [poolId], references: [id], onDelete: Cascade)
   poolSubaccount    PoolSubaccount     @relation(fields: [poolSubaccountId], references: [id], onDelete: Cascade)
   guildDistribution GuildDistribution?
+  guildWalletCoins  GuildWalletCoin[]
 
   @@unique([poolSubaccountId, occurredAt, category, transactionType, amount])
   @@index([poolId])
@@ -2447,6 +2588,15 @@ enum AuditAction {
   GUILD_DISTRIBUTION_SETTLED
   GUILD_PAYOUT_SETTINGS_UPDATED
   GUILD_PAYOUT_BATCH_CREATED
+  GUILD_PAYOUT_TREZOR_CONNECTED
+  GUILD_TREZOR_WALLET_SET_UP
+  GUILD_WALLET_SEALED
+  GUILD_PAYOUT_APPROVERS_UPDATED
+  GUILD_PAYOUT_PREPARED
+  GUILD_PAYOUT_SIGNED
+  GUILD_PAYOUT_BROADCAST
+  GUILD_PAYOUT_CANCELLED
+  GUILD_PAYOUT_UNEXPECTED_SPEND
   REPAIR_CHARGE_CREATED
   REPAIR_CHARGE_UPDATED
   REPAIR_CHARGE_DELETED

@@ -20,7 +20,11 @@ export function effectivePayoutMethod(
   return guild.payoutMethod ?? settings.defaultPayoutMethod;
 }
 
-/** Methods that can send today; the rest are coming in Phase 2b. */
+/**
+ * Methods an admin can pick for a guild directly. TREZOR_BTC is never
+ * picked here: a guild switches to it through Set up Trezor wallet, which
+ * gives it its own account on the payout Trezor.
+ */
 export const AVAILABLE_PAYOUT_METHODS: GuildPayoutMethod[] = ["MANUAL"];
 
 /** The lowest minimum payout allowed: nothing below the dust limit. */

@@ -8,6 +8,7 @@
 
 import { Prisma } from "@prisma/client";
 import { applyAdminSplit } from "./adminSplit";
+import { defaultWalletNetwork } from "./walletNetworks";
 import type { NewGuildPerson } from "./accounts";
 
 type Tx = Prisma.TransactionClient;
@@ -31,6 +32,7 @@ export async function addMember(
       userId,
       rewardPercent: new Prisma.Decimal(person.percent.toFixed(4)),
       walletAddress: person.walletAddress ?? null,
+      walletNetwork: defaultWalletNetwork(),
       walletUpdatedAt: person.walletAddress ? now : null,
     },
   });
