@@ -130,6 +130,8 @@ interface PaymentPartsFieldsProps {
   targetUsd?: number;
   /** e.g. "hardware sales payment"; used in the amount helper text. */
   amountLabel?: string;
+  /** One transfer in one currency: no "Add another currency". */
+  singlePart?: boolean;
 }
 
 export function PaymentPartsFields({
@@ -140,6 +142,7 @@ export function PaymentPartsFields({
   withFee = false,
   targetUsd,
   amountLabel = "payment",
+  singlePart = false,
 }: PaymentPartsFieldsProps) {
   const update = (index: number, patch: Partial<PaymentPartValue>) =>
     onChange(parts.map((p, i) => (i === index ? { ...p, ...patch } : p)));
@@ -257,7 +260,7 @@ export function PaymentPartsFields({
         );
       })}
 
-      {!amountsDisabled && (
+      {!amountsDisabled && !singlePart && (
         <Box>
           <Button
             size="small"

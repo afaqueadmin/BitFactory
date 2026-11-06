@@ -672,12 +672,36 @@ export default function HardwarePurchaseDetailPage() {
         >
           <DialogTitle>Mark Invoice as Unpaid</DialogTitle>
           <DialogContent>
-            <DialogContentText>
-              Are you sure you want to mark invoice{" "}
-              <strong>{invoice.invoiceNumber}</strong> as unpaid? The status
-              will be changed back to Pending, its paid date and receipt will be
-              cleared and the recorded payment will be removed.
-            </DialogContentText>
+            {invoice.consolidatedItem ? (
+              <DialogContentText>
+                Invoice <strong>{invoice.invoiceNumber}</strong> was paid in a
+                consolidated payment together with invoice
+                {invoice.consolidatedItem.payment.items.length > 2
+                  ? "s"
+                  : ""}{" "}
+                <strong>
+                  {invoice.consolidatedItem.payment.items
+                    .map(
+                      (i) =>
+                        (i.vendorInvoice ?? i.hardwarePurchase)?.invoiceNumber,
+                    )
+                    .filter((n) => n && n !== invoice.invoiceNumber)
+                    .join(", ")}
+                </strong>
+                . Marking it as unpaid undoes the whole payment: all{" "}
+                {invoice.consolidatedItem.payment.items.length} invoices go back
+                to Pending, their paid date and receipt are cleared, and the
+                consolidated payment is removed. Record it again afterwards if
+                needed.
+              </DialogContentText>
+            ) : (
+              <DialogContentText>
+                Are you sure you want to mark invoice{" "}
+                <strong>{invoice.invoiceNumber}</strong> as unpaid? The status
+                will be changed back to Pending, its paid date and receipt will
+                be cleared and the recorded payment will be removed.
+              </DialogContentText>
+            )}
           </DialogContent>
           <DialogActions>
             <Button

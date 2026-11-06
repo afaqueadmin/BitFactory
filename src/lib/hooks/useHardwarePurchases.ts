@@ -1,4 +1,5 @@
 import type {
+  ConsolidatedPaymentItem,
   DepositAdjustment,
   InvoiceVendor,
   VendorPaymentPart,
@@ -45,6 +46,8 @@ export interface HardwarePurchaseInvoice {
   paymentReceiptKey: string | null;
   /** The payment's currency parts (detail responses only). */
   paymentParts?: VendorPaymentPart[];
+  /** Set when paid in a consolidated payment (detail responses only). */
+  consolidatedItem?: ConsolidatedPaymentItem | null;
   createdBy: string;
   updatedBy: string | null;
   createdAt: Date;

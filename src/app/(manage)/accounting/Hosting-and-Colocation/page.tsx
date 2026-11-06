@@ -34,7 +34,7 @@ import {
 } from "@mui/material";
 import Link from "next/link";
 import { useState } from "react";
-import { useDashboardStats } from "@/lib/hooks/useDashboard";
+import { useRecurringTemplateStats } from "@/lib/hooks/useDashboard";
 import { useUser } from "@/lib/hooks/useUser";
 import {
   Customer,
@@ -90,10 +90,10 @@ export default function AccountingDashboard() {
   const { d } = useDaylight();
   const ds = useDaylightAdminSx();
   const {
-    dashboard,
+    stats: recurringStats,
     loading: statsLoading,
     error: statsError,
-  } = useDashboardStats();
+  } = useRecurringTemplateStats();
   const { customers, loading: customersLoading } = useCustomers({
     hostingOnly: true,
     includeSimulated: true,
@@ -130,6 +130,7 @@ export default function AccountingDashboard() {
   const {
     invoices,
     total,
+    summary,
     loading: invoicesLoading,
     error: invoicesError,
   } = useInvoices(
@@ -145,6 +146,7 @@ export default function AccountingDashboard() {
       startDate: startDateFilter || undefined,
       endDate: endDateFilter || undefined,
       keepPrevious: true,
+      includeSummary: true,
     },
   );
 
@@ -266,6 +268,21 @@ export default function AccountingDashboard() {
   const handleApplyBulkStatus = async () => {
     if (!bulkStatus || selectedInvoiceIds.length === 0) return;
     setBulkError(null);
+    // A draft must be issued first; check up front so nothing is half-applied.
+    if (bulkStatus === "PAID" || bulkStatus === "OVERDUE") {
+      const drafts = invoices.filter(
+        (inv: InvoiceWithDetails) =>
+          selectedInvoiceIds.includes(inv.id) && inv.status === "DRAFT",
+      );
+      if (drafts.length > 0) {
+        setBulkError(
+          `Issue these draft invoices first (Issue Invoice, optionally without email): ${drafts
+            .map((inv: InvoiceWithDetails) => inv.invoiceNumber)
+            .join(", ")}`,
+        );
+        return;
+      }
+    }
     try {
       for (const id of selectedInvoiceIds) {
         await changeStatus(id, bulkStatus as BulkStatusType);
@@ -431,7 +448,7 @@ export default function AccountingDashboard() {
     );
   }
 
-  if (!dashboard) {
+  if (!recurringStats) {
     return (
       <DaylightAdminPage>
         <Alert severity="warning" sx={{ ...ds.alertSx("warning") }}>
@@ -605,30 +622,26 @@ export default function AccountingDashboard() {
         }}
       >
         <Box>
-          <StatsCard
-            label="Total Invoices"
-            value={dashboard.totalInvoices}
-            color="info"
-          />
+          <StatsCard label="Total Invoices" value={total} color="info" />
         </Box>
         <Box>
           <StatsCard
             label="Unpaid Invoices"
-            value={dashboard.unpaidInvoices}
+            value={summary.unpaidCount}
             color="warning"
           />
         </Box>
         <Box>
           <StatsCard
             label="Overdue Invoices"
-            value={dashboard.overdueInvoices}
+            value={summary.overdueCount}
             color="error"
           />
         </Box>
         <Box>
           <StatsCard
             label="Total Outstanding"
-            value={dashboard.totalOutstanding}
+            value={summary.totalOutstanding}
             isCurrency
             color="primary"
           />
@@ -647,15 +660,15 @@ export default function AccountingDashboard() {
         <Box>
           <StatsCard
             label="Recurring Templates"
-            value={dashboard.recurringInvoices.total}
-            subtext={`${dashboard.recurringInvoices.active} active`}
+            value={recurringStats.total}
+            subtext={`${recurringStats.active} active`}
             color="success"
           />
         </Box>
         <Box>
           <StatsCard
             label="Active Templates"
-            value={dashboard.recurringInvoices.active}
+            value={recurringStats.active}
             color="success"
           />
         </Box>

@@ -84,6 +84,8 @@ interface ApiResponse {
       braiins: TransactionStats;
     };
     customers: Customer[];
+    /** Pool fetches that failed (the rest of the data still loaded). */
+    warnings?: string[];
   };
   timestamp: string;
   error?: string;
@@ -101,6 +103,7 @@ interface PageState {
   pageSize: number;
   loading: boolean;
   error: string | null;
+  warnings: string[];
 }
 
 // Utility: Format date for API
@@ -137,6 +140,7 @@ export default function ClientTransactionHistoryPage() {
     pageSize: 20,
     loading: true,
     error: null,
+    warnings: [],
   });
 
   const [stats, setStats] = useState<TransactionStats>({
@@ -212,6 +216,7 @@ export default function ClientTransactionHistoryPage() {
           transactions: addInternalReactKeys(data.data.transactions),
           currentPage: 1,
           error: null,
+          warnings: data.data.warnings ?? [],
         }));
 
         console.log(
@@ -228,6 +233,7 @@ export default function ClientTransactionHistoryPage() {
           ...prev,
           transactions: [],
           error: errorMsg,
+          warnings: [],
         }));
       }
     },
@@ -272,6 +278,7 @@ export default function ClientTransactionHistoryPage() {
           selectedCustomerIds: customerIds,
           loading: false,
           error: null,
+          warnings: data.data.warnings ?? [],
         }));
 
         console.log(
@@ -571,12 +578,6 @@ export default function ClientTransactionHistoryPage() {
           value={stats.totalDebits.toFixed(8)}
           subtitle="BTC"
         />
-        <AdminValueCard
-          daylight
-          title="Net Amount"
-          value={stats.netAmount.toFixed(8)}
-          subtitle="BTC"
-        />
       </Box>
 
       {/* Filter Panel */}
@@ -715,6 +716,17 @@ export default function ClientTransactionHistoryPage() {
         {state.error && (
           <Alert severity="error" sx={{ mt: 2, ...ds.alertSx("error") }}>
             {state.error}
+          </Alert>
+        )}
+
+        {state.warnings.length > 0 && (
+          <Alert severity="warning" sx={{ mt: 2, ...ds.alertSx("warning") }}>
+            Some transactions could not be loaded:
+            <Box component="ul" sx={{ m: 0, pl: 2.5 }}>
+              {state.warnings.map((warning) => (
+                <li key={warning}>{warning}</li>
+              ))}
+            </Box>
           </Alert>
         )}
       </Paper>

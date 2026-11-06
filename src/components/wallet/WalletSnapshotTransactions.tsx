@@ -1,10 +1,12 @@
 "use client";
 
 /**
- * Payout transactions in the "you've been paid" wallet snapshot PDF: every
- * debit (payments and their transaction fees) on the payout's UTC day, laid
- * out like the /transaction page. Transaction IDs link to mempool.space -
- * Chrome keeps the links clickable in the printed PDF.
+ * Latest payouts in the wallet snapshot PDF (admin send and payout cron):
+ * for each of the customer's subaccounts, the payment(s) on that
+ * subaccount's most recent payout day (no transaction fees), laid out
+ * like the /transaction page. With `payoutDate` (the cron), only payouts up
+ * to that day count. Transaction IDs link to mempool.space - Chrome keeps
+ * the links clickable in the printed PDF.
  *
  * Reports `onLoaded` once the fetch has settled, success or not, so a
  * failure here never holds up the PDF.
@@ -44,12 +46,47 @@ const formatUtcDate = (value: string | Date): string =>
     timeZone: "UTC",
   });
 
+const utcDayKey = (value: string) => new Date(value).toISOString().slice(0, 10);
+
+// Luxor and the simulated ledger call the payout "Payment"; stored Braiins
+// payouts are "Payout".
+const PAYMENT_CATEGORIES = new Set([
+  DEFAULT_PAYOUT_CATEGORIES.payment,
+  "Payout",
+]);
+
+/**
+ * Each subaccount's payment(s) on its most recent payout day, newest payout
+ * first. Subaccounts that have never been paid out are left out.
+ */
+function latestPayoutPerSubaccount(
+  debits: SnapshotTransaction[],
+): SnapshotTransaction[] {
+  const bySubaccount = new Map<string, SnapshotTransaction[]>();
+  for (const tx of debits) {
+    if (!PAYMENT_CATEGORIES.has(tx.transaction_category)) continue;
+    const key = `${tx.pool}|${tx.subaccount_name}`;
+    const list = bySubaccount.get(key) ?? [];
+    list.push(tx);
+    bySubaccount.set(key, list);
+  }
+
+  const groups: { day: string; rows: SnapshotTransaction[] }[] = [];
+  for (const rows of bySubaccount.values()) {
+    const day = rows
+      .map((tx) => utcDayKey(tx.date_time))
+      .reduce((a, b) => (a > b ? a : b));
+    groups.push({
+      day,
+      rows: rows.filter((tx) => utcDayKey(tx.date_time) === day),
+    });
+  }
+
+  groups.sort((a, b) => b.day.localeCompare(a.day));
+  return groups.flatMap((g) => g.rows);
+}
+
 const formatBtc = (btc: number) => `₿ ${btc.toFixed(8)}`;
-const formatUsd = (usd: number) =>
-  `$${usd.toLocaleString("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
 
 const COLUMNS: { label: string; align?: "right" }[] = [
   { label: "Date" },
@@ -58,7 +95,6 @@ const COLUMNS: { label: string; align?: "right" }[] = [
   { label: "Category" },
   { label: "Type" },
   { label: "Amount (BTC)", align: "right" },
-  { label: "Amount (USD)", align: "right" },
   { label: "Transaction ID" },
 ];
 
@@ -68,8 +104,8 @@ export default function WalletSnapshotTransactions({
   onLoaded,
 }: {
   customerId: string;
-  /** The payout's UTC day, YYYY-MM-DD. */
-  payoutDate: string;
+  /** The payout cron's UTC day, YYYY-MM-DD: ignore payouts after it. */
+  payoutDate?: string | null;
   onLoaded: () => void;
 }) {
   const { d, fonts } = useDaylight();
@@ -84,14 +120,17 @@ export default function WalletSnapshotTransactions({
   useEffect(() => {
     const load = async () => {
       try {
+        // No range and no start_date: the stored history (or the simulated
+        // ledger), from the beginning up to end_date.
         const params = new URLSearchParams({
           customerId,
           type: "debit",
           pool: "total",
           subaccounts: "all",
           export: "true",
-          start_date: `${payoutDate}T00:00:00.000Z`,
-          end_date: `${payoutDate}T23:59:59.999Z`,
+          end_date: payoutDate
+            ? `${payoutDate}T23:59:59.999Z`
+            : new Date().toISOString(),
         });
         const response = await fetch(`/api/wallet/transactions?${params}`, {
           credentials: "include",
@@ -100,7 +139,7 @@ export default function WalletSnapshotTransactions({
           throw new Error(`Failed to load transactions (${response.status})`);
         }
         const json = await response.json();
-        setTransactions(json.transactions ?? []);
+        setTransactions(latestPayoutPerSubaccount(json.transactions ?? []));
       } catch (e) {
         console.error("[Wallet Snapshot] Transactions failed:", e);
         setError("Transactions could not be loaded for this snapshot.");
@@ -112,19 +151,6 @@ export default function WalletSnapshotTransactions({
   }, [customerId, payoutDate]);
 
   const rows = transactions ?? [];
-  // "Total paid" counts payments only (fees are listed but not added), so it
-  // matches the payout amount stated in the email.
-  const payments = rows.filter(
-    (tx) => tx.transaction_category === DEFAULT_PAYOUT_CATEGORIES.payment,
-  );
-  const totalBtc = payments.reduce(
-    (s, tx) => s + Math.abs(tx.currency_amount),
-    0,
-  );
-  const totalUsd = payments.reduce(
-    (s, tx) => s + Math.abs(tx.usd_equivalent),
-    0,
-  );
 
   const headCellSx = {
     fontFamily: fonts.body,
@@ -165,11 +191,11 @@ export default function WalletSnapshotTransactions({
             color: d.text,
           }}
         >
-          Payout Transactions
+          Latest Payouts
         </Typography>
         <Typography sx={{ fontSize: 12, color: d.muted, mt: "4px" }}>
-          Payments and transaction fees on {formatUtcDate(payoutDate)} (UTC).
-          Click a transaction ID to view it on mempool.space.
+          The most recent payout of each subaccount (dates in UTC). Click a
+          transaction ID to view it on mempool.space.
         </Typography>
       </Box>
 
@@ -183,7 +209,7 @@ export default function WalletSnapshotTransactions({
         <Typography
           sx={{ px: "24px", pb: "20px", fontSize: 12, color: d.muted }}
         >
-          No payout transactions were recorded on this day.
+          No payouts have been recorded yet.
         </Typography>
       ) : transactions ? (
         <Table size="small">
@@ -247,12 +273,6 @@ export default function WalletSnapshotTransactions({
                   {formatBtc(Math.abs(tx.currency_amount))}
                 </TableCell>
                 <TableCell
-                  align="right"
-                  sx={{ ...cellSx, fontVariantNumeric: "tabular-nums" }}
-                >
-                  {formatUsd(Math.abs(tx.usd_equivalent))}
-                </TableCell>
-                <TableCell
                   sx={{ ...cellSx, fontSize: 11, fontFamily: "monospace" }}
                 >
                   {tx.transaction_id ? (
@@ -270,37 +290,6 @@ export default function WalletSnapshotTransactions({
                 </TableCell>
               </TableRow>
             ))}
-            <TableRow sx={{ bgcolor: d.hover }}>
-              <TableCell
-                colSpan={5}
-                sx={{ ...cellSx, fontWeight: 700, borderBottom: 0 }}
-              >
-                Total paid
-              </TableCell>
-              <TableCell
-                align="right"
-                sx={{
-                  ...cellSx,
-                  fontWeight: 750,
-                  fontVariantNumeric: "tabular-nums",
-                  borderBottom: 0,
-                }}
-              >
-                {formatBtc(totalBtc)}
-              </TableCell>
-              <TableCell
-                align="right"
-                sx={{
-                  ...cellSx,
-                  fontWeight: 700,
-                  fontVariantNumeric: "tabular-nums",
-                  borderBottom: 0,
-                }}
-              >
-                {formatUsd(totalUsd)}
-              </TableCell>
-              <TableCell sx={{ ...cellSx, borderBottom: 0 }} />
-            </TableRow>
           </TableBody>
         </Table>
       ) : null}

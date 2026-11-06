@@ -28,7 +28,6 @@ import {
 } from "@mui/material";
 import Link from "next/link";
 import { useState } from "react";
-import { useDashboardStats } from "@/lib/hooks/useDashboard";
 import { StatsCard } from "@/components/accounting/dashboard/StatsCard";
 import { StatusBadge } from "@/components/accounting/common/StatusBadge";
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
@@ -43,6 +42,7 @@ import {
   VendorInvoice,
 } from "@/lib/hooks/useVendorInvoices";
 import { useAccountingVendors } from "@/lib/hooks/usePaymentAccounts";
+import { ConsolidatedPaymentDialog } from "@/components/accounting/common/ConsolidatedPaymentDialog";
 import EditVendorInvoiceModal from "@/components/accounting/EditVendorInvoiceModal";
 import { useDaylight } from "@/lib/daylight";
 import {
@@ -56,11 +56,6 @@ import {
 export default function FarmTariffs() {
   const { d } = useDaylight();
   const ds = useDaylightAdminSx();
-  const {
-    dashboard,
-    loading: statsLoading,
-    error: statsError,
-  } = useDashboardStats();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [sortBy, setSortBy] = useState("createdAt");
@@ -72,6 +67,10 @@ export default function FarmTariffs() {
   const [selectedInvoiceData, setSelectedInvoiceData] =
     useState<VendorInvoice | null>(null);
   const [exporting, setExporting] = useState<"csv" | "pdf" | null>(null);
+  const [consolidatedOpen, setConsolidatedOpen] = useState(false);
+  const [consolidatedNotice, setConsolidatedNotice] = useState<string | null>(
+    null,
+  );
   const [exportError, setExportError] = useState<string | null>(null);
   const [startDateFilter, setStartDateFilter] = useState("");
   const [endDateFilter, setEndDateFilter] = useState("");
@@ -167,8 +166,8 @@ export default function FarmTariffs() {
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   };
 
-  const loading = statsLoading || invoicesLoading;
-  const error = statsError || invoicesError;
+  const loading = invoicesLoading;
+  const error = invoicesError;
 
   if (loading) {
     return (
@@ -188,32 +187,54 @@ export default function FarmTariffs() {
     );
   }
 
-  if (!dashboard) {
-    return (
-      <DaylightAdminPage>
-        <Alert severity="warning" sx={{ ...ds.alertSx("warning") }}>
-          No data available
-        </Alert>
-      </DaylightAdminPage>
-    );
-  }
-
   return (
     <DaylightAdminPage>
       <DaylightPageHeader
         title="Farm Tariffs Dashboard"
         description="Overview of vendor invoices and payments"
         actions={
-          <Link href="/accounting/vendor-invoices/create">
+          <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
             <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              sx={ds.primaryBtnSx}
+              variant="outlined"
+              sx={ds.outlineBtnSx}
+              onClick={() => {
+                setConsolidatedNotice(null);
+                setConsolidatedOpen(true);
+              }}
             >
-              Record Vendor Invoice
+              Record Consolidated Payment
             </Button>
-          </Link>
+            <Link href="/accounting/vendor-invoices/create">
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                sx={ds.primaryBtnSx}
+              >
+                Record Vendor Invoice
+              </Button>
+            </Link>
+          </Box>
         }
+      />
+
+      {consolidatedNotice && (
+        <Alert
+          severity="success"
+          sx={{ ...ds.alertSx("success"), mb: 2 }}
+          onClose={() => setConsolidatedNotice(null)}
+        >
+          {consolidatedNotice}
+        </Alert>
+      )}
+      <ConsolidatedPaymentDialog
+        kind="farm"
+        open={consolidatedOpen}
+        onClose={() => setConsolidatedOpen(false)}
+        onRecorded={(message) => {
+          setConsolidatedOpen(false);
+          setConsolidatedNotice(message);
+          refetch();
+        }}
       />
 
       {/* Stats Row */}
