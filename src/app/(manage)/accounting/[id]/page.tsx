@@ -60,6 +60,7 @@ import CreateMemoModal from "@/components/CreateMemoModal";
 import { useMemos } from "@/lib/hooks/admin/useMemos";
 import { memoDisplayAmount } from "@/lib/accounting/memoAmount";
 import { DaylightThemedPage } from "@/components/daylight/DaylightMuiScope";
+import { CostPayment } from "@prisma/client";
 
 function formatAuditAction(action: string): string {
   const actionMap: { [key: string]: string } = {
@@ -107,6 +108,11 @@ export default function InvoiceDetailPage() {
     null,
   );
   const [cancelLoading, setCancelLoading] = useState(false);
+  const [cancelPaymentDialogOpen, setCancelPaymentDialogOpen] = useState(false);
+  const [cancelPaymentDialogError, setCancelPaymentDialogError] = useState<
+    string | null
+  >(null);
+  const [cancelPaymentLoading, setCancelPaymentLoading] = useState(false);
   const [unpaidDialogOpen, setUnpaidDialogOpen] = useState(false);
   const [unpaidDialogError, setUnpaidDialogError] = useState<string | null>(
     null,
@@ -350,6 +356,43 @@ export default function InvoiceDetailPage() {
       setUnpaidLoading(false);
     }
   };
+
+  // Reverse every manual payment on the invoice and set it back to ISSUED
+  // (SUPER_ADMIN only)
+  const handleCancelPayment = async () => {
+    try {
+      setCancelPaymentDialogError(null);
+      setCancelPaymentLoading(true);
+
+      const response = await fetch(
+        `/api/accounting/invoices/${invoice!.id}/cancel-payment`,
+        {
+          method: "POST",
+          credentials: "include",
+        },
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to cancel payment");
+      }
+
+      setCancelPaymentDialogOpen(false);
+      // Reload to show updated invoice status, payments and audit trail
+      window.location.reload();
+    } catch (err) {
+      setCancelPaymentDialogError(
+        err instanceof Error ? err.message : "Failed to cancel payment",
+      );
+    } finally {
+      setCancelPaymentLoading(false);
+    }
+  };
+
+  // Memo-created payments are reversed by voiding the memo, not here
+  const hasCancellablePayments = !!invoice?.costPayments?.some(
+    (p: CostPayment) => !p.isDeleted && !p.memoId,
+  );
 
   if (loading) {
     return (
@@ -770,6 +813,24 @@ export default function InvoiceDetailPage() {
                   >
                     Record Payment
                   </Button>
+
+                  {isSuperAdmin &&
+                    hasCancellablePayments &&
+                    invoice.status !== "CANCELLED" && (
+                      <Button
+                        sx={{ displayPrint: "none" }}
+                        variant="outlined"
+                        color="error"
+                        fullWidth
+                        size="large"
+                        onClick={() => {
+                          setCancelPaymentDialogError(null);
+                          setCancelPaymentDialogOpen(true);
+                        }}
+                      >
+                        Cancel Payment
+                      </Button>
+                    )}
 
                   {isSuperAdmin && invoice.status === "PAID" && (
                     <Button
@@ -1385,6 +1446,51 @@ export default function InvoiceDetailPage() {
               disabled={cancelLoading}
             >
               {cancelLoading ? "Cancelling..." : "Cancel Invoice"}
+            </Button>
+          </DialogActions>
+        </Dialog>
+        {/* Cancel Payment Confirmation Dialog */}
+        <Dialog
+          open={cancelPaymentDialogOpen}
+          onClose={() => setCancelPaymentDialogOpen(false)}
+        >
+          <DialogTitle>Cancel Payment</DialogTitle>
+          <DialogContent>
+            <Box sx={{ pt: 2 }}>
+              {cancelPaymentDialogError && (
+                <Alert severity="error" sx={{ mb: 2 }}>
+                  {cancelPaymentDialogError}
+                </Alert>
+              )}
+              <Alert severity="warning" sx={{ mb: 2 }}>
+                This reverses every payment recorded on this invoice.
+              </Alert>
+              <Typography>
+                Are you sure you want to cancel the payment on invoice{" "}
+                {invoice?.invoiceNumber}? This will:
+              </Typography>
+              <ul style={{ marginTop: 12 }}>
+                <li>Remove all payments recorded against this invoice</li>
+                <li>Change the invoice status to ISSUED</li>
+                <li>Clear the paid date</li>
+                <li>Log the payment reversal in the audit trail</li>
+              </ul>
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button
+              onClick={() => setCancelPaymentDialogOpen(false)}
+              disabled={cancelPaymentLoading}
+            >
+              Close
+            </Button>
+            <Button
+              onClick={handleCancelPayment}
+              variant="contained"
+              color="error"
+              disabled={cancelPaymentLoading}
+            >
+              {cancelPaymentLoading ? "Cancelling..." : "Cancel Payment"}
             </Button>
           </DialogActions>
         </Dialog>
