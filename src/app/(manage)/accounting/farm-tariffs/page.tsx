@@ -42,6 +42,7 @@ import {
   VendorInvoice,
 } from "@/lib/hooks/useVendorInvoices";
 import { useAccountingVendors } from "@/lib/hooks/usePaymentAccounts";
+import { ConsolidatedPaymentDialog } from "@/components/accounting/common/ConsolidatedPaymentDialog";
 import EditVendorInvoiceModal from "@/components/accounting/EditVendorInvoiceModal";
 import { useDaylight } from "@/lib/daylight";
 import {
@@ -66,6 +67,10 @@ export default function FarmTariffs() {
   const [selectedInvoiceData, setSelectedInvoiceData] =
     useState<VendorInvoice | null>(null);
   const [exporting, setExporting] = useState<"csv" | "pdf" | null>(null);
+  const [consolidatedOpen, setConsolidatedOpen] = useState(false);
+  const [consolidatedNotice, setConsolidatedNotice] = useState<string | null>(
+    null,
+  );
   const [exportError, setExportError] = useState<string | null>(null);
   const [startDateFilter, setStartDateFilter] = useState("");
   const [endDateFilter, setEndDateFilter] = useState("");
@@ -188,16 +193,48 @@ export default function FarmTariffs() {
         title="Farm Tariffs Dashboard"
         description="Overview of vendor invoices and payments"
         actions={
-          <Link href="/accounting/vendor-invoices/create">
+          <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
             <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              sx={ds.primaryBtnSx}
+              variant="outlined"
+              sx={ds.outlineBtnSx}
+              onClick={() => {
+                setConsolidatedNotice(null);
+                setConsolidatedOpen(true);
+              }}
             >
-              Record Vendor Invoice
+              Record Consolidated Payment
             </Button>
-          </Link>
+            <Link href="/accounting/vendor-invoices/create">
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                sx={ds.primaryBtnSx}
+              >
+                Record Vendor Invoice
+              </Button>
+            </Link>
+          </Box>
         }
+      />
+
+      {consolidatedNotice && (
+        <Alert
+          severity="success"
+          sx={{ ...ds.alertSx("success"), mb: 2 }}
+          onClose={() => setConsolidatedNotice(null)}
+        >
+          {consolidatedNotice}
+        </Alert>
+      )}
+      <ConsolidatedPaymentDialog
+        kind="farm"
+        open={consolidatedOpen}
+        onClose={() => setConsolidatedOpen(false)}
+        onRecorded={(message) => {
+          setConsolidatedOpen(false);
+          setConsolidatedNotice(message);
+          refetch();
+        }}
       />
 
       {/* Stats Row */}

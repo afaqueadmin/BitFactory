@@ -15,6 +15,7 @@ import {
   adjustedOnInvoice,
   checkInvoiceChangeWithAdjustments,
 } from "@/lib/accounting/vendorDeposit";
+import { isInConsolidatedPayment } from "@/lib/accounting/consolidatedVendorPayment";
 
 interface UpdateHardwarePurchaseRequest {
   invoiceNumber?: string;
@@ -156,15 +157,29 @@ export async function PUT(
       return NextResponse.json({ error: ruleError }, { status: 400 });
     }
 
+    const vendorChanged =
+      body.vendorId !== undefined && body.vendorId !== existingInvoice.vendorId;
+
+    if (
+      vendorChanged &&
+      (await isInConsolidatedPayment("hardware", invoiceId))
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "This invoice was paid in a consolidated payment with other invoices from its vendor, so its vendor can't change. Mark it as unpaid first.",
+        },
+        { status: 400 },
+      );
+    }
+
     const adjustmentError = checkInvoiceChangeWithAdjustments(
       await adjustedOnInvoice(prisma, "hardware", invoiceId),
       {
         cancel:
           body.paymentStatus === "Cancelled" &&
           existingInvoice.paymentStatus !== "Cancelled",
-        vendorChanged:
-          body.vendorId !== undefined &&
-          body.vendorId !== existingInvoice.vendorId,
+        vendorChanged,
         newTotal: body.totalAmount,
       },
     );

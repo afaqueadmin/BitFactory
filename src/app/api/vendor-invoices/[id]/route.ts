@@ -15,6 +15,7 @@ import {
   adjustedOnInvoice,
   checkInvoiceChangeWithAdjustments,
 } from "@/lib/accounting/vendorDeposit";
+import { isInConsolidatedPayment } from "@/lib/accounting/consolidatedVendorPayment";
 
 interface UpdateVendorInvoiceRequest {
   invoiceNumber?: string;
@@ -172,6 +173,16 @@ export async function PUT(
     const vendorChanged =
       body.vendorId !== undefined &&
       (body.vendorId || null) !== existingInvoice.vendorId;
+
+    if (vendorChanged && (await isInConsolidatedPayment("farm", invoiceId))) {
+      return NextResponse.json(
+        {
+          error:
+            "This invoice was paid in a consolidated payment with other invoices from its vendor, so its vendor can't change. Mark it as unpaid first.",
+        },
+        { status: 400 },
+      );
+    }
     const adjustmentError = checkInvoiceChangeWithAdjustments(
       await adjustedOnInvoice(prisma, "farm", invoiceId),
       {

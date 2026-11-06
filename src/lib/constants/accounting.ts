@@ -265,6 +265,10 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   [AuditAction.HARDWARE_PURCHASE_INVOICE_DELETED]:
     "Hardware Purchase Invoice Deleted",
   [AuditAction.VENDOR_INVOICE_PAID]: "Vendor Invoice Paid",
+  [AuditAction.VENDOR_CONSOLIDATED_PAYMENT_RECORDED]:
+    "Consolidated Vendor Payment Recorded",
+  [AuditAction.VENDOR_CONSOLIDATED_PAYMENT_REMOVED]:
+    "Consolidated Vendor Payment Undone",
   [AuditAction.HARDWARE_PURCHASE_INVOICE_PAID]:
     "Hardware Purchase Invoice Paid",
   [AuditAction.ACCOUNTING_ENTITY_CREATED]: "Accounting Entity Created",

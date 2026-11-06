@@ -118,6 +118,7 @@ model User {
   secondaryLoginRequests                  SecondaryLoginRequest[]         @relation("secondaryLoginRequests")
   secondaryLoginRequestsReviewed          SecondaryLoginRequest[]         @relation("secondaryLoginRequestsReviewed")
   accountingEntitiesCreated               AccountingEntity[]              @relation("accountingEntitiesCreated")
+  vendorConsolidatedPaymentsCreated       VendorConsolidatedPayment[]     @relation("vendorConsolidatedPaymentsCreated")
   accountingBanksCreated                  AccountingBank[]                @relation("accountingBanksCreated")
   accountingVendorsCreated                AccountingVendor[]              @relation("accountingVendorsCreated")
   vendorDepositMovementsCreated           VendorDepositMovement[]         @relation("vendorDepositMovementsCreated")
@@ -1700,21 +1701,21 @@ model Memo {
 }
 
 model VendorInvoice {
-  id                   String                  @id @default(cuid())
-  invoiceNumber        String                  @unique
-  billingDate          DateTime                @db.Date
+  id                   String                         @id @default(cuid())
+  invoiceNumber        String                         @unique
+  billingDate          DateTime                       @db.Date
   paidDate             DateTime?
   dueDate              DateTime
   totalMiners          Int
-  unitPrice            Decimal                 @db.Decimal(10, 2)
-  miscellaneousCharges Decimal                 @default(0.00) @db.Decimal(10, 2)
-  totalAmount          Decimal                 @db.Decimal(12, 2)
-  paymentStatus        VendorPaymentStatus     @default(Pending)
+  unitPrice            Decimal                        @db.Decimal(10, 2)
+  miscellaneousCharges Decimal                        @default(0.00) @db.Decimal(10, 2)
+  totalAmount          Decimal                        @db.Decimal(12, 2)
+  paymentStatus        VendorPaymentStatus            @default(Pending)
   notes                String?
   createdBy            String
   updatedBy            String?
-  createdAt            DateTime                @default(now())
-  updatedAt            DateTime                @updatedAt
+  createdAt            DateTime                       @default(now())
+  updatedAt            DateTime                       @updatedAt
   // R2 object key of the vendor's invoice PDF. Null on invoices recorded
   // before PDF uploads existed.
   invoicePdfKey        String?
@@ -1737,23 +1738,25 @@ model VendorInvoice {
   paymentEntityId      String?
   paymentBankId        String?
   paymentCurrencyId    String?
-  paymentAmount        Decimal?                @db.Decimal(18, 2)
-  paymentExchangeRate  Decimal?                @db.Decimal(18, 8)
-  paymentAmountUsd     Decimal?                @db.Decimal(12, 2)
-  transactionFee       Decimal?                @db.Decimal(18, 2)
+  paymentAmount        Decimal?                       @db.Decimal(18, 2)
+  paymentExchangeRate  Decimal?                       @db.Decimal(18, 8)
+  paymentAmountUsd     Decimal?                       @db.Decimal(12, 2)
+  transactionFee       Decimal?                       @db.Decimal(18, 2)
   // Receipt PDF covering every part of the payment.
   paymentReceiptKey    String?
   paymentParts         VendorPaymentPart[]
+  /// Set when it was paid in a consolidated payment with other invoices.
+  consolidatedItem     VendorConsolidatedPaymentItem?
   // Optional: Farm Tariffs recorded before vendors existed have none.
   vendorId             String?
-  vendor               AccountingVendor?       @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+  vendor               AccountingVendor?              @relation(fields: [vendorId], references: [id], onDelete: Restrict)
   // Security deposit the vendor applied to this invoice (lowers cash due).
   depositAdjustments   VendorDepositMovement[]
-  createdByUser        User                    @relation("vendorInvoicesCreated", fields: [createdBy], references: [id])
-  updatedByUser        User?                   @relation("vendorInvoicesUpdated", fields: [updatedBy], references: [id])
-  paymentEntity        AccountingEntity?       @relation("vendorInvoicePaymentEntity", fields: [paymentEntityId], references: [id], onDelete: Restrict)
-  paymentBank          AccountingBank?         @relation("vendorInvoicePaymentBank", fields: [paymentBankId], references: [id], onDelete: Restrict)
-  paymentCurrency      AccountingCurrency?     @relation("vendorInvoicePaymentCurrency", fields: [paymentCurrencyId], references: [id], onDelete: Restrict)
+  createdByUser        User                           @relation("vendorInvoicesCreated", fields: [createdBy], references: [id])
+  updatedByUser        User?                          @relation("vendorInvoicesUpdated", fields: [updatedBy], references: [id])
+  paymentEntity        AccountingEntity?              @relation("vendorInvoicePaymentEntity", fields: [paymentEntityId], references: [id], onDelete: Restrict)
+  paymentBank          AccountingBank?                @relation("vendorInvoicePaymentBank", fields: [paymentBankId], references: [id], onDelete: Restrict)
+  paymentCurrency      AccountingCurrency?            @relation("vendorInvoicePaymentCurrency", fields: [paymentCurrencyId], references: [id], onDelete: Restrict)
 
   @@index([paymentStatus])
   @@index([billingDate])
@@ -1767,31 +1770,31 @@ model VendorInvoice {
 }
 
 model HardwarePurchaseInvoice {
-  id                   String                  @id @default(cuid())
-  invoiceNumber        String                  @unique
+  id                   String                         @id @default(cuid())
+  invoiceNumber        String                         @unique
   vendorId             String
   // DEPRECATED (2026-10-22): replaced by vendorId (accounting_vendors). No
   // longer written or read. TODO: drop this column and the VendorName enum
   // after 2026-11-21 if nothing breaks.
   vendorName           VendorName?
   hardwareDescription  String
-  billingDate          DateTime                @db.Date
+  billingDate          DateTime                       @db.Date
   paidDate             DateTime?
   dueDate              DateTime
   quantity             Int
-  unitPrice            Decimal                 @db.Decimal(10, 2)
-  miscellaneousCharges Decimal                 @default(0.00) @db.Decimal(10, 2)
+  unitPrice            Decimal                        @db.Decimal(10, 2)
+  miscellaneousCharges Decimal                        @default(0.00) @db.Decimal(10, 2)
   // Refundable deposit the vendor holds. Part of totalAmount (so the
   // payment covers it) but not a hardware cost: cost = totalAmount -
   // securityDeposit = quantity * unitPrice + miscellaneousCharges.
-  securityDeposit      Decimal                 @default(0.00) @db.Decimal(10, 2)
-  totalAmount          Decimal                 @db.Decimal(12, 2)
-  paymentStatus        VendorPaymentStatus     @default(Pending)
+  securityDeposit      Decimal                        @default(0.00) @db.Decimal(10, 2)
+  totalAmount          Decimal                        @db.Decimal(12, 2)
+  paymentStatus        VendorPaymentStatus            @default(Pending)
   notes                String?
   createdBy            String
   updatedBy            String?
-  createdAt            DateTime                @default(now())
-  updatedAt            DateTime                @updatedAt
+  createdAt            DateTime                       @default(now())
+  updatedAt            DateTime                       @updatedAt
   // Same PDF and payment columns as VendorInvoice; set by
   // POST /api/hardware-purchases/[id]/record-payment.
   invoicePdfKey        String?
@@ -1808,21 +1811,23 @@ model HardwarePurchaseInvoice {
   paymentEntityId      String?
   paymentBankId        String?
   paymentCurrencyId    String?
-  paymentAmount        Decimal?                @db.Decimal(18, 2)
-  paymentExchangeRate  Decimal?                @db.Decimal(18, 8)
-  paymentAmountUsd     Decimal?                @db.Decimal(12, 2)
-  transactionFee       Decimal?                @db.Decimal(18, 2)
+  paymentAmount        Decimal?                       @db.Decimal(18, 2)
+  paymentExchangeRate  Decimal?                       @db.Decimal(18, 8)
+  paymentAmountUsd     Decimal?                       @db.Decimal(12, 2)
+  transactionFee       Decimal?                       @db.Decimal(18, 2)
   // Receipt PDF covering every part of the payment.
   paymentReceiptKey    String?
   paymentParts         VendorPaymentPart[]
-  vendor               AccountingVendor        @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+  /// Set when it was paid in a consolidated payment with other invoices.
+  consolidatedItem     VendorConsolidatedPaymentItem?
+  vendor               AccountingVendor               @relation(fields: [vendorId], references: [id], onDelete: Restrict)
   // Security deposit the vendor applied to this invoice (lowers cash due).
   depositAdjustments   VendorDepositMovement[]
-  createdByUser        User                    @relation("hardwarePurchasesCreated", fields: [createdBy], references: [id])
-  updatedByUser        User?                   @relation("hardwarePurchasesUpdated", fields: [updatedBy], references: [id])
-  paymentEntity        AccountingEntity?       @relation("hardwarePurchasePaymentEntity", fields: [paymentEntityId], references: [id], onDelete: Restrict)
-  paymentBank          AccountingBank?         @relation("hardwarePurchasePaymentBank", fields: [paymentBankId], references: [id], onDelete: Restrict)
-  paymentCurrency      AccountingCurrency?     @relation("hardwarePurchasePaymentCurrency", fields: [paymentCurrencyId], references: [id], onDelete: Restrict)
+  createdByUser        User                           @relation("hardwarePurchasesCreated", fields: [createdBy], references: [id])
+  updatedByUser        User?                          @relation("hardwarePurchasesUpdated", fields: [updatedBy], references: [id])
+  paymentEntity        AccountingEntity?              @relation("hardwarePurchasePaymentEntity", fields: [paymentEntityId], references: [id], onDelete: Restrict)
+  paymentBank          AccountingBank?                @relation("hardwarePurchasePaymentBank", fields: [paymentBankId], references: [id], onDelete: Restrict)
+  paymentCurrency      AccountingCurrency?            @relation("hardwarePurchasePaymentCurrency", fields: [paymentCurrencyId], references: [id], onDelete: Restrict)
 
   @@index([paymentStatus])
   @@index([billingDate])
@@ -1838,18 +1843,19 @@ model HardwarePurchaseInvoice {
 /// A vendor of Hardware Purchases and/or Farm Tariffs (Finance Settings ->
 /// Vendors). The two flags pick which invoice forms list it.
 model AccountingVendor {
-  id                   String                    @id @default(cuid())
-  name                 String                    @unique
-  isActive             Boolean                   @default(true)
-  forHardwarePurchases Boolean                   @default(false)
-  forFarmTariffs       Boolean                   @default(false)
+  id                   String                      @id @default(cuid())
+  name                 String                      @unique
+  isActive             Boolean                     @default(true)
+  forHardwarePurchases Boolean                     @default(false)
+  forFarmTariffs       Boolean                     @default(false)
   createdBy            String
-  createdAt            DateTime                  @default(now())
-  updatedAt            DateTime                  @updatedAt
-  createdByUser        User                      @relation("accountingVendorsCreated", fields: [createdBy], references: [id])
+  createdAt            DateTime                    @default(now())
+  updatedAt            DateTime                    @updatedAt
+  createdByUser        User                        @relation("accountingVendorsCreated", fields: [createdBy], references: [id])
   hardwarePurchases    HardwarePurchaseInvoice[]
   vendorInvoices       VendorInvoice[]
   depositMovements     VendorDepositMovement[]
+  consolidatedPayments VendorConsolidatedPayment[]
 
   @@index([createdBy])
   @@map("accounting_vendors")
@@ -1947,22 +1953,86 @@ model VendorPaymentPart {
   @@map("vendor_payment_parts")
 }
 
+// One bank transfer that paid several of a vendor's Farm Tariff invoices, or
+// several of its Hardware Purchase invoices (never a mix), credits included -
+// recorded once, exactly as it appears on the bank statement. Each invoice it
+// paid is Paid with this paid date and receipt, and has one item here with
+// its share. One currency, one entity/bank. The amount paid includes the
+// transaction fee, as on single-invoice payments (D8): the items' shares
+// plus the fee (converted at the rate) = amount / exchangeRate.
+model VendorConsolidatedPayment {
+  id             String   @id @default(cuid())
+  /// "farm" (Farm Tariffs / VendorInvoice) or "hardware" (Hardware Purchases).
+  kind           String
+  vendorId       String
+  paidDate       DateTime
+  entityId       String
+  bankId         String
+  currencyId     String
+  /// In the payment's currency. Includes transactionFee.
+  amount         Decimal  @db.Decimal(18, 2)
+  /// 1 USD = exchangeRate currency.
+  exchangeRate   Decimal  @db.Decimal(18, 8)
+  /// amount / exchangeRate, rounded to cents.
+  amountUsd      Decimal  @db.Decimal(12, 2)
+  /// In the payment's currency.
+  transactionFee Decimal  @db.Decimal(18, 2)
+  /// The receipt PDF; also set as paymentReceiptKey on every invoice it paid.
+  receiptKey     String
+  createdBy      String
+  createdAt      DateTime @default(now())
+
+  vendor        AccountingVendor                @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+  entity        AccountingEntity                @relation(fields: [entityId], references: [id], onDelete: Restrict)
+  bank          AccountingBank                  @relation(fields: [bankId], references: [id], onDelete: Restrict)
+  currency      AccountingCurrency              @relation(fields: [currencyId], references: [id], onDelete: Restrict)
+  createdByUser User                            @relation("vendorConsolidatedPaymentsCreated", fields: [createdBy], references: [id])
+  items         VendorConsolidatedPaymentItem[]
+
+  @@index([vendorId])
+  @@index([entityId])
+  @@index([bankId])
+  @@index([currencyId])
+  @@map("vendor_consolidated_payments")
+}
+
+// An invoice paid by a consolidated payment, and its share of it: its cash
+// due when paid (total minus any security deposit applied), negative for a
+// credit.
+model VendorConsolidatedPaymentItem {
+  id                 String  @id @default(cuid())
+  paymentId          String
+  vendorInvoiceId    String? @unique
+  hardwarePurchaseId String? @unique
+  amountUsd          Decimal @db.Decimal(12, 2)
+  /// Order the invoices were listed in.
+  sortOrder          Int     @default(0)
+
+  payment          VendorConsolidatedPayment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  vendorInvoice    VendorInvoice?            @relation(fields: [vendorInvoiceId], references: [id], onDelete: Restrict)
+  hardwarePurchase HardwarePurchaseInvoice?  @relation(fields: [hardwarePurchaseId], references: [id], onDelete: Restrict)
+
+  @@index([paymentId])
+  @@map("vendor_consolidated_payment_items")
+}
+
 // Accounting master data: the entities that pay or receive money, their
 // banks, and the currencies each bank holds. Payment forms cascade
 // Entity -> Bank -> Currency.
 model AccountingEntity {
-  id                       String                    @id @default(cuid())
-  name                     String                    @unique
-  isActive                 Boolean                   @default(true)
+  id                       String                      @id @default(cuid())
+  name                     String                      @unique
+  isActive                 Boolean                     @default(true)
   createdBy                String
-  createdAt                DateTime                  @default(now())
-  updatedAt                DateTime                  @updatedAt
-  createdByUser            User                      @relation("accountingEntitiesCreated", fields: [createdBy], references: [id])
+  createdAt                DateTime                    @default(now())
+  updatedAt                DateTime                    @updatedAt
+  createdByUser            User                        @relation("accountingEntitiesCreated", fields: [createdBy], references: [id])
   banks                    AccountingBank[]
-  vendorInvoicePayments    VendorInvoice[]           @relation("vendorInvoicePaymentEntity")
-  hardwarePurchasePayments HardwarePurchaseInvoice[] @relation("hardwarePurchasePaymentEntity")
+  vendorInvoicePayments    VendorInvoice[]             @relation("vendorInvoicePaymentEntity")
+  hardwarePurchasePayments HardwarePurchaseInvoice[]   @relation("hardwarePurchasePaymentEntity")
   costPayments             CostPayment[]
   vendorPaymentParts       VendorPaymentPart[]
+  consolidatedPayments     VendorConsolidatedPayment[]
   depositReturns           VendorDepositMovement[]
 
   @@index([createdBy])
@@ -1970,20 +2040,21 @@ model AccountingEntity {
 }
 
 model AccountingBank {
-  id                       String                    @id @default(cuid())
+  id                       String                      @id @default(cuid())
   entityId                 String
   name                     String
-  isActive                 Boolean                   @default(true)
+  isActive                 Boolean                     @default(true)
   createdBy                String
-  createdAt                DateTime                  @default(now())
-  updatedAt                DateTime                  @updatedAt
-  entity                   AccountingEntity          @relation(fields: [entityId], references: [id])
-  createdByUser            User                      @relation("accountingBanksCreated", fields: [createdBy], references: [id])
+  createdAt                DateTime                    @default(now())
+  updatedAt                DateTime                    @updatedAt
+  entity                   AccountingEntity            @relation(fields: [entityId], references: [id])
+  createdByUser            User                        @relation("accountingBanksCreated", fields: [createdBy], references: [id])
   currencies               AccountingBankCurrency[]
-  vendorInvoicePayments    VendorInvoice[]           @relation("vendorInvoicePaymentBank")
-  hardwarePurchasePayments HardwarePurchaseInvoice[] @relation("hardwarePurchasePaymentBank")
+  vendorInvoicePayments    VendorInvoice[]             @relation("vendorInvoicePaymentBank")
+  hardwarePurchasePayments HardwarePurchaseInvoice[]   @relation("hardwarePurchasePaymentBank")
   costPayments             CostPayment[]
   vendorPaymentParts       VendorPaymentPart[]
+  consolidatedPayments     VendorConsolidatedPayment[]
   depositReturns           VendorDepositMovement[]
 
   @@unique([entityId, name])
@@ -1992,17 +2063,18 @@ model AccountingBank {
 }
 
 model AccountingCurrency {
-  id                       String                    @id @default(cuid())
-  code                     String                    @unique
+  id                       String                      @id @default(cuid())
+  code                     String                      @unique
   name                     String
-  isActive                 Boolean                   @default(true)
-  createdAt                DateTime                  @default(now())
-  updatedAt                DateTime                  @updatedAt
+  isActive                 Boolean                     @default(true)
+  createdAt                DateTime                    @default(now())
+  updatedAt                DateTime                    @updatedAt
   banks                    AccountingBankCurrency[]
-  vendorInvoicePayments    VendorInvoice[]           @relation("vendorInvoicePaymentCurrency")
-  hardwarePurchasePayments HardwarePurchaseInvoice[] @relation("hardwarePurchasePaymentCurrency")
+  vendorInvoicePayments    VendorInvoice[]             @relation("vendorInvoicePaymentCurrency")
+  hardwarePurchasePayments HardwarePurchaseInvoice[]   @relation("hardwarePurchasePaymentCurrency")
   costPayments             CostPayment[]
   vendorPaymentParts       VendorPaymentPart[]
+  consolidatedPayments     VendorConsolidatedPayment[]
   depositReturns           VendorDepositMovement[]
 
   @@map("accounting_currencies")
@@ -2368,6 +2440,8 @@ enum AuditAction {
   HARDWARE_PURCHASE_INVOICE_UPDATED
   HARDWARE_PURCHASE_INVOICE_DELETED
   VENDOR_INVOICE_PAID
+  VENDOR_CONSOLIDATED_PAYMENT_RECORDED
+  VENDOR_CONSOLIDATED_PAYMENT_REMOVED
   HARDWARE_PURCHASE_INVOICE_PAID
   ACCOUNTING_ENTITY_CREATED
   ACCOUNTING_ENTITY_UPDATED
