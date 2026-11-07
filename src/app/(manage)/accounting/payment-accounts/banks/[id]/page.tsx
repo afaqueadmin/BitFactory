@@ -2,6 +2,7 @@
 
 import {
   Alert,
+  Autocomplete,
   Box,
   Button,
   Link as MuiLink,
@@ -14,19 +15,33 @@ import {
   TableHead,
   TableRow,
   TextField,
+  ToggleButton,
+  ToggleButtonGroup,
   Typography,
 } from "@mui/material";
+import AccountBalanceIcon from "@mui/icons-material/AccountBalance";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import CallMadeIcon from "@mui/icons-material/CallMade";
+import CallReceivedIcon from "@mui/icons-material/CallReceived";
+import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
+import HistoryIcon from "@mui/icons-material/History";
 import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
 import Link from "next/link";
-import { useParams } from "next/navigation";
-import { Fragment, useState } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useMemo, useState } from "react";
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
 import { DateDisplay } from "@/components/accounting/common/DateDisplay";
+import StatCard from "@/components/daylight/StatCard";
 import {
+  AccountingBank,
   BankStatementRow,
+  useAccountingBanks,
   useBankStatement,
 } from "@/lib/hooks/usePaymentAccounts";
+import {
+  CURRENCY_FORMAT_OPTIONS,
+  CURRENCY_LOCALE,
+} from "@/lib/constants/accounting";
 import { downloadExport } from "@/lib/downloadExport";
 import { useDaylight } from "@/lib/daylight";
 import {
@@ -40,37 +55,59 @@ import {
  * Bank Statement: every payment received into (Debit) or sent from (Credit)
  * one bank, oldest first, with a running balance. USD at the rate saved
  * with each payment. Opened from Entities, Banks & Currencies -> Banks.
+ *
+ * The date range lives in the URL (?from=&to=), so it survives a refresh
+ * and switching to another bank with the picker.
  */
 
-const COLUMN_COUNT = 10;
+const COLUMN_COUNT = 9;
+const BANKS_HREF = "/accounting/payment-accounts";
 
-function SummaryCard({ label, value }: { label: string; value: string }) {
-  const { d, fonts } = useDaylight();
-  const ds = useDaylightAdminSx();
-  return (
-    <Paper
-      elevation={0}
-      sx={{ ...ds.cardSx, p: { xs: "14px 16px", sm: "16px 18px" } }}
-    >
-      <Typography sx={{ fontSize: 12.5, fontWeight: 600, color: d.muted }}>
-        {label}
-      </Typography>
-      <Typography
-        sx={{
-          mt: "6px",
-          fontFamily: fonts.heading,
-          fontWeight: 750,
-          fontSize: 20,
-          letterSpacing: "-0.02em",
-          fontVariantNumeric: "tabular-nums",
-          color: Number(value) < 0 ? d.danger : d.text,
-        }}
-      >
-        <CurrencyDisplay value={value} />
-      </Typography>
-    </Paper>
-  );
+const money = new Intl.NumberFormat(CURRENCY_LOCALE, CURRENCY_FORMAT_OPTIONS);
+const formatUsd = (value: string | number | undefined) =>
+  money.format(Number(value ?? 0));
+
+const isDay = (v: string | null): v is string =>
+  !!v && /^\d{4}-\d{2}-\d{2}$/.test(v);
+
+/** Local yyyy-mm-dd. */
+const day = (date: Date) => date.toLocaleDateString("en-CA");
+
+/** "Nov 1, 2026" for a yyyy-mm-dd day. */
+const dayLabel = (v: string) =>
+  new Date(`${v}T12:00:00`).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+
+type Preset = "all" | "thisMonth" | "lastMonth" | "last3" | "thisYear";
+
+function presetRange(preset: Preset): { from: string; to: string } {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = now.getMonth();
+  switch (preset) {
+    case "thisMonth":
+      return { from: day(new Date(y, m, 1)), to: day(now) };
+    case "lastMonth":
+      return { from: day(new Date(y, m - 1, 1)), to: day(new Date(y, m, 0)) };
+    case "last3":
+      return { from: day(new Date(y, m - 2, 1)), to: day(now) };
+    case "thisYear":
+      return { from: day(new Date(y, 0, 1)), to: day(now) };
+    default:
+      return { from: "", to: "" };
+  }
 }
+
+const PRESETS: { key: Preset; label: string }[] = [
+  { key: "all", label: "All time" },
+  { key: "thisMonth", label: "This month" },
+  { key: "lastMonth", label: "Last month" },
+  { key: "last3", label: "Last 3 months" },
+  { key: "thisYear", label: "This year" },
+];
 
 function BalanceRow({
   label,
@@ -88,12 +125,17 @@ function BalanceRow({
       <TableCell sx={{ ...sx, whiteSpace: "nowrap" }}>
         {date ? <DateDisplay date={date} /> : "—"}
       </TableCell>
-      <TableCell sx={sx} colSpan={7}>
+      <TableCell sx={sx} colSpan={6}>
         {label}
       </TableCell>
       <TableCell
         align="right"
-        sx={{ ...sx, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}
+        sx={{
+          ...sx,
+          fontVariantNumeric: "tabular-nums",
+          whiteSpace: "nowrap",
+          color: Number(value) < 0 ? d.danger : undefined,
+        }}
       >
         <CurrencyDisplay value={value} />
       </TableCell>
@@ -106,25 +148,29 @@ function StatementRow({ row }: { row: BankStatementRow }) {
   const { d } = useDaylight();
   const num = { fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" };
   const link = { color: d.action, textDecoration: "none", fontWeight: 650 };
+  const debit = row.side === "DEBIT";
   return (
     <TableRow hover>
       <TableCell sx={{ whiteSpace: "nowrap" }}>
         <DateDisplay date={row.date} />
       </TableCell>
       <TableCell>
-        {row.invoices.length === 0
-          ? "—"
-          : row.invoices.map((inv, i) => (
-              <Fragment key={inv.href}>
-                {i > 0 && ", "}
-                <Link href={inv.href} style={link}>
-                  {inv.number}
-                </Link>
-              </Fragment>
+        {row.invoices.length === 0 ? (
+          <Box component="span" sx={{ color: d.muted }}>
+            —
+          </Box>
+        ) : (
+          <Stack spacing={0.25}>
+            {row.invoices.map((inv) => (
+              <Link key={inv.href} href={inv.href} style={link}>
+                {inv.number}
+              </Link>
             ))}
+          </Stack>
+        )}
       </TableCell>
       <TableCell sx={{ whiteSpace: "nowrap" }}>{row.invoiceType}</TableCell>
-      <TableCell>
+      <TableCell sx={{ minWidth: 140 }}>
         {row.counterparty.href ? (
           <Link href={row.counterparty.href} style={link}>
             {row.counterparty.name}
@@ -137,34 +183,30 @@ function StatementRow({ row }: { row: BankStatementRow }) {
         {row.invoiceAmountUsd !== null ? (
           <CurrencyDisplay value={row.invoiceAmountUsd} />
         ) : (
-          "—"
+          <Box component="span" sx={{ color: d.muted }}>
+            —
+          </Box>
         )}
       </TableCell>
       <TableCell>
         <DaylightStatusPill
-          label={row.side === "DEBIT" ? "Debit" : "Credit"}
-          tone={row.side === "DEBIT" ? "success" : "danger"}
+          label={debit ? "Debit" : "Credit"}
+          tone={debit ? "success" : "danger"}
         />
       </TableCell>
       <TableCell align="right" sx={num}>
-        <Stack
-          direction="row"
-          spacing={0.75}
-          justifyContent="flex-end"
-          alignItems="center"
+        <Box
+          sx={{ fontWeight: 650, color: debit ? d.success : d.danger }}
+          component="span"
         >
-          {row.partial && <DaylightStatusPill label="Partial" tone="warning" />}
-          <Box
-            component="span"
-            sx={{ color: row.side === "DEBIT" ? d.success : d.danger }}
-          >
-            {row.side === "CREDIT" && "−"}
-            <CurrencyDisplay value={row.amountUsd} />
+          {debit ? "+" : "−"}
+          <CurrencyDisplay value={row.amountUsd} />
+        </Box>
+        {row.original && (
+          <Box sx={{ fontSize: 11.5, color: d.muted, mt: 0.25 }}>
+            {row.original}
           </Box>
-        </Stack>
-      </TableCell>
-      <TableCell sx={{ whiteSpace: "nowrap", color: d.muted }}>
-        {row.original ?? "—"}
+        )}
       </TableCell>
       <TableCell
         align="right"
@@ -177,9 +219,13 @@ function StatementRow({ row }: { row: BankStatementRow }) {
         <CurrencyDisplay value={row.balanceUsd} />
       </TableCell>
       <TableCell sx={{ minWidth: 220, maxWidth: 420 }}>
-        <Stack spacing={0.25}>
+        <Stack spacing={0.5} alignItems="flex-start">
+          {row.partial && <DaylightStatusPill label="Partial" tone="warning" />}
           {row.note && (
-            <Typography variant="caption" sx={{ color: d.text }}>
+            <Typography
+              variant="caption"
+              sx={{ color: d.text, lineHeight: 1.45 }}
+            >
               {row.note}
             </Typography>
           )}
@@ -189,10 +235,21 @@ function StatementRow({ row }: { row: BankStatementRow }) {
               target="_blank"
               rel="noopener noreferrer"
               variant="caption"
-              sx={{ display: "inline-flex", alignItems: "center", gap: 0.5 }}
+              sx={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 0.5,
+                color: d.action,
+                fontWeight: 600,
+              }}
             >
               <PictureAsPdfIcon sx={{ fontSize: 14 }} /> Receipt
             </MuiLink>
+          )}
+          {!row.note && !row.receiptHref && !row.partial && (
+            <Box component="span" sx={{ color: d.muted }}>
+              —
+            </Box>
           )}
         </Stack>
       </TableCell>
@@ -200,23 +257,136 @@ function StatementRow({ row }: { row: BankStatementRow }) {
   );
 }
 
-export default function BankStatementPage() {
+/** Switch to another bank's statement, keeping the date range. */
+function BankPicker({
+  banks,
+  current,
+  onChange,
+}: {
+  banks: AccountingBank[];
+  current: AccountingBank;
+  onChange: (bank: AccountingBank) => void;
+}) {
   const ds = useDaylightAdminSx();
   const { d } = useDaylight();
+  const options = useMemo(
+    () =>
+      [...banks].sort(
+        (a, b) =>
+          a.entity.name.localeCompare(b.entity.name) ||
+          Number(b.isActive) - Number(a.isActive) ||
+          a.name.localeCompare(b.name),
+      ),
+    [banks],
+  );
+  return (
+    <Autocomplete<AccountingBank, false, true>
+      size="small"
+      disableClearable
+      options={options}
+      value={current}
+      groupBy={(b) => b.entity.name}
+      getOptionLabel={(b) => b.name}
+      isOptionEqualToValue={(a, b) => a.id === b.id}
+      onChange={(_, bank) => bank && bank.id !== current.id && onChange(bank)}
+      renderOption={({ key, ...props }, b) => (
+        <Box
+          component="li"
+          key={key}
+          {...props}
+          sx={{
+            display: "flex",
+            justifyContent: "space-between",
+            gap: 2,
+            fontSize: 13,
+          }}
+        >
+          <Box
+            component="span"
+            sx={{ color: b.isActive ? d.text : d.muted, minWidth: 0 }}
+          >
+            {b.name}
+            {!b.isActive && " (inactive)"}
+          </Box>
+          <Box
+            component="span"
+            sx={{
+              fontVariantNumeric: "tabular-nums",
+              whiteSpace: "nowrap",
+              color: Number(b.balanceUsd ?? 0) < 0 ? d.danger : d.muted,
+            }}
+          >
+            {formatUsd(b.balanceUsd)}
+          </Box>
+        </Box>
+      )}
+      renderInput={(params) => (
+        <TextField
+          {...params}
+          label="Bank"
+          placeholder="Switch bank"
+          sx={ds.inputSx}
+        />
+      )}
+      sx={{ width: { xs: "100%", sm: 320 } }}
+    />
+  );
+}
+
+export default function BankStatementPage() {
+  return (
+    <Suspense fallback={<DaylightLoading />}>
+      <BankStatementContent />
+    </Suspense>
+  );
+}
+
+function BankStatementContent() {
+  const ds = useDaylightAdminSx();
+  const { d } = useDaylight();
+  const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const bankId = typeof params.id === "string" ? params.id : "";
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
+  const fromParam = searchParams.get("from");
+  const toParam = searchParams.get("to");
+  const from = isDay(fromParam) ? fromParam : "";
+  const to = isDay(toParam) ? toParam : "";
   const [exporting, setExporting] = useState<"csv" | "pdf" | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
 
-  const rangeError = from && to && from > to;
+  const { data: banks = [] } = useAccountingBanks();
+  const rangeError = !!(from && to && from > to);
   const { data, isLoading, error } = useBankStatement(
     bankId,
     rangeError ? "" : from,
     rangeError ? "" : to,
   );
   const hasRange = !!(from || to) && !rangeError;
+
+  const rangeQuery = (f: string, t: string) => {
+    const q = new URLSearchParams();
+    if (f) q.set("from", f);
+    if (t) q.set("to", t);
+    const s = q.toString();
+    return s ? `?${s}` : "";
+  };
+  const setRange = (f: string, t: string) =>
+    router.replace(
+      `/accounting/payment-accounts/banks/${bankId}${rangeQuery(f, t)}`,
+      { scroll: false },
+    );
+  const switchBank = (bank: AccountingBank) =>
+    router.push(
+      `/accounting/payment-accounts/banks/${bank.id}${rangeQuery(from, to)}`,
+      { scroll: false },
+    );
+
+  const activePreset =
+    PRESETS.find((p) => {
+      const r = presetRange(p.key);
+      return r.from === from && r.to === to;
+    })?.key ?? null;
 
   const handleExport = async (format: "csv" | "pdf") => {
     try {
@@ -246,114 +416,147 @@ export default function BankStatementPage() {
   const rows = data?.rows ?? [];
   const first = rows[0]?.date ?? null;
   const last = rows.at(-1)?.date ?? null;
+  const debitCount = rows.filter((r) => r.side === "DEBIT").length;
+  const creditCount = rows.length - debitCount;
+  const currentBank = banks.find((b) => b.id === bankId) ?? null;
+  const plural = (n: number, word: string) =>
+    `${n} ${word}${n === 1 ? "" : "s"}`;
 
   return (
     <DaylightAdminPage>
-      <Box sx={{ mb: 3 }}>
-        <Button
-          component={Link}
-          href="/accounting/payment-accounts"
-          startIcon={<ArrowBackIcon />}
-          sx={{ ...ds.textBtnSx("action"), mb: 1, px: 0 }}
-        >
-          Entities, Banks &amp; Currencies
-        </Button>
-        <Stack
-          direction="row"
-          spacing={1}
-          alignItems="center"
-          flexWrap="wrap"
-          useFlexGap
-        >
-          <Typography component="h1" sx={ds.pageTitleSx}>
-            {data ? data.bank.name : "Bank Statement"}
-          </Typography>
-          {data && !data.bank.isActive && (
-            <DaylightStatusPill label="Inactive" tone="neutral" />
-          )}
-        </Stack>
-        <Stack
-          direction="row"
-          spacing={1}
-          alignItems="center"
-          flexWrap="wrap"
-          useFlexGap
-          sx={{ mt: 0.5 }}
-        >
-          {data && (
-            <Typography sx={{ ...ds.pageDescSx, mb: 0 }}>
-              {data.bank.entity.name}
+      <Button
+        component={Link}
+        href={BANKS_HREF}
+        startIcon={<ArrowBackIcon />}
+        sx={{ ...ds.textBtnSx("action"), mb: 1, px: 0 }}
+      >
+        Banks
+      </Button>
+
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: { xs: "column", md: "row" },
+          alignItems: { xs: "stretch", md: "flex-end" },
+          justifyContent: "space-between",
+          gap: 2,
+          mb: 3,
+        }}
+      >
+        <Box sx={{ minWidth: 0 }}>
+          <Stack
+            direction="row"
+            spacing={1}
+            alignItems="center"
+            flexWrap="wrap"
+            useFlexGap
+          >
+            <Typography component="h1" sx={{ ...ds.pageTitleSx, mb: 0 }}>
+              {data ? data.bank.name : "Bank Statement"}
             </Typography>
-          )}
-          {data?.bank.currencies.map((code) => (
-            <DaylightStatusPill key={code} label={code} tone="info" />
-          ))}
-        </Stack>
-        <Typography sx={{ ...ds.pageDescSx, mt: 1 }}>
-          Payments received into this bank (Debit) and sent from it (Credit),
-          oldest first. Amounts are in USD at the rate saved with each payment.
-        </Typography>
+            {data && !data.bank.isActive && (
+              <DaylightStatusPill label="Inactive" tone="neutral" />
+            )}
+          </Stack>
+          <Stack
+            direction="row"
+            spacing={1}
+            alignItems="center"
+            flexWrap="wrap"
+            useFlexGap
+            sx={{ mt: 0.75 }}
+          >
+            <Typography sx={{ fontSize: 13, color: d.muted }}>
+              Bank Statement
+              {data && ` · ${data.bank.entity.name}`}
+            </Typography>
+            {data?.bank.currencies.map((code) => (
+              <DaylightStatusPill key={code} label={code} tone="info" />
+            ))}
+          </Stack>
+        </Box>
+        {currentBank && (
+          <BankPicker
+            banks={banks}
+            current={currentBank}
+            onChange={switchBank}
+          />
+        )}
       </Box>
 
       <Paper elevation={0} sx={{ ...ds.listCardSx, p: { xs: 2, sm: 3 } }}>
         <Stack
-          direction={{ xs: "column", md: "row" }}
+          direction={{ xs: "column", lg: "row" }}
           spacing={2}
           justifyContent="space-between"
-          alignItems={{ xs: "stretch", md: "center" }}
-          sx={{ mb: 2 }}
+          alignItems={{ xs: "stretch", lg: "center" }}
+          sx={{ mb: 2.5 }}
         >
           <Stack
-            direction={{ xs: "column", sm: "row" }}
+            direction={{ xs: "column", md: "row" }}
             spacing={1.5}
-            alignItems={{ xs: "stretch", sm: "center" }}
+            alignItems={{ xs: "stretch", md: "center" }}
+            useFlexGap
+            flexWrap="wrap"
           >
-            <TextField
-              id="statement-from"
-              label="From"
-              type="date"
+            <ToggleButtonGroup
+              exclusive
               size="small"
-              value={from}
-              onChange={(e) => setFrom(e.target.value)}
-              slotProps={{ inputLabel: { shrink: true } }}
-            />
-            <TextField
-              id="statement-to"
-              label="To"
-              type="date"
-              size="small"
-              value={to}
-              onChange={(e) => setTo(e.target.value)}
-              slotProps={{ inputLabel: { shrink: true } }}
-            />
-            {(from || to) && (
-              <Button
-                onClick={() => {
-                  setFrom("");
-                  setTo("");
-                }}
-                sx={ds.textBtnSx("action")}
-              >
-                Clear dates
-              </Button>
-            )}
+              value={activePreset}
+              onChange={(_, p: Preset | null) => {
+                if (!p) return;
+                const r = presetRange(p);
+                setRange(r.from, r.to);
+              }}
+              sx={{ ...ds.toggleGroupSx, flexWrap: "wrap" }}
+            >
+              {PRESETS.map((p) => (
+                <ToggleButton key={p.key} value={p.key}>
+                  {p.label}
+                </ToggleButton>
+              ))}
+            </ToggleButtonGroup>
+            <Stack direction="row" spacing={1.5} sx={ds.inputSx}>
+              <TextField
+                id="statement-from"
+                label="From"
+                type="date"
+                size="small"
+                value={from}
+                onChange={(e) => setRange(e.target.value, to)}
+                slotProps={{ inputLabel: { shrink: true } }}
+                sx={{ flex: 1 }}
+              />
+              <TextField
+                id="statement-to"
+                label="To"
+                type="date"
+                size="small"
+                value={to}
+                onChange={(e) => setRange(from, e.target.value)}
+                slotProps={{ inputLabel: { shrink: true } }}
+                sx={{ flex: 1 }}
+              />
+            </Stack>
           </Stack>
           <Stack direction="row" spacing={1}>
             <Button
               variant="outlined"
+              startIcon={<FileDownloadOutlinedIcon />}
               onClick={() => handleExport("csv")}
               disabled={!data || exporting !== null}
               sx={ds.outlineBtnSx}
             >
-              {exporting === "csv" ? "Exporting..." : "Export CSV"}
+              {exporting === "csv" ? "Exporting..." : "CSV"}
             </Button>
             <Button
               variant="outlined"
+              startIcon={<PictureAsPdfIcon />}
               onClick={() => handleExport("pdf")}
               disabled={!data || exporting !== null}
               sx={ds.outlineBtnSx}
             >
-              {exporting === "pdf" ? "Exporting..." : "Export PDF"}
+              {exporting === "pdf" ? "Exporting..." : "PDF"}
             </Button>
           </Stack>
         </Stack>
@@ -380,45 +583,100 @@ export default function BankStatementPage() {
             <Box
               sx={{
                 display: "grid",
-                gridTemplateColumns:
-                  "repeat(auto-fit, minmax(min(180px, 100%), 1fr))",
+                gridTemplateColumns: {
+                  xs: "repeat(2, minmax(0, 1fr))",
+                  md: `repeat(${hasRange ? 4 : 3}, minmax(0, 1fr))`,
+                },
                 gap: { xs: "12px", md: "16px" },
                 mb: 3,
               }}
             >
-              <SummaryCard label="Total Debit" value={data.totals.debitUsd} />
-              <SummaryCard label="Total Credit" value={data.totals.creditUsd} />
-              <SummaryCard
-                label={hasRange ? "Closing balance" : "Balance"}
-                value={data.closingBalanceUsd}
+              {hasRange && (
+                <StatCard
+                  title="Opening balance"
+                  value={formatUsd(data.openingBalanceUsd)}
+                  caption={
+                    from ? `Before ${dayLabel(from)}` : "Start of history"
+                  }
+                  tone="sky"
+                  icon={<HistoryIcon />}
+                  valueColor={
+                    Number(data.openingBalanceUsd) < 0 ? d.danger : undefined
+                  }
+                />
+              )}
+              <StatCard
+                title="Total Debit (received)"
+                value={formatUsd(data.totals.debitUsd)}
+                caption={plural(debitCount, "payment")}
+                tone="mint"
+                icon={<CallReceivedIcon />}
+              />
+              <StatCard
+                title="Total Credit (sent)"
+                value={formatUsd(data.totals.creditUsd)}
+                caption={plural(creditCount, "payment")}
+                tone="danger"
+                icon={<CallMadeIcon />}
+              />
+              <StatCard
+                title={hasRange ? "Closing balance" : "Balance"}
+                value={formatUsd(data.closingBalanceUsd)}
+                caption={
+                  hasRange
+                    ? to
+                      ? `At end of ${dayLabel(to)}`
+                      : "To date"
+                    : "Debit − Credit, all time"
+                }
+                tone="amber"
+                icon={<AccountBalanceIcon />}
+                valueColor={
+                  Number(data.closingBalanceUsd) < 0 ? d.danger : undefined
+                }
               />
             </Box>
+
+            <Stack
+              direction="row"
+              justifyContent="space-between"
+              alignItems="baseline"
+              flexWrap="wrap"
+              useFlexGap
+              spacing={1}
+              sx={{ mb: 1 }}
+            >
+              <Typography sx={{ fontSize: 13, fontWeight: 650, color: d.text }}>
+                {plural(rows.length, "transaction")}
+                {hasRange && " in this period"}
+              </Typography>
+              <Typography sx={{ fontSize: 12, color: d.muted }}>
+                Oldest first · USD at the rate saved with each payment
+              </Typography>
+            </Stack>
 
             <TableContainer
               component={Paper}
               variant="outlined"
-              sx={{ overflowX: "auto" }}
+              sx={{ overflowX: "auto", maxHeight: "70vh" }}
             >
-              <Table size="small">
+              <Table
+                size="small"
+                stickyHeader
+                sx={{
+                  "& .MuiTableCell-stickyHeader": { bgcolor: d.tableHead },
+                }}
+              >
                 <TableHead>
                   <TableRow>
                     <TableCell>Payment Date</TableCell>
                     <TableCell>Invoice #</TableCell>
                     <TableCell>Invoice Type</TableCell>
                     <TableCell>Vendor / Customer</TableCell>
-                    <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
-                      Invoice Amount (USD)
-                    </TableCell>
+                    <TableCell align="right">Invoice Amount (USD)</TableCell>
                     <TableCell>Credit/Debit</TableCell>
-                    <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
-                      Amount (USD)
-                    </TableCell>
-                    <TableCell sx={{ whiteSpace: "nowrap" }}>
-                      Original Amount
-                    </TableCell>
-                    <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
-                      Balance (USD)
-                    </TableCell>
+                    <TableCell align="right">Amount (USD)</TableCell>
+                    <TableCell align="right">Balance (USD)</TableCell>
                     <TableCell>Notes / Receipt</TableCell>
                   </TableRow>
                 </TableHead>
@@ -435,7 +693,7 @@ export default function BankStatementPage() {
                       <TableCell
                         colSpan={COLUMN_COUNT}
                         align="center"
-                        sx={{ py: 4 }}
+                        sx={{ py: 5 }}
                       >
                         <Typography sx={{ color: d.muted, fontSize: 13 }}>
                           {hasRange
