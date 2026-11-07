@@ -10,6 +10,7 @@ import {
   MAX_MASTER_NAME_LENGTH as MAX_NAME_LENGTH,
   parseCurrencyIds,
 } from "@/lib/accounting/masterData";
+import { getBankBalances } from "@/lib/accounting/bankStatement";
 
 export async function GET(request: NextRequest) {
   try {
@@ -29,7 +30,24 @@ export async function GET(request: NextRequest) {
       orderBy: [{ entity: { name: "asc" } }, { name: "asc" }],
     });
 
-    return NextResponse.json({ success: true, data: banks });
+    // Balance = Total Debit (money in) - Total Credit (money out), USD.
+    // Only on the full list (the Banks tab); the payment forms ask for
+    // active banks and don't need it.
+    if (activeOnly) {
+      return NextResponse.json({ success: true, data: banks });
+    }
+    const balances = await getBankBalances(banks.map((b) => b.id));
+    const data = banks.map((bank) => {
+      const b = balances.get(bank.id);
+      return {
+        ...bank,
+        debitUsd: (b?.debitUsd ?? 0).toFixed(2),
+        creditUsd: (b?.creditUsd ?? 0).toFixed(2),
+        balanceUsd: (b?.balanceUsd ?? 0).toFixed(2),
+      };
+    });
+
+    return NextResponse.json({ success: true, data });
   } catch (error) {
     console.error("Error fetching accounting banks:", error);
     return NextResponse.json(

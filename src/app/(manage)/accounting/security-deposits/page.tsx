@@ -27,7 +27,8 @@ import {
 import DeleteIcon from "@mui/icons-material/Delete";
 import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
 import Link from "next/link";
-import { useState } from "react";
+import { Suspense, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
 import { DateDisplay } from "@/components/accounting/common/DateDisplay";
 import { StatusBadge } from "@/components/accounting/common/StatusBadge";
@@ -159,7 +160,6 @@ function ReturnDialog({
     EMPTY_PAYMENT_ACCOUNT,
   );
   const [amount, setAmount] = useState("");
-  const [fee, setFee] = useState("0");
   const [note, setNote] = useState("");
   const [receipt, setReceipt] = useState<UploadedPdf | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -172,14 +172,11 @@ function ReturnDialog({
   const usd = rate && amountOk ? amountNum / rate : 0;
   const held = detail.balance.held;
   const overHeld = usd > held + 0.005;
-  const feeNum = Number(fee);
-  const feeOk = fee.trim() !== "" && Number.isFinite(feeNum) && feeNum >= 0;
 
   const canSave =
     !!date &&
     isPaymentAccountComplete(account) &&
     amountOk &&
-    feeOk &&
     !overHeld &&
     !!receipt &&
     !uploading &&
@@ -199,7 +196,8 @@ function ReturnDialog({
           currencyId: account.currencyId,
           exchangeRate: account.exchangeRate.trim(),
           amount: amount.trim(),
-          transactionFee: fee.trim(),
+          // A return records what landed in our bank; no fee is asked.
+          transactionFee: "0",
           receiptKey: receipt.key,
           note,
         },
@@ -237,26 +235,15 @@ function ReturnDialog({
             onChange={setAccount}
             disabled={save.isPending}
           />
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-            <TextField
-              label={`Amount received${account.currencyCode ? ` (${account.currencyCode})` : ""}`}
-              type="number"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              required
-              fullWidth
-              slotProps={{ htmlInput: { min: 0, step: 0.01 } }}
-            />
-            <TextField
-              label={`Transaction fee${account.currencyCode ? ` (${account.currencyCode})` : ""}`}
-              type="number"
-              value={fee}
-              onChange={(e) => setFee(e.target.value)}
-              required
-              fullWidth
-              slotProps={{ htmlInput: { min: 0, step: 0.01 } }}
-            />
-          </Stack>
+          <TextField
+            label={`Amount received${account.currencyCode ? ` (${account.currencyCode})` : ""}`}
+            type="number"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            required
+            fullWidth
+            slotProps={{ htmlInput: { min: 0, step: 0.01 } }}
+          />
           {usd > 0 && (
             <Typography color={overHeld ? "error" : "text.secondary"}>
               USD equivalent: <CurrencyDisplay value={usd} />
@@ -784,10 +771,26 @@ function VendorDetail({ vendorId }: { vendorId: string }) {
 // ---------------------------------------------------------------------------
 
 export default function SecurityDepositsPage() {
+  // useSearchParams needs a Suspense boundary (see the Next docs).
+  return (
+    <Suspense fallback={<DaylightLoading />}>
+      <SecurityDepositsContent />
+    </Suspense>
+  );
+}
+
+function SecurityDepositsContent() {
   const { d } = useDaylight();
   const ds = useDaylightAdminSx();
   const { data, isLoading, error } = useSecurityDeposits();
-  const [selected, setSelected] = useState<string | null>(null);
+  // ?vendor=<id> (e.g. from a bank statement) preselects that vendor.
+  const vendorParam = useSearchParams().get("vendor");
+  const [picked, setSelected] = useState<string | null>(null);
+  const selected =
+    picked ??
+    (vendorParam && data?.vendors.some((v) => v.id === vendorParam)
+      ? vendorParam
+      : null);
 
   return (
     <DaylightAdminPage>

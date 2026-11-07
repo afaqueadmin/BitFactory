@@ -30,6 +30,43 @@ export interface AccountingBank {
     currencyId: string;
     currency: Pick<AccountingCurrency, "id" | "code" | "name" | "isActive">;
   }[];
+  /** USD, 2 dp. Only on the full list (not with activeOnly). */
+  debitUsd?: string;
+  creditUsd?: string;
+  /** Total Debit − Total Credit. */
+  balanceUsd?: string;
+}
+
+export interface BankStatementRow {
+  id: string;
+  source: "COST_PAYMENT" | "VENDOR_PART" | "CONSOLIDATED" | "DEPOSIT_RETURN";
+  date: string;
+  invoices: { number: string; href: string }[];
+  invoiceType: string;
+  counterparty: { name: string; href: string | null };
+  invoiceAmountUsd: string | null;
+  side: "DEBIT" | "CREDIT";
+  amountUsd: string;
+  original: string | null;
+  balanceUsd: string;
+  partial: boolean;
+  note: string;
+  receiptHref: string | null;
+}
+
+export interface BankStatement {
+  bank: {
+    id: string;
+    name: string;
+    isActive: boolean;
+    entity: { id: string; name: string };
+    currencies: string[];
+  };
+  range: { from: string | null; to: string | null };
+  openingBalanceUsd: string;
+  totals: { debitUsd: string; creditUsd: string };
+  closingBalanceUsd: string;
+  rows: BankStatementRow[];
 }
 
 /** A Hardware Purchase / Farm Tariff vendor (Finance Settings -> Vendors). */
@@ -88,6 +125,26 @@ export function useAccountingCurrencies(activeOnly = false) {
     queryKey: [ROOT_KEY, "currencies", activeOnly],
     queryFn: () =>
       request<AccountingCurrency[]>(listUrl("currencies", activeOnly)),
+  });
+}
+
+/**
+ * One bank's statement. `from` / `to` are inclusive YYYY-MM-DD days (empty =
+ * no bound), taken in the browser's time zone.
+ */
+export function useBankStatement(bankId: string, from: string, to: string) {
+  const params = new URLSearchParams({
+    tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
+  });
+  if (from) params.set("from", from);
+  if (to) params.set("to", to);
+  return useQuery({
+    queryKey: [ROOT_KEY, "bankStatement", bankId, from, to],
+    queryFn: () =>
+      request<BankStatement>(
+        `/api/accounting/banks/${bankId}/statement?${params.toString()}`,
+      ),
+    enabled: !!bankId,
   });
 }
 

@@ -23,7 +23,9 @@ import {
   Typography,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
+import Link from "next/link";
 import { useState } from "react";
+import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
 import { StatusBadge } from "@/components/accounting/common/StatusBadge";
 import {
   ConfirmDeleteDialog,
@@ -241,6 +243,7 @@ function BanksTab() {
               <TableCell>Bank</TableCell>
               <TableCell>Entity</TableCell>
               <TableCell>Currencies</TableCell>
+              <TableCell align="right">Balance (USD)</TableCell>
               <TableCell>Status</TableCell>
               <TableCell align="right">Actions</TableCell>
             </TableRow>
@@ -250,14 +253,22 @@ function BanksTab() {
               loading={isLoading}
               error={error}
               empty={rows.length === 0}
-              colSpan={5}
+              colSpan={6}
             />
             {rows.map((bank) => (
               <TableRow
                 key={bank.id}
                 sx={bank.isActive ? undefined : inactiveRowSx}
               >
-                <TableCell>{bank.name}</TableCell>
+                <TableCell>
+                  <Link
+                    href={`/accounting/payment-accounts/banks/${bank.id}`}
+                    title="Open bank statement"
+                    style={{ color: "inherit", fontWeight: 600 }}
+                  >
+                    {bank.name}
+                  </Link>
+                </TableCell>
                 <TableCell>{bank.entity.name}</TableCell>
                 <TableCell>
                   <Stack
@@ -274,6 +285,19 @@ function BanksTab() {
                       />
                     ))}
                   </Stack>
+                </TableCell>
+                <TableCell
+                  align="right"
+                  sx={{
+                    fontVariantNumeric: "tabular-nums",
+                    whiteSpace: "nowrap",
+                    color:
+                      Number(bank.balanceUsd ?? 0) < 0
+                        ? "error.main"
+                        : undefined,
+                  }}
+                >
+                  <CurrencyDisplay value={bank.balanceUsd ?? 0} />
                 </TableCell>
                 <TableCell>
                   <StatusBadge
