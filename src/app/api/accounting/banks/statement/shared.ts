@@ -62,7 +62,7 @@ export async function loadConsolidatedStatement(searchParams: URLSearchParams) {
     ? all.filter((b) => bankParam.includes(b.id))
     : all;
 
-  const [{ statement, byBank }, unbanked] = await Promise.all([
+  const [statement, unbanked] = await Promise.all([
     getBanksStatement(
       banks.map((b) => b.id),
       range,
@@ -74,7 +74,6 @@ export async function loadConsolidatedStatement(searchParams: URLSearchParams) {
     banks,
     allBanks: bankParam.length === 0,
     statement,
-    byBank,
     unbanked,
     tz,
     from,

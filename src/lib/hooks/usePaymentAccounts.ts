@@ -81,13 +81,6 @@ export interface ConsolidatedStatement {
     entity: { id: string; name: string };
   }[];
   range: { from: string | null; to: string | null };
-  byBank: {
-    bankId: string;
-    openingBalanceUsd: string;
-    debitUsd: string;
-    creditUsd: string;
-    closingBalanceUsd: string;
-  }[];
   /** Payments recorded with no bank in the range (on no statement). */
   unbanked: { count: number; amountUsd: string };
   openingBalanceUsd: string;

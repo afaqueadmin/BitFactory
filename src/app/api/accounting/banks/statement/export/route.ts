@@ -13,6 +13,7 @@ import {
 import { loadConsolidatedStatement } from "../shared";
 
 // The single-bank export's columns with Bank and Entity after the date.
+// No per-bank summary: the export matches the page.
 const COLUMNS = [
   { header: "Payment Date", nowrap: true },
   { header: "Bank" },
@@ -26,15 +27,6 @@ const COLUMNS = [
   { header: "Original Amount", nowrap: true },
   { header: "Balance (USD)", align: "right" as const, nowrap: true },
   { header: "Notes" },
-];
-
-const BY_BANK_COLUMNS = [
-  { header: "Bank" },
-  { header: "Entity" },
-  { header: "Opening (USD)", align: "right" as const, nowrap: true },
-  { header: "Debit (USD)", align: "right" as const, nowrap: true },
-  { header: "Credit (USD)", align: "right" as const, nowrap: true },
-  { header: "Closing (USD)", align: "right" as const, nowrap: true },
 ];
 
 const slug = (s: string) =>
@@ -60,7 +52,7 @@ export async function GET(request: NextRequest) {
 
     const result = await loadConsolidatedStatement(searchParams);
     if ("error" in result) return result.error;
-    const { entity, banks, allBanks, statement, byBank, unbanked, tz } = result;
+    const { entity, banks, allBanks, statement, unbanked, tz } = result;
     const { from, to } = result;
     const bankById = new Map(banks.map((b) => [b.id, b]));
 
@@ -131,28 +123,6 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const byBankRows = [
-      ...byBank.map((b) => {
-        const bank = bankById.get(b.bankId);
-        return [
-          bank ? `${bank.name}${bank.isActive ? "" : " (inactive)"}` : "-",
-          bank?.entity.name ?? "-",
-          money(b.openingBalanceUsd),
-          money(b.debitUsd),
-          money(b.creditUsd),
-          money(b.closingBalanceUsd),
-        ];
-      }),
-      [
-        `Total (${banks.length} bank${banks.length === 1 ? "" : "s"})`,
-        "",
-        money(statement.openingBalanceUsd),
-        money(statement.totals.debitUsd),
-        money(statement.totals.creditUsd),
-        money(statement.closingBalanceUsd),
-      ],
-    ];
-
     const scopeLabel = allBanks
       ? entity
         ? `All banks of ${entity.name}`
@@ -172,9 +142,6 @@ export async function GET(request: NextRequest) {
             ]
           : []),
       ].join(" · "),
-      before: [
-        { heading: "By bank", columns: BY_BANK_COLUMNS, rows: byBankRows },
-      ],
       columns: COLUMNS,
       rows,
       generatedAt: now,

@@ -1,9 +1,7 @@
 import { Decimal } from "@prisma/client/runtime/library";
 import { prisma } from "@/lib/prisma";
 import {
-  BankSummary,
   buildStatement,
-  byBankSummary,
   customerInvoiceHref,
   customerPaymentTypeLabel,
   feeUsd,
@@ -541,19 +539,14 @@ export async function getBankStatement(
 
 /**
  * Consolidated statement of several banks: one running balance across all of
- * them, plus each bank's own opening / debit / credit / closing. There is no
- * transfer between our own banks yet, so nothing is counted twice.
+ * them. There is no transfer between our own banks yet, so nothing is
+ * counted twice.
  */
 export async function getBanksStatement(
   bankIds: string[],
   { from, toExclusive, tz }: StatementRange,
-): Promise<{ statement: Statement; byBank: BankSummary[] }> {
-  const rows = await bankRows(bankIds, tz);
-  const range = { from, toExclusive };
-  return {
-    statement: buildStatement(rows, range),
-    byBank: byBankSummary(rows, bankIds, range),
-  };
+): Promise<Statement> {
+  return buildStatement(await bankRows(bankIds, tz), { from, toExclusive });
 }
 
 export interface UnbankedPayments {
