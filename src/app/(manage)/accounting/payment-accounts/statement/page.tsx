@@ -11,12 +11,6 @@ import {
   Paper,
   Select,
   Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
   TextField,
   Typography,
 } from "@mui/material";
@@ -25,11 +19,9 @@ import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useMemo, useState } from "react";
-import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
 import {
   ALL_BANKS,
   BANKS_HREF,
-  BankCell,
   BankLabel,
   BankPicker,
   CONSOLIDATED_HREF,
@@ -45,7 +37,6 @@ import {
 } from "@/components/accounting/bankStatement/StatementParts";
 import {
   AccountingBank,
-  ConsolidatedStatement,
   consolidatedStatementQuery,
   useAccountingBanks,
   useAccountingEntities,
@@ -61,8 +52,8 @@ import {
 
 /**
  * Consolidated Bank Statement: the payments of several banks (default: all)
- * in one table with one running balance, a Bank column, and a "By bank"
- * summary. Filters live in the URL: ?entity=<id>&bank=<id>,<id>&from&to.
+ * in one table with one running balance and a Bank column (the PDF export
+ * also has a "By bank" summary). Filters live in the URL: ?entity=<id>&bank=<id>,<id>&from&to.
  *
  * There is no transfer between our own banks in the app yet, so adding
  * banks together counts nothing twice.
@@ -73,102 +64,6 @@ export default function ConsolidatedStatementPage() {
     <Suspense fallback={<DaylightLoading />}>
       <ConsolidatedStatementContent />
     </Suspense>
-  );
-}
-
-function ByBankTable({
-  data,
-  banks,
-  hasRange,
-}: {
-  data: ConsolidatedStatement;
-  banks: Map<string, BankLabel>;
-  hasRange: boolean;
-}) {
-  const { d } = useDaylight();
-  const num = {
-    fontVariantNumeric: "tabular-nums",
-    whiteSpace: "nowrap",
-  } as const;
-  const signed = (v: string) => ({
-    ...num,
-    color: Number(v) < 0 ? d.danger : undefined,
-  });
-  const total = { fontWeight: 700, bgcolor: d.tableHead };
-  return (
-    <Box sx={{ mb: 3 }}>
-      <Typography sx={{ fontSize: 13, fontWeight: 650, color: d.text, mb: 1 }}>
-        By bank
-      </Typography>
-      <TableContainer component={Paper} variant="outlined">
-        <Table size="small">
-          <TableHead>
-            <TableRow>
-              <TableCell>Bank</TableCell>
-              {hasRange && <TableCell align="right">Opening (USD)</TableCell>}
-              <TableCell align="right">Debit (USD)</TableCell>
-              <TableCell align="right">Credit (USD)</TableCell>
-              <TableCell align="right">
-                {hasRange ? "Closing (USD)" : "Balance (USD)"}
-              </TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {data.byBank.map((b) => (
-              <TableRow key={b.bankId} hover>
-                <TableCell>
-                  <BankCell bankId={b.bankId} bank={banks.get(b.bankId)} />
-                </TableCell>
-                {hasRange && (
-                  <TableCell align="right" sx={signed(b.openingBalanceUsd)}>
-                    <CurrencyDisplay value={b.openingBalanceUsd} />
-                  </TableCell>
-                )}
-                <TableCell align="right" sx={num}>
-                  <CurrencyDisplay value={b.debitUsd} />
-                </TableCell>
-                <TableCell align="right" sx={num}>
-                  <CurrencyDisplay value={b.creditUsd} />
-                </TableCell>
-                <TableCell
-                  align="right"
-                  sx={{ ...signed(b.closingBalanceUsd), fontWeight: 600 }}
-                >
-                  <CurrencyDisplay value={b.closingBalanceUsd} />
-                </TableCell>
-              </TableRow>
-            ))}
-            {data.byBank.length > 1 && (
-              <TableRow>
-                <TableCell sx={total}>
-                  Total ({plural(data.byBank.length, "bank")})
-                </TableCell>
-                {hasRange && (
-                  <TableCell
-                    align="right"
-                    sx={{ ...total, ...signed(data.openingBalanceUsd) }}
-                  >
-                    <CurrencyDisplay value={data.openingBalanceUsd} />
-                  </TableCell>
-                )}
-                <TableCell align="right" sx={{ ...total, ...num }}>
-                  <CurrencyDisplay value={data.totals.debitUsd} />
-                </TableCell>
-                <TableCell align="right" sx={{ ...total, ...num }}>
-                  <CurrencyDisplay value={data.totals.creditUsd} />
-                </TableCell>
-                <TableCell
-                  align="right"
-                  sx={{ ...total, ...signed(data.closingBalanceUsd) }}
-                >
-                  <CurrencyDisplay value={data.closingBalanceUsd} />
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </TableContainer>
-    </Box>
   );
 }
 
@@ -418,9 +313,6 @@ function ConsolidatedStatementContent() {
                   any bank statement and not included here.
                 </span>
               </Stack>
-            )}
-            {data.byBank.length > 0 && (
-              <ByBankTable data={data} banks={bankLabels} hasRange={hasRange} />
             )}
             <StatementTable
               data={data}
