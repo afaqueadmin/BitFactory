@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAccountingAdmin } from "@/lib/accounting/adminAuth";
+import { statementJson } from "../../statementJson";
 import { loadBankStatement } from "./shared";
 
 /**
@@ -34,28 +35,7 @@ export async function GET(
           currencies: bank.currencies.map((c) => c.currency.code),
         },
         range: { from, to },
-        openingBalanceUsd: statement.openingBalanceUsd.toFixed(2),
-        totals: {
-          debitUsd: statement.totals.debitUsd.toFixed(2),
-          creditUsd: statement.totals.creditUsd.toFixed(2),
-        },
-        closingBalanceUsd: statement.closingBalanceUsd.toFixed(2),
-        rows: statement.rows.map((r) => ({
-          id: r.id,
-          source: r.source,
-          date: r.date.toISOString(),
-          invoices: r.invoices,
-          invoiceType: r.invoiceType,
-          counterparty: r.counterparty,
-          invoiceAmountUsd: r.invoiceAmountUsd?.toFixed(2) ?? null,
-          side: r.side,
-          amountUsd: r.amountUsd.toFixed(2),
-          original: r.original,
-          balanceUsd: r.balanceUsd.toFixed(2),
-          partial: r.partial,
-          note: r.note,
-          receiptHref: r.receiptHref,
-        })),
+        ...statementJson(statement),
       },
     });
   } catch (error) {

@@ -233,14 +233,29 @@ function BanksTab() {
             ))}
           </Select>
         </FormControl>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => openForm("new")}
-          sx={ds.primaryBtnSx}
-        >
-          Add bank
-        </Button>
+        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+          <Button
+            component={Link}
+            href={
+              entityFilter
+                ? `/accounting/payment-accounts/statement?entity=${encodeURIComponent(entityFilter)}`
+                : "/accounting/payment-accounts/statement"
+            }
+            variant="outlined"
+            startIcon={<ReceiptLongIcon />}
+            sx={ds.outlineBtnSx}
+          >
+            Consolidated statement
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => openForm("new")}
+            sx={ds.primaryBtnSx}
+          >
+            Add bank
+          </Button>
+        </Stack>
       </Stack>
       {editor.pageError && (
         <Alert severity="error" sx={{ mb: 2, ...ds.alertSx("error") }}>

@@ -1,7 +1,9 @@
 import { Decimal } from "@prisma/client/runtime/library";
 import { prisma } from "@/lib/prisma";
 import {
+  BankSummary,
   buildStatement,
+  byBankSummary,
   customerInvoiceHref,
   customerPaymentTypeLabel,
   feeUsd,
@@ -153,11 +155,12 @@ const feeNote = (fee: Decimal, rate: Decimal) => {
   return f.greaterThan(0) ? `incl. ${usd(f)} fee` : "";
 };
 
-async function customerRows(bankId: string, tz: string) {
+async function customerRows(bankIds: string[], tz: string) {
   const payments = await prisma.costPayment.findMany({
-    where: costPaymentWhere(bankId),
+    where: costPaymentWhere({ in: bankIds }),
     select: {
       id: true,
+      bankId: true,
       amount: true,
       type: true,
       paymentDate: true,
@@ -232,6 +235,7 @@ async function customerRows(bankId: string, tz: string) {
     return {
       id: `cp_${p.id}`,
       source: "COST_PAYMENT",
+      bankId: p.bankId ?? "",
       date: p.paymentDate ?? p.createdAt,
       recordedAt: p.createdAt,
       invoices: inv
@@ -260,7 +264,7 @@ async function customerRows(bankId: string, tz: string) {
   });
 }
 
-async function vendorPartRows(bankId: string, tz: string) {
+async function vendorPartRows(bankIds: string[], tz: string) {
   const invoiceSelect = {
     id: true,
     invoiceNumber: true,
@@ -269,9 +273,10 @@ async function vendorPartRows(bankId: string, tz: string) {
     vendor: { select: { name: true } },
   } as const;
   const parts = await prisma.vendorPaymentPart.findMany({
-    where: { bankId },
+    where: { bankId: { in: bankIds } },
     select: {
       id: true,
+      bankId: true,
       vendorInvoiceId: true,
       hardwarePurchaseId: true,
       amount: true,
@@ -354,6 +359,7 @@ async function vendorPartRows(bankId: string, tz: string) {
     rows.push({
       id: `vp_${p.id}`,
       source: "VENDOR_PART",
+      bankId: p.bankId,
       date: paidDate,
       recordedAt: p.createdAt,
       invoices: [
@@ -378,12 +384,13 @@ async function vendorPartRows(bankId: string, tz: string) {
   return rows;
 }
 
-async function consolidatedRows(bankId: string) {
+async function consolidatedRows(bankIds: string[]) {
   const invoiceSelect = { id: true, invoiceNumber: true, totalAmount: true };
   const payments = await prisma.vendorConsolidatedPayment.findMany({
-    where: { bankId },
+    where: { bankId: { in: bankIds } },
     select: {
       id: true,
+      bankId: true,
       kind: true,
       paidDate: true,
       amount: true,
@@ -434,6 +441,7 @@ async function consolidatedRows(bankId: string) {
     return {
       id: `cvp_${p.id}`,
       source: "CONSOLIDATED",
+      bankId: p.bankId,
       date: p.paidDate,
       recordedAt: p.createdAt,
       invoices: invoices.map((i) => ({
@@ -461,11 +469,12 @@ async function consolidatedRows(bankId: string) {
   });
 }
 
-async function depositReturnRows(bankId: string) {
+async function depositReturnRows(bankIds: string[]) {
   const returns = await prisma.vendorDepositMovement.findMany({
-    where: { bankId, type: "RETURN" },
+    where: { bankId: { in: bankIds }, type: "RETURN" },
     select: {
       id: true,
+      bankId: true,
       date: true,
       amountUsd: true,
       amount: true,
@@ -481,6 +490,7 @@ async function depositReturnRows(bankId: string) {
   return returns.map((r): StatementRow => ({
     id: `dr_${r.id}`,
     source: "DEPOSIT_RETURN",
+    bankId: r.bankId ?? "",
     date: r.date,
     recordedAt: r.createdAt,
     invoices: [],
@@ -501,23 +511,111 @@ async function depositReturnRows(bankId: string) {
   }));
 }
 
-/**
- * One bank's statement. `from` / `toExclusive` are instants (the route
- * turns the viewer's calendar days into them); `tz` formats note dates.
- */
+export interface StatementRange {
+  /** Instants: the route turns the viewer's calendar days into them. */
+  from?: Date | null;
+  toExclusive?: Date | null;
+  /** Formats the dates inside notes. */
+  tz: string;
+}
+
+/** Every row of these banks, unsorted (buildStatement sorts). */
+async function bankRows(bankIds: string[], tz: string) {
+  if (bankIds.length === 0) return [];
+  const groups = await Promise.all([
+    customerRows(bankIds, tz),
+    vendorPartRows(bankIds, tz),
+    consolidatedRows(bankIds),
+    depositReturnRows(bankIds),
+  ]);
+  return groups.flat();
+}
+
+/** One bank's statement. */
 export async function getBankStatement(
   bankId: string,
-  {
-    from,
-    toExclusive,
-    tz,
-  }: { from?: Date | null; toExclusive?: Date | null; tz: string },
+  { from, toExclusive, tz }: StatementRange,
 ): Promise<Statement> {
-  const groups = await Promise.all([
-    customerRows(bankId, tz),
-    vendorPartRows(bankId, tz),
-    consolidatedRows(bankId),
-    depositReturnRows(bankId),
+  return buildStatement(await bankRows([bankId], tz), { from, toExclusive });
+}
+
+/**
+ * Consolidated statement of several banks: one running balance across all of
+ * them, plus each bank's own opening / debit / credit / closing. There is no
+ * transfer between our own banks yet, so nothing is counted twice.
+ */
+export async function getBanksStatement(
+  bankIds: string[],
+  { from, toExclusive, tz }: StatementRange,
+): Promise<{ statement: Statement; byBank: BankSummary[] }> {
+  const rows = await bankRows(bankIds, tz);
+  const range = { from, toExclusive };
+  return {
+    statement: buildStatement(rows, range),
+    byBank: byBankSummary(rows, bankIds, range),
+  };
+}
+
+export interface UnbankedPayments {
+  count: number;
+  /** USD received. */
+  amountUsd: Decimal;
+}
+
+/**
+ * Money received with no bank recorded in the range, so on no bank
+ * statement: customer payments of the kinds that can save a bank (Hosting &
+ * Colocation, Hardware Sales, Hardware Repair, balance top-ups; most predate
+ * the bank field) and deposit returns. Not memo applications, and not the
+ * ELECTRICITY_CHARGES / ADJUSTMENT rows, which are internal ledger entries,
+ * not money moving. Vendor payments always save a bank.
+ */
+export async function getUnbankedPayments({
+  from,
+  toExclusive,
+}: Omit<StatementRange, "tz">): Promise<UnbankedPayments> {
+  const range =
+    from || toExclusive
+      ? {
+          ...(from ? { gte: from } : {}),
+          ...(toExclusive ? { lt: toExclusive } : {}),
+        }
+      : undefined;
+  const [customer, returns] = await Promise.all([
+    prisma.costPayment.aggregate({
+      where: {
+        bankId: null,
+        memoId: null,
+        isDeleted: false,
+        type: { in: ["PAYMENT", "HARDWARE_SALES", "HARDWARE_REPAIR"] },
+        amount: { gt: 0 },
+        // Same date as the statement: paymentDate, else when recorded.
+        ...(range
+          ? {
+              OR: [
+                { paymentDate: range },
+                { paymentDate: null, createdAt: range },
+              ],
+            }
+          : {}),
+      },
+      _count: { _all: true },
+      _sum: { amount: true },
+    }),
+    prisma.vendorDepositMovement.aggregate({
+      where: {
+        bankId: null,
+        type: "RETURN",
+        ...(range ? { date: range } : {}),
+      },
+      _count: { _all: true },
+      _sum: { amountUsd: true },
+    }),
   ]);
-  return buildStatement(groups.flat(), { from, toExclusive });
+  return {
+    count: customer._count._all + returns._count._all,
+    amountUsd: floatUsd(customer._sum.amount ?? 0).plus(
+      returns._sum.amountUsd ?? ZERO,
+    ),
+  };
 }

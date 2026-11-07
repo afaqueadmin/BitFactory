@@ -187,6 +187,8 @@ interface BuildTablePdfHtmlOptions {
   rows: string[][];
   generatedAt: Date;
   tz: string;
+  /** Smaller tables drawn above the main one, e.g. a summary. */
+  before?: { heading: string; columns: TablePdfColumn[]; rows: string[][] }[];
 }
 
 /**
@@ -200,14 +202,37 @@ export function buildTablePdfHtml({
   rows,
   generatedAt,
   tz,
+  before = [],
 }: BuildTablePdfHtmlOptions): string {
-  const style = (i: number, isCell: boolean) => {
+  const cellStyle = (
+    cols: TablePdfColumn[],
+    i: number,
+    isCell: boolean,
+  ): string => {
     const rules = [
-      columns[i]?.align === "right" ? "text-align:right" : "",
-      isCell && columns[i]?.nowrap ? "white-space:nowrap" : "",
+      cols[i]?.align === "right" ? "text-align:right" : "",
+      isCell && cols[i]?.nowrap ? "white-space:nowrap" : "",
     ].filter(Boolean);
     return rules.length ? ` style="${rules.join(";")}"` : "";
   };
+  const beforeHtml = before
+    .map(
+      (t) =>
+        `<h2>${escapeHtml(t.heading)}</h2><table class="before"><thead><tr>${t.columns
+          .map(
+            (c, i) =>
+              `<th${cellStyle(t.columns, i, false)}>${escapeHtml(c.header)}</th>`,
+          )
+          .join("")}</tr></thead><tbody>${t.rows
+          .map(
+            (row) =>
+              `<tr>${row.map((cell, i) => `<td${cellStyle(t.columns, i, true)}>${escapeHtml(cell)}</td>`).join("")}</tr>`,
+          )
+          .join("")}</tbody></table>`,
+    )
+    .join("");
+
+  const style = (i: number, isCell: boolean) => cellStyle(columns, i, isCell);
 
   const headerHtml = columns
     .map((c, i) => `<th${style(i, false)}>${escapeHtml(c.header)}</th>`)
@@ -245,11 +270,14 @@ export function buildTablePdfHtml({
   thead { display: table-header-group; }
   tr { page-break-inside: avoid; }
   .footer { margin-top: 18px; font-size: 10px; color: #888; }
+  h2 { font-size: 13px; margin: 0 0 8px 0; }
+  table.before { width: auto; min-width: 60%; margin-bottom: 20px; }
 </style>
 </head>
 <body>
   <h1>${escapeHtml(title)}</h1>
   ${subtitle ? `<p class="subtitle">${escapeHtml(subtitle)}</p>` : ""}
+  ${beforeHtml}
 
   <table>
     <thead><tr>${headerHtml}</tr></thead>

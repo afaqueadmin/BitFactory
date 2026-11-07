@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { Decimal } from "@prisma/client/runtime/library";
 import {
   buildStatement,
+  byBankSummary,
   customerInvoiceHref,
   customerPaymentTypeLabel,
   feeUsd,
@@ -20,9 +21,11 @@ const row = (
   side: "DEBIT" | "CREDIT",
   amount: number,
   recordedAt = date,
+  bankId = "bank1",
 ): StatementRow => ({
   id,
   source: side === "DEBIT" ? "COST_PAYMENT" : "VENDOR_PART",
+  bankId,
   date: new Date(date),
   recordedAt: new Date(recordedAt),
   invoices: [],
@@ -99,6 +102,80 @@ describe("buildStatement", () => {
       row("x", day, "DEBIT", 1, "2026-11-05T10:00:00Z"),
     ]);
     expect(s.rows.map((r) => r.id)).toEqual(["y", "x", "z"]);
+  });
+});
+
+describe("byBankSummary", () => {
+  const rows = [
+    row("a", "2026-10-20T00:00:00Z", "DEBIT", 20000, undefined, "wise"),
+    row("b", "2026-11-03T00:00:00Z", "DEBIT", 6000, undefined, "binance"),
+    row("c", "2026-11-10T00:00:00Z", "CREDIT", 10000, undefined, "wise"),
+    row("d", "2026-11-15T00:00:00Z", "CREDIT", 500, undefined, "binance"),
+    row("e", "2026-12-01T00:00:00Z", "DEBIT", 50, undefined, "wise"),
+    row("x", "2026-11-05T00:00:00Z", "DEBIT", 999, undefined, "other"),
+  ];
+  const range = {
+    from: new Date("2026-11-01T00:00:00Z"),
+    toExclusive: new Date("2026-12-01T00:00:00Z"),
+  };
+  const fixed = (s: ReturnType<typeof byBankSummary>[number]) => ({
+    bankId: s.bankId,
+    opening: s.openingBalanceUsd.toFixed(2),
+    debit: s.debitUsd.toFixed(2),
+    credit: s.creditUsd.toFixed(2),
+    closing: s.closingBalanceUsd.toFixed(2),
+  });
+
+  it("splits the range per bank, in the given order, zeros for no rows", () => {
+    expect(
+      byBankSummary(rows, ["wise", "binance", "empty"], range).map(fixed),
+    ).toEqual([
+      {
+        bankId: "wise",
+        opening: "20000.00",
+        debit: "0.00",
+        credit: "10000.00",
+        closing: "10000.00",
+      },
+      {
+        bankId: "binance",
+        opening: "0.00",
+        debit: "6000.00",
+        credit: "500.00",
+        closing: "5500.00",
+      },
+      {
+        bankId: "empty",
+        opening: "0.00",
+        debit: "0.00",
+        credit: "0.00",
+        closing: "0.00",
+      },
+    ]);
+  });
+
+  it("adds up to the consolidated statement of the same banks", () => {
+    const ids = ["wise", "binance"];
+    const mine = rows.filter((r) => ids.includes(r.bankId));
+    const s = buildStatement(mine, range);
+    const lines = byBankSummary(mine, ids, range);
+    const sum = (f: (b: (typeof lines)[number]) => Decimal) =>
+      lines.reduce((t, b) => t.plus(f(b)), D(0)).toFixed(2);
+    expect(sum((b) => b.openingBalanceUsd)).toBe(
+      s.openingBalanceUsd.toFixed(2),
+    );
+    expect(sum((b) => b.debitUsd)).toBe(s.totals.debitUsd.toFixed(2));
+    expect(sum((b) => b.creditUsd)).toBe(s.totals.creditUsd.toFixed(2));
+    expect(sum((b) => b.closingBalanceUsd)).toBe(
+      s.closingBalanceUsd.toFixed(2),
+    );
+    // One running balance across both banks, oldest first.
+    expect(s.rows.map((r) => r.id)).toEqual(["b", "c", "d"]);
+    expect(s.rows.map((r) => r.balanceUsd.toFixed(2))).toEqual([
+      "26000.00",
+      "16000.00",
+      "15500.00",
+    ]);
   });
 });
 

@@ -40,6 +40,7 @@ export interface AccountingBank {
 export interface BankStatementRow {
   id: string;
   source: "COST_PAYMENT" | "VENDOR_PART" | "CONSOLIDATED" | "DEPOSIT_RETURN";
+  bankId: string;
   date: string;
   invoices: { number: string; href: string }[];
   invoiceType: string;
@@ -63,6 +64,32 @@ export interface BankStatement {
     currencies: string[];
   };
   range: { from: string | null; to: string | null };
+  openingBalanceUsd: string;
+  totals: { debitUsd: string; creditUsd: string };
+  closingBalanceUsd: string;
+  rows: BankStatementRow[];
+}
+
+export interface ConsolidatedStatement {
+  entity: { id: string; name: string } | null;
+  /** No bank filter: every bank (of the entity, if one is picked). */
+  allBanks: boolean;
+  banks: {
+    id: string;
+    name: string;
+    isActive: boolean;
+    entity: { id: string; name: string };
+  }[];
+  range: { from: string | null; to: string | null };
+  byBank: {
+    bankId: string;
+    openingBalanceUsd: string;
+    debitUsd: string;
+    creditUsd: string;
+    closingBalanceUsd: string;
+  }[];
+  /** Payments recorded with no bank in the range (on no statement). */
+  unbanked: { count: number; amountUsd: string };
   openingBalanceUsd: string;
   totals: { debitUsd: string; creditUsd: string };
   closingBalanceUsd: string;
@@ -145,6 +172,50 @@ export function useBankStatement(bankId: string, from: string, to: string) {
         `/api/accounting/banks/${bankId}/statement?${params.toString()}`,
       ),
     enabled: !!bankId,
+  });
+}
+
+/**
+ * Consolidated statement query string: entity (optional), banks (empty =
+ * all), inclusive YYYY-MM-DD days. Also used by the export buttons.
+ */
+export function consolidatedStatementQuery(
+  entityId: string,
+  bankIds: string[],
+  from: string,
+  to: string,
+) {
+  const params = new URLSearchParams({
+    tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
+  });
+  if (entityId) params.set("entity", entityId);
+  if (bankIds.length) params.set("bank", bankIds.join(","));
+  if (from) params.set("from", from);
+  if (to) params.set("to", to);
+  return params;
+}
+
+/** Several banks' payments in one statement (default: every bank). */
+export function useConsolidatedStatement(
+  entityId: string,
+  bankIds: string[],
+  from: string,
+  to: string,
+) {
+  const params = consolidatedStatementQuery(entityId, bankIds, from, to);
+  return useQuery({
+    queryKey: [
+      ROOT_KEY,
+      "consolidatedStatement",
+      entityId,
+      bankIds.join(","),
+      from,
+      to,
+    ],
+    queryFn: () =>
+      request<ConsolidatedStatement>(
+        `/api/accounting/banks/statement?${params.toString()}`,
+      ),
   });
 }
 

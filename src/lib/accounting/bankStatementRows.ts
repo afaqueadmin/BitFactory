@@ -34,6 +34,8 @@ export interface StatementRow {
   /** Source-prefixed id: cp_, vp_, cvp_ or dr_. */
   id: string;
   source: StatementSource;
+  /** The bank the money went into or came out of. */
+  bankId: string;
   /** Payment date. */
   date: Date;
   /** When it was recorded; breaks ties between same-day rows. */
@@ -249,4 +251,54 @@ export function buildStatement(
     closingBalanceUsd: rows.length ? balance : opening,
     rows,
   };
+}
+
+/** One bank's line in the consolidated statement's "By bank" box. */
+export interface BankSummary {
+  bankId: string;
+  openingBalanceUsd: Decimal;
+  debitUsd: Decimal;
+  creditUsd: Decimal;
+  closingBalanceUsd: Decimal;
+}
+
+/**
+ * Opening / Debit / Credit / Closing per bank for the same range as
+ * buildStatement, in `bankIds` order; a bank with no rows gets zeros.
+ * The lines add up to the consolidated statement's figures.
+ */
+export function byBankSummary(
+  all: StatementRow[],
+  bankIds: string[],
+  range: { from?: Date | null; toExclusive?: Date | null } = {},
+): BankSummary[] {
+  const map = new Map<string, BankSummary>(
+    bankIds.map((id) => [
+      id,
+      {
+        bankId: id,
+        openingBalanceUsd: ZERO,
+        debitUsd: ZERO,
+        creditUsd: ZERO,
+        closingBalanceUsd: ZERO,
+      },
+    ]),
+  );
+  for (const row of all) {
+    const b = map.get(row.bankId);
+    if (!b) continue;
+    if (range.from && row.date < range.from) {
+      b.openingBalanceUsd = b.openingBalanceUsd.plus(signed(row));
+      continue;
+    }
+    if (range.toExclusive && row.date >= range.toExclusive) continue;
+    if (row.side === "DEBIT") b.debitUsd = b.debitUsd.plus(row.amountUsd);
+    else b.creditUsd = b.creditUsd.plus(row.amountUsd);
+  }
+  for (const b of map.values()) {
+    b.closingBalanceUsd = b.openingBalanceUsd
+      .plus(b.debitUsd)
+      .minus(b.creditUsd);
+  }
+  return [...map.values()];
 }
