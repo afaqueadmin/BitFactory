@@ -122,6 +122,7 @@ model User {
   accountingBanksCreated                  AccountingBank[]                @relation("accountingBanksCreated")
   accountingVendorsCreated                AccountingVendor[]              @relation("accountingVendorsCreated")
   vendorDepositMovementsCreated           VendorDepositMovement[]         @relation("vendorDepositMovementsCreated")
+  bankTransfersCreated                    AccountingBankTransfer[]        @relation("bankTransfersCreated")
   simulatedCostPayments                   SimulatedCostPayment[]          @relation("simulatedCostPayments")
   simulatedCostPaymentsCreated            SimulatedCostPayment[]          @relation("simulatedCostPaymentsCreated")
   walletPaymentEmails                     WalletPaymentEmail[]
@@ -2056,6 +2057,8 @@ model AccountingBank {
   vendorPaymentParts       VendorPaymentPart[]
   consolidatedPayments     VendorConsolidatedPayment[]
   depositReturns           VendorDepositMovement[]
+  transfersOut             AccountingBankTransfer[]    @relation("bankTransfersFrom")
+  transfersIn              AccountingBankTransfer[]    @relation("bankTransfersTo")
 
   @@unique([entityId, name])
   @@index([createdBy])
@@ -2076,8 +2079,61 @@ model AccountingCurrency {
   vendorPaymentParts       VendorPaymentPart[]
   consolidatedPayments     VendorConsolidatedPayment[]
   depositReturns           VendorDepositMovement[]
+  transfersOut             AccountingBankTransfer[]    @relation("bankTransferFromCurrency")
+  transfersIn              AccountingBankTransfer[]    @relation("bankTransferToCurrency")
 
   @@map("accounting_currencies")
+}
+
+/// Money moved between two of our own banks (or two currencies of one bank).
+/// The sending bank loses fromAmount + fromFee; the receiving bank gains
+/// toAmount and pays toFee. conversionRate is the bank's rate between the two
+/// currencies (1 from = r to), so toAmount = fromAmount × r. Both sides carry
+/// the same amountUsd: from the USD side when there is one, else
+/// fromAmount ÷ fromExchangeRate (entered). Rates are 1 USD = X currency.
+/// Entities come from the banks (a bank used by payments can't change entity).
+model AccountingBankTransfer {
+  id               String   @id @default(cuid())
+  date             DateTime @db.Date
+  fromBankId       String
+  fromCurrencyId   String
+  /// Sent, in the from currency, excluding the fee.
+  fromAmount       Decimal  @db.Decimal(18, 2)
+  /// Charged by the sending bank, in the from currency.
+  fromFee          Decimal  @default(0) @db.Decimal(18, 2)
+  fromExchangeRate Decimal  @db.Decimal(18, 8)
+  toBankId         String
+  toCurrencyId     String
+  /// 1 from currency = conversionRate to currency (1 when the same).
+  conversionRate   Decimal  @db.Decimal(18, 8)
+  /// Received, in the to currency, before the receiving fee.
+  toAmount         Decimal  @db.Decimal(18, 2)
+  /// Charged by the receiving bank, in the to currency.
+  toFee            Decimal  @default(0) @db.Decimal(18, 2)
+  toExchangeRate   Decimal  @db.Decimal(18, 8)
+  /// USD value of the transfer, the same on both sides.
+  amountUsd        Decimal  @db.Decimal(12, 2)
+  fromFeeUsd       Decimal  @default(0) @db.Decimal(12, 2)
+  toFeeUsd         Decimal  @default(0) @db.Decimal(12, 2)
+  reference        String?
+  note             String?
+  receiptKey       String?
+  createdBy        String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  fromBank      AccountingBank     @relation("bankTransfersFrom", fields: [fromBankId], references: [id], onDelete: Restrict)
+  toBank        AccountingBank     @relation("bankTransfersTo", fields: [toBankId], references: [id], onDelete: Restrict)
+  fromCurrency  AccountingCurrency @relation("bankTransferFromCurrency", fields: [fromCurrencyId], references: [id], onDelete: Restrict)
+  toCurrency    AccountingCurrency @relation("bankTransferToCurrency", fields: [toCurrencyId], references: [id], onDelete: Restrict)
+  createdByUser User               @relation("bankTransfersCreated", fields: [createdBy], references: [id])
+
+  @@index([fromBankId])
+  @@index([toBankId])
+  @@index([fromCurrencyId])
+  @@index([toCurrencyId])
+  @@index([date])
+  @@map("accounting_bank_transfers")
 }
 
 model AccountingBankCurrency {
@@ -2458,6 +2514,9 @@ enum AuditAction {
   VENDOR_DEPOSIT_RETURN_RECORDED
   VENDOR_DEPOSIT_ADJUSTMENT_RECORDED
   VENDOR_DEPOSIT_MOVEMENT_DELETED
+  BANK_TRANSFER_RECORDED
+  BANK_TRANSFER_UPDATED
+  BANK_TRANSFER_DELETED
   FRANCHISE_CREATED
   FRANCHISE_UPDATED
   FRANCHISE_DELETED

@@ -2,6 +2,8 @@
 
 import { Alert, Box, Button, Paper, Stack, Typography } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
+import { TransferDialog } from "@/components/accounting/bankTransfer/TransferDialog";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
@@ -61,6 +63,7 @@ function BankStatementContent() {
   const to = isDay(toParam) ? toParam : "";
   const [exporting, setExporting] = useState<"csv" | "pdf" | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [recordingTransfer, setRecordingTransfer] = useState(false);
 
   const { data: banks = [] } = useAccountingBanks();
   const rangeError = !!(from && to && from > to);
@@ -159,8 +162,28 @@ function BankStatementContent() {
             ))}
           </Stack>
         </Box>
-        <BankPicker banks={banks} current={bankId} onChange={switchBank} />
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          spacing={1.5}
+          alignItems={{ xs: "stretch", sm: "center" }}
+        >
+          <Button
+            variant="outlined"
+            startIcon={<SwapHorizIcon />}
+            onClick={() => setRecordingTransfer(true)}
+            sx={ds.outlineBtnSx}
+          >
+            Record transfer
+          </Button>
+          <BankPicker banks={banks} current={bankId} onChange={switchBank} />
+        </Stack>
       </Box>
+      {recordingTransfer && (
+        <TransferDialog
+          defaultFromBank={banks.find((b) => b.id === bankId)}
+          onClose={() => setRecordingTransfer(false)}
+        />
+      )}
 
       <Paper elevation={0} sx={{ ...ds.listCardSx, p: { xs: 2, sm: 3 } }}>
         <Stack

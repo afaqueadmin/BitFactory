@@ -289,6 +289,9 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
     "Security Deposit Adjustment Recorded",
   [AuditAction.VENDOR_DEPOSIT_MOVEMENT_DELETED]:
     "Security Deposit Return/Adjustment Deleted",
+  [AuditAction.BANK_TRANSFER_RECORDED]: "Internal Bank Transfer Recorded",
+  [AuditAction.BANK_TRANSFER_UPDATED]: "Internal Bank Transfer Updated",
+  [AuditAction.BANK_TRANSFER_DELETED]: "Internal Bank Transfer Deleted",
   [AuditAction.FRANCHISE_CREATED]: "Franchise Created",
   [AuditAction.FRANCHISE_UPDATED]: "Franchise Updated",
   [AuditAction.FRANCHISE_DELETED]: "Franchise Deleted",

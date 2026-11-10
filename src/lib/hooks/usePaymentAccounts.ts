@@ -39,7 +39,12 @@ export interface AccountingBank {
 
 export interface BankStatementRow {
   id: string;
-  source: "COST_PAYMENT" | "VENDOR_PART" | "CONSOLIDATED" | "DEPOSIT_RETURN";
+  source:
+    | "COST_PAYMENT"
+    | "VENDOR_PART"
+    | "CONSOLIDATED"
+    | "DEPOSIT_RETURN"
+    | "TRANSFER";
   bankId: string;
   date: string;
   invoices: { number: string; href: string }[];
@@ -230,6 +235,99 @@ export function useAccountingVendors(
       request<AccountingVendor[]>(
         `/api/accounting/vendors${query ? `?${query}` : ""}`,
       ),
+  });
+}
+
+/** One side of an internal bank transfer. Amounts as 2 dp strings. */
+export interface BankTransferSide {
+  entityId: string;
+  entityName: string;
+  bankId: string;
+  bankName: string;
+  bankActive: boolean;
+  currencyId: string;
+  currencyCode: string;
+  amount: string;
+  fee: string;
+  /** 1 USD = X currency. */
+  exchangeRate: string;
+  feeUsd: string;
+}
+
+/** Money moved between two of our banks. */
+export interface BankTransfer {
+  id: string;
+  /** YYYY-MM-DD. */
+  date: string;
+  from: BankTransferSide;
+  to: BankTransferSide;
+  /** 1 from currency = X to currency. */
+  conversionRate: string;
+  amountUsd: string;
+  interCompany: boolean;
+  reference: string | null;
+  note: string | null;
+  receiptKey: string | null;
+  receiptHref: string | null;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** What the Record / Edit transfer form sends. */
+export interface BankTransferInput {
+  date: string;
+  from: {
+    entityId: string;
+    bankId: string;
+    currencyId: string;
+    amount: string;
+    fee: string;
+  };
+  to: {
+    entityId: string;
+    bankId: string;
+    currencyId: string;
+    amount: string;
+    fee: string;
+  };
+  conversionRate: string;
+  fromUsdRate: string;
+  reference: string;
+  note: string;
+  receiptKey: string | null;
+}
+
+export function useBankTransfers() {
+  return useQuery({
+    queryKey: [ROOT_KEY, "bankTransfers"],
+    queryFn: () => request<BankTransfer[]>("/api/accounting/bank-transfers"),
+  });
+}
+
+/**
+ * Record (no id), edit or delete a transfer. Refreshes everything under
+ * "paymentAccounts": the list, bank balances and every statement.
+ */
+export function useSaveBankTransfer() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      method,
+      data,
+    }: {
+      id?: string;
+      method: "POST" | "PUT" | "DELETE";
+      data?: BankTransferInput;
+    }) =>
+      request<unknown>(`/api/accounting/bank-transfers${id ? `/${id}` : ""}`, {
+        method,
+        body: data ? JSON.stringify(data) : undefined,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [ROOT_KEY] });
+    },
   });
 }
 

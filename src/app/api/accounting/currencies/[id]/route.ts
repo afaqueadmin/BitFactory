@@ -36,6 +36,9 @@ export async function PUT(
             consolidatedPayments: true,
             // Security deposit returns received into it.
             depositReturns: true,
+            // Internal bank transfers, either side.
+            transfersOut: true,
+            transfersIn: true,
           },
         },
       },
@@ -69,6 +72,8 @@ export async function PUT(
           vendorPaymentParts,
           consolidatedPayments,
           depositReturns,
+          transfersOut,
+          transfersIn,
         } = existing._count;
         if (
           vendorInvoicePayments +
@@ -76,7 +81,9 @@ export async function PUT(
             costPayments +
             vendorPaymentParts +
             consolidatedPayments +
-            depositReturns >
+            depositReturns +
+            transfersOut +
+            transfersIn >
           0
         ) {
           return NextResponse.json(
@@ -176,6 +183,9 @@ export async function DELETE(
             consolidatedPayments: true,
             // Security deposit returns received into it.
             depositReturns: true,
+            // Internal bank transfers, either side.
+            transfersOut: true,
+            transfersIn: true,
           },
         },
       },
@@ -195,6 +205,8 @@ export async function DELETE(
       vendorPaymentParts,
       consolidatedPayments,
       depositReturns,
+      transfersOut,
+      transfersIn,
     } = existing._count;
     if (
       banks > 0 ||
@@ -203,7 +215,9 @@ export async function DELETE(
         costPayments +
         vendorPaymentParts +
         consolidatedPayments +
-        depositReturns >
+        depositReturns +
+        transfersOut +
+        transfersIn >
         0
     ) {
       return NextResponse.json(

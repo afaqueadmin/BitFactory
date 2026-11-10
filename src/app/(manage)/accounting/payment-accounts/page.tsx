@@ -24,6 +24,9 @@ import {
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
+import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
+import { TransferDialog } from "@/components/accounting/bankTransfer/TransferDialog";
+import { TransfersTab } from "@/components/accounting/bankTransfer/TransfersTab";
 import { useDaylight } from "@/lib/daylight";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -45,6 +48,7 @@ import {
   useAccountingBanks,
   useAccountingCurrencies,
   useAccountingEntities,
+  useBankTransfers,
 } from "@/lib/hooks/usePaymentAccounts";
 import {
   DaylightAdminPage,
@@ -171,6 +175,7 @@ function BanksTab() {
   const { data: currencies = [] } = useAccountingCurrencies();
   const editor = useRecordEditor<AccountingBank>("banks");
   const [entityFilter, setEntityFilter] = useState("");
+  const [recordingTransfer, setRecordingTransfer] = useState(false);
   const [form, setForm] = useState({
     entityId: "",
     name: "",
@@ -246,6 +251,14 @@ function BanksTab() {
             sx={ds.outlineBtnSx}
           >
             Consolidated statement
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<SwapHorizIcon />}
+            onClick={() => setRecordingTransfer(true)}
+            sx={ds.outlineBtnSx}
+          >
+            Record transfer
           </Button>
           <Button
             variant="contained"
@@ -376,9 +389,13 @@ function BanksTab() {
         </Table>
       </TableContainer>
       <Typography sx={{ mt: 1.5, fontSize: 12, color: d.muted }}>
-        Balance = payments received into the bank (Debit) minus payments sent
-        from it (Credit), in USD. Click a bank to open its statement.
+        Balance = payments and transfers received into the bank (Debit) minus
+        payments, transfers and transfer fees sent from it (Credit), in USD.
+        Click a bank to open its statement.
       </Typography>
+      {recordingTransfer && (
+        <TransferDialog onClose={() => setRecordingTransfer(false)} />
+      )}
 
       <FormDialog
         open={editor.editing !== null}
@@ -586,6 +603,7 @@ function CurrenciesTab() {
 
 const TABS = [
   { key: "banks", label: "Banks" },
+  { key: "transfers", label: "Transfers" },
   { key: "entities", label: "Entities" },
   { key: "currencies", label: "Currencies" },
 ] as const;
@@ -611,8 +629,10 @@ function PaymentAccountsContent() {
   const { data: banks } = useAccountingBanks();
   const { data: entities } = useAccountingEntities();
   const { data: currencies } = useAccountingCurrencies();
+  const { data: transfers } = useBankTransfers();
   const counts: Record<TabKey, number | undefined> = {
     banks: banks?.length,
+    transfers: transfers?.length,
     entities: entities?.length,
     currencies: currencies?.length,
   };
@@ -624,9 +644,9 @@ function PaymentAccountsContent() {
           Entities, Banks &amp; Currencies
         </Typography>
         <Typography sx={ds.pageDescSx}>
-          The paying and receiving accounts used when recording payments.
-          Inactive records are hidden from payment forms but stay on past
-          payments.
+          The paying and receiving accounts used when recording payments, and
+          the transfers between them. Inactive records are hidden from payment
+          forms but stay on past payments.
         </Typography>
       </Box>
       <Paper elevation={0} sx={{ ...ds.listCardSx, p: { xs: 2, sm: 3 } }}>
@@ -657,6 +677,7 @@ function PaymentAccountsContent() {
           ))}
         </Tabs>
         {tab === "banks" && <BanksTab />}
+        {tab === "transfers" && <TransfersTab />}
         {tab === "entities" && <EntitiesTab />}
         {tab === "currencies" && <CurrenciesTab />}
       </Paper>

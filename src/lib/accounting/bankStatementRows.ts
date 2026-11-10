@@ -17,11 +17,18 @@ import {
  *   vendor invoices (Credit)
  * - DEPOSIT_RETURN: VendorDepositMovement RETURN, a vendor paying a
  *   security deposit back (Debit)
+ * - TRANSFER: AccountingBankTransfer between two of our banks: Credit on
+ *   the sending bank, Debit on the receiving one, and a Credit row per fee
+ *   (see bankTransfer.ts). Up to four rows per transfer.
  * All amounts are the USD value saved with the payment.
  */
 
 export type StatementSource =
-  "COST_PAYMENT" | "VENDOR_PART" | "CONSOLIDATED" | "DEPOSIT_RETURN";
+  | "COST_PAYMENT"
+  | "VENDOR_PART"
+  | "CONSOLIDATED"
+  | "DEPOSIT_RETURN"
+  | "TRANSFER";
 
 export type StatementSide = "DEBIT" | "CREDIT";
 
@@ -31,7 +38,7 @@ export interface StatementLink {
 }
 
 export interface StatementRow {
-  /** Source-prefixed id: cp_, vp_, cvp_ or dr_. */
+  /** Source-prefixed id: cp_, vp_, cvp_, dr_ or bt_. */
   id: string;
   source: StatementSource;
   /** The bank the money went into or came out of. */
@@ -86,6 +93,10 @@ const amountFormat = new Intl.NumberFormat("en-US", {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
 });
+
+/** "3,670.00 AED". */
+export const formatAmount = (amount: Decimal, code: string): string =>
+  `${amountFormat.format(amount.toNumber())} ${code}`;
 
 /** "3,670.00 AED @ 3.67" (rate only for non-USD), or null with no currency. */
 export function formatOriginal(

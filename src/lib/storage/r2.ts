@@ -30,6 +30,7 @@ export const PDF_PREFIXES = {
   "hardware-purchase-invoice": "hardware-purchases/",
   "hardware-purchase-receipt": "hardware-purchase-receipts/",
   "vendor-deposit-return-receipt": "vendor-deposit-return-receipts/",
+  "bank-transfer-receipt": "bank-transfer-receipts/",
 } as const;
 
 export type PdfPurpose = keyof typeof PDF_PREFIXES;

@@ -19,9 +19,10 @@ import {
   vendorKindLabel,
   vendorReceiptHref,
 } from "@/lib/accounting/bankStatementRows";
+import { transferStatementRows } from "@/lib/accounting/bankTransfer";
 
 /**
- * Bank balances and statements, read from the four tables that save a bank
+ * Bank balances and statements, read from the five tables that save a bank
  * (see bankStatementRows.ts). Debit = money in, Credit = money out, all in
  * the USD value saved with each payment.
  *
@@ -50,38 +51,57 @@ export async function getBankBalances(
   bankIds?: string[],
 ): Promise<Map<string, BankBalance>> {
   const filter = bankIds ? { in: bankIds } : undefined;
-  const [customerIn, customerOut, parts, consolidated, returns] =
-    await Promise.all([
-      // Customer payments are positive; a negative one would be money out.
-      prisma.costPayment.groupBy({
-        by: ["bankId"],
-        where: { ...costPaymentWhere(filter), amount: { gt: 0 } },
-        _sum: { amount: true },
-      }),
-      prisma.costPayment.groupBy({
-        by: ["bankId"],
-        where: { ...costPaymentWhere(filter), amount: { lt: 0 } },
-        _sum: { amount: true },
-      }),
-      prisma.vendorPaymentPart.groupBy({
-        by: ["bankId"],
-        where: filter ? { bankId: filter } : undefined,
-        _sum: { amountUsd: true },
-      }),
-      prisma.vendorConsolidatedPayment.groupBy({
-        by: ["bankId"],
-        where: filter ? { bankId: filter } : undefined,
-        _sum: { amountUsd: true },
-      }),
-      prisma.vendorDepositMovement.groupBy({
-        by: ["bankId"],
-        where: {
-          type: "RETURN",
-          bankId: filter ?? { not: null },
-        },
-        _sum: { amountUsd: true },
-      }),
-    ]);
+  const [
+    customerIn,
+    customerOut,
+    parts,
+    consolidated,
+    returns,
+    transfersOut,
+    transfersIn,
+  ] = await Promise.all([
+    // Customer payments are positive; a negative one would be money out.
+    prisma.costPayment.groupBy({
+      by: ["bankId"],
+      where: { ...costPaymentWhere(filter), amount: { gt: 0 } },
+      _sum: { amount: true },
+    }),
+    prisma.costPayment.groupBy({
+      by: ["bankId"],
+      where: { ...costPaymentWhere(filter), amount: { lt: 0 } },
+      _sum: { amount: true },
+    }),
+    prisma.vendorPaymentPart.groupBy({
+      by: ["bankId"],
+      where: filter ? { bankId: filter } : undefined,
+      _sum: { amountUsd: true },
+    }),
+    prisma.vendorConsolidatedPayment.groupBy({
+      by: ["bankId"],
+      where: filter ? { bankId: filter } : undefined,
+      _sum: { amountUsd: true },
+    }),
+    prisma.vendorDepositMovement.groupBy({
+      by: ["bankId"],
+      where: {
+        type: "RETURN",
+        bankId: filter ?? { not: null },
+      },
+      _sum: { amountUsd: true },
+    }),
+    // Sending bank: the transfer plus its fee.
+    prisma.accountingBankTransfer.groupBy({
+      by: ["fromBankId"],
+      where: filter ? { fromBankId: filter } : undefined,
+      _sum: { amountUsd: true, fromFeeUsd: true },
+    }),
+    // Receiving bank: the transfer in, its own fee out.
+    prisma.accountingBankTransfer.groupBy({
+      by: ["toBankId"],
+      where: filter ? { toBankId: filter } : undefined,
+      _sum: { amountUsd: true, toFeeUsd: true },
+    }),
+  ]);
 
   const map = new Map<string, BankBalance>();
   const add = (bankId: string | null, amount: Decimal, side: "D" | "C") => {
@@ -103,6 +123,14 @@ export async function getBankBalances(
   for (const r of returns) add(r.bankId, r._sum.amountUsd ?? ZERO, "D");
   for (const r of parts) add(r.bankId, r._sum.amountUsd ?? ZERO, "C");
   for (const r of consolidated) add(r.bankId, r._sum.amountUsd ?? ZERO, "C");
+  for (const r of transfersOut) {
+    add(r.fromBankId, r._sum.amountUsd ?? ZERO, "C");
+    add(r.fromBankId, r._sum.fromFeeUsd ?? ZERO, "C");
+  }
+  for (const r of transfersIn) {
+    add(r.toBankId, r._sum.amountUsd ?? ZERO, "D");
+    add(r.toBankId, r._sum.toFeeUsd ?? ZERO, "C");
+  }
   return map;
 }
 
@@ -509,6 +537,42 @@ async function depositReturnRows(bankIds: string[]) {
   }));
 }
 
+const transferBankSelect = {
+  name: true,
+  entity: { select: { name: true } },
+} as const;
+
+/** Internal transfers touching these banks: 1–4 rows each (bankTransfer.ts). */
+async function transferRows(bankIds: string[]) {
+  const transfers = await prisma.accountingBankTransfer.findMany({
+    where: {
+      OR: [{ fromBankId: { in: bankIds } }, { toBankId: { in: bankIds } }],
+    },
+    include: {
+      fromBank: { select: transferBankSelect },
+      toBank: { select: transferBankSelect },
+      fromCurrency: { select: { code: true } },
+      toCurrency: { select: { code: true } },
+    },
+  });
+  const wanted = new Set(bankIds);
+  return transfers.flatMap((t) =>
+    transferStatementRows(
+      {
+        ...t,
+        fromBankName: t.fromBank.name,
+        toBankName: t.toBank.name,
+        fromEntityName: t.fromBank.entity.name,
+        toEntityName: t.toBank.entity.name,
+        fromCode: t.fromCurrency.code,
+        toCode: t.toCurrency.code,
+        hasReceipt: !!t.receiptKey,
+      },
+      wanted,
+    ),
+  );
+}
+
 export interface StatementRange {
   /** Instants: the route turns the viewer's calendar days into them. */
   from?: Date | null;
@@ -525,6 +589,7 @@ async function bankRows(bankIds: string[], tz: string) {
     vendorPartRows(bankIds, tz),
     consolidatedRows(bankIds),
     depositReturnRows(bankIds),
+    transferRows(bankIds),
   ]);
   return groups.flat();
 }
@@ -539,8 +604,8 @@ export async function getBankStatement(
 
 /**
  * Consolidated statement of several banks: one running balance across all of
- * them. There is no transfer between our own banks yet, so nothing is
- * counted twice.
+ * them. A transfer between two selected banks shows both sides, which cancel
+ * out except for the fees.
  */
 export async function getBanksStatement(
   bankIds: string[],
