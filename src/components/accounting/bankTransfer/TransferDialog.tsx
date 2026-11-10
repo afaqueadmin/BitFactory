@@ -39,6 +39,7 @@ import { DaylightStatusPill } from "@/components/daylight/AdminPage";
 import {
   AccountingBank,
   BankTransfer,
+  useAccountingBanks,
   useAccountingEntities,
   useSaveBankTransfer,
 } from "@/lib/hooks/usePaymentAccounts";
@@ -98,6 +99,7 @@ export function TransferDialog({
 }) {
   const save = useSaveBankTransfer();
   const { data: entities = [] } = useAccountingEntities(true);
+  const { data: banks = [] } = useAccountingBanks(true);
 
   const [date, setDate] = useState(transfer?.date ?? today());
   const [from, setFrom] = useState<PaymentAccountValue>(
@@ -207,6 +209,11 @@ export function TransferDialog({
       : 0;
 
   const entityName = (id: string) => entities.find((e) => e.id === id)?.name;
+  const bankName = (id: string) => banks.find((b) => b.id === id)?.name;
+  const fromBankName = bankName(from.bankId) ?? "sending bank";
+  const toBankName = bankName(to.bankId) ?? "receiving bank";
+  // What leaves the sending bank: amount sent + its fee.
+  const totalDeducted = sent ? sent + (feeOut ?? 0) : null;
   const interCompany =
     !!from.entityId && !!to.entityId && from.entityId !== to.entityId;
 
@@ -324,6 +331,47 @@ export function TransferDialog({
               slotProps={money(fromCode)}
             />
           </Stack>
+          {totalDeducted !== null && feeOut !== null && (
+            <Box
+              sx={{
+                p: 1.5,
+                borderRadius: 1,
+                bgcolor: "action.hover",
+                display: "flex",
+                flexWrap: "wrap",
+                alignItems: "baseline",
+                justifyContent: "space-between",
+                columnGap: 2,
+                rowGap: 0.5,
+              }}
+            >
+              <Box>
+                <Typography sx={{ fontSize: 13, fontWeight: 650 }}>
+                  Total deducted from {fromBankName}
+                </Typography>
+                <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
+                  Amount sent + sending bank fee
+                </Typography>
+              </Box>
+              <Box
+                sx={{
+                  textAlign: "right",
+                  fontVariantNumeric: "tabular-nums",
+                }}
+              >
+                <Typography sx={{ fontSize: 16, fontWeight: 700 }}>
+                  {fromCode
+                    ? formatCurrencyAmount(totalDeducted, fromCode)
+                    : totalDeducted.toFixed(2)}
+                </Typography>
+                {amountUsd !== null && fromCode !== USD && (
+                  <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
+                    ≈ <CurrencyDisplay value={amountUsd + feeOutUsd} />
+                  </Typography>
+                )}
+              </Box>
+            </Box>
+          )}
 
           <Divider />
           <Typography sx={{ fontWeight: 700, fontSize: 14 }}>
@@ -431,18 +479,19 @@ export function TransferDialog({
                   </Box>
                 )}
                 <Box>
-                  Sending bank loses{" "}
+                  Deducted from {fromBankName}:{" "}
                   <strong>
                     {formatCurrencyAmount(sent + (feeOut ?? 0), fromCode)}
                   </strong>{" "}
                   (<CurrencyDisplay value={amountUsd + feeOutUsd} />)
                 </Box>
                 <Box>
-                  Receiving bank gains{" "}
+                  Added to {toBankName}:{" "}
                   <strong>
                     {formatCurrencyAmount(received - (feeIn ?? 0), toCode)}
                   </strong>{" "}
                   (<CurrencyDisplay value={amountUsd - feeInUsd} />)
+                  {(feeIn ?? 0) > 0 && " after its fee"}
                 </Box>
                 <Box sx={{ color: "text.secondary", fontSize: 12 }}>
                   Transfer value <CurrencyDisplay value={amountUsd} /> on both
