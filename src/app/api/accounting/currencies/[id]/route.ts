@@ -39,6 +39,8 @@ export async function PUT(
             // Internal bank transfers, either side.
             transfersOut: true,
             transfersIn: true,
+            // Expense payments made in it.
+            expensePayments: true,
           },
         },
       },
@@ -74,6 +76,7 @@ export async function PUT(
           depositReturns,
           transfersOut,
           transfersIn,
+          expensePayments,
         } = existing._count;
         if (
           vendorInvoicePayments +
@@ -83,7 +86,8 @@ export async function PUT(
             consolidatedPayments +
             depositReturns +
             transfersOut +
-            transfersIn >
+            transfersIn +
+            expensePayments >
           0
         ) {
           return NextResponse.json(
@@ -186,6 +190,8 @@ export async function DELETE(
             // Internal bank transfers, either side.
             transfersOut: true,
             transfersIn: true,
+            // Expense payments made in it.
+            expensePayments: true,
           },
         },
       },
@@ -207,6 +213,7 @@ export async function DELETE(
       depositReturns,
       transfersOut,
       transfersIn,
+      expensePayments,
     } = existing._count;
     if (
       banks > 0 ||
@@ -217,7 +224,8 @@ export async function DELETE(
         consolidatedPayments +
         depositReturns +
         transfersOut +
-        transfersIn >
+        transfersIn +
+        expensePayments >
         0
     ) {
       return NextResponse.json(

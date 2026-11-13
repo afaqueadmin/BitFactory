@@ -60,6 +60,8 @@ import {
   PictureAsPdf as PdfSettingsIcon,
   AccountBalance as PaymentAccountsIcon,
   LocalShipping as VendorsIcon,
+  RequestPage as ExpensesIcon,
+  Category as ExpenseHeadsIcon,
   Timeline as CustomerPaybackIcon,
   Factory as CompanyPaybackIcon,
   History as ActivityLogIcon,
@@ -305,6 +307,11 @@ const sidebarSections: SidebarSection[] = [
         ],
       },
       {
+        title: "Expenses",
+        icon: <ExpensesIcon />,
+        path: "/accounting/expenses",
+      },
+      {
         title: "Customer Statements",
         icon: <StatementsIcon />,
         path: "/accounting/statements",
@@ -352,6 +359,11 @@ const sidebarSections: SidebarSection[] = [
             title: "Vendors",
             icon: <VendorsIcon />,
             path: "/accounting/vendors",
+          },
+          {
+            title: "Expense Heads",
+            icon: <ExpenseHeadsIcon />,
+            path: "/accounting/expense-heads",
           },
         ],
       },

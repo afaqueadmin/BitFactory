@@ -44,7 +44,8 @@ export interface BankStatementRow {
     | "VENDOR_PART"
     | "CONSOLIDATED"
     | "DEPOSIT_RETURN"
-    | "TRANSFER";
+    | "TRANSFER"
+    | "EXPENSE";
   bankId: string;
   date: string;
   invoices: { number: string; href: string }[];
@@ -110,7 +111,17 @@ export interface AccountingVendor {
   };
 }
 
-type Kind = "entities" | "banks" | "currencies" | "vendors";
+/** A kind of expense (Finance Settings -> Expense Heads). */
+export interface ExpenseHead {
+  id: string;
+  name: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  _count: { expenses: number };
+}
+
+type Kind = "entities" | "banks" | "currencies" | "vendors" | "expense-heads";
 
 const ROOT_KEY = "paymentAccounts";
 
@@ -150,6 +161,14 @@ export function useAccountingCurrencies(activeOnly = false) {
     queryKey: [ROOT_KEY, "currencies", activeOnly],
     queryFn: () =>
       request<AccountingCurrency[]>(listUrl("currencies", activeOnly)),
+  });
+}
+
+/** Expense heads (activeOnly: for the Add expense form). */
+export function useExpenseHeads(activeOnly = false) {
+  return useQuery({
+    queryKey: [ROOT_KEY, "expense-heads", activeOnly],
+    queryFn: () => request<ExpenseHead[]>(listUrl("expense-heads", activeOnly)),
   });
 }
 

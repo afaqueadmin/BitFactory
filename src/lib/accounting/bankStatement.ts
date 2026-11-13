@@ -20,6 +20,7 @@ import {
   vendorReceiptHref,
 } from "@/lib/accounting/bankStatementRows";
 import { transferStatementRows } from "@/lib/accounting/bankTransfer";
+import { expenseStatementRows } from "@/lib/accounting/expense";
 
 /**
  * Bank balances and statements, read from the five tables that save a bank
@@ -59,6 +60,7 @@ export async function getBankBalances(
     returns,
     transfersOut,
     transfersIn,
+    expensePayments,
   ] = await Promise.all([
     // Customer payments are positive; a negative one would be money out.
     prisma.costPayment.groupBy({
@@ -101,6 +103,12 @@ export async function getBankBalances(
       where: filter ? { toBankId: filter } : undefined,
       _sum: { amountUsd: true, toFeeUsd: true },
     }),
+    // Expense payments: the amount and its fee, both out.
+    prisma.accountingExpensePayment.groupBy({
+      by: ["bankId"],
+      where: filter ? { bankId: filter } : undefined,
+      _sum: { amountUsd: true, feeUsd: true },
+    }),
   ]);
 
   const map = new Map<string, BankBalance>();
@@ -130,6 +138,10 @@ export async function getBankBalances(
   for (const r of transfersIn) {
     add(r.toBankId, r._sum.amountUsd ?? ZERO, "D");
     add(r.toBankId, r._sum.toFeeUsd ?? ZERO, "C");
+  }
+  for (const r of expensePayments) {
+    add(r.bankId, r._sum.amountUsd ?? ZERO, "C");
+    add(r.bankId, r._sum.feeUsd ?? ZERO, "C");
   }
   return map;
 }
@@ -573,6 +585,55 @@ async function transferRows(bankIds: string[]) {
   );
 }
 
+/** Expense payments from these banks: 1–2 rows each (expense.ts). */
+async function expenseRows(bankIds: string[], tz: string) {
+  const payments = await prisma.accountingExpensePayment.findMany({
+    where: { bankId: { in: bankIds } },
+    include: {
+      currency: { select: { code: true } },
+      expense: {
+        select: {
+          id: true,
+          narration: true,
+          amountDueUsd: true,
+          head: { select: { name: true } },
+          // Every payment of the expense, for the split note.
+          payments: {
+            select: {
+              id: true,
+              amountUsd: true,
+              date: true,
+              bank: { select: { name: true } },
+            },
+          },
+        },
+      },
+    },
+  });
+  return payments.flatMap((p) =>
+    expenseStatementRows(
+      {
+        ...p,
+        code: p.currency.code,
+        hasReceipt: !!p.receiptKey,
+        expense: {
+          id: p.expense.id,
+          headName: p.expense.head.name,
+          narration: p.expense.narration,
+          amountDueUsd: p.expense.amountDueUsd,
+        },
+        siblings: p.expense.payments.map((s) => ({
+          id: s.id,
+          amountUsd: s.amountUsd,
+          via: s.bank.name,
+          date: s.date,
+        })),
+      },
+      tz,
+    ),
+  );
+}
+
 export interface StatementRange {
   /** Instants: the route turns the viewer's calendar days into them. */
   from?: Date | null;
@@ -590,6 +651,7 @@ async function bankRows(bankIds: string[], tz: string) {
     consolidatedRows(bankIds),
     depositReturnRows(bankIds),
     transferRows(bankIds),
+    expenseRows(bankIds, tz),
   ]);
   return groups.flat();
 }

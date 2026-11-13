@@ -31,14 +31,17 @@ export const PDF_PREFIXES = {
   "hardware-purchase-receipt": "hardware-purchase-receipts/",
   "vendor-deposit-return-receipt": "vendor-deposit-return-receipts/",
   "bank-transfer-receipt": "bank-transfer-receipts/",
+  "expense-attachment": "expense-attachments/",
+  "expense-payment-receipt": "expense-payment-receipts/",
 } as const;
 
 export type PdfPurpose = keyof typeof PDF_PREFIXES;
 
-/** Key prefixes for the Excel/CSV sheets attached to vendor invoices. */
+/** Key prefixes for the Excel/CSV sheets attached to vendor invoices and expenses. */
 export const SHEET_PREFIXES = {
   "hardware-purchase-sheet": "hardware-purchase-sheets/",
   "vendor-invoice-sheet": "vendor-invoice-sheets/",
+  "expense-sheet": "expense-sheets/",
 } as const;
 
 export type SheetPurpose = keyof typeof SHEET_PREFIXES;

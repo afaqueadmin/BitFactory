@@ -123,6 +123,9 @@ model User {
   accountingVendorsCreated                AccountingVendor[]              @relation("accountingVendorsCreated")
   vendorDepositMovementsCreated           VendorDepositMovement[]         @relation("vendorDepositMovementsCreated")
   bankTransfersCreated                    AccountingBankTransfer[]        @relation("bankTransfersCreated")
+  expenseHeadsCreated                     AccountingExpenseHead[]         @relation("expenseHeadsCreated")
+  expensesCreated                         AccountingExpense[]             @relation("expensesCreated")
+  expensePaymentsCreated                  AccountingExpensePayment[]      @relation("expensePaymentsCreated")
   simulatedCostPayments                   SimulatedCostPayment[]          @relation("simulatedCostPayments")
   simulatedCostPaymentsCreated            SimulatedCostPayment[]          @relation("simulatedCostPaymentsCreated")
   walletPaymentEmails                     WalletPaymentEmail[]
@@ -2059,6 +2062,7 @@ model AccountingBank {
   depositReturns           VendorDepositMovement[]
   transfersOut             AccountingBankTransfer[]    @relation("bankTransfersFrom")
   transfersIn              AccountingBankTransfer[]    @relation("bankTransfersTo")
+  expensePayments          AccountingExpensePayment[]
 
   @@unique([entityId, name])
   @@index([createdBy])
@@ -2081,6 +2085,7 @@ model AccountingCurrency {
   depositReturns           VendorDepositMovement[]
   transfersOut             AccountingBankTransfer[]    @relation("bankTransferFromCurrency")
   transfersIn              AccountingBankTransfer[]    @relation("bankTransferToCurrency")
+  expensePayments          AccountingExpensePayment[]
 
   @@map("accounting_currencies")
 }
@@ -2134,6 +2139,83 @@ model AccountingBankTransfer {
   @@index([toCurrencyId])
   @@index([date])
   @@map("accounting_bank_transfers")
+}
+
+/// A kind of company expense (Salary, Fuel, Maintenance, ...). A head used by
+/// an expense can't be deleted, only deactivated.
+model AccountingExpenseHead {
+  id            String              @id @default(cuid())
+  name          String              @unique
+  isActive      Boolean             @default(true)
+  createdBy     String
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  createdByUser User                @relation("expenseHeadsCreated", fields: [createdBy], references: [id])
+  expenses      AccountingExpense[]
+
+  @@index([createdBy])
+  @@map("accounting_expense_heads")
+}
+
+/// A company expense, owed in USD and paid in one or more payments from our
+/// banks. Balance = amountDueUsd − Σ payments' amountUsd (fees don't count);
+/// the status (Pending / Partially paid / Paid) follows from it.
+model AccountingExpense {
+  id            String                     @id @default(cuid())
+  date          DateTime                   @db.Date
+  headId        String
+  narration     String?
+  pdfKey        String?
+  pdfName       String?
+  sheetKey      String?
+  sheetName     String?
+  amountDueUsd  Decimal                    @db.Decimal(12, 2)
+  createdBy     String
+  createdAt     DateTime                   @default(now())
+  updatedAt     DateTime                   @updatedAt
+  head          AccountingExpenseHead      @relation(fields: [headId], references: [id], onDelete: Restrict)
+  createdByUser User                       @relation("expensesCreated", fields: [createdBy], references: [id])
+  payments      AccountingExpensePayment[]
+
+  @@index([headId])
+  @@index([date])
+  @@index([createdBy])
+  @@map("accounting_expenses")
+}
+
+/// One payment of an expense, always a Credit on the paying bank: amountUsd
+/// plus feeUsd (its own "Expense Fee" row). Amount and fee are typed in the
+/// bank's currency; the rate is 1 USD = X currency. The entity comes from
+/// the bank (a bank used by payments can't change entity).
+model AccountingExpensePayment {
+  id            String             @id @default(cuid())
+  expenseId     String
+  date          DateTime           @db.Date
+  bankId        String
+  currencyId    String
+  exchangeRate  Decimal            @db.Decimal(18, 8)
+  /// Paid, in the bank's currency, excluding the fee.
+  amount        Decimal            @db.Decimal(18, 2)
+  /// Charged by the bank, in the bank's currency.
+  fee           Decimal            @default(0) @db.Decimal(18, 2)
+  amountUsd     Decimal            @db.Decimal(12, 2)
+  feeUsd        Decimal            @default(0) @db.Decimal(12, 2)
+  note          String?
+  receiptKey    String?
+  createdBy     String
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  expense       AccountingExpense  @relation(fields: [expenseId], references: [id], onDelete: Restrict)
+  bank          AccountingBank     @relation(fields: [bankId], references: [id], onDelete: Restrict)
+  currency      AccountingCurrency @relation(fields: [currencyId], references: [id], onDelete: Restrict)
+  createdByUser User               @relation("expensePaymentsCreated", fields: [createdBy], references: [id])
+
+  @@index([expenseId])
+  @@index([bankId])
+  @@index([currencyId])
+  @@index([date])
+  @@index([createdBy])
+  @@map("accounting_expense_payments")
 }
 
 model AccountingBankCurrency {
@@ -2517,6 +2599,15 @@ enum AuditAction {
   BANK_TRANSFER_RECORDED
   BANK_TRANSFER_UPDATED
   BANK_TRANSFER_DELETED
+  EXPENSE_HEAD_CREATED
+  EXPENSE_HEAD_UPDATED
+  EXPENSE_HEAD_DELETED
+  EXPENSE_RECORDED
+  EXPENSE_UPDATED
+  EXPENSE_DELETED
+  EXPENSE_PAYMENT_RECORDED
+  EXPENSE_PAYMENT_UPDATED
+  EXPENSE_PAYMENT_DELETED
   FRANCHISE_CREATED
   FRANCHISE_UPDATED
   FRANCHISE_DELETED

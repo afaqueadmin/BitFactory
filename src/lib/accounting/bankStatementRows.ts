@@ -20,6 +20,9 @@ import {
  * - TRANSFER: AccountingBankTransfer between two of our banks: Credit on
  *   the sending bank, Debit on the receiving one, and a Credit row per fee
  *   (see bankTransfer.ts). Up to four rows per transfer.
+ * - EXPENSE: AccountingExpensePayment, an expense paid from the bank
+ *   (Credit), plus an "Expense Fee" Credit row when it has a fee (see
+ *   expense.ts).
  * All amounts are the USD value saved with the payment.
  */
 
@@ -28,7 +31,8 @@ export type StatementSource =
   | "VENDOR_PART"
   | "CONSOLIDATED"
   | "DEPOSIT_RETURN"
-  | "TRANSFER";
+  | "TRANSFER"
+  | "EXPENSE";
 
 export type StatementSide = "DEBIT" | "CREDIT";
 
@@ -38,7 +42,7 @@ export interface StatementLink {
 }
 
 export interface StatementRow {
-  /** Source-prefixed id: cp_, vp_, cvp_, dr_ or bt_. */
+  /** Source-prefixed id: cp_, vp_, cvp_, dr_, bt_ or ep_. */
   id: string;
   source: StatementSource;
   /** The bank the money went into or came out of. */
