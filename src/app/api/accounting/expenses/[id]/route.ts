@@ -7,12 +7,17 @@ import {
   ExpenseRequest,
   parseExpenseRequest,
 } from "@/lib/accounting/expenseRequest";
-import { checkDueCoversPaid } from "@/lib/accounting/expense";
+import {
+  checkDueCoversPaid,
+  checkExpenseDate,
+  ymd,
+} from "@/lib/accounting/expense";
 import { deleteObject } from "@/lib/storage/r2";
 import { auditExpense, expenseInclude, expenseJson } from "../shared";
 
 /**
- * Edits an expense. Amount Due can't drop below what has been paid. A
+ * Edits an expense. Amount Due can't drop below what has been paid, and the
+ * date can't move after the first payment's date. A
  * replaced or removed PDF / sheet is deleted from R2 after the save.
  */
 export async function PUT(
@@ -40,20 +45,39 @@ export async function PUT(
     }
     const { data, headName } = parsed;
 
-    const paidUsd = existing.payments.reduce(
-      (s, p) => s.plus(p.amountUsd),
-      new Decimal(0),
-    );
-    const dueError = checkDueCoversPaid(data.amountDueUsd, paidUsd);
-    if (dueError) {
-      return NextResponse.json({ error: dueError }, { status: 400 });
-    }
-
-    const expense = await prisma.accountingExpense.update({
-      where: { id },
-      data,
-      include: expenseInclude,
+    // With the expense row locked (as payment saves do), so a payment saved
+    // at the same time can't slip past either check.
+    const result = await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`
+        SELECT "id" FROM "accounting_expenses" WHERE "id" = ${id} FOR UPDATE`;
+      const payments = await tx.accountingExpensePayment.findMany({
+        where: { expenseId: id },
+        select: { amountUsd: true, date: true },
+        orderBy: { date: "asc" },
+      });
+      const paidUsd = payments.reduce(
+        (s, p) => s.plus(p.amountUsd),
+        new Decimal(0),
+      );
+      const error =
+        checkDueCoversPaid(data.amountDueUsd, paidUsd) ??
+        checkExpenseDate({
+          expenseDate: ymd(data.date as Date),
+          firstPaymentDate: payments[0] ? ymd(payments[0].date) : null,
+        });
+      if (error) return { error };
+      return {
+        expense: await tx.accountingExpense.update({
+          where: { id },
+          data,
+          include: expenseInclude,
+        }),
+      };
     });
+    if ("error" in result) {
+      return NextResponse.json({ error: result.error }, { status: 400 });
+    }
+    const { expense } = result;
 
     // Files no longer referenced. A failure only leaves an orphan.
     for (const [before, after] of [

@@ -8,9 +8,10 @@ import {
   parseExpensePaymentRequest,
 } from "@/lib/accounting/expenseRequest";
 import {
+  isPaymentRuleError,
   lockAndCheckBalance,
-  OverpaidError,
 } from "@/lib/accounting/expensePaymentSave";
+import { todayIn } from "@/lib/accounting/expense";
 import { deleteObject } from "@/lib/storage/r2";
 import {
   expensePaymentInclude,
@@ -56,7 +57,13 @@ export async function PUT(
     let payment;
     try {
       payment = await prisma.$transaction(async (tx) => {
-        await lockAndCheckBalance(tx, existing.expenseId, data, id);
+        await lockAndCheckBalance(
+          tx,
+          existing.expenseId,
+          data,
+          todayIn(body.tz),
+          id,
+        );
         return tx.accountingExpensePayment.update({
           where: { id },
           data,
@@ -64,7 +71,7 @@ export async function PUT(
         });
       });
     } catch (error) {
-      if (error instanceof OverpaidError) {
+      if (isPaymentRuleError(error)) {
         return NextResponse.json({ error: error.message }, { status: 400 });
       }
       throw error;

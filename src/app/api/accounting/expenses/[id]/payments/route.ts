@@ -8,9 +8,10 @@ import {
   parseExpensePaymentRequest,
 } from "@/lib/accounting/expenseRequest";
 import {
+  isPaymentRuleError,
   lockAndCheckBalance,
-  OverpaidError,
 } from "@/lib/accounting/expensePaymentSave";
+import { todayIn } from "@/lib/accounting/expense";
 import { expensePaymentInclude, expensePaymentJson } from "../../shared";
 
 /**
@@ -45,14 +46,15 @@ export async function POST(
     let payment;
     try {
       payment = await prisma.$transaction(async (tx) => {
-        if (!(await lockAndCheckBalance(tx, expenseId, data))) return null;
+        if (!(await lockAndCheckBalance(tx, expenseId, data, todayIn(body.tz))))
+          return null;
         return tx.accountingExpensePayment.create({
           data: { ...data, expenseId, createdBy: userId },
           include: expensePaymentInclude,
         });
       });
     } catch (error) {
-      if (error instanceof OverpaidError) {
+      if (isPaymentRuleError(error)) {
         return NextResponse.json({ error: error.message }, { status: 400 });
       }
       throw error;

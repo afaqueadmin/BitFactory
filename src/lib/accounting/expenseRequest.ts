@@ -166,6 +166,8 @@ export interface ExpensePaymentRequest {
   note?: unknown;
   /** Uploaded receipt PDF key, or null / "" for none. */
   receiptKey?: unknown;
+  /** The browser's time zone: "today" for the no-future-date rule. */
+  tz?: unknown;
 }
 
 export interface ParsedExpensePayment {

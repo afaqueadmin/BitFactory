@@ -50,6 +50,12 @@ import { Fragment, Suspense, useEffect, useState } from "react";
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
 import { DateDisplay } from "@/components/accounting/common/DateDisplay";
 import { formatCurrencyAmount } from "@/components/accounting/common/PaymentAccountFields";
+import {
+  SortHeader,
+  SortValue,
+  sortRows,
+  useTableSort,
+} from "@/components/accounting/common/SortableHeader";
 import { TableState } from "@/components/accounting/masterData/MasterDataTable";
 import { ExpenseDialog } from "@/components/accounting/expenses/ExpenseDialog";
 import { ExpensePaymentDialog } from "@/components/accounting/expenses/ExpensePaymentDialog";
@@ -76,6 +82,15 @@ const STATUS: Record<ExpenseStatus, { label: string; tone: DaylightTone }> = {
   PARTIAL: { label: "Partially paid", tone: "warning" },
   PAID: { label: "Paid", tone: "success" },
 };
+
+const STATUS_ORDER: Record<ExpenseStatus, number> = {
+  PENDING: 0,
+  PARTIAL: 1,
+  PAID: 2,
+};
+
+type ExpenseSortKey =
+  "date" | "head" | "narration" | "due" | "paid" | "balance" | "status";
 
 const day = (d: string) => <DateDisplay date={`${d}T12:00:00.000Z`} />;
 const statementHref = (bankId: string) =>
@@ -211,12 +226,35 @@ function ExpensesTab({ focusId }: { focusId: string | null }) {
       ?.scrollIntoView({ block: "center" });
   }, [focusId, isLoading]);
 
-  const rows = data.filter(
-    (e) =>
-      (!headFilter || e.head.id === headFilter) &&
-      (!statusFilter || e.status === statusFilter) &&
-      (!from || e.date >= from) &&
-      (!to || e.date <= to),
+  // Newest first by default, as the list comes from the API.
+  const sort = useTableSort<ExpenseSortKey>("date", "desc");
+  const rows = sortRows(
+    data.filter(
+      (e) =>
+        (!headFilter || e.head.id === headFilter) &&
+        (!statusFilter || e.status === statusFilter) &&
+        (!from || e.date >= from) &&
+        (!to || e.date <= to),
+    ),
+    sort,
+    (e, key): SortValue => {
+      switch (key) {
+        case "date":
+          return e.date;
+        case "head":
+          return e.head.name;
+        case "narration":
+          return e.narration;
+        case "due":
+          return Number(e.amountDueUsd);
+        case "paid":
+          return Number(e.paidUsd);
+        case "balance":
+          return Number(e.balanceUsd);
+        case "status":
+          return STATUS_ORDER[e.status];
+      }
+    },
   );
   const total = (key: "amountDueUsd" | "paidUsd" | "balanceUsd") =>
     rows.reduce((s, e) => s + Number(e[key]), 0);
@@ -336,14 +374,29 @@ function ExpensesTab({ focusId }: { focusId: string | null }) {
           <TableHead>
             <TableRow>
               <TableCell padding="checkbox" />
-              <TableCell>Date</TableCell>
-              <TableCell>Head</TableCell>
-              <TableCell>Narration</TableCell>
-              <TableCell align="right">Amount Due (USD)</TableCell>
-              <TableCell align="right">Amount Paid (USD)</TableCell>
-              <TableCell align="right">Balance (USD)</TableCell>
+              <SortHeader sort={sort} sortKey="date" label="Date" />
+              <SortHeader sort={sort} sortKey="head" label="Head" />
+              <SortHeader sort={sort} sortKey="narration" label="Narration" />
+              <SortHeader
+                sort={sort}
+                sortKey="due"
+                label="Amount Due (USD)"
+                align="right"
+              />
+              <SortHeader
+                sort={sort}
+                sortKey="paid"
+                label="Amount Paid (USD)"
+                align="right"
+              />
+              <SortHeader
+                sort={sort}
+                sortKey="balance"
+                label="Balance (USD)"
+                align="right"
+              />
               <TableCell>Entity / Bank</TableCell>
-              <TableCell>Status</TableCell>
+              <SortHeader sort={sort} sortKey="status" label="Status" />
               <TableCell align="right">Actions</TableCell>
             </TableRow>
           </TableHead>

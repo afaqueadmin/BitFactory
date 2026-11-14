@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { AuditAction } from "@prisma/client";
+import { Decimal } from "@prisma/client/runtime/library";
 import { prisma } from "@/lib/prisma";
 import {
   isUniqueViolation,
@@ -21,7 +22,40 @@ export async function GET(request: NextRequest) {
       include: headCountInclude,
       orderBy: { name: "asc" },
     });
-    return NextResponse.json({ success: true, data: heads });
+    if (activeOnly) return NextResponse.json({ success: true, data: heads });
+
+    // Full list (Expense Heads page): Amount due = Σ the head's expenses'
+    // Amount Due; Amount paid = Σ their payments' USD (fees not included).
+    const [expenses, paid] = await Promise.all([
+      prisma.accountingExpense.findMany({
+        select: { id: true, headId: true, amountDueUsd: true },
+      }),
+      prisma.accountingExpensePayment.groupBy({
+        by: ["expenseId"],
+        _sum: { amountUsd: true },
+      }),
+    ]);
+    const paidByExpense = new Map(
+      paid.map((p) => [p.expenseId, p._sum.amountUsd ?? new Decimal(0)]),
+    );
+    const totals = new Map<string, { due: Decimal; paid: Decimal }>();
+    for (const e of expenses) {
+      const t = totals.get(e.headId) ?? {
+        due: new Decimal(0),
+        paid: new Decimal(0),
+      };
+      t.due = t.due.plus(e.amountDueUsd);
+      t.paid = t.paid.plus(paidByExpense.get(e.id) ?? 0);
+      totals.set(e.headId, t);
+    }
+    return NextResponse.json({
+      success: true,
+      data: heads.map((h) => ({
+        ...h,
+        amountDueUsd: (totals.get(h.id)?.due ?? new Decimal(0)).toFixed(2),
+        amountPaidUsd: (totals.get(h.id)?.paid ?? new Decimal(0)).toFixed(2),
+      })),
+    });
   } catch (error) {
     console.error("Error fetching expense heads:", error);
     return NextResponse.json(

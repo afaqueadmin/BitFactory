@@ -35,6 +35,12 @@ import Link from "next/link";
 import { useMemo } from "react";
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
 import { DateDisplay } from "@/components/accounting/common/DateDisplay";
+import {
+  SortHeader,
+  SortValue,
+  sortRows,
+  useTableSort,
+} from "@/components/accounting/common/SortableHeader";
 import StatCard from "@/components/daylight/StatCard";
 import {
   AccountingBank,
@@ -386,20 +392,39 @@ function StatementRow({
           <BankCell bankId={row.bankId} bank={banks.get(row.bankId)} />
         </TableCell>
       )}
-      <TableCell>
+      <TableCell sx={{ minWidth: 130 }}>
         {row.invoices.length === 0 ? (
-          dash
+          row.typeHref ? (
+            <Link href={row.typeHref} style={link}>
+              {row.invoiceType}
+            </Link>
+          ) : (
+            <Box component="span" sx={{ whiteSpace: "nowrap" }}>
+              {row.invoiceType}
+            </Box>
+          )
         ) : (
-          <Stack spacing={0.25}>
-            {row.invoices.map((inv) => (
-              <Link key={inv.href} href={inv.href} style={link}>
-                {inv.number}
-              </Link>
-            ))}
-          </Stack>
+          <>
+            <Stack spacing={0.25}>
+              {row.invoices.map((inv) => (
+                <Link key={inv.href} href={inv.href} style={link}>
+                  {inv.number}
+                </Link>
+              ))}
+            </Stack>
+            <Box
+              sx={{
+                fontSize: 12,
+                color: d.muted,
+                mt: 0.25,
+                whiteSpace: "nowrap",
+              }}
+            >
+              {row.invoiceType}
+            </Box>
+          </>
         )}
       </TableCell>
-      <TableCell sx={{ whiteSpace: "nowrap" }}>{row.invoiceType}</TableCell>
       <TableCell sx={{ minWidth: 140 }}>
         {row.counterparty.href ? (
           <Link href={row.counterparty.href} style={link}>
@@ -481,9 +506,25 @@ function StatementRow({
   );
 }
 
+type StatementSortKey =
+  "date" | "bank" | "against" | "toFrom" | "type" | "due" | "paid" | "balance";
+
+const SORT_LABELS: Record<StatementSortKey, string> = {
+  date: "Payment Date",
+  bank: "Bank",
+  against: "Transactions Against",
+  toFrom: "Transaction To/From",
+  type: "Transaction Type",
+  due: "Amount Due",
+  paid: "Amount Paid",
+  balance: "Balance",
+};
+
 /**
- * The statement table, oldest first, with Opening / Closing balance rows.
- * Pass `banks` to add the Bank column (consolidated statement).
+ * The statement table, oldest first by default, with Opening / Closing
+ * balance rows. Every column but Notes sorts; each row keeps the running
+ * balance it has in date order, and the Opening / Closing rows show only
+ * while sorted by date. Pass `banks` to add the Bank column (consolidated).
  */
 export function StatementTable({
   data,
@@ -501,12 +542,81 @@ export function StatementTable({
   emptyText: string;
 }) {
   const { d } = useDaylight();
-  const rows = data.rows;
-  const first = rows[0]?.date ?? null;
-  const last = rows.at(-1)?.date ?? null;
+  const sort = useTableSort<StatementSortKey>("date", "asc");
+  // Rows come oldest first; the index is the date order.
+  const order = useMemo(
+    () => new Map(data.rows.map((r, i) => [r.id, i])),
+    [data.rows],
+  );
+  const rows = useMemo(
+    () =>
+      sortRows(data.rows, sort, (r, key): SortValue => {
+        switch (key) {
+          case "date":
+            return order.get(r.id);
+          case "bank":
+            return banks?.get(r.bankId)?.name;
+          case "against":
+            return [...r.invoices.map((i) => i.number), r.invoiceType].join(
+              " ",
+            );
+          case "toFrom":
+            return r.counterparty.name;
+          case "type":
+            return r.side === "DEBIT" ? "Debit" : "Credit";
+          case "due":
+            return r.invoiceAmountUsd === null
+              ? null
+              : Number(r.invoiceAmountUsd);
+          case "paid":
+            return (r.side === "DEBIT" ? 1 : -1) * Number(r.amountUsd);
+          case "balance":
+            return Number(r.balanceUsd);
+        }
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sort is rebuilt each render; key/dir are what matter
+    [data.rows, sort.key, sort.dir, order, banks],
+  );
+  const byDate = sort.key === "date";
+  const newestFirst = byDate && sort.dir === "desc";
+  const first = data.rows[0]?.date ?? null;
+  const last = data.rows.at(-1)?.date ?? null;
   const columnCount = banks ? 10 : 9;
   // Balance rows: date, label up to the Balance column, balance, notes.
   const labelSpan = columnCount - 3;
+  const opening = byDate && hasRange && (
+    <BalanceRow
+      key="opening"
+      label="Opening balance"
+      date={from ? `${from}T12:00:00.000Z` : first}
+      value={data.openingBalanceUsd}
+      labelSpan={labelSpan}
+    />
+  );
+  const closing = byDate && (data.rows.length > 0 || hasRange) && (
+    <BalanceRow
+      key="closing"
+      label="Closing balance"
+      date={to ? `${to}T12:00:00.000Z` : last}
+      value={data.closingBalanceUsd}
+      labelSpan={labelSpan}
+    />
+  );
+  const caption = byDate
+    ? newestFirst
+      ? "Newest first"
+      : "Oldest first"
+    : `Sorted by ${SORT_LABELS[sort.key ?? "date"]} (${
+        sort.dir === "asc" ? "ascending" : "descending"
+      }) · balance as of each row's date`;
+  const header = (key: StatementSortKey, label: string, right?: boolean) => (
+    <SortHeader
+      sort={sort}
+      sortKey={key}
+      label={label}
+      align={right ? "right" : undefined}
+    />
+  );
   return (
     <>
       <Stack
@@ -523,7 +633,7 @@ export function StatementTable({
           {hasRange && " in this period"}
         </Typography>
         <Typography sx={{ fontSize: 12, color: d.muted }}>
-          Oldest first · USD at the rate saved with each payment
+          {caption} · USD at the rate saved with each payment
         </Typography>
       </Stack>
       <TableContainer
@@ -538,27 +648,19 @@ export function StatementTable({
         >
           <TableHead>
             <TableRow>
-              <TableCell>Payment Date</TableCell>
-              {banks && <TableCell>Bank</TableCell>}
-              <TableCell>Invoice #</TableCell>
-              <TableCell>Invoice Type</TableCell>
-              <TableCell>Vendor / Customer</TableCell>
-              <TableCell align="right">Invoice Amount (USD)</TableCell>
-              <TableCell>Credit/Debit</TableCell>
-              <TableCell align="right">Amount (USD)</TableCell>
-              <TableCell align="right">Balance (USD)</TableCell>
+              {header("date", "Payment Date")}
+              {banks && header("bank", "Bank")}
+              {header("against", "Transactions Against")}
+              {header("toFrom", "Transaction To/From")}
+              {header("type", "Transaction Type")}
+              {header("due", "Amount Due (USD)", true)}
+              {header("paid", "Amount Paid (USD)", true)}
+              {header("balance", "Balance (USD)", true)}
               <TableCell>Notes / Receipt</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {hasRange && (
-              <BalanceRow
-                label="Opening balance"
-                date={from ? `${from}T12:00:00.000Z` : first}
-                value={data.openingBalanceUsd}
-                labelSpan={labelSpan}
-              />
-            )}
+            {newestFirst ? closing : opening}
             {rows.length === 0 && (
               <TableRow>
                 <TableCell colSpan={columnCount} align="center" sx={{ py: 5 }}>
@@ -571,14 +673,7 @@ export function StatementTable({
             {rows.map((row) => (
               <StatementRow key={row.id} row={row} banks={banks} />
             ))}
-            {(rows.length > 0 || hasRange) && (
-              <BalanceRow
-                label="Closing balance"
-                date={to ? `${to}T12:00:00.000Z` : last}
-                value={data.closingBalanceUsd}
-                labelSpan={labelSpan}
-              />
-            )}
+            {newestFirst ? opening : closing}
           </TableBody>
         </Table>
       </TableContainer>

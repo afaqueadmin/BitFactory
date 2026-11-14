@@ -17,6 +17,13 @@ import {
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import { useState } from "react";
+import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
+import {
+  SortHeader,
+  SortValue,
+  sortRows,
+  useTableSort,
+} from "@/components/accounting/common/SortableHeader";
 import { StatusBadge } from "@/components/accounting/common/StatusBadge";
 import {
   ConfirmDeleteDialog,
@@ -32,11 +39,33 @@ import {
   useDaylightAdminSx,
 } from "@/components/daylight/AdminPage";
 
+type HeadSortKey = "name" | "expenses" | "due" | "paid" | "status";
+
+const numSx = {
+  whiteSpace: "nowrap",
+  fontVariantNumeric: "tabular-nums",
+} as const;
+
 export default function ExpenseHeadsPage() {
   const ds = useDaylightAdminSx();
   const { data = [], isLoading, error } = useExpenseHeads();
   const editor = useRecordEditor<ExpenseHead>("expense-heads");
   const [name, setName] = useState("");
+  const sort = useTableSort<HeadSortKey>("name");
+  const rows = sortRows(data, sort, (h, key): SortValue => {
+    switch (key) {
+      case "name":
+        return h.name;
+      case "expenses":
+        return h._count.expenses;
+      case "due":
+        return Number(h.amountDueUsd ?? 0);
+      case "paid":
+        return Number(h.amountPaidUsd ?? 0);
+      case "status":
+        return h.isActive ? 0 : 1;
+    }
+  });
 
   const openForm = (head: ExpenseHead | "new") => {
     setName(head === "new" ? "" : head.name);
@@ -75,9 +104,26 @@ export default function ExpenseHeadsPage() {
           <Table size="small">
             <TableHead>
               <TableRow>
-                <TableCell>Name</TableCell>
-                <TableCell align="right">Expenses</TableCell>
-                <TableCell>Status</TableCell>
+                <SortHeader sort={sort} sortKey="name" label="Name" />
+                <SortHeader
+                  sort={sort}
+                  sortKey="expenses"
+                  label="Expenses"
+                  align="right"
+                />
+                <SortHeader
+                  sort={sort}
+                  sortKey="due"
+                  label="Amount due (USD)"
+                  align="right"
+                />
+                <SortHeader
+                  sort={sort}
+                  sortKey="paid"
+                  label="Amount paid (USD)"
+                  align="right"
+                />
+                <SortHeader sort={sort} sortKey="status" label="Status" />
                 <TableCell align="right">Actions</TableCell>
               </TableRow>
             </TableHead>
@@ -86,15 +132,21 @@ export default function ExpenseHeadsPage() {
                 loading={isLoading}
                 error={error}
                 empty={data.length === 0}
-                colSpan={4}
+                colSpan={6}
               />
-              {data.map((head) => (
+              {rows.map((head) => (
                 <TableRow
                   key={head.id}
                   sx={head.isActive ? undefined : inactiveRowSx}
                 >
                   <TableCell>{head.name}</TableCell>
                   <TableCell align="right">{head._count.expenses}</TableCell>
+                  <TableCell align="right" sx={numSx}>
+                    <CurrencyDisplay value={head.amountDueUsd ?? 0} />
+                  </TableCell>
+                  <TableCell align="right" sx={numSx}>
+                    <CurrencyDisplay value={head.amountPaidUsd ?? 0} />
+                  </TableCell>
                   <TableCell>
                     <StatusBadge
                       status={head.isActive ? "Active" : "Inactive"}

@@ -34,6 +34,7 @@ import {
   UploadedPdf,
 } from "@/components/accounting/common/PdfUploadField";
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
+import { dayLabel } from "@/components/accounting/bankStatement/StatementParts";
 import { useAccountingBanks } from "@/lib/hooks/usePaymentAccounts";
 import {
   Expense,
@@ -145,8 +146,19 @@ export function ExpensePaymentDialog({
     (payment?.bankId === account.bankId ? payment?.bankName : undefined) ??
     "the bank";
 
+  // On or after the expense's date, not after today (the server checks too).
+  const maxDate = today();
+  const dateError = !date
+    ? null
+    : date < expense.date
+      ? `Can't be before the expense date (${dayLabel(expense.date)})`
+      : date > maxDate
+        ? "Can't be in the future"
+        : null;
+
   const canSave =
     !!date &&
+    !dateError &&
     !!account.entityId &&
     !!account.bankId &&
     !!account.currencyId &&
@@ -177,6 +189,7 @@ export function ExpensePaymentDialog({
           fee: fee.trim(),
           note,
           receiptKey: receipt?.key ?? null,
+          tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
         },
       });
       onClose();
@@ -224,7 +237,15 @@ export function ExpensePaymentDialog({
             onChange={(e) => setDate(e.target.value)}
             required
             fullWidth
-            slotProps={{ inputLabel: { shrink: true } }}
+            error={!!dateError}
+            helperText={
+              dateError ??
+              `From the expense date (${dayLabel(expense.date)}) to today`
+            }
+            slotProps={{
+              inputLabel: { shrink: true },
+              htmlInput: { min: expense.date, max: maxDate },
+            }}
           />
           <PaymentAccountFields
             value={account}

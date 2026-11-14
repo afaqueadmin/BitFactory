@@ -94,6 +94,8 @@ export interface ExpensePaymentInput {
   fee: string;
   note: string;
   receiptKey: string | null;
+  /** Browser time zone, for the "not in the future" date rule. */
+  tz: string;
 }
 
 export interface ExpenseReportCell {
