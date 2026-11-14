@@ -216,7 +216,7 @@ export function ExpensePaymentDialog({
       <DialogTitle>
         {payment ? "Edit payment" : "Record payment"}
         <Typography sx={{ fontSize: 13, color: "text.secondary" }}>
-          {expense.head.name} · {expense.date} · due{" "}
+          {expense.entryLabel} · {expense.head.name} · {expense.date} · due{" "}
           <CurrencyDisplay value={expense.amountDueUsd} /> · remaining{" "}
           <CurrencyDisplay value={remaining} />
         </Typography>

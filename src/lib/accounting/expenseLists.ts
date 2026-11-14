@@ -13,6 +13,7 @@ const isDay = (v: string | null): v is string =>
 /* -------------------------------- Expenses -------------------------------- */
 
 export const EXPENSE_SORT_KEYS = [
+  "entry",
   "date",
   "head",
   "narration",
@@ -42,6 +43,8 @@ export interface ExpenseFilter {
 
 /** What filtering and sorting need from an expense. */
 export interface ExpenseListRow {
+  /** Entry # (shown as EXP-0001). */
+  entryNumber: number;
   date: string;
   head: { id: string; name: string };
   narration: string | null;
@@ -62,6 +65,8 @@ export function expenseSortValue(
   key: ExpenseSortKey,
 ): SortValue {
   switch (key) {
+    case "entry":
+      return e.entryNumber;
     case "date":
       return e.date;
     case "head":

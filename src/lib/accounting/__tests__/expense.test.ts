@@ -7,6 +7,7 @@ import {
   checkExpenseDate,
   checkNotOverpaid,
   checkPaymentDate,
+  expenseEntryLabel,
   todayIn,
   ExpensePaymentForRows,
   expensePaymentAmounts,
@@ -120,6 +121,7 @@ const payment = (
   hasReceipt: true,
   expense: {
     id: "e1",
+    entryNumber: 1,
     headName: "Fuel",
     narration: "Generator diesel",
     amountDueUsd: D(250),
@@ -146,11 +148,15 @@ describe("expenseStatementRows", () => {
     ]);
     expect(rows[0].source).toBe("EXPENSE");
     expect(rows[0].counterparty).toEqual({ name: "Fuel", href: null });
-    expect(rows.map((r) => r.typeHref)).toEqual([
-      "/accounting/expenses?expense=e1",
-      "/accounting/expenses?expense=e1",
-    ]);
-    expect(transactionsAgainst(rows[0])).toBe("Expense");
+    // Transactions Against: the entry, linked to the expense, on both rows.
+    const entry = [
+      { number: "EXP-0001", href: "/accounting/expenses?expense=e1" },
+    ];
+    expect(rows.map((r) => r.invoices)).toEqual([entry, entry]);
+    expect(transactionsAgainst(rows[0])).toBe("EXP-0001 · Expense");
+    expect(transactionsAgainst(rows[1])).toBe("EXP-0001 · Expense Fee");
+    expect(expenseEntryLabel(1)).toBe("EXP-0001");
+    expect(expenseEntryLabel(12345)).toBe("EXP-12345");
     expect(
       transactionsAgainst({
         invoices: [

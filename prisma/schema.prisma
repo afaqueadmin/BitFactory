@@ -2165,6 +2165,8 @@ model AccountingExpenseHead {
 /// the status (Pending / Partially paid / Paid) follows from it.
 model AccountingExpense {
   id            String                     @id @default(cuid())
+  /// Running number shown as EXP-0001 (Entry #). Never reused.
+  entryNumber   Int                        @unique @default(autoincrement())
   date          DateTime                   @db.Date
   headId        String
   narration     String?

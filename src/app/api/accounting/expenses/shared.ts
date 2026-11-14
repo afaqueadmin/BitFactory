@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { Decimal } from "@prisma/client/runtime/library";
 import {
   expenseBalance,
+  expenseEntryLabel,
   expensePaymentReceiptHref,
   expenseStatus,
 } from "@/lib/accounting/expense";
@@ -90,6 +91,8 @@ export function expenseJson(e: ExpenseWithRelations) {
   ];
   return {
     id: e.id,
+    entryNumber: e.entryNumber,
+    entryLabel: expenseEntryLabel(e.entryNumber),
     date: isoDay(e.date),
     head: e.head,
     narration: e.narration,

@@ -55,6 +55,9 @@ export interface ExpensePayment {
 
 export interface Expense {
   id: string;
+  /** Running number; entryLabel is it as shown ("EXP-0001"). */
+  entryNumber: number;
+  entryLabel: string;
   /** YYYY-MM-DD. */
   date: string;
   head: { id: string; name: string; isActive: boolean };

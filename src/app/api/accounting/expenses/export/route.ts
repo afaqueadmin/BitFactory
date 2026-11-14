@@ -19,8 +19,9 @@ import {
 import { expenseInclude, expenseJson } from "../shared";
 
 const COLUMNS = [
+  { header: "Entry #", nowrap: true },
   { header: "Date", nowrap: true },
-  { header: "Head" },
+  { header: "Account Head" },
   { header: "Narration" },
   { header: "Amount Due (USD)", align: "right" as const, nowrap: true },
   { header: "Amount Paid (USD)", align: "right" as const, nowrap: true },
@@ -67,6 +68,7 @@ export async function GET(request: NextRequest) {
     ) => rows.reduce((s, e) => s + Math.round(Number(e[key]) * 100), 0) / 100;
 
     const body: string[][] = rows.map((e) => [
+      e.entryLabel,
       day(e.date),
       e.head.name,
       e.narration ?? "",
@@ -80,6 +82,7 @@ export async function GET(request: NextRequest) {
     if (rows.length > 0) {
       body.push([
         `Total (${rows.length} expense${rows.length === 1 ? "" : "s"})`,
+        "",
         "",
         "",
         money(total("amountDueUsd")),
@@ -119,7 +122,7 @@ export async function GET(request: NextRequest) {
       title: "Expenses",
       subtitle: [
         `Period: ${formatIssuedRange(filter.from || null, filter.to || null)}`,
-        `Head: ${head?.name ?? "All heads"}`,
+        `Account Head: ${head?.name ?? "All"}`,
         `Status: ${filter.status ? expenseStatusLabel(filter.status) : "All"}`,
         `${rows.length} expense${rows.length === 1 ? "" : "s"}`,
         "Balance = Amount Due − Amount Paid; fees don't reduce the balance",

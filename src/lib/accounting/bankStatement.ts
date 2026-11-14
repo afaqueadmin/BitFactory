@@ -594,6 +594,7 @@ async function expenseRows(bankIds: string[], tz: string) {
       expense: {
         select: {
           id: true,
+          entryNumber: true,
           narration: true,
           amountDueUsd: true,
           head: { select: { name: true } },
@@ -618,6 +619,7 @@ async function expenseRows(bankIds: string[], tz: string) {
         hasReceipt: !!p.receiptKey,
         expense: {
           id: p.expense.id,
+          entryNumber: p.expense.entryNumber,
           headName: p.expense.head.name,
           narration: p.expense.narration,
           amountDueUsd: p.expense.amountDueUsd,

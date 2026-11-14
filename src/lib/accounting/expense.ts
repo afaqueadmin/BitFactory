@@ -182,6 +182,10 @@ export function checkExpenseDate({
 
 export const expenseHref = (id: string) => `/accounting/expenses?expense=${id}`;
 
+/** Entry # as shown: "EXP-0001" (4 digits at least). */
+export const expenseEntryLabel = (entryNumber: number) =>
+  `EXP-${String(entryNumber).padStart(4, "0")}`;
+
 export const expensePaymentReceiptHref = (id: string) =>
   `/api/accounting/expense-payments/${id}/receipt`;
 
@@ -201,6 +205,8 @@ export interface ExpensePaymentForRows {
   hasReceipt: boolean;
   expense: {
     id: string;
+    /** Entry #, shown as EXP-0001. */
+    entryNumber: number;
     headName: string;
     narration: string | null;
     amountDueUsd: Decimal;
@@ -217,14 +223,19 @@ export function expenseStatementRows(
   p: ExpensePaymentForRows,
   tz: string,
 ): StatementRow[] {
-  // Transactions Against = "Expense" linked to the expense; To/From = head.
+  // Transactions Against = the entry (EXP-0001, linked to the expense) with
+  // "Expense" / "Expense Fee" under it, like an invoice; To/From = the head.
   const base = {
     source: "EXPENSE" as const,
     bankId: p.bankId,
     date: p.date,
     recordedAt: p.createdAt,
-    invoices: [],
-    typeHref: expenseHref(p.expense.id),
+    invoices: [
+      {
+        number: expenseEntryLabel(p.expense.entryNumber),
+        href: expenseHref(p.expense.id),
+      },
+    ],
     counterparty: { name: p.expense.headName, href: null },
     invoiceAmountUsd: p.expense.amountDueUsd,
     side: "CREDIT" as const,

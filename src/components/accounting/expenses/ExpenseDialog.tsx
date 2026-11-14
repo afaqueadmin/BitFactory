@@ -143,9 +143,9 @@ export function ExpenseDialog({
             }}
           />
           <FormControl fullWidth required disabled={headsLoading}>
-            <InputLabel>Head</InputLabel>
+            <InputLabel>Account Head</InputLabel>
             <Select
-              label="Head"
+              label="Account Head"
               value={headId}
               onChange={(e) => setHeadId(e.target.value)}
             >

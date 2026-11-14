@@ -306,9 +306,9 @@ function ExpensesTab({ focusId }: { focusId: string | null }) {
           useFlexGap
         >
           <FormControl size="small" sx={{ minWidth: 180 }}>
-            <InputLabel>Head</InputLabel>
+            <InputLabel>Account Head</InputLabel>
             <Select
-              label="Head"
+              label="Account Head"
               value={headFilter}
               onChange={(e) => setHeadFilter(e.target.value)}
             >
@@ -387,8 +387,9 @@ function ExpensesTab({ focusId }: { focusId: string | null }) {
           <TableHead>
             <TableRow>
               <TableCell padding="checkbox" />
+              <SortHeader sort={sort} sortKey="entry" label="Entry #" />
               <SortHeader sort={sort} sortKey="date" label="Date" />
-              <SortHeader sort={sort} sortKey="head" label="Head" />
+              <SortHeader sort={sort} sortKey="head" label="Account Head" />
               <SortHeader sort={sort} sortKey="narration" label="Narration" />
               <SortHeader
                 sort={sort}
@@ -418,7 +419,7 @@ function ExpensesTab({ focusId }: { focusId: string | null }) {
               loading={isLoading}
               error={error}
               empty={rows.length === 0}
-              colSpan={10}
+              colSpan={11}
             />
             {rows.map((e) => {
               const isOpen = open.has(e.id);
@@ -452,6 +453,15 @@ function ExpensesTab({ focusId }: { focusId: string | null }) {
                           </IconButton>
                         </span>
                       </Tooltip>
+                    </TableCell>
+                    <TableCell
+                      sx={{
+                        whiteSpace: "nowrap",
+                        fontWeight: 650,
+                        fontVariantNumeric: "tabular-nums",
+                      }}
+                    >
+                      {e.entryLabel}
                     </TableCell>
                     <TableCell sx={{ whiteSpace: "nowrap" }}>
                       {day(e.date)}
@@ -578,7 +588,7 @@ function ExpensesTab({ focusId }: { focusId: string | null }) {
                   </TableRow>
                   <TableRow>
                     <TableCell
-                      colSpan={10}
+                      colSpan={11}
                       sx={{ py: 0, ...(isOpen ? {} : { borderBottom: 0 }) }}
                     >
                       <Collapse in={isOpen} timeout="auto" unmountOnExit>
@@ -604,7 +614,7 @@ function ExpensesTab({ focusId }: { focusId: string | null }) {
             {rows.length > 1 && (
               <TableRow>
                 <TableCell />
-                <TableCell colSpan={3} sx={{ fontWeight: 700 }}>
+                <TableCell colSpan={4} sx={{ fontWeight: 700 }}>
                   Total ({rows.length} expenses)
                 </TableCell>
                 <TableCell align="right" sx={{ ...numSx, fontWeight: 700 }}>
@@ -659,7 +669,7 @@ function ExpensesTab({ focusId }: { focusId: string | null }) {
           <Stack spacing={2}>
             {deleting?.kind === "expense" && (
               <DialogContentText>
-                {deleting.expense.head.name} of{" "}
+                {deleting.expense.entryLabel} · {deleting.expense.head.name} of{" "}
                 <CurrencyDisplay value={deleting.expense.amountDueUsd} /> on{" "}
                 {deleting.expense.date}. Its attached files are deleted too.
                 This can&apos;t be undone.

@@ -20,6 +20,8 @@ const exp = (
   status: ExpenseListRow["status"],
 ): ExpenseListRow & { id: string } => ({
   id,
+  // e1 was recorded first, e3 last.
+  entryNumber: Number(id.slice(1)),
   date,
   head: { id: `h-${head}`, name: head },
   narration: null,
@@ -64,6 +66,12 @@ describe("expenseListRows", () => {
         ),
       ),
     ).toEqual(["e3", "e2"]);
+  });
+
+  it("sorts by entry number", () => {
+    expect(
+      ids(expenseListRows(rows, all, { key: "entry", dir: "asc" })),
+    ).toEqual(["e1", "e2", "e3"]);
   });
 
   it("sorts amounts as numbers", () => {
