@@ -2,6 +2,7 @@ import { createHmac } from "crypto";
 import { Pay } from "@binance/pay";
 import { Decimal } from "@prisma/client/runtime/library";
 import { prisma } from "@/lib/prisma";
+import crypto from "crypto";
 
 // Signed /sapi endpoints must hit the main API from a region Binance doesn't
 // geo-block (US requests fail with HTTP 451).
@@ -12,7 +13,7 @@ const BINANCE_API_SECRET = process.env.BINANCE_API_SECRET!;
 
 const RECV_WINDOW_MS = 5000;
 const CACHE_TTL_MS = 8000;
-const MAX_LOOKBACK_MS = 24 * 60 * 60 * 1000;
+const MAX_LOOKBACK_MS = 40 * 60 * 60 * 1000;
 
 export const BINANCE_USDT_NETWORKS = [
   {
@@ -89,6 +90,7 @@ export async function getUsdtDeposits(
   }
 
   const deposits = (await res.json()) as BinanceDeposit[];
+  console.log("deposits on-chain", deposits);
   const addresses = new Map(
     BINANCE_USDT_NETWORKS.filter((n) => n.address).map((n) => [
       n.network,
@@ -120,7 +122,13 @@ export async function getIncomingPayTransactions(
     limit: 100,
   });
   const body = await response.data();
-
+  console.log("getIncomingPayTransactions body internal transfers:", body);
+  body.data?.map((t) => {
+    console.log(t.walletTypes);
+    console.log(t.fundsDetail);
+    console.log(t.payerInfo);
+    console.log(t.receiverInfo);
+  });
   return (body.data ?? [])
     .filter(
       (t) =>
@@ -184,4 +192,71 @@ export async function findMatchingBinancePayment(
   });
   const usedIds = new Set(used.map((u) => u.binanceTxId));
   return candidates.find((c) => !usedIds.has(c.txId)) ?? null;
+}
+
+const BASE = "https://api.binance.com";
+
+export async function binanceGet(
+  path: string,
+  params: Record<string, string | number> = {},
+) {
+  const query = new URLSearchParams({
+    ...Object.fromEntries(
+      Object.entries(params).map(([k, v]) => [k, String(v)]),
+    ),
+    timestamp: Date.now().toString(),
+    recvWindow: "10000",
+  }).toString();
+
+  const signature = crypto
+    .createHmac("sha256", process.env.BINANCE_API_SECRET!)
+    .update(query)
+    .digest("hex");
+
+  const res = await fetch(`${BASE}${path}?${query}&signature=${signature}`, {
+    headers: { "X-MBX-APIKEY": process.env.BINANCE_API_KEY! },
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(`Binance ${res.status}: ${await res.text()}`);
+  return res.json();
+}
+
+export async function binanceRequest<T = never>(
+  method: "GET" | "POST",
+  path: string,
+  params: Record<string, string | number> = {},
+): Promise<T> {
+  const query = new URLSearchParams({
+    ...Object.fromEntries(
+      Object.entries(params).map(([k, v]) => [k, String(v)]),
+    ),
+    timestamp: Date.now().toString(),
+    recvWindow: "10000",
+  }).toString();
+
+  const signature = crypto
+    .createHmac("sha256", process.env.BINANCE_API_SECRET!)
+    .update(query)
+    .digest("hex");
+
+  const signed = `${query}&signature=${signature}`;
+
+  const res = await fetch(
+    method === "GET" ? `${BASE}${path}?${signed}` : `${BASE}${path}`,
+    {
+      method,
+      headers: {
+        "X-MBX-APIKEY": process.env.BINANCE_API_KEY!,
+        ...(method === "POST" && {
+          "Content-Type": "application/x-www-form-urlencoded",
+        }),
+      },
+      body: method === "POST" ? signed : undefined,
+      cache: "no-store",
+    },
+  );
+
+  const text = await res.text();
+  if (!res.ok) throw new Error(`Binance ${res.status}: ${text}`);
+  return JSON.parse(text) as T;
 }

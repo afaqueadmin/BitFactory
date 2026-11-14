@@ -7,6 +7,7 @@ import { paymentTypeForInvoice } from "@/lib/accounting/paymentTypes";
 import { sendInvoicePaymentReceivedEmail } from "@/lib/email";
 
 export const runtime = "nodejs";
+// THIS FILE IS NOT USED ANYWHERE AND CAN BE DELETED
 
 // Allows for clock drift between our server and Binance timestamps.
 const CLOCK_SKEW_MS = 2 * 60 * 1000;

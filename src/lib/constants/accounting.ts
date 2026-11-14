@@ -88,6 +88,7 @@ export const INVOICE_STATUS_LABELS: Record<
   [InvoiceStatus.ISSUED]: "Issued",
   [InvoiceStatus.PAID]: "Paid",
   [InvoiceStatus.OVERDUE]: "Overdue",
+  [InvoiceStatus.PROCESSING]: "Processing",
   [InvoiceStatus.CANCELLED]: "Cancelled",
   [InvoiceStatus.REFUNDED]: "Refunded",
 
@@ -113,6 +114,7 @@ export const INVOICE_STATUS_COLORS: Record<
   [InvoiceStatus.ISSUED]: "info",
   [InvoiceStatus.PAID]: "success",
   [InvoiceStatus.OVERDUE]: "error",
+  [InvoiceStatus.PROCESSING]: "primary",
   [InvoiceStatus.CANCELLED]: "warning",
   [InvoiceStatus.REFUNDED]: "secondary",
   [VendorPaymentStatus.Paid]: "success",
@@ -129,6 +131,7 @@ export const INVOICE_STATUS_HEX_COLORS: Record<
   [InvoiceStatus.ISSUED]: "#3B82F6", // Blue
   [InvoiceStatus.PAID]: "#10B981", // Green
   [InvoiceStatus.OVERDUE]: "#EF4444", // Red
+  [InvoiceStatus.PROCESSING]: "#06B6D4", // Cyan
   [InvoiceStatus.CANCELLED]: "#F59E0B", // Amber
   [InvoiceStatus.REFUNDED]: "#8B5CF6", // Purple
   [VendorPaymentStatus.Paid]: "#10B981",

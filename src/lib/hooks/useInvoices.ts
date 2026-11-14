@@ -69,6 +69,9 @@ export interface InvoiceWithDetails extends Invoice {
     space: { name: string; location: string } | null;
   } | null;
   repairNote?: { id: string; note: string; dateOfEntry: string } | null;
+  // Single-invoice GET only: the customer has a Binance sub-account with a
+  // deposit address, so Binance checkout can be offered.
+  hasBinanceSubaccount?: boolean;
   group?: {
     id: string;
     name: string;

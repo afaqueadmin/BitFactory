@@ -33,6 +33,7 @@ import {
   TextField,
   Checkbox,
   FormControlLabel,
+  MenuItem,
 } from "@mui/material";
 import {
   useInvoice,
@@ -118,6 +119,17 @@ export default function InvoiceDetailPage() {
     null,
   );
   const [unpaidLoading, setUnpaidLoading] = useState(false);
+  const [subAccountLoading, setSubAccountLoading] = useState(false);
+  const [subAccountNetwork, setSubAccountNetwork] = useState<"TRX" | "ETH">(
+    "TRX",
+  );
+  const [subAccountResult, setSubAccountResult] = useState<{
+    address?: string;
+    coin?: string;
+    network?: string;
+    tag?: string | null;
+    error?: string;
+  } | null>(null);
   const [memoModalOpen, setMemoModalOpen] = useState(false);
   const [memoNotification, setMemoNotification] = useState("");
 
@@ -174,6 +186,36 @@ export default function InvoiceDetailPage() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     return selectedDate < today;
+  };
+
+  // Not used anywhere on client portal
+  const handleGetBinanceDepositAddress = async () => {
+    setSubAccountLoading(true);
+    setSubAccountResult(null);
+    try {
+      const query = new URLSearchParams({
+        email: "higgs_virtual@1mg7esaqnoemail.com",
+        coin: "USDT",
+        network: subAccountNetwork,
+      });
+      const res = await fetch(
+        `/api/invoices/${params.id as string}/binance-subaccount?${query}`,
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setSubAccountResult({
+          error: data.error || `Request failed (${res.status})`,
+        });
+      } else {
+        setSubAccountResult(data);
+      }
+    } catch (err) {
+      setSubAccountResult({
+        error: err instanceof Error ? err.message : "Request failed",
+      });
+    } finally {
+      setSubAccountLoading(false);
+    }
   };
 
   const handleOpenIssueDialog = () => {
@@ -452,9 +494,47 @@ export default function InvoiceDetailPage() {
             <Typography variant="h4" sx={{ fontWeight: 700 }}>
               {invoice.invoiceNumber}
             </Typography>
-            <Typography color="textSecondary">
-              Invoice Details & Payment Tracking
-            </Typography>
+            <Stack direction="row" spacing={2} alignItems="center">
+              <Typography color="textSecondary">
+                Invoice Details & Payment Tracking
+              </Typography>
+              <TextField
+                select
+                size="small"
+                label="Network"
+                value={subAccountNetwork}
+                onChange={(e) =>
+                  setSubAccountNetwork(e.target.value as "TRX" | "ETH")
+                }
+                sx={{ minWidth: 100 }}
+              >
+                <MenuItem value="TRX">TRX</MenuItem>
+                <MenuItem value="ETH">ETH</MenuItem>
+              </TextField>
+              <Button
+                size="small"
+                variant="outlined"
+                onClick={handleGetBinanceDepositAddress}
+                disabled={subAccountLoading}
+                startIcon={
+                  subAccountLoading ? <CircularProgress size={14} /> : undefined
+                }
+              >
+                Get Deposit Address
+              </Button>
+            </Stack>
+            {subAccountResult && (
+              <Alert
+                severity={subAccountResult.error ? "error" : "success"}
+                onClose={() => setSubAccountResult(null)}
+                sx={{ mt: 1 }}
+              >
+                {subAccountResult.error ??
+                  `${subAccountResult.coin} (${subAccountResult.network}) deposit address: ${subAccountResult.address}${
+                    subAccountResult.tag ? ` · tag ${subAccountResult.tag}` : ""
+                  }`}
+              </Alert>
+            )}
           </Box>
           <Stack direction="row" spacing={2}>
             <Button
@@ -795,6 +875,46 @@ export default function InvoiceDetailPage() {
                   {invoice.status === "OVERDUE" && (
                     <Alert severity="error" sx={{ my: 1 }}>
                       Invoice is overdue
+                    </Alert>
+                  )}
+
+                  {/* Binance overpayment: what was received, for accounts to record */}
+                  {invoice.binanceReceivedAmount != null && (
+                    <Alert
+                      severity={
+                        invoice.status === "PROCESSING" ? "warning" : "info"
+                      }
+                      sx={{ my: 1 }}
+                    >
+                      <strong>
+                        Binance received{" "}
+                        {Number(invoice.binanceReceivedAmount).toFixed(2)} USDT
+                      </strong>
+                      {invoice.binanceReceivedAt && (
+                        <>
+                          {" "}
+                          on{" "}
+                          <DateDisplay
+                            date={invoice.binanceReceivedAt}
+                            format="datetime"
+                          />
+                        </>
+                      )}
+                      {invoice.status === "PROCESSING" && (
+                        <>
+                          {" "}
+                          - more than the invoice total plus tolerance. Record
+                          the payment to mark it paid.
+                        </>
+                      )}
+                      {invoice.binanceTxId && (
+                        <Box
+                          component="span"
+                          sx={{ display: "block", fontSize: 12, mt: 0.5 }}
+                        >
+                          Deposit ID: {invoice.binanceTxId}
+                        </Box>
+                      )}
                     </Alert>
                   )}
 

@@ -933,6 +933,61 @@ export const sendInvoicePaymentReceivedEmail = async (
   }
 };
 
+/**
+ * Tells the accounts team (invoices inbox, cc admin) that a Binance deposit
+ * was over the invoice total + tolerance. The invoice was set to PROCESSING
+ * with no payment recorded: accounts marks it paid and adds the payment.
+ */
+export const sendBinanceOverpaymentEmail = async (details: {
+  invoiceNumber: string;
+  customerName: string | null;
+  customerEmail: string;
+  invoiceTotal: string;
+  amountPaid: string;
+  coin: string;
+  network: string;
+  binanceTxId: string;
+  onChainTxId: string;
+  receivedAt: Date;
+}) => {
+  const customer = details.customerName
+    ? `${details.customerName} (${details.customerEmail})`
+    : details.customerEmail;
+  const row = (label: string, value: string) =>
+    `<tr><td style="padding: 4px 12px 4px 0;"><strong>${label}</strong></td><td style="padding: 4px 0;">${escapeHtml(value)}</td></tr>`;
+
+  const mailOptions = {
+    from:
+      `BitFactory Admin <${process.env.SMTP_FROM}>` || "noreply@bitfactory.com",
+    to: CC_INVOICE_EMAIL,
+    cc: "admin@bitfactory.ae",
+    subject: `Binance overpayment - Invoice ${details.invoiceNumber} needs review`,
+    html: `
+      <h1>Binance overpayment needs review</h1>
+      <p>A Binance deposit for invoice <strong>${escapeHtml(details.invoiceNumber)}</strong> was more than the invoice total plus the overpayment tolerance, so it was not applied automatically.</p>
+      <p>The invoice is now <strong>Processing</strong>. No payment entry was recorded. Please mark it paid and add the payment manually.</p>
+      <table style="border-collapse: collapse;">
+        ${row("Customer", customer)}
+        ${row("Invoice", details.invoiceNumber)}
+        ${row("Invoice total", `${details.invoiceTotal} ${details.coin}`)}
+        ${row("Amount paid", `${details.amountPaid} ${details.coin}`)}
+        ${row("Network", details.network)}
+        ${row("Binance transaction ID", details.binanceTxId)}
+        ${row("On-chain transaction ID", details.onChainTxId)}
+        ${row("Received", details.receivedAt.toISOString())}
+      </table>
+    `,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    return { success: true };
+  } catch (error) {
+    console.error("Error sending Binance overpayment email:", error);
+    return { success: false, error };
+  }
+};
+
 export const sendInvoiceEmail = async (
   email: string,
   customerName: string,

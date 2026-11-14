@@ -8,10 +8,15 @@ export interface InvoiceListSummary {
   totalOutstanding: number;
 }
 
-/** Sent to the customer and not yet settled. */
+/**
+ * Sent to the customer and not yet settled. PROCESSING (a Binance
+ * overpayment waiting on accounts) has no payment recorded yet, so it is
+ * still owed until accounts records the payment and marks it PAID.
+ */
 const UNPAID_STATUSES: InvoiceStatus[] = [
   InvoiceStatus.ISSUED,
   InvoiceStatus.OVERDUE,
+  InvoiceStatus.PROCESSING,
 ];
 
 /**
@@ -19,7 +24,7 @@ const UNPAID_STATUSES: InvoiceStatus[] = [
  * so the two can never disagree. Drafts, cancelled, refunded and paid
  * invoices are not owed. Overdue: marked OVERDUE, or ISSUED with a due date
  * before today in the viewer's tz (the day the table's "Days Until Due"
- * counts from). Outstanding subtracts partial payments (voided ones don't
+ * counts from). PROCESSING is never overdue: the customer has paid. Outstanding subtracts partial payments (voided ones don't
  * count), never below zero per invoice.
  */
 export async function computeInvoiceSummary(
@@ -40,7 +45,10 @@ export async function computeInvoiceSummary(
           {
             OR: [
               { status: InvoiceStatus.OVERDUE },
-              { dueDate: { lt: todayStart } },
+              {
+                status: { not: InvoiceStatus.PROCESSING },
+                dueDate: { lt: todayStart },
+              },
             ],
           },
         ],
