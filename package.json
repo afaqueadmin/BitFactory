@@ -31,7 +31,7 @@
     "@binance/pay": "^7.0.5",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
-    "@faker-js/faker": "^10.2.0",
+    "@faker-js/faker": "10.5.0",
     "@mui/icons-material": "^7.3.2",
     "@mui/material": "^7.3.4",
     "@mui/material-nextjs": "^9.1.1",
@@ -44,7 +44,7 @@
     "@types/lru-cache": "^7.10.9",
     "@types/nodemailer": "^7.0.3",
     "@upstash/redis": "^1.35.5",
-    "axios": "^1.16.0",
+    "axios": "^1.20.0",
     "bitcoin-address-validation": "^3.0.0",
     "canvas-confetti": "^1.9.3",
     "cloudinary": "^2.8.0",
@@ -52,8 +52,8 @@
     "html-to-pdf": "^0.1.11",
     "jose": "^6.1.0",
     "lru-cache": "^11.2.2",
-    "next": "^16.2.6",
-    "next-auth": "^4.24.14",
+    "next": "^16.4.6",
+    "next-auth": "^4.24.15",
     "nodemailer": "^7.0.7",
     "pg": "^8.16.3",
     "prisma": "^6.16.2",
@@ -72,7 +72,7 @@
     "@types/bcrypt": "^6.0.0",
     "@types/canvas-confetti": "^1.9.0",
     "@types/next-auth": "^3.13.0",
-    "@types/node": "^20",
+    "@types/node": "^22",
     "@types/pg": "^8.15.5",
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19",
@@ -88,6 +88,6 @@
     "tailwindcss": "^4",
     "ts-node": "^10.9.2",
     "typescript": "^5",
-    "vitest": "^4.1.10"
+    "vitest": "^5.1.0"
   }
 }
