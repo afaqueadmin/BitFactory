@@ -1610,6 +1610,11 @@ model Invoice {
   // customer opened the pay modal (only transfers after it can match).
   binanceTxId              String?               @unique
   binanceCheckoutStartedAt DateTime?
+  // Set when a Binance deposit over the total + tolerance moves the invoice
+  // to PROCESSING: what was actually received and when. Accounts records the
+  // payment by hand from these; they are not a payment themselves.
+  binanceReceivedAmount    Decimal?              @db.Decimal(18, 8)
+  binanceReceivedAt        DateTime?
   // HARDWARE_REPAIR invoices: the one miner being repaired, and a flat
   // discount taken off the line-item subtotal (totalAmount is after it).
   // Other invoice types leave minerId null and discountAmount 0.
