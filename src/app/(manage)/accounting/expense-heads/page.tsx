@@ -4,7 +4,11 @@ import {
   Alert,
   Box,
   Button,
+  FormControl,
+  InputLabel,
+  MenuItem,
   Paper,
+  Select,
   Stack,
   Table,
   TableBody,
@@ -20,10 +24,17 @@ import { useState } from "react";
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
 import {
   SortHeader,
-  SortValue,
-  sortRows,
   useTableSort,
 } from "@/components/accounting/common/SortableHeader";
+import { ExportButtons } from "@/components/accounting/bankStatement/StatementParts";
+import {
+  HEAD_DEFAULT_SORT,
+  HeadSortKey,
+  HeadStatusFilter,
+  headListQuery,
+  headListRows,
+} from "@/lib/accounting/expenseLists";
+import { downloadExport } from "@/lib/downloadExport";
 import { StatusBadge } from "@/components/accounting/common/StatusBadge";
 import {
   ConfirmDeleteDialog,
@@ -39,8 +50,6 @@ import {
   useDaylightAdminSx,
 } from "@/components/daylight/AdminPage";
 
-type HeadSortKey = "name" | "expenses" | "due" | "paid" | "status";
-
 const numSx = {
   whiteSpace: "nowrap",
   fontVariantNumeric: "tabular-nums",
@@ -51,21 +60,35 @@ export default function ExpenseHeadsPage() {
   const { data = [], isLoading, error } = useExpenseHeads();
   const editor = useRecordEditor<ExpenseHead>("expense-heads");
   const [name, setName] = useState("");
-  const sort = useTableSort<HeadSortKey>("name");
-  const rows = sortRows(data, sort, (h, key): SortValue => {
-    switch (key) {
-      case "name":
-        return h.name;
-      case "expenses":
-        return h._count.expenses;
-      case "due":
-        return Number(h.amountDueUsd ?? 0);
-      case "paid":
-        return Number(h.amountPaidUsd ?? 0);
-      case "status":
-        return h.isActive ? 0 : 1;
+  const [statusFilter, setStatusFilter] = useState<HeadStatusFilter>("");
+  const sort = useTableSort<HeadSortKey>(
+    HEAD_DEFAULT_SORT.key,
+    HEAD_DEFAULT_SORT.dir,
+  );
+  // The export gets the same filter and sort, so it holds exactly these rows.
+  const rows = headListRows(data, statusFilter, sort);
+
+  const [exporting, setExporting] = useState<"csv" | "pdf" | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const handleExport = async (format: "csv" | "pdf") => {
+    try {
+      setExporting(format);
+      setExportError(null);
+      const query = headListQuery(statusFilter, sort);
+      query.set("format", format);
+      query.set("tz", Intl.DateTimeFormat().resolvedOptions().timeZone);
+      await downloadExport(
+        `/api/accounting/expense-heads/export?${query.toString()}`,
+        `expense-heads-${new Date().toLocaleDateString("en-CA")}.${format}`,
+      );
+    } catch (err) {
+      setExportError(
+        err instanceof Error ? err.message : "Failed to download export",
+      );
+    } finally {
+      setExporting(null);
     }
-  });
+  };
 
   const openForm = (head: ExpenseHead | "new") => {
     setName(head === "new" ? "" : head.name);
@@ -85,16 +108,53 @@ export default function ExpenseHeadsPage() {
         </Typography>
       </Box>
       <Paper elevation={0} sx={{ ...ds.listCardSx, p: { xs: 2, sm: 3 } }}>
-        <Stack direction="row" justifyContent="flex-end" sx={{ mb: 2 }}>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => openForm("new")}
-            sx={ds.primaryBtnSx}
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          justifyContent="space-between"
+          spacing={2}
+          sx={{ mb: 2 }}
+        >
+          <FormControl size="small" sx={{ minWidth: 170 }}>
+            <InputLabel>Status</InputLabel>
+            <Select
+              label="Status"
+              value={statusFilter}
+              onChange={(e) =>
+                setStatusFilter(e.target.value as HeadStatusFilter)
+              }
+            >
+              <MenuItem value="">All</MenuItem>
+              <MenuItem value="active">Active</MenuItem>
+              <MenuItem value="inactive">Inactive</MenuItem>
+            </Select>
+          </FormControl>
+          <Stack
+            direction="row"
+            spacing={1}
+            alignItems="flex-start"
+            flexWrap="wrap"
+            useFlexGap
           >
-            Add head
-          </Button>
+            <ExportButtons
+              disabled={isLoading || !!error}
+              exporting={exporting}
+              onExport={handleExport}
+            />
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => openForm("new")}
+              sx={ds.primaryBtnSx}
+            >
+              Add head
+            </Button>
+          </Stack>
         </Stack>
+        {exportError && (
+          <Alert severity="error" sx={{ mb: 2, ...ds.alertSx("error") }}>
+            {exportError}
+          </Alert>
+        )}
         {editor.pageError && (
           <Alert severity="error" sx={{ mb: 2, ...ds.alertSx("error") }}>
             {editor.pageError}
@@ -131,7 +191,7 @@ export default function ExpenseHeadsPage() {
               <TableState
                 loading={isLoading}
                 error={error}
-                empty={data.length === 0}
+                empty={rows.length === 0}
                 colSpan={6}
               />
               {rows.map((head) => (

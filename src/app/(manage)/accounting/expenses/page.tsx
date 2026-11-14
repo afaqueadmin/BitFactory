@@ -52,10 +52,16 @@ import { DateDisplay } from "@/components/accounting/common/DateDisplay";
 import { formatCurrencyAmount } from "@/components/accounting/common/PaymentAccountFields";
 import {
   SortHeader,
-  SortValue,
-  sortRows,
   useTableSort,
 } from "@/components/accounting/common/SortableHeader";
+import { ExportButtons } from "@/components/accounting/bankStatement/StatementParts";
+import {
+  EXPENSE_DEFAULT_SORT,
+  ExpenseSortKey,
+  expenseListQuery,
+  expenseListRows,
+} from "@/lib/accounting/expenseLists";
+import { downloadExport } from "@/lib/downloadExport";
 import { TableState } from "@/components/accounting/masterData/MasterDataTable";
 import { ExpenseDialog } from "@/components/accounting/expenses/ExpenseDialog";
 import { ExpensePaymentDialog } from "@/components/accounting/expenses/ExpensePaymentDialog";
@@ -82,15 +88,6 @@ const STATUS: Record<ExpenseStatus, { label: string; tone: DaylightTone }> = {
   PARTIAL: { label: "Partially paid", tone: "warning" },
   PAID: { label: "Paid", tone: "success" },
 };
-
-const STATUS_ORDER: Record<ExpenseStatus, number> = {
-  PENDING: 0,
-  PARTIAL: 1,
-  PAID: 2,
-};
-
-type ExpenseSortKey =
-  "date" | "head" | "narration" | "due" | "paid" | "balance" | "status";
 
 const day = (d: string) => <DateDisplay date={`${d}T12:00:00.000Z`} />;
 const statementHref = (bankId: string) =>
@@ -226,36 +223,36 @@ function ExpensesTab({ focusId }: { focusId: string | null }) {
       ?.scrollIntoView({ block: "center" });
   }, [focusId, isLoading]);
 
-  // Newest first by default, as the list comes from the API.
-  const sort = useTableSort<ExpenseSortKey>("date", "desc");
-  const rows = sortRows(
-    data.filter(
-      (e) =>
-        (!headFilter || e.head.id === headFilter) &&
-        (!statusFilter || e.status === statusFilter) &&
-        (!from || e.date >= from) &&
-        (!to || e.date <= to),
-    ),
-    sort,
-    (e, key): SortValue => {
-      switch (key) {
-        case "date":
-          return e.date;
-        case "head":
-          return e.head.name;
-        case "narration":
-          return e.narration;
-        case "due":
-          return Number(e.amountDueUsd);
-        case "paid":
-          return Number(e.paidUsd);
-        case "balance":
-          return Number(e.balanceUsd);
-        case "status":
-          return STATUS_ORDER[e.status];
-      }
-    },
+  // Newest first by default, as the list comes from the API. The export
+  // gets the same filter and sort, so it holds exactly these rows.
+  const sort = useTableSort<ExpenseSortKey>(
+    EXPENSE_DEFAULT_SORT.key,
+    EXPENSE_DEFAULT_SORT.dir,
   );
+  const filter = { headId: headFilter, status: statusFilter, from, to };
+  const rows = expenseListRows(data, filter, sort);
+
+  const [exporting, setExporting] = useState<"csv" | "pdf" | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const handleExport = async (format: "csv" | "pdf") => {
+    try {
+      setExporting(format);
+      setExportError(null);
+      const query = expenseListQuery(filter, sort);
+      query.set("format", format);
+      query.set("tz", Intl.DateTimeFormat().resolvedOptions().timeZone);
+      await downloadExport(
+        `/api/accounting/expenses/export?${query.toString()}`,
+        `expenses-${new Date().toLocaleDateString("en-CA")}.${format}`,
+      );
+    } catch (err) {
+      setExportError(
+        err instanceof Error ? err.message : "Failed to download export",
+      );
+    } finally {
+      setExporting(null);
+    }
+  };
   const total = (key: "amountDueUsd" | "paidUsd" | "balanceUsd") =>
     rows.reduce((s, e) => s + Number(e[key]), 0);
 
@@ -357,7 +354,18 @@ function ExpensesTab({ focusId }: { focusId: string | null }) {
             slotProps={{ inputLabel: { shrink: true } }}
           />
         </Stack>
-        <Box>
+        <Stack
+          direction="row"
+          spacing={1}
+          alignItems="flex-start"
+          flexWrap="wrap"
+          useFlexGap
+        >
+          <ExportButtons
+            disabled={isLoading || !!error}
+            exporting={exporting}
+            onExport={handleExport}
+          />
           <Button
             variant="contained"
             startIcon={<AddIcon />}
@@ -366,8 +374,13 @@ function ExpensesTab({ focusId }: { focusId: string | null }) {
           >
             Add expense
           </Button>
-        </Box>
+        </Stack>
       </Stack>
+      {exportError && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {exportError}
+        </Alert>
+      )}
 
       <TableContainer component={Paper} variant="outlined">
         <Table size="small">

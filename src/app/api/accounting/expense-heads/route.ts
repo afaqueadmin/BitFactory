@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { AuditAction } from "@prisma/client";
-import { Decimal } from "@prisma/client/runtime/library";
 import { prisma } from "@/lib/prisma";
 import {
   isUniqueViolation,
@@ -8,6 +7,7 @@ import {
 } from "@/lib/accounting/adminAuth";
 import { MAX_MASTER_NAME_LENGTH as MAX_NAME_LENGTH } from "@/lib/accounting/masterData";
 import { headCountInclude } from "@/lib/accounting/expenseRequest";
+import { headsWithTotals } from "./shared";
 
 /** Expense heads (?active=true: only active ones, for the Add expense form). */
 export async function GET(request: NextRequest) {
@@ -17,45 +17,16 @@ export async function GET(request: NextRequest) {
 
     const activeOnly =
       new URL(request.url).searchParams.get("active") === "true";
-    const heads = await prisma.accountingExpenseHead.findMany({
-      where: activeOnly ? { isActive: true } : undefined,
-      include: headCountInclude,
-      orderBy: { name: "asc" },
-    });
-    if (activeOnly) return NextResponse.json({ success: true, data: heads });
-
-    // Full list (Expense Heads page): Amount due = Σ the head's expenses'
-    // Amount Due; Amount paid = Σ their payments' USD (fees not included).
-    const [expenses, paid] = await Promise.all([
-      prisma.accountingExpense.findMany({
-        select: { id: true, headId: true, amountDueUsd: true },
-      }),
-      prisma.accountingExpensePayment.groupBy({
-        by: ["expenseId"],
-        _sum: { amountUsd: true },
-      }),
-    ]);
-    const paidByExpense = new Map(
-      paid.map((p) => [p.expenseId, p._sum.amountUsd ?? new Decimal(0)]),
-    );
-    const totals = new Map<string, { due: Decimal; paid: Decimal }>();
-    for (const e of expenses) {
-      const t = totals.get(e.headId) ?? {
-        due: new Decimal(0),
-        paid: new Decimal(0),
-      };
-      t.due = t.due.plus(e.amountDueUsd);
-      t.paid = t.paid.plus(paidByExpense.get(e.id) ?? 0);
-      totals.set(e.headId, t);
+    if (activeOnly) {
+      const heads = await prisma.accountingExpenseHead.findMany({
+        where: { isActive: true },
+        include: headCountInclude,
+        orderBy: { name: "asc" },
+      });
+      return NextResponse.json({ success: true, data: heads });
     }
-    return NextResponse.json({
-      success: true,
-      data: heads.map((h) => ({
-        ...h,
-        amountDueUsd: (totals.get(h.id)?.due ?? new Decimal(0)).toFixed(2),
-        amountPaidUsd: (totals.get(h.id)?.paid ?? new Decimal(0)).toFixed(2),
-      })),
-    });
+    // Full list (Expense Heads page), with Amount due / Amount paid.
+    return NextResponse.json({ success: true, data: await headsWithTotals() });
   } catch (error) {
     console.error("Error fetching expense heads:", error);
     return NextResponse.json(

@@ -8,13 +8,12 @@
 
 import { TableCell, TableSortLabel } from "@mui/material";
 import { useState } from "react";
+import { SortDir, SortState } from "@/lib/sortRows";
 
-export type SortDir = "asc" | "desc";
+export { sortRows } from "@/lib/sortRows";
+export type { SortDir, SortValue } from "@/lib/sortRows";
 
-export interface TableSort<K extends string> {
-  /** null = the order the rows came in. */
-  key: K | null;
-  dir: SortDir;
+export interface TableSort<K extends string> extends SortState<K> {
   request: (key: K) => void;
 }
 
@@ -35,41 +34,6 @@ export function useTableSort<K extends string>(
           : { key, dir: "asc" },
       ),
   };
-}
-
-export type SortValue = string | number | null | undefined;
-
-/**
- * Rows sorted by `value(row, key)`. Numbers compare as numbers, text
- * ignoring case; empty values (null / "") always go last. Ties keep the
- * incoming order. No key = rows unchanged.
- */
-export function sortRows<T, K extends string>(
-  rows: T[],
-  sort: Pick<TableSort<K>, "key" | "dir">,
-  value: (row: T, key: K) => SortValue,
-): T[] {
-  const key = sort.key;
-  if (!key) return rows;
-  const sign = sort.dir === "asc" ? 1 : -1;
-  return rows
-    .map((row, i) => ({ row, i, v: value(row, key) }))
-    .sort((a, b) => {
-      const aEmpty = a.v === null || a.v === undefined || a.v === "";
-      const bEmpty = b.v === null || b.v === undefined || b.v === "";
-      if (aEmpty || bEmpty) {
-        return aEmpty && bEmpty ? a.i - b.i : aEmpty ? 1 : -1;
-      }
-      const c =
-        typeof a.v === "number" && typeof b.v === "number"
-          ? a.v - b.v
-          : String(a.v).localeCompare(String(b.v), undefined, {
-              sensitivity: "base",
-              numeric: true,
-            });
-      return c * sign || a.i - b.i;
-    })
-    .map((x) => x.row);
 }
 
 /** A header cell that sorts its table by `sortKey`. */
