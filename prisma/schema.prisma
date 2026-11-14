@@ -126,6 +126,9 @@ model User {
   expenseHeadsCreated                     AccountingExpenseHead[]         @relation("expenseHeadsCreated")
   expensesCreated                         AccountingExpense[]             @relation("expensesCreated")
   expensePaymentsCreated                  AccountingExpensePayment[]      @relation("expensePaymentsCreated")
+  binanceSubaccounts                      BinanceSubaccount[]             @relation("binanceSubaccounts")
+  binanceSubaccountsCreated               BinanceSubaccount[]             @relation("binanceSubaccountsCreated")
+  binanceSubaccountsUpdated               BinanceSubaccount[]             @relation("binanceSubaccountsUpdated")
   simulatedCostPayments                   SimulatedCostPayment[]          @relation("simulatedCostPayments")
   simulatedCostPaymentsCreated            SimulatedCostPayment[]          @relation("simulatedCostPaymentsCreated")
   walletPaymentEmails                     WalletPaymentEmail[]
@@ -3050,4 +3053,28 @@ enum TicketStatus {
   WAITING_ON_CUSTOMER
   RESOLVED
   CLOSED
+}
+
+/// A customer's Binance (virtual) sub-account and its deposit addresses for
+/// one coin, on TRON (TRC20) and Ethereum (ERC20).
+model BinanceSubaccount {
+  id                     String   @id @default(cuid())
+  userId                 String
+  binanceSubaccountEmail String
+  coin                   String   @default("USDT")
+  TRXAddress             String?
+  ETHAddress             String?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+  createdBy              String
+  updatedBy              String?
+  user                   User     @relation("binanceSubaccounts", fields: [userId], references: [id])
+  createdByUser          User     @relation("binanceSubaccountsCreated", fields: [createdBy], references: [id])
+  updatedByUser          User?    @relation("binanceSubaccountsUpdated", fields: [updatedBy], references: [id])
+
+  @@unique([binanceSubaccountEmail, coin])
+  @@index([userId])
+  @@index([createdBy])
+  @@index([updatedBy])
+  @@map("binance_subaccounts")
 }
