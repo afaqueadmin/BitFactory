@@ -10,6 +10,7 @@ import {
   formatTableDate,
   utcDayStart,
 } from "@/lib/helpers/admin/tableExport";
+import { transactionsAgainst } from "@/lib/accounting/bankStatementRows";
 import { loadConsolidatedStatement } from "../shared";
 
 // The single-bank export's columns with Bank and Entity after the date.
@@ -18,10 +19,9 @@ const COLUMNS = [
   { header: "Payment Date", nowrap: true },
   { header: "Bank" },
   { header: "Entity" },
-  { header: "Invoice #" },
-  { header: "Invoice Type" },
-  { header: "Vendor / Customer" },
-  { header: "Invoice Amount (USD)", align: "right" as const, nowrap: true },
+  { header: "Transactions Against" },
+  { header: "Transaction To/From" },
+  { header: "Amount Due (USD)", align: "right" as const, nowrap: true },
   { header: "Debit (USD)", align: "right" as const, nowrap: true },
   { header: "Credit (USD)", align: "right" as const, nowrap: true },
   { header: "Original Amount", nowrap: true },
@@ -79,7 +79,7 @@ export async function GET(request: NextRequest) {
       label: string,
       when: string,
       value: typeof statement.openingBalanceUsd,
-    ) => [when, label, "", "", "", "", "", "", "", "", money(value), ""];
+    ) => [when, label, "", "", "", "", "", "", "", money(value), ""];
 
     const first = statement.rows[0]?.date;
     const last = statement.rows.at(-1)?.date;
@@ -93,8 +93,7 @@ export async function GET(request: NextRequest) {
           date(r.date),
           bank?.name ?? empty,
           bank?.entity.name ?? empty,
-          r.invoices.map((i) => i.number).join(", ") || empty,
-          r.invoiceType,
+          transactionsAgainst(r) || empty,
           r.counterparty.name,
           r.invoiceAmountUsd ? money(r.invoiceAmountUsd) : empty,
           r.side === "DEBIT" ? money(r.amountUsd) : empty,

@@ -53,6 +53,8 @@ export interface StatementRow {
   recordedAt: Date;
   invoices: StatementLink[];
   invoiceType: string;
+  /** Link for the type when the row has no invoice (e.g. "Expense"). */
+  typeHref?: string | null;
   counterparty: { name: string; href: string | null };
   /** Invoice total (sum of totals for a consolidated payment). */
   invoiceAmountUsd: Decimal | null;
@@ -217,6 +219,15 @@ export function splitNote({
   }
   return parts.join(" · ");
 }
+
+/**
+ * "Transactions Against" as one export cell: "1151, 1153 · Farm Tariff",
+ * or only the type when there is no invoice ("Expense", "Internal Transfer").
+ */
+export const transactionsAgainst = (
+  row: Pick<StatementRow, "invoices" | "invoiceType">,
+): string =>
+  joinNote(row.invoices.map((i) => i.number).join(", "), row.invoiceType);
 
 /** Joins the non-empty note parts with " · ". */
 export const joinNote = (...parts: (string | null | undefined)[]): string =>

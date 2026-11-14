@@ -4,7 +4,11 @@ import {
   Alert,
   Box,
   Button,
+  FormControl,
+  InputLabel,
+  MenuItem,
   Paper,
+  Select,
   Stack,
   Table,
   TableBody,
@@ -17,6 +21,20 @@ import {
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import { useState } from "react";
+import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
+import {
+  SortHeader,
+  useTableSort,
+} from "@/components/accounting/common/SortableHeader";
+import { ExportButtons } from "@/components/accounting/bankStatement/StatementParts";
+import {
+  HEAD_DEFAULT_SORT,
+  HeadSortKey,
+  HeadStatusFilter,
+  headListQuery,
+  headListRows,
+} from "@/lib/accounting/expenseLists";
+import { downloadExport } from "@/lib/downloadExport";
 import { StatusBadge } from "@/components/accounting/common/StatusBadge";
 import {
   ConfirmDeleteDialog,
@@ -32,11 +50,45 @@ import {
   useDaylightAdminSx,
 } from "@/components/daylight/AdminPage";
 
+const numSx = {
+  whiteSpace: "nowrap",
+  fontVariantNumeric: "tabular-nums",
+} as const;
+
 export default function ExpenseHeadsPage() {
   const ds = useDaylightAdminSx();
   const { data = [], isLoading, error } = useExpenseHeads();
   const editor = useRecordEditor<ExpenseHead>("expense-heads");
   const [name, setName] = useState("");
+  const [statusFilter, setStatusFilter] = useState<HeadStatusFilter>("");
+  const sort = useTableSort<HeadSortKey>(
+    HEAD_DEFAULT_SORT.key,
+    HEAD_DEFAULT_SORT.dir,
+  );
+  // The export gets the same filter and sort, so it holds exactly these rows.
+  const rows = headListRows(data, statusFilter, sort);
+
+  const [exporting, setExporting] = useState<"csv" | "pdf" | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const handleExport = async (format: "csv" | "pdf") => {
+    try {
+      setExporting(format);
+      setExportError(null);
+      const query = headListQuery(statusFilter, sort);
+      query.set("format", format);
+      query.set("tz", Intl.DateTimeFormat().resolvedOptions().timeZone);
+      await downloadExport(
+        `/api/accounting/expense-heads/export?${query.toString()}`,
+        `expense-heads-${new Date().toLocaleDateString("en-CA")}.${format}`,
+      );
+    } catch (err) {
+      setExportError(
+        err instanceof Error ? err.message : "Failed to download export",
+      );
+    } finally {
+      setExporting(null);
+    }
+  };
 
   const openForm = (head: ExpenseHead | "new") => {
     setName(head === "new" ? "" : head.name);
@@ -56,16 +108,53 @@ export default function ExpenseHeadsPage() {
         </Typography>
       </Box>
       <Paper elevation={0} sx={{ ...ds.listCardSx, p: { xs: 2, sm: 3 } }}>
-        <Stack direction="row" justifyContent="flex-end" sx={{ mb: 2 }}>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => openForm("new")}
-            sx={ds.primaryBtnSx}
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          justifyContent="space-between"
+          spacing={2}
+          sx={{ mb: 2 }}
+        >
+          <FormControl size="small" sx={{ minWidth: 170 }}>
+            <InputLabel>Status</InputLabel>
+            <Select
+              label="Status"
+              value={statusFilter}
+              onChange={(e) =>
+                setStatusFilter(e.target.value as HeadStatusFilter)
+              }
+            >
+              <MenuItem value="">All</MenuItem>
+              <MenuItem value="active">Active</MenuItem>
+              <MenuItem value="inactive">Inactive</MenuItem>
+            </Select>
+          </FormControl>
+          <Stack
+            direction="row"
+            spacing={1}
+            alignItems="flex-start"
+            flexWrap="wrap"
+            useFlexGap
           >
-            Add head
-          </Button>
+            <ExportButtons
+              disabled={isLoading || !!error}
+              exporting={exporting}
+              onExport={handleExport}
+            />
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => openForm("new")}
+              sx={ds.primaryBtnSx}
+            >
+              Add head
+            </Button>
+          </Stack>
         </Stack>
+        {exportError && (
+          <Alert severity="error" sx={{ mb: 2, ...ds.alertSx("error") }}>
+            {exportError}
+          </Alert>
+        )}
         {editor.pageError && (
           <Alert severity="error" sx={{ mb: 2, ...ds.alertSx("error") }}>
             {editor.pageError}
@@ -75,9 +164,26 @@ export default function ExpenseHeadsPage() {
           <Table size="small">
             <TableHead>
               <TableRow>
-                <TableCell>Name</TableCell>
-                <TableCell align="right">Expenses</TableCell>
-                <TableCell>Status</TableCell>
+                <SortHeader sort={sort} sortKey="name" label="Name" />
+                <SortHeader
+                  sort={sort}
+                  sortKey="expenses"
+                  label="Expenses"
+                  align="right"
+                />
+                <SortHeader
+                  sort={sort}
+                  sortKey="due"
+                  label="Amount due (USD)"
+                  align="right"
+                />
+                <SortHeader
+                  sort={sort}
+                  sortKey="paid"
+                  label="Amount paid (USD)"
+                  align="right"
+                />
+                <SortHeader sort={sort} sortKey="status" label="Status" />
                 <TableCell align="right">Actions</TableCell>
               </TableRow>
             </TableHead>
@@ -85,16 +191,22 @@ export default function ExpenseHeadsPage() {
               <TableState
                 loading={isLoading}
                 error={error}
-                empty={data.length === 0}
-                colSpan={4}
+                empty={rows.length === 0}
+                colSpan={6}
               />
-              {data.map((head) => (
+              {rows.map((head) => (
                 <TableRow
                   key={head.id}
                   sx={head.isActive ? undefined : inactiveRowSx}
                 >
                   <TableCell>{head.name}</TableCell>
                   <TableCell align="right">{head._count.expenses}</TableCell>
+                  <TableCell align="right" sx={numSx}>
+                    <CurrencyDisplay value={head.amountDueUsd ?? 0} />
+                  </TableCell>
+                  <TableCell align="right" sx={numSx}>
+                    <CurrencyDisplay value={head.amountPaidUsd ?? 0} />
+                  </TableCell>
                   <TableCell>
                     <StatusBadge
                       status={head.isActive ? "Active" : "Inactive"}

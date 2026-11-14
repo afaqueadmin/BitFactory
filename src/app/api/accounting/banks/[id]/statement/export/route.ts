@@ -10,16 +10,16 @@ import {
   formatTableDate,
   utcDayStart,
 } from "@/lib/helpers/admin/tableExport";
+import { transactionsAgainst } from "@/lib/accounting/bankStatementRows";
 import { loadBankStatement } from "../shared";
 
-// Same columns as the statement page, with Debit and Credit split so the
-// CSV sums in a spreadsheet.
+// Same columns as the statement page, with Debit and Credit split (in place
+// of Transaction Type / Amount Paid) so the CSV sums in a spreadsheet.
 const COLUMNS = [
   { header: "Payment Date", nowrap: true },
-  { header: "Invoice #" },
-  { header: "Invoice Type" },
-  { header: "Vendor / Customer" },
-  { header: "Invoice Amount (USD)", align: "right" as const, nowrap: true },
+  { header: "Transactions Against" },
+  { header: "Transaction To/From" },
+  { header: "Amount Due (USD)", align: "right" as const, nowrap: true },
   { header: "Debit (USD)", align: "right" as const, nowrap: true },
   { header: "Credit (USD)", align: "right" as const, nowrap: true },
   { header: "Original Amount", nowrap: true },
@@ -72,7 +72,7 @@ export async function GET(
       label: string,
       when: string,
       value: typeof statement.openingBalanceUsd,
-    ) => [when, label, "", "", "", "", "", "", money(value), ""];
+    ) => [when, label, "", "", "", "", "", money(value), ""];
 
     const first = statement.rows[0]?.date;
     const last = statement.rows.at(-1)?.date;
@@ -82,8 +82,7 @@ export async function GET(
       balanceRow("Opening balance", openingDate, statement.openingBalanceUsd),
       ...statement.rows.map((r) => [
         date(r.date),
-        r.invoices.map((i) => i.number).join(", ") || empty,
-        r.invoiceType,
+        transactionsAgainst(r) || empty,
         r.counterparty.name,
         r.invoiceAmountUsd ? money(r.invoiceAmountUsd) : empty,
         r.side === "DEBIT" ? money(r.amountUsd) : empty,

@@ -50,6 +50,18 @@ import { Fragment, Suspense, useEffect, useState } from "react";
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
 import { DateDisplay } from "@/components/accounting/common/DateDisplay";
 import { formatCurrencyAmount } from "@/components/accounting/common/PaymentAccountFields";
+import {
+  SortHeader,
+  useTableSort,
+} from "@/components/accounting/common/SortableHeader";
+import { ExportButtons } from "@/components/accounting/bankStatement/StatementParts";
+import {
+  EXPENSE_DEFAULT_SORT,
+  ExpenseSortKey,
+  expenseListQuery,
+  expenseListRows,
+} from "@/lib/accounting/expenseLists";
+import { downloadExport } from "@/lib/downloadExport";
 import { TableState } from "@/components/accounting/masterData/MasterDataTable";
 import { ExpenseDialog } from "@/components/accounting/expenses/ExpenseDialog";
 import { ExpensePaymentDialog } from "@/components/accounting/expenses/ExpensePaymentDialog";
@@ -211,13 +223,36 @@ function ExpensesTab({ focusId }: { focusId: string | null }) {
       ?.scrollIntoView({ block: "center" });
   }, [focusId, isLoading]);
 
-  const rows = data.filter(
-    (e) =>
-      (!headFilter || e.head.id === headFilter) &&
-      (!statusFilter || e.status === statusFilter) &&
-      (!from || e.date >= from) &&
-      (!to || e.date <= to),
+  // Newest first by default, as the list comes from the API. The export
+  // gets the same filter and sort, so it holds exactly these rows.
+  const sort = useTableSort<ExpenseSortKey>(
+    EXPENSE_DEFAULT_SORT.key,
+    EXPENSE_DEFAULT_SORT.dir,
   );
+  const filter = { headId: headFilter, status: statusFilter, from, to };
+  const rows = expenseListRows(data, filter, sort);
+
+  const [exporting, setExporting] = useState<"csv" | "pdf" | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const handleExport = async (format: "csv" | "pdf") => {
+    try {
+      setExporting(format);
+      setExportError(null);
+      const query = expenseListQuery(filter, sort);
+      query.set("format", format);
+      query.set("tz", Intl.DateTimeFormat().resolvedOptions().timeZone);
+      await downloadExport(
+        `/api/accounting/expenses/export?${query.toString()}`,
+        `expenses-${new Date().toLocaleDateString("en-CA")}.${format}`,
+      );
+    } catch (err) {
+      setExportError(
+        err instanceof Error ? err.message : "Failed to download export",
+      );
+    } finally {
+      setExporting(null);
+    }
+  };
   const total = (key: "amountDueUsd" | "paidUsd" | "balanceUsd") =>
     rows.reduce((s, e) => s + Number(e[key]), 0);
 
@@ -319,7 +354,18 @@ function ExpensesTab({ focusId }: { focusId: string | null }) {
             slotProps={{ inputLabel: { shrink: true } }}
           />
         </Stack>
-        <Box>
+        <Stack
+          direction="row"
+          spacing={1}
+          alignItems="flex-start"
+          flexWrap="wrap"
+          useFlexGap
+        >
+          <ExportButtons
+            disabled={isLoading || !!error}
+            exporting={exporting}
+            onExport={handleExport}
+          />
           <Button
             variant="contained"
             startIcon={<AddIcon />}
@@ -328,22 +374,42 @@ function ExpensesTab({ focusId }: { focusId: string | null }) {
           >
             Add expense
           </Button>
-        </Box>
+        </Stack>
       </Stack>
+      {exportError && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {exportError}
+        </Alert>
+      )}
 
       <TableContainer component={Paper} variant="outlined">
         <Table size="small">
           <TableHead>
             <TableRow>
               <TableCell padding="checkbox" />
-              <TableCell>Date</TableCell>
-              <TableCell>Head</TableCell>
-              <TableCell>Narration</TableCell>
-              <TableCell align="right">Amount Due (USD)</TableCell>
-              <TableCell align="right">Amount Paid (USD)</TableCell>
-              <TableCell align="right">Balance (USD)</TableCell>
+              <SortHeader sort={sort} sortKey="date" label="Date" />
+              <SortHeader sort={sort} sortKey="head" label="Head" />
+              <SortHeader sort={sort} sortKey="narration" label="Narration" />
+              <SortHeader
+                sort={sort}
+                sortKey="due"
+                label="Amount Due (USD)"
+                align="right"
+              />
+              <SortHeader
+                sort={sort}
+                sortKey="paid"
+                label="Amount Paid (USD)"
+                align="right"
+              />
+              <SortHeader
+                sort={sort}
+                sortKey="balance"
+                label="Balance (USD)"
+                align="right"
+              />
               <TableCell>Entity / Bank</TableCell>
-              <TableCell>Status</TableCell>
+              <SortHeader sort={sort} sortKey="status" label="Status" />
               <TableCell align="right">Actions</TableCell>
             </TableRow>
           </TableHead>

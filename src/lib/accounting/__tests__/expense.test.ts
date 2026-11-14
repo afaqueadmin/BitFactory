@@ -4,13 +4,16 @@ import {
   buildExpenseReport,
   checkAmountDue,
   checkDueCoversPaid,
+  checkExpenseDate,
   checkNotOverpaid,
+  checkPaymentDate,
+  todayIn,
   ExpensePaymentForRows,
   expensePaymentAmounts,
   expenseStatementRows,
   expenseStatus,
 } from "../expense";
-import { buildStatement } from "../bankStatementRows";
+import { buildStatement, transactionsAgainst } from "../bankStatementRows";
 
 const D = (v: number | string) => new Decimal(v);
 const TZ = "UTC";
@@ -138,14 +141,25 @@ describe("expenseStatementRows", () => {
     expect(
       rows.map((r) => [r.id, r.invoiceType, r.side, r.amountUsd.toFixed(2)]),
     ).toEqual([
-      ["ep_p1_a", "Expense · Fuel", "CREDIT", "100.00"],
+      ["ep_p1_a", "Expense", "CREDIT", "100.00"],
       ["ep_p1_f", "Expense Fee", "CREDIT", "5.00"],
     ]);
     expect(rows[0].source).toBe("EXPENSE");
-    expect(rows[0].counterparty).toEqual({
-      name: "Fuel",
-      href: "/accounting/expenses?expense=e1",
-    });
+    expect(rows[0].counterparty).toEqual({ name: "Fuel", href: null });
+    expect(rows.map((r) => r.typeHref)).toEqual([
+      "/accounting/expenses?expense=e1",
+      "/accounting/expenses?expense=e1",
+    ]);
+    expect(transactionsAgainst(rows[0])).toBe("Expense");
+    expect(
+      transactionsAgainst({
+        invoices: [
+          { number: "1151", href: "" },
+          { number: "1153", href: "" },
+        ],
+        invoiceType: "Farm Tariff",
+      }),
+    ).toBe("1151, 1153 · Farm Tariff");
     expect(rows[0].original).toBe("367.25 AED @ 3.6725");
     expect(rows[0].partial).toBe(true);
     expect(rows[0].note).toBe("Generator diesel · ref 42");
@@ -228,5 +242,43 @@ describe("buildExpenseReport", () => {
     expect(r.totals["2026-11"].dueUsd.toFixed(2)).toBe("1200.00");
     expect(r.grandTotal.balanceUsd.toFixed(2)).toBe("800.00");
     expect(r.grandTotal.feesUsd.toFixed(2)).toBe("5.00");
+  });
+});
+
+describe("expense date rules", () => {
+  const rule = (paymentDate: string) =>
+    checkPaymentDate({
+      paymentDate,
+      expenseDate: "2026-11-10",
+      today: "2026-11-14",
+    });
+
+  it("a payment is dated from the expense date to today", () => {
+    expect(rule("2026-11-10")).toBeNull();
+    expect(rule("2026-11-14")).toBeNull();
+    expect(rule("2026-11-09")).toBe(
+      "Payment date can't be before the expense date (Nov 10, 2026)",
+    );
+    expect(rule("2026-11-15")).toBe("Payment date can't be in the future");
+  });
+
+  it("an expense date can't move after its first payment", () => {
+    const check = (expenseDate: string, first: string | null) =>
+      checkExpenseDate({ expenseDate, firstPaymentDate: first });
+    expect(check("2026-11-12", "2026-11-12")).toBeNull();
+    expect(check("2026-11-01", "2026-11-12")).toBeNull();
+    expect(check("2026-12-01", null)).toBeNull();
+    expect(check("2026-11-13", "2026-11-12")).toBe(
+      "Date can't be after the first payment (Nov 12, 2026)",
+    );
+  });
+
+  it("today follows the browser's time zone", () => {
+    // 21:00 UTC on Nov 14 is already Nov 15 in Karachi (UTC+5).
+    const now = new Date("2026-11-14T21:00:00Z");
+    expect(todayIn("Asia/Karachi", now)).toBe("2026-11-15");
+    expect(todayIn("UTC", now)).toBe("2026-11-14");
+    expect(todayIn(undefined, now)).toBe("2026-11-14");
+    expect(todayIn("Not/AZone", now)).toBe("2026-11-14");
   });
 });

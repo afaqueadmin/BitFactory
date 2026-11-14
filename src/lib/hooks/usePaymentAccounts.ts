@@ -50,6 +50,8 @@ export interface BankStatementRow {
   date: string;
   invoices: { number: string; href: string }[];
   invoiceType: string;
+  /** Link for the type when there is no invoice (expense rows). */
+  typeHref: string | null;
   counterparty: { name: string; href: string | null };
   invoiceAmountUsd: string | null;
   side: "DEBIT" | "CREDIT";
@@ -119,6 +121,10 @@ export interface ExpenseHead {
   createdAt: string;
   updatedAt: string;
   _count: { expenses: number };
+  /** USD, 2 dp. Only on the full list (not with activeOnly). */
+  amountDueUsd?: string;
+  /** Σ payments' USD, fees not included. */
+  amountPaidUsd?: string;
 }
 
 type Kind = "entities" | "banks" | "currencies" | "vendors" | "expense-heads";

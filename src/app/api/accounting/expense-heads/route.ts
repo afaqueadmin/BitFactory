@@ -7,6 +7,7 @@ import {
 } from "@/lib/accounting/adminAuth";
 import { MAX_MASTER_NAME_LENGTH as MAX_NAME_LENGTH } from "@/lib/accounting/masterData";
 import { headCountInclude } from "@/lib/accounting/expenseRequest";
+import { headsWithTotals } from "./shared";
 
 /** Expense heads (?active=true: only active ones, for the Add expense form). */
 export async function GET(request: NextRequest) {
@@ -16,12 +17,16 @@ export async function GET(request: NextRequest) {
 
     const activeOnly =
       new URL(request.url).searchParams.get("active") === "true";
-    const heads = await prisma.accountingExpenseHead.findMany({
-      where: activeOnly ? { isActive: true } : undefined,
-      include: headCountInclude,
-      orderBy: { name: "asc" },
-    });
-    return NextResponse.json({ success: true, data: heads });
+    if (activeOnly) {
+      const heads = await prisma.accountingExpenseHead.findMany({
+        where: { isActive: true },
+        include: headCountInclude,
+        orderBy: { name: "asc" },
+      });
+      return NextResponse.json({ success: true, data: heads });
+    }
+    // Full list (Expense Heads page), with Amount due / Amount paid.
+    return NextResponse.json({ success: true, data: await headsWithTotals() });
   } catch (error) {
     console.error("Error fetching expense heads:", error);
     return NextResponse.json(

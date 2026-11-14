@@ -16,6 +16,7 @@ export function statementJson(statement: Statement) {
       date: r.date.toISOString(),
       invoices: r.invoices,
       invoiceType: r.invoiceType,
+      typeHref: r.typeHref ?? null,
       counterparty: r.counterparty,
       invoiceAmountUsd: r.invoiceAmountUsd?.toFixed(2) ?? null,
       side: r.side,

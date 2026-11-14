@@ -125,6 +125,61 @@ export function checkNotOverpaid({
     : "This expense is already fully paid";
 }
 
+/* ------------------------------- Date rules ------------------------------- */
+// Days are "YYYY-MM-DD" calendar days (stored as @db.Date, UTC midnight).
+
+/** "YYYY-MM-DD" of a stored calendar day. */
+export const ymd = (d: Date): string => d.toISOString().slice(0, 10);
+
+/** "Nov 14, 2026" for a "YYYY-MM-DD" day. */
+const dayText = (day: string) =>
+  new Date(`${day}T12:00:00.000Z`).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+
+/** Today as "YYYY-MM-DD" in `tz` (UTC when the zone is missing or invalid). */
+export function todayIn(tz: unknown, now = new Date()): string {
+  const zone = typeof tz === "string" && tz ? tz : "UTC";
+  try {
+    return now.toLocaleDateString("en-CA", { timeZone: zone });
+  } catch {
+    return now.toLocaleDateString("en-CA", { timeZone: "UTC" });
+  }
+}
+
+/** A payment is dated on or after its expense, and not after today. */
+export function checkPaymentDate({
+  paymentDate,
+  expenseDate,
+  today,
+}: {
+  paymentDate: string;
+  expenseDate: string;
+  today: string;
+}): string | null {
+  if (paymentDate < expenseDate) {
+    return `Payment date can't be before the expense date (${dayText(expenseDate)})`;
+  }
+  if (paymentDate > today) return "Payment date can't be in the future";
+  return null;
+}
+
+/** An expense's date can't move after its first payment's date. */
+export function checkExpenseDate({
+  expenseDate,
+  firstPaymentDate,
+}: {
+  expenseDate: string;
+  firstPaymentDate: string | null;
+}): string | null {
+  return firstPaymentDate && expenseDate > firstPaymentDate
+    ? `Date can't be after the first payment (${dayText(firstPaymentDate)})`
+    : null;
+}
+
 export const expenseHref = (id: string) => `/accounting/expenses?expense=${id}`;
 
 export const expensePaymentReceiptHref = (id: string) =>
@@ -162,17 +217,15 @@ export function expenseStatementRows(
   p: ExpensePaymentForRows,
   tz: string,
 ): StatementRow[] {
-  const counterparty = {
-    name: p.expense.headName,
-    href: expenseHref(p.expense.id),
-  };
+  // Transactions Against = "Expense" linked to the expense; To/From = head.
   const base = {
     source: "EXPENSE" as const,
     bankId: p.bankId,
     date: p.date,
     recordedAt: p.createdAt,
     invoices: [],
-    counterparty,
+    typeHref: expenseHref(p.expense.id),
+    counterparty: { name: p.expense.headName, href: null },
     invoiceAmountUsd: p.expense.amountDueUsd,
     side: "CREDIT" as const,
   };
@@ -180,7 +233,7 @@ export function expenseStatementRows(
     {
       ...base,
       id: `ep_${p.id}_a`,
-      invoiceType: `Expense · ${p.expense.headName}`,
+      invoiceType: "Expense",
       amountUsd: p.amountUsd,
       original: formatOriginal(p.amount, p.code, p.exchangeRate),
       partial: p.amountUsd.lessThan(p.expense.amountDueUsd),

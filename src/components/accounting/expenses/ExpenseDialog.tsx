@@ -31,6 +31,7 @@ import {
   UploadedPdf,
 } from "@/components/accounting/common/PdfUploadField";
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
+import { dayLabel } from "@/components/accounting/bankStatement/StatementParts";
 import { useExpenseHeads } from "@/lib/hooks/usePaymentAccounts";
 import { Expense, useSaveExpense } from "@/lib/hooks/useExpenses";
 
@@ -78,9 +79,14 @@ export function ExpenseDialog({
   const dueOk = validDue(due);
   const dueNum = dueOk ? Number(due) : null;
   const belowPaid = dueNum !== null && dueNum < paid;
+  // The date can't move after the first payment's (the server checks too).
+  const firstPayment =
+    expense?.payments.map((p) => p.date).sort()[0] ?? undefined;
+  const afterFirstPayment = !!date && !!firstPayment && date > firstPayment;
 
   const canSave =
     !!date &&
+    !afterFirstPayment &&
     !!headId &&
     dueOk &&
     !belowPaid &&
@@ -123,7 +129,18 @@ export function ExpenseDialog({
             onChange={(e) => setDate(e.target.value)}
             required
             fullWidth
-            slotProps={{ inputLabel: { shrink: true } }}
+            error={afterFirstPayment}
+            helperText={
+              firstPayment
+                ? afterFirstPayment
+                  ? `Can't be after the first payment (${dayLabel(firstPayment)})`
+                  : `Up to the first payment's date (${dayLabel(firstPayment)})`
+                : undefined
+            }
+            slotProps={{
+              inputLabel: { shrink: true },
+              htmlInput: firstPayment ? { max: firstPayment } : undefined,
+            }}
           />
           <FormControl fullWidth required disabled={headsLoading}>
             <InputLabel>Head</InputLabel>
