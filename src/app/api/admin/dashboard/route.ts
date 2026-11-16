@@ -691,9 +691,16 @@ async function fetchBraiinsMiners(_request: NextRequest): Promise<{
       `[Admin Dashboard] Braiins DB miners (AUTO): ${braiinsDbMiners}`,
     );
 
-    // Step 3: Get all Braiins authKeys from PoolAuth
+    // Step 3: Braiins authKeys of users who have a Braiins miner with us - a
+    // miner moved to Luxor stays listed on Braiins as "off" and would count
+    // as an extra inactive miner.
     const braiinsAuthKeys = await prisma.poolAuth.findMany({
-      where: { poolId: braiinsPool.id },
+      where: {
+        poolId: braiinsPool.id,
+        user: {
+          miners: { some: { isDeleted: false, poolId: braiinsPool.id } },
+        },
+      },
       select: { authKey: true },
     });
 
@@ -702,8 +709,13 @@ async function fetchBraiinsMiners(_request: NextRequest): Promise<{
     );
 
     if (braiinsAuthKeys.length === 0) {
-      console.log("[Admin Dashboard] No Braiins PoolAuth found");
-      return null;
+      console.log("[Admin Dashboard] No Braiins PoolAuth with Braiins miners");
+      return {
+        active: 0,
+        inactive: 0,
+        actionRequired: 0,
+        dbCount: braiinsDbMiners,
+      };
     }
 
     // Step 4: Aggregate Braiins API data from all authKeys
@@ -1086,6 +1098,19 @@ export async function GET(request: NextRequest) {
         },
         select: {
           authKey: true,
+          // Workers only count for users with a Braiins miner with us (see
+          // fetchBraiinsMiners); revenue and hashrate count for everyone.
+          user: {
+            select: {
+              _count: {
+                select: {
+                  miners: {
+                    where: { isDeleted: false, pool: { name: "Braiins" } },
+                  },
+                },
+              },
+            },
+          },
         },
       });
 
@@ -1099,15 +1124,19 @@ export async function GET(request: NextRequest) {
         let totalHashrate5m = 0;
         let totalHashrate24h = 0;
         let totalRevenue = 0;
+        let fetchedAny = false;
 
         // Aggregate data from all Braiins customers
-        for (const { authKey } of braiinsPoolAuths) {
+        for (const { authKey, user: authUser } of braiinsPoolAuths) {
           try {
             // Fetch profile for this Braiins customer
             const braiinsProfile = await fetchBraiinsProfile(authKey);
             if (braiinsProfile) {
-              totalActiveWorkers += braiinsProfile.activeWorkers;
-              totalInactiveWorkers += braiinsProfile.inactiveWorkers;
+              fetchedAny = true;
+              if (authUser._count.miners > 0) {
+                totalActiveWorkers += braiinsProfile.activeWorkers;
+                totalInactiveWorkers += braiinsProfile.inactiveWorkers;
+              }
               totalHashrate5m += braiinsProfile.hashrate_5m;
               totalHashrate24h += braiinsProfile.hashrate_24h;
               console.log(
@@ -1118,6 +1147,7 @@ export async function GET(request: NextRequest) {
             // Fetch all-time revenue for this Braiins customer
             const braiinsRevenue = await fetchBraiinsAllTimeRevenue(authKey);
             if (braiinsRevenue) {
+              fetchedAny = true;
               totalRevenue += braiinsRevenue.revenue;
             }
           } catch (error) {
@@ -1129,7 +1159,9 @@ export async function GET(request: NextRequest) {
           }
         }
 
-        if (totalActiveWorkers > 0 || totalInactiveWorkers > 0) {
+        // Not gated on worker counts: a customer kept on Braiins only for
+        // earnings history has 0 counted workers but real revenue.
+        if (fetchedAny) {
           braiinsStats = {
             workers: {
               activeWorkers: totalActiveWorkers,
