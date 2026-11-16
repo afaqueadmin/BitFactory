@@ -21,9 +21,10 @@ import {
 } from "@/lib/accounting/bankStatementRows";
 import { transferStatementRows } from "@/lib/accounting/bankTransfer";
 import { expenseStatementRows } from "@/lib/accounting/expense";
+import { incomeStatementRows } from "@/lib/accounting/capitalIncome";
 
 /**
- * Bank balances and statements, read from the five tables that save a bank
+ * Bank balances and statements, read from the tables that save a bank
  * (see bankStatementRows.ts). Debit = money in, Credit = money out, all in
  * the USD value saved with each payment.
  *
@@ -61,6 +62,7 @@ export async function getBankBalances(
     transfersOut,
     transfersIn,
     expensePayments,
+    incomes,
   ] = await Promise.all([
     // Customer payments are positive; a negative one would be money out.
     prisma.costPayment.groupBy({
@@ -109,6 +111,12 @@ export async function getBankBalances(
       where: filter ? { bankId: filter } : undefined,
       _sum: { amountUsd: true, feeUsd: true },
     }),
+    // Capital & Income: the amount in, its fee out.
+    prisma.accountingIncome.groupBy({
+      by: ["bankId"],
+      where: filter ? { bankId: filter } : undefined,
+      _sum: { amountUsd: true, feeUsd: true },
+    }),
   ]);
 
   const map = new Map<string, BankBalance>();
@@ -141,6 +149,10 @@ export async function getBankBalances(
   }
   for (const r of expensePayments) {
     add(r.bankId, r._sum.amountUsd ?? ZERO, "C");
+    add(r.bankId, r._sum.feeUsd ?? ZERO, "C");
+  }
+  for (const r of incomes) {
+    add(r.bankId, r._sum.amountUsd ?? ZERO, "D");
     add(r.bankId, r._sum.feeUsd ?? ZERO, "C");
   }
   return map;
@@ -636,6 +648,25 @@ async function expenseRows(bankIds: string[], tz: string) {
   );
 }
 
+/** Capital & Income received into these banks: 1–2 rows each (capitalIncome.ts). */
+async function incomeRows(bankIds: string[]) {
+  const entries = await prisma.accountingIncome.findMany({
+    where: { bankId: { in: bankIds } },
+    include: {
+      currency: { select: { code: true } },
+      head: { select: { name: true } },
+    },
+  });
+  return entries.flatMap((e) =>
+    incomeStatementRows({
+      ...e,
+      code: e.currency.code,
+      headName: e.head.name,
+      hasPdf: !!e.pdfKey,
+    }),
+  );
+}
+
 export interface StatementRange {
   /** Instants: the route turns the viewer's calendar days into them. */
   from?: Date | null;
@@ -654,6 +685,7 @@ async function bankRows(bankIds: string[], tz: string) {
     depositReturnRows(bankIds),
     transferRows(bankIds),
     expenseRows(bankIds, tz),
+    incomeRows(bankIds),
   ]);
   return groups.flat();
 }

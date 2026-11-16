@@ -62,6 +62,8 @@ import {
   LocalShipping as VendorsIcon,
   RequestPage as ExpensesIcon,
   Category as ExpenseHeadsIcon,
+  AddCard as CapitalIncomeIcon,
+  Label as CapitalIncomeHeadsIcon,
   Timeline as CustomerPaybackIcon,
   Factory as CompanyPaybackIcon,
   History as ActivityLogIcon,
@@ -312,6 +314,11 @@ const sidebarSections: SidebarSection[] = [
         path: "/accounting/expenses",
       },
       {
+        title: "Capital & Income",
+        icon: <CapitalIncomeIcon />,
+        path: "/accounting/capital-income",
+      },
+      {
         title: "Customer Statements",
         icon: <StatementsIcon />,
         path: "/accounting/statements",
@@ -364,6 +371,11 @@ const sidebarSections: SidebarSection[] = [
             title: "Expense Heads",
             icon: <ExpenseHeadsIcon />,
             path: "/accounting/expense-heads",
+          },
+          {
+            title: "Capital & Income Heads",
+            icon: <CapitalIncomeHeadsIcon />,
+            path: "/accounting/capital-income-heads",
           },
         ],
       },

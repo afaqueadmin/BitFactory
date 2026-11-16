@@ -31,10 +31,14 @@ export type PdfUploadPurpose =
   | "vendor-deposit-return-receipt"
   | "bank-transfer-receipt"
   | "expense-attachment"
-  | "expense-payment-receipt";
+  | "expense-payment-receipt"
+  | "income-attachment";
 
 export type SheetUploadPurpose =
-  "vendor-invoice-sheet" | "hardware-purchase-sheet" | "expense-sheet";
+  | "vendor-invoice-sheet"
+  | "hardware-purchase-sheet"
+  | "expense-sheet"
+  | "income-sheet";
 
 export interface UploadedPdf {
   key: string;

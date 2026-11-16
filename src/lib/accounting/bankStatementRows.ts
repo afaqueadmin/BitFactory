@@ -23,6 +23,9 @@ import {
  * - EXPENSE: AccountingExpensePayment, an expense paid from the bank
  *   (Credit), plus an "Expense Fee" Credit row when it has a fee (see
  *   expense.ts).
+ * - INCOME: AccountingIncome, Capital & Income received into the bank
+ *   (Debit), plus a "Capital & Income Fee" Credit row when it has a fee
+ *   (see capitalIncome.ts).
  * All amounts are the USD value saved with the payment.
  */
 
@@ -32,7 +35,8 @@ export type StatementSource =
   | "CONSOLIDATED"
   | "DEPOSIT_RETURN"
   | "TRANSFER"
-  | "EXPENSE";
+  | "EXPENSE"
+  | "INCOME";
 
 export type StatementSide = "DEBIT" | "CREDIT";
 
@@ -42,7 +46,7 @@ export interface StatementLink {
 }
 
 export interface StatementRow {
-  /** Source-prefixed id: cp_, vp_, cvp_, dr_, bt_ or ep_. */
+  /** Source-prefixed id: cp_, vp_, cvp_, dr_, bt_, ep_ or ci_. */
   id: string;
   source: StatementSource;
   /** The bank the money went into or came out of. */
