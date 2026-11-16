@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
           where: {
             userId,
             status: {
-              in: ["PAID", "ISSUED", "OVERDUE"],
+              in: ["PAID", "ISSUED", "OVERDUE", "PROCESSING"],
             },
           },
           include: {
@@ -111,10 +111,9 @@ export async function GET(request: NextRequest) {
           0,
         );
 
-        const outstanding =
-          invoice.status === "ISSUED" || invoice.status === "OVERDUE"
-            ? Math.max(0, totalAmount - paidAmount)
-            : 0;
+        const outstanding = isOpen(invoice.status)
+          ? Math.max(0, totalAmount - paidAmount)
+          : 0;
 
         const invoiceType = INVOICE_TYPE_LABELS[invoice.invoiceType];
 
@@ -161,9 +160,7 @@ export async function GET(request: NextRequest) {
       return sum + paid;
     }, 0);
 
-    const issuedInvoices = invoices.filter(
-      (invoice) => invoice.status === "ISSUED" || invoice.status === "OVERDUE",
-    );
+    const issuedInvoices = invoices.filter((invoice) => isOpen(invoice.status));
     const issuedTotalAmount = issuedInvoices.reduce(
       (sum, invoice) => sum + Number(invoice.totalAmount),
       0,
@@ -252,4 +249,12 @@ export async function GET(request: NextRequest) {
       { status: 500 },
     );
   }
+}
+
+/**
+ * Issued and not yet settled. PROCESSING (a Binance overpayment waiting on
+ * accounts) has no payment recorded yet, so it still counts as outstanding.
+ */
+function isOpen(status: InvoiceStatus): boolean {
+  return status === "ISSUED" || status === "OVERDUE" || status === "PROCESSING";
 }

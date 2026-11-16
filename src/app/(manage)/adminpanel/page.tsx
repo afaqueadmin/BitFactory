@@ -267,7 +267,7 @@ export default function AdminDashboard() {
     ...hardwareRepairInvoices,
   ]
     .filter((invoice: InvoiceWithDetails) =>
-      ["DRAFT", "ISSUED", "OVERDUE"].includes(invoice.status),
+      ["DRAFT", "ISSUED", "OVERDUE", "PROCESSING"].includes(invoice.status),
     )
     .reduce(
       (sum: number, invoice: InvoiceWithDetails) =>

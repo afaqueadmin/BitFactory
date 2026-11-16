@@ -131,7 +131,7 @@ export const INVOICE_STATUS_HEX_COLORS: Record<
   [InvoiceStatus.ISSUED]: "#3B82F6", // Blue
   [InvoiceStatus.PAID]: "#10B981", // Green
   [InvoiceStatus.OVERDUE]: "#EF4444", // Red
-  [InvoiceStatus.PROCESSING]: "#6366F1", // Indigo
+  [InvoiceStatus.PROCESSING]: "#06B6D4", // Cyan
   [InvoiceStatus.CANCELLED]: "#F59E0B", // Amber
   [InvoiceStatus.REFUNDED]: "#8B5CF6", // Purple
   [VendorPaymentStatus.Paid]: "#10B981",

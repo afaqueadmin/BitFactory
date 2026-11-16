@@ -2,6 +2,10 @@ import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
+import {
+  getUserBinanceSubaccount,
+  subaccountAddress,
+} from "@/lib/binanceSubaccounts";
 import { resolveDataOwnerId } from "@/lib/guildScope";
 import { AuditAction, InvoiceStatus } from "@prisma/client";
 import { isSimulatedRole } from "@/lib/simulation/config";
@@ -152,7 +156,19 @@ export async function GET(
     // Fetch group information for this customer
     const group = await getGroupByUserId(invoice.user.id);
 
-    const response = NextResponse.json({ ...invoice, group });
+    // Whether Binance checkout can show this customer a deposit address.
+    // Only the flag is sent; the addresses come from the checkout itself.
+    const binanceSub = await getUserBinanceSubaccount(invoice.userId, "USDT");
+    const hasBinanceSubaccount =
+      !!binanceSub &&
+      (!!subaccountAddress(binanceSub, "TRX") ||
+        !!subaccountAddress(binanceSub, "ETH"));
+
+    const response = NextResponse.json({
+      ...invoice,
+      group,
+      hasBinanceSubaccount,
+    });
     response.headers.set(
       "Cache-Control",
       "no-store, no-cache, must-revalidate, proxy-revalidate",
