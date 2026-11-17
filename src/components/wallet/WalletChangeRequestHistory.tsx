@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import {
   Box,
   Paper,
@@ -13,14 +13,10 @@ import {
   TableRow,
   Chip,
   CircularProgress,
-  IconButton,
-  Tooltip,
   useTheme,
   useMediaQuery,
   alpha,
 } from "@mui/material";
-import ContentCopyIcon from "@mui/icons-material/ContentCopy";
-import CheckIcon from "@mui/icons-material/Check";
 import { useWalletChangeRequests } from "@/lib/hooks/useWalletChangeRequests";
 import FreezeCountdown from "@/components/wallet/FreezeCountdown";
 import { RADIUS_CARD, useDaylight } from "@/lib/daylight";
@@ -59,14 +55,8 @@ export default function WalletChangeRequestHistory({
   const { d, fonts } = useDaylight();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const isDark = theme.palette.mode === "dark";
+  // Addresses arrive masked from /api/wallet/change-requests; no copy button.
   const { requests, loading, error } = useWalletChangeRequests();
-  const [copiedId, setCopiedId] = useState<string | null>(null);
-
-  const handleCopy = (id: string, text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
-  };
 
   if (loading) {
     return (
@@ -224,22 +214,6 @@ export default function WalletChangeRequestHistory({
                 >
                   {req.requestedAddress}
                 </Typography>
-                <Tooltip
-                  title={copiedId === req.id ? "Copied!" : "Copy"}
-                  placement="top"
-                >
-                  <IconButton
-                    size="small"
-                    onClick={() => handleCopy(req.id, req.requestedAddress)}
-                    sx={{ ml: 1, p: 0.5, flexShrink: 0 }}
-                  >
-                    {copiedId === req.id ? (
-                      <CheckIcon sx={{ fontSize: 14, color: "success.main" }} />
-                    ) : (
-                      <ContentCopyIcon sx={{ fontSize: 14 }} />
-                    )}
-                  </IconButton>
-                </Tooltip>
               </Box>
             </Box>
 

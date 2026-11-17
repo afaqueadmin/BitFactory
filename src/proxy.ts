@@ -125,6 +125,7 @@ const securePaths = {
     "/activity-log",
     "/incentives/payouts",
     "/tickets",
+    "/wallets",
     "/wallet-requests",
     "/payment-frequency-requests",
     "/firmware-change-requests",

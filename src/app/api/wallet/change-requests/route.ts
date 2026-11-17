@@ -42,6 +42,8 @@ import { verifyStepUp } from "@/lib/auth/stepUp";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
 import { fetchAddressForSubaccount } from "@/lib/wallet";
+import { findLuxorPoolSubaccount } from "@/lib/clientWallets";
+import { maskWalletAddress } from "@/lib/walletCrypto";
 import { resolveLuxorSubaccounts } from "@/lib/luxorSubaccounts";
 import { sendWalletChangeRequestSubmittedEmail } from "@/lib/email";
 
@@ -97,8 +99,10 @@ export async function GET(request: NextRequest) {
           id: req.id,
           userId: req.userId,
           currency: req.currency,
-          currentAddress: req.currentAddress,
-          requestedAddress: req.requestedAddress,
+          subaccountName: req.subaccountName,
+          // Clients only ever see bank-style masked addresses.
+          currentAddress: maskWalletAddress(req.currentAddress),
+          requestedAddress: maskWalletAddress(req.requestedAddress),
           reason: req.reason,
           status: req.status,
           rejectionReason: req.rejectionReason,
@@ -267,9 +271,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const currentAddress = subaccountName
-      ? await fetchAddressForSubaccount(subaccountName)
+    // "Previous address" on the request: our own record of this subaccount's
+    // wallet when we have one, else what Luxor holds right now.
+    const recordSub = subaccountName
+      ? await findLuxorPoolSubaccount(subaccountName)
       : null;
+    const record = recordSub
+      ? await prisma.clientWallet.findUnique({
+          where: { poolSubaccountId: recordSub.id },
+          select: { address: true },
+        })
+      : null;
+    const currentAddress =
+      record?.address ??
+      (subaccountName ? await fetchAddressForSubaccount(subaccountName) : null);
 
     const created = await prisma.$transaction(async (tx) => {
       const walletChangeRequest = await tx.walletChangeRequest.create({
@@ -331,7 +346,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         success: true,
-        data: created,
+        data: {
+          ...created,
+          currentAddress: maskWalletAddress(created.currentAddress),
+          requestedAddress: maskWalletAddress(created.requestedAddress),
+          currentAddressHash: undefined,
+          requestedAddressHash: undefined,
+        },
         message: "Wallet change request submitted",
       },
       { status: 201 },

@@ -376,6 +376,16 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   [AuditAction.REPAIR_CHARGE_UPDATED]: "Repair Charge Updated",
   [AuditAction.REPAIR_CHARGE_DELETED]: "Repair Charge Deleted",
   [AuditAction.REPAIR_SITE_SETTING_UPDATED]: "Repair Site Settings Updated",
+  [AuditAction.CLIENT_WALLET_SYNCED]: "Client Wallet Synced From Luxor",
+  [AuditAction.CLIENT_WALLET_UPDATED]: "Client Wallet Record Updated",
+  [AuditAction.CLIENT_WALLET_MISMATCH_DETECTED]:
+    "Client Wallet Mismatch Detected",
+  [AuditAction.CLIENT_WALLET_MISMATCH_ACCEPTED]:
+    "Client Wallet Mismatch - Luxor Address Accepted",
+  [AuditAction.CLIENT_WALLET_MISMATCH_FIXED]:
+    "Client Wallet Mismatch - Luxor Updated",
+  [AuditAction.CLIENT_WALLET_RECHECKED]: "Client Wallet Re-checked",
+  [AuditAction.CLIENT_WALLET_HISTORY_VIEWED]: "Client Wallet History Viewed",
 };
 
 // ============================================================================

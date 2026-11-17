@@ -23,6 +23,13 @@ import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
 import { verifyStepUp } from "@/lib/auth/stepUp";
 import { sendWalletChangeRequestApprovedEmail } from "@/lib/email";
+import {
+  auditClientWallet,
+  findLuxorPoolSubaccount,
+  masked,
+  setClientWalletAddress,
+} from "@/lib/clientWallets";
+import { requestMeta } from "@/lib/guilds/audit";
 
 async function requireAdmin(request: NextRequest) {
   const token = request.cookies.get("token")?.value;
@@ -94,15 +101,70 @@ export async function POST(
     }
 
     const now = new Date();
-    const claim = await prisma.walletChangeRequest.updateMany({
-      where: { id, status: "CONFIRMED" },
-      data: {
-        status: "APPROVED",
-        reviewedById: auth.decoded.userId,
-        reviewedAt: now,
-      },
+    // Claim, our wallet record and the audit trail change together: the
+    // approved address becomes what we expect Luxor to hold, so the daily
+    // check (cron_wallet_address_check) flags Luxor until an admin updates it.
+    const claimed = await prisma.$transaction(async (tx) => {
+      const claim = await tx.walletChangeRequest.updateMany({
+        where: { id, status: "CONFIRMED" },
+        data: {
+          status: "APPROVED",
+          reviewedById: auth.decoded.userId,
+          reviewedAt: now,
+        },
+      });
+      if (claim.count === 0) return false;
+
+      await tx.auditLog.create({
+        data: {
+          action: AuditAction.WALLET_CHANGE_APPROVED,
+          entityType: "WalletChangeRequest",
+          entityId: id,
+          userId: auth.decoded.userId,
+          description: `Wallet change approved: ${walletChangeRequest.currentAddress ?? "(not configured)"} -> ${walletChangeRequest.requestedAddress}. Admin must update the address on Luxor manually.`,
+          changes: JSON.stringify({
+            requestedAddress: {
+              from: walletChangeRequest.currentAddress,
+              to: walletChangeRequest.requestedAddress,
+            },
+          }),
+          ...requestMeta(request),
+        },
+      });
+
+      // Rows from before multi-subaccount support have no subaccount, so
+      // there's no record to update for them.
+      const sub = walletChangeRequest.subaccountName
+        ? await findLuxorPoolSubaccount(walletChangeRequest.subaccountName, tx)
+        : null;
+      if (sub) {
+        const { changed, previous } = await setClientWalletAddress(tx, {
+          poolSubaccountId: sub.id,
+          address: walletChangeRequest.requestedAddress,
+          source: "CHANGE_REQUEST",
+          at: now,
+          walletChangeRequestId: id,
+          actorId: auth.decoded.userId,
+        });
+        await auditClientWallet(tx, {
+          action: AuditAction.CLIENT_WALLET_UPDATED,
+          poolSubaccountId: sub.id,
+          userId: auth.decoded.userId,
+          description: `Wallet record for ${sub.subaccountName} ${changed ? `changed ${masked(previous)} -> ${masked(walletChangeRequest.requestedAddress)}` : "unchanged (already this address)"} by approved change request ${id}. Luxor must now be updated by hand.`,
+          changes: {
+            subaccountName: sub.subaccountName,
+            walletChangeRequestId: id,
+            address: {
+              from: masked(previous),
+              to: masked(walletChangeRequest.requestedAddress),
+            },
+          },
+          ...requestMeta(request),
+        });
+      }
+      return true;
     });
-    if (claim.count === 0) {
+    if (!claimed) {
       return NextResponse.json(
         {
           success: false,
@@ -111,22 +173,6 @@ export async function POST(
         { status: 400 },
       );
     }
-
-    await prisma.auditLog.create({
-      data: {
-        action: AuditAction.WALLET_CHANGE_APPROVED,
-        entityType: "WalletChangeRequest",
-        entityId: id,
-        userId: auth.decoded.userId,
-        description: `Wallet change approved: ${walletChangeRequest.currentAddress ?? "(not configured)"} -> ${walletChangeRequest.requestedAddress}. Admin must update the address on Luxor manually.`,
-        changes: JSON.stringify({
-          requestedAddress: {
-            from: walletChangeRequest.currentAddress,
-            to: walletChangeRequest.requestedAddress,
-          },
-        }),
-      },
-    });
 
     try {
       await sendWalletChangeRequestApprovedEmail(

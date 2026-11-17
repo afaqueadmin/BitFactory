@@ -150,6 +150,8 @@ model User {
   guildPayoutBatchesCreated               GuildPayoutBatch[]              @relation("guildPayoutBatchesCreated")
   guildPayoutSettingsUpdated              GuildPayoutSettings[]           @relation("guildPayoutSettingsUpdated")
   guildDistributionLines                  GuildDistributionLine[]         @relation("guildDistributionLines")
+  clientWalletHistoryActions              ClientWalletHistory[]           @relation("clientWalletHistoryActor")
+  clientWalletMismatchesResolved          ClientWalletMismatch[]          @relation("clientWalletMismatchResolvedBy")
 
   @@index([isDeleted])
   @@index([franchiseeId])
@@ -251,8 +253,12 @@ model WalletChangeRequest {
   /// a second login. Null on rows from before this was recorded.
   requestedByEmail     String?
   requestedBySecondary Boolean       @default(false)
+  /// Encrypted (src/lib/walletCrypto.ts); *Hash is its lookup hash.
   currentAddress       String?
+  currentAddressHash   String?
+  /// Encrypted (src/lib/walletCrypto.ts).
   requestedAddress     String
+  requestedAddressHash String?
   reason               String?       @db.Text
   status               RequestStatus @default(PENDING)
   rejectionReason      String?
@@ -439,7 +445,10 @@ model Guild {
   /// The guild's own receiving address - set as its Luxor subaccount's
   /// payout address. Typed in by an admin for now; derived from the payout
   /// wallet (payoutAddressIndex) once multisig payouts are live.
+  /// Encrypted (src/lib/walletCrypto.ts). Still @unique in the DB, which is
+  /// harmless on ciphertext; payoutAddressHash is the real uniqueness check.
   payoutAddress        String?                    @unique
+  payoutAddressHash    String?                    @unique
   payoutAddressIndex   Int?                       @unique
   /// How this guild is paid; null = GuildPayoutSettings.defaultPayoutMethod.
   /// Lets a new method be trialled on one guild.
@@ -472,7 +481,9 @@ model GuildMembership {
   rewardPercent      Decimal                        @db.Decimal(7, 4)
   /// Where this person's share is sent. Saved here, not on Luxor - Luxor
   /// pays the whole guild reward to a Higgs wallet.
+  /// Encrypted (src/lib/walletCrypto.ts).
   walletAddress      String?
+  walletAddressHash  String?
   /// Which chain walletAddress is on (src/lib/guilds/walletNetworks.ts).
   /// Only "BTC" today; a string so another chain needs no schema change.
   walletNetwork      String                         @default("BTC")
@@ -510,8 +521,11 @@ model GuildWalletChangeRequest {
   requestedByEmail     String?
   requestedBySecondary Boolean         @default(false)
   network              String          @default("BTC")
+  /// Encrypted (src/lib/walletCrypto.ts), as is requestedAddress.
   currentAddress       String?
+  currentAddressHash   String?
   requestedAddress     String
+  requestedAddressHash String?
   reason               String?         @db.Text
   status               RequestStatus   @default(PENDING)
   rejectionReason      String?
@@ -595,7 +609,9 @@ model GuildMemberChangeRequest {
   newEmail             String?
   newPhoneNumber       String?
   newPercent           Decimal?                       @db.Decimal(7, 4)
+  /// Encrypted (src/lib/walletCrypto.ts).
   newWalletAddress     String?
+  newWalletAddressHash String?
   newWalletNetwork     String                         @default("BTC")
   /// ADD: the membership created on approval.
   createdMembershipId  String?                        @unique
@@ -789,30 +805,32 @@ model GuildDistribution {
 }
 
 model GuildDistributionLine {
-  id              String            @id @default(cuid())
-  distributionId  String
-  distribution    GuildDistribution @relation(fields: [distributionId], references: [id], onDelete: Cascade)
-  membershipId    String
-  membership      GuildMembership   @relation(fields: [membershipId], references: [id], onDelete: Restrict)
-  userId          String
-  user            User              @relation("guildDistributionLines", fields: [userId], references: [id])
-  nameSnapshot    String
-  isGuildmaster   Boolean
-  percentSnapshot Decimal           @db.Decimal(7, 4)
-  walletSnapshot  String?
-  networkSnapshot String            @default("BTC")
+  id                 String            @id @default(cuid())
+  distributionId     String
+  distribution       GuildDistribution @relation(fields: [distributionId], references: [id], onDelete: Cascade)
+  membershipId       String
+  membership         GuildMembership   @relation(fields: [membershipId], references: [id], onDelete: Restrict)
+  userId             String
+  user               User              @relation("guildDistributionLines", fields: [userId], references: [id])
+  nameSnapshot       String
+  isGuildmaster      Boolean
+  percentSnapshot    Decimal           @db.Decimal(7, 4)
+  /// Encrypted (src/lib/walletCrypto.ts).
+  walletSnapshot     String?
+  walletSnapshotHash String?
+  networkSnapshot    String            @default("BTC")
   /// This month's share of the reward.
-  btcAmount       Decimal           @db.Decimal(20, 8)
+  btcAmount          Decimal           @db.Decimal(20, 8)
   /// Carried from earlier months, added to this month's share.
-  carriedInBtc    Decimal           @default(0) @db.Decimal(20, 8)
+  carriedInBtc       Decimal           @default(0) @db.Decimal(20, 8)
   /// Actually sent this month (share + carried in, or 0 if carried).
-  paidBtc         Decimal           @default(0) @db.Decimal(20, 8)
+  paidBtc            Decimal           @default(0) @db.Decimal(20, 8)
   /// Carried to next month.
-  carriedOutBtc   Decimal           @default(0) @db.Decimal(20, 8)
+  carriedOutBtc      Decimal           @default(0) @db.Decimal(20, 8)
   /// Why it was carried (below the minimum, no wallet, wallet freeze).
-  carryReason     String?
+  carryReason        String?
   /// This member's output in the payout transaction (multisig mode).
-  payoutVout      Int?
+  payoutVout         Int?
 
   @@unique([distributionId, membershipId])
   @@index([userId])
@@ -1197,12 +1215,15 @@ model PoolSubaccount {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
-  pool           Pool                          @relation(fields: [poolId], references: [id], onDelete: Cascade)
-  user           User?                         @relation(fields: [userId], references: [id])
-  poolAuth       PoolAuth?                     @relation(fields: [poolAuthId], references: [id])
-  dailySnapshots PoolSubaccountDailySnapshot[]
-  workerMetrics  PoolWorkerDailyMetric[]
-  transactions   PoolTransaction[]
+  pool             Pool                          @relation(fields: [poolId], references: [id], onDelete: Cascade)
+  user             User?                         @relation(fields: [userId], references: [id])
+  poolAuth         PoolAuth?                     @relation(fields: [poolAuthId], references: [id])
+  dailySnapshots   PoolSubaccountDailySnapshot[]
+  workerMetrics    PoolWorkerDailyMetric[]
+  transactions     PoolTransaction[]
+  clientWallet     ClientWallet?
+  walletHistory    ClientWalletHistory[]
+  walletMismatches ClientWalletMismatch[]
 
   @@unique([poolId, subaccountName])
   @@index([userId])
@@ -1279,7 +1300,10 @@ model PoolTransaction {
   category              String? // Luxor transaction_category / Braiins payout kind
   amount                Decimal  @db.Decimal(20, 8)
   usdEquivalent         Decimal? @db.Decimal(20, 2)
+  /// The payout address - encrypted (src/lib/walletCrypto.ts) once
+  /// scripts/encrypt-wallet-addresses.js has run; addressHash groups by it.
   addressName           String?
+  addressHash           String?
   status                String? // Braiins payout status: queued/confirmed/failed
   occurredAt            DateTime
 
@@ -1293,6 +1317,7 @@ model PoolTransaction {
   @@index([poolId])
   @@index([externalTransactionId])
   @@index([occurredAt])
+  @@index([addressHash])
   @@map("pool_transactions")
 }
 
@@ -1374,6 +1399,115 @@ model WalletPaymentEmail {
   @@unique([userId, payoutDate])
   @@index([payoutDate])
   @@map("wallet_payment_emails")
+}
+
+// ============================================================================
+// Client wallets: our own record of each Luxor subaccount's payout address.
+// Luxor stays the place payouts are configured (by an admin, by hand); this
+// is what we expect Luxor to hold. cron_wallet_address_check compares the
+// two daily and opens a ClientWalletMismatch when they differ. Addresses are
+// encrypted (src/lib/walletCrypto.ts); *Hash columns are lookup hashes.
+// ============================================================================
+
+enum ClientWalletSource {
+  /// First fetched from Luxor by scripts/wallet-initial-sync.js.
+  INITIAL_SYNC
+  /// Seen on past Luxor payments (pool_transactions) before our record began.
+  PAYOUT_HISTORY
+  /// An approved WalletChangeRequest.
+  CHANGE_REQUEST
+  /// An admin accepted the address found on Luxor during a mismatch.
+  LUXOR_ACCEPTED
+}
+
+enum ClientWalletCheckStatus {
+  MATCH
+  MISMATCH
+  /// Luxor has no payout address for the subaccount.
+  LUXOR_EMPTY
+  /// Luxor could not be reached or returned an error.
+  ERROR
+}
+
+enum ClientWalletMismatchStatus {
+  OPEN
+  /// Luxor was corrected to our address (re-fetched and confirmed).
+  RESOLVED_FIXED
+  /// Luxor's address was accepted as correct; our record now matches it.
+  RESOLVED_ACCEPTED
+}
+
+/// The current expected payout address for one Luxor subaccount.
+model ClientWallet {
+  id                    String                   @id @default(cuid())
+  poolSubaccountId      String                   @unique
+  poolSubaccount        PoolSubaccount           @relation(fields: [poolSubaccountId], references: [id], onDelete: Cascade)
+  /// Encrypted. Null when Luxor had no address at the initial sync.
+  address               String?
+  addressHash           String?
+  source                ClientWalletSource
+  effectiveFrom         DateTime
+  walletChangeRequestId String?
+  lastCheckedAt         DateTime?
+  lastCheckStatus       ClientWalletCheckStatus?
+  lastCheckError        String?
+  createdAt             DateTime                 @default(now())
+  updatedAt             DateTime                 @updatedAt
+
+  @@index([addressHash])
+  @@map("client_wallets")
+}
+
+/// Every address a subaccount has had. The open row (validTo null) is the
+/// current one. PAYOUT_HISTORY rows are dated by the first payout seen.
+model ClientWalletHistory {
+  id                    String             @id @default(cuid())
+  poolSubaccountId      String
+  poolSubaccount        PoolSubaccount     @relation(fields: [poolSubaccountId], references: [id], onDelete: Cascade)
+  /// Encrypted.
+  address               String?
+  addressHash           String?
+  source                ClientWalletSource
+  validFrom             DateTime
+  validTo               DateTime?
+  walletChangeRequestId String?
+  mismatchId            String?
+  note                  String?            @db.Text
+  actorId               String?
+  actor                 User?              @relation("clientWalletHistoryActor", fields: [actorId], references: [id])
+  createdAt             DateTime           @default(now())
+
+  @@index([poolSubaccountId, validFrom])
+  @@index([addressHash])
+  @@map("client_wallet_history")
+}
+
+/// Luxor holds a different address than our record. At most one OPEN row per
+/// subaccount (partial unique index client_wallet_mismatches_open_key, which
+/// Prisma cannot model).
+model ClientWalletMismatch {
+  id                  String                     @id @default(cuid())
+  poolSubaccountId    String
+  poolSubaccount      PoolSubaccount             @relation(fields: [poolSubaccountId], references: [id], onDelete: Cascade)
+  /// Encrypted: what we expected (our record) and what Luxor had.
+  expectedAddress     String?
+  expectedAddressHash String?
+  luxorAddress        String?
+  luxorAddressHash    String?
+  status              ClientWalletMismatchStatus @default(OPEN)
+  detectedAt          DateTime                   @default(now())
+  lastSeenAt          DateTime                   @default(now())
+  emailedAt           DateTime?
+  resolvedAt          DateTime?
+  resolvedById        String?
+  resolvedBy          User?                      @relation("clientWalletMismatchResolvedBy", fields: [resolvedById], references: [id])
+  resolutionNote      String?                    @db.Text
+  createdAt           DateTime                   @default(now())
+  updatedAt           DateTime                   @updatedAt
+
+  @@index([status])
+  @@index([poolSubaccountId])
+  @@map("client_wallet_mismatches")
 }
 
 model CostPayment {
@@ -2756,6 +2890,13 @@ enum AuditAction {
   REPAIR_CHARGE_UPDATED
   REPAIR_CHARGE_DELETED
   REPAIR_SITE_SETTING_UPDATED
+  CLIENT_WALLET_SYNCED
+  CLIENT_WALLET_UPDATED
+  CLIENT_WALLET_MISMATCH_DETECTED
+  CLIENT_WALLET_MISMATCH_ACCEPTED
+  CLIENT_WALLET_MISMATCH_FIXED
+  CLIENT_WALLET_RECHECKED
+  CLIENT_WALLET_HISTORY_VIEWED
 }
 
 enum NotificationType {

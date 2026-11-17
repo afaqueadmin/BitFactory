@@ -8,6 +8,12 @@ import { resolveDataOwnerId } from "@/lib/guildScope";
 export interface WalletTarget {
   userId: string;
   role: string;
+  /**
+   * Whether the person asking is staff (ADMIN/SUPER_ADMIN/ACCOUNTING). Only
+   * staff see full wallet addresses; everyone else - the customer, a
+   * franchisee, a guild member, the PDF renderer - gets them masked.
+   */
+  callerIsStaff: boolean;
 }
 
 /**
@@ -29,9 +35,17 @@ export async function resolveWalletTarget(
 ): Promise<WalletTarget | NextResponse> {
   if (!customerId || customerId === decoded.userId) {
     if (decoded.role === "GUILDMEMBER") {
-      return { userId: await resolveDataOwnerId(decoded), role: "GUILDMASTER" };
+      return {
+        userId: await resolveDataOwnerId(decoded),
+        role: "GUILDMASTER",
+        callerIsStaff: false,
+      };
     }
-    return { userId: decoded.userId, role: decoded.role };
+    return {
+      userId: decoded.userId,
+      role: decoded.role,
+      callerIsStaff: isStaffRole(decoded.role),
+    };
   }
 
   const isAdmin = isStaffRole(decoded.role);
@@ -51,7 +65,7 @@ export async function resolveWalletTarget(
   if (!target) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
-  return { userId: target.id, role: target.role };
+  return { userId: target.id, role: target.role, callerIsStaff: isAdmin };
 }
 
 /**
@@ -96,7 +110,8 @@ export async function authenticateWalletRequest(
     if (!target) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
-    return { userId: target.id, role: target.role };
+    // The PDF renderer: what the customer would see, so masked.
+    return { userId: target.id, role: target.role, callerIsStaff: false };
   }
 
   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

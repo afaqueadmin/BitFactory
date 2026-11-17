@@ -22,7 +22,6 @@ import {
   SupportAgent as SupportIcon,
   TrendingDown as HashrateAlertsIcon,
   AccountBalanceWallet as WalletRequestsIcon,
-  EventRepeat as PaymentFrequencyRequestsIcon,
   SystemUpdateAlt as FirmwareRequestsIcon,
   ContactMail as SecondaryLoginRequestsIcon,
   Group as CustomersIcon,
@@ -94,18 +93,13 @@ import {
   useSecondaryLoginRequests,
   useHashrateAlerts,
 } from "@/lib/hooks";
+import { useWalletMismatchCount } from "@/lib/hooks/useWalletMismatchCount";
 import { useSimulationRequestCount } from "@/lib/hooks/useSimulationRequestCount";
 import { useAdminNav } from "@/lib/contexts/admin-nav-context";
 import { focusRing, useDaylight } from "@/lib/daylight";
 
 type BadgeKey =
-  | "tickets"
-  | "wallet"
-  | "frequency"
-  | "firmware"
-  | "logins"
-  | "alerts"
-  | "simulation";
+  "tickets" | "wallets" | "firmware" | "logins" | "alerts" | "simulation";
 
 interface SidebarItem {
   title: string;
@@ -151,16 +145,13 @@ const sidebarSections: SidebarSection[] = [
         badgeKey: "alerts",
       },
       {
-        title: "Wallet Requests",
+        // Client wallets: records, Luxor mismatch alerts, wallet / guild
+        // wallet / payment frequency requests (badge sums all of them).
+        title: "Wallets",
         icon: <WalletRequestsIcon />,
-        path: "/wallet-requests",
-        badgeKey: "wallet",
-      },
-      {
-        title: "Payment Frequency Requests",
-        icon: <PaymentFrequencyRequestsIcon />,
-        path: "/payment-frequency-requests",
-        badgeKey: "frequency",
+        path: "/wallets",
+        activeMatch: [/^\/wallet-requests/, /^\/payment-frequency-requests/],
+        badgeKey: "wallets",
       },
       {
         title: "Firmware Change Requests",
@@ -510,12 +501,15 @@ export default function AdminSidebar() {
     acknowledged: false,
   });
   const pendingSimulationRequests = useSimulationRequestCount();
+  const openWalletMismatches = useWalletMismatchCount();
   const { d, fonts } = useDaylight();
 
   const badgeCounts: Record<BadgeKey, number> = {
     tickets: openTickets.length,
-    wallet: pendingWalletRequests.length,
-    frequency: pendingFrequencyRequests.length,
+    wallets:
+      pendingWalletRequests.length +
+      pendingFrequencyRequests.length +
+      openWalletMismatches,
     firmware: pendingFirmwareRequests.length,
     logins: pendingLoginRequests.length,
     alerts: pendingHashrateAlerts.length,
