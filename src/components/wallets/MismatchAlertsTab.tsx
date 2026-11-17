@@ -26,6 +26,8 @@ import {
 import { useStepUp, type StepUpCredentials } from "@/components/StepUpDialog";
 import NoteActionDialog from "@/components/wallets/NoteActionDialog";
 import WalletHistoryDialog from "@/components/wallets/WalletHistoryDialog";
+import { AddressBox } from "@/components/wallets/WalletUi";
+import { asDate, useSortableRows } from "@/components/wallets/useSortableRows";
 import {
   MISMATCH_STATUS,
   fmtDateTime,
@@ -152,6 +154,20 @@ export default function MismatchAlertsTab({
     }
   };
 
+  const { sorted, sortCell } = useSortableRows<
+    Mismatch,
+    "customer" | "detected" | "status"
+  >(
+    rows ?? [],
+    {
+      customer: (m) => personLabel(m.customer),
+      detected: (m) => asDate(m.detectedAt),
+      // Open first, then the resolved ones.
+      status: (m) => (m.status === "OPEN" ? 0 : 1),
+    },
+    { key: "detected", dir: "desc" },
+  );
+
   return (
     <>
       <Stack direction="row" sx={{ mb: 2 }}>
@@ -193,26 +209,32 @@ export default function MismatchAlertsTab({
           <Table size="small">
             <TableHead>
               <TableRow>
-                <TableCell>Customer / subaccount</TableCell>
+                {sortCell("customer", "Customer / subaccount")}
                 <TableCell>Our record</TableCell>
                 <TableCell>Luxor has</TableCell>
-                <TableCell>Detected</TableCell>
-                <TableCell>Status</TableCell>
+                {sortCell("detected", "Detected", { firstDir: "desc" })}
+                {sortCell("status", "Status")}
                 <TableCell align="right">Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {rows.map((m) => (
+              {sorted.map((m) => (
                 <TableRow key={m.id} hover>
-                  <TableCell>
-                    {personLabel(m.customer)}
+                  <TableCell sx={{ "&&&": { minWidth: 150 } }}>
+                    <Box sx={{ fontWeight: 600 }}>
+                      {personLabel(m.customer)}
+                    </Box>
                     <CellNote>{m.subaccountName}</CellNote>
                   </TableCell>
-                  <TableCell sx={{ "&&&": { minWidth: 220, maxWidth: 300 } }}>
-                    <Box sx={monoSx}>{m.currentRecord ?? "(none)"}</Box>
+                  <TableCell sx={{ "&&&": { minWidth: 240 } }}>
+                    <AddressBox address={m.currentRecord} tone="success" />
                   </TableCell>
-                  <TableCell sx={{ "&&&": { minWidth: 220, maxWidth: 300 } }}>
-                    <Box sx={monoSx}>{m.luxorAddress ?? "(no address)"}</Box>
+                  <TableCell sx={{ "&&&": { minWidth: 240 } }}>
+                    <AddressBox
+                      address={m.luxorAddress}
+                      empty="No address on Luxor"
+                      tone="danger"
+                    />
                   </TableCell>
                   <TableCell>
                     {fmtDateTime(m.detectedAt)}

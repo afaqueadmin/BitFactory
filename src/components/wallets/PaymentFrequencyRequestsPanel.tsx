@@ -44,6 +44,14 @@ import {
 } from "@/lib/hooks/usePaymentFrequencyChangeRequests";
 import { useUser } from "@/lib/hooks/useUser";
 import { formatPaymentSchedule } from "@/lib/constants/paymentFrequency";
+import { asDate, useSortableRows } from "@/components/wallets/useSortableRows";
+
+const STATUS_ORDER: Record<string, number> = {
+  PENDING: 0,
+  CONFIRMED: 1,
+  APPROVED: 2,
+  REJECTED: 3,
+};
 
 const STATUSES = ["PENDING", "CONFIRMED", "APPROVED", "REJECTED"];
 
@@ -224,6 +232,20 @@ export default function PaymentFrequencyRequestsPanel({
     }
   };
 
+  const { sorted, sortCell } = useSortableRows<
+    (typeof requests)[number],
+    "client" | "requested" | "subaccount" | "status"
+  >(
+    requests,
+    {
+      client: (r) => r.user.name || r.user.email,
+      requested: (r) => asDate(r.createdAt),
+      subaccount: (r) => r.subaccountName,
+      status: (r) => STATUS_ORDER[r.status] ?? 9,
+    },
+    { key: "requested", dir: "desc" },
+  );
+
   return (
     <Shell>
       {!embedded && (
@@ -275,18 +297,18 @@ export default function PaymentFrequencyRequestsPanel({
           <Table size="small">
             <TableHead>
               <TableRow>
-                <TableCell>Client</TableCell>
-                <TableCell>Requested</TableCell>
-                <TableCell>Subaccount</TableCell>
+                {sortCell("client", "Client")}
+                {sortCell("requested", "Requested", { firstDir: "desc" })}
+                {sortCell("subaccount", "Subaccount")}
                 <TableCell>Current Schedule</TableCell>
                 <TableCell>Requested Schedule</TableCell>
                 <TableCell>Reason</TableCell>
-                <TableCell>Status</TableCell>
+                {sortCell("status", "Status")}
                 <TableCell align="right">Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {requests.map((req) => (
+              {sorted.map((req) => (
                 <TableRow key={req.id}>
                   <TableCell>
                     {req.user.name || req.user.email}

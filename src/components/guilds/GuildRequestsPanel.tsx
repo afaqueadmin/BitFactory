@@ -38,6 +38,14 @@ import {
   useDaylightAdminSx,
 } from "@/components/daylight/AdminPage";
 import { useStepUp } from "@/components/StepUpDialog";
+import { asDate, useSortableRows } from "@/components/wallets/useSortableRows";
+
+const STATUS_ORDER: Record<string, number> = {
+  PENDING: 0,
+  CONFIRMED: 1,
+  APPROVED: 2,
+  REJECTED: 3,
+};
 
 const STATUSES = ["PENDING", "CONFIRMED", "APPROVED", "REJECTED"];
 // Pending and Confirmed together: everything still needing an admin step.
@@ -189,6 +197,19 @@ export default function GuildRequestsPanel({
     }
   };
 
+  const { sorted, sortCell } = useSortableRows<
+    GuildRequest,
+    "guild" | "requested" | "status"
+  >(
+    requests,
+    {
+      guild: (r) => r.guild.name,
+      requested: (r) => asDate(r.createdAt),
+      status: (r) => STATUS_ORDER[r.status] ?? 9,
+    },
+    { key: "requested", dir: "desc" },
+  );
+
   return (
     <Shell>
       {!embedded && (
@@ -249,16 +270,16 @@ export default function GuildRequestsPanel({
           <Table size="small">
             <TableHead>
               <TableRow>
-                <TableCell>Guild</TableCell>
-                <TableCell>Requested</TableCell>
+                {sortCell("guild", "Guild")}
+                {sortCell("requested", "Requested", { firstDir: "desc" })}
                 <TableCell>Change</TableCell>
                 <TableCell>Reason</TableCell>
-                <TableCell>Status</TableCell>
+                {sortCell("status", "Status")}
                 <TableCell align="right">Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {requests.map((req) => (
+              {sorted.map((req) => (
                 <TableRow key={`${req.kind}-${req.id}`}>
                   <TableCell>
                     <Link href={`/guilds/${req.guild.id}`}>

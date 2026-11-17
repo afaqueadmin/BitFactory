@@ -8,8 +8,14 @@ import {
   DaylightLoading,
   useDaylightAdminSx,
 } from "@/components/daylight/AdminPage";
+import AccountBalanceWalletIcon from "@mui/icons-material/AccountBalanceWallet";
+import VerifiedIcon from "@mui/icons-material/Verified";
+import ReportProblemIcon from "@mui/icons-material/ReportProblem";
+import PendingActionsIcon from "@mui/icons-material/PendingActions";
+import StatCard from "@/components/daylight/StatCard";
 import CurrentWalletsTab, {
   type WalletRow,
+  walletState,
 } from "@/components/wallets/CurrentWalletsTab";
 import MismatchAlertsTab from "@/components/wallets/MismatchAlertsTab";
 import WalletChangeRequestsPanel from "@/components/wallets/WalletChangeRequestsPanel";
@@ -90,6 +96,15 @@ function WalletsContent() {
       scroll: false,
     });
 
+  const matching = rows
+    ? rows.filter((r) => walletState(r) === "match").length
+    : "—";
+  const pendingRequests = counts
+    ? counts.pendingChangeRequests +
+      counts.pendingGuildWalletRequests +
+      counts.pendingFrequencyRequests
+    : "—";
+
   const withCount = (label: string, n: number | undefined) =>
     n ? `${label} (${n})` : label;
 
@@ -106,6 +121,70 @@ function WalletsContent() {
           {error}
         </Alert>
       )}
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns:
+            "repeat(auto-fit, minmax(min(210px, 100%), 1fr))",
+          gap: { xs: "12px", sm: "16px" },
+          mb: { xs: "20px", md: "24px" },
+        }}
+      >
+        <StatCard
+          title="Subaccounts tracked"
+          value={rows ? rows.length : "—"}
+          caption={
+            rows
+              ? `${rows.filter((r) => r.address).length} with a payout address`
+              : undefined
+          }
+          tone="sky"
+          icon={<AccountBalanceWalletIcon />}
+          isLoading={!rows}
+        />
+        <StatCard
+          title="Matching Luxor"
+          value={matching}
+          caption={rows ? `of ${rows.length} at the last check` : undefined}
+          tone="mint"
+          icon={<VerifiedIcon />}
+          isLoading={!rows}
+        />
+        <Box
+          component="button"
+          type="button"
+          onClick={() => go("mismatches")}
+          aria-label="Open mismatch alerts"
+          sx={{
+            all: "unset",
+            display: "block",
+            cursor: "pointer",
+            borderRadius: "16px",
+            "&:focus-visible": { outline: "2px solid", outlineOffset: 2 },
+          }}
+        >
+          <StatCard
+            title="Open mismatches"
+            value={counts ? counts.openMismatches : "—"}
+            caption={
+              counts?.openMismatches
+                ? "Luxor differs from our record"
+                : "Luxor matches everywhere"
+            }
+            tone={counts?.openMismatches ? "danger" : "mint"}
+            icon={<ReportProblemIcon />}
+            isLoading={!counts}
+          />
+        </Box>
+        <StatCard
+          title="Requests to review"
+          value={pendingRequests}
+          caption="Wallet, guild wallet and schedule"
+          tone="amber"
+          icon={<PendingActionsIcon />}
+          isLoading={!counts}
+        />
+      </Box>
       {counts && counts.noRecord > 0 && tab === "current" && (
         <Alert severity="warning" sx={{ mb: 2 }}>
           {counts.noRecord} subaccount(s) have no wallet record yet because

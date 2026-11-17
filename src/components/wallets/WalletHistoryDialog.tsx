@@ -24,6 +24,8 @@ import {
   statusLabel,
   useDaylightAdminSx,
 } from "@/components/daylight/AdminPage";
+import { AddressBox } from "@/components/wallets/WalletUi";
+import { asDate, useSortableRows } from "@/components/wallets/useSortableRows";
 import {
   MISMATCH_STATUS,
   SOURCE_LABEL,
@@ -109,6 +111,44 @@ export default function WalletHistoryDialog({
     };
   }, [poolSubaccountId]);
 
+  const hist = useSortableRows<
+    HistoryData["history"][number],
+    "from" | "until" | "source" | "paid"
+  >(
+    data?.history ?? [],
+    {
+      from: (h) => asDate(h.validFrom),
+      // The open (current) row counts as the latest.
+      until: (h) => (h.validTo ? asDate(h.validTo) : new Date(8.64e15)),
+      source: (h) => SOURCE_LABEL[h.source] ?? h.source,
+      paid: (h) => h.paid.btc,
+    },
+    { key: "from", dir: "desc" },
+  );
+  const mism = useSortableRows<
+    HistoryData["mismatches"][number],
+    "detected" | "status"
+  >(
+    data?.mismatches ?? [],
+    {
+      detected: (m) => asDate(m.detectedAt),
+      status: (m) => (m.status === "OPEN" ? 0 : 1),
+    },
+    { key: "detected", dir: "desc" },
+  );
+  const reqs = useSortableRows<
+    HistoryData["changeRequests"][number],
+    "requested" | "status" | "reviewed"
+  >(
+    data?.changeRequests ?? [],
+    {
+      requested: (r) => asDate(r.createdAt),
+      status: (r) => r.status,
+      reviewed: (r) => asDate(r.reviewedAt),
+    },
+    { key: "requested", dir: "desc" },
+  );
+
   const section = (title: string) => (
     <Typography sx={{ ...ds.sectionTitleSx, mt: 3, mb: 1 }}>{title}</Typography>
   );
@@ -135,19 +175,20 @@ export default function WalletHistoryDialog({
                 <TableHead>
                   <TableRow>
                     <TableCell>Address</TableCell>
-                    <TableCell>From</TableCell>
-                    <TableCell>Until</TableCell>
-                    <TableCell>How we got it</TableCell>
-                    <TableCell align="right">
-                      Paid to this address (all time)
-                    </TableCell>
+                    {hist.sortCell("from", "From", { firstDir: "desc" })}
+                    {hist.sortCell("until", "Until", { firstDir: "desc" })}
+                    {hist.sortCell("source", "How we got it")}
+                    {hist.sortCell("paid", "Paid to this address (all time)", {
+                      firstDir: "desc",
+                      align: "right",
+                    })}
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {data.history.map((h) => (
+                  {hist.sorted.map((h) => (
                     <TableRow key={h.id}>
                       <TableCell sx={{ "&&&": { minWidth: 260 } }}>
-                        <Box sx={monoSx}>{h.address ?? "(none)"}</Box>
+                        <AddressBox address={h.address} />
                         {h.note && <CellNote>{h.note}</CellNote>}
                       </TableCell>
                       <TableCell>{fmtDate(h.validFrom)}</TableCell>
@@ -210,14 +251,16 @@ export default function WalletHistoryDialog({
                 <Table size="small" sx={ds.tableSx}>
                   <TableHead>
                     <TableRow>
-                      <TableCell>Detected</TableCell>
+                      {mism.sortCell("detected", "Detected", {
+                        firstDir: "desc",
+                      })}
                       <TableCell>Our record / Luxor</TableCell>
-                      <TableCell>Status</TableCell>
+                      {mism.sortCell("status", "Status")}
                       <TableCell>Resolution</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {data.mismatches.map((m) => (
+                    {mism.sorted.map((m) => (
                       <TableRow key={m.id}>
                         <TableCell>{fmtDateTime(m.detectedAt)}</TableCell>
                         <TableCell sx={{ "&&&": { minWidth: 260 } }}>
@@ -262,14 +305,18 @@ export default function WalletHistoryDialog({
                 <Table size="small" sx={ds.tableSx}>
                   <TableHead>
                     <TableRow>
-                      <TableCell>Requested</TableCell>
+                      {reqs.sortCell("requested", "Requested", {
+                        firstDir: "desc",
+                      })}
                       <TableCell>From / to</TableCell>
-                      <TableCell>Status</TableCell>
-                      <TableCell>Reviewed</TableCell>
+                      {reqs.sortCell("status", "Status")}
+                      {reqs.sortCell("reviewed", "Reviewed", {
+                        firstDir: "desc",
+                      })}
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {data.changeRequests.map((r) => (
+                    {reqs.sorted.map((r) => (
                       <TableRow key={r.id}>
                         <TableCell>{fmtDate(r.createdAt)}</TableCell>
                         <TableCell sx={{ "&&&": { minWidth: 260 } }}>

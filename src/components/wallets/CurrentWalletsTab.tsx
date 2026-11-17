@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   Alert,
   Box,
   Button,
+  InputAdornment,
   Paper,
   Stack,
   Table,
@@ -15,6 +16,7 @@ import {
   TableRow,
   TextField,
 } from "@mui/material";
+import SearchIcon from "@mui/icons-material/Search";
 import {
   CellNote,
   DaylightEmptyState,
@@ -24,12 +26,18 @@ import {
 import NoteActionDialog from "@/components/wallets/NoteActionDialog";
 import WalletHistoryDialog from "@/components/wallets/WalletHistoryDialog";
 import {
+  AddressBox,
+  FilterChips,
+  WALLET_STATE,
+  type WalletState,
+} from "@/components/wallets/WalletUi";
+import { asDate, useSortableRows } from "@/components/wallets/useSortableRows";
+import {
   CHECK_LABEL,
   SOURCE_LABEL,
   fmtBtc,
   fmtDate,
   fmtDateTime,
-  monoSx,
   personLabel,
 } from "@/components/wallets/walletLabels";
 
@@ -53,6 +61,27 @@ export interface WalletRow {
   paidToCurrent: { count: number; btc: number; last: string | null };
 }
 
+export function walletState(r: WalletRow): WalletState {
+  if (r.openMismatch) return "mismatch";
+  if (!r.hasRecord) return "norecord";
+  switch (r.lastCheckStatus) {
+    case "MATCH":
+      return "match";
+    case "MISMATCH":
+      return "mismatch";
+    case "LUXOR_EMPTY":
+      return "empty";
+    case "ERROR":
+      return "error";
+    default:
+      return "unchecked";
+  }
+}
+
+type Filter = "all" | "attention" | WalletState;
+type SortKey =
+  "customer" | "subaccount" | "state" | "since" | "checked" | "paid";
+
 /** Every client subaccount and the payout address we expect Luxor to hold. */
 export default function CurrentWalletsTab({
   rows,
@@ -65,20 +94,57 @@ export default function CurrentWalletsTab({
 }) {
   const ds = useDaylightAdminSx();
   const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState<Filter>("all");
   const [historyFor, setHistoryFor] = useState<string | null>(null);
   const [recheck, setRecheck] = useState<WalletRow | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  const q = search.trim().toLowerCase();
-  const visible = q
-    ? rows.filter((r) =>
-        [r.subaccountName, r.customer?.name, r.customer?.email, r.address]
-          .filter(Boolean)
-          .some((v) => String(v).toLowerCase().includes(q)),
+  const counts = useMemo(() => {
+    const c: Record<WalletState, number> = {
+      match: 0,
+      mismatch: 0,
+      empty: 0,
+      error: 0,
+      norecord: 0,
+      unchecked: 0,
+    };
+    for (const r of rows) c[walletState(r)]++;
+    return c;
+  }, [rows]);
+  const attention = counts.mismatch + counts.norecord + counts.error;
+
+  const visible = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return rows.filter((r) => {
+      const s = walletState(r);
+      if (
+        filter === "attention" &&
+        !["mismatch", "norecord", "error"].includes(s)
       )
-    : rows;
+        return false;
+      if (filter !== "all" && filter !== "attention" && s !== filter)
+        return false;
+      if (!q) return true;
+      return [r.subaccountName, r.customer?.name, r.customer?.email, r.address]
+        .filter(Boolean)
+        .some((v) => String(v).toLowerCase().includes(q));
+    });
+  }, [rows, search, filter]);
+
+  const { sorted, sortCell } = useSortableRows<WalletRow, SortKey>(
+    visible,
+    {
+      customer: (r) => personLabel(r.customer),
+      subaccount: (r) => r.subaccountName,
+      state: (r) => WALLET_STATE[walletState(r)].order,
+      since: (r) => asDate(r.effectiveFrom),
+      checked: (r) => asDate(r.lastCheckedAt),
+      paid: (r) => r.paidToCurrent.btc,
+    },
+    { key: "state", dir: "asc" },
+  );
 
   const doRecheck = async (note: string) => {
     if (!recheck) return;
@@ -115,14 +181,54 @@ export default function CurrentWalletsTab({
 
   return (
     <>
-      <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ mb: 2 }}>
+      <Stack
+        direction={{ xs: "column", md: "row" }}
+        spacing={2}
+        alignItems={{ md: "center" }}
+        justifyContent="space-between"
+        sx={{ mb: 2.5 }}
+      >
+        <FilterChips<Filter>
+          value={filter}
+          onChange={setFilter}
+          options={[
+            { value: "all", label: "All", count: rows.length },
+            {
+              value: "attention",
+              label: "Needs attention",
+              count: attention,
+              tone: "danger",
+            },
+            {
+              value: "match",
+              label: "Matches Luxor",
+              count: counts.match,
+              tone: "success",
+            },
+            {
+              value: "empty",
+              label: "No address on Luxor",
+              count: counts.empty,
+              tone: "warning",
+            },
+          ]}
+        />
         <TextField
           id="wallets-search"
           size="small"
-          label="Search customer, subaccount or address"
+          placeholder="Search customer, subaccount or address"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          sx={{ minWidth: { sm: 340 }, ...ds.inputSx }}
+          sx={{ minWidth: { md: 320 }, ...ds.inputSx }}
+          slotProps={{
+            input: {
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon sx={{ fontSize: 18 }} />
+                </InputAdornment>
+              ),
+            },
+          }}
         />
       </Stack>
       {notice && (
@@ -135,44 +241,69 @@ export default function CurrentWalletsTab({
         </Alert>
       )}
 
-      {visible.length === 0 ? (
-        <DaylightEmptyState>No subaccounts match.</DaylightEmptyState>
+      {sorted.length === 0 ? (
+        <DaylightEmptyState>
+          {rows.length === 0
+            ? "No client subaccounts yet."
+            : "No subaccounts match this filter."}
+        </DaylightEmptyState>
       ) : (
         <TableContainer component={Paper} elevation={0} sx={ds.tableCardSx}>
           <Table size="small">
             <TableHead>
               <TableRow>
-                <TableCell>Customer / subaccount</TableCell>
+                {sortCell("customer", "Customer")}
+                {sortCell("subaccount", "Subaccount")}
                 <TableCell>Payout address (our record)</TableCell>
-                <TableCell>Since</TableCell>
-                <TableCell>Last Luxor check</TableCell>
-                <TableCell align="right">Paid to this address</TableCell>
+                {sortCell("state", "Status")}
+                {sortCell("since", "Since", { firstDir: "desc" })}
+                {sortCell("checked", "Last check", { firstDir: "desc" })}
+                {sortCell("paid", "Paid to address", {
+                  firstDir: "desc",
+                  align: "right",
+                })}
                 <TableCell align="right">Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {visible.map((r) => {
-                const check = r.lastCheckStatus
-                  ? CHECK_LABEL[r.lastCheckStatus]
-                  : null;
+              {sorted.map((r) => {
+                const state = WALLET_STATE[walletState(r)];
                 return (
                   <TableRow key={r.poolSubaccountId} hover>
-                    <TableCell>
-                      {personLabel(r.customer)}
+                    <TableCell sx={{ "&&&": { minWidth: 160 } }}>
+                      <Box sx={{ fontWeight: 600 }}>
+                        {r.customer?.name || r.customer?.email || "—"}
+                      </Box>
+                      {r.customer?.name && (
+                        <CellNote>{r.customer.email}</CellNote>
+                      )}
                       {r.customer?.isDeleted && (
                         <CellNote tone="danger">Account deleted</CellNote>
                       )}
-                      <CellNote>{r.subaccountName}</CellNote>
                     </TableCell>
-                    <TableCell sx={{ "&&&": { minWidth: 240, maxWidth: 320 } }}>
+                    <TableCell>
+                      <Box
+                        component="span"
+                        sx={{
+                          fontFamily:
+                            "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+                          fontSize: 12,
+                        }}
+                      >
+                        {r.subaccountName}
+                      </Box>
+                    </TableCell>
+                    <TableCell sx={{ "&&&": { minWidth: 260 } }}>
                       {r.hasRecord ? (
-                        <Box sx={monoSx}>
-                          {r.address ?? "No address on Luxor"}
-                        </Box>
+                        <AddressBox
+                          address={r.address}
+                          empty="No address on Luxor"
+                          tone={r.openMismatch ? "danger" : undefined}
+                        />
                       ) : (
                         <CellNote tone="danger">
-                          No record yet - Luxor couldn&apos;t be read when
-                          records were started
+                          No record - Luxor couldn&apos;t be read when records
+                          were started
                         </CellNote>
                       )}
                       {r.source && (
@@ -181,49 +312,66 @@ export default function CurrentWalletsTab({
                         </CellNote>
                       )}
                     </TableCell>
-                    <TableCell>{fmtDate(r.effectiveFrom)}</TableCell>
                     <TableCell>
                       {r.openMismatch ? (
-                        <Button
-                          size="small"
+                        <Box
+                          component="button"
+                          type="button"
                           onClick={onOpenMismatches}
-                          sx={ds.textBtnSx("danger")}
+                          sx={{
+                            all: "unset",
+                            cursor: "pointer",
+                            "&:focus-visible": { outline: "2px solid" },
+                          }}
+                          aria-label="Open mismatch alerts"
                         >
-                          Mismatch open
-                        </Button>
-                      ) : check ? (
-                        <DaylightStatusPill
-                          label={check.label}
-                          tone={check.tone}
-                        />
+                          <DaylightStatusPill
+                            label="Mismatch ›"
+                            tone="danger"
+                          />
+                        </Box>
                       ) : (
-                        "—"
+                        <DaylightStatusPill
+                          label={state.label}
+                          tone={state.tone}
+                        />
                       )}
-                      <CellNote>{fmtDateTime(r.lastCheckedAt)}</CellNote>
                       {r.lastCheckError && (
                         <CellNote tone="danger">{r.lastCheckError}</CellNote>
                       )}
                     </TableCell>
+                    <TableCell sx={{ whiteSpace: "nowrap" }}>
+                      {fmtDate(r.effectiveFrom)}
+                    </TableCell>
+                    <TableCell sx={{ whiteSpace: "nowrap" }}>
+                      {fmtDateTime(r.lastCheckedAt)}
+                    </TableCell>
                     <TableCell
                       align="right"
-                      sx={{ fontVariantNumeric: "tabular-nums" }}
+                      sx={{
+                        fontVariantNumeric: "tabular-nums",
+                        whiteSpace: "nowrap",
+                      }}
                     >
                       {r.paidToCurrent.count > 0 ? (
                         <>
-                          {fmtBtc(r.paidToCurrent.btc)}
+                          <Box sx={{ fontWeight: 600 }}>
+                            {fmtBtc(r.paidToCurrent.btc)}
+                          </Box>
                           <CellNote>
-                            {r.paidToCurrent.count} payout(s), last{" "}
+                            {r.paidToCurrent.count} payout
+                            {r.paidToCurrent.count === 1 ? "" : "s"} · last{" "}
                             {fmtDate(r.paidToCurrent.last)}
                           </CellNote>
                         </>
                       ) : (
-                        "—"
+                        <CellNote>No payouts yet</CellNote>
                       )}
                     </TableCell>
                     <TableCell align="right">
                       <Stack
                         direction="row"
-                        spacing={1}
+                        spacing={0.5}
                         justifyContent="flex-end"
                       >
                         <Button
@@ -253,6 +401,10 @@ export default function CurrentWalletsTab({
           </Table>
         </TableContainer>
       )}
+      <CellNote>
+        Showing {sorted.length} of {rows.length} subaccount
+        {rows.length === 1 ? "" : "s"}. Click a column heading to sort.
+      </CellNote>
 
       <WalletHistoryDialog
         poolSubaccountId={historyFor}
