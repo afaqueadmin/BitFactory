@@ -20,6 +20,7 @@ import type { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { generateTokens, verifyJwtToken } from "@/lib/jwt";
 import { setSessionCookies } from "@/lib/auth/sessionCookies";
+import { restrictionClaims } from "@/lib/auth/staffAccessServer";
 
 /**
  * The cutoff to store, rounded down to a whole second because token `iat`
@@ -75,12 +76,14 @@ export async function signOutOtherDevices(
   { mfa = false }: { mfa?: boolean } = {},
 ): Promise<void> {
   // Only a valid session of this same login is carried over.
-  let current: { mfa: boolean } | null = null;
+  let current: { mfa: boolean; dbp: boolean } | null = null;
   const token = request.cookies.get("token")?.value;
   if (token) {
     try {
       const payload = await verifyJwtToken(token);
-      if (payload.loginId === loginId) current = { mfa: payload.mfa === true };
+      if (payload.loginId === loginId) {
+        current = { mfa: payload.mfa === true, dbp: payload.dbp === true };
+      }
     } catch {
       // No usable session - just sign everything out below.
     }
@@ -93,9 +96,15 @@ export async function signOutOtherDevices(
   });
 
   if (!current) return;
+  // Staff access rules apply to the re-issued session too; if it may not
+  // continue (e.g. its time is over), this device is signed out as well.
+  const restriction = await restrictionClaims(login.userId, login.user.role, {
+    viaBuiltInPasskey: current.dbp,
+  });
+  if (!restriction.ok) return;
   const { accessToken, refreshToken } = await generateTokens(
     { userId: login.userId, loginId, role: login.user.role },
-    { mfa: mfa || current.mfa },
+    { mfa: mfa || current.mfa, ...restriction.claims },
   );
   setSessionCookies(response, accessToken, refreshToken);
 }

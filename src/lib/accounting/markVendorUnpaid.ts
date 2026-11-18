@@ -8,6 +8,10 @@ import {
   getVendorDepositBalance,
   lockVendor,
 } from "@/lib/accounting/vendorDeposit";
+import {
+  ConsolidatedRollback,
+  undoConsolidatedPayment,
+} from "@/lib/accounting/consolidatedVendorPayment";
 
 const CONFIG = {
   farm: {
@@ -82,6 +86,10 @@ export async function requireSuperAdmin(
  * A Hardware Purchase's own security deposit moves from "paid" back to
  * "pending" for its vendor, so this is refused when the vendor has already
  * returned or applied more of the deposit than it would still hold.
+ *
+ * An invoice paid in a consolidated payment can't be unpaid on its own: the
+ * whole payment is undone, so every invoice in it goes back to Pending and
+ * the record keeps matching the bank statement.
  */
 export async function markVendorSideUnpaid(
   kind: DepositInvoiceKind,
@@ -94,11 +102,17 @@ export async function markVendorSideUnpaid(
     kind === "hardware"
       ? await prisma.hardwarePurchaseInvoice.findUnique({
           where: { id },
-          include: { paymentParts: true },
+          include: {
+            paymentParts: true,
+            consolidatedItem: { select: { paymentId: true } },
+          },
         })
       : await prisma.vendorInvoice.findUnique({
           where: { id },
-          include: { paymentParts: true },
+          include: {
+            paymentParts: true,
+            consolidatedItem: { select: { paymentId: true } },
+          },
         });
   if (!invoice) {
     return NextResponse.json({ error: config.notFound }, { status: 404 });
@@ -115,8 +129,14 @@ export async function markVendorSideUnpaid(
   const securityDeposit =
     "securityDeposit" in invoice ? invoice.securityDeposit : null;
 
+  const consolidatedPaymentId = invoice.consolidatedItem?.paymentId ?? null;
+
   try {
     await prisma.$transaction(async (tx) => {
+      if (consolidatedPaymentId) {
+        await undoConsolidatedPayment(tx, kind, consolidatedPaymentId, userId);
+        return;
+      }
       if (invoice.vendorId) {
         // Serializes with deposit returns/adjustments for this vendor.
         await lockVendor(tx, invoice.vendorId);
@@ -183,7 +203,7 @@ export async function markVendorSideUnpaid(
       });
     });
   } catch (error) {
-    if (error instanceof Rollback) {
+    if (error instanceof Rollback || error instanceof ConsolidatedRollback) {
       return NextResponse.json(
         { error: error.message },
         { status: error.status },

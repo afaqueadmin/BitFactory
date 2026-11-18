@@ -32,6 +32,10 @@ import { loadSimLiveWorker, simWorkerForDisplay } from "@/lib/simulation/data";
 import { resolveDataOwnerId } from "@/lib/guildScope";
 import { isGuildRole } from "@/lib/customerRoles";
 import {
+  maskPaymentSettingsBody,
+  maskTransactionAddresses,
+} from "@/lib/walletMasking";
+import {
   joinSubaccountNames,
   selectRequestedSubaccounts,
   type LuxorSubaccount,
@@ -1023,11 +1027,25 @@ export async function GET(
       );
     }
 
-    // ✅ STEP 6: Return successful response
+    // ✅ STEP 6: Return successful response. Payout addresses
+    // (payment-settings `addresses[]`, transactions `address_name`) leave
+    // the server masked for everyone but staff, as on /api/wallet/*.
+    let body = data as unknown as Record<string, unknown>;
+    if (!isAdmin) {
+      body = maskPaymentSettingsBody(body);
+      if (Array.isArray(body?.transactions)) {
+        body = {
+          ...body,
+          transactions: maskTransactionAddresses(
+            body.transactions as { address_name?: string }[],
+          ),
+        };
+      }
+    }
     return NextResponse.json<ProxyResponse<Record<string, unknown>>>(
       {
         success: true,
-        data: data as unknown as Record<string, unknown>,
+        data: body,
         timestamp: new Date().toISOString(),
       },
       { status: 200 },

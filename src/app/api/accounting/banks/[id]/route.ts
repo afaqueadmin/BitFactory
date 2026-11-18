@@ -13,21 +13,46 @@ import {
 
 async function paymentReferenceCount(bankId: string): Promise<number> {
   // Farm Tariff / Hardware Purchase payment parts, and Hosting / Hardware
-  // Sales payments, and security deposit returns. The two invoice-column
+  // Sales payments, security deposit returns, internal transfers,
+  // expense payments and Capital & Income. The two invoice-column
   // counts cover the deprecated single-currency columns; remove them when
   // those columns are dropped.
-  const [parts, vendor, hardware, received, depositReturns] = await Promise.all(
-    [
-      prisma.vendorPaymentPart.count({ where: { bankId } }),
-      prisma.vendorInvoice.count({ where: { paymentBankId: bankId } }),
-      prisma.hardwarePurchaseInvoice.count({
-        where: { paymentBankId: bankId },
-      }),
-      prisma.costPayment.count({ where: { bankId } }),
-      prisma.vendorDepositMovement.count({ where: { bankId } }),
-    ],
+  const [
+    parts,
+    consolidated,
+    vendor,
+    hardware,
+    received,
+    depositReturns,
+    transfers,
+    expensePayments,
+    incomes,
+  ] = await Promise.all([
+    prisma.vendorPaymentPart.count({ where: { bankId } }),
+    prisma.vendorConsolidatedPayment.count({ where: { bankId } }),
+    prisma.vendorInvoice.count({ where: { paymentBankId: bankId } }),
+    prisma.hardwarePurchaseInvoice.count({
+      where: { paymentBankId: bankId },
+    }),
+    prisma.costPayment.count({ where: { bankId } }),
+    prisma.vendorDepositMovement.count({ where: { bankId } }),
+    prisma.accountingBankTransfer.count({
+      where: { OR: [{ fromBankId: bankId }, { toBankId: bankId }] },
+    }),
+    prisma.accountingExpensePayment.count({ where: { bankId } }),
+    prisma.accountingIncome.count({ where: { bankId } }),
+  ]);
+  return (
+    parts +
+    consolidated +
+    vendor +
+    hardware +
+    received +
+    depositReturns +
+    transfers +
+    expensePayments +
+    incomes
   );
-  return parts + vendor + hardware + received + depositReturns;
 }
 
 export async function PUT(

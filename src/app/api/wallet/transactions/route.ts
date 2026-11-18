@@ -10,6 +10,7 @@ import {
 import { simRoute } from "@/lib/simulation/context";
 import { loadSimPoolLedger } from "@/lib/simulation/data";
 import { authenticateWalletRequest } from "@/lib/walletTarget";
+import { maskTransactionAddresses } from "@/lib/walletMasking";
 
 /**
  * Transaction object from unified transaction history
@@ -150,6 +151,9 @@ export async function GET(request: NextRequest) {
     const target = await authenticateWalletRequest(request);
     if (target instanceof NextResponse) return target;
     const userId = target.userId;
+    // Payout addresses go out masked unless the caller is staff.
+    const presentRows = (rows: WalletTransaction[]) =>
+      target.callerIsStaff ? rows : maskTransactionAddresses(rows);
     console.log(`[Transactions API] Fetching transactions for user: ${userId}`);
 
     // Get pagination and filter parameters
@@ -228,7 +232,7 @@ export async function GET(request: NextRequest) {
 
       return NextResponse.json(
         {
-          transactions: pageRows,
+          transactions: presentRows(pageRows),
           pagination: {
             pageNumber: page,
             pageSize: limit,
@@ -435,7 +439,7 @@ export async function GET(request: NextRequest) {
 
       return NextResponse.json(
         {
-          transactions: paginatedTransactions,
+          transactions: presentRows(paginatedTransactions),
           pagination: {
             pageNumber: page,
             pageSize: limit,
@@ -647,7 +651,7 @@ export async function GET(request: NextRequest) {
       luxorStats.totalDebitsUsd + braiinsStats.totalDebitsUsd;
 
     const response = {
-      transactions: paginatedTransactions,
+      transactions: presentRows(paginatedTransactions),
       pagination: {
         pageNumber: page,
         pageSize: limit,

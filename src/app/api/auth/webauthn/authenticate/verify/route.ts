@@ -11,6 +11,13 @@ import {
 } from "@/lib/auth/sessionCookies";
 import type { AuthenticationResponseJSON } from "@simplewebauthn/types";
 import {
+  accessDeniedResponse,
+  readAttachment,
+  reportBlock,
+  restrictionClaims,
+} from "@/lib/auth/staffAccessServer";
+import { isBuiltInPasskey } from "@/lib/auth/staffAccess";
+import {
   clearAuthRateLimitForEmail,
   enforceAuthRateLimit,
   getClientIp,
@@ -201,14 +208,40 @@ export async function POST(request: NextRequest) {
 
     await clearAuthRateLimitForEmail("webauthn_authenticate", email);
 
-    // Update counter to latest value (for cloning detection on next auth)
+    // Update counter to latest value (for cloning detection on next auth),
+    // and what the authenticator reports about itself (staff access rules).
+    const attachment = readAttachment(response.authenticatorAttachment);
     await prisma.webAuthnCredential.update({
       where: { id: verified.credentialID },
       data: {
         counter: verified.newCounter,
         lastUsedAt: new Date(),
+        deviceType: verified.deviceType,
+        backedUp: verified.backedUp,
+        ...(attachment ? { attachment } : {}),
       },
     });
+
+    // Staff access rules: hours, and whether this passkey is one built into
+    // the device (the office PC). The assertion is proven by now.
+    const restriction = await restrictionClaims(user.id, user.role, {
+      viaBuiltInPasskey: isBuiltInPasskey({
+        deviceType: verified.deviceType,
+        attachment,
+      }),
+    });
+    if (!restriction.ok) {
+      await reportBlock(user, login.id, restriction.code, request.headers);
+      const denied = accessDeniedResponse(restriction.code);
+      denied.cookies.set("webauthn_auth_challenge", "", {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        maxAge: 0,
+        path: "/",
+      });
+      return denied;
+    }
 
     // Log activity and create session
     const sessionId = await recordLogin(login.id, user.id, "LOGIN_WEBAUTHN", {
@@ -224,7 +257,7 @@ export async function POST(request: NextRequest) {
     // A verified passkey is itself a second factor (see NOTE above).
     const { accessToken, refreshToken } = await generateTokens(
       { userId: user.id, loginId: login.id, role: user.role },
-      { mfa: true },
+      { mfa: true, ...restriction.claims },
     );
 
     // N-9: same cookies and redirect as every other login route. This used

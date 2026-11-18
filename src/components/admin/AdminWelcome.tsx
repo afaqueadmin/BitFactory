@@ -80,12 +80,12 @@ export default function AdminWelcome() {
     {
       n: wallet.length,
       label: plural(wallet.length, "wallet request"),
-      href: "/wallet-requests",
+      href: "/wallets?tab=change-requests",
     },
     {
       n: frequency.length,
       label: plural(frequency.length, "payment frequency request"),
-      href: "/payment-frequency-requests",
+      href: "/wallets?tab=frequency",
     },
     {
       n: firmware.length,

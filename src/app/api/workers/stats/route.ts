@@ -169,8 +169,18 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Query Braiins
-    if (braiinsAuth) {
+    // Query Braiins workers only if the user has a Braiins miner with us: a
+    // miner moved to Luxor stays listed on Braiins as "off" and would count as
+    // an extra inactive miner. activePoolNames keeps Braiins for the earnings
+    // chart, which still needs the historical Braiins data.
+    // shortcut: a user with real Braiins miners plus a dead worker still shows
+    // the dead one; match workers to DB miners by name if that comes up.
+    const hasBraiinsMiners =
+      !!braiinsAuth &&
+      (await prisma.miner.count({
+        where: { userId, isDeleted: false, pool: { name: "Braiins" } },
+      })) > 0;
+    if (braiinsAuth && hasBraiinsMiners) {
       try {
         const authKey = braiinsAuth.authKey;
         const braiinsClient = createBraiinsClient(authKey, userId);

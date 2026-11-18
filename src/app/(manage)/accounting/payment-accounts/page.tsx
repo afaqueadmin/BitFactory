@@ -23,7 +23,15 @@ import {
   Typography,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
-import { useState } from "react";
+import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
+import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
+import { TransferDialog } from "@/components/accounting/bankTransfer/TransferDialog";
+import { TransfersTab } from "@/components/accounting/bankTransfer/TransfersTab";
+import { useDaylight } from "@/lib/daylight";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
+import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
 import { StatusBadge } from "@/components/accounting/common/StatusBadge";
 import {
   ConfirmDeleteDialog,
@@ -40,6 +48,7 @@ import {
   useAccountingBanks,
   useAccountingCurrencies,
   useAccountingEntities,
+  useBankTransfers,
 } from "@/lib/hooks/usePaymentAccounts";
 import {
   DaylightAdminPage,
@@ -160,11 +169,13 @@ function EntitiesTab() {
 
 function BanksTab() {
   const ds = useDaylightAdminSx();
+  const { d } = useDaylight();
   const { data = [], isLoading, error } = useAccountingBanks();
   const { data: entities = [] } = useAccountingEntities();
   const { data: currencies = [] } = useAccountingCurrencies();
   const editor = useRecordEditor<AccountingBank>("banks");
   const [entityFilter, setEntityFilter] = useState("");
+  const [recordingTransfer, setRecordingTransfer] = useState(false);
   const [form, setForm] = useState({
     entityId: "",
     name: "",
@@ -196,6 +207,13 @@ function BanksTab() {
   const rows = entityFilter
     ? data.filter((b) => b.entityId === entityFilter)
     : data;
+  // Balances come as 2 dp strings: sum whole cents to avoid float drift.
+  const totalBalance = (
+    rows.reduce(
+      (cents, b) => cents + Math.round(Number(b.balanceUsd ?? 0) * 100),
+      0,
+    ) / 100
+  ).toFixed(2);
 
   return (
     <>
@@ -220,14 +238,37 @@ function BanksTab() {
             ))}
           </Select>
         </FormControl>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => openForm("new")}
-          sx={ds.primaryBtnSx}
-        >
-          Add bank
-        </Button>
+        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+          <Button
+            component={Link}
+            href={
+              entityFilter
+                ? `/accounting/payment-accounts/statement?entity=${encodeURIComponent(entityFilter)}`
+                : "/accounting/payment-accounts/statement"
+            }
+            variant="outlined"
+            startIcon={<ReceiptLongIcon />}
+            sx={ds.outlineBtnSx}
+          >
+            Consolidated statement
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<SwapHorizIcon />}
+            onClick={() => setRecordingTransfer(true)}
+            sx={ds.outlineBtnSx}
+          >
+            Record transfer
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => openForm("new")}
+            sx={ds.primaryBtnSx}
+          >
+            Add bank
+          </Button>
+        </Stack>
       </Stack>
       {editor.pageError && (
         <Alert severity="error" sx={{ mb: 2, ...ds.alertSx("error") }}>
@@ -241,6 +282,7 @@ function BanksTab() {
               <TableCell>Bank</TableCell>
               <TableCell>Entity</TableCell>
               <TableCell>Currencies</TableCell>
+              <TableCell align="right">Balance (USD)</TableCell>
               <TableCell>Status</TableCell>
               <TableCell align="right">Actions</TableCell>
             </TableRow>
@@ -250,14 +292,30 @@ function BanksTab() {
               loading={isLoading}
               error={error}
               empty={rows.length === 0}
-              colSpan={5}
+              colSpan={6}
             />
             {rows.map((bank) => (
               <TableRow
                 key={bank.id}
                 sx={bank.isActive ? undefined : inactiveRowSx}
               >
-                <TableCell>{bank.name}</TableCell>
+                <TableCell>
+                  <Link
+                    href={`/accounting/payment-accounts/banks/${bank.id}`}
+                    title="Open bank statement"
+                    style={{
+                      color: d.action,
+                      fontWeight: 650,
+                      textDecoration: "none",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 4,
+                    }}
+                  >
+                    {bank.name}
+                    <ReceiptLongIcon sx={{ fontSize: 15, opacity: 0.8 }} />
+                  </Link>
+                </TableCell>
                 <TableCell>{bank.entity.name}</TableCell>
                 <TableCell>
                   <Stack
@@ -274,6 +332,18 @@ function BanksTab() {
                       />
                     ))}
                   </Stack>
+                </TableCell>
+                <TableCell
+                  align="right"
+                  sx={{
+                    fontVariantNumeric: "tabular-nums",
+                    whiteSpace: "nowrap",
+                    fontWeight: 600,
+                    color:
+                      Number(bank.balanceUsd ?? 0) < 0 ? d.danger : undefined,
+                  }}
+                >
+                  <CurrencyDisplay value={bank.balanceUsd ?? 0} />
                 </TableCell>
                 <TableCell>
                   <StatusBadge
@@ -292,9 +362,40 @@ function BanksTab() {
                 </TableCell>
               </TableRow>
             ))}
+            {!isLoading && !error && rows.length > 1 && (
+              <TableRow>
+                <TableCell
+                  colSpan={3}
+                  sx={{ fontWeight: 700, bgcolor: d.tableHead }}
+                >
+                  Total ({rows.length} banks)
+                </TableCell>
+                <TableCell
+                  align="right"
+                  sx={{
+                    fontWeight: 700,
+                    bgcolor: d.tableHead,
+                    fontVariantNumeric: "tabular-nums",
+                    whiteSpace: "nowrap",
+                    color: Number(totalBalance) < 0 ? d.danger : undefined,
+                  }}
+                >
+                  <CurrencyDisplay value={totalBalance} />
+                </TableCell>
+                <TableCell colSpan={2} sx={{ bgcolor: d.tableHead }} />
+              </TableRow>
+            )}
           </TableBody>
         </Table>
       </TableContainer>
+      <Typography sx={{ mt: 1.5, fontSize: 12, color: d.muted }}>
+        Balance = payments and transfers received into the bank (Debit) minus
+        payments, transfers and transfer fees sent from it (Credit), in USD.
+        Click a bank to open its statement.
+      </Typography>
+      {recordingTransfer && (
+        <TransferDialog onClose={() => setRecordingTransfer(false)} />
+      )}
 
       <FormDialog
         open={editor.editing !== null}
@@ -500,9 +601,41 @@ function CurrenciesTab() {
 // Page
 // ---------------------------------------------------------------------------
 
+const TABS = [
+  { key: "banks", label: "Banks" },
+  { key: "transfers", label: "Transfers" },
+  { key: "entities", label: "Entities" },
+  { key: "currencies", label: "Currencies" },
+] as const;
+type TabKey = (typeof TABS)[number]["key"];
+
 export default function PaymentAccountsPage() {
+  return (
+    <Suspense fallback={null}>
+      <PaymentAccountsContent />
+    </Suspense>
+  );
+}
+
+function PaymentAccountsContent() {
   const ds = useDaylightAdminSx();
-  const [tab, setTab] = useState(0);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const param = searchParams.get("tab");
+  // Banks first; ?tab= keeps the tab on refresh and back from a statement.
+  const tab: TabKey = TABS.some((t) => t.key === param)
+    ? (param as TabKey)
+    : "banks";
+  const { data: banks } = useAccountingBanks();
+  const { data: entities } = useAccountingEntities();
+  const { data: currencies } = useAccountingCurrencies();
+  const { data: transfers } = useBankTransfers();
+  const counts: Record<TabKey, number | undefined> = {
+    banks: banks?.length,
+    transfers: transfers?.length,
+    entities: entities?.length,
+    currencies: currencies?.length,
+  };
 
   return (
     <DaylightAdminPage>
@@ -511,26 +644,42 @@ export default function PaymentAccountsPage() {
           Entities, Banks &amp; Currencies
         </Typography>
         <Typography sx={ds.pageDescSx}>
-          The paying and receiving accounts used when recording payments.
-          Inactive records are hidden from payment forms but stay on past
-          payments.
+          The paying and receiving accounts used when recording payments, and
+          the transfers between them. Inactive records are hidden from payment
+          forms but stay on past payments.
         </Typography>
       </Box>
       <Paper elevation={0} sx={{ ...ds.listCardSx, p: { xs: 2, sm: 3 } }}>
         <Tabs
           value={tab}
-          onChange={(_, v) => setTab(v)}
+          onChange={(_, v: TabKey) =>
+            router.replace(
+              v === "banks"
+                ? "/accounting/payment-accounts"
+                : `/accounting/payment-accounts?tab=${v}`,
+              { scroll: false },
+            )
+          }
           sx={{ ...ds.tabsSx, mb: 3 }}
           variant="scrollable"
           allowScrollButtonsMobile
         >
-          <Tab label="Entities" />
-          <Tab label="Banks" />
-          <Tab label="Currencies" />
+          {TABS.map((t) => (
+            <Tab
+              key={t.key}
+              value={t.key}
+              label={
+                counts[t.key] === undefined
+                  ? t.label
+                  : `${t.label} (${counts[t.key]})`
+              }
+            />
+          ))}
         </Tabs>
-        {tab === 0 && <EntitiesTab />}
-        {tab === 1 && <BanksTab />}
-        {tab === 2 && <CurrenciesTab />}
+        {tab === "banks" && <BanksTab />}
+        {tab === "transfers" && <TransfersTab />}
+        {tab === "entities" && <EntitiesTab />}
+        {tab === "currencies" && <CurrenciesTab />}
       </Paper>
     </DaylightAdminPage>
   );

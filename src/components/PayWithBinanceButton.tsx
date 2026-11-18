@@ -51,6 +51,8 @@ export default function PayWithBinanceButton({
   const [error, setError] = useState<string | null>(null);
   const [checkout, setCheckout] = useState<BinanceCheckout | null>(null);
   const [paid, setPaid] = useState(false);
+  // Paid over the invoice total + tolerance: accounts will settle it by hand.
+  const [processing, setProcessing] = useState(false);
   const [timedOut, setTimedOut] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
   const confettiFired = useRef(false);
@@ -58,7 +60,7 @@ export default function PayWithBinanceButton({
   const open = !!checkout;
 
   useEffect(() => {
-    if (!open || paid) return;
+    if (!open || paid || processing) return;
     const startedAt = Date.now();
     let cancelled = false;
 
@@ -69,12 +71,20 @@ export default function PayWithBinanceButton({
         return;
       }
       try {
-        const res = await fetch(
-          `/api/checkPaymentReceived2?invoiceId=${encodeURIComponent(invoiceId)}`,
+        // The checkout shows both TRX and ETH addresses, so check both chains.
+        const results = await Promise.all(
+          ["TRX", "ETH"].map(async (network) => {
+            const res = await fetch(
+              `/api/checkSubAccountDeposit?invoiceId=${encodeURIComponent(invoiceId)}&network=${network}`,
+            );
+            if (!res.ok) return null;
+            const data = await res.json();
+            return data as { paid?: boolean; processing?: boolean };
+          }),
         );
-        if (!res.ok) return;
-        const data = await res.json();
-        if (!cancelled && data.paid) setPaid(true);
+        if (cancelled) return;
+        if (results.some((r) => r?.paid)) setPaid(true);
+        else if (results.some((r) => r?.processing)) setProcessing(true);
       } catch {
         // Network hiccup: try again on the next tick.
       }
@@ -85,7 +95,7 @@ export default function PayWithBinanceButton({
       cancelled = true;
       clearInterval(timer);
     };
-  }, [open, paid, invoiceId]);
+  }, [open, paid, processing, invoiceId]);
 
   useEffect(() => {
     if (!paid || confettiFired.current) return;
@@ -101,18 +111,24 @@ export default function PayWithBinanceButton({
     queryClient.invalidateQueries({ queryKey: ["invoices"] });
   }, [paid, invoiceId, queryClient]);
 
+  useEffect(() => {
+    if (!processing) return;
+    queryClient.invalidateQueries({ queryKey: ["invoice", invoiceId] });
+    queryClient.invalidateQueries({ queryKey: ["invoices"] });
+  }, [processing, invoiceId, queryClient]);
+
   async function handleClick() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/binanceDeposit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ invoiceId }),
-      });
+      const res = await fetch(
+        `/api/invoices/${encodeURIComponent(invoiceId)}/binance-subaccount`,
+        { method: "POST" },
+      );
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error ?? "Failed to start payment");
       setPaid(false);
+      setProcessing(false);
       setTimedOut(false);
       confettiFired.current = false;
       setCheckout(data);
@@ -185,6 +201,17 @@ export default function PayWithBinanceButton({
               <Typography color="text.secondary" sx={{ mt: 1 }}>
                 Thank you! Your invoice is now marked as paid and a confirmation
                 email is on its way.
+              </Typography>
+            </Box>
+          ) : processing ? (
+            <Box sx={{ textAlign: "center", py: 6 }}>
+              <CheckCircleIcon color="info" sx={{ fontSize: 96 }} />
+              <Typography variant="h4" sx={{ fontWeight: 700, mt: 2 }}>
+                Payment received - under review
+              </Typography>
+              <Typography color="text.secondary" sx={{ mt: 1 }}>
+                We received more than the invoice amount, so our accounts team
+                will review the payment and mark your invoice as paid.
               </Typography>
             </Box>
           ) : (
@@ -296,7 +323,7 @@ export default function PayWithBinanceButton({
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setCheckout(null)}>
-            {paid ? "Done" : "Close"}
+            {paid || processing ? "Done" : "Close"}
           </Button>
         </DialogActions>
       </Dialog>

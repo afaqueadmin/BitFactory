@@ -22,7 +22,6 @@ import {
   SupportAgent as SupportIcon,
   TrendingDown as HashrateAlertsIcon,
   AccountBalanceWallet as WalletRequestsIcon,
-  EventRepeat as PaymentFrequencyRequestsIcon,
   SystemUpdateAlt as FirmwareRequestsIcon,
   ContactMail as SecondaryLoginRequestsIcon,
   Group as CustomersIcon,
@@ -60,10 +59,15 @@ import {
   PictureAsPdf as PdfSettingsIcon,
   AccountBalance as PaymentAccountsIcon,
   LocalShipping as VendorsIcon,
+  RequestPage as ExpensesIcon,
+  Category as ExpenseHeadsIcon,
+  AddCard as CapitalIncomeIcon,
+  Label as CapitalIncomeHeadsIcon,
   Timeline as CustomerPaybackIcon,
   Factory as CompanyPaybackIcon,
   History as ActivityLogIcon,
   FactCheck as AuditLogIcon,
+  ManageAccounts as AccessRulesIcon,
   Dataset as DbDataIcon,
   ListAlt as SubaccountRecordsIcon,
   ShowChart as DailySnapshotsIcon,
@@ -90,18 +94,20 @@ import {
   useSecondaryLoginRequests,
   useHashrateAlerts,
 } from "@/lib/hooks";
+import { useWalletMismatchCount } from "@/lib/hooks/useWalletMismatchCount";
 import { useSimulationRequestCount } from "@/lib/hooks/useSimulationRequestCount";
+import { useStaffTimeRequestCount } from "@/lib/hooks/useStaffTimeRequestCount";
 import { useAdminNav } from "@/lib/contexts/admin-nav-context";
 import { focusRing, useDaylight } from "@/lib/daylight";
 
 type BadgeKey =
   | "tickets"
-  | "wallet"
-  | "frequency"
+  | "wallets"
   | "firmware"
   | "logins"
   | "alerts"
-  | "simulation";
+  | "simulation"
+  | "access";
 
 interface SidebarItem {
   title: string;
@@ -147,16 +153,13 @@ const sidebarSections: SidebarSection[] = [
         badgeKey: "alerts",
       },
       {
-        title: "Wallet Requests",
+        // Client wallets: records, Luxor mismatch alerts, wallet / guild
+        // wallet / payment frequency requests (badge sums all of them).
+        title: "Wallets",
         icon: <WalletRequestsIcon />,
-        path: "/wallet-requests",
-        badgeKey: "wallet",
-      },
-      {
-        title: "Payment Frequency Requests",
-        icon: <PaymentFrequencyRequestsIcon />,
-        path: "/payment-frequency-requests",
-        badgeKey: "frequency",
+        path: "/wallets",
+        activeMatch: [/^\/wallet-requests/, /^\/payment-frequency-requests/],
+        badgeKey: "wallets",
       },
       {
         title: "Firmware Change Requests",
@@ -305,6 +308,16 @@ const sidebarSections: SidebarSection[] = [
         ],
       },
       {
+        title: "Expenses",
+        icon: <ExpensesIcon />,
+        path: "/accounting/expenses",
+      },
+      {
+        title: "Capital & Income",
+        icon: <CapitalIncomeIcon />,
+        path: "/accounting/capital-income",
+      },
+      {
         title: "Customer Statements",
         icon: <StatementsIcon />,
         path: "/accounting/statements",
@@ -353,6 +366,16 @@ const sidebarSections: SidebarSection[] = [
             icon: <VendorsIcon />,
             path: "/accounting/vendors",
           },
+          {
+            title: "Expense Heads",
+            icon: <ExpenseHeadsIcon />,
+            path: "/accounting/expense-heads",
+          },
+          {
+            title: "Capital & Income Heads",
+            icon: <CapitalIncomeHeadsIcon />,
+            path: "/accounting/capital-income-heads",
+          },
         ],
       },
     ],
@@ -381,6 +404,14 @@ const sidebarSections: SidebarSection[] = [
         path: "/activity-log",
       },
       { title: "Audit Log", icon: <AuditLogIcon />, path: "/audit-log" },
+      {
+        // Office hours + office-passkey rules for admin/accounting accounts.
+        title: "Access Rules",
+        icon: <AccessRulesIcon />,
+        path: "/access-rules",
+        roles: ["SUPER_ADMIN"],
+        badgeKey: "access",
+      },
       {
         title: "DB Data Management",
         icon: <DbDataIcon />,
@@ -486,16 +517,23 @@ export default function AdminSidebar() {
     acknowledged: false,
   });
   const pendingSimulationRequests = useSimulationRequestCount();
+  const pendingTimeRequests = useStaffTimeRequestCount(
+    user?.role === "SUPER_ADMIN",
+  );
+  const openWalletMismatches = useWalletMismatchCount();
   const { d, fonts } = useDaylight();
 
   const badgeCounts: Record<BadgeKey, number> = {
     tickets: openTickets.length,
-    wallet: pendingWalletRequests.length,
-    frequency: pendingFrequencyRequests.length,
+    wallets:
+      pendingWalletRequests.length +
+      pendingFrequencyRequests.length +
+      openWalletMismatches,
     firmware: pendingFirmwareRequests.length,
     logins: pendingLoginRequests.length,
     alerts: pendingHashrateAlerts.length,
     simulation: pendingSimulationRequests,
+    access: pendingTimeRequests,
   };
 
   // A group shows the total of its children so counts aren't hidden when

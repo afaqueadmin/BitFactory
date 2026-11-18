@@ -26,6 +26,7 @@ import { requireSession, jsonError } from "@/lib/guilds/routeAuth";
 import { verifyStepUp } from "@/lib/auth/stepUp";
 import { getGuildMembership } from "@/lib/guildScope";
 import { GuildInputError, parseWalletAddress } from "@/lib/guilds/accounts";
+import { maskWalletAddress } from "@/lib/walletCrypto";
 import {
   GUILD_MEMBER_REQUEST_AUDIT,
   OPEN_REQUEST,
@@ -136,7 +137,7 @@ export async function POST(request: NextRequest) {
         });
         return {
           id: created.id,
-          summary: `change ${nameOf(target.id)}'s reward wallet to ${address}`,
+          summary: `change ${nameOf(target.id)}'s reward wallet to ${maskWalletAddress(address)}`,
         };
       };
     } else if (body.kind === "split") {

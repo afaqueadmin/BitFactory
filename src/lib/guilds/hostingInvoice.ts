@@ -16,6 +16,9 @@ import {
 } from "@/app/api/accounting/invoices/invoiceNumber";
 import type { UnpaidHostingInvoice } from "./distribution";
 
+// Invoices the guild reward pays down. PROCESSING is left out on purpose:
+// the customer already paid it (a Binance overpayment waiting on accounts),
+// so allocating reward to it would pay it twice.
 const OPEN_STATUSES = [InvoiceStatus.ISSUED, InvoiceStatus.OVERDUE];
 
 /**

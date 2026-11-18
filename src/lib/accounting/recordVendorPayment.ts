@@ -15,6 +15,7 @@ import {
   lockVendor,
   recordAdjustment,
 } from "@/lib/accounting/vendorDeposit";
+import { consolidatedPageName } from "@/lib/accounting/consolidatedVendorPayment";
 
 /**
  * Body of POST /api/{vendor-invoices|hardware-purchases}/[id]/record-payment:
@@ -80,6 +81,16 @@ export async function recordVendorSidePayment(
     return NextResponse.json(
       {
         error: `Cannot record payment for a ${invoice.paymentStatus.toLowerCase()} invoice`,
+      },
+      { status: 400 },
+    );
+  }
+
+  // A credit has nothing to pay on its own; it offsets other invoices.
+  if (invoice.totalAmount.isNegative()) {
+    return NextResponse.json(
+      {
+        error: `This invoice is a credit of ${invoice.totalAmount.abs().toFixed(2)}. Settle it with Record Consolidated Payment on the ${consolidatedPageName(kind)} page, together with this vendor's invoices it offsets`,
       },
       { status: 400 },
     );

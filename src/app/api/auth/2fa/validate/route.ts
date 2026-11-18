@@ -18,6 +18,11 @@ import { findLoginByEmail, recordLogin } from "@/lib/auth/loginIdentity";
 import { consumeBackupCode } from "@/lib/auth/backupCodes";
 import { verifyTotpCode } from "@/lib/auth/totpSecret";
 import { isTokenBlacklisted } from "@/lib/auth/tokenBlacklist";
+import {
+  accessDeniedResponse,
+  reportBlock,
+  restrictionClaims,
+} from "@/lib/auth/staffAccessServer";
 
 export async function POST(req: NextRequest) {
   try {
@@ -81,10 +86,16 @@ export async function POST(req: NextRequest) {
     const user = login.user;
     const twoFactorAuth = login.twoFactorAuth;
 
+    // Staff access rules. A refusal is only returned once the code is proven
+    // right (below), so it tells a guesser nothing.
+    const restriction = await restrictionClaims(user.id, user.role, {
+      viaBuiltInPasskey: false,
+    });
+
     // Generate tokens with role
     const { accessToken, refreshToken } = await generateTokens(
       { userId: user.id, loginId: login.id, role: user.role },
-      { mfa: true },
+      { mfa: true, ...(restriction.ok ? restriction.claims : {}) },
     );
 
     // Determine redirect URL based on role
@@ -169,6 +180,13 @@ export async function POST(req: NextRequest) {
         );
       }
       throw error;
+    }
+
+    if (!restriction.ok) {
+      await reportBlock(user, login.id, restriction.code, req.headers);
+      const denied = accessDeniedResponse(restriction.code);
+      clearPendingTwoFactorCookie(denied);
+      return denied;
     }
 
     // consumeBackupCode already stamped lastUsedAt when it removed the code.

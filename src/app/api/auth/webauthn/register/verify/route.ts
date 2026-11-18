@@ -6,6 +6,11 @@ import { signOutOtherDevices } from "@/lib/auth/sessionRevocation";
 import { verifyWebAuthnRegistration } from "@/lib/webauthn/server";
 import { WebAuthnAttestationResponse } from "@/types/webauthn";
 import type { RegistrationResponseJSON } from "@simplewebauthn/types";
+import {
+  passkeysLocked,
+  passkeysLockedResponse,
+  readAttachment,
+} from "@/lib/auth/staffAccessServer";
 
 export const runtime = "nodejs";
 
@@ -68,6 +73,10 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       );
     }
+
+    // Staff access rules: an account that must use its office passkey can't
+    // add passkeys itself (a super admin turns the rule off to add one).
+    if (await passkeysLocked(userId)) return passkeysLockedResponse();
 
     // The signed-in login, which the passkey will belong to
     const user = await prisma.userLogin.findUnique({
@@ -165,6 +174,10 @@ export async function POST(request: NextRequest) {
           counter: verified.counter,
           transports: body.transports || [],
           credentialName: body.credentialName || "My Passkey",
+          aaguid: verified.aaguid,
+          deviceType: verified.deviceType,
+          backedUp: verified.backedUp,
+          attachment: readAttachment(body.authenticatorAttachment),
         },
       });
 

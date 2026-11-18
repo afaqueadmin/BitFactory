@@ -5,7 +5,11 @@
  * invoice pages. Pending: the payment form (date, one or more currency
  * parts - each with its own Entity/Bank/Currency, rate, amount and fee -
  * and the receipt PDF) posting to `<apiBase>/<id>/record-payment`.
- * Paid: a read-only summary of the parts with a link to the receipt.
+ * Paid: a read-only summary of the parts with a link to the receipt, or -
+ * when it was paid in a consolidated payment - of that one transfer, this
+ * invoice's share and the other invoices it paid.
+ * A Pending credit (negative total) has nothing to pay on its own: it is
+ * settled with Record Consolidated Payment on its list page.
  *
  * Security deposit: the vendor may apply part of the deposit it holds to
  * the invoice. Adjustments recorded earlier (Security Deposits page) and
@@ -32,6 +36,7 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CancelIcon from "@mui/icons-material/Cancel";
 import DeleteIcon from "@mui/icons-material/Delete";
 import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
+import NextLink from "next/link";
 import { ReactNode, useState } from "react";
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
 import { DateDisplay } from "@/components/accounting/common/DateDisplay";
@@ -47,6 +52,7 @@ import {
   partsTotalUsd,
 } from "@/components/accounting/common/PaymentPartsFields";
 import type {
+  ConsolidatedPaymentItem,
   DepositAdjustment,
   InvoiceVendor,
   VendorPaymentPart,
@@ -80,6 +86,8 @@ export interface VendorSideInvoice {
   vendor?: InvoiceVendor | null;
   /** Security deposit the vendor applied to this invoice. */
   depositAdjustments?: DepositAdjustment[];
+  /** Set when it was paid in a consolidated payment. */
+  consolidatedItem?: ConsolidatedPaymentItem | null;
 }
 
 /**
@@ -178,6 +186,134 @@ function SummaryRow({
   );
 }
 
+/** Paid in a consolidated payment: the one transfer and what it paid. */
+function ConsolidatedSummary({
+  invoice,
+  item,
+  receiptHref,
+}: {
+  invoice: VendorSideInvoice;
+  item: ConsolidatedPaymentItem;
+  receiptHref: string;
+}) {
+  const p = item.payment;
+  const code = p.currency.code;
+  const feeUsd = Number(p.transactionFee) / Number(p.exchangeRate);
+  const due = p.items.reduce((s, i) => s + Number(i.amountUsd), 0);
+  return (
+    <Stack spacing={2}>
+      <Alert severity="success">
+        This invoice was paid on{" "}
+        <DateDisplay
+          date={new Date(invoice.paidDate ?? p.paidDate)}
+          format="date"
+        />{" "}
+        in a consolidated payment: one transfer that paid {p.items.length}{" "}
+        invoices from this vendor.
+      </Alert>
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
+          gap: 2,
+        }}
+      >
+        <SummaryRow label="Entity">{p.entity.name}</SummaryRow>
+        <SummaryRow label="Bank">{p.bank.name}</SummaryRow>
+        <SummaryRow label="Amount Paid (whole transfer)">
+          {formatCurrencyAmount(p.amount, code)}
+        </SummaryRow>
+        <SummaryRow label="Exchange Rate">
+          {`1 USD = ${Number(p.exchangeRate)} ${code}`}
+        </SummaryRow>
+        <SummaryRow label="USD Equivalent">
+          <CurrencyDisplay value={p.amountUsd} />
+        </SummaryRow>
+        <SummaryRow label="Transaction Fee">
+          {formatCurrencyAmount(p.transactionFee, code)}
+        </SummaryRow>
+        <SummaryRow label="Fee (USD)">
+          <CurrencyDisplay value={feeUsd} />
+        </SummaryRow>
+        <SummaryRow label="This Invoice's Share (USD)">
+          <CurrencyDisplay value={item.amountUsd} />
+        </SummaryRow>
+      </Box>
+      <Box>
+        <Typography
+          variant="subtitle2"
+          color="textSecondary"
+          sx={{ fontWeight: 600, mb: 0.5 }}
+        >
+          Invoices in this payment
+        </Typography>
+        <Stack spacing={0.5}>
+          {p.items.map((i) => {
+            const inv = i.vendorInvoice ?? i.hardwarePurchase;
+            if (!inv) return null;
+            const href = i.vendorInvoice
+              ? `/accounting/vendorInvoice/${inv.id}`
+              : `/accounting/hardwarePurchase/${inv.id}`;
+            return (
+              <Stack
+                key={inv.id}
+                direction="row"
+                justifyContent="space-between"
+                spacing={1}
+              >
+                <Typography variant="body2">
+                  {inv.id === invoice.id ? (
+                    <strong>Invoice {inv.invoiceNumber} (this one)</strong>
+                  ) : (
+                    <MuiLink component={NextLink} href={href}>
+                      Invoice {inv.invoiceNumber}
+                    </MuiLink>
+                  )}
+                  {Number(i.amountUsd) < 0 ? " · credit" : ""}
+                </Typography>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                  <CurrencyDisplay value={i.amountUsd} />
+                </Typography>
+              </Stack>
+            );
+          })}
+          <Divider />
+          <Stack direction="row" justifyContent="space-between">
+            <Typography variant="body2" color="textSecondary">
+              Amount due
+            </Typography>
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+              <CurrencyDisplay value={due} />
+            </Typography>
+          </Stack>
+          <Stack direction="row" justifyContent="space-between">
+            <Typography variant="body2" color="textSecondary">
+              + Transaction fee
+            </Typography>
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+              <CurrencyDisplay value={feeUsd} />
+            </Typography>
+          </Stack>
+        </Stack>
+      </Box>
+      <SummaryRow label="Payment Receipt">
+        {invoice.paymentReceiptKey ? (
+          <MuiLink
+            href={receiptHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            sx={{ display: "inline-flex", alignItems: "center", gap: 0.5 }}
+          >
+            <PictureAsPdfIcon fontSize="small" /> View receipt
+          </MuiLink>
+        ) : (
+          "No receipt"
+        )}
+      </SummaryRow>
+    </Stack>
+  );
+}
+
 function PaidSummary({
   invoice,
   receiptHref,
@@ -185,6 +321,15 @@ function PaidSummary({
   invoice: VendorSideInvoice;
   receiptHref: string;
 }) {
+  if (invoice.consolidatedItem) {
+    return (
+      <ConsolidatedSummary
+        invoice={invoice}
+        item={invoice.consolidatedItem}
+        receiptHref={receiptHref}
+      />
+    );
+  }
   const parts = invoice.paymentParts ?? [];
   const adjustments = invoice.depositAdjustments ?? [];
   const multi = parts.length > 1;
@@ -337,6 +482,34 @@ export function VendorPaymentSection({
 
   if (invoice.paymentStatus === "Paid") {
     return <PaidSummary invoice={invoice} receiptHref={receiptHref} />;
+  }
+
+  // A credit offsets other invoices; it's never paid on its own.
+  if (Number(invoice.totalAmount) < 0) {
+    const page = apiBase.includes("hardware-purchases")
+      ? "Hardware Purchases"
+      : "Farm Tariffs";
+    return (
+      <Stack spacing={2}>
+        <Alert severity="info">
+          This invoice is a credit of{" "}
+          <CurrencyDisplay value={Math.abs(Number(invoice.totalAmount))} />: the
+          vendor owes this amount, so there is nothing to pay on it. Settle it
+          with <strong>Record Consolidated Payment</strong> on the {page} page,
+          together with this vendor&apos;s invoices it was deducted from in the
+          bank transfer.
+        </Alert>
+        <Button
+          fullWidth
+          variant="outlined"
+          color="error"
+          startIcon={<CancelIcon />}
+          onClick={onCancelClick}
+        >
+          Cancel Invoice
+        </Button>
+      </Stack>
+    );
   }
 
   const totalUsd = Number(invoice.totalAmount);

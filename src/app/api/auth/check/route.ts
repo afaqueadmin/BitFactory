@@ -3,9 +3,37 @@ import { prisma } from "@/lib/prisma";
 import { verifyJwtToken, generateTokens } from "@/lib/jwt";
 import { twoFactorRequirement } from "@/lib/auth/twoFactorPolicy";
 import { findLoginById } from "@/lib/auth/loginIdentity";
+import { restrictionClaims } from "@/lib/auth/staffAccessServer";
+import {
+  ACCESS_DENIED_MESSAGES,
+  type AccessDeniedCode,
+} from "@/lib/auth/staffAccess";
 
 // Runtime config
 export const runtime = "nodejs";
+
+function accessTimeOver(accessUntil: number | undefined): boolean {
+  return typeof accessUntil === "number" && Date.now() >= accessUntil * 1000;
+}
+
+/** 401 that ends the session, with the staff-access reason. */
+function signedOutResponse(code: AccessDeniedCode): NextResponse {
+  const response = NextResponse.json(
+    { isAuthenticated: false, code, error: ACCESS_DENIED_MESSAGES[code] },
+    { status: 401 },
+  );
+  for (const name of ["token", "refresh_token"]) {
+    response.cookies.set(name, "", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 0,
+      path: "/",
+      expires: new Date(0),
+    });
+  }
+  return response;
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -20,6 +48,11 @@ export async function GET(request: NextRequest) {
     if (accessToken) {
       try {
         const decoded = await verifyJwtToken(accessToken);
+        // Staff access rules: a session past its allowed time is over, even
+        // if the token itself hasn't expired (the proxy blocks it too).
+        if (accessTimeOver(decoded.accessUntil)) {
+          return signedOutResponse("OUTSIDE_HOURS");
+        }
         // Get user data. `email` is the account's (primary) email;
         // `loginEmail` is the one this session signed in with.
         const login = await prisma.userLogin.findUnique({
@@ -77,11 +110,20 @@ export async function GET(request: NextRequest) {
               role: found.user.role,
               loginEmail: found.email,
             };
+            // Staff access rules, re-checked on every refresh: hours, and
+            // whether the session came from the office passkey (dbp) or is
+            // still within a passkey exception. Not reported as a block: the
+            // app calls this every few minutes, and the session simply ends.
+            const restriction = await restrictionClaims(user.id, user.role, {
+              viaBuiltInPasskey: decoded.dbp === true,
+            });
+            if (!restriction.ok) return signedOutResponse(restriction.code);
+
             // Generate new tokens, keeping how the session was established.
             const { accessToken, refreshToken: newRefreshToken } =
               await generateTokens(
                 { userId: user.id, loginId: found.id, role: user.role },
-                { mfa: decoded.mfa === true },
+                { mfa: decoded.mfa === true, ...restriction.claims },
               );
 
             // Create response with new tokens

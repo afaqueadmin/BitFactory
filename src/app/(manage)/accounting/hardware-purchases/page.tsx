@@ -35,6 +35,7 @@ import {
   HardwarePurchaseInvoice,
 } from "@/lib/hooks/useHardwarePurchases";
 import { useAccountingVendors } from "@/lib/hooks/usePaymentAccounts";
+import { ConsolidatedPaymentDialog } from "@/components/accounting/common/ConsolidatedPaymentDialog";
 import EditHardwarePurchaseModal from "@/components/accounting/EditHardwarePurchaseModal";
 import { useDaylight } from "@/lib/daylight";
 import {
@@ -58,6 +59,10 @@ export default function HardwarePurchases() {
   const [selectedInvoiceData, setSelectedInvoiceData] =
     useState<HardwarePurchaseInvoice | null>(null);
   const [exporting, setExporting] = useState<"csv" | "pdf" | null>(null);
+  const [consolidatedOpen, setConsolidatedOpen] = useState(false);
+  const [consolidatedNotice, setConsolidatedNotice] = useState<string | null>(
+    null,
+  );
   const [exportError, setExportError] = useState<string | null>(null);
   const [vendorFilter, setVendorFilter] = useState("");
   // Every vendor that is or was used for hardware purchases, inactive too.
@@ -203,16 +208,48 @@ export default function HardwarePurchases() {
         title="Hardware Purchases Dashboard"
         description="Overview of hardware purchase invoices and payments"
         actions={
-          <Link href="/accounting/hardware-purchases/create">
+          <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
             <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              sx={ds.primaryBtnSx}
+              variant="outlined"
+              sx={ds.outlineBtnSx}
+              onClick={() => {
+                setConsolidatedNotice(null);
+                setConsolidatedOpen(true);
+              }}
             >
-              Record Hardware Purchase
+              Record Consolidated Payment
             </Button>
-          </Link>
+            <Link href="/accounting/hardware-purchases/create">
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                sx={ds.primaryBtnSx}
+              >
+                Record Hardware Purchase
+              </Button>
+            </Link>
+          </Box>
         }
+      />
+
+      {consolidatedNotice && (
+        <Alert
+          severity="success"
+          sx={{ ...ds.alertSx("success"), mb: 2 }}
+          onClose={() => setConsolidatedNotice(null)}
+        >
+          {consolidatedNotice}
+        </Alert>
+      )}
+      <ConsolidatedPaymentDialog
+        kind="hardware"
+        open={consolidatedOpen}
+        onClose={() => setConsolidatedOpen(false)}
+        onRecorded={(message) => {
+          setConsolidatedOpen(false);
+          setConsolidatedNotice(message);
+          refetch();
+        }}
       />
 
       {/* Stats Row */}

@@ -93,7 +93,14 @@ export default function FactoryStatusCard({
       color: d.poolBraiins,
       stats: poolBreakdown?.braiins,
     },
-  ].filter((p) => activePoolNames.includes(p.name) && p.stats);
+  ].filter(
+    (p) =>
+      activePoolNames.includes(p.name) &&
+      p.stats &&
+      // A pool login with no workers counted (e.g. Braiins kept only for
+      // earnings history) would show an empty "0/0 active" row.
+      p.stats.activeWorkers + p.stats.inactiveWorkers > 0,
+  );
 
   const showTotalMiners =
     typeof totalMinerCount === "number" &&

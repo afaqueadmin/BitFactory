@@ -29,14 +29,14 @@ export async function GET(request: NextRequest) {
     }
 
     // Hosting revenue is invoice-based: sum totalAmount of all ELECTRICITY_CHARGES
-    // invoices that have been issued to the customer (ISSUED/OVERDUE/PAID).
+    // invoices that have been issued to the customer (ISSUED/OVERDUE/PROCESSING/PAID).
     // DRAFT invoices are excluded since they haven't been sent yet.
     const [invoices, credits] = await Promise.all([
       prisma.invoice.aggregate({
         where: {
           invoiceType: "ELECTRICITY_CHARGES",
           status: {
-            in: ["ISSUED", "OVERDUE", "PAID"],
+            in: ["ISSUED", "OVERDUE", "PROCESSING", "PAID"],
           },
         },
         _sum: {

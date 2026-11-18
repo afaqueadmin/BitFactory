@@ -85,13 +85,21 @@ interface PaymentAccountFieldsProps {
   value: PaymentAccountValue;
   onChange: (value: PaymentAccountValue) => void;
   disabled?: boolean;
+  /** False hides the exchange rate (the form asks for its own rates). */
+  showRate?: boolean;
+  /** Prefix for the select labels, e.g. "From" → "From entity". */
+  labelPrefix?: string;
 }
 
 export function PaymentAccountFields({
   value,
   onChange,
   disabled = false,
+  showRate = true,
+  labelPrefix,
 }: PaymentAccountFieldsProps) {
+  const label = (name: string) =>
+    labelPrefix ? `${labelPrefix} ${name.toLowerCase()}` : name;
   const entitiesQuery = useAccountingEntities(true);
   const banksQuery = useAccountingBanks(true);
   const entities = entitiesQuery.data ?? [];
@@ -134,9 +142,9 @@ export function PaymentAccountFields({
       )}
 
       <FormControl fullWidth required disabled={disabled || loading}>
-        <InputLabel>Entity</InputLabel>
+        <InputLabel>{label("Entity")}</InputLabel>
         <Select
-          label="Entity"
+          label={label("Entity")}
           value={value.entityId}
           onChange={(e) =>
             onChange({
@@ -158,9 +166,9 @@ export function PaymentAccountFields({
         required
         disabled={disabled || loading || !value.entityId}
       >
-        <InputLabel>Bank</InputLabel>
+        <InputLabel>{label("Bank")}</InputLabel>
         <Select
-          label="Bank"
+          label={label("Bank")}
           value={value.bankId}
           onChange={(e) =>
             onChange({
@@ -186,9 +194,9 @@ export function PaymentAccountFields({
         required
         disabled={disabled || loading || !value.bankId}
       >
-        <InputLabel>Currency</InputLabel>
+        <InputLabel>{label("Currency")}</InputLabel>
         <Select
-          label="Currency"
+          label={label("Currency")}
           value={value.currencyId}
           onChange={(e) => selectCurrency(e.target.value)}
         >
@@ -200,36 +208,38 @@ export function PaymentAccountFields({
         </Select>
       </FormControl>
 
-      <TextField
-        label="Exchange rate"
-        type="number"
-        required
-        fullWidth
-        value={value.exchangeRate}
-        onChange={(e) => onChange({ ...value, exchangeRate: e.target.value })}
-        disabled={disabled || !value.currencyId || rateLocked}
-        error={rateInvalid}
-        helperText={
-          rateInvalid
-            ? "Enter a rate greater than 0"
-            : rateLocked
-              ? "USD payments use a rate of 1"
-              : "How many units of the payment currency equal 1 USD"
-        }
-        slotProps={{
-          htmlInput: { min: 0, step: "any" },
-          input: {
-            startAdornment: (
-              <InputAdornment position="start">1 USD =</InputAdornment>
-            ),
-            endAdornment: value.currencyCode ? (
-              <InputAdornment position="end">
-                {value.currencyCode}
-              </InputAdornment>
-            ) : undefined,
-          },
-        }}
-      />
+      {showRate && (
+        <TextField
+          label="Exchange rate"
+          type="number"
+          required
+          fullWidth
+          value={value.exchangeRate}
+          onChange={(e) => onChange({ ...value, exchangeRate: e.target.value })}
+          disabled={disabled || !value.currencyId || rateLocked}
+          error={rateInvalid}
+          helperText={
+            rateInvalid
+              ? "Enter a rate greater than 0"
+              : rateLocked
+                ? "USD payments use a rate of 1"
+                : "How many units of the payment currency equal 1 USD"
+          }
+          slotProps={{
+            htmlInput: { min: 0, step: "any" },
+            input: {
+              startAdornment: (
+                <InputAdornment position="start">1 USD =</InputAdornment>
+              ),
+              endAdornment: value.currencyCode ? (
+                <InputAdornment position="end">
+                  {value.currencyCode}
+                </InputAdornment>
+              ) : undefined,
+            },
+          }}
+        />
+      )}
     </Stack>
   );
 }

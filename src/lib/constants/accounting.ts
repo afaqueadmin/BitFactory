@@ -88,6 +88,7 @@ export const INVOICE_STATUS_LABELS: Record<
   [InvoiceStatus.ISSUED]: "Issued",
   [InvoiceStatus.PAID]: "Paid",
   [InvoiceStatus.OVERDUE]: "Overdue",
+  [InvoiceStatus.PROCESSING]: "Processing",
   [InvoiceStatus.CANCELLED]: "Cancelled",
   [InvoiceStatus.REFUNDED]: "Refunded",
 
@@ -113,6 +114,7 @@ export const INVOICE_STATUS_COLORS: Record<
   [InvoiceStatus.ISSUED]: "info",
   [InvoiceStatus.PAID]: "success",
   [InvoiceStatus.OVERDUE]: "error",
+  [InvoiceStatus.PROCESSING]: "primary",
   [InvoiceStatus.CANCELLED]: "warning",
   [InvoiceStatus.REFUNDED]: "secondary",
   [VendorPaymentStatus.Paid]: "success",
@@ -129,6 +131,7 @@ export const INVOICE_STATUS_HEX_COLORS: Record<
   [InvoiceStatus.ISSUED]: "#3B82F6", // Blue
   [InvoiceStatus.PAID]: "#10B981", // Green
   [InvoiceStatus.OVERDUE]: "#EF4444", // Red
+  [InvoiceStatus.PROCESSING]: "#06B6D4", // Cyan
   [InvoiceStatus.CANCELLED]: "#F59E0B", // Amber
   [InvoiceStatus.REFUNDED]: "#8B5CF6", // Purple
   [VendorPaymentStatus.Paid]: "#10B981",
@@ -265,6 +268,10 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   [AuditAction.HARDWARE_PURCHASE_INVOICE_DELETED]:
     "Hardware Purchase Invoice Deleted",
   [AuditAction.VENDOR_INVOICE_PAID]: "Vendor Invoice Paid",
+  [AuditAction.VENDOR_CONSOLIDATED_PAYMENT_RECORDED]:
+    "Consolidated Vendor Payment Recorded",
+  [AuditAction.VENDOR_CONSOLIDATED_PAYMENT_REMOVED]:
+    "Consolidated Vendor Payment Undone",
   [AuditAction.HARDWARE_PURCHASE_INVOICE_PAID]:
     "Hardware Purchase Invoice Paid",
   [AuditAction.ACCOUNTING_ENTITY_CREATED]: "Accounting Entity Created",
@@ -285,6 +292,24 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
     "Security Deposit Adjustment Recorded",
   [AuditAction.VENDOR_DEPOSIT_MOVEMENT_DELETED]:
     "Security Deposit Return/Adjustment Deleted",
+  [AuditAction.BANK_TRANSFER_RECORDED]: "Internal Bank Transfer Recorded",
+  [AuditAction.BANK_TRANSFER_UPDATED]: "Internal Bank Transfer Updated",
+  [AuditAction.BANK_TRANSFER_DELETED]: "Internal Bank Transfer Deleted",
+  [AuditAction.EXPENSE_HEAD_CREATED]: "Expense Head Created",
+  [AuditAction.EXPENSE_HEAD_UPDATED]: "Expense Head Updated",
+  [AuditAction.EXPENSE_HEAD_DELETED]: "Expense Head Deleted",
+  [AuditAction.EXPENSE_RECORDED]: "Expense Added",
+  [AuditAction.EXPENSE_UPDATED]: "Expense Updated",
+  [AuditAction.EXPENSE_DELETED]: "Expense Deleted",
+  [AuditAction.EXPENSE_PAYMENT_RECORDED]: "Expense Payment Recorded",
+  [AuditAction.EXPENSE_PAYMENT_UPDATED]: "Expense Payment Updated",
+  [AuditAction.EXPENSE_PAYMENT_DELETED]: "Expense Payment Deleted",
+  [AuditAction.INCOME_HEAD_CREATED]: "Capital & Income Head Created",
+  [AuditAction.INCOME_HEAD_UPDATED]: "Capital & Income Head Updated",
+  [AuditAction.INCOME_HEAD_DELETED]: "Capital & Income Head Deleted",
+  [AuditAction.INCOME_RECORDED]: "Capital & Income Added",
+  [AuditAction.INCOME_UPDATED]: "Capital & Income Updated",
+  [AuditAction.INCOME_DELETED]: "Capital & Income Deleted",
   [AuditAction.FRANCHISE_CREATED]: "Franchise Created",
   [AuditAction.FRANCHISE_UPDATED]: "Franchise Updated",
   [AuditAction.FRANCHISE_DELETED]: "Franchise Deleted",
@@ -361,6 +386,21 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   [AuditAction.REPAIR_CHARGE_UPDATED]: "Repair Charge Updated",
   [AuditAction.REPAIR_CHARGE_DELETED]: "Repair Charge Deleted",
   [AuditAction.REPAIR_SITE_SETTING_UPDATED]: "Repair Site Settings Updated",
+  [AuditAction.CLIENT_WALLET_SYNCED]: "Client Wallet Synced From Luxor",
+  [AuditAction.CLIENT_WALLET_UPDATED]: "Client Wallet Record Updated",
+  [AuditAction.CLIENT_WALLET_MISMATCH_DETECTED]:
+    "Client Wallet Mismatch Detected",
+  [AuditAction.CLIENT_WALLET_MISMATCH_ACCEPTED]:
+    "Client Wallet Mismatch - Luxor Address Accepted",
+  [AuditAction.CLIENT_WALLET_MISMATCH_FIXED]:
+    "Client Wallet Mismatch - Luxor Updated",
+  [AuditAction.CLIENT_WALLET_RECHECKED]: "Client Wallet Re-checked",
+  [AuditAction.CLIENT_WALLET_HISTORY_VIEWED]: "Client Wallet History Viewed",
+  [AuditAction.STAFF_ACCESS_RULE_UPDATED]: "Staff Access Rules Updated",
+  [AuditAction.STAFF_ACCESS_TIME_ADDED]: "Staff Extra Time Added",
+  [AuditAction.STAFF_ACCESS_EXCEPTION_SET]: "Staff Access Exception",
+  [AuditAction.STAFF_ACCESS_PASSKEY_REMOVED]: "Staff Passkey Removed",
+  [AuditAction.STAFF_HOLIDAY_UPDATED]: "Staff Holiday Updated",
 };
 
 // ============================================================================

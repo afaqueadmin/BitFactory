@@ -247,6 +247,10 @@ export async function verifyWebAuthnRegistration(
   credentialID: Uint8Array;
   credentialPublicKey: Uint8Array;
   counter: number;
+  /** "singleDevice" | "multiDevice" (synced), as the authenticator reports. */
+  deviceType: string;
+  backedUp: boolean;
+  aaguid: string;
 }> {
   const challenge = expectedChallenge ?? getStoredChallenge(user.id, true);
   if (!challenge) {
@@ -319,6 +323,9 @@ export async function verifyWebAuthnRegistration(
       credentialID: normalizedCredentialID,
       credentialPublicKey: normalizedPublicKey,
       counter: (credentialData.counter as number) || 0,
+      deviceType: verified.registrationInfo.credentialDeviceType,
+      backedUp: verified.registrationInfo.credentialBackedUp,
+      aaguid: verified.registrationInfo.aaguid,
     };
   } catch (error) {
     console.error("Registration verification error details:", error);
@@ -437,6 +444,9 @@ export async function verifyWebAuthnAuthentication(
   verified: boolean;
   credentialID: string;
   newCounter: number;
+  /** "singleDevice" | "multiDevice" (synced), as the authenticator reports. */
+  deviceType: string;
+  backedUp: boolean;
 }> {
   const challenge = expectedChallenge ?? getStoredChallenge(loginId, false);
   if (!challenge) {
@@ -549,6 +559,8 @@ export async function verifyWebAuthnAuthentication(
       verified: true,
       credentialID: matchingCredentialData.id,
       newCounter: verified.authenticationInfo.newCounter,
+      deviceType: verified.authenticationInfo.credentialDeviceType,
+      backedUp: verified.authenticationInfo.credentialBackedUp,
     };
   } catch (error) {
     console.error("WebAuthn auth verify: Error during verification", {

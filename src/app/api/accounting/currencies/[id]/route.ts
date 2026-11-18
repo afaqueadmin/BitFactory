@@ -32,8 +32,17 @@ export async function PUT(
             // *Payments counts above cover the deprecated single-currency
             // columns; remove them when those columns are dropped.
             vendorPaymentParts: true,
+            // Consolidated payments (several invoices in one transfer).
+            consolidatedPayments: true,
             // Security deposit returns received into it.
             depositReturns: true,
+            // Internal bank transfers, either side.
+            transfersOut: true,
+            transfersIn: true,
+            // Expense payments made in it.
+            expensePayments: true,
+            // Capital & Income received in it.
+            incomes: true,
           },
         },
       },
@@ -65,14 +74,24 @@ export async function PUT(
           hardwarePurchasePayments,
           costPayments,
           vendorPaymentParts,
+          consolidatedPayments,
           depositReturns,
+          transfersOut,
+          transfersIn,
+          expensePayments,
+          incomes,
         } = existing._count;
         if (
           vendorInvoicePayments +
             hardwarePurchasePayments +
             costPayments +
             vendorPaymentParts +
-            depositReturns >
+            consolidatedPayments +
+            depositReturns +
+            transfersOut +
+            transfersIn +
+            expensePayments +
+            incomes >
           0
         ) {
           return NextResponse.json(
@@ -168,8 +187,17 @@ export async function DELETE(
             // *Payments counts above cover the deprecated single-currency
             // columns; remove them when those columns are dropped.
             vendorPaymentParts: true,
+            // Consolidated payments (several invoices in one transfer).
+            consolidatedPayments: true,
             // Security deposit returns received into it.
             depositReturns: true,
+            // Internal bank transfers, either side.
+            transfersOut: true,
+            transfersIn: true,
+            // Expense payments made in it.
+            expensePayments: true,
+            // Capital & Income received in it.
+            incomes: true,
           },
         },
       },
@@ -187,7 +215,12 @@ export async function DELETE(
       hardwarePurchasePayments,
       costPayments,
       vendorPaymentParts,
+      consolidatedPayments,
       depositReturns,
+      transfersOut,
+      transfersIn,
+      expensePayments,
+      incomes,
     } = existing._count;
     if (
       banks > 0 ||
@@ -195,7 +228,12 @@ export async function DELETE(
         hardwarePurchasePayments +
         costPayments +
         vendorPaymentParts +
-        depositReturns >
+        consolidatedPayments +
+        depositReturns +
+        transfersOut +
+        transfersIn +
+        expensePayments +
+        incomes >
         0
     ) {
       return NextResponse.json(

@@ -48,6 +48,9 @@ export default function PasskeySettings({
   const { d, fonts } = useDaylight();
   const { requestStepUp, stepUpDialog } = useStepUp();
   const [credentials, setCredentials] = useState<Credential[]>([]);
+  // Staff access rules: this account must use its office passkey, so only a
+  // super admin adds or removes passkeys.
+  const [managedByAdmin, setManagedByAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -77,6 +80,7 @@ export default function PasskeySettings({
 
       if (result.success && result.credentials) {
         setCredentials(result.credentials);
+        setManagedByAdmin(result.managedByAdmin === true);
       } else {
         setError(result.error || "Failed to load passkeys");
       }
@@ -379,6 +383,7 @@ export default function PasskeySettings({
           </Box>
           <Button
             variant="contained"
+            disabled={managedByAdmin}
             startIcon={<AddIcon />}
             onClick={() => {
               setAddDialogOpen(true);
@@ -394,6 +399,12 @@ export default function PasskeySettings({
           Manage your passkeys for secure, passwordless login using biometrics
           or security keys.
         </Typography>
+        {managedByAdmin && (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            Your passkeys are managed by a super admin. Ask them if you need to
+            add or remove one.
+          </Alert>
+        )}
 
         {error && (
           <Alert severity="error" sx={{ mb: 2 }}>
@@ -454,6 +465,7 @@ export default function PasskeySettings({
                         <IconButton
                           size="small"
                           color="error"
+                          disabled={managedByAdmin}
                           onClick={() => {
                             setSelectedCredential(credential);
                             setDeleteDialogOpen(true);
@@ -572,6 +584,7 @@ export default function PasskeySettings({
         </Box>
         <Button
           variant="contained"
+          disabled={managedByAdmin}
           startIcon={<AddIcon sx={{ fontSize: 18 }} />}
           onClick={() => {
             setAddDialogOpen(true);
@@ -590,6 +603,13 @@ export default function PasskeySettings({
         Manage your passkeys for secure, passwordless login using biometrics or
         security keys.
       </Typography>
+
+      {managedByAdmin && (
+        <Alert sx={{ mb: 2, ...alertSx("info") }}>
+          Your passkeys are managed by a super admin. Ask them if you need to
+          add or remove one.
+        </Alert>
+      )}
 
       {error && <Alert sx={{ mb: 2, ...alertSx("error") }}>{error}</Alert>}
 
@@ -691,6 +711,7 @@ export default function PasskeySettings({
                     <Tooltip title="Delete">
                       <IconButton
                         size="small"
+                        disabled={managedByAdmin}
                         onClick={() => {
                           setSelectedCredential(credential);
                           setDeleteDialogOpen(true);

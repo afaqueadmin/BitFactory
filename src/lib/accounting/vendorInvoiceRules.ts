@@ -28,6 +28,33 @@ export const vendorPaymentInclude = {
     orderBy: { createdAt: "asc" },
     select: { id: true, date: true, amountUsd: true, note: true },
   },
+  // Set when it was paid in a consolidated payment with other invoices.
+  consolidatedItem: {
+    select: {
+      amountUsd: true,
+      payment: {
+        select: {
+          id: true,
+          paidDate: true,
+          amount: true,
+          exchangeRate: true,
+          amountUsd: true,
+          transactionFee: true,
+          entity: { select: { id: true, name: true } },
+          bank: { select: { id: true, name: true } },
+          currency: { select: { id: true, code: true, name: true } },
+          items: {
+            orderBy: { sortOrder: "asc" },
+            select: {
+              amountUsd: true,
+              vendorInvoice: { select: { id: true, invoiceNumber: true } },
+              hardwarePurchase: { select: { id: true, invoiceNumber: true } },
+            },
+          },
+        },
+      },
+    },
+  },
 } satisfies Prisma.VendorInvoiceInclude & Prisma.HardwarePurchaseInvoiceInclude;
 
 // Compared at the columns' 2-decimal scale: the edit modals recompute the

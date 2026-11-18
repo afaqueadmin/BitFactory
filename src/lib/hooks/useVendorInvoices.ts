@@ -23,6 +23,31 @@ export interface VendorPaymentPart {
 }
 
 /** A Farm Tariff / Hardware Purchase invoice's vendor. */
+/**
+ * Set on an invoice paid in a consolidated payment: one bank transfer that
+ * paid several of the vendor's invoices (credits included). amountUsd is
+ * this invoice's share; the payment's amount includes its fee.
+ */
+export interface ConsolidatedPaymentItem {
+  amountUsd: string;
+  payment: {
+    id: string;
+    paidDate: string;
+    amount: string;
+    exchangeRate: string;
+    amountUsd: string;
+    transactionFee: string;
+    entity: { id: string; name: string };
+    bank: { id: string; name: string };
+    currency: { id: string; code: string; name: string };
+    items: {
+      amountUsd: string;
+      vendorInvoice: { id: string; invoiceNumber: string } | null;
+      hardwarePurchase: { id: string; invoiceNumber: string } | null;
+    }[];
+  };
+}
+
 export interface InvoiceVendor {
   id: string;
   name: string;
@@ -73,6 +98,8 @@ export interface VendorInvoice {
   paymentReceiptKey: string | null;
   /** The payment's currency parts (detail responses only). */
   paymentParts?: VendorPaymentPart[];
+  /** Set when paid in a consolidated payment (detail responses only). */
+  consolidatedItem?: ConsolidatedPaymentItem | null;
   createdBy: string;
   updatedBy: string | null;
   createdAt: Date;
