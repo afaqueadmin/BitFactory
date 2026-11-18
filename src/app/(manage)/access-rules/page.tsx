@@ -221,11 +221,15 @@ export default function AccessRulesPage() {
 
   const refresh = () =>
     queryClient.invalidateQueries({ queryKey: ["staff-access"] });
+  // `onError`: a dialog passes its own setter so the error shows inside the
+  // dialog, not on the page behind it.
   const run = async (
     fn: () => Promise<{ message?: string }>,
     fallback: string,
+    onError?: (message: string | null) => void,
   ) => {
-    setActionError(null);
+    const showError = onError ?? setActionError;
+    showError(null);
     setNotice(null);
     try {
       const result = await fn();
@@ -233,9 +237,7 @@ export default function AccessRulesPage() {
       await refresh();
       return true;
     } catch (err) {
-      setActionError(
-        err instanceof Error ? err.message : "Something went wrong",
-      );
+      showError(err instanceof Error ? err.message : "Something went wrong");
       return false;
     }
   };
@@ -476,7 +478,23 @@ export default function AccessRulesPage() {
 type Run = (
   fn: () => Promise<{ message?: string }>,
   fallback: string,
+  onError?: (message: string | null) => void,
 ) => Promise<boolean>;
+
+/** Errors from a dialog's actions, shown at the top of that dialog. */
+function useDialogRun(run: Run) {
+  const [error, setError] = useState<string | null>(null);
+  const runHere: Run = (fn, fallback) => run(fn, fallback, setError);
+  return { error, setError, runHere };
+}
+
+function DialogError({ error }: { error: string | null }) {
+  return error ? (
+    <Alert severity="error" sx={{ mb: 2 }}>
+      {error}
+    </Alert>
+  ) : null;
+}
 
 // ---------------------------------------------------------------------------
 // Rows and cards
@@ -702,14 +720,21 @@ function EditRulesDialog({
     rule?.requireDeviceBoundPasskey ?? false,
   );
   const [saving, setSaving] = useState(false);
+  const { error, setError, runHere } = useDialogRun(run);
   const builtIn = account.passkeys.filter((p) => p.builtIn).length;
 
   const setDay = (day: DayKey, value: WeeklyHours[DayKey]) =>
     setHours((h) => ({ ...h, [day]: value }));
 
   const save = async () => {
+    if (hoursEnabled && WEEK_ORDER.every((d) => !hours[d])) {
+      setError(
+        'Tick at least one working day, or turn off "Limit to working hours".',
+      );
+      return;
+    }
     setSaving(true);
-    const ok = await run(
+    const ok = await runHere(
       () =>
         send(`/api/admin/staff-access/${account.id}`, "PUT", {
           hoursEnabled,
@@ -727,6 +752,7 @@ function EditRulesDialog({
     <Dialog open onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle>Access rules: {who(account)}</DialogTitle>
       <DialogContent>
+        <DialogError error={error} />
         <Stack spacing={2.5} sx={{ mt: 1 }}>
           <Box>
             <FormControlLabel
@@ -896,7 +922,7 @@ function EditRulesDialog({
                             `Remove the passkey "${p.name || "Passkey"}" from ${who(account)}? They will be signed out.`,
                           )
                         ) {
-                          run(
+                          runHere(
                             () =>
                               send(
                                 `/api/admin/staff-access/${account.id}/passkeys/${p.id}`,
@@ -922,7 +948,7 @@ function EditRulesDialog({
             hint="Days off for this account only, on top of office holidays."
             holidays={account.holidays}
             onAdd={(date, name) =>
-              run(
+              runHere(
                 () =>
                   send("/api/admin/staff-access/holidays", "POST", {
                     date,
@@ -933,7 +959,7 @@ function EditRulesDialog({
               )
             }
             onRemove={(id) =>
-              run(
+              runHere(
                 () =>
                   send(`/api/admin/staff-access/holidays?id=${id}`, "DELETE"),
                 "Day off removed",
@@ -961,7 +987,7 @@ function EditRulesDialog({
                     size="small"
                     sx={ds.textBtnSx("danger")}
                     onClick={() =>
-                      run(
+                      runHere(
                         () =>
                           send(
                             `/api/admin/staff-access/${account.id}/windows?id=${w.id}`,
@@ -1006,11 +1032,12 @@ function AddTimeDialog({
     String(request?.minutesRequested ?? 15),
   );
   const [saving, setSaving] = useState(false);
+  const { error, runHere } = useDialogRun(run);
   const until = account.live?.allowed ? account.live.accessUntil : null;
 
   const save = async () => {
     setSaving(true);
-    const ok = await run(
+    const ok = await runHere(
       () =>
         send(`/api/admin/staff-access/${account.id}/time`, "POST", {
           minutes: Number(minutes),
@@ -1026,6 +1053,7 @@ function AddTimeDialog({
     <Dialog open onClose={onClose} maxWidth="xs" fullWidth>
       <DialogTitle>Add time: {who(account)}</DialogTitle>
       <DialogContent>
+        <DialogError error={error} />
         <Stack spacing={2} sx={{ mt: 1 }}>
           <Typography sx={{ fontSize: 13 }}>
             {until
@@ -1084,13 +1112,14 @@ function EmergencyDialog({
   const [passkeyUntil, setPasskeyUntil] = useState(inHours(4));
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
+  const { error, runHere } = useDialogRun(run);
 
   const exemptActive =
     rule?.passkeyExemptUntil && new Date(rule.passkeyExemptUntil) > new Date();
 
   const save = async () => {
     setSaving(true);
-    const ok = await run(async () => {
+    const ok = await runHere(async () => {
       const done: string[] = [];
       if (hoursOn && rule?.hoursEnabled) {
         await send(`/api/admin/staff-access/${account.id}/windows`, "POST", {
@@ -1123,6 +1152,7 @@ function EmergencyDialog({
     <Dialog open onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle>Emergency access: {who(account)}</DialogTitle>
       <DialogContent>
+        <DialogError error={error} />
         <Stack spacing={2.5} sx={{ mt: 1, ...ds.inputSx }}>
           <Typography sx={{ fontSize: 13 }}>
             Office time (Pakistan). The two exceptions are separate: to let
@@ -1192,7 +1222,7 @@ function EmergencyDialog({
                       size="small"
                       onClick={async () => {
                         if (
-                          await run(
+                          await runHere(
                             () =>
                               send(
                                 `/api/admin/staff-access/${account.id}/passkey-exception`,
