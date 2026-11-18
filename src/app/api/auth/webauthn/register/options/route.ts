@@ -3,6 +3,10 @@ import { prisma } from "@/lib/prisma";
 import { signRegistrationChallenge, verifyJwtToken } from "@/lib/jwt";
 import { verifyStepUp } from "@/lib/auth/stepUp";
 import { generateWebAuthnRegistrationOptions } from "@/lib/webauthn/server";
+import {
+  passkeysLocked,
+  passkeysLockedResponse,
+} from "@/lib/auth/staffAccessServer";
 
 export const runtime = "nodejs";
 
@@ -52,6 +56,10 @@ export async function POST(request: NextRequest) {
         { status: 401 },
       );
     }
+
+    // Staff access rules: an account that must use its office passkey can't
+    // add passkeys itself.
+    if (await passkeysLocked(userId)) return passkeysLockedResponse();
 
     // The signed-in login: the passkey is registered to it, under its own
     // email, not to the account's other login.

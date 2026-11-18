@@ -61,6 +61,16 @@ export default function Login() {
     }
   }, []);
 
+  // Sent here because a staff account's allowed time ran out (proxy / the
+  // access-window banner).
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("reason") === "hours") {
+      setError(
+        "Your access time has ended, so you were signed out. Ask a super admin if you need extra time.",
+      );
+    }
+  }, []);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));

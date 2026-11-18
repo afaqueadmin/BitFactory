@@ -67,6 +67,7 @@ import {
   Factory as CompanyPaybackIcon,
   History as ActivityLogIcon,
   FactCheck as AuditLogIcon,
+  ManageAccounts as AccessRulesIcon,
   Dataset as DbDataIcon,
   ListAlt as SubaccountRecordsIcon,
   ShowChart as DailySnapshotsIcon,
@@ -95,11 +96,18 @@ import {
 } from "@/lib/hooks";
 import { useWalletMismatchCount } from "@/lib/hooks/useWalletMismatchCount";
 import { useSimulationRequestCount } from "@/lib/hooks/useSimulationRequestCount";
+import { useStaffTimeRequestCount } from "@/lib/hooks/useStaffTimeRequestCount";
 import { useAdminNav } from "@/lib/contexts/admin-nav-context";
 import { focusRing, useDaylight } from "@/lib/daylight";
 
 type BadgeKey =
-  "tickets" | "wallets" | "firmware" | "logins" | "alerts" | "simulation";
+  | "tickets"
+  | "wallets"
+  | "firmware"
+  | "logins"
+  | "alerts"
+  | "simulation"
+  | "access";
 
 interface SidebarItem {
   title: string;
@@ -397,6 +405,14 @@ const sidebarSections: SidebarSection[] = [
       },
       { title: "Audit Log", icon: <AuditLogIcon />, path: "/audit-log" },
       {
+        // Office hours + office-passkey rules for admin/accounting accounts.
+        title: "Access Rules",
+        icon: <AccessRulesIcon />,
+        path: "/access-rules",
+        roles: ["SUPER_ADMIN"],
+        badgeKey: "access",
+      },
+      {
         title: "DB Data Management",
         icon: <DbDataIcon />,
         items: [
@@ -501,6 +517,9 @@ export default function AdminSidebar() {
     acknowledged: false,
   });
   const pendingSimulationRequests = useSimulationRequestCount();
+  const pendingTimeRequests = useStaffTimeRequestCount(
+    user?.role === "SUPER_ADMIN",
+  );
   const openWalletMismatches = useWalletMismatchCount();
   const { d, fonts } = useDaylight();
 
@@ -514,6 +533,7 @@ export default function AdminSidebar() {
     logins: pendingLoginRequests.length,
     alerts: pendingHashrateAlerts.length,
     simulation: pendingSimulationRequests,
+    access: pendingTimeRequests,
   };
 
   // A group shows the total of its children so counts aren't hidden when

@@ -219,11 +219,12 @@ export async function registerPasskey(
             .attestationObject,
         },
         type: attestResp.type,
+        // "platform" = built into this device; staff access rules need it.
+        authenticatorAttachment: attestResp.authenticatorAttachment,
         credentialName: credentialName || "My Passkey",
         transports:
           ((attestResp.response as Record<string, unknown>).transports as
-            | string[]
-            | undefined) || [],
+            string[] | undefined) || [],
       }),
     });
 
@@ -383,6 +384,8 @@ export async function getPasskeys(): Promise<{
     createdAt: string;
     lastUsedAt: string | null;
   }>;
+  /** Staff access rules: a super admin manages this account's passkeys. */
+  managedByAdmin?: boolean;
   error?: string;
 }> {
   try {
@@ -402,6 +405,7 @@ export async function getPasskeys(): Promise<{
     return {
       success: true,
       credentials: data.credentials,
+      managedByAdmin: data.managedByAdmin === true,
     };
   } catch (error: unknown) {
     const errorMsg = error instanceof Error ? error.message : String(error);

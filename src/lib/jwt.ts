@@ -10,6 +10,23 @@ export interface JwtPayload extends JWTPayload {
   /** Set when the session was established with a second factor (2FA code,
    *  backup code or passkey), and carried across refreshes. */
   mfa?: boolean;
+  /** Staff access rules (src/lib/auth/staffAccess.ts). Epoch seconds after
+   *  which the proxy blocks this session: end of allowed hours, or of the
+   *  passkey exception. */
+  accessUntil?: number;
+  /** Signed in with a built-in (device-bound) passkey; carried across
+   *  refreshes. */
+  dbp?: boolean;
+  /** Signed in under a SUPER_ADMIN's emergency passkey exception. */
+  pxe?: boolean;
+}
+
+/** Optional claims a session token may carry beyond its subject. */
+export interface SessionClaimOptions {
+  mfa?: boolean;
+  accessUntil?: number;
+  dbp?: boolean;
+  pxe?: boolean;
 }
 
 /** Who a token is issued to: the account, the login on it, and its role. */
@@ -127,14 +144,35 @@ export async function signJwtToken(
 
 export async function generateTokens(
   { userId, loginId, role }: TokenSubject,
-  { mfa = false }: { mfa?: boolean } = {},
+  { mfa = false, accessUntil, dbp, pxe }: SessionClaimOptions = {},
 ) {
-  const claims = mfa
-    ? { userId, loginId, role, mfa: true }
-    : { userId, loginId, role };
+  // Optional claims only when set, so unrestricted tokens look as before.
+  const claims: Omit<JwtPayload, "exp"> = { userId, loginId, role };
+  if (mfa) claims.mfa = true;
+  if (typeof accessUntil === "number") claims.accessUntil = accessUntil;
+  if (dbp) claims.dbp = true;
+  if (pxe) claims.pxe = true;
   const accessToken = await signJwtToken(claims);
   const refreshToken = await signJwtToken({ ...claims, type: "refresh" }, "7d");
   return { accessToken, refreshToken };
+}
+
+/**
+ * Signature, expiry and session-type check only - no revocation lookup, so no
+ * database. For the proxy's per-request staff-hours check, which must not add
+ * a DB query to every API call. Never use it to authorize anything else:
+ * API routes keep calling verifyJwtToken. Returns null for any bad token.
+ */
+export async function decodeSessionClaims(
+  token: string,
+): Promise<JwtPayload | null> {
+  try {
+    const payload = await decodeJwt(token);
+    if (payload.type && NON_SESSION_TYPES.has(payload.type)) return null;
+    return payload;
+  } catch {
+    return null;
+  }
 }
 
 /** 15-minute token for the forced 2FA setup step after a correct password. */

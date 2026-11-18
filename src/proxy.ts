@@ -1,7 +1,7 @@
 import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { JwtPayload, verifyJwtToken } from "@/lib/jwt";
+import { JwtPayload, decodeSessionClaims, verifyJwtToken } from "@/lib/jwt";
 
 // Lightweight stand-ins for URLPattern's `{base}` / `{base}/...` matching.
 // URLPattern isn't reliably available as a global in Vercel's deployed Edge
@@ -134,6 +134,7 @@ const securePaths = {
     "/simulated-accounts",
     "/guilds",
     "/guild-requests",
+    "/access-rules", // SUPER_ADMIN only - the page and its APIs check the role
     // Add admin-specific public paths if any
   ]),
   // Franchisee: their own dashboard/account/customers/miners pages under
@@ -207,11 +208,52 @@ const isInRouteGroup = (pathname: string, role: keyof typeof securePaths) => {
   );
 };
 
+// Staff access rules (src/lib/auth/staffAccess.ts): a session token may carry
+// `accessUntil`; once it has passed, every API call and page is refused. These
+// API paths stay open so sign-in, refresh, sign-out and the access-window
+// banner still work.
+const ACCESS_CHECK_EXEMPT_API = [
+  prefixPattern("/api/login"),
+  prefixPattern("/api/auth"),
+  prefixPattern("/api/user/access-window"),
+];
+
+const accessTimeOver = (accessUntil: number | undefined) =>
+  typeof accessUntil === "number" && Date.now() >= accessUntil * 1000;
+
+function clearSessionCookies(response: NextResponse) {
+  response.cookies.set("token", "", { maxAge: 0, path: "/" });
+  response.cookies.set("refresh_token", "", { maxAge: 0, path: "/" });
+}
+
+function accessOverPageResponse(request: NextRequest) {
+  const response = NextResponse.redirect(
+    new URL("/login?reason=hours", request.url),
+  );
+  clearSessionCookies(response);
+  return response;
+}
+
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // ✅ Skip all API routes entirely (no JSON parse errors)
+  // ✅ Skip all API routes entirely (no JSON parse errors) - except the staff
+  // access cutoff. decodeSessionClaims checks only the signature (no DB), so
+  // this adds no database query to API calls; the routes still authenticate.
   if (pathname.startsWith("/api/")) {
+    const token = request.cookies.get("token")?.value;
+    if (token && !ACCESS_CHECK_EXEMPT_API.some((p) => p.test(pathname))) {
+      const claims = await decodeSessionClaims(token);
+      if (claims && accessTimeOver(claims.accessUntil)) {
+        return NextResponse.json(
+          {
+            error: "Your access time is over. Please sign in again.",
+            code: "OUTSIDE_HOURS",
+          },
+          { status: 403 },
+        );
+      }
+    }
     return NextResponse.next();
   }
 
@@ -267,6 +309,11 @@ export async function proxy(request: NextRequest) {
       response.cookies.set("token", "", { maxAge: 0, path: "/" });
       response.cookies.set("refresh_token", "", { maxAge: 0, path: "/" });
       return response;
+    }
+
+    // Staff access rules: the session's allowed time is over.
+    if (accessTimeOver(decoded.accessUntil)) {
+      return accessOverPageResponse(request);
     }
 
     // ✅ Role-based access control

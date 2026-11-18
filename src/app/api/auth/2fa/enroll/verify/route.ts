@@ -18,6 +18,11 @@ import { completeTwoFactorSetup } from "@/lib/auth/twoFactorEnrollment";
 import { notifySecurityChange } from "@/lib/auth/securityAlerts";
 import { revokeLoginSessions } from "@/lib/auth/sessionRevocation";
 import { findLoginById, recordLogin } from "@/lib/auth/loginIdentity";
+import {
+  accessDeniedResponse,
+  reportBlock,
+  restrictionClaims,
+} from "@/lib/auth/staffAccessServer";
 
 export const runtime = "nodejs";
 
@@ -69,8 +74,6 @@ export async function POST(request: NextRequest) {
         userAgent,
       },
     });
-    await recordLogin(login.id, user.id, "LOGIN", { ipAddress, userAgent });
-
     await notifySecurityChange(
       login.email,
       { type: "2FA_ENABLED" },
@@ -81,10 +84,31 @@ export async function POST(request: NextRequest) {
     // issued below is newer than the cutoff and stays valid.
     await revokeLoginSessions(login.id);
 
+    // Staff access rules (already checked at the password step; time may have
+    // passed). 2FA stays set up either way, so the backup codes - shown only
+    // once - still go back with the refusal; only the session is refused.
+    const restriction = await restrictionClaims(user.id, user.role, {
+      viaBuiltInPasskey: false,
+    });
+    if (!restriction.ok) {
+      await reportBlock(user, login.id, restriction.code, request.headers);
+      const denied = NextResponse.json(
+        {
+          ...(await accessDeniedResponse(restriction.code).json()),
+          backupCodes: result.backupCodes,
+        },
+        { status: 403 },
+      );
+      clearEnrollmentCookie(denied);
+      return denied;
+    }
+
+    await recordLogin(login.id, user.id, "LOGIN", { ipAddress, userAgent });
+
     // The code just entered is the second factor for this login.
     const { accessToken, refreshToken } = await generateTokens(
       { userId: user.id, loginId: login.id, role: user.role },
-      { mfa: true },
+      { mfa: true, ...restriction.claims },
     );
 
     const response = NextResponse.json({

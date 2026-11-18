@@ -57,6 +57,8 @@ export interface WebAuthnAttestationResponse {
     clientExtensionResults?: Record<string, unknown>;
   };
   type: "public-key";
+  /** Browser-reported; "platform" = built into this device. */
+  authenticatorAttachment?: string | null;
 }
 
 /**
@@ -109,6 +111,8 @@ export interface WebAuthnAssertionResponse {
     clientExtensionResults?: Record<string, unknown>;
   };
   type: "public-key";
+  /** Browser-reported; "platform" = built into this device. */
+  authenticatorAttachment?: string | null;
 }
 
 /**

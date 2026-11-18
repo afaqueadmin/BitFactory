@@ -386,6 +386,11 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
     "Client Wallet Mismatch - Luxor Updated",
   [AuditAction.CLIENT_WALLET_RECHECKED]: "Client Wallet Re-checked",
   [AuditAction.CLIENT_WALLET_HISTORY_VIEWED]: "Client Wallet History Viewed",
+  [AuditAction.STAFF_ACCESS_RULE_UPDATED]: "Staff Access Rules Updated",
+  [AuditAction.STAFF_ACCESS_TIME_ADDED]: "Staff Extra Time Added",
+  [AuditAction.STAFF_ACCESS_EXCEPTION_SET]: "Staff Access Exception",
+  [AuditAction.STAFF_ACCESS_PASSKEY_REMOVED]: "Staff Passkey Removed",
+  [AuditAction.STAFF_HOLIDAY_UPDATED]: "Staff Holiday Updated",
 };
 
 // ============================================================================

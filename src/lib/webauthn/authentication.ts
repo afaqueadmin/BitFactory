@@ -117,6 +117,8 @@ export async function authenticateWithPasskey(email: string): Promise<{
                 .userHandle,
             },
             type: assertion.type,
+            // "platform" = built into this device; staff access rules need it.
+            authenticatorAttachment: assertion.authenticatorAttachment,
           },
         }),
         credentials: "include",

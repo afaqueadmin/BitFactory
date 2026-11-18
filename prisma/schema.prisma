@@ -83,6 +83,10 @@ model User {
   poolAuths                               PoolAuth[]
   poolSubaccounts                         PoolSubaccount[]
   webauthnCredentials                     WebAuthnCredential[]
+  staffAccessRule                         StaffAccessRule?
+  staffAccessWindows                      StaffAccessWindow[]
+  staffHolidays                           StaffHoliday[]
+  staffTimeRequests                       StaffTimeRequest[]
   twoFactorAuths                          TwoFactorAuth[]
   logins                                  UserLogin[]                     @relation("userLogins")
   loginsCreated                           UserLogin[]                     @relation("userLoginsCreated")
@@ -909,6 +913,15 @@ model WebAuthnCredential {
   transports String[] @default([])
   aaguid     String?
 
+  /// What the authenticator reported, saved at registration and refreshed on
+  /// every sign-in (src/lib/auth/staffAccess.ts). Null = not used since these
+  /// columns were added. "singleDevice" | "multiDevice" (synced passkey).
+  deviceType String?
+  backedUp   Boolean?
+  /// Browser-reported: "platform" (built into the device) | "cross-platform"
+  /// (USB/NFC key, phone).
+  attachment String?
+
   credentialName String?
   createdAt      DateTime  @default(now())
   lastUsedAt     DateTime?
@@ -916,6 +929,93 @@ model WebAuthnCredential {
   @@index([userId])
   @@index([loginId])
   @@map("webauthn_credentials")
+}
+
+// Staff access rules (office hours + device-bound passkeys) for ADMIN and
+// ACCOUNTING accounts, set by a SUPER_ADMIN on the Access Rules page. Logic in
+// src/lib/auth/staffAccess.ts; times are in the office time zone (Asia/Karachi).
+// One row per restricted account; no row = no restriction.
+model StaffAccessRule {
+  id                        String    @id @default(cuid())
+  userId                    String    @unique
+  user                      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  hoursEnabled              Boolean   @default(false)
+  /// { mon: { start: "10:00", end: "18:00" } | null, tue: ..., sun: ... }
+  weeklyHours               Json
+  graceMinutes              Int       @default(0)
+  requireDeviceBoundPasskey Boolean   @default(false)
+  /// Emergency exception: sign-in without a built-in passkey is allowed
+  /// until this moment (password + 2FA still apply). Null or past = off.
+  passkeyExemptUntil        DateTime?
+  passkeyExemptNote         String?
+  updatedById               String
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
+
+  @@map("staff_access_rules")
+}
+
+enum StaffAccessWindowKind {
+  /// Allowed hours set in advance (hours exception); also applies on holidays.
+  ONE_OFF
+  /// Time added to a running day by a SUPER_ADMIN (live extra time).
+  EXTRA_TIME
+}
+
+model StaffAccessWindow {
+  id          String                @id @default(cuid())
+  userId      String
+  user        User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  startsAt    DateTime
+  endsAt      DateTime
+  kind        StaffAccessWindowKind
+  note        String?
+  createdById String
+  createdAt   DateTime              @default(now())
+
+  @@index([userId, endsAt])
+  @@map("staff_access_windows")
+}
+
+/// A day off. userId null = office-wide holiday; otherwise that account only.
+/// Office-wide dates are unique through the partial index
+/// "staff_holidays_office_date_key" (raw SQL in the migration).
+model StaffHoliday {
+  id          String   @id @default(cuid())
+  /// Office calendar day (Asia/Karachi), stored as a date.
+  date        DateTime @db.Date
+  name        String
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdById String
+  createdAt   DateTime @default(now())
+
+  @@unique([date, userId])
+  @@index([date])
+  @@map("staff_holidays")
+}
+
+enum StaffTimeRequestStatus {
+  PENDING
+  APPROVED
+  DECLINED
+}
+
+model StaffTimeRequest {
+  id               String                 @id @default(cuid())
+  userId           String
+  user             User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  minutesRequested Int
+  note             String?
+  status           StaffTimeRequestStatus @default(PENDING)
+  minutesGranted   Int?
+  decidedById      String?
+  createdAt        DateTime               @default(now())
+  decidedAt        DateTime?
+
+  @@index([status])
+  @@index([userId])
+  @@map("staff_time_requests")
 }
 
 // One row per login that has ever engaged with 2FA (created lazily on first
@@ -2897,6 +2997,11 @@ enum AuditAction {
   CLIENT_WALLET_MISMATCH_FIXED
   CLIENT_WALLET_RECHECKED
   CLIENT_WALLET_HISTORY_VIEWED
+  STAFF_ACCESS_RULE_UPDATED
+  STAFF_ACCESS_TIME_ADDED
+  STAFF_ACCESS_EXCEPTION_SET
+  STAFF_ACCESS_PASSKEY_REMOVED
+  STAFF_HOLIDAY_UPDATED
 }
 
 enum NotificationType {

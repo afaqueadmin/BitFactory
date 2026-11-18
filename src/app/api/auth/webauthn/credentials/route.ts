@@ -3,6 +3,10 @@ import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
 import { notifySecurityChange } from "@/lib/auth/securityAlerts";
 import { signOutOtherDevices } from "@/lib/auth/sessionRevocation";
+import {
+  passkeysLocked,
+  passkeysLockedResponse,
+} from "@/lib/auth/staffAccessServer";
 
 export const runtime = "nodejs";
 
@@ -19,27 +23,33 @@ export async function GET(request: NextRequest) {
     }
 
     let loginId: string;
+    let userId: string;
     try {
       const decoded = await verifyJwtToken(token);
       loginId = decoded.loginId;
+      userId = decoded.userId;
     } catch {
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
 
-    const credentials = await prisma.webAuthnCredential.findMany({
-      where: { loginId },
-      select: {
-        id: true,
-        credentialName: true,
-        createdAt: true,
-        lastUsedAt: true,
-        transports: true,
-        aaguid: true,
-      },
-      orderBy: { createdAt: "desc" },
-    });
+    const [credentials, managedByAdmin] = await Promise.all([
+      prisma.webAuthnCredential.findMany({
+        where: { loginId },
+        select: {
+          id: true,
+          credentialName: true,
+          createdAt: true,
+          lastUsedAt: true,
+          transports: true,
+          aaguid: true,
+        },
+        orderBy: { createdAt: "desc" },
+      }),
+      passkeysLocked(userId),
+    ]);
 
-    return NextResponse.json({ credentials }, { status: 200 });
+    // managedByAdmin: staff access rules lock adding/removing passkeys.
+    return NextResponse.json({ credentials, managedByAdmin }, { status: 200 });
   } catch (error) {
     console.error("WebAuthn credentials list error:", error);
     return NextResponse.json(
@@ -70,6 +80,10 @@ export async function DELETE(request: NextRequest) {
     } catch {
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
+
+    // Staff access rules: only a super admin removes passkeys while the
+    // account must use its office passkey.
+    if (await passkeysLocked(userId)) return passkeysLockedResponse();
 
     const { searchParams } = new URL(request.url);
     const credentialId = searchParams.get("id");
