@@ -101,4 +101,7 @@ export const EXCLUDED_SUBACCOUNTS = new Set([
   "higgs_test",
   "higgs_test2",
   "higgs_test3",
+  // Guild test subaccount: not under our Luxor key (403), so it has no
+  // wallet record and would alert every day.
+  "guild-test-01",
 ]);
