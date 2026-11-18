@@ -116,6 +116,12 @@ const DAY_LABELS: Record<DayKey, string> = {
   sat: "Saturday",
   sun: "Sunday",
 };
+/** Account types shown in the Account type column. */
+const ROLE_LABELS: Record<string, string> = {
+  ADMIN: "Admin",
+  ACCOUNTING: "Accounting",
+  SUPER_ADMIN: "Super admin",
+};
 const WEEK_ORDER: DayKey[] = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 
 // ---------------------------------------------------------------------------
@@ -394,6 +400,7 @@ export default function AccessRulesPage() {
                   <TableHead>
                     <TableRow>
                       <TableCell>Account</TableCell>
+                      <TableCell>Account type</TableCell>
                       <TableCell>Working hours</TableCell>
                       <TableCell>Office passkey</TableCell>
                       <TableCell>Right now</TableCell>
@@ -497,9 +504,13 @@ function AccountRow({
     <TableRow>
       <TableCell>
         {who(a)}
-        <CellNote>
-          {a.email} · {a.role === "ACCOUNTING" ? "Accounting" : "Admin"}
-        </CellNote>
+        <CellNote>{a.email}</CellNote>
+      </TableCell>
+      <TableCell>
+        <DaylightStatusPill
+          label={ROLE_LABELS[a.role] ?? a.role}
+          tone={a.role === "ACCOUNTING" ? "info" : "neutral"}
+        />
       </TableCell>
       <TableCell>
         {hoursSummary(a.rule)}

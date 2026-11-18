@@ -406,7 +406,7 @@ const sidebarSections: SidebarSection[] = [
       { title: "Audit Log", icon: <AuditLogIcon />, path: "/audit-log" },
       {
         // Office hours + office-passkey rules for admin/accounting accounts.
-        title: "Access Rules",
+        title: "Access Rules (Incomplete - In Progress)",
         icon: <AccessRulesIcon />,
         path: "/access-rules",
         roles: ["SUPER_ADMIN"],
