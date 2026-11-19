@@ -625,9 +625,12 @@ export function useChangeInvoiceStatus() {
     mutationFn: async ({
       invoiceId,
       status,
+      confirmBankEffect,
     }: {
       invoiceId: string;
       status: "ISSUED" | "PAID" | "CANCELLED" | "OVERDUE" | "REFUNDED";
+      /** Paid -> another status: the user confirmed it deletes payments. */
+      confirmBankEffect?: boolean;
     }) => {
       // Cancel goes through the dedicated POST so it gets the same guard,
       // CC'd cancellation email, audit and notification as single cancel.
@@ -641,7 +644,7 @@ export function useChangeInvoiceStatus() {
               method: "PUT",
               headers: { "Content-Type": "application/json" },
               credentials: "include",
-              body: JSON.stringify({ status }),
+              body: JSON.stringify({ status, confirmBankEffect }),
             });
 
       if (!res.ok) {
@@ -668,7 +671,13 @@ export function useChangeInvoiceStatus() {
     changeStatus: (
       invoiceId: string,
       status: "ISSUED" | "PAID" | "CANCELLED" | "OVERDUE" | "REFUNDED",
-    ) => mutation.mutateAsync({ invoiceId, status }),
+      opts?: { confirmBankEffect?: boolean },
+    ) =>
+      mutation.mutateAsync({
+        invoiceId,
+        status,
+        confirmBankEffect: opts?.confirmBankEffect,
+      }),
     loading: mutation.isPending,
     error: mutation.error instanceof Error ? mutation.error.message : null,
   };

@@ -1,5 +1,7 @@
 "use client";
 
+import { BankEffectNotice } from "@/components/accounting/common/BankEffectNotice";
+import { CONFIRM_BANK_EFFECT, useBankEffect } from "@/lib/hooks/useBankEffect";
 import {
   Box,
   Button,
@@ -79,6 +81,11 @@ export default function HardwarePurchaseDetailPage() {
   const [cancelLoading, setCancelLoading] = useState(false);
   const [openUnpaidDialog, setOpenUnpaidDialog] = useState(false);
   const [unpaidLoading, setUnpaidLoading] = useState(false);
+  const unpaidEffect = useBankEffect(
+    openUnpaidDialog
+      ? `/api/hardware-purchases/${invoiceId}/mark-unpaid`
+      : null,
+  );
   const { user } = useUser();
   const isSuperAdmin = user?.role === "SUPER_ADMIN";
 
@@ -170,6 +177,8 @@ export default function HardwarePurchaseDetailPage() {
         `/api/hardware-purchases/${invoiceId}/mark-unpaid`,
         {
           method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: CONFIRM_BANK_EFFECT,
         },
       );
 
@@ -702,6 +711,11 @@ export default function HardwarePurchaseDetailPage() {
                 be cleared and the recorded payment will be removed.
               </DialogContentText>
             )}
+            <BankEffectNotice
+              effect={unpaidEffect.data}
+              loading={unpaidEffect.isLoading}
+              error={unpaidEffect.error}
+            />
           </DialogContent>
           <DialogActions>
             <Button
@@ -714,7 +728,9 @@ export default function HardwarePurchaseDetailPage() {
               onClick={handleMarkUnpaid}
               color="warning"
               variant="contained"
-              disabled={unpaidLoading}
+              disabled={
+                unpaidLoading || unpaidEffect.isLoading || !!unpaidEffect.error
+              }
               startIcon={unpaidLoading ? <CircularProgress size={20} /> : null}
             >
               {unpaidLoading ? "Updating..." : "Mark as Unpaid"}

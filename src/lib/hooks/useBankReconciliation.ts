@@ -69,6 +69,11 @@ export interface ReconciliationInvoice {
   totalUsd: string;
   /** ISO instant, or null when the invoice has no paid date saved. */
   paidDate: string | null;
+  /** ISO instants, for the hint when there is no paid date. */
+  issuedDate: string | null;
+  dueDate: string;
+  /** Who set it to PAID with no payment date, and when (audit log). */
+  markedPaid: { at: string; by: string } | null;
   /** The invoice's payment notes, joined. */
   narration: string;
 }

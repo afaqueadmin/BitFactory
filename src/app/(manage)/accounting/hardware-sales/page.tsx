@@ -6,6 +6,7 @@
 
 "use client";
 
+import { BulkUnpayDialog } from "@/components/accounting/invoices/BulkUnpayDialog";
 import { isStaffRole } from "@/lib/auth/staffRoles";
 import {
   Box,
@@ -89,6 +90,10 @@ export default function HardwareSalesDashboard() {
 
   const [selectedInvoiceIds, setSelectedInvoiceIds] = useState<string[]>([]);
   const [bulkStatus, setBulkStatus] = useState<"" | BulkStatusType>("");
+  // Paid invoices a bulk status change would un-pay, while confirming.
+  const [bulkUnpay, setBulkUnpay] = useState<
+    { id: string; invoiceNumber: string }[] | null
+  >(null);
   const [bulkError, setBulkError] = useState<string | null>(null);
   const [bulkEmailDialogOpen, setBulkEmailDialogOpen] =
     useState<boolean>(false);
@@ -243,7 +248,7 @@ export default function HardwareSalesDashboard() {
     }
   };
 
-  const handleApplyBulkStatus = async () => {
+  const handleApplyBulkStatus = async (confirmBankEffect = false) => {
     if (!bulkStatus || selectedInvoiceIds.length === 0) return;
     setBulkError(null);
     // A draft must be issued first; check up front so nothing is half-applied.
@@ -261,13 +266,35 @@ export default function HardwareSalesDashboard() {
         return;
       }
     }
+    // Paid -> Issued / Overdue / Refunded deletes the payment records and
+    // bank statement rows (as Mark as Unpaid): show them and confirm.
+    const paidSelected =
+      bulkStatus === "PAID" || bulkStatus === "CANCELLED"
+        ? []
+        : invoices.filter(
+            (inv: InvoiceWithDetails) =>
+              selectedInvoiceIds.includes(inv.id) && inv.status === "PAID",
+          );
+    if (paidSelected.length > 0 && !confirmBankEffect) {
+      setBulkUnpay(
+        paidSelected.map((inv: InvoiceWithDetails) => ({
+          id: inv.id,
+          invoiceNumber: inv.invoiceNumber,
+        })),
+      );
+      return;
+    }
     try {
       for (const id of selectedInvoiceIds) {
-        await changeStatus(id, bulkStatus as BulkStatusType);
+        await changeStatus(id, bulkStatus as BulkStatusType, {
+          confirmBankEffect,
+        });
       }
+      setBulkUnpay(null);
       setSelectedInvoiceIds([]);
       setBulkStatus("");
     } catch (error) {
+      setBulkUnpay(null);
       setBulkError(
         error instanceof Error
           ? error.message
@@ -735,6 +762,15 @@ export default function HardwareSalesDashboard() {
             <Box sx={{ flexGrow: 1 }} />
             {isAdmin && (
               <>
+                {bulkUnpay && (
+                  <BulkUnpayDialog
+                    invoices={bulkUnpay}
+                    targetStatus={bulkStatus}
+                    busy={bulkStatusLoading}
+                    onClose={() => setBulkUnpay(null)}
+                    onConfirm={() => void handleApplyBulkStatus(true)}
+                  />
+                )}
                 <TextField
                   select
                   size="small"
@@ -756,7 +792,7 @@ export default function HardwareSalesDashboard() {
                 <Button
                   variant="outlined"
                   size="small"
-                  onClick={handleApplyBulkStatus}
+                  onClick={() => void handleApplyBulkStatus()}
                   disabled={
                     !bulkStatus ||
                     selectedInvoiceIds.length === 0 ||

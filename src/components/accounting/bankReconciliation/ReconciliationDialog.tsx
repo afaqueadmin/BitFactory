@@ -54,6 +54,8 @@ const USD = "USD";
 const today = () => new Date().toLocaleDateString("en-CA");
 /** A saved instant as the viewer's calendar day (YYYY-MM-DD). */
 const localDay = (iso: string) => new Date(iso).toLocaleDateString("en-CA");
+/** A saved instant as dd/mm/yyyy in the viewer's time zone. */
+const dmy = (iso: string) => new Date(iso).toLocaleDateString("en-GB");
 const round2 = (n: number) => Math.round(n * 100) / 100;
 /** 0 or more, up to 2 decimals. */
 const money = (v: string) =>
@@ -81,6 +83,9 @@ export function ReconciliationDialog({
           clientName: entry.clientName,
           totalUsd: entry.invoiceTotalUsd,
           paidDate: null,
+          issuedDate: null,
+          dueDate: "",
+          markedPaid: null,
           narration: "",
         }
       : null,
@@ -134,6 +139,24 @@ export function ReconciliationDialog({
     setDate(inv.paidDate ? localDay(inv.paidDate) : "");
     setNarration(inv.narration);
   };
+
+  // The picked invoice as listed (an edit starts with a stub until loaded).
+  const listed = invoice
+    ? invoices.find((i) => i.id === invoice.id)
+    : undefined;
+  const noPaidDateHint =
+    listed && !listed.paidDate
+      ? [
+          "This invoice was marked as paid with no payment date.",
+          listed.issuedDate ? `Issued ${dmy(listed.issuedDate)}` : "Not issued",
+          listed.dueDate ? `Due ${dmy(listed.dueDate)}` : null,
+          listed.markedPaid
+            ? `Marked as paid ${dmy(listed.markedPaid.at)} by ${listed.markedPaid.by}`
+            : null,
+        ]
+          .filter(Boolean)
+          .join(" · ")
+      : null;
 
   const code = account.currencyCode;
   const rate = parseExchangeRate(account);
@@ -316,6 +339,7 @@ export function ReconciliationDialog({
               />
             )}
           />
+          {noPaidDateHint && <Alert severity="info">{noPaidDateHint}</Alert>}
           <TextField
             label="Client"
             value={invoice?.clientName ?? ""}

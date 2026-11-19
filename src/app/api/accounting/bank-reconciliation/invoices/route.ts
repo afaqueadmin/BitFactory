@@ -8,6 +8,57 @@ import {
 import { candidateInvoiceWhere } from "@/lib/accounting/bankReconciliationRequest";
 import { userName } from "../shared";
 
+/** An audit entry's changes, saved as a JSON string or as JSON. */
+const changesOf = (v: unknown): Record<string, unknown> | null => {
+  if (typeof v === "string") {
+    try {
+      return JSON.parse(v);
+    } catch {
+      return null;
+    }
+  }
+  return v && typeof v === "object" ? (v as Record<string, unknown>) : null;
+};
+
+/**
+ * When and by whom each invoice was last set to PAID by a status change
+ * (the list pages' bulk "Mark as Paid"), for invoices with no paid date: the
+ * form shows it as a hint. Not found when the status changed without an
+ * audit entry (e.g. the BTCPay webhook).
+ */
+async function markedPaidWithoutDate(
+  invoiceIds: string[],
+): Promise<Map<string, { at: string; by: string }>> {
+  const found = new Map<string, { at: string; by: string }>();
+  if (invoiceIds.length === 0) return found;
+  const logs = await prisma.auditLog.findMany({
+    where: {
+      entityType: "Invoice",
+      entityId: { in: invoiceIds },
+      action: "INVOICE_UPDATED",
+    },
+    orderBy: { createdAt: "desc" },
+    select: {
+      entityId: true,
+      changes: true,
+      createdAt: true,
+      user: { select: { name: true, email: true } },
+    },
+  });
+  for (const log of logs) {
+    if (found.has(log.entityId)) continue;
+    const status = changesOf(log.changes)?.status as
+      { to?: unknown } | undefined;
+    if (status?.to === "PAID") {
+      found.set(log.entityId, {
+        at: log.createdAt.toISOString(),
+        by: userName(log.user),
+      });
+    }
+  }
+  return found;
+}
+
 /**
  * GET /api/accounting/bank-reconciliation/invoices?type=<InvoiceType>&keep=<invoiceId>
  * The invoices an entry can be made for (candidateInvoiceWhere): PAID, of
@@ -40,6 +91,8 @@ export async function GET(request: NextRequest) {
         invoiceNumber: true,
         totalAmount: true,
         paidDate: true,
+        issuedDate: true,
+        dueDate: true,
         user: { select: { name: true, email: true } },
         // Payment notes pre-fill the narration, oldest first.
         costPayments: {
@@ -50,6 +103,10 @@ export async function GET(request: NextRequest) {
       },
     });
 
+    const markedPaid = await markedPaidWithoutDate(
+      invoices.filter((i) => !i.paidDate).map((i) => i.id),
+    );
+
     return NextResponse.json({
       success: true,
       data: invoices.map((i) => ({
@@ -57,8 +114,11 @@ export async function GET(request: NextRequest) {
         invoiceNumber: i.invoiceNumber,
         clientName: userName(i.user),
         totalUsd: i.totalAmount.toFixed(2),
-        // An instant: the form shows it as the viewer's calendar day.
+        // Instants: the form shows them as the viewer's calendar days.
         paidDate: i.paidDate?.toISOString() ?? null,
+        issuedDate: i.issuedDate?.toISOString() ?? null,
+        dueDate: i.dueDate.toISOString(),
+        markedPaid: markedPaid.get(i.id) ?? null,
         narration: joinPaymentNotes(i.costPayments.map((p) => p.narration)),
       })),
     });
