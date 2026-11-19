@@ -19,6 +19,7 @@ import { sendInvoiceCancellationEmail } from "@/lib/email";
 import { getGroupByUserId } from "@/lib/groupUtils";
 import { InvoiceEmailService } from "@/services/invoiceEmailService";
 import { recordSingleEmailRun } from "@/lib/accounting/emailRunLog";
+import { reconciliationEntryLabel } from "@/lib/accounting/bankReconciliation";
 import { accrueIncentivesForInvoice } from "@/lib/incentives/accrue";
 import { reverseIncentivesForInvoice } from "@/lib/incentives/reverse";
 import { assertFranchiseeOwnsCustomer } from "@/lib/franchiseeScope";
@@ -691,7 +692,10 @@ export async function DELETE(
 
     const invoice = await prisma.invoice.findUnique({
       where: { id },
-      include: { repairNote: { select: { minerId: true } } },
+      include: {
+        repairNote: { select: { minerId: true } },
+        bankReconciliation: { select: { entryNumber: true } },
+      },
     });
 
     if (!invoice) {
@@ -707,6 +711,16 @@ export async function DELETE(
           error: "Only DRAFT or CANCELLED invoices can be deleted",
         },
         { status: 400 },
+      );
+    }
+
+    // Its money is on a bank statement through Bank Reconciliation.
+    if (invoice.bankReconciliation) {
+      return NextResponse.json(
+        {
+          error: `This invoice has Bank Reconciliation entry ${reconciliationEntryLabel(invoice.bankReconciliation.entryNumber)}. Delete that entry first.`,
+        },
+        { status: 409 },
       );
     }
 

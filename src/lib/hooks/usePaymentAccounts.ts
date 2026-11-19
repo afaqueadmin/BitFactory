@@ -46,7 +46,8 @@ export interface BankStatementRow {
     | "DEPOSIT_RETURN"
     | "TRANSFER"
     | "EXPENSE"
-    | "INCOME";
+    | "INCOME"
+    | "RECONCILIATION";
   bankId: string;
   date: string;
   invoices: { number: string; href: string }[];
