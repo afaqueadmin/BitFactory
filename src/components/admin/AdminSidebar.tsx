@@ -58,6 +58,7 @@ import {
   PriceCheck as PricingIcon,
   PictureAsPdf as PdfSettingsIcon,
   AccountBalance as PaymentAccountsIcon,
+  Payment as BanksIcon,
   LocalShipping as VendorsIcon,
   RequestPage as ExpensesIcon,
   Category as ExpenseHeadsIcon,
@@ -231,6 +232,12 @@ const sidebarSections: SidebarSection[] = [
         ],
       },
       { title: "Pools", icon: <PoolsIcon />, path: "/pools" },
+      {
+        // Luxor/Braiins pool payouts and charges per customer.
+        title: "Transaction History",
+        icon: <TransactionHistoryIcon />,
+        path: "/accounting/client-transaction-history",
+      },
       { title: "Locations", icon: <LocationsIcon />, path: "/space" },
       { title: "Hardware Models", icon: <HardwareIcon />, path: "/hardware" },
     ],
@@ -266,6 +273,11 @@ const sidebarSections: SidebarSection[] = [
             title: "Recurring Invoices",
             icon: <RecurringIcon />,
             path: "/accounting/recurring",
+          },
+          {
+            title: "Email Reports",
+            icon: <EmailReportsIcon />,
+            path: "/accounting/email-report",
           },
         ],
       },
@@ -308,14 +320,38 @@ const sidebarSections: SidebarSection[] = [
         ],
       },
       {
-        title: "Expenses",
-        icon: <ExpensesIcon />,
-        path: "/accounting/expenses",
-      },
-      {
-        title: "Capital & Income",
-        icon: <CapitalIncomeIcon />,
-        path: "/accounting/capital-income",
+        // Everything that moves money in or out of our banks.
+        title: "Banking",
+        icon: <PaymentAccountsIcon />,
+        items: [
+          {
+            // Banks / Transfers / Entities / Currencies tabs, plus bank
+            // statements under /payment-accounts/banks/[id] and /statement.
+            title: "Banks",
+            icon: <BanksIcon />,
+            path: "/accounting/payment-accounts",
+          },
+          {
+            title: "Expenses",
+            icon: <ExpensesIcon />,
+            path: "/accounting/expenses",
+          },
+          {
+            title: "Capital & Income",
+            icon: <CapitalIncomeIcon />,
+            path: "/accounting/capital-income",
+          },
+          {
+            title: "Expense Heads",
+            icon: <ExpenseHeadsIcon />,
+            path: "/accounting/expense-heads",
+          },
+          {
+            title: "Capital & Income Heads",
+            icon: <CapitalIncomeHeadsIcon />,
+            path: "/accounting/capital-income-heads",
+          },
+        ],
       },
       {
         title: "Customer Statements",
@@ -323,19 +359,9 @@ const sidebarSections: SidebarSection[] = [
         path: "/accounting/statements",
       },
       {
-        title: "Transaction History",
-        icon: <TransactionHistoryIcon />,
-        path: "/accounting/client-transaction-history",
-      },
-      {
         title: "Incentive Payouts",
         icon: <IncentivesIcon />,
         path: "/incentives/payouts",
-      },
-      {
-        title: "Email Reports",
-        icon: <EmailReportsIcon />,
-        path: "/accounting/email-report",
       },
       {
         title: "Finance Settings",
@@ -357,24 +383,9 @@ const sidebarSections: SidebarSection[] = [
             path: "/accounting/pdf-invoice-settings",
           },
           {
-            title: "Entities, Banks & Currencies",
-            icon: <PaymentAccountsIcon />,
-            path: "/accounting/payment-accounts",
-          },
-          {
             title: "Vendors",
             icon: <VendorsIcon />,
             path: "/accounting/vendors",
-          },
-          {
-            title: "Expense Heads",
-            icon: <ExpenseHeadsIcon />,
-            path: "/accounting/expense-heads",
-          },
-          {
-            title: "Capital & Income Heads",
-            icon: <CapitalIncomeHeadsIcon />,
-            path: "/accounting/capital-income-heads",
           },
         ],
       },
@@ -392,6 +403,22 @@ const sidebarSections: SidebarSection[] = [
         title: "Company Payback",
         icon: <CompanyPaybackIcon />,
         path: "/admin/payback-analysis-company",
+      },
+      {
+        title: "Payback Settings",
+        icon: <SettingsIcon />,
+        items: [
+          {
+            title: "Customer Payback",
+            icon: <CustomerPaybackSettingsIcon />,
+            path: "/admin/payback-analysis-settings",
+          },
+          {
+            title: "Company Payback",
+            icon: <CompanyPaybackSettingsIcon />,
+            path: "/admin/payback-analysis-company-settings",
+          },
+        ],
       },
     ],
   },
@@ -435,22 +462,6 @@ const sidebarSections: SidebarSection[] = [
             title: "Pool Transactions",
             icon: <PoolTransactionsIcon />,
             path: "/db-data-management/pool-transactions",
-          },
-        ],
-      },
-      {
-        title: "Payback Settings",
-        icon: <SettingsIcon />,
-        items: [
-          {
-            title: "Customer Payback",
-            icon: <CustomerPaybackSettingsIcon />,
-            path: "/admin/payback-analysis-settings",
-          },
-          {
-            title: "Company Payback",
-            icon: <CompanyPaybackSettingsIcon />,
-            path: "/admin/payback-analysis-company-settings",
           },
         ],
       },
