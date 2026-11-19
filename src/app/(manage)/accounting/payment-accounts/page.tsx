@@ -26,7 +26,6 @@ import AddIcon from "@mui/icons-material/Add";
 import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
 import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
 import { TransferDialog } from "@/components/accounting/bankTransfer/TransferDialog";
-import { TransfersTab } from "@/components/accounting/bankTransfer/TransfersTab";
 import { useDaylight } from "@/lib/daylight";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -48,7 +47,6 @@ import {
   useAccountingBanks,
   useAccountingCurrencies,
   useAccountingEntities,
-  useBankTransfers,
 } from "@/lib/hooks/usePaymentAccounts";
 import {
   DaylightAdminPage,
@@ -601,9 +599,9 @@ function CurrenciesTab() {
 // Page
 // ---------------------------------------------------------------------------
 
+// Transfers have their own page (/accounting/transfers).
 const TABS = [
   { key: "banks", label: "Banks" },
-  { key: "transfers", label: "Transfers" },
   { key: "entities", label: "Entities" },
   { key: "currencies", label: "Currencies" },
 ] as const;
@@ -629,10 +627,8 @@ function PaymentAccountsContent() {
   const { data: banks } = useAccountingBanks();
   const { data: entities } = useAccountingEntities();
   const { data: currencies } = useAccountingCurrencies();
-  const { data: transfers } = useBankTransfers();
   const counts: Record<TabKey, number | undefined> = {
     banks: banks?.length,
-    transfers: transfers?.length,
     entities: entities?.length,
     currencies: currencies?.length,
   };
@@ -644,9 +640,9 @@ function PaymentAccountsContent() {
           Entities, Banks &amp; Currencies
         </Typography>
         <Typography sx={ds.pageDescSx}>
-          The paying and receiving accounts used when recording payments, and
-          the transfers between them. Inactive records are hidden from payment
-          forms but stay on past payments.
+          The paying and receiving accounts used when recording payments.
+          Inactive records are hidden from payment forms but stay on past
+          payments. Transfers between banks are on the Transfers page.
         </Typography>
       </Box>
       <Paper elevation={0} sx={{ ...ds.listCardSx, p: { xs: 2, sm: 3 } }}>
@@ -677,7 +673,6 @@ function PaymentAccountsContent() {
           ))}
         </Tabs>
         {tab === "banks" && <BanksTab />}
-        {tab === "transfers" && <TransfersTab />}
         {tab === "entities" && <EntitiesTab />}
         {tab === "currencies" && <CurrenciesTab />}
       </Paper>

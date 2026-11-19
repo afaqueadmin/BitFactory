@@ -25,6 +25,7 @@ import {
 } from "@mui/material";
 import { useState } from "react";
 import {
+  bankPaymentAccount,
   EMPTY_PAYMENT_ACCOUNT,
   formatCurrencyAmount,
   PaymentAccountFields,
@@ -70,20 +71,6 @@ const sideAccount = (s: BankTransfer["from"]): PaymentAccountValue => ({
   exchangeRate: "",
 });
 
-/** The From side pre-filled with a bank (and its currency if it has one). */
-function bankAccount(bank: AccountingBank | undefined): PaymentAccountValue {
-  if (!bank) return EMPTY_PAYMENT_ACCOUNT;
-  const currencies = bank.currencies.filter((c) => c.currency.isActive);
-  const only = currencies.length === 1 ? currencies[0].currency : null;
-  return {
-    ...EMPTY_PAYMENT_ACCOUNT,
-    entityId: bank.entityId,
-    bankId: bank.id,
-    currencyId: only?.id ?? "",
-    currencyCode: only?.code ?? "",
-  };
-}
-
 const zeroBlank = (v: string) => (Number(v) === 0 ? "" : v);
 
 export function TransferDialog({
@@ -103,7 +90,7 @@ export function TransferDialog({
 
   const [date, setDate] = useState(transfer?.date ?? today());
   const [from, setFrom] = useState<PaymentAccountValue>(
-    transfer ? sideAccount(transfer.from) : bankAccount(defaultFromBank),
+    transfer ? sideAccount(transfer.from) : bankPaymentAccount(defaultFromBank),
   );
   const [to, setTo] = useState<PaymentAccountValue>(
     transfer ? sideAccount(transfer.to) : EMPTY_PAYMENT_ACCOUNT,

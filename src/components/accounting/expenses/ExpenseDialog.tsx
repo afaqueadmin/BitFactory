@@ -158,7 +158,7 @@ export function ExpenseDialog({
             </Select>
             {!headsLoading && headOptions.length === 0 && (
               <FormHelperText>
-                No active heads. Add one under Finance Settings → Expense Heads.
+                No active heads. Add one under Expenses → Heads.
               </FormHelperText>
             )}
           </FormControl>

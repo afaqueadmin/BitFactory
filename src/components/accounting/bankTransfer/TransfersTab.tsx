@@ -1,8 +1,9 @@
 "use client";
 
 /**
- * Entities, Banks & Currencies -> Transfers: every internal bank transfer,
- * newest first, with Record / Edit / Delete.
+ * Transfers page (/accounting/transfers): every internal bank transfer,
+ * newest first, with filters, sortable columns, CSV / PDF export and
+ * Record / Edit / Delete. Filter and sort rules: lib/accounting/transferLists.
  */
 
 import {
@@ -28,6 +29,7 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  TextField,
   Tooltip,
   Typography,
 } from "@mui/material";
@@ -40,8 +42,20 @@ import { useState } from "react";
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
 import { DateDisplay } from "@/components/accounting/common/DateDisplay";
 import { formatCurrencyAmount } from "@/components/accounting/common/PaymentAccountFields";
+import {
+  SortHeader,
+  useTableSort,
+} from "@/components/accounting/common/SortableHeader";
+import { ExportButtons } from "@/components/accounting/bankStatement/StatementParts";
 import { TableState } from "@/components/accounting/masterData/MasterDataTable";
 import { TransferDialog } from "@/components/accounting/bankTransfer/TransferDialog";
+import {
+  TRANSFER_DEFAULT_SORT,
+  TransferSortKey,
+  transferListQuery,
+  transferListRows,
+} from "@/lib/accounting/transferLists";
+import { downloadExport } from "@/lib/downloadExport";
 import {
   DaylightStatusPill,
   useDaylightAdminSx,
@@ -107,22 +121,45 @@ export function TransfersTab() {
   const save = useSaveBankTransfer();
   const [entityFilter, setEntityFilter] = useState("");
   const [bankFilter, setBankFilter] = useState("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
   const [editing, setEditing] = useState<BankTransfer | "new" | null>(null);
   const [deleting, setDeleting] = useState<BankTransfer | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  const rows = data.filter(
-    (t) =>
-      (!entityFilter ||
-        t.from.entityId === entityFilter ||
-        t.to.entityId === entityFilter) &&
-      (!bankFilter ||
-        t.from.bankId === bankFilter ||
-        t.to.bankId === bankFilter),
+  // Newest first by default, as the list comes from the API. The export
+  // gets the same filter and sort, so it holds exactly these rows.
+  const sort = useTableSort<TransferSortKey>(
+    TRANSFER_DEFAULT_SORT.key,
+    TRANSFER_DEFAULT_SORT.dir,
   );
+  const filter = { entityId: entityFilter, bankId: bankFilter, from, to };
+  const rows = transferListRows(data, filter, sort);
   const bankOptions = banks.filter(
     (b) => !entityFilter || b.entityId === entityFilter,
   );
+
+  const [exporting, setExporting] = useState<"csv" | "pdf" | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const handleExport = async (format: "csv" | "pdf") => {
+    try {
+      setExporting(format);
+      setExportError(null);
+      const query = transferListQuery(filter, sort);
+      query.set("format", format);
+      query.set("tz", Intl.DateTimeFormat().resolvedOptions().timeZone);
+      await downloadExport(
+        `/api/accounting/bank-transfers/export?${query.toString()}`,
+        `transfers-${new Date().toLocaleDateString("en-CA")}.${format}`,
+      );
+    } catch (err) {
+      setExportError(
+        err instanceof Error ? err.message : "Failed to download export",
+      );
+    } finally {
+      setExporting(null);
+    }
+  };
 
   const remove = async () => {
     if (!deleting) return;
@@ -143,7 +180,12 @@ export function TransfersTab() {
         spacing={2}
         sx={{ mb: 2 }}
       >
-        <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          spacing={2}
+          flexWrap="wrap"
+          useFlexGap
+        >
           <FormControl size="small" sx={{ minWidth: 220 }}>
             <InputLabel>Entity</InputLabel>
             <Select
@@ -178,8 +220,35 @@ export function TransfersTab() {
               ))}
             </Select>
           </FormControl>
+          <TextField
+            label="From"
+            type="date"
+            size="small"
+            value={from}
+            onChange={(e) => setFrom(e.target.value)}
+            slotProps={{ inputLabel: { shrink: true } }}
+          />
+          <TextField
+            label="To"
+            type="date"
+            size="small"
+            value={to}
+            onChange={(e) => setTo(e.target.value)}
+            slotProps={{ inputLabel: { shrink: true } }}
+          />
         </Stack>
-        <Box>
+        <Stack
+          direction="row"
+          spacing={1}
+          alignItems="flex-start"
+          flexWrap="wrap"
+          useFlexGap
+        >
+          <ExportButtons
+            disabled={isLoading || !!error}
+            exporting={exporting}
+            onExport={handleExport}
+          />
           <Button
             variant="contained"
             startIcon={<AddIcon />}
@@ -188,19 +257,39 @@ export function TransfersTab() {
           >
             Record transfer
           </Button>
-        </Box>
+        </Stack>
       </Stack>
+      {exportError && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {exportError}
+        </Alert>
+      )}
 
       <TableContainer component={Paper} variant="outlined">
         <Table size="small">
           <TableHead>
             <TableRow>
-              <TableCell>Date</TableCell>
-              <TableCell>From</TableCell>
-              <TableCell>To</TableCell>
-              <TableCell align="right">Sent</TableCell>
-              <TableCell align="right">Received</TableCell>
-              <TableCell align="right">Value (USD)</TableCell>
+              <SortHeader sort={sort} sortKey="date" label="Date" />
+              <SortHeader sort={sort} sortKey="from" label="From" />
+              <SortHeader sort={sort} sortKey="to" label="To" />
+              <SortHeader
+                sort={sort}
+                sortKey="sent"
+                label="Sent"
+                align="right"
+              />
+              <SortHeader
+                sort={sort}
+                sortKey="received"
+                label="Received"
+                align="right"
+              />
+              <SortHeader
+                sort={sort}
+                sortKey="value"
+                label="Value (USD)"
+                align="right"
+              />
               <TableCell>Reference / Note</TableCell>
               <TableCell align="right">Actions</TableCell>
             </TableRow>

@@ -61,9 +61,8 @@ import {
   Payment as BanksIcon,
   LocalShipping as VendorsIcon,
   RequestPage as ExpensesIcon,
-  Category as ExpenseHeadsIcon,
+  SyncAlt as TransfersIcon,
   AddCard as CapitalIncomeIcon,
-  Label as CapitalIncomeHeadsIcon,
   Timeline as CustomerPaybackIcon,
   Factory as CompanyPaybackIcon,
   History as ActivityLogIcon,
@@ -325,13 +324,19 @@ const sidebarSections: SidebarSection[] = [
         icon: <PaymentAccountsIcon />,
         items: [
           {
-            // Banks / Transfers / Entities / Currencies tabs, plus bank
-            // statements under /payment-accounts/banks/[id] and /statement.
+            // Banks / Entities / Currencies tabs, plus bank statements
+            // under /payment-accounts/banks/[id] and /statement.
             title: "Banks",
             icon: <BanksIcon />,
             path: "/accounting/payment-accounts",
           },
           {
+            title: "Transfers",
+            icon: <TransfersIcon />,
+            path: "/accounting/transfers",
+          },
+          {
+            // Heads are a tab on this page (and on Capital & Income).
             title: "Expenses",
             icon: <ExpensesIcon />,
             path: "/accounting/expenses",
@@ -340,16 +345,6 @@ const sidebarSections: SidebarSection[] = [
             title: "Capital & Income",
             icon: <CapitalIncomeIcon />,
             path: "/accounting/capital-income",
-          },
-          {
-            title: "Expense Heads",
-            icon: <ExpenseHeadsIcon />,
-            path: "/accounting/expense-heads",
-          },
-          {
-            title: "Capital & Income Heads",
-            icon: <CapitalIncomeHeadsIcon />,
-            path: "/accounting/capital-income-heads",
           },
         ],
       },

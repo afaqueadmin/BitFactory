@@ -3,7 +3,11 @@
 import { Alert, Box, Button, Paper, Stack, Typography } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
+import PaymentsIcon from "@mui/icons-material/Payments";
+import AddCardIcon from "@mui/icons-material/AddCard";
 import { TransferDialog } from "@/components/accounting/bankTransfer/TransferDialog";
+import { PayExpenseDialog } from "@/components/accounting/expenses/PayExpenseDialog";
+import { IncomeDialog } from "@/components/accounting/capitalIncome/IncomeDialog";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
@@ -37,6 +41,7 @@ import {
  * Bank Statement: every payment received into (Debit) or sent from (Credit)
  * one bank, oldest first, with a running balance. USD at the rate saved
  * with each payment. Opened from Entities, Banks & Currencies -> Banks.
+ * Record transfer / Pay expense / Add capital & income pre-fill this bank.
  *
  * The date range lives in the URL (?from=&to=), so it survives a refresh
  * and switching bank (or to "All banks") with the picker.
@@ -64,8 +69,11 @@ function BankStatementContent() {
   const [exporting, setExporting] = useState<"csv" | "pdf" | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
   const [recordingTransfer, setRecordingTransfer] = useState(false);
+  const [payingExpense, setPayingExpense] = useState(false);
+  const [addingIncome, setAddingIncome] = useState(false);
 
   const { data: banks = [] } = useAccountingBanks();
+  const currentBank = banks.find((b) => b.id === bankId);
   const rangeError = !!(from && to && from > to);
   const { data, isLoading, error } = useBankStatement(
     bankId,
@@ -166,6 +174,8 @@ function BankStatementContent() {
           direction={{ xs: "column", sm: "row" }}
           spacing={1.5}
           alignItems={{ xs: "stretch", sm: "center" }}
+          flexWrap="wrap"
+          useFlexGap
         >
           <Button
             variant="outlined"
@@ -175,13 +185,45 @@ function BankStatementContent() {
           >
             Record transfer
           </Button>
+          {/* Payment forms only offer active banks, so an inactive one
+              can't be pre-filled. */}
+          <Button
+            variant="outlined"
+            startIcon={<PaymentsIcon />}
+            onClick={() => setPayingExpense(true)}
+            disabled={!currentBank?.isActive}
+            sx={ds.outlineBtnSx}
+          >
+            Pay expense
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<AddCardIcon />}
+            onClick={() => setAddingIncome(true)}
+            disabled={!currentBank?.isActive}
+            sx={ds.outlineBtnSx}
+          >
+            Add capital &amp; income
+          </Button>
           <BankPicker banks={banks} current={bankId} onChange={switchBank} />
         </Stack>
       </Box>
       {recordingTransfer && (
         <TransferDialog
-          defaultFromBank={banks.find((b) => b.id === bankId)}
+          defaultFromBank={currentBank}
           onClose={() => setRecordingTransfer(false)}
+        />
+      )}
+      {payingExpense && (
+        <PayExpenseDialog
+          bank={currentBank}
+          onClose={() => setPayingExpense(false)}
+        />
+      )}
+      {addingIncome && (
+        <IncomeDialog
+          defaultBank={currentBank}
+          onClose={() => setAddingIncome(false)}
         />
       )}
 
