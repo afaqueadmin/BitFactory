@@ -3,7 +3,7 @@
 /**
  * Expenses: company expenses owed in USD and paid from our banks (one or
  * more payments each). Payments are Credits on the bank statements. Rules
- * in lib/accounting/expense.ts; Heads are under Finance Settings.
+ * in lib/accounting/expense.ts; Heads are the Heads tab here.
  */
 
 import {
@@ -66,6 +66,7 @@ import { TableState } from "@/components/accounting/masterData/MasterDataTable";
 import { ExpenseDialog } from "@/components/accounting/expenses/ExpenseDialog";
 import { ExpensePaymentDialog } from "@/components/accounting/expenses/ExpensePaymentDialog";
 import { ExpenseReport } from "@/components/accounting/expenses/ExpenseReport";
+import { ExpenseHeadsTab } from "@/components/accounting/expenses/ExpenseHeadsTab";
 import {
   DaylightAdminPage,
   DaylightStatusPill,
@@ -109,7 +110,8 @@ function ExpensesContent() {
   const ds = useDaylightAdminSx();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const tab = searchParams.get("tab") === "report" ? "report" : "expenses";
+  const param = searchParams.get("tab");
+  const tab = param === "report" || param === "heads" ? param : "expenses";
   const { data } = useExpenses();
 
   return (
@@ -129,9 +131,9 @@ function ExpensesContent() {
           value={tab}
           onChange={(_, v: string) =>
             router.replace(
-              v === "report"
-                ? "/accounting/expenses?tab=report"
-                : "/accounting/expenses",
+              v === "expenses"
+                ? "/accounting/expenses"
+                : `/accounting/expenses?tab=${v}`,
               { scroll: false },
             )
           }
@@ -144,12 +146,13 @@ function ExpensesContent() {
             label={data ? `Expenses (${data.length})` : "Expenses"}
           />
           <Tab value="report" label="Report" />
+          <Tab value="heads" label="Heads" />
         </Tabs>
-        {tab === "expenses" ? (
+        {tab === "expenses" && (
           <ExpensesTab focusId={searchParams.get("expense")} />
-        ) : (
-          <ExpenseReport />
         )}
+        {tab === "report" && <ExpenseReport />}
+        {tab === "heads" && <ExpenseHeadsTab />}
       </Paper>
     </DaylightAdminPage>
   );

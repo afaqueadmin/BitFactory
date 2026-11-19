@@ -114,7 +114,7 @@ export interface AccountingVendor {
   };
 }
 
-/** A kind of expense (Finance Settings -> Expense Heads). */
+/** A kind of expense (Expenses -> Heads tab). */
 export interface ExpenseHead {
   id: string;
   name: string;
@@ -128,7 +128,7 @@ export interface ExpenseHead {
   amountPaidUsd?: string;
 }
 
-/** A kind of Capital & Income (Finance Settings -> Capital & Income Heads). */
+/** A kind of Capital & Income (Capital & Income -> Heads tab). */
 export interface IncomeHead {
   id: string;
   name: string;

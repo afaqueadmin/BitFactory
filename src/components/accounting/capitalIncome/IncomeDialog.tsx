@@ -29,7 +29,7 @@ import {
 } from "@mui/material";
 import { useState } from "react";
 import {
-  EMPTY_PAYMENT_ACCOUNT,
+  bankPaymentAccount,
   formatCurrencyAmount,
   parseExchangeRate,
   PaymentAccountFields,
@@ -41,6 +41,7 @@ import {
 } from "@/components/accounting/common/PdfUploadField";
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
 import {
+  AccountingBank,
   useAccountingBanks,
   useIncomeHeads,
 } from "@/lib/hooks/usePaymentAccounts";
@@ -59,10 +60,13 @@ const zeroBlank = (v: string) => (Number(v) === 0 ? "" : v);
 
 export function IncomeDialog({
   entry,
+  defaultBank,
   onClose,
 }: {
   /** Edit this entry; absent = add a new one. */
   entry?: IncomeEntry;
+  /** New entry: pre-fill the receiving bank (from its statement page). */
+  defaultBank?: AccountingBank;
   onClose: () => void;
 }) {
   const save = useSaveIncome();
@@ -85,7 +89,7 @@ export function IncomeDialog({
           currencyCode: entry.currencyCode,
           exchangeRate: entry.exchangeRate,
         }
-      : EMPTY_PAYMENT_ACCOUNT,
+      : bankPaymentAccount(defaultBank),
   );
   const [amount, setAmount] = useState(entry?.amount ?? "");
   const [fee, setFee] = useState(zeroBlank(entry?.fee ?? ""));
@@ -227,8 +231,7 @@ export function IncomeDialog({
             </Select>
             {!headsLoading && headOptions.length === 0 && (
               <FormHelperText>
-                No active heads. Add one under Finance Settings → Capital &amp;
-                Income Heads.
+                No active heads. Add one under Capital &amp; Income → Heads.
               </FormHelperText>
             )}
           </FormControl>

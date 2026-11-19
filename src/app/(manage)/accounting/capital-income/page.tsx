@@ -4,7 +4,7 @@
  * Capital & Income: money added to our banks without an invoice (initial
  * deposit, equity, loan, ...). Each entry is a Debit on its bank's
  * statement; a bank fee is its own Credit row. Rules in
- * lib/accounting/capitalIncome.ts; Heads are under Finance Settings.
+ * lib/accounting/capitalIncome.ts; Heads are the Heads tab here.
  */
 
 import {
@@ -55,6 +55,7 @@ import { ExportButtons } from "@/components/accounting/bankStatement/StatementPa
 import { TableState } from "@/components/accounting/masterData/MasterDataTable";
 import { IncomeDialog } from "@/components/accounting/capitalIncome/IncomeDialog";
 import { IncomeReport } from "@/components/accounting/capitalIncome/IncomeReport";
+import { IncomeHeadsTab } from "@/components/accounting/capitalIncome/IncomeHeadsTab";
 import {
   INCOME_DEFAULT_SORT,
   IncomeSortKey,
@@ -99,7 +100,8 @@ function CapitalIncomeContent() {
   const ds = useDaylightAdminSx();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const tab = searchParams.get("tab") === "report" ? "report" : "entries";
+  const param = searchParams.get("tab");
+  const tab = param === "report" || param === "heads" ? param : "entries";
   const { data } = useCapitalIncome();
 
   return (
@@ -118,7 +120,7 @@ function CapitalIncomeContent() {
         <Tabs
           value={tab}
           onChange={(_, v: string) =>
-            router.replace(v === "report" ? `${PATH}?tab=report` : PATH, {
+            router.replace(v === "entries" ? PATH : `${PATH}?tab=${v}`, {
               scroll: false,
             })
           }
@@ -131,12 +133,13 @@ function CapitalIncomeContent() {
             label={data ? `Entries (${data.length})` : "Entries"}
           />
           <Tab value="report" label="Report" />
+          <Tab value="heads" label="Heads" />
         </Tabs>
-        {tab === "entries" ? (
+        {tab === "entries" && (
           <EntriesTab focusId={searchParams.get("entry")} />
-        ) : (
-          <IncomeReport />
         )}
+        {tab === "report" && <IncomeReport />}
+        {tab === "heads" && <IncomeHeadsTab />}
       </Paper>
     </DaylightAdminPage>
   );
