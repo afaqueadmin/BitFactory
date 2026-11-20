@@ -4,6 +4,8 @@ import { ensurePoolSubaccounts } from "@/lib/services/poolDailySnapshotService";
 import { waitForDatabase } from "@/lib/services/cronRetry";
 import { sendPoolCronSummaryEmail } from "@/lib/email";
 
+export const maxDuration = 300;
+
 /**
  * GET /api/cron_pool_worker_status
  *
