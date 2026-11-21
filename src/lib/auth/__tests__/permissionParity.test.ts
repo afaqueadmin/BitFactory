@@ -254,6 +254,51 @@ const ROUTES: ParityRow[] = [
     today: "staff",
     shared: true,
   },
+
+  // Pool Workers. The luxor proxy serves every account type; only its staff
+  // branch checks a permission. workers/stats is own-data only (unchanged).
+  {
+    route: "luxor",
+    method: "GET",
+    permissions: [
+      "subaccounts.view",
+      "pool_workers.view",
+      "dashboard.view",
+      "miners.view",
+      "customers.view",
+      "customers.create",
+      "customers.edit",
+      "franchisees.create",
+      "franchisees.edit",
+      "franchisees.approve_customer_requests",
+    ],
+    today: "staff",
+    shared: true,
+  },
+  {
+    route: "braiins-workers",
+    method: "GET",
+    permissions: ["pool_workers.view"],
+    today: "staff",
+  },
+  {
+    route: "braiins-customers",
+    method: "GET",
+    permissions: ["pool_workers.view"],
+    today: "staff",
+  },
+  {
+    route: "braiins-workers/all",
+    method: "GET",
+    permissions: ["pool_workers.view"],
+    today: "staff",
+  },
+  {
+    route: "braiins-miners/all",
+    method: "GET",
+    permissions: ["pool_workers.view"],
+    today: "staff",
+  },
 ];
 
 const SYSTEM_ROLES = ["SUPER_ADMIN", "ADMIN", "ACCOUNTING"] as const;

@@ -22,6 +22,7 @@
  */
 
 import { isStaffRole } from "@/lib/auth/staffRoles";
+import { requireStaffPermission } from "@/lib/auth/authorization";
 import { NextRequest, NextResponse } from "next/server";
 import { verifyJwtToken } from "@/lib/jwt";
 import { createLuxorClient, LuxorError } from "@/lib/luxor";
@@ -388,6 +389,26 @@ export async function GET(
         { success: false, error: errorMsg },
         { status: 401 },
       );
+    }
+
+    // Staff: any screen that reads Luxor data. Server-side callers
+    // (admin/dashboard, GET machine) forward the caller's cookie, so their
+    // permission counts here. Client, franchisee, guild and simulated
+    // accounts keep their own scoping below.
+    if (isStaffRole(user.role)) {
+      const denied = await requireStaffPermission(request, [
+        "subaccounts.view",
+        "pool_workers.view",
+        "dashboard.view",
+        "miners.view",
+        "customers.view", // HostedMinersList on the customer page
+        "customers.create", // Luxor subaccount picker in the account dialogs
+        "customers.edit",
+        "franchisees.create",
+        "franchisees.edit",
+        "franchisees.approve_customer_requests",
+      ]);
+      if (denied) return denied as NextResponse<ProxyResponse>;
     }
 
     // ✅ STEP 2: Validate endpoint parameter
