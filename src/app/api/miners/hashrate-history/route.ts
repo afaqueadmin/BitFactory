@@ -1,4 +1,5 @@
 import { isStaffRole } from "@/lib/auth/staffRoles";
+import { requireStaffPermission } from "@/lib/auth/authorization";
 import { NextRequest, NextResponse } from "next/server";
 import { verifyJwtToken } from "@/lib/jwt";
 import { resolveDataOwnerId } from "@/lib/guildScope";
@@ -138,6 +139,12 @@ export async function GET(request: NextRequest) {
       requestedUserId !== decoded.userId
     ) {
       if (isStaffRole(callerRole)) {
+        // Staff: another account's chart (customer page, Miners table).
+        const denied = await requireStaffPermission(request, [
+          "miners.view",
+          "customers.view",
+        ]);
+        if (denied) return denied;
         targetUserId = requestedUserId;
       } else if (callerRole === "FRANCHISEE") {
         const owned = await assertFranchiseeOwnsCustomer(

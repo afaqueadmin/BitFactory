@@ -168,6 +168,92 @@ const ROUTES: ParityRow[] = [
     permissions: ["pools.manage_credentials"],
     today: "staff",
   },
+
+  // Miners. GET machine also serves franchisees (own customers' miners);
+  // the shared reads keep their client / franchisee / guild branches.
+  {
+    route: "machine",
+    method: "GET",
+    permissions: ["miners.view", "farm_tariffs.create"],
+    today: "staff",
+  },
+  {
+    route: "machine",
+    method: "POST",
+    permissions: ["miners.create"],
+    today: "staff",
+  },
+  {
+    route: "machine/[id]",
+    method: "PUT",
+    permissions: ["miners.edit"],
+    today: "staff",
+  },
+  {
+    route: "machine/[id]",
+    method: "DELETE",
+    permissions: ["miners.delete"],
+    today: "staff",
+  },
+  {
+    route: "machine/bulk-edit",
+    method: "POST",
+    permissions: ["miners.edit"],
+    today: "staff",
+  },
+  {
+    route: "machine/bulk-delete",
+    method: "POST",
+    permissions: ["miners.bulk_delete"],
+    today: "staff",
+  },
+  {
+    route: "machine/[id]/restarts",
+    method: "POST",
+    permissions: ["miners.log_restart", "hashrate_alerts.acknowledge"],
+    today: "staff",
+  },
+  {
+    route: "machine/[id]/repair-notes",
+    method: "GET",
+    permissions: ["miners.view", "customers.view"],
+    today: "staff",
+    shared: true,
+  },
+  {
+    route: "miners/[id]/pool-history",
+    method: "GET",
+    permissions: ["miners.view"],
+    today: "staff",
+  },
+  {
+    route: "miners/[id]/hashrate-history",
+    method: "GET",
+    permissions: ["miners.view", "customers.view"],
+    today: "staff",
+    shared: true,
+  },
+  {
+    route: "miners/hashrate-history",
+    method: "GET",
+    permissions: ["miners.view", "customers.view"],
+    today: "staff",
+    shared: true,
+  },
+  {
+    route: "miners/daily-costs",
+    method: "GET",
+    permissions: ["miners.view", "customers.view"],
+    today: "staff",
+    shared: true,
+  },
+  {
+    route: "miners/user",
+    method: "GET",
+    permissions: ["miners.view", "customers.view"],
+    today: "staff",
+    shared: true,
+  },
 ];
 
 const SYSTEM_ROLES = ["SUPER_ADMIN", "ADMIN", "ACCOUNTING"] as const;
@@ -205,7 +291,7 @@ describe("permission parity", () => {
         "route.ts",
       );
       const source = fs.readFileSync(file, "utf8");
-      expect(source).toMatch(/require(Any)?Permission\(/);
+      expect(source).toMatch(/require(Any|Staff)?Permission\(/);
       if (!row.shared) expect(source).not.toMatch(OLD_STAFF_CHECKS);
     });
   }

@@ -1,4 +1,5 @@
 import { isStaffRole } from "@/lib/auth/staffRoles";
+import { requireStaffPermission } from "@/lib/auth/authorization";
 import { NextRequest, NextResponse } from "next/server";
 import { verifyJwtToken } from "@/lib/jwt";
 import { resolveDataOwnerId } from "@/lib/guildScope";
@@ -120,6 +121,13 @@ export async function GET(
           { success: false, error: "Forbidden" },
           { status: 403 },
         );
+      } else {
+        // Staff: the chart on the customer page and the Miners table.
+        const denied = await requireStaffPermission(request, [
+          "miners.view",
+          "customers.view",
+        ]);
+        if (denied) return denied;
       }
     }
 

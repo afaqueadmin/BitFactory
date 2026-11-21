@@ -8,10 +8,12 @@
  * - GET /api/miners/[id]/pool-history - Get pool assignment history for a miner
  */
 
-import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { verifyJwtToken } from "@/lib/jwt";
+import {
+  getAuthorizationContext,
+  requirePermission,
+} from "@/lib/auth/authorization";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,47 +28,17 @@ interface ApiResponse<T = unknown> {
   timestamp?: string;
 }
 
-async function verifyAdminAuth(request: NextRequest) {
-  const token = request.cookies.get("token")?.value;
-
-  if (!token) {
-    throw new Error("Unauthorized: No token provided");
-  }
-
-  try {
-    const decoded = await verifyJwtToken(token);
-
-    if (!isStaffRole(decoded.role)) {
-      throw new Error("Forbidden: Admin access required");
-    }
-
-    return { userId: decoded.userId, role: decoded.role };
-  } catch (error) {
-    if (error instanceof Error) {
-      throw error;
-    }
-    throw new Error("Invalid token");
-  }
-}
-
 export async function GET(
   request: NextRequest,
   context: { params: Promise<{ id: string }> },
-): Promise<NextResponse<ApiResponse>> {
+): Promise<NextResponse> {
   try {
     const { id } = await context.params;
 
-    try {
-      await verifyAdminAuth(request);
-    } catch (authError) {
-      const errorMsg =
-        authError instanceof Error ? authError.message : "Authorization failed";
-      console.error(`[Miner Pool History API] GET: ${errorMsg}`);
-      return NextResponse.json<ApiResponse>(
-        { success: false, error: errorMsg },
-        { status: errorMsg.includes("Forbidden") ? 403 : 401 },
-      );
-    }
+    const ctx = await getAuthorizationContext(request);
+    if ("response" in ctx) return ctx.response;
+    const denied = requirePermission(ctx, "miners.view");
+    if (denied) return denied;
 
     const miner = await prisma.miner.findUnique({
       where: { id },

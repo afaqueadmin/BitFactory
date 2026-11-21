@@ -1,8 +1,10 @@
-import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { Decimal } from "@prisma/client/runtime/library";
-import { verifyJwtToken } from "@/lib/jwt";
+import {
+  getAuthorizationContext,
+  requirePermission,
+} from "@/lib/auth/authorization";
 import { AuditAction } from "@prisma/client";
 import {
   parseWarrantyDateInput,
@@ -21,60 +23,13 @@ interface BulkEditRequest {
   };
 }
 
-interface ApiResponse<T = unknown> {
-  success: boolean;
-  data?: T;
-  error?: string;
-}
-
-async function verifyAdminAuth(request: NextRequest) {
-  const token = request.cookies.get("token")?.value;
-
-  if (!token) {
-    throw new Error("Unauthorized: No token provided");
-  }
-
+export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
-    const decoded = await verifyJwtToken(token);
-
-    if (!isStaffRole(decoded.role)) {
-      throw new Error("Forbidden: Admin access required");
-    }
-
-    return {
-      userId: decoded.userId,
-      role: decoded.role,
-    };
-  } catch (error) {
-    if (error instanceof Error) {
-      throw error;
-    }
-    throw new Error("Invalid token");
-  }
-}
-
-export async function POST(
-  req: NextRequest,
-): Promise<NextResponse<ApiResponse>> {
-  try {
-    // Verify admin authorization
-    let userId: string;
-    try {
-      ({ userId } = await verifyAdminAuth(req));
-    } catch (authError) {
-      const errorMsg =
-        authError instanceof Error ? authError.message : "Authorization failed";
-      if (errorMsg.includes("Unauthorized")) {
-        return NextResponse.json(
-          { success: false, error: errorMsg },
-          { status: 401 },
-        );
-      }
-      return NextResponse.json(
-        { success: false, error: errorMsg },
-        { status: 403 },
-      );
-    }
+    const ctx = await getAuthorizationContext(req);
+    if ("response" in ctx) return ctx.response;
+    const denied = requirePermission(ctx, "miners.edit");
+    if (denied) return denied;
+    const userId = ctx.userId;
 
     const body: BulkEditRequest = await req.json();
     const { minerIds, updates } = body;

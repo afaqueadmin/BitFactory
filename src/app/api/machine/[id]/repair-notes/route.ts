@@ -1,4 +1,5 @@
 import { isStaffRole } from "@/lib/auth/staffRoles";
+import { requireStaffPermission } from "@/lib/auth/authorization";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
@@ -24,6 +25,14 @@ export async function GET(
     const isCustomer = decoded.role === "CLIENT" || isGuildRole(decoded.role);
     if (!isStaffRole(decoded.role) && !isCustomer) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    if (!isCustomer) {
+      // Staff: the Miners table and the customer page's miner list.
+      const denied = await requireStaffPermission(request, [
+        "miners.view",
+        "customers.view",
+      ]);
+      if (denied) return denied;
     }
     const { id: minerId } = await params;
     if (!minerId) {
