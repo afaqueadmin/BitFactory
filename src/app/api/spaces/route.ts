@@ -11,10 +11,13 @@
  * - DELETE /api/spaces/[id] - Delete a space (admin only)
  */
 
-import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { verifyJwtToken } from "@/lib/jwt";
+import {
+  getAuthorizationContext,
+  requireAnyPermission,
+  requirePermission,
+} from "@/lib/auth/authorization";
 import { AuditAction } from "@prisma/client";
 
 export const runtime = "nodejs";
@@ -22,42 +25,6 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 export const fetchCache = "force-no-store";
 export const preferredRegion = "iad1";
-
-/**
- * Helper: Verify admin authorization
- *
- * Checks if the user making the request is an admin
- *
- * @param request - NextRequest object
- * @returns Object with userId and role if authorized
- * @throws Error if not authorized
- */
-async function verifyAdminAuth(request: NextRequest) {
-  const token = request.cookies.get("token")?.value;
-
-  if (!token) {
-    throw new Error("Unauthorized: No token provided");
-  }
-
-  try {
-    const decoded = await verifyJwtToken(token);
-
-    // Verify user is admin
-    if (!isStaffRole(decoded.role)) {
-      throw new Error("Forbidden: Admin access required");
-    }
-
-    return {
-      userId: decoded.userId,
-      role: decoded.role,
-    };
-  } catch (error) {
-    if (error instanceof Error) {
-      throw error;
-    }
-    throw new Error("Invalid token");
-  }
-}
 
 /**
  * Response type for API endpoints
@@ -87,27 +54,21 @@ interface ApiResponse<T = unknown> {
  * - 403: Forbidden (not admin)
  * - 500: Server error
  */
-export async function GET(
-  request: NextRequest,
-): Promise<NextResponse<ApiResponse>> {
+export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
     console.log("[Spaces API] GET: Starting");
 
-    // Verify admin authorization
-    try {
-      await verifyAdminAuth(request);
-    } catch (authError) {
-      const errorMsg =
-        authError instanceof Error ? authError.message : "Authorization failed";
-      console.error(`[Spaces API] GET: ${errorMsg}`);
-
-      return NextResponse.json<ApiResponse>(
-        { success: false, error: errorMsg },
-        {
-          status: errorMsg.includes("Forbidden") ? 403 : 401,
-        },
-      );
-    }
+    const ctx = await getAuthorizationContext(request);
+    if ("response" in ctx) return ctx.response;
+    // Shared lookup: also the location picker on /machine and the "Machine
+    // Hosting Location" dropdown on invoice forms (useSpaceLocations).
+    const denied = requireAnyPermission(ctx, [
+      "locations.view",
+      "miners.view",
+      "invoicing.create",
+      "invoicing.edit",
+    ]);
+    if (denied) return denied;
 
     const { searchParams } = request.nextUrl;
     const status = searchParams.get("status");
@@ -241,28 +202,15 @@ export async function GET(
  * - 403: Forbidden (not admin)
  * - 500: Server error
  */
-export async function POST(
-  request: NextRequest,
-): Promise<NextResponse<ApiResponse>> {
+export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     console.log("[Spaces API] POST: Starting");
 
-    // Verify admin authorization
-    let actorUserId: string;
-    try {
-      ({ userId: actorUserId } = await verifyAdminAuth(request));
-    } catch (authError) {
-      const errorMsg =
-        authError instanceof Error ? authError.message : "Authorization failed";
-      console.error(`[Spaces API] POST: ${errorMsg}`);
-
-      return NextResponse.json<ApiResponse>(
-        { success: false, error: errorMsg },
-        {
-          status: errorMsg.includes("Forbidden") ? 403 : 401,
-        },
-      );
-    }
+    const ctx = await getAuthorizationContext(request);
+    if ("response" in ctx) return ctx.response;
+    const denied = requirePermission(ctx, "locations.create");
+    if (denied) return denied;
+    const actorUserId = ctx.userId;
 
     const body = await request.json();
     const { name, location, address, capacity, powerCapacity, status } = body;
