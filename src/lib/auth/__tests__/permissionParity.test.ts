@@ -315,6 +315,76 @@ const ROUTES: ParityRow[] = [
     permissions: ["transaction_history.view"],
     today: "staff",
   },
+
+  // Customer Groups. GET groups/[id] and groups/available also serve
+  // franchisees (own customers only); GET groups feeds the group picker in
+  // the create / edit customer dialogs.
+  {
+    route: "groups",
+    method: "GET",
+    permissions: ["customer_groups.view", "customers.create", "customers.edit"],
+    today: "staff",
+  },
+  {
+    route: "groups",
+    method: "POST",
+    permissions: ["customer_groups.create"],
+    today: "staff",
+  },
+  {
+    route: "groups/[id]",
+    method: "GET",
+    permissions: ["customer_groups.view"],
+    today: "staff",
+  },
+  {
+    route: "groups/[id]",
+    method: "PUT",
+    permissions: ["customer_groups.edit"],
+    today: "staff",
+  },
+  {
+    route: "groups/[id]",
+    method: "DELETE",
+    permissions: ["customer_groups.delete"],
+    today: "staff",
+  },
+  {
+    route: "groups/available",
+    method: "GET",
+    permissions: ["customer_groups.view"],
+    today: "staff",
+  },
+  {
+    route: "groups/[id]/subaccounts",
+    method: "GET",
+    permissions: ["customer_groups.view"],
+    today: "staff",
+  },
+  {
+    route: "groups/[id]/subaccounts/add",
+    method: "POST",
+    permissions: ["customer_groups.edit"],
+    today: "staff",
+  },
+  {
+    route: "groups/[id]/subaccounts/bulk-add",
+    method: "POST",
+    permissions: ["customer_groups.edit"],
+    today: "staff",
+  },
+  {
+    route: "groups/[id]/subaccounts/bulk-remove",
+    method: "POST",
+    permissions: ["customer_groups.edit"],
+    today: "staff",
+  },
+  {
+    route: "groups/[id]/subaccounts/[subaccountId]",
+    method: "DELETE",
+    permissions: ["customer_groups.edit"],
+    today: "staff",
+  },
 ];
 
 const SYSTEM_ROLES = ["SUPER_ADMIN", "ADMIN", "ACCOUNTING"] as const;

@@ -1,7 +1,9 @@
-import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { verifyJwtToken } from "@/lib/jwt";
+import {
+  getAuthorizationContext,
+  requirePermission,
+} from "@/lib/auth/authorization";
 import { franchiseeUserFilter } from "@/lib/franchiseeScope";
 
 interface ApiResponse<T = unknown> {
@@ -11,35 +13,16 @@ interface ApiResponse<T = unknown> {
   message?: string;
 }
 
-async function getAuthenticatedUser(request: NextRequest) {
-  try {
-    const token = request.cookies.get("token")?.value;
-    if (!token) return null;
-    return await verifyJwtToken(token);
-  } catch {
-    return null;
-  }
-}
-
 export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
-    const user = await getAuthenticatedUser(request);
-    if (!user) {
-      return NextResponse.json(
-        { success: false, error: "Unauthorized" } as ApiResponse,
-        { status: 401 },
-      );
+    const ctx = await getAuthorizationContext(request);
+    if ("response" in ctx) return ctx.response;
+    // Shared: a franchisee sees only their own customers (franchiseeUserFilter).
+    if (ctx.role !== "FRANCHISEE") {
+      const denied = requirePermission(ctx, "customer_groups.view");
+      if (denied) return denied;
     }
-
-    if (!isStaffRole(user.role) && user.role !== "FRANCHISEE") {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Forbidden: Only Admin/Super Admin can access",
-        } as ApiResponse,
-        { status: 403 },
-      );
-    }
+    const user = { userId: ctx.userId, role: ctx.role };
 
     // Get all PoolAuth rows for in-scope users (any pool)
     const allPoolAuths = await prisma.poolAuth.findMany({

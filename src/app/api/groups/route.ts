@@ -9,10 +9,13 @@
  * Authorization: Admin/Super Admin only
  */
 
-import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { verifyJwtToken } from "@/lib/jwt";
+import {
+  getAuthorizationContext,
+  requireAnyPermission,
+  requirePermission,
+} from "@/lib/auth/authorization";
 import { AuditAction } from "@prisma/client";
 
 /**
@@ -26,24 +29,6 @@ interface ApiResponse<T = Record<string, unknown>> {
 }
 
 /**
- * Helper: Extract and verify JWT token from request cookies
- */
-async function getAuthenticatedUser(request: NextRequest) {
-  try {
-    const token = request.cookies.get("token")?.value;
-    if (!token) {
-      console.warn("[Groups API] No token in cookies");
-      return null;
-    }
-    const user = await verifyJwtToken(token);
-    return user;
-  } catch (error) {
-    console.error("[Groups API] Token verification error:", error);
-    return null;
-  }
-}
-
-/**
  * GET /api/groups
  * List all groups with subaccount counts
  */
@@ -51,31 +36,14 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
     console.log("[Groups API] GET /api/groups - Fetching all groups");
 
-    // Get authenticated user
-    const user = await getAuthenticatedUser(request);
-
-    if (!user) {
-      console.warn("[Groups API] GET - Unauthorized: No user session");
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Unauthorized",
-        } as ApiResponse,
-        { status: 401 },
-      );
-    }
-
-    // Check authorization (Admin or Super Admin)
-    if (!isStaffRole(user.role)) {
-      console.warn("[Groups API] GET - Forbidden: User role is", user.role);
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Forbidden: Only Admin/Super Admin can manage groups",
-        } as ApiResponse,
-        { status: 403 },
-      );
-    }
+    const ctx = await getAuthorizationContext(request);
+    if ("response" in ctx) return ctx.response;
+    const denied = requireAnyPermission(ctx, [
+      "customer_groups.view",
+      "customers.create",
+      "customers.edit",
+    ]);
+    if (denied) return denied;
 
     // Fetch all groups with subaccount count and creator info
     const groups = await prisma.group.findMany({
@@ -138,31 +106,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     console.log("[Groups API] POST /api/groups - Creating new group");
 
-    // Get authenticated user
-    const user = await getAuthenticatedUser(request);
-
-    if (!user) {
-      console.warn("[Groups API] POST - Unauthorized: No user session");
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Unauthorized",
-        } as ApiResponse,
-        { status: 401 },
-      );
-    }
-
-    // Check authorization (Admin or Super Admin)
-    if (!isStaffRole(user.role)) {
-      console.warn("[Groups API] POST - Forbidden: User role is", user.role);
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Forbidden: Only Admin/Super Admin can create groups",
-        } as ApiResponse,
-        { status: 403 },
-      );
-    }
+    const ctx = await getAuthorizationContext(request);
+    if ("response" in ctx) return ctx.response;
+    const denied = requirePermission(ctx, "customer_groups.create");
+    if (denied) return denied;
+    const user = { userId: ctx.userId, role: ctx.role };
 
     // Parse request body
     const body = await request.json();
