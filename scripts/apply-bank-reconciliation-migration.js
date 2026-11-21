@@ -19,9 +19,14 @@ const path = require("path");
 //
 //   node scripts/apply-bank-reconciliation-migration.js           dry run
 //   node scripts/apply-bank-reconciliation-migration.js --apply   apply
+//   add --target=test for the singlesig test branch (ep-green-haze, the
+//   live DATABASE_URL in .env)
 const MIGRATION_NAME = "20261119120000_bank_reconciliation";
 const PRODUCTION_HOST = "ep-misty-fog";
+const TEST_HOST = "ep-green-haze";
 const APPLY = process.argv.includes("--apply");
+const TEST = process.argv.includes("--target=test");
+const HOST = TEST ? TEST_HOST : PRODUCTION_HOST;
 
 const sqlPath = path.join(
   __dirname,
@@ -201,13 +206,12 @@ async function migrate(client) {
 }
 
 (async () => {
-  const url = productionUrl();
+  const url = TEST ? process.env.DATABASE_URL : productionUrl();
+  if (!url) throw new Error("DATABASE_URL not set");
   const host = new URL(url).hostname;
   console.log("Database host:", host, APPLY ? "(APPLY)" : "(DRY RUN)");
-  if (!host.includes(PRODUCTION_HOST)) {
-    throw new Error(
-      `Refusing to run: the database isn't production (${PRODUCTION_HOST})`,
-    );
+  if (!host.includes(HOST)) {
+    throw new Error(`Refusing to run: the database isn't ${HOST}`);
   }
 
   const client = new Client({
