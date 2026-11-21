@@ -88,9 +88,10 @@ export async function DELETE(
       select: { role: true },
     });
 
-    if (!user || !isStaffRole(user.role)) {
+    // Same effect as Mark Unpaid on a paid invoice, so the same SUPER_ADMIN rule.
+    if (user?.role !== "SUPER_ADMIN") {
       return NextResponse.json(
-        { error: "Only administrators can delete payments" },
+        { error: "Only a super admin can delete payments" },
         { status: 403 },
       );
     }
