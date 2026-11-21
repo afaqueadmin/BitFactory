@@ -1,4 +1,5 @@
 import { isStaffRole } from "@/lib/auth/staffRoles";
+import { requireStaffPermission } from "@/lib/auth/authorization";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
@@ -67,6 +68,13 @@ export async function GET(request: NextRequest) {
           { error: "Only administrators can search by customerId" },
           { status: 403 },
         );
+      } else {
+        // Staff: the customer page and the Miners table.
+        const denied = await requireStaffPermission(request, [
+          "miners.view",
+          "customers.view",
+        ]);
+        if (denied) return denied;
       }
       userId = customerId;
     }

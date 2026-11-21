@@ -11,10 +11,13 @@
  * - DELETE /api/machine/[id] - Delete a miner (admin only)
  */
 
-import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { verifyJwtToken } from "@/lib/jwt";
+import {
+  getAuthorizationContext,
+  requireAnyPermission,
+  requirePermission,
+} from "@/lib/auth/authorization";
 import { AuditAction } from "@prisma/client";
 import { franchiseeMinerFilter } from "@/lib/franchiseeScope";
 import { WorkersResponse } from "@/lib/luxor";
@@ -37,48 +40,6 @@ interface ApiResponse<T = unknown> {
   data?: T;
   error?: string;
   timestamp?: string;
-}
-
-/**
- * Helper: Verify admin authorization
- *
- * Checks if the user making the request is an admin
- *
- * @param request - NextRequest object
- * @returns Object with userId and role if authorized
- * @throws Error if not authorized
- */
-async function verifyAdminAuth(
-  request: NextRequest,
-  { allowFranchisee = false }: { allowFranchisee?: boolean } = {},
-) {
-  const token = request.cookies.get("token")?.value;
-
-  if (!token) {
-    throw new Error("Unauthorized: No token provided");
-  }
-
-  try {
-    const decoded = await verifyJwtToken(token);
-
-    // Verify user is admin (optionally, a franchisee scoped to their own data)
-    const isAdmin = isStaffRole(decoded.role);
-    const isAllowedFranchisee =
-      allowFranchisee && decoded.role === "FRANCHISEE";
-    if (!isAdmin && !isAllowedFranchisee) {
-      throw new Error("Forbidden: Admin access required");
-    }
-
-    return {
-      userId: decoded.userId,
-      role: decoded.role,
-    };
-  } catch (error) {
-    if (error instanceof Error) {
-      throw error;
-    }
-    throw new Error("Invalid token");
-  }
 }
 
 /**
@@ -161,28 +122,22 @@ async function fetchLuxorWorkerStatuses(
  * - 403: Forbidden (not admin)
  * - 500: Server error
  */
-export async function GET(
-  request: NextRequest,
-): Promise<NextResponse<ApiResponse>> {
+export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
     console.log("[Miners API] GET: Starting");
 
-    // Verify admin authorization (franchisees may also view, scoped to their own miners)
-    let authedUser: { userId: string; role: string };
-    try {
-      authedUser = await verifyAdminAuth(request, { allowFranchisee: true });
-    } catch (authError) {
-      const errorMsg =
-        authError instanceof Error ? authError.message : "Authorization failed";
-      console.error(`[Miners API] GET: ${errorMsg}`);
-
-      return NextResponse.json<ApiResponse>(
-        { success: false, error: errorMsg },
-        {
-          status: errorMsg.includes("Forbidden") ? 403 : 401,
-        },
-      );
+    // Shared: a franchisee may also list, scoped to their own customers'
+    // miners (franchiseeMinerFilter below; /api/franchise/miners calls this).
+    const ctx = await getAuthorizationContext(request);
+    if ("response" in ctx) return ctx.response;
+    if (ctx.role !== "FRANCHISEE") {
+      const denied = requireAnyPermission(ctx, [
+        "miners.view",
+        "farm_tariffs.create", // miner picker on the vendor invoice form
+      ]);
+      if (denied) return denied;
     }
+    const authedUser = { userId: ctx.userId, role: ctx.role };
 
     const { searchParams } = request.nextUrl;
     const status = searchParams.get("status");
@@ -473,27 +428,14 @@ export async function GET(
  * - 409: Conflict (miner name exists, no hardware quantity available)
  * - 500: Server error
  */
-export async function POST(
-  request: NextRequest,
-): Promise<NextResponse<ApiResponse>> {
+export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     console.log("[Miners API] POST: Starting");
 
-    // Verify admin authorization
-    try {
-      await verifyAdminAuth(request);
-    } catch (authError) {
-      const errorMsg =
-        authError instanceof Error ? authError.message : "Authorization failed";
-      console.error(`[Miners API] POST: ${errorMsg}`);
-
-      return NextResponse.json<ApiResponse>(
-        { success: false, error: errorMsg },
-        {
-          status: errorMsg.includes("Forbidden") ? 403 : 401,
-        },
-      );
-    }
+    const ctx = await getAuthorizationContext(request);
+    if ("response" in ctx) return ctx.response;
+    const denied = requirePermission(ctx, "miners.create");
+    if (denied) return denied;
 
     const body = await request.json();
     const {
@@ -710,10 +652,7 @@ export async function POST(
       }
     }
 
-    // Get authenticated user ID from token
-    const token = request.cookies.get("token")?.value;
-    const decoded = await verifyJwtToken(token!);
-    const authenticatedUserId = decoded.userId;
+    const authenticatedUserId = ctx.userId;
 
     // Create miner and reduce hardware quantity in transaction
     const miner = await prisma.$transaction(async (tx) => {

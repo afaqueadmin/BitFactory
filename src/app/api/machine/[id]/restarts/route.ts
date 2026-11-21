@@ -4,7 +4,7 @@
  * Records that an admin restarted this miner from the Luxor backend. Nothing
  * is sent to Luxor - this only writes a MinerRestart history row plus a
  * MINER_RESTARTED audit log entry, in one transaction.
- * ADMIN/SUPER_ADMIN/ACCOUNTING only.
+ * Needs miners.log_restart or hashrate_alerts.acknowledge.
  *
  * Request Body:
  * {
@@ -17,38 +17,27 @@
  * separate action.
  */
 
-import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { verifyJwtToken } from "@/lib/jwt";
+import {
+  getAuthorizationContext,
+  requireAnyPermission,
+} from "@/lib/auth/authorization";
 import { AuditAction } from "@prisma/client";
-
-async function requireAdmin(request: NextRequest) {
-  const token = request.cookies.get("token")?.value;
-  if (!token) return { error: "Unauthorized", status: 401 as const };
-  try {
-    const decoded = await verifyJwtToken(token);
-    if (!isStaffRole(decoded.role)) {
-      return { error: "Admin access required", status: 403 as const };
-    }
-    return { decoded };
-  } catch {
-    return { error: "Invalid token", status: 401 as const };
-  }
-}
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const auth = await requireAdmin(request);
-    if ("error" in auth) {
-      return NextResponse.json(
-        { success: false, error: auth.error },
-        { status: auth.status },
-      );
-    }
+    const ctx = await getAuthorizationContext(request);
+    if ("response" in ctx) return ctx.response;
+    // Recorded from the Hashrate Alerts page.
+    const denied = requireAnyPermission(ctx, [
+      "miners.log_restart",
+      "hashrate_alerts.acknowledge",
+    ]);
+    if (denied) return denied;
 
     const { id } = await params;
     const body = await request.json().catch(() => null);
@@ -126,7 +115,7 @@ export async function POST(
           alertId: alert?.id ?? null,
           restartedAt: restartedAtDate,
           note: trimmedNote,
-          createdById: auth.decoded.userId,
+          createdById: ctx.userId,
         },
         include: {
           createdBy: { select: { id: true, name: true, email: true } },
@@ -138,7 +127,7 @@ export async function POST(
           action: AuditAction.MINER_RESTARTED,
           entityType: "Miner",
           entityId: id,
-          userId: auth.decoded.userId,
+          userId: ctx.userId,
           description: `Miner ${miner.name} restarted at ${restartedAtDate.toISOString()}${
             alertDate ? ` (hashrate alert for ${alertDate})` : ""
           }`,
