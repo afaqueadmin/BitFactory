@@ -62,45 +62,42 @@ export async function GET(request: NextRequest) {
     };
 
     // Fetch all users (excluding passwords)
-    console.time("user/all findMany");
     const [users, balances, totalRevenue] = await Promise.all([
-      prisma.user
-        .findMany({
-          select: {
-            id: true,
-            email: true,
-            name: true,
-            role: true,
-            city: true,
-            country: true,
-            phoneNumber: true,
-            companyName: true,
-            twoFactorAuths: {
-              where: { login: { isPrimary: true } },
-              select: { enabled: true },
-            },
-            streetAddress: true,
-            createdAt: true,
-            isDeleted: true,
-            franchiseeId: true,
-            segment: true,
-            _count: {
-              select: { miners: { where: { isDeleted: false } } },
-            },
-            poolAuths: {
-              orderBy: { createdAt: "asc" },
-              select: {
-                authKey: true,
-                pool: { select: { name: true } },
-              },
+      prisma.user.findMany({
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          role: true,
+          city: true,
+          country: true,
+          phoneNumber: true,
+          companyName: true,
+          twoFactorAuths: {
+            where: { login: { isPrimary: true } },
+            select: { enabled: true },
+          },
+          streetAddress: true,
+          createdAt: true,
+          isDeleted: true,
+          franchiseeId: true,
+          segment: true,
+          _count: {
+            select: { miners: { where: { isDeleted: false } } },
+          },
+          poolAuths: {
+            orderBy: { createdAt: "asc" },
+            select: {
+              authKey: true,
+              pool: { select: { name: true } },
             },
           },
-          where,
-          orderBy: {
-            createdAt: "desc",
-          },
-        })
-        .finally(() => console.timeEnd("user/all findMany")),
+        },
+        where,
+        orderBy: {
+          createdAt: "desc",
+        },
+      }),
       // Balance per user, summed in the database. Excludes hardware sales &
       // repair from the running balance amount.
       prisma.costPayment.groupBy({

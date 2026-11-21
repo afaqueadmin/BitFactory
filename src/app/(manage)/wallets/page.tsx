@@ -157,7 +157,13 @@ function WalletsContent() {
           aria-label="Open mismatch alerts"
           sx={{
             all: "unset",
-            display: "block",
+            display: "flex",
+            alignItems: "stretch",
+            alignSelf: "stretch",
+            minWidth: 0,
+            // Stretch the card to the wrapper (and so the grid row) rather than
+            // using its own height: 100%, so it matches the other stat cards.
+            "& > [role=article]": { flex: 1, minWidth: 0, height: "auto" },
             cursor: "pointer",
             borderRadius: "16px",
             "&:focus-visible": { outline: "2px solid", outlineOffset: 2 },
