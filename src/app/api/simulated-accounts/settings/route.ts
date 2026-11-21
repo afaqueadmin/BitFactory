@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { AuditAction } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { requireSimAdmin } from "@/lib/simulation/adminAuth";
+import {
+  getAuthorizationContext,
+  requirePermission,
+} from "@/lib/auth/authorization";
 import {
   DEFAULT_SIM_DISPLAY_NAME,
   SIM_SETTINGS_ID,
@@ -52,8 +55,10 @@ const minerView = (m: MinerRow) => ({
  */
 export async function GET(request: NextRequest) {
   try {
-    const auth = await requireSimAdmin(request);
-    if ("response" in auth) return auth.response;
+    const ctx = await getAuthorizationContext(request);
+    if ("response" in ctx) return ctx.response;
+    const denied = requirePermission(ctx, "simulated_accounts.view");
+    if (denied) return denied;
 
     const [settings, miners] = await Promise.all([
       getSimSettings(),
@@ -98,8 +103,10 @@ export async function GET(request: NextRequest) {
  */
 export async function PUT(request: NextRequest) {
   try {
-    const auth = await requireSimAdmin(request);
-    if ("response" in auth) return auth.response;
+    const ctx = await getAuthorizationContext(request);
+    if ("response" in ctx) return ctx.response;
+    const denied = requirePermission(ctx, "simulated_accounts.edit_settings");
+    if (denied) return denied;
 
     const body = await request.json().catch(() => ({}));
     const sourceMinerId =
@@ -154,7 +161,7 @@ export async function PUT(request: NextRequest) {
       displayName,
       welcomeBonusUsd: Math.round(welcomeBonusUsd * 100) / 100,
       ratePerKwh,
-      updatedById: auth.actorId,
+      updatedById: ctx.userId,
     };
 
     await prisma.$transaction(async (tx) => {
@@ -168,7 +175,7 @@ export async function PUT(request: NextRequest) {
           action: AuditAction.PRICING_CONFIG_UPDATED,
           entityType: "SimulationSettings",
           entityId: String(SIM_SETTINGS_ID),
-          userId: auth.actorId,
+          userId: ctx.userId,
           description: "Simulation settings updated",
           changes: JSON.stringify({
             from: before && {

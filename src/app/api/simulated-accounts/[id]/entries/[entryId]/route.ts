@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { AuditAction } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { requireSimAdmin } from "@/lib/simulation/adminAuth";
+import {
+  getAuthorizationContext,
+  requirePermission,
+} from "@/lib/auth/authorization";
 
 export const runtime = "nodejs";
 
@@ -17,8 +20,10 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string; entryId: string }> },
 ) {
   try {
-    const auth = await requireSimAdmin(request);
-    if ("response" in auth) return auth.response;
+    const ctx = await getAuthorizationContext(request);
+    if ("response" in ctx) return ctx.response;
+    const denied = requirePermission(ctx, "simulated_accounts.manage_ledger");
+    if (denied) return denied;
 
     const { id, entryId } = await params;
     const entry = await prisma.simulatedCostPayment.findFirst({
@@ -44,7 +49,7 @@ export async function DELETE(
           action: AuditAction.PAYMENT_REMOVED,
           entityType: "SimulatedCostPayment",
           entityId: entryId,
-          userId: auth.actorId,
+          userId: ctx.userId,
           description: "Simulated ledger entry removed",
           changes: JSON.stringify({ simulatedUserId: id, ...entry }),
         },

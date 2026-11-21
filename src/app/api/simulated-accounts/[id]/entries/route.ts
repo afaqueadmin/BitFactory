@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { AuditAction } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { requireSimAdmin } from "@/lib/simulation/adminAuth";
+import {
+  getAuthorizationContext,
+  requirePermission,
+} from "@/lib/auth/authorization";
 import {
   SimNotConfiguredError,
   loadSimSetup,
@@ -34,8 +37,10 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const auth = await requireSimAdmin(request);
-    if ("response" in auth) return auth.response;
+    const ctx = await getAuthorizationContext(request);
+    if ("response" in ctx) return ctx.response;
+    const denied = requirePermission(ctx, "simulated_accounts.view");
+    if (denied) return denied;
 
     const { id } = await params;
     const account = await findSimulatedAccount(id);
@@ -96,8 +101,10 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const auth = await requireSimAdmin(request);
-    if ("response" in auth) return auth.response;
+    const ctx = await getAuthorizationContext(request);
+    if ("response" in ctx) return ctx.response;
+    const denied = requirePermission(ctx, "simulated_accounts.manage_ledger");
+    if (denied) return denied;
 
     const { id } = await params;
     const account = await findSimulatedAccount(id);
@@ -153,7 +160,7 @@ export async function POST(
           amount: rounded,
           type,
           narration: narration || null,
-          createdById: auth.actorId,
+          createdById: ctx.userId,
         },
       });
       await tx.auditLog.create({
@@ -161,7 +168,7 @@ export async function POST(
           action: AuditAction.PAYMENT_ADDED,
           entityType: "SimulatedCostPayment",
           entityId: created.id,
-          userId: auth.actorId,
+          userId: ctx.userId,
           description: `Simulated ${type === "PAYMENT" ? "payment" : "adjustment"} of ${rounded} USD for ${account.name || account.email}`,
           changes: JSON.stringify({
             simulatedUserId: id,
