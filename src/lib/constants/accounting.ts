@@ -394,6 +394,11 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   [AuditAction.STAFF_ACCESS_EXCEPTION_SET]: "Staff Access Exception",
   [AuditAction.STAFF_ACCESS_PASSKEY_REMOVED]: "Staff Passkey Removed",
   [AuditAction.STAFF_HOLIDAY_UPDATED]: "Staff Holiday Updated",
+  [AuditAction.STAFF_ROLE_CREATED]: "Staff Role Created",
+  [AuditAction.STAFF_ROLE_UPDATED]: "Staff Role Updated",
+  [AuditAction.STAFF_ROLE_DELETED]: "Staff Role Deleted",
+  [AuditAction.STAFF_ROLE_ASSIGNED]: "Staff Role Assigned",
+  [AuditAction.STAFF_ROLE_UNASSIGNED]: "Staff Role Unassigned",
 };
 
 // ============================================================================
