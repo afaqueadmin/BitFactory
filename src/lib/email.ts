@@ -1323,6 +1323,7 @@ export const sendWorkerTransactionCronSummaryEmail = async (params: {
     from:
       `BitFactory Admin <${process.env.SMTP_FROM}>` || "noreply@bitfactory.com",
     to: process.env.SMTP_USER,
+    cc: process.env.CC_DEV_EMAIL,
     subject: `${fatalError ? "⚠️ FAILED " : hasErrors ? "⚠️ " : ""}Cron run: cron_pool_worker_transactions - BitFactory`,
     html: `
       <h1>cron_pool_worker_transactions</h1>
@@ -1387,6 +1388,7 @@ export const sendHashrateBenchmarkAlertEmail = async (params: {
     from:
       `BitFactory Admin <${process.env.SMTP_FROM}>` || "noreply@bitfactory.com",
     to: process.env.SMTP_USER,
+    cc: process.env.CC_DEV_EMAIL,
     subject: `${alerts.length > 0 ? "⚠️ " : ""}Cron run: cron_hashrate_benchmark_alert - BitFactory`,
     html: `
       <h1>cron_hashrate_benchmark_alert</h1>

@@ -26,7 +26,40 @@ interface ParityRow {
   shared?: boolean;
 }
 
-const ROUTES: ParityRow[] = [];
+// Note: routes that read the role from the token today (spaces) read it from
+// the database after migration - same answer for every live account.
+const ROUTES: ParityRow[] = [
+  // Locations (pilot)
+  {
+    route: "spaces",
+    method: "GET",
+    permissions: [
+      "locations.view",
+      "miners.view",
+      "invoicing.create",
+      "invoicing.edit",
+    ],
+    today: "staff",
+  },
+  {
+    route: "spaces",
+    method: "POST",
+    permissions: ["locations.create"],
+    today: "staff",
+  },
+  {
+    route: "spaces/[id]",
+    method: "PUT",
+    permissions: ["locations.edit"],
+    today: "staff",
+  },
+  {
+    route: "spaces/[id]",
+    method: "DELETE",
+    permissions: ["locations.delete"],
+    today: "staff",
+  },
+];
 
 const SYSTEM_ROLES = ["SUPER_ADMIN", "ADMIN", "ACCOUNTING"] as const;
 const OLD_STAFF_CHECKS =

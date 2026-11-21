@@ -9,10 +9,12 @@
  * - DELETE /api/spaces/[id] - Delete a space
  */
 
-import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { verifyJwtToken } from "@/lib/jwt";
+import {
+  getAuthorizationContext,
+  requirePermission,
+} from "@/lib/auth/authorization";
 import { AuditAction } from "@prisma/client";
 
 export const runtime = "nodejs";
@@ -20,42 +22,6 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 export const fetchCache = "force-no-store";
 export const preferredRegion = "iad1";
-
-/**
- * Helper: Verify admin authorization
- *
- * Checks if the user making the request is an admin
- *
- * @param request - NextRequest object
- * @returns Object with userId and role if authorized
- * @throws Error if not authorized
- */
-async function verifyAdminAuth(request: NextRequest) {
-  const token = request.cookies.get("token")?.value;
-
-  if (!token) {
-    throw new Error("Unauthorized: No token provided");
-  }
-
-  try {
-    const decoded = await verifyJwtToken(token);
-
-    // Verify user is admin
-    if (!isStaffRole(decoded.role)) {
-      throw new Error("Forbidden: Admin access required");
-    }
-
-    return {
-      userId: decoded.userId,
-      role: decoded.role,
-    };
-  } catch (error) {
-    if (error instanceof Error) {
-      throw error;
-    }
-    throw new Error("Invalid token");
-  }
-}
 
 /**
  * Response type for API endpoints
@@ -95,27 +61,16 @@ interface ApiResponse<T = unknown> {
 export async function PUT(
   request: NextRequest,
   context: { params: Promise<{ id: string }> },
-): Promise<NextResponse<ApiResponse>> {
+): Promise<NextResponse> {
   try {
     const { id } = await context.params;
     console.log(`[Spaces API] PUT: Starting for space id ${id}`);
 
-    // Verify admin authorization
-    let actorUserId: string;
-    try {
-      ({ userId: actorUserId } = await verifyAdminAuth(request));
-    } catch (authError) {
-      const errorMsg =
-        authError instanceof Error ? authError.message : "Authorization failed";
-      console.error(`[Spaces API] PUT: ${errorMsg}`);
-
-      return NextResponse.json<ApiResponse>(
-        { success: false, error: errorMsg },
-        {
-          status: errorMsg.includes("Forbidden") ? 403 : 401,
-        },
-      );
-    }
+    const ctx = await getAuthorizationContext(request);
+    if ("response" in ctx) return ctx.response;
+    const denied = requirePermission(ctx, "locations.edit");
+    if (denied) return denied;
+    const actorUserId = ctx.userId;
 
     // Check if space exists
     const existingSpace = await prisma.space.findUnique({
@@ -287,27 +242,16 @@ export async function PUT(
 export async function DELETE(
   request: NextRequest,
   context: { params: Promise<{ id: string }> },
-): Promise<NextResponse<ApiResponse>> {
+): Promise<NextResponse> {
   try {
     const { id } = await context.params;
     console.log(`[Spaces API] DELETE: Starting for space id ${id}`);
 
-    // Verify admin authorization
-    let actorUserId: string;
-    try {
-      ({ userId: actorUserId } = await verifyAdminAuth(request));
-    } catch (authError) {
-      const errorMsg =
-        authError instanceof Error ? authError.message : "Authorization failed";
-      console.error(`[Spaces API] DELETE: ${errorMsg}`);
-
-      return NextResponse.json<ApiResponse>(
-        { success: false, error: errorMsg },
-        {
-          status: errorMsg.includes("Forbidden") ? 403 : 401,
-        },
-      );
-    }
+    const ctx = await getAuthorizationContext(request);
+    if ("response" in ctx) return ctx.response;
+    const denied = requirePermission(ctx, "locations.delete");
+    if (denied) return denied;
+    const actorUserId = ctx.userId;
 
     // Check if space exists
     const existingSpace = await prisma.space.findUnique({
