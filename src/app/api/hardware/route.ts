@@ -1,7 +1,10 @@
-import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { verifyJwtToken } from "@/lib/jwt";
+import {
+  getAuthorizationContext,
+  requireAnyPermission,
+  requirePermission,
+} from "@/lib/auth/authorization";
 import { AuditAction } from "@prisma/client";
 
 interface ApiResponse<T = unknown> {
@@ -15,6 +18,18 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const includeDeleted = searchParams.get("isDeleted") === "true";
   try {
+    // Was open to anyone, staff names and emails included. Shared lookup: the
+    // model picker on the miner form and on invoice create/edit pages.
+    const ctx = await getAuthorizationContext(req);
+    if ("response" in ctx) return ctx.response;
+    const denied = requireAnyPermission(ctx, [
+      "hardware_models.view",
+      "miners.view",
+      "invoicing.create",
+      "invoicing.edit",
+    ]);
+    if (denied) return denied;
+
     const hardware = await prisma.hardware.findMany({
       include: {
         procurementHistory: {
@@ -62,39 +77,11 @@ export async function GET(req: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const token = request.cookies.get("token")?.value;
-
-    if (!token) {
-      return NextResponse.json<ApiResponse>(
-        { success: false, error: "Unauthorized" },
-        { status: 401 },
-      );
-    }
-
-    // Verify token and check if admin
-    let userId: string;
-    try {
-      const decoded = await verifyJwtToken(token);
-      userId = decoded.userId;
-    } catch (error) {
-      console.error("Token verification failed:", error);
-      return NextResponse.json<ApiResponse>(
-        { success: false, error: "Invalid token" },
-        { status: 401 },
-      );
-    }
-
-    // Check if user is admin or super admin
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-    });
-
-    if (!user || !isStaffRole(user.role)) {
-      return NextResponse.json<ApiResponse>(
-        { success: false, error: "Admin access required" },
-        { status: 403 },
-      );
-    }
+    const ctx = await getAuthorizationContext(request);
+    if ("response" in ctx) return ctx.response;
+    const denied = requirePermission(ctx, "hardware_models.create");
+    if (denied) return denied;
+    const userId = ctx.userId;
 
     const body = await request.json();
     const { model, powerUsage, hashRate, quantity } = body;

@@ -7,7 +7,10 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { verifyJwtToken } from "@/lib/jwt";
+import {
+  getAuthorizationContext,
+  requirePermission,
+} from "@/lib/auth/authorization";
 import { AuditAction } from "@prisma/client";
 
 export const runtime = "nodejs";
@@ -22,31 +25,14 @@ interface ApiResponse<T = unknown> {
   error?: string;
 }
 
-export async function POST(
-  request: NextRequest,
-): Promise<NextResponse<ApiResponse>> {
+export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
-    // Verify authentication
-    const token = request.cookies.get("token")?.value;
-    if (!token) {
-      return NextResponse.json<ApiResponse>(
-        { success: false, error: "Unauthorized" },
-        { status: 401 },
-      );
-    }
-
-    let userId: string;
-    let userRole: string;
-    try {
-      const decoded = await verifyJwtToken(token);
-      userId = decoded.userId;
-      userRole = decoded.role;
-    } catch {
-      return NextResponse.json<ApiResponse>(
-        { success: false, error: "Invalid token" },
-        { status: 401 },
-      );
-    }
+    // Was open to any signed-in account, clients included.
+    const ctx = await getAuthorizationContext(request);
+    if ("response" in ctx) return ctx.response;
+    const denied = requirePermission(ctx, "hardware_models.procure");
+    if (denied) return denied;
+    const { userId, role: userRole } = ctx;
 
     const body = await request.json();
     const { hardwareId, quantity } = body;

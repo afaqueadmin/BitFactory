@@ -59,6 +59,50 @@ const ROUTES: ParityRow[] = [
     permissions: ["locations.delete"],
     today: "staff",
   },
+
+  // Hardware Models. Both GETs had no check and procure only needed a
+  // session; staff keep their access, clients and visitors lose it.
+  {
+    route: "hardware",
+    method: "GET",
+    permissions: [
+      "hardware_models.view",
+      "miners.view",
+      "invoicing.create",
+      "invoicing.edit",
+    ],
+    today: "staff",
+  },
+  {
+    route: "hardware",
+    method: "POST",
+    permissions: ["hardware_models.create"],
+    today: "staff",
+  },
+  {
+    route: "hardware/[id]",
+    method: "GET",
+    permissions: ["hardware_models.view"],
+    today: "staff",
+  },
+  {
+    route: "hardware/[id]",
+    method: "PUT",
+    permissions: ["hardware_models.edit"],
+    today: "staff",
+  },
+  {
+    route: "hardware/[id]",
+    method: "DELETE",
+    permissions: ["hardware_models.delete"],
+    today: "staff",
+  },
+  {
+    route: "hardware/procure",
+    method: "POST",
+    permissions: ["hardware_models.procure"],
+    today: "staff",
+  },
 ];
 
 const SYSTEM_ROLES = ["SUPER_ADMIN", "ADMIN", "ACCOUNTING"] as const;
