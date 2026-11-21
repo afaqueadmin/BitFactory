@@ -1,6 +1,8 @@
-import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
-import { verifyJwtToken } from "@/lib/jwt";
+import {
+  getAuthorizationContext,
+  requirePermission,
+} from "@/lib/auth/authorization";
 import {
   getOrCreatePaybackConfig,
   updatePaybackConfig,
@@ -15,26 +17,10 @@ import {
  */
 export async function GET(request: NextRequest) {
   try {
-    const token = request.cookies.get("token")?.value;
-
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Verify token and check admin role
-    let userRole: string;
-    try {
-      const decoded = await verifyJwtToken(token);
-      userRole = decoded.role;
-    } catch (error) {
-      console.error("[Payback Config API] Token verification failed:", error);
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
-    }
-
-    // Only admins and super admins can access this endpoint
-    if (!isStaffRole(userRole)) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+    const ctx = await getAuthorizationContext(request);
+    if ("response" in ctx) return ctx.response;
+    const denied = requirePermission(ctx, "company_payback.view");
+    if (denied) return denied;
 
     const config = await getOrCreatePaybackConfig("COMPANY");
 
@@ -63,28 +49,11 @@ export async function GET(request: NextRequest) {
  */
 export async function PATCH(request: NextRequest) {
   try {
-    const token = request.cookies.get("token")?.value;
-
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Verify token and check admin role
-    let userId: string;
-    let userRole: string;
-    try {
-      const decoded = await verifyJwtToken(token);
-      userId = decoded.userId;
-      userRole = decoded.role;
-    } catch (error) {
-      console.error("[Payback Config API] Token verification failed:", error);
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
-    }
-
-    // Only admins and super admins can access this endpoint
-    if (!isStaffRole(userRole)) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+    const ctx = await getAuthorizationContext(request);
+    if ("response" in ctx) return ctx.response;
+    const denied = requirePermission(ctx, "company_payback.edit_settings");
+    if (denied) return denied;
+    const userId = ctx.userId;
 
     const body = await request.json();
     const config = await updatePaybackConfig("COMPANY", body);
