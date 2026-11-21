@@ -1,7 +1,8 @@
 //src/components/ElectricityCostTable.tsx
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { createContext, useContext, useState } from "react";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import {
   Box,
   Paper,
@@ -18,9 +19,12 @@ import {
   InputAdornment,
   useTheme,
   CircularProgress,
+  IconButton,
   Alert,
   Button,
 } from "@mui/material";
+import KeyboardArrowLeft from "@mui/icons-material/KeyboardArrowLeft";
+import KeyboardArrowRight from "@mui/icons-material/KeyboardArrowRight";
 import SearchIcon from "@mui/icons-material/Search";
 import DownloadOutlinedIcon from "@mui/icons-material/DownloadOutlined";
 import { visuallyHidden } from "@mui/utils";
@@ -225,6 +229,59 @@ function EnhancedTableHead(props: EnhancedTableHeadProps) {
   );
 }
 
+/** Pagination prev/next buttons plus a spinner shown while a page is fetching. */
+const PaginationLoadingContext = createContext<{
+  fetching: boolean;
+  color?: string;
+}>({ fetching: false });
+
+function PaginationActions({
+  count,
+  page,
+  rowsPerPage,
+  onPageChange,
+}: {
+  count: number;
+  page: number;
+  rowsPerPage: number;
+  onPageChange: (
+    event: React.MouseEvent<HTMLButtonElement>,
+    page: number,
+  ) => void;
+}) {
+  const { fetching, color } = useContext(PaginationLoadingContext);
+  return (
+    <Box
+      sx={{
+        flexShrink: 0,
+        ml: { xs: 1, sm: 2 },
+        display: "flex",
+        alignItems: "center",
+      }}
+    >
+      <IconButton
+        onClick={(e) => onPageChange(e, page - 1)}
+        disabled={page === 0}
+        aria-label="previous page"
+      >
+        <KeyboardArrowLeft />
+      </IconButton>
+      <IconButton
+        onClick={(e) => onPageChange(e, page + 1)}
+        disabled={page >= Math.ceil(count / rowsPerPage) - 1}
+        aria-label="next page"
+      >
+        <KeyboardArrowRight />
+      </IconButton>
+      <Box sx={{ width: 20, ml: 1, display: "flex" }}>
+        {fetching && (
+          <CircularProgress size={20} aria-label="Loading" sx={{ color }} />
+        )}
+      </Box>
+    </Box>
+  );
+}
+
 interface ElectricityCostTableProps {
   customerId?: string;
   /** Daylight styling: white card chrome, guide-style header row, Manrope
@@ -243,17 +300,18 @@ export default function ElectricityCostTable({
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
   const [searchTerm, setSearchTerm] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [data, setData] = useState<ElectricityData[]>([]);
-  const [totalCount, setTotalCount] = useState(0);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   // Fetch cost payments data from API
-  const fetchCostPayments = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
+  const {
+    data: queryResult,
+    isLoading: loading,
+    isFetching,
+    error: queryError,
+  } = useQuery({
+    placeholderData: keepPreviousData,
+    queryKey: ["cost-payments", { customerId, page, rowsPerPage }],
+    queryFn: async () => {
       const url = customerId
         ? `/api/cost-payments?page=${page}&pageSize=${rowsPerPage}&customerId=${customerId}`
         : `/api/cost-payments?page=${page}&pageSize=${rowsPerPage}`;
@@ -271,26 +329,24 @@ export default function ElectricityCostTable({
       }
 
       const result = await response.json();
+      return {
+        data: (result.success && result.data
+          ? result.data
+          : []) as ElectricityData[],
+        totalCount: (result.pagination?.totalCount ?? 0) as number,
+      };
+    },
+  });
 
-      if (result.success && result.data) {
-        setData(result.data);
-        setTotalCount(result.pagination.totalCount);
-      }
-    } catch (err) {
-      console.error("Error fetching cost payments:", err);
-      setError(
-        err instanceof Error ? err.message : "Failed to load cost payments",
-      );
-      setData([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchCostPayments();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, rowsPerPage]);
+  const data = React.useMemo(() => queryResult?.data ?? [], [queryResult]);
+  const totalCount = queryResult?.totalCount ?? 0;
+  const error =
+    exportError ??
+    (queryError
+      ? queryError instanceof Error
+        ? queryError.message
+        : "Failed to load cost payments"
+      : null);
 
   // Admin view only: downloads the customer's whole statement (every page,
   // newest first) as CSV with the same values the table shows.
@@ -299,7 +355,7 @@ export default function ElectricityCostTable({
     if (!customerId) return;
     try {
       setIsExporting(true);
-      setError(null);
+      setExportError(null);
 
       const rows: ElectricityData[] = [];
       for (let exportPage = 0; ; exportPage++) {
@@ -343,7 +399,7 @@ export default function ElectricityCostTable({
       URL.revokeObjectURL(url);
     } catch (err) {
       console.error("Error exporting cost payments:", err);
-      setError(
+      setExportError(
         err instanceof Error ? err.message : "Failed to export statement",
       );
     } finally {
@@ -445,6 +501,13 @@ export default function ElectricityCostTable({
             width: { xs: "100%", sm: "auto" },
           }}
         >
+          {isFetching && !loading && (
+            <CircularProgress
+              size={20}
+              aria-label="Loading"
+              sx={{ flexShrink: 0, ...(daylight && { color: d.action }) }}
+            />
+          )}
           {customerId && (
             <Button
               variant="outlined"
@@ -683,39 +746,48 @@ export default function ElectricityCostTable({
                 </TableBody>
               </Table>
             </TableContainer>
-            <TablePagination
-              rowsPerPageOptions={[10, 25, 50, { value: 9999, label: "All" }]}
-              component="div"
-              count={totalCount}
-              rowsPerPage={rowsPerPage}
-              page={page}
-              onPageChange={handleChangePage}
-              onRowsPerPageChange={handleChangeRowsPerPage}
-              sx={{
-                borderTop: `1px solid ${daylight ? d.border : theme.palette.divider}`,
-                ...(daylight && {
-                  fontFamily: fonts.body,
-                  color: d.muted,
-                  "& .MuiSelect-select, & .MuiTablePagination-actions button": {
-                    color: d.text,
-                  },
-                }),
-                "& .MuiTablePagination-toolbar": {
-                  paddingLeft: { xs: 1, sm: 2 },
-                  paddingRight: { xs: 1, sm: 1 },
-                  flexWrap: "wrap",
-                  minHeight: { xs: 48, sm: 52 },
-                },
-                "& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows":
-                  {
-                    margin: 0,
-                    fontSize: { xs: "0.75rem", sm: "0.875rem" },
-                  },
-                "& .MuiTablePagination-actions": {
-                  marginLeft: { xs: 1, sm: 2 },
-                },
+            <PaginationLoadingContext.Provider
+              value={{
+                fetching: isFetching,
+                color: daylight ? d.action : undefined,
               }}
-            />
+            >
+              <TablePagination
+                rowsPerPageOptions={[10, 25, 50, { value: 9999, label: "All" }]}
+                component="div"
+                count={totalCount}
+                rowsPerPage={rowsPerPage}
+                page={page}
+                onPageChange={handleChangePage}
+                onRowsPerPageChange={handleChangeRowsPerPage}
+                ActionsComponent={PaginationActions}
+                sx={{
+                  borderTop: `1px solid ${daylight ? d.border : theme.palette.divider}`,
+                  ...(daylight && {
+                    fontFamily: fonts.body,
+                    color: d.muted,
+                    "& .MuiSelect-select, & .MuiTablePagination-actions button":
+                      {
+                        color: d.text,
+                      },
+                  }),
+                  "& .MuiTablePagination-toolbar": {
+                    paddingLeft: { xs: 1, sm: 2 },
+                    paddingRight: { xs: 1, sm: 1 },
+                    flexWrap: "wrap",
+                    minHeight: { xs: 48, sm: 52 },
+                  },
+                  "& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows":
+                    {
+                      margin: 0,
+                      fontSize: { xs: "0.75rem", sm: "0.875rem" },
+                    },
+                  "& .MuiTablePagination-actions": {
+                    marginLeft: { xs: 1, sm: 2 },
+                  },
+                }}
+              />
+            </PaginationLoadingContext.Provider>
           </>
         )}
       </Paper>
