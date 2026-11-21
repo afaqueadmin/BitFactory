@@ -8,34 +8,14 @@
  * claimed.
  */
 
-import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { prisma } from "@/lib/prisma";
-import { verifyJwtToken } from "@/lib/jwt";
-
-async function requireAdmin(request: NextRequest) {
-  const token = request.cookies.get("token")?.value;
-  if (!token) return { error: "Unauthorized", status: 401 as const };
-  try {
-    const decoded = await verifyJwtToken(token);
-    if (!isStaffRole(decoded.role)) {
-      return { error: "Admin access required", status: 403 as const };
-    }
-    return { decoded };
-  } catch {
-    return { error: "Invalid token", status: 401 as const };
-  }
-}
 
 export async function POST(request: NextRequest) {
   try {
-    const auth = await requireAdmin(request);
-    if ("error" in auth) {
-      return NextResponse.json(
-        { success: false, error: auth.error },
-        { status: auth.status },
-      );
-    }
+    const auth = await authorizeStaff(request, ["hashrate_alerts.acknowledge"]);
+    if ("response" in auth) return auth.response;
 
     const body = await request.json();
     const ids = body?.ids;

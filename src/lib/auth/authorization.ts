@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { verifyJwtToken } from "@/lib/jwt";
+import { verifyJwtToken, type JwtPayload } from "@/lib/jwt";
 import { effectivePermissions, type Permission } from "@/lib/auth/permissions";
 
 /**
@@ -59,7 +59,12 @@ export async function getAuthorizationContext(
     return { response: unauthorized() };
   }
   if (!userId) return { response: unauthorized() };
+  return contextFor(userId);
+}
 
+async function contextFor(
+  userId: string,
+): Promise<AuthorizationContext | { response: NextResponse }> {
   try {
     const loaded = await loadPermissions(userId);
     if (!loaded) return { response: unauthorized() };
@@ -110,6 +115,29 @@ export async function requireStaffPermission(
   const ctx = await getAuthorizationContext(request);
   if ("response" in ctx) return ctx.response;
   return requireAnyPermission(ctx, permissions);
+}
+
+/**
+ * For staff-only routes that also need the session claims (step-up reads
+ * loginId): one token check, then the permission check from the database.
+ */
+export async function authorizeStaff(
+  request: NextRequest,
+  permissions: readonly Permission[],
+): Promise<{ decoded: JwtPayload } | { response: NextResponse }> {
+  const token = request.cookies.get("token")?.value;
+  if (!token) return { response: unauthorized() };
+  let decoded: JwtPayload;
+  try {
+    decoded = await verifyJwtToken(token);
+  } catch {
+    return { response: unauthorized() };
+  }
+  if (!decoded.userId) return { response: unauthorized() };
+  const ctx = await contextFor(decoded.userId);
+  if ("response" in ctx) return ctx;
+  const denied = requireAnyPermission(ctx, permissions);
+  return denied ? { response: denied } : { decoded };
 }
 
 function unauthorized() {

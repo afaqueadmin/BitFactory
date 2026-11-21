@@ -7,34 +7,17 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { verifyJwtToken } from "@/lib/jwt";
+import {
+  getAuthorizationContext,
+  requirePermission,
+} from "@/lib/auth/authorization";
 
 export async function GET(request: NextRequest) {
   try {
-    const token = request.cookies.get("token")?.value;
-    if (!token) {
-      return NextResponse.json(
-        { success: false, error: "Unauthorized" },
-        { status: 401 },
-      );
-    }
-
-    let decoded;
-    try {
-      decoded = await verifyJwtToken(token);
-    } catch {
-      return NextResponse.json(
-        { success: false, error: "Invalid token" },
-        { status: 401 },
-      );
-    }
-
-    if (decoded.role !== "SUPER_ADMIN") {
-      return NextResponse.json(
-        { success: false, error: "Only a super admin can view staff list" },
-        { status: 403 },
-      );
-    }
+    const ctx = await getAuthorizationContext(request);
+    if ("response" in ctx) return ctx.response;
+    const denied = requirePermission(ctx, "tickets.assign");
+    if (denied) return denied;
 
     const staff = await prisma.user.findMany({
       where: {

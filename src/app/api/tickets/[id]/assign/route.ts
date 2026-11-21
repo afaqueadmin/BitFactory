@@ -12,7 +12,10 @@ import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { AuditAction } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { verifyJwtToken } from "@/lib/jwt";
+import {
+  getAuthorizationContext,
+  requirePermission,
+} from "@/lib/auth/authorization";
 
 export async function POST(
   request: NextRequest,
@@ -20,30 +23,10 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const token = request.cookies.get("token")?.value;
-    if (!token) {
-      return NextResponse.json(
-        { success: false, error: "Unauthorized" },
-        { status: 401 },
-      );
-    }
-
-    let decoded;
-    try {
-      decoded = await verifyJwtToken(token);
-    } catch {
-      return NextResponse.json(
-        { success: false, error: "Invalid token" },
-        { status: 401 },
-      );
-    }
-
-    if (decoded.role !== "SUPER_ADMIN") {
-      return NextResponse.json(
-        { success: false, error: "Only a super admin can assign tickets" },
-        { status: 403 },
-      );
-    }
+    const ctx = await getAuthorizationContext(request);
+    if ("response" in ctx) return ctx.response;
+    const denied = requirePermission(ctx, "tickets.assign");
+    if (denied) return denied;
 
     const ticket = await prisma.supportTicket.findUnique({ where: { id } });
     if (!ticket) {
@@ -86,7 +69,7 @@ export async function POST(
           action: AuditAction.TICKET_ASSIGNED,
           entityType: "SupportTicket",
           entityId: id,
-          userId: decoded.userId,
+          userId: ctx.userId,
           description: assignedToId
             ? `Ticket "${ticket.subject}" assigned to ${result.assignedTo?.name || result.assignedTo?.email}`
             : `Ticket "${ticket.subject}" unassigned`,

@@ -13,6 +13,7 @@
  */
 
 import { isStaffRole } from "@/lib/auth/staffRoles";
+import { requireStaffPermission } from "@/lib/auth/authorization";
 import { NextRequest, NextResponse } from "next/server";
 import { AuditAction } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -42,6 +43,12 @@ export async function GET(request: NextRequest) {
     }
 
     const isAdmin = isStaffRole(auth.decoded.role);
+    if (isAdmin) {
+      const denied = await requireStaffPermission(request, [
+        "firmware_requests.view",
+      ]);
+      if (denied) return denied;
+    }
     const includeInactive =
       isAdmin && request.nextUrl.searchParams.get("includeInactive") === "1";
 
@@ -76,12 +83,10 @@ export async function POST(request: NextRequest) {
         { status: auth.status },
       );
     }
-    if (!isStaffRole(auth.decoded.role)) {
-      return NextResponse.json(
-        { success: false, error: "Admin access required" },
-        { status: 403 },
-      );
-    }
+    const denied = await requireStaffPermission(request, [
+      "firmware_requests.manage_options",
+    ]);
+    if (denied) return denied;
 
     const body = await request.json().catch(() => ({}));
     const name =

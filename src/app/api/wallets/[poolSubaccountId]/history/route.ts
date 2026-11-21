@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { AuditAction } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { requireStaff } from "@/lib/guilds/routeAuth";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { requestMeta } from "@/lib/guilds/audit";
 import { auditClientWallet } from "@/lib/clientWallets";
 import { walletAddressHash } from "@/lib/walletCrypto";
@@ -21,8 +21,8 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ poolSubaccountId: string }> },
 ) {
-  const auth = await requireStaff(request);
-  if ("error" in auth) return auth.error;
+  const auth = await authorizeStaff(request, ["wallets.view"]);
+  if ("response" in auth) return auth.response;
 
   try {
     const { poolSubaccountId } = await params;

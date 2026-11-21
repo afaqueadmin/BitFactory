@@ -8,8 +8,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { AuditAction } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { verifyJwtToken } from "@/lib/jwt";
-import { LOGIN_MANAGER_ROLES } from "@/lib/auth/loginIdentity";
+import {
+  getAuthorizationContext,
+  requirePermission,
+} from "@/lib/auth/authorization";
 import { sendSecondaryLoginRequestRejectedEmail } from "@/lib/email";
 
 export const runtime = "nodejs";
@@ -20,36 +22,11 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const token = request.cookies.get("token")?.value;
-    if (!token) {
-      return NextResponse.json(
-        { success: false, error: "Unauthorized" },
-        { status: 401 },
-      );
-    }
-    let actorId: string;
-    try {
-      actorId = (await verifyJwtToken(token)).userId;
-    } catch {
-      return NextResponse.json(
-        { success: false, error: "Invalid token" },
-        { status: 401 },
-      );
-    }
-    // Role from the database, not the token.
-    const actor = await prisma.user.findFirst({
-      where: { id: actorId, isDeleted: false },
-      select: { id: true, role: true },
-    });
-    if (!actor || !LOGIN_MANAGER_ROLES.has(actor.role)) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "You do not have permission to manage sign-in emails",
-        },
-        { status: 403 },
-      );
-    }
+    const ctx = await getAuthorizationContext(request);
+    if ("response" in ctx) return ctx.response;
+    const denied = requirePermission(ctx, "signin_email_requests.reject");
+    if (denied) return denied;
+    const actor = { id: ctx.userId };
 
     const body = await request.json().catch(() => ({}));
     const rejectionReason =

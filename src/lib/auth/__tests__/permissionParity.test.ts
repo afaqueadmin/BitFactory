@@ -430,6 +430,273 @@ const ROUTES: ParityRow[] = [
     permissions: ["company_payback.edit_settings"],
     today: "staff",
   },
+
+  // System: logs and DB Data Management (all view-only)
+  {
+    route: "admin/activity-log",
+    method: "GET",
+    permissions: ["activity_log.view"],
+    today: "staff",
+  },
+  {
+    route: "admin/audit-log",
+    method: "GET",
+    permissions: ["audit_log.view"],
+    today: "staff",
+  },
+  {
+    route: "pool-subaccounts",
+    method: "GET",
+    permissions: ["db_data.view"],
+    today: "staff",
+  },
+  {
+    route: "pool-subaccounts/[id]",
+    method: "GET",
+    permissions: ["db_data.view"],
+    today: "staff",
+  },
+  {
+    route: "pool-daily-snapshots",
+    method: "GET",
+    permissions: ["db_data.view"],
+    today: "staff",
+  },
+  {
+    route: "pool-worker-metrics",
+    method: "GET",
+    permissions: ["db_data.view"],
+    today: "staff",
+  },
+  {
+    route: "pool-transactions",
+    method: "GET",
+    permissions: ["db_data.view"],
+    today: "staff",
+  },
+  // Work Queue
+  {
+    route: "tickets",
+    method: "GET",
+    permissions: ["tickets.view"],
+    today: "staff",
+    shared: true,
+  },
+  {
+    route: "tickets/[id]",
+    method: "GET",
+    permissions: ["tickets.view"],
+    today: "staff",
+    shared: true,
+  },
+  {
+    route: "tickets/[id]",
+    method: "PATCH",
+    permissions: ["tickets.edit"],
+    today: "staff",
+    shared: true,
+  },
+  {
+    route: "tickets/[id]/messages",
+    method: "POST",
+    permissions: ["tickets.reply"],
+    today: "staff",
+    shared: true,
+  },
+  {
+    route: "tickets/[id]/assign",
+    method: "POST",
+    permissions: ["tickets.assign"],
+    today: "super_admin",
+    shared: true, // isStaffRole checks the assignee, not the caller
+  },
+  {
+    route: "admin/staff",
+    method: "GET",
+    permissions: ["tickets.assign"],
+    today: "super_admin",
+  },
+  {
+    route: "admin/hashrate-alerts",
+    method: "GET",
+    permissions: ["hashrate_alerts.view"],
+    today: "staff",
+  },
+  {
+    route: "admin/hashrate-alerts/bulk-acknowledge",
+    method: "POST",
+    permissions: ["hashrate_alerts.acknowledge"],
+    today: "staff",
+  },
+  {
+    route: "admin/hashrate-alerts/[id]/acknowledge",
+    method: "POST",
+    permissions: ["hashrate_alerts.acknowledge"],
+    today: "staff",
+  },
+  {
+    route: "wallets",
+    method: "GET",
+    permissions: ["wallets.view"],
+    today: "staff",
+  },
+  {
+    route: "wallets/mismatches",
+    method: "GET",
+    permissions: ["wallets.view"],
+    today: "staff",
+  },
+  {
+    route: "wallets/[poolSubaccountId]/history",
+    method: "GET",
+    permissions: ["wallets.view"],
+    today: "staff",
+  },
+  {
+    route: "wallets/[poolSubaccountId]/recheck",
+    method: "POST",
+    permissions: ["wallets.recheck"],
+    today: "staff",
+  },
+  {
+    route: "wallets/mismatches/[id]/[action]",
+    method: "POST",
+    permissions: ["wallets.resolve_mismatch"],
+    today: "staff",
+  },
+  {
+    route: "wallet/change-requests",
+    method: "GET",
+    permissions: ["wallets.view"],
+    today: "staff",
+    shared: true,
+  },
+  {
+    route: "wallet/change-requests/[id]/confirm",
+    method: "POST",
+    permissions: ["wallets.confirm"],
+    today: "staff",
+  },
+  {
+    route: "wallet/change-requests/[id]/approve",
+    method: "POST",
+    permissions: ["wallets.approve"],
+    today: "staff",
+  },
+  {
+    route: "wallet/change-requests/[id]/reject",
+    method: "POST",
+    permissions: ["wallets.reject"],
+    today: "staff",
+  },
+  {
+    route: "wallet/frequency-change-requests",
+    method: "GET",
+    permissions: ["wallets.view"],
+    today: "staff",
+    shared: true,
+  },
+  {
+    route: "wallet/frequency-change-requests/[id]/confirm",
+    method: "POST",
+    permissions: ["wallets.confirm"],
+    today: "staff",
+  },
+  {
+    route: "wallet/frequency-change-requests/[id]/approve",
+    method: "POST",
+    permissions: ["wallets.approve"],
+    today: "staff",
+  },
+  {
+    route: "wallet/frequency-change-requests/[id]/reject",
+    method: "POST",
+    permissions: ["wallets.reject"],
+    today: "staff",
+  },
+  {
+    route: "firmware-change-requests",
+    method: "GET",
+    permissions: ["firmware_requests.view"],
+    today: "staff",
+    shared: true,
+  },
+  {
+    route: "firmware-change-requests/[id]/confirm",
+    method: "POST",
+    permissions: ["firmware_requests.confirm"],
+    today: "staff",
+  },
+  {
+    route: "firmware-change-requests/[id]/approve",
+    method: "POST",
+    permissions: ["firmware_requests.approve"],
+    today: "staff",
+  },
+  {
+    route: "firmware-change-requests/[id]/reject",
+    method: "POST",
+    permissions: ["firmware_requests.reject"],
+    today: "staff",
+  },
+  {
+    route: "firmware-options",
+    method: "GET",
+    permissions: ["firmware_requests.view"],
+    today: "staff",
+    shared: true,
+  },
+  {
+    route: "firmware-options",
+    method: "POST",
+    permissions: ["firmware_requests.manage_options"],
+    today: "staff",
+    shared: true, // same file as the shared GET
+  },
+  {
+    route: "firmware-options/[id]",
+    method: "PUT",
+    permissions: ["firmware_requests.manage_options"],
+    today: "staff",
+  },
+  {
+    route: "firmware-options/[id]",
+    method: "DELETE",
+    permissions: ["firmware_requests.manage_options"],
+    today: "staff",
+  },
+  {
+    route: "secondary-login-requests",
+    method: "GET",
+    permissions: ["signin_email_requests.view"],
+    today: "staff",
+    shared: true,
+  },
+  {
+    route: "secondary-login-requests/[id]/approve",
+    method: "POST",
+    permissions: ["signin_email_requests.approve"],
+    today: "staff",
+  },
+  {
+    route: "secondary-login-requests/[id]/reject",
+    method: "POST",
+    permissions: ["signin_email_requests.reject"],
+    today: "staff",
+  },
+  {
+    route: "guild-requests",
+    method: "GET",
+    permissions: ["guild_requests.view"],
+    today: "staff",
+  },
+  // confirm and approve need .approve, reject needs .reject
+  {
+    route: "guild-requests/[kind]/[id]/[action]",
+    method: "POST",
+    permissions: ["guild_requests.approve", "guild_requests.reject"],
+    today: "staff",
+  },
 ];
 
 const SYSTEM_ROLES = ["SUPER_ADMIN", "ADMIN", "ACCOUNTING"] as const;
@@ -467,7 +734,9 @@ describe("permission parity", () => {
         "route.ts",
       );
       const source = fs.readFileSync(file, "utf8");
-      expect(source).toMatch(/require(Any|Staff)?Permission\(/);
+      expect(source).toMatch(
+        /require(Any|Staff)?Permission\(|authorizeStaff\(/,
+      );
       if (!row.shared) expect(source).not.toMatch(OLD_STAFF_CHECKS);
     });
   }
