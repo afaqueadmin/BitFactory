@@ -10,10 +10,12 @@
  * Authorization: Admin/Super Admin only
  */
 
-import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { verifyJwtToken } from "@/lib/jwt";
+import {
+  getAuthorizationContext,
+  requirePermission,
+} from "@/lib/auth/authorization";
 import { AuditAction } from "@prisma/client";
 import { franchiseeUserFilter } from "@/lib/franchiseeScope";
 
@@ -25,21 +27,6 @@ interface ApiResponse<T = Record<string, unknown>> {
   data?: T;
   error?: string;
   message?: string;
-}
-
-/**
- * Helper: Extract and verify JWT token from request cookies
- */
-async function getAuthenticatedUser(request: NextRequest) {
-  try {
-    const token = request.cookies.get("token")?.value;
-    if (!token) {
-      return null;
-    }
-    return await verifyJwtToken(token);
-  } catch {
-    return null;
-  }
 }
 
 /**
@@ -55,31 +42,14 @@ export async function GET(
 
     console.log("[Groups API] GET /api/groups/[id] - Fetching group:", id);
 
-    // Get authenticated user
-    const user = await getAuthenticatedUser(request);
-
-    if (!user) {
-      console.warn("[Groups API] GET[id] - Unauthorized: No user session");
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Unauthorized",
-        } as ApiResponse,
-        { status: 401 },
-      );
+    const ctx = await getAuthorizationContext(request);
+    if ("response" in ctx) return ctx.response;
+    // Shared: a franchisee sees only their own customers (franchiseeUserFilter).
+    if (ctx.role !== "FRANCHISEE") {
+      const denied = requirePermission(ctx, "customer_groups.view");
+      if (denied) return denied;
     }
-
-    // Check authorization
-    if (!isStaffRole(user.role) && user.role !== "FRANCHISEE") {
-      console.warn("[Groups API] GET[id] - Forbidden: User role is", user.role);
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Forbidden: Only Admin/Super Admin can access groups",
-        } as ApiResponse,
-        { status: 403 },
-      );
-    }
+    const user = { userId: ctx.userId, role: ctx.role };
 
     // Fetch group with subaccounts (via poolAuth -> user relation, or
     // directly via userId for subaccount-less members) and creator
@@ -335,31 +305,11 @@ export async function PUT(
 
     console.log("[Groups API] PUT /api/groups/[id] - Updating group:", id);
 
-    // Get authenticated user
-    const user = await getAuthenticatedUser(request);
-
-    if (!user) {
-      console.warn("[Groups API] PUT[id] - Unauthorized: No user session");
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Unauthorized",
-        } as ApiResponse,
-        { status: 401 },
-      );
-    }
-
-    // Check authorization
-    if (!isStaffRole(user.role)) {
-      console.warn("[Groups API] PUT[id] - Forbidden: User role is", user.role);
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Forbidden: Only Admin/Super Admin can update groups",
-        } as ApiResponse,
-        { status: 403 },
-      );
-    }
+    const ctx = await getAuthorizationContext(request);
+    if ("response" in ctx) return ctx.response;
+    const denied = requirePermission(ctx, "customer_groups.edit");
+    if (denied) return denied;
+    const user = { userId: ctx.userId, role: ctx.role };
 
     // Check if group exists
     const existingGroup = await prisma.group.findUnique({
@@ -532,34 +482,11 @@ export async function DELETE(
 
     console.log("[Groups API] DELETE /api/groups/[id] - Deleting group:", id);
 
-    // Get authenticated user
-    const user = await getAuthenticatedUser(request);
-
-    if (!user) {
-      console.warn("[Groups API] DELETE[id] - Unauthorized: No user session");
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Unauthorized",
-        } as ApiResponse,
-        { status: 401 },
-      );
-    }
-
-    // Check authorization
-    if (!isStaffRole(user.role)) {
-      console.warn(
-        "[Groups API] DELETE[id] - Forbidden: User role is",
-        user.role,
-      );
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Forbidden: Only Admin/Super Admin can delete groups",
-        } as ApiResponse,
-        { status: 403 },
-      );
-    }
+    const ctx = await getAuthorizationContext(request);
+    if ("response" in ctx) return ctx.response;
+    const denied = requirePermission(ctx, "customer_groups.delete");
+    if (denied) return denied;
+    const user = { userId: ctx.userId, role: ctx.role };
 
     // Check if group exists
     const existingGroup = await prisma.group.findUnique({
