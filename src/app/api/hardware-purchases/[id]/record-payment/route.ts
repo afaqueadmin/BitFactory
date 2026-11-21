@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAccountingAdmin } from "@/lib/accounting/adminAuth";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import {
   recordVendorSidePayment,
   RecordVendorPaymentWithDepositRequest,
@@ -14,7 +14,9 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const auth = await requireAccountingAdmin(request);
+    const auth = await authorizeStaff(request, [
+      "hardware_purchases.record_payment",
+    ]);
     if ("response" in auth) return auth.response;
     const { id } = await params;
 

@@ -6,10 +6,9 @@
  * removes the request log entry, not the customer User it created.
  */
 
-import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { prisma } from "@/lib/prisma";
-import { verifyJwtToken } from "@/lib/jwt";
 import { AuditAction } from "@prisma/client";
 
 export async function DELETE(
@@ -18,30 +17,11 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const token = request.cookies.get("token")?.value;
-    if (!token) {
-      return NextResponse.json(
-        { success: false, error: "Unauthorized" },
-        { status: 401 },
-      );
-    }
-
-    let decoded;
-    try {
-      decoded = await verifyJwtToken(token);
-    } catch {
-      return NextResponse.json(
-        { success: false, error: "Invalid token" },
-        { status: 401 },
-      );
-    }
-
-    if (!isStaffRole(decoded.role)) {
-      return NextResponse.json(
-        { success: false, error: "Admin access required" },
-        { status: 403 },
-      );
-    }
+    const auth = await authorizeStaff(request, [
+      "franchisees.reject_customer_requests",
+    ]);
+    if ("response" in auth) return auth.response;
+    const decoded = auth.decoded;
 
     const customerRequest = await prisma.franchiseCustomerRequest.findUnique({
       where: { id },

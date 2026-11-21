@@ -1,7 +1,6 @@
-import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { prisma } from "@/lib/prisma";
-import { verifyJwtToken } from "@/lib/jwt";
 import { Decimal } from "@prisma/client/runtime/library";
 import { AuditAction } from "@prisma/client";
 import {
@@ -39,26 +38,8 @@ export async function GET(
   try {
     const { id: invoiceId } = await params;
 
-    const token = request.cookies.get("token")?.value;
-
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const decoded = await verifyJwtToken(token);
-    const userId = decoded.userId;
-
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { role: true },
-    });
-
-    if (!user || !isStaffRole(user.role)) {
-      return NextResponse.json(
-        { error: "Only administrators can update vendor invoices" },
-        { status: 403 },
-      );
-    }
+    const auth = await authorizeStaff(request, ["farm_tariffs.view"]);
+    if ("response" in auth) return auth.response;
     const invoice = await prisma.vendorInvoice.findUnique({
       where: { id: invoiceId },
       include: {
@@ -109,26 +90,9 @@ export async function PUT(
 ) {
   try {
     const { id: invoiceId } = await params;
-    const token = request.cookies.get("token")?.value;
-
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const decoded = await verifyJwtToken(token);
-    const userId = decoded.userId;
-
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { role: true },
-    });
-
-    if (!user || !isStaffRole(user.role)) {
-      return NextResponse.json(
-        { error: "Only administrators can update vendor invoices" },
-        { status: 403 },
-      );
-    }
+    const auth = await authorizeStaff(request, ["farm_tariffs.edit"]);
+    if ("response" in auth) return auth.response;
+    const userId = auth.userId;
 
     // Check if invoice exists
     const existingInvoice = await prisma.vendorInvoice.findUnique({
@@ -353,26 +317,9 @@ export async function DELETE(
 ) {
   try {
     const { id: invoiceId } = await params;
-    const token = request.cookies.get("token")?.value;
-
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const decoded = await verifyJwtToken(token);
-    const userId = decoded.userId;
-
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { role: true },
-    });
-
-    if (!user || !isStaffRole(user.role)) {
-      return NextResponse.json(
-        { error: "Only administrators can delete vendor invoices" },
-        { status: 403 },
-      );
-    }
+    const auth = await authorizeStaff(request, ["farm_tariffs.delete"]);
+    if ("response" in auth) return auth.response;
+    const userId = auth.userId;
 
     const existingInvoice = await prisma.vendorInvoice.findUnique({
       where: { id: invoiceId },

@@ -1,7 +1,6 @@
-import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { isEmailTaken } from "@/lib/auth/emailIdentity";
-import { verifyJwtToken } from "@/lib/jwt";
 
 /**
  * GET /api/user/check-email?email=test@example.com
@@ -12,19 +11,14 @@ import { verifyJwtToken } from "@/lib/jwt";
  */
 export async function GET(request: NextRequest) {
   try {
-    const token = request.cookies.get("token")?.value;
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    let role: string;
-    try {
-      role = (await verifyJwtToken(token)).role;
-    } catch {
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
-    }
-    if (!isStaffRole(role)) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+    const auth = await authorizeStaff(request, [
+      "customers.view",
+      "customers.create",
+      "customers.edit",
+      "franchisees.create",
+      "franchisees.edit",
+    ]);
+    if ("response" in auth) return auth.response;
 
     const email = request.nextUrl.searchParams.get("email");
 

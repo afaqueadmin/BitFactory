@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { AuditAction } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { requireAccountingAdmin } from "@/lib/accounting/adminAuth";
 import {
   auditIncome,
   IncomeRequest,
@@ -20,7 +20,7 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const auth = await requireAccountingAdmin(request);
+    const auth = await authorizeStaff(request, ["capital_income.edit"]);
     if ("response" in auth) return auth.response;
     const { userId } = auth;
     const { id } = await params;
@@ -91,7 +91,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const auth = await requireAccountingAdmin(request);
+    const auth = await authorizeStaff(request, ["capital_income.delete"]);
     if ("response" in auth) return auth.response;
     const { userId } = auth;
     const { id } = await params;

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { AuditAction } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { requireAccountingAdmin } from "@/lib/accounting/adminAuth";
 import {
   ExpenseRequest,
   parseExpenseRequest,
@@ -11,7 +11,7 @@ import { auditExpense, expenseInclude, expenseJson } from "./shared";
 /** Every expense with its payments, newest first. */
 export async function GET(request: NextRequest) {
   try {
-    const auth = await requireAccountingAdmin(request);
+    const auth = await authorizeStaff(request, ["expenses.view"]);
     if ("response" in auth) return auth.response;
 
     const expenses = await prisma.accountingExpense.findMany({
@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
 /** Adds an expense (unpaid). Payments are recorded separately. */
 export async function POST(request: NextRequest) {
   try {
-    const auth = await requireAccountingAdmin(request);
+    const auth = await authorizeStaff(request, ["expenses.create"]);
     if ("response" in auth) return auth.response;
     const { userId } = auth;
 

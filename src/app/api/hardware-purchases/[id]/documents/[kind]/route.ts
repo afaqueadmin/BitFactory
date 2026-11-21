@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import {
   openInvoiceDocument,
   removeInvoiceSheet,
@@ -13,16 +14,22 @@ import {
 type Params = { params: Promise<{ id: string; kind: string }> };
 
 export async function GET(request: NextRequest, { params }: Params) {
+  const auth = await authorizeStaff(request, ["hardware_purchases.view"]);
+  if ("response" in auth) return auth.response;
   const { id, kind } = await params;
-  return openInvoiceDocument(request, "hardware", id, kind);
+  return openInvoiceDocument("hardware", id, kind);
 }
 
 export async function PUT(request: NextRequest, { params }: Params) {
+  const auth = await authorizeStaff(request, ["hardware_purchases.edit"]);
+  if ("response" in auth) return auth.response;
   const { id, kind } = await params;
-  return replaceInvoiceDocument(request, "hardware", id, kind);
+  return replaceInvoiceDocument(request, auth.userId, "hardware", id, kind);
 }
 
 export async function DELETE(request: NextRequest, { params }: Params) {
+  const auth = await authorizeStaff(request, ["hardware_purchases.edit"]);
+  if ("response" in auth) return auth.response;
   const { id, kind } = await params;
-  return removeInvoiceSheet(request, "hardware", id, kind);
+  return removeInvoiceSheet(auth.userId, "hardware", id, kind);
 }

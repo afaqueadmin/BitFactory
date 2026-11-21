@@ -1,5 +1,8 @@
-import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
+import {
+  authorizeStaff,
+  requireStaffPermission,
+} from "@/lib/auth/authorization";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
 import { AuditAction } from "@prisma/client";
@@ -38,6 +41,13 @@ export async function GET(request: NextRequest) {
       url.searchParams.get("customerId"),
     );
     if (target instanceof NextResponse) return target;
+    if (target.callerIsStaff) {
+      const denied = await requireStaffPermission(request, [
+        "credit_adjustments.view",
+        "customers.view",
+      ]);
+      if (denied) return denied;
+    }
     const userId = target.userId;
     // Validate pagination parameters
     if (page < 0 || pageSize < 1 || pageSize > 9999) {
@@ -165,34 +175,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const token = request.cookies.get("token")?.value;
-
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Verify token
-    let userId: string;
-    try {
-      const decoded = await verifyJwtToken(token);
-      userId = decoded.userId;
-    } catch (error) {
-      console.error("Token verification failed:", error);
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
-    }
-
-    // Check if user is admin
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { role: true },
-    });
-
-    if (!user || !isStaffRole(user.role)) {
-      return NextResponse.json(
-        { error: "Only administrators can manage cost payments" },
-        { status: 403 },
-      );
-    }
+    const auth = await authorizeStaff(request, ["credit_adjustments.create"]);
+    if ("response" in auth) return auth.response;
+    const userId = auth.userId;
 
     const {
       userId: customerId,

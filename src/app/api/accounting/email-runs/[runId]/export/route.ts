@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { prisma } from "@/lib/prisma";
-import { requireAccountingAdmin } from "@/lib/accounting/adminAuth";
 import {
   EMAIL_RUN_KIND_LABELS,
   MEMO_CATEGORY_LABELS,
@@ -23,7 +23,7 @@ export async function GET(
   { params }: { params: Promise<{ runId: string }> },
 ) {
   try {
-    const auth = await requireAccountingAdmin(request);
+    const auth = await authorizeStaff(request, ["email_reports.view"]);
     if ("response" in auth) return auth.response;
 
     const { runId } = await params;

@@ -6,22 +6,15 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { prisma } from "@/lib/prisma";
 import { isRepairSite } from "@/lib/repairCharges";
-import {
-  requireRepairChargesUser,
-  touchRepairSite,
-} from "@/lib/repairChargesServer";
+import { touchRepairSite } from "@/lib/repairChargesServer";
 
 export async function PUT(request: NextRequest) {
   try {
-    const auth = await requireRepairChargesUser(request, { staffOnly: true });
-    if ("error" in auth) {
-      return NextResponse.json(
-        { success: false, error: auth.error },
-        { status: auth.status },
-      );
-    }
+    const auth = await authorizeStaff(request, ["repair_charges.edit"]);
+    if ("response" in auth) return auth.response;
 
     const body = (await request.json().catch(() => ({}))) as {
       site?: unknown;

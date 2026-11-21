@@ -1,5 +1,9 @@
 import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
+import {
+  authorizeStaff,
+  requireStaffPermission,
+} from "@/lib/auth/authorization";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
 import {
@@ -64,6 +68,13 @@ export async function GET(request: NextRequest) {
       searchParams.set("customerId", selfId);
     }
     const customerId = searchParams.get("customerId");
+    if (isStaffRole(userRole)) {
+      const denied = await requireStaffPermission(request, [
+        "invoicing.view",
+        "customers.view",
+      ]);
+      if (denied) return denied;
+    }
 
     // Anyone who isn't staff or a franchisee (clients, simulated accounts, any
     // future role) may only ask for their own invoices.
@@ -203,26 +214,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const token = request.cookies.get("token")?.value;
-
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const decoded = await verifyJwtToken(token);
-    const userId = decoded.userId;
-
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { role: true },
-    });
-
-    if (!user || !isStaffRole(user.role)) {
-      return NextResponse.json(
-        { error: "Only administrators can create invoices" },
-        { status: 403 },
-      );
-    }
+    const auth = await authorizeStaff(request, ["invoicing.create"]);
+    if ("response" in auth) return auth.response;
+    const userId = auth.userId;
 
     const body = await request.json();
     const {

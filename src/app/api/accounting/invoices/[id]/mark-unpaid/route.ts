@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { prisma } from "@/lib/prisma";
-import { verifyJwtToken } from "@/lib/jwt";
 import { InvoiceStatus, AuditAction } from "@prisma/client";
 import {
   confirmBankEffectResponse,
@@ -9,32 +9,6 @@ import {
   deleteReconciliationFiles,
   readConfirm,
 } from "@/lib/accounting/invoiceBankEffect";
-
-/** Signed-in SUPER_ADMIN: their userId, or the error response. */
-async function superAdmin(
-  request: NextRequest,
-): Promise<{ userId: string } | { response: NextResponse }> {
-  const token = request.cookies.get("token")?.value;
-  if (!token) {
-    return {
-      response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
-    };
-  }
-  const { userId } = await verifyJwtToken(token);
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { role: true },
-  });
-  if (user?.role !== "SUPER_ADMIN") {
-    return {
-      response: NextResponse.json(
-        { error: "Only super administrators can mark invoices as unpaid" },
-        { status: 403 },
-      ),
-    };
-  }
-  return { userId };
-}
 
 /** Same effect as voiding every payment, plus the reconciliation entry. */
 const effectOf = (id: string) =>
@@ -53,7 +27,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const auth = await superAdmin(request);
+    const auth = await authorizeStaff(request, ["invoicing.mark_unpaid"]);
     if ("response" in auth) return auth.response;
     const { id } = await params;
     return NextResponse.json({ success: true, data: await effectOf(id) });
@@ -81,7 +55,7 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const auth = await superAdmin(request);
+    const auth = await authorizeStaff(request, ["invoicing.mark_unpaid"]);
     if ("response" in auth) return auth.response;
     const { userId } = auth;
     const confirmed = await readConfirm(request);

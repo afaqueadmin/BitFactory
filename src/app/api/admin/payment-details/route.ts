@@ -1,7 +1,6 @@
-import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { prisma } from "@/lib/prisma";
-import { verifyJwtToken } from "@/lib/jwt";
 
 interface PaymentDetailsPayload {
   companyName?: string;
@@ -24,29 +23,8 @@ interface PaymentDetailsPayload {
 // GET /api/admin/payment-details - Fetch current payment details
 export async function GET(request: NextRequest) {
   try {
-    // Verify admin authorization
-    const token = request.cookies.get("token")?.value;
-
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    try {
-      const decoded = await verifyJwtToken(token);
-
-      // Only ADMIN, SUPER_ADMIN and ACCOUNTING can access
-      if (!isStaffRole(decoded.role)) {
-        return NextResponse.json(
-          { error: "Forbidden: Admin access required" },
-          { status: 403 },
-        );
-      }
-    } catch {
-      return NextResponse.json(
-        { error: "Unauthorized: Invalid token" },
-        { status: 401 },
-      );
-    }
+    const auth = await authorizeStaff(request, ["invoice_pdf_settings.view"]);
+    if ("response" in auth) return auth.response;
 
     // Fetch payment details
     const paymentDetails = await prisma.paymentDetails.findFirst();
@@ -105,35 +83,9 @@ export async function GET(request: NextRequest) {
 // PUT /api/admin/payment-details - Update payment details
 export async function PUT(req: NextRequest) {
   try {
-    // Verify admin authorization
-    const token = req.cookies.get("token")?.value;
-
-    if (!token) {
-      return NextResponse.json(
-        { error: "Unauthorized: No token provided" },
-        { status: 401 },
-      );
-    }
-
-    let userId: string;
-    try {
-      const decoded = await verifyJwtToken(token);
-
-      // Only ADMIN, SUPER_ADMIN and ACCOUNTING can update
-      if (!isStaffRole(decoded.role)) {
-        return NextResponse.json(
-          { error: "Forbidden: Admin access required" },
-          { status: 403 },
-        );
-      }
-
-      userId = decoded.userId;
-    } catch {
-      return NextResponse.json(
-        { error: "Unauthorized: Invalid token" },
-        { status: 401 },
-      );
-    }
+    const auth = await authorizeStaff(req, ["invoice_pdf_settings.edit"]);
+    if ("response" in auth) return auth.response;
+    const userId = auth.userId;
 
     const body: PaymentDetailsPayload = await req.json();
 

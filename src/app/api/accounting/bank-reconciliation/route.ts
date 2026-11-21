@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { AuditAction } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import {
-  isUniqueViolation,
-  requireAccountingAdmin,
-} from "@/lib/accounting/adminAuth";
+import { isUniqueViolation } from "@/lib/accounting/adminAuth";
 import {
   auditReconciliation,
   invoiceStillQualifies,
@@ -21,7 +19,7 @@ import {
 /** Every Bank Reconciliation entry, newest first. */
 export async function GET(request: NextRequest) {
   try {
-    const auth = await requireAccountingAdmin(request);
+    const auth = await authorizeStaff(request, ["bank_reconciliation.view"]);
     if ("response" in auth) return auth.response;
 
     const entries = await prisma.accountingBankReconciliation.findMany({
@@ -44,7 +42,7 @@ export async function GET(request: NextRequest) {
 /** Adds an entry: one invoice's money into one bank (a Debit). */
 export async function POST(request: NextRequest) {
   try {
-    const auth = await requireAccountingAdmin(request);
+    const auth = await authorizeStaff(request, ["bank_reconciliation.create"]);
     if ("response" in auth) return auth.response;
     const { userId } = auth;
 

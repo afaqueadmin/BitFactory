@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "../route";
+import { authorizeStaff } from "@/lib/auth/authorization";
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const auth = await requireAdmin(request);
-    if ("error" in auth) return auth.error;
+    const auth = await authorizeStaff(request, ["credit_adjustments.view"]);
+    if ("response" in auth) return auth.response;
 
     const { id } = await params;
 

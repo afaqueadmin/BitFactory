@@ -15,6 +15,10 @@
 
 import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
+import {
+  authorizeStaff,
+  requireStaffPermission,
+} from "@/lib/auth/authorization";
 import { AuditAction } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { isUniqueViolation } from "@/lib/accounting/adminAuth";
@@ -42,6 +46,12 @@ export async function GET(request: NextRequest) {
     const includeInactive =
       isStaffRole(auth.decoded.role) &&
       request.nextUrl.searchParams.get("includeInactive") === "1";
+    if (includeInactive) {
+      const denied = await requireStaffPermission(request, [
+        "repair_charges.view",
+      ]);
+      if (denied) return denied;
+    }
 
     const [charges, settings] = await Promise.all([
       prisma.repairCharge.findMany({
@@ -69,13 +79,8 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const auth = await requireRepairChargesUser(request, { staffOnly: true });
-    if ("error" in auth) {
-      return NextResponse.json(
-        { success: false, error: auth.error },
-        { status: auth.status },
-      );
-    }
+    const auth = await authorizeStaff(request, ["repair_charges.edit"]);
+    if ("response" in auth) return auth.response;
 
     const body = await request.json().catch(() => ({}));
     const parsed = parseRepairChargeInput(body as Record<string, unknown>);

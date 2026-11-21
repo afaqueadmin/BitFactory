@@ -124,7 +124,15 @@ export async function requireStaffPermission(
 export async function authorizeStaff(
   request: NextRequest,
   permissions: readonly Permission[],
-): Promise<{ decoded: JwtPayload } | { response: NextResponse }> {
+): Promise<
+  | {
+      decoded: JwtPayload;
+      userId: string;
+      role: string;
+      permissions: ReadonlySet<Permission>;
+    }
+  | { response: NextResponse }
+> {
   const token = request.cookies.get("token")?.value;
   if (!token) return { response: unauthorized() };
   let decoded: JwtPayload;
@@ -137,7 +145,14 @@ export async function authorizeStaff(
   const ctx = await contextFor(decoded.userId);
   if ("response" in ctx) return ctx;
   const denied = requireAnyPermission(ctx, permissions);
-  return denied ? { response: denied } : { decoded };
+  return denied
+    ? { response: denied }
+    : {
+        decoded,
+        userId: decoded.userId,
+        role: ctx.role,
+        permissions: ctx.permissions,
+      };
 }
 
 function unauthorized() {

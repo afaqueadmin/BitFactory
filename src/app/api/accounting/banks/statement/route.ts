@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAccountingAdmin } from "@/lib/accounting/adminAuth";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { statementJson } from "../statementJson";
 import { loadConsolidatedStatement } from "./shared";
 
@@ -10,7 +10,7 @@ import { loadConsolidatedStatement } from "./shared";
  */
 export async function GET(request: NextRequest) {
   try {
-    const auth = await requireAccountingAdmin(request);
+    const auth = await authorizeStaff(request, ["banks.view"]);
     if ("response" in auth) return auth.response;
 
     const result = await loadConsolidatedStatement(

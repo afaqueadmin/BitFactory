@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { AuditAction } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import {
-  isUniqueViolation,
-  requireAccountingAdmin,
-} from "@/lib/accounting/adminAuth";
+import { isUniqueViolation } from "@/lib/accounting/adminAuth";
 import { MAX_MASTER_NAME_LENGTH as MAX_NAME_LENGTH } from "@/lib/accounting/masterData";
 import { vendorCountInclude } from "@/lib/accounting/vendorRules";
 
@@ -13,7 +11,7 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const auth = await requireAccountingAdmin(request);
+    const auth = await authorizeStaff(request, ["vendors.edit"]);
     if ("response" in auth) return auth.response;
     const { userId } = auth;
     const { id } = await params;
@@ -117,7 +115,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const auth = await requireAccountingAdmin(request);
+    const auth = await authorizeStaff(request, ["vendors.delete"]);
     if ("response" in auth) return auth.response;
     const { userId } = auth;
     const { id } = await params;

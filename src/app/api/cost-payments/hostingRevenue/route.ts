@@ -1,32 +1,11 @@
-import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { prisma } from "@/lib/prisma";
-import { verifyJwtToken } from "@/lib/jwt";
 
 export async function GET(request: NextRequest) {
   try {
-    const token = request.cookies.get("token")?.value;
-
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Verify token and extract user ID
-    let userRole: string;
-    try {
-      const decoded = await verifyJwtToken(token);
-      userRole = decoded.role;
-    } catch (error) {
-      console.error("[Cost Payments GET] Token verification failed:", error);
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
-    }
-
-    if (!isStaffRole(userRole)) {
-      return NextResponse.json(
-        { error: "Only administrators can search by customerId" },
-        { status: 403 },
-      );
-    }
+    const auth = await authorizeStaff(request, ["dashboard.view"]);
+    if ("response" in auth) return auth.response;
 
     // Hosting revenue is invoice-based: sum totalAmount of all ELECTRICITY_CHARGES
     // invoices that have been issued to the customer (ISSUED/OVERDUE/PROCESSING/PAID).

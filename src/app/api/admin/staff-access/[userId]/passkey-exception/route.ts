@@ -10,6 +10,7 @@
  *        ends it early and signs the account out everywhere.
  */
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { AuditAction } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { sessionCutoffNow } from "@/lib/auth/sessionRevocation";
@@ -17,7 +18,7 @@ import {
   label,
   loadTarget,
   requestMeta,
-  requireSuperAdmin,
+  staffAccessActor,
 } from "@/lib/auth/staffAccessAdmin";
 import { notifyAccount } from "@/lib/auth/staffAccessServer";
 import {
@@ -38,8 +39,9 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ userId: string }> },
 ) {
-  const actor = await requireSuperAdmin(request);
-  if (actor instanceof NextResponse) return actor;
+  const auth = await authorizeStaff(request, ["access_rules.manage"]);
+  if ("response" in auth) return auth.response;
+  const actor = await staffAccessActor(auth.userId);
   const { userId } = await params;
   const target = await loadTarget(actor, userId);
   if (target instanceof NextResponse) return target;
@@ -129,8 +131,9 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ userId: string }> },
 ) {
-  const actor = await requireSuperAdmin(request);
-  if (actor instanceof NextResponse) return actor;
+  const auth = await authorizeStaff(request, ["access_rules.manage"]);
+  if ("response" in auth) return auth.response;
+  const actor = await staffAccessActor(auth.userId);
   const { userId } = await params;
   const target = await loadTarget(actor, userId);
   if (target instanceof NextResponse) return target;

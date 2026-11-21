@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireStaffPermission } from "@/lib/auth/authorization";
 import { createLuxorClient } from "@/lib/luxor";
 import { createBraiinsClient } from "@/lib/braiins";
 import { prisma } from "@/lib/prisma";
@@ -150,6 +151,10 @@ export async function GET(request: NextRequest) {
     // by an admin still gets the simulated ledger.
     const target = await authenticateWalletRequest(request);
     if (target instanceof NextResponse) return target;
+    if (target.callerIsStaff) {
+      const denied = await requireStaffPermission(request, ["customers.view"]);
+      if (denied) return denied;
+    }
     const userId = target.userId;
     // Payout addresses go out masked unless the caller is staff.
     const presentRows = (rows: WalletTransaction[]) =>

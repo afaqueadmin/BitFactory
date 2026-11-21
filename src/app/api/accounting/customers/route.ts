@@ -1,5 +1,6 @@
 import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
+import { requireStaffPermission } from "@/lib/auth/authorization";
 import { prisma } from "@/lib/prisma";
 import { BILLED_CUSTOMER_ROLES } from "@/lib/customerRoles";
 import { verifyJwtToken } from "@/lib/jwt";
@@ -27,6 +28,21 @@ export async function GET(request: NextRequest) {
         { error: "Only administrators can access customers" },
         { status: 403 },
       );
+    }
+    if (isStaffRole(user.role)) {
+      const denied = await requireStaffPermission(request, [
+        "invoicing.view",
+        "invoicing.create",
+        "invoicing.edit",
+        "credit_adjustments.view",
+        "credit_adjustments.create",
+        "memos.view",
+        "memos.create",
+        "recurring_invoices.view",
+        "recurring_invoices.manage",
+        "dashboard.view",
+      ]);
+      if (denied) return denied;
     }
 
     // ?scope=hosting limits the list to customers who can be billed for

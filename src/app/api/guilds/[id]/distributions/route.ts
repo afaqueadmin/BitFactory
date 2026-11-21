@@ -6,7 +6,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { requireStaff, jsonError } from "@/lib/guilds/routeAuth";
+import { jsonError } from "@/lib/guilds/routeAuth";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { runGuildDistribution } from "@/lib/guilds/runDistribution";
 
 const OUTCOME_ERRORS: Record<string, string> = {
@@ -20,8 +21,8 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const auth = await requireStaff(request);
-  if ("error" in auth) return auth.error;
+  const auth = await authorizeStaff(request, ["guilds.calculate_distribution"]);
+  if ("response" in auth) return auth.response;
 
   try {
     const { id } = await params;

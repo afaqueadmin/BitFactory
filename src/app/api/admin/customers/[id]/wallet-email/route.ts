@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { prisma } from "@/lib/prisma";
 import { secondaryLoginEmails } from "@/lib/auth/loginIdentity";
 import { getGroupByUserId } from "@/lib/groupUtils";
@@ -8,7 +9,6 @@ import {
   defaultWalletSnapshotSubject,
 } from "@/lib/email-templates/wallet-snapshot-email";
 import {
-  authorizeAdmin,
   loadSnapshotCustomer,
   renderWalletSnapshotPdf,
   walletSnapshotFilename,
@@ -46,8 +46,8 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const auth = await authorizeAdmin(request);
-  if (auth instanceof NextResponse) return auth;
+  const auth = await authorizeStaff(request, ["customers.send_wallet_email"]);
+  if ("response" in auth) return auth.response;
 
   const { id } = await params;
   const customer = await loadSnapshotCustomer(id);
@@ -83,8 +83,8 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const auth = await authorizeAdmin(request);
-  if (auth instanceof NextResponse) return auth;
+  const auth = await authorizeStaff(request, ["customers.send_wallet_email"]);
+  if ("response" in auth) return auth.response;
 
   const { id } = await params;
   const customer = await loadSnapshotCustomer(id);
@@ -144,7 +144,7 @@ export async function POST(
         action: result.success ? "EMAIL_SENT" : "EMAIL_FAILED",
         entityType: "WalletSnapshot",
         entityId: customer.id,
-        userId: auth.adminId,
+        userId: auth.userId,
         description: `Wallet snapshot ${result.success ? "sent" : "failed to send"} to ${customer.email}`,
         changes: JSON.stringify({
           sentTo: customer.email,

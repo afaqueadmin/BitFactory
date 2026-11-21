@@ -5,14 +5,14 @@
  * the sidebar badge on Access Rules. Polled, so it stays a single count.
  */
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { prisma } from "@/lib/prisma";
-import { requireSuperAdmin } from "@/lib/auth/staffAccessAdmin";
 
 export const runtime = "nodejs";
 
 export async function GET(request: NextRequest) {
-  const actor = await requireSuperAdmin(request);
-  if (actor instanceof NextResponse) return actor;
+  const auth = await authorizeStaff(request, ["access_rules.view"]);
+  if ("response" in auth) return auth.response;
   try {
     const count = await prisma.staffTimeRequest.count({
       where: { status: "PENDING" },

@@ -1,7 +1,9 @@
-import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
+import {
+  requireStaffPermission,
+  authorizeStaff,
+} from "@/lib/auth/authorization";
 import { prisma } from "@/lib/prisma";
-import { verifyJwtToken } from "@/lib/jwt";
 import { createLuxorClient, LuxorError } from "@/lib/luxor";
 import { walletCache } from "@/lib/cache";
 import { WalletFetchResponse, WalletErrorResponse } from "@/lib/types/wallet";
@@ -86,6 +88,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       );
     }
     const userId = target.userId;
+    if (target.callerIsStaff) {
+      const denied = await requireStaffPermission(request, ["customers.view"]);
+      if (denied) return denied;
+    }
     // Cached unmasked per customer; masked per response for non-staff.
     const present = <T>(body: T): T =>
       target.callerIsStaff ? body : maskPaymentSettingsBody(body);
@@ -402,32 +408,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     // Verify admin authentication
-    const token = request.cookies.get("token")?.value;
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    let userId: string;
-    let userRole: string;
-    try {
-      const decoded = await verifyJwtToken(token);
-      userId = decoded.userId;
-      userRole = decoded.role;
-    } catch (error) {
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
-    }
-
-    // Check if user is admin
-    if (!isStaffRole(userRole)) {
-      console.warn(
-        "[Wallet API] Non-admin attempted cache invalidation:",
-        userId,
-      );
-      return NextResponse.json(
-        { error: "Only admins can invalidate cache" },
-        { status: 403 },
-      );
-    }
+    const auth = await authorizeStaff(request, ["customers.edit"]);
+    if ("response" in auth) return auth.response;
+    const userId = auth.userId;
 
     const body = await request.json();
     const { userId: targetUserId, currency } = body;

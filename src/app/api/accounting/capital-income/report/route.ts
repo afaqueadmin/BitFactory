@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { prisma } from "@/lib/prisma";
-import { requireAccountingAdmin } from "@/lib/accounting/adminAuth";
 import {
   buildIncomeReport,
   IncomeReportCell,
@@ -24,7 +24,7 @@ const recordJson = (r: Record<string, IncomeReportCell>) =>
  */
 export async function GET(request: NextRequest) {
   try {
-    const auth = await requireAccountingAdmin(request);
+    const auth = await authorizeStaff(request, ["capital_income.view"]);
     if ("response" in auth) return auth.response;
 
     const params = new URL(request.url).searchParams;
