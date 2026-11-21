@@ -73,6 +73,18 @@ export async function PUT(
         segment: true,
       },
     });
+    if (!currentUser) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
+    // Same tier rule as delete and password reset. Editing your own record
+    // stays allowed (canManageAccount refuses SUPER_ADMIN → SUPER_ADMIN).
+    if (id !== userId && !canManageAccount(user.role, currentUser.role)) {
+      return NextResponse.json(
+        { error: "You do not have permission to edit this user" },
+        { status: 403 },
+      );
+    }
 
     // franchiseeId is only applicable to CLIENT users (null = direct BitFactory
     // customer). Ignore any attempt to set it on a non-CLIENT user.
