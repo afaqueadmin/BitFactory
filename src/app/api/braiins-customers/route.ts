@@ -1,7 +1,9 @@
-import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { verifyJwtToken } from "@/lib/jwt";
+import {
+  getAuthorizationContext,
+  requirePermission,
+} from "@/lib/auth/authorization";
 
 /**
  * GET /api/braiins-customers
@@ -13,33 +15,10 @@ import { verifyJwtToken } from "@/lib/jwt";
  */
 export async function GET(request: NextRequest) {
   try {
-    const token = request.cookies.get("token")?.value;
-
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Verify token and check if user is admin
-    let userId: string;
-    try {
-      const decoded = await verifyJwtToken(token);
-      userId = decoded.userId;
-    } catch (error) {
-      console.error("[Braiins Customers] Token verification failed:", error);
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { role: true },
-    });
-
-    if (!user || !isStaffRole(user.role)) {
-      return NextResponse.json(
-        { error: "Only administrators can access Braiins customers" },
-        { status: 403 },
-      );
-    }
+    const ctx = await getAuthorizationContext(request);
+    if ("response" in ctx) return ctx.response;
+    const denied = requirePermission(ctx, "pool_workers.view");
+    if (denied) return denied;
 
     // Get Braiins pool
     const braiinsPool = await prisma.pool.findUnique({

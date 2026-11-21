@@ -16,9 +16,11 @@
  * }
  */
 
-import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
-import { verifyJwtToken } from "@/lib/jwt";
+import {
+  getAuthorizationContext,
+  requirePermission,
+} from "@/lib/auth/authorization";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
@@ -40,46 +42,6 @@ interface BraiinsMinerInfo {
 /**
  * Helper: Extract and validate JWT token from request cookies
  */
-async function extractUserFromToken(request: NextRequest) {
-  const token = request.cookies.get("token")?.value;
-
-  if (!token) {
-    throw new Error("Authentication required: No token found");
-  }
-
-  try {
-    const decoded = await verifyJwtToken(token);
-
-    // Fetch user from database
-    const user = await prisma.user.findUnique({
-      where: { id: decoded.userId },
-      select: {
-        id: true,
-        role: true,
-      },
-    });
-
-    if (!user) {
-      throw new Error("User not found in database");
-    }
-
-    // Check if user is admin
-    if (!isStaffRole(user.role)) {
-      throw new Error("Admin access required");
-    }
-
-    return {
-      userId: decoded.userId,
-      role: decoded.role,
-    };
-  } catch (error) {
-    if (error instanceof Error) {
-      throw error;
-    }
-    throw new Error("Authentication failed: Invalid or expired token");
-  }
-}
-
 /**
  * GET /api/braiins-miners/all
  *
@@ -88,33 +50,14 @@ async function extractUserFromToken(request: NextRequest) {
  *
  * Response: Array of miners with id, name, userId, userName
  */
-export async function GET(
-  request: NextRequest,
-): Promise<NextResponse<ProxyResponse<Record<string, unknown>>>> {
+export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
     // ✅ STEP 1: Authenticate and verify admin role
     console.log("[Braiins Miners All] GET: Authenticating user...");
-    let user: {
-      userId: string;
-      role: string;
-    };
-
-    try {
-      user = await extractUserFromToken(request);
-      console.log(
-        `[Braiins Miners All] GET: Admin authenticated: ${user.userId}`,
-      );
-    } catch (authError) {
-      const errorMsg =
-        authError instanceof Error
-          ? authError.message
-          : "Authentication failed";
-      console.error(`[Braiins Miners All] GET: ${errorMsg}`);
-      return NextResponse.json<ProxyResponse>(
-        { success: false, error: errorMsg },
-        { status: 401 },
-      );
-    }
+    const ctx = await getAuthorizationContext(request);
+    if ("response" in ctx) return ctx.response;
+    const denied = requirePermission(ctx, "pool_workers.view");
+    if (denied) return denied;
 
     // ✅ STEP 2: Fetch all Braiins miners from all clients
     console.log(
