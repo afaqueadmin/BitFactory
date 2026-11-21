@@ -35,6 +35,7 @@
  */
 
 import { isStaffRole } from "@/lib/auth/staffRoles";
+import { requireStaffPermission } from "@/lib/auth/authorization";
 import { NextRequest, NextResponse } from "next/server";
 import { AuditAction, Prisma } from "@prisma/client";
 import { validate, Network } from "bitcoin-address-validation";
@@ -72,6 +73,10 @@ export async function GET(request: NextRequest) {
 
     const statusParam = request.nextUrl.searchParams.get("status");
     const isAdmin = isStaffRole(auth.decoded.role);
+    if (isAdmin) {
+      const denied = await requireStaffPermission(request, ["wallets.view"]);
+      if (denied) return denied;
+    }
 
     const where: Prisma.WalletChangeRequestWhereInput = {
       ...(isAdmin ? {} : { userId: auth.decoded.userId }),

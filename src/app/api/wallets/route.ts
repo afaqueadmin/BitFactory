@@ -7,7 +7,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireStaff } from "@/lib/guilds/routeAuth";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import {
   listTrackedSubaccounts,
   payoutStatsBySubaccount,
@@ -17,8 +17,8 @@ import {
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
-  const auth = await requireStaff(request);
-  if ("error" in auth) return auth.error;
+  const auth = await authorizeStaff(request, ["wallets.view"]);
+  if ("response" in auth) return auth.response;
 
   try {
     const subs = await listTrackedSubaccounts();

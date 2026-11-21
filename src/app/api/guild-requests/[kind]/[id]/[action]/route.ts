@@ -17,7 +17,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { AuditAction, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { requireStaff, jsonError } from "@/lib/guilds/routeAuth";
+import { jsonError } from "@/lib/guilds/routeAuth";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { verifyStepUp } from "@/lib/auth/stepUp";
 import {
   GuildInputError,
@@ -150,8 +151,12 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ kind: string; id: string; action: string }> },
 ) {
-  const auth = await requireStaff(request);
-  if ("error" in auth) return auth.error;
+  const auth = await authorizeStaff(request, [
+    (await params).action === "reject"
+      ? "guild_requests.reject"
+      : "guild_requests.approve",
+  ]);
+  if ("response" in auth) return auth.response;
 
   let createdUserId: string | null = null;
   try {
