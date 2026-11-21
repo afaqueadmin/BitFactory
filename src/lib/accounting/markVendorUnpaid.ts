@@ -1,7 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { AuditAction } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { verifyJwtToken } from "@/lib/jwt";
 import { vendorPaymentInclude } from "@/lib/accounting/vendorInvoiceRules";
 import {
   DepositInvoiceKind,
@@ -51,46 +50,6 @@ class Rollback extends Error {
   ) {
     super(message);
   }
-}
-
-/**
- * Token cookie, then SUPER_ADMIN only. Returns the caller's userId, or a
- * ready 401/403 response.
- */
-export async function requireSuperAdmin(
-  request: NextRequest,
-): Promise<{ userId: string } | { response: NextResponse }> {
-  const token = request.cookies.get("token")?.value;
-  if (!token) {
-    return {
-      response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
-    };
-  }
-
-  let userId: string;
-  try {
-    ({ userId } = await verifyJwtToken(token));
-  } catch {
-    return {
-      response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
-    };
-  }
-
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { role: true },
-  });
-
-  if (user?.role !== "SUPER_ADMIN") {
-    return {
-      response: NextResponse.json(
-        { error: "Only super administrators can mark invoices as unpaid" },
-        { status: 403 },
-      ),
-    };
-  }
-
-  return { userId };
 }
 
 /**

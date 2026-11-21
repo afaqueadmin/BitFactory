@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireStaffPermission } from "@/lib/auth/authorization";
 import { prisma } from "@/lib/prisma";
 import { simRoute } from "@/lib/simulation/context";
 import {
@@ -25,6 +26,10 @@ export async function GET(request: NextRequest) {
     // Signed-in session, or the PDF renderer's wallet snapshot ticket.
     const target = await authenticateWalletRequest(request);
     if (target instanceof NextResponse) return target;
+    if (target.callerIsStaff) {
+      const denied = await requireStaffPermission(request, ["customers.view"]);
+      if (denied) return denied;
+    }
 
     // Simulated accounts: electricity is the simulated daily charges so far;
     // hardware is the simulated Hardware Sales invoice, shown as paid - or,

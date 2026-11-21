@@ -68,6 +68,7 @@ export function useAcknowledgeHashrateAlert() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["hashrate-alerts"] });
+      queryClient.invalidateQueries({ queryKey: ["badge-counts"] });
     },
   });
 }
@@ -100,6 +101,7 @@ export function useRecordMinerRestart() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["hashrate-alerts"] });
+      queryClient.invalidateQueries({ queryKey: ["badge-counts"] });
     },
   });
 }
@@ -123,6 +125,7 @@ export function useBulkAcknowledgeHashrateAlerts() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["hashrate-alerts"] });
+      queryClient.invalidateQueries({ queryKey: ["badge-counts"] });
     },
   });
 }

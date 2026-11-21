@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { fetchAuthCheck } from "@/lib/authCheck";
 import {
   Dialog,
   DialogActions,
@@ -34,13 +35,7 @@ export default function PasskeySetupPrompt() {
 
       try {
         // Confirm authenticated session via cookie-backed auth check.
-        const authRes = await fetch("/api/auth/check", {
-          method: "GET",
-          credentials: "include",
-          headers: {
-            "Cache-Control": "no-cache",
-          },
-        });
+        const authRes = await fetchAuthCheck();
 
         if (!authRes.ok) {
           return;

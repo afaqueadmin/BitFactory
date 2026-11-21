@@ -1,5 +1,9 @@
 import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
+import {
+  authorizeStaff,
+  requireStaffPermission,
+} from "@/lib/auth/authorization";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
 import {
@@ -97,6 +101,13 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     const isAdmin = isStaffRole(requester.role);
+    if (isAdmin) {
+      const denied = await requireStaffPermission(request, [
+        "invoicing.view",
+        "customers.view",
+      ]);
+      if (denied) return denied;
+    }
 
     const userSelect = { select: { id: true, email: true, name: true } };
 
@@ -196,26 +207,9 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
-    const token = request.cookies.get("token")?.value;
-
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const decoded = await verifyJwtToken(token);
-    const userId = decoded.userId;
-
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { role: true },
-    });
-
-    if (!user || !isStaffRole(user.role)) {
-      return NextResponse.json(
-        { error: "Only administrators can update invoices" },
-        { status: 403 },
-      );
-    }
+    const auth = await authorizeStaff(request, ["invoicing.edit"]);
+    if ("response" in auth) return auth.response;
+    const userId = auth.userId;
 
     const body = await request.json();
     const { totalMiners, unitPrice, dueDate, billingMonth, lineItems } = body;
@@ -379,26 +373,9 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
-    const token = request.cookies.get("token")?.value;
-
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const decoded = await verifyJwtToken(token);
-    const userId = decoded.userId;
-
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { role: true },
-    });
-
-    if (!user || !isStaffRole(user.role)) {
-      return NextResponse.json(
-        { error: "Only administrators can update invoices" },
-        { status: 403 },
-      );
-    }
+    const auth = await authorizeStaff(request, ["invoicing.edit"]);
+    if ("response" in auth) return auth.response;
+    const userId = auth.userId;
 
     const body = await request.json();
     const { status, issuedDate, paidDate, dueDate } = body;
@@ -427,15 +404,15 @@ export async function PUT(
 
     // Paid -> another status (the list pages' bulk status change) does what
     // Mark Unpaid does: voids every payment, clears the paid date and
-    // deletes the Bank Reconciliation entry. So it is SUPER_ADMIN only, and
-    // the body must carry { confirmBankEffect: true } after the screen has
+    // deletes the Bank Reconciliation entry. So it is invoicing.mark_unpaid
+    // (SUPER_ADMIN only), and the body must carry { confirmBankEffect: true } after the screen has
     // shown what it removes (decided 2026-11-19).
     const unpaying =
       !!status &&
       status !== InvoiceStatus.PAID &&
       currentInvoice.status === InvoiceStatus.PAID;
     if (unpaying) {
-      if (user.role !== "SUPER_ADMIN") {
+      if (!auth.permissions.has("invoicing.mark_unpaid")) {
         return NextResponse.json(
           {
             error: `Invoice ${currentInvoice.invoiceNumber} is paid: only super administrators can change the status of a paid invoice, because it deletes its payment records`,
@@ -593,26 +570,9 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const token = request.cookies.get("token")?.value;
-
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const decoded = await verifyJwtToken(token);
-    const userId = decoded.userId;
-
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { role: true, email: true },
-    });
-
-    if (!user || !isStaffRole(user.role)) {
-      return NextResponse.json(
-        { error: "Only administrators can cancel invoices" },
-        { status: 403 },
-      );
-    }
+    const auth = await authorizeStaff(request, ["invoicing.cancel"]);
+    if ("response" in auth) return auth.response;
+    const userId = auth.userId;
 
     const invoice = await prisma.invoice.findUnique({
       where: { id },
@@ -760,26 +720,9 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const token = request.cookies.get("token")?.value;
-
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const decoded = await verifyJwtToken(token);
-    const userId = decoded.userId;
-
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { role: true },
-    });
-
-    if (!user || !isStaffRole(user.role)) {
-      return NextResponse.json(
-        { error: "Only administrators can delete invoices" },
-        { status: 403 },
-      );
-    }
+    const auth = await authorizeStaff(request, ["invoicing.delete"]);
+    if ("response" in auth) return auth.response;
+    const userId = auth.userId;
 
     const invoice = await prisma.invoice.findUnique({
       where: { id },

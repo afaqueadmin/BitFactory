@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import {
   markVendorSideUnpaid,
-  requireSuperAdmin,
   vendorUnpaidPreview,
 } from "@/lib/accounting/markVendorUnpaid";
 import { readConfirm } from "@/lib/accounting/invoiceBankEffect";
@@ -12,7 +12,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const auth = await requireSuperAdmin(request);
+    const auth = await authorizeStaff(request, ["farm_tariffs.mark_unpaid"]);
     if ("response" in auth) return auth.response;
     const { id } = await params;
     return await vendorUnpaidPreview("farm", id);
@@ -35,7 +35,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const auth = await requireSuperAdmin(request);
+    const auth = await authorizeStaff(request, ["farm_tariffs.mark_unpaid"]);
     if ("response" in auth) return auth.response;
     const { id } = await params;
 

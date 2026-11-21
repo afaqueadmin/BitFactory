@@ -1,6 +1,5 @@
-import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
-import { verifyJwtToken } from "@/lib/jwt";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { listAssignedLuxorSubaccountNames } from "@/lib/luxorSubaccounts";
 
 /**
@@ -13,28 +12,15 @@ import { listAssignedLuxorSubaccountNames } from "@/lib/luxorSubaccounts";
  */
 export async function GET(request: NextRequest) {
   try {
-    const token = request.cookies.get("token")?.value;
-
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    let decoded;
-    try {
-      decoded = await verifyJwtToken(token);
-    } catch (error) {
-      console.error("Token verification failed:", error);
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
-    }
-
-    // Subaccount assignment is an admin-only capability — franchisees must
-    // not be able to view which Luxor subaccounts exist/are taken.
-    if (!isStaffRole(decoded.role)) {
-      return NextResponse.json(
-        { error: "Only administrators can view subaccount assignments" },
-        { status: 403 },
-      );
-    }
+    const auth = await authorizeStaff(request, [
+      "customers.view",
+      "customers.create",
+      "customers.edit",
+      "franchisees.create",
+      "franchisees.edit",
+      "franchisees.approve_customer_requests",
+    ]);
+    if ("response" in auth) return auth.response;
 
     // Every Luxor subaccount assigned to any user (one PoolAuth row each).
     const existingSubaccounts = await listAssignedLuxorSubaccountNames();

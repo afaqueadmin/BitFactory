@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { AuditAction } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import {
-  isUniqueViolation,
-  requireAccountingAdmin,
-} from "@/lib/accounting/adminAuth";
+import { isUniqueViolation } from "@/lib/accounting/adminAuth";
 import {
   MAX_MASTER_NAME_LENGTH as MAX_NAME_LENGTH,
   parseCurrencyCode,
@@ -12,7 +10,7 @@ import {
 
 export async function GET(request: NextRequest) {
   try {
-    const auth = await requireAccountingAdmin(request);
+    const auth = await authorizeStaff(request, ["banks.view"]);
     if ("response" in auth) return auth.response;
 
     const activeOnly =
@@ -35,7 +33,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const auth = await requireAccountingAdmin(request);
+    const auth = await authorizeStaff(request, ["banks.manage_currencies"]);
     if ("response" in auth) return auth.response;
     const { userId } = auth;
 

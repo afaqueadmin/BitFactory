@@ -1,8 +1,7 @@
-import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { prisma } from "@/lib/prisma";
 import { BILLED_CUSTOMER_ROLES } from "@/lib/customerRoles";
-import { verifyJwtToken } from "@/lib/jwt";
 import { REPAIR_MINER_SELECT } from "@/lib/accounting/hardwareRepair";
 
 /**
@@ -14,28 +13,12 @@ import { REPAIR_MINER_SELECT } from "@/lib/accounting/hardwareRepair";
  */
 export async function GET(request: NextRequest) {
   try {
-    const token = request.cookies.get("token")?.value;
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    let userId: string;
-    try {
-      ({ userId } = await verifyJwtToken(token));
-    } catch {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { role: true },
-    });
-    if (!user || !isStaffRole(user.role)) {
-      return NextResponse.json(
-        { error: "Only administrators can access miners" },
-        { status: 403 },
-      );
-    }
+    const auth = await authorizeStaff(request, [
+      "invoicing.view",
+      "invoicing.create",
+      "invoicing.edit",
+    ]);
+    if ("response" in auth) return auth.response;
 
     // Without customerId: every miner that can be invoiced, with its owner -
     // the create form picks the miner first and fills in the customer. Same

@@ -7,9 +7,9 @@
  * office-wide holidays.
  */
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import type { Role } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { requireSuperAdmin } from "@/lib/auth/staffAccessAdmin";
 import {
   RESTRICTABLE_ROLES,
   loadStaffAccess,
@@ -25,8 +25,8 @@ import {
 export const runtime = "nodejs";
 
 export async function GET(request: NextRequest) {
-  const actor = await requireSuperAdmin(request);
-  if (actor instanceof NextResponse) return actor;
+  const auth = await authorizeStaff(request, ["access_rules.view"]);
+  if ("response" in auth) return auth.response;
 
   try {
     const now = new Date();

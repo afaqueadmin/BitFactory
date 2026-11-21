@@ -86,18 +86,8 @@ import {
 } from "@mui/icons-material";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  useUser,
-  useTickets,
-  useWalletChangeRequests,
-  usePaymentFrequencyChangeRequests,
-  useFirmwareChangeRequests,
-  useSecondaryLoginRequests,
-  useHashrateAlerts,
-} from "@/lib/hooks";
-import { useWalletMismatchCount } from "@/lib/hooks/useWalletMismatchCount";
-import { useSimulationRequestCount } from "@/lib/hooks/useSimulationRequestCount";
-import { useStaffTimeRequestCount } from "@/lib/hooks/useStaffTimeRequestCount";
+import { useUser } from "@/lib/hooks";
+import { useBadgeCounts } from "@/lib/hooks/useBadgeCounts";
 import { useAdminNav } from "@/lib/contexts/admin-nav-context";
 import { focusRing, useDaylight } from "@/lib/daylight";
 
@@ -513,39 +503,20 @@ export default function AdminSidebar() {
   const [expandedItems, setExpandedItems] = React.useState<string[]>([]);
   const { user } = useUser();
   const { mobileOpen, setMobileOpen } = useAdminNav();
-  const { tickets: openTickets } = useTickets({ status: "OPEN" });
-  const { requests: pendingWalletRequests } = useWalletChangeRequests({
-    status: "PENDING",
-  });
-  const { requests: pendingFrequencyRequests } =
-    usePaymentFrequencyChangeRequests({ status: "PENDING" });
-  const { requests: pendingFirmwareRequests } = useFirmwareChangeRequests({
-    status: "PENDING",
-  });
-  const { requests: pendingLoginRequests } = useSecondaryLoginRequests({
-    status: "PENDING",
-  });
-  const { alerts: pendingHashrateAlerts } = useHashrateAlerts({
-    acknowledged: false,
-  });
-  const pendingSimulationRequests = useSimulationRequestCount();
-  const pendingTimeRequests = useStaffTimeRequestCount(
-    user?.role === "SUPER_ADMIN",
-  );
-  const openWalletMismatches = useWalletMismatchCount();
+  const { counts } = useBadgeCounts();
   const { d, fonts } = useDaylight();
 
   const badgeCounts: Record<BadgeKey, number> = {
-    tickets: openTickets.length,
+    tickets: counts.tickets,
     wallets:
-      pendingWalletRequests.length +
-      pendingFrequencyRequests.length +
-      openWalletMismatches,
-    firmware: pendingFirmwareRequests.length,
-    logins: pendingLoginRequests.length,
-    alerts: pendingHashrateAlerts.length,
-    simulation: pendingSimulationRequests,
-    access: pendingTimeRequests,
+      counts.walletRequests +
+      counts.frequencyRequests +
+      counts.walletMismatches,
+    firmware: counts.firmwareRequests,
+    logins: counts.loginRequests,
+    alerts: counts.hashrateAlerts,
+    simulation: counts.simulationRequests,
+    access: counts.staffTimeRequests,
   };
 
   // A group shows the total of its children so counts aren't hidden when

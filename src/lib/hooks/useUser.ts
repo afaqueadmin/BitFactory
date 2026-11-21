@@ -63,39 +63,7 @@ export function useUser({ enabled = true }: { enabled?: boolean } = {}) {
       try {
         console.log("Starting user fetch process...");
 
-        // First verify the auth status
-        const authCheck = await fetch("/api/auth/check", {
-          credentials: "include",
-          headers: {
-            "Cache-Control": "no-cache",
-          },
-        });
-
-        console.log("Auth Check Status:", authCheck.status);
-        console.log(
-          "Auth Check Headers:",
-          Object.fromEntries(authCheck.headers.entries()),
-        );
-
-        // Get auth check response as text first
-        const authCheckText = await authCheck.text();
-        console.log("Auth Check Raw Response:", authCheckText);
-
-        // Try to parse the auth check response
-        let authData;
-        try {
-          authData = JSON.parse(authCheckText);
-        } catch (e) {
-          console.error("Failed to parse auth check response:", e);
-          throw new Error("Invalid authentication response");
-        }
-
-        // Check if auth was successful
-        if (!authCheck.ok || !authData.isAuthenticated) {
-          throw new Error(authData.error || "Authentication failed");
-        }
-
-        // Then fetch the user profile
+        // The profile route rejects unauthenticated callers itself
         console.log("Fetching user profile...");
         const profileResponse = await fetch("/api/user/profile", {
           credentials: "include",

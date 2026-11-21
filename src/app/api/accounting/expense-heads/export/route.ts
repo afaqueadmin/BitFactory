@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAccountingAdmin } from "@/lib/accounting/adminAuth";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { generatePDFFromHTML } from "@/lib/email";
 import {
   headListRows,
@@ -28,7 +28,7 @@ const COLUMNS = [
  */
 export async function GET(request: NextRequest) {
   try {
-    const auth = await requireAccountingAdmin(request);
+    const auth = await authorizeStaff(request, ["expenses.view"]);
     if ("response" in auth) return auth.response;
 
     const { searchParams } = new URL(request.url);

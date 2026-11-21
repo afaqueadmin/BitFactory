@@ -2,7 +2,7 @@ import { isStaffRole } from "@/lib/auth/staffRoles";
 import { prisma } from "@/lib/prisma";
 import { hash } from "bcrypt";
 import { NextRequest, NextResponse } from "next/server";
-import { verifyJwtToken } from "@/lib/jwt";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { AuditAction } from "@prisma/client";
 import { logPoolCredentialChange } from "@/lib/audit/logPoolCredentialChange";
 import {
@@ -35,53 +35,12 @@ interface ProxyResponse<T = Record<string, unknown>> {
 
 export async function POST(request: NextRequest) {
   try {
-    const token = request.cookies.get("token")?.value;
-    console.log("Create user API [POST]: Token present:", !!token);
-
-    if (!token) {
-      return Response.json(
-        { error: "Unauthorized" },
-        {
-          status: 401,
-          headers: {
-            "Cache-Control": "no-store, no-cache, must-revalidate",
-          },
-        },
-      );
-    }
-
-    let userId: string;
-    // Check if the current user is an admin
-    try {
-      const decoded = await verifyJwtToken(token);
-      userId = decoded.userId;
-      console.log("CreateUser API [POST]: Token verified, userId:", userId);
-    } catch (error) {
-      console.error("CreateUser API [POST]: Token verification failed:", error);
-      return Response.json(
-        { error: "Invalid token" },
-        {
-          status: 401,
-          headers: {
-            "Cache-Control": "no-store, no-cache, must-revalidate",
-          },
-        },
-      );
-    }
-
-    // N-11: the caller must exist, not be deleted, and be an admin. This
-    // used to skip both role checks when the caller's row wasn't found.
-    const user = await prisma.user.findFirst({
-      where: { id: userId, isDeleted: false },
-      select: { role: true },
-    });
-
-    if (!user || !isStaffRole(user.role)) {
-      return NextResponse.json(
-        { error: "Only administrators can create users" },
-        { status: 403 },
-      );
-    }
+    const auth = await authorizeStaff(request, [
+      "customers.create",
+      "customers.create_staff",
+    ]);
+    if ("response" in auth) return auth.response;
+    const userId = auth.userId;
 
     const {
       name,
@@ -113,7 +72,12 @@ export async function POST(request: NextRequest) {
     }
     const email = canonicalEmail(rawEmail);
 
-    if (user.role !== "SUPER_ADMIN" && isStaffRole(role)) {
+    const createsStaff = isStaffRole(role);
+    if (
+      !auth.permissions.has(
+        createsStaff ? "customers.create_staff" : "customers.create",
+      )
+    ) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
     // shortcut: STAFF accounts are refused until RBAC stage 5 wires STAFF into

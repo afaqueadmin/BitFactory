@@ -1,7 +1,6 @@
-import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { prisma } from "@/lib/prisma";
-import { verifyJwtToken } from "@/lib/jwt";
 import { AuditAction } from "@prisma/client";
 
 export async function GET(
@@ -10,13 +9,8 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const token = request.cookies.get("token")?.value;
-
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    await verifyJwtToken(token);
+    const auth = await authorizeStaff(request, ["recurring_invoices.view"]);
+    if ("response" in auth) return auth.response;
 
     const recurringInvoice = await prisma.recurringInvoice.findUnique({
       where: { id },
@@ -50,26 +44,9 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
-    const token = request.cookies.get("token")?.value;
-
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const decoded = await verifyJwtToken(token);
-    const userId = decoded.userId;
-
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { role: true },
-    });
-
-    if (!user || !isStaffRole(user.role)) {
-      return NextResponse.json(
-        { error: "Only administrators can update recurring invoices" },
-        { status: 403 },
-      );
-    }
+    const auth = await authorizeStaff(request, ["recurring_invoices.manage"]);
+    if ("response" in auth) return auth.response;
+    const userId = auth.userId;
 
     const body = await request.json();
     const { dayOfMonth, unitPrice, isActive, endDate } = body;
@@ -155,26 +132,9 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const token = request.cookies.get("token")?.value;
-
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const decoded = await verifyJwtToken(token);
-    const userId = decoded.userId;
-
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { role: true },
-    });
-
-    if (!user || !isStaffRole(user.role)) {
-      return NextResponse.json(
-        { error: "Only administrators can delete recurring invoices" },
-        { status: 403 },
-      );
-    }
+    const auth = await authorizeStaff(request, ["recurring_invoices.manage"]);
+    if ("response" in auth) return auth.response;
+    const userId = auth.userId;
 
     const recurringInvoice = await prisma.recurringInvoice.findUnique({
       where: { id },

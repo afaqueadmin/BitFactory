@@ -93,6 +93,7 @@ export function useCreatePaymentFrequencyChangeRequest() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [QUERY_KEY] });
+      queryClient.invalidateQueries({ queryKey: ["badge-counts"] });
     },
   });
 }
@@ -128,6 +129,7 @@ export function useReviewPaymentFrequencyChangeRequest() {
   const queryClient = useQueryClient();
   const onSuccess = () => {
     queryClient.invalidateQueries({ queryKey: [QUERY_KEY] });
+    queryClient.invalidateQueries({ queryKey: ["badge-counts"] });
   };
 
   const confirmMutation = useMutation({

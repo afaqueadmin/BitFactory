@@ -1,7 +1,6 @@
-import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { prisma } from "@/lib/prisma";
-import { verifyJwtToken } from "@/lib/jwt";
 import { AuditAction } from "@prisma/client";
 
 /**
@@ -12,50 +11,13 @@ import { AuditAction } from "@prisma/client";
  * invoice.
  */
 
-export type AdminAuthResult = { userId: string } | { error: NextResponse };
-
-export async function requireAdmin(
-  request: NextRequest,
-): Promise<AdminAuthResult> {
-  const token = request.cookies.get("token")?.value;
-  if (!token) {
-    return {
-      error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
-    };
-  }
-
-  let userId: string;
-  let userRole: string;
-  try {
-    const decoded = await verifyJwtToken(token);
-    userId = decoded.userId;
-    userRole = decoded.role;
-  } catch (error) {
-    console.error("[Admin Adjustments] Token verification failed:", error);
-    return {
-      error: NextResponse.json({ error: "Invalid token" }, { status: 401 }),
-    };
-  }
-
-  if (!isStaffRole(userRole)) {
-    return {
-      error: NextResponse.json(
-        { error: "Only administrators can manage adjustments" },
-        { status: 403 },
-      ),
-    };
-  }
-
-  return { userId };
-}
-
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const auth = await requireAdmin(request);
-    if ("error" in auth) return auth.error;
+    const auth = await authorizeStaff(request, ["credit_adjustments.edit"]);
+    if ("response" in auth) return auth.response;
 
     const { id } = await params;
     const { amount, narration } = await request.json();
@@ -149,8 +111,8 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const auth = await requireAdmin(request);
-    if ("error" in auth) return auth.error;
+    const auth = await authorizeStaff(request, ["credit_adjustments.delete"]);
+    if ("response" in auth) return auth.response;
 
     const { id } = await params;
 

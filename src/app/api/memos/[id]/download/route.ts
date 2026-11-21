@@ -1,5 +1,6 @@
 import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
+import { requireStaffPermission } from "@/lib/auth/authorization";
 import { verifyJwtToken } from "@/lib/jwt";
 import { resolveDataOwnerId } from "@/lib/guildScope";
 import { prisma } from "@/lib/prisma";
@@ -40,6 +41,10 @@ export async function GET(
 
     const isAdmin = isStaffRole(requester?.role);
     const isOwnMemo = memo.userId === (await resolveDataOwnerId(decoded));
+    if (isAdmin && !isOwnMemo) {
+      const denied = await requireStaffPermission(request, ["memos.view"]);
+      if (denied) return denied;
+    }
 
     if (!isAdmin && !isOwnMemo) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });

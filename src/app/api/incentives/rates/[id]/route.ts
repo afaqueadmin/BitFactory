@@ -1,7 +1,6 @@
-import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { prisma } from "@/lib/prisma";
-import { verifyJwtToken } from "@/lib/jwt";
 import { AuditAction } from "@prisma/client";
 
 export async function GET(
@@ -10,24 +9,8 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const token = request.cookies.get("token")?.value;
-
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const decoded = await verifyJwtToken(token);
-    const user = await prisma.user.findUnique({
-      where: { id: decoded.userId },
-      select: { role: true },
-    });
-
-    if (!user || !isStaffRole(user.role)) {
-      return NextResponse.json(
-        { error: "Only administrators can access incentive rates" },
-        { status: 403 },
-      );
-    }
+    const auth = await authorizeStaff(request, ["franchisees.view"]);
+    if ("response" in auth) return auth.response;
 
     const rate = await prisma.franchiseIncentiveRate.findUnique({
       where: { id },
@@ -64,26 +47,11 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const token = request.cookies.get("token")?.value;
-
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const decoded = await verifyJwtToken(token);
-    const userId = decoded.userId;
-
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { role: true },
-    });
-
-    if (!user || !isStaffRole(user.role)) {
-      return NextResponse.json(
-        { error: "Only administrators can delete incentive rates" },
-        { status: 403 },
-      );
-    }
+    const auth = await authorizeStaff(request, [
+      "franchisees.manage_incentive_rates",
+    ]);
+    if ("response" in auth) return auth.response;
+    const userId = auth.userId;
 
     const rate = await prisma.franchiseIncentiveRate.findUnique({
       where: { id },

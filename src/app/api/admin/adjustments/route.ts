@@ -1,7 +1,6 @@
-import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { prisma } from "@/lib/prisma";
-import { verifyJwtToken } from "@/lib/jwt";
 import { Prisma } from "@prisma/client";
 
 /**
@@ -31,27 +30,8 @@ function buildOrderBy(
 
 export async function GET(request: NextRequest) {
   try {
-    const token = request.cookies.get("token")?.value;
-
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    let userRole: string;
-    try {
-      const decoded = await verifyJwtToken(token);
-      userRole = decoded.role;
-    } catch (error) {
-      console.error("[Admin Adjustments] Token verification failed:", error);
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
-    }
-
-    if (!isStaffRole(userRole)) {
-      return NextResponse.json(
-        { error: "Only administrators can access this data" },
-        { status: 403 },
-      );
-    }
+    const auth = await authorizeStaff(request, ["credit_adjustments.view"]);
+    if ("response" in auth) return auth.response;
 
     const url = new URL(request.url);
     const page = parseInt(url.searchParams.get("page") || "0", 10);

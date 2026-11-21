@@ -23,7 +23,12 @@ export async function requireSession(
   }
 }
 
-/** ADMIN, SUPER_ADMIN or ACCOUNTING. */
+/**
+ * ADMIN, SUPER_ADMIN or ACCOUNTING.
+ * shortcut: main no longer calls this (guild routes use authorizeStaff); the
+ * singlesig Trezor payout routes still do. Give them permissions and delete
+ * this when singlesig merges into main.
+ */
 export async function requireStaff(request: NextRequest): Promise<AuthResult> {
   const auth = await requireSession(request);
   if ("error" in auth) return auth;

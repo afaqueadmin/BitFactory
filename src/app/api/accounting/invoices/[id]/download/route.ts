@@ -1,5 +1,6 @@
 import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
+import { requireStaffPermission } from "@/lib/auth/authorization";
 import { verifyJwtToken } from "@/lib/jwt";
 import { resolveDataOwnerId } from "@/lib/guildScope";
 import { prisma } from "@/lib/prisma";
@@ -114,6 +115,14 @@ export async function GET(
     const isAdmin = isStaffRole(user.role);
     // A Guildmember's own invoices are the guild's (the Guildmaster's).
     const isOwnInvoice = invoice.userId === (await resolveDataOwnerId(userId));
+    if (isAdmin && !isOwnInvoice) {
+      const denied = await requireStaffPermission(request, [
+        "invoicing.view",
+        "customers.view",
+        "customer_statements.view",
+      ]);
+      if (denied) return denied;
+    }
 
     if (!isAdmin && !isOwnInvoice) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });

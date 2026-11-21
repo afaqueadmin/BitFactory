@@ -1,7 +1,6 @@
-import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { prisma } from "@/lib/prisma";
-import { verifyJwtToken } from "@/lib/jwt";
 import { AuditAction, InvoiceStatus } from "@prisma/client";
 import {
   confirmBankEffectResponse,
@@ -17,25 +16,8 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const token = request.cookies.get("token")?.value;
-
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const decoded = await verifyJwtToken(token);
-
-    // Same gate as the list endpoint - any customer's payment can be read here.
-    const requester = await prisma.user.findUnique({
-      where: { id: decoded.userId },
-      select: { role: true },
-    });
-    if (!requester || !isStaffRole(requester.role)) {
-      return NextResponse.json(
-        { error: "Only administrators can access invoice payments" },
-        { status: 403 },
-      );
-    }
+    const auth = await authorizeStaff(request, ["invoicing.view"]);
+    if ("response" in auth) return auth.response;
 
     const payment = await prisma.costPayment.findUnique({
       where: { id },
@@ -74,27 +56,9 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const token = request.cookies.get("token")?.value;
-
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const decoded = await verifyJwtToken(token);
-    const userId = decoded.userId;
-
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { role: true },
-    });
-
-    // Same effect as Mark Unpaid on a paid invoice, so the same SUPER_ADMIN rule.
-    if (user?.role !== "SUPER_ADMIN") {
-      return NextResponse.json(
-        { error: "Only a super admin can delete payments" },
-        { status: 403 },
-      );
-    }
+    const auth = await authorizeStaff(request, ["invoicing.delete_payment"]);
+    if ("response" in auth) return auth.response;
+    const userId = auth.userId;
 
     const payment = await prisma.costPayment.findUnique({
       where: { id },

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireStaffPermission } from "@/lib/auth/authorization";
 import { createLuxorClient } from "@/lib/luxor";
 import { createBraiinsClient } from "@/lib/braiins";
 import { prisma } from "@/lib/prisma";
@@ -31,6 +32,10 @@ export async function GET(request: NextRequest) {
     // Signed-in session, or the PDF renderer's wallet snapshot ticket.
     const target = await authenticateWalletRequest(request);
     if (target instanceof NextResponse) return target;
+    if (target.callerIsStaff) {
+      const denied = await requireStaffPermission(request, ["customers.view"]);
+      if (denied) return denied;
+    }
     const url = new URL(request.url);
     const userId = target.userId;
 

@@ -6,37 +6,14 @@
  * filter (defaults to all).
  */
 
-import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { prisma } from "@/lib/prisma";
-import { verifyJwtToken } from "@/lib/jwt";
 
 export async function GET(request: NextRequest) {
   try {
-    const token = request.cookies.get("token")?.value;
-    if (!token) {
-      return NextResponse.json(
-        { success: false, error: "Unauthorized" },
-        { status: 401 },
-      );
-    }
-
-    let decoded;
-    try {
-      decoded = await verifyJwtToken(token);
-    } catch {
-      return NextResponse.json(
-        { success: false, error: "Invalid token" },
-        { status: 401 },
-      );
-    }
-
-    if (!isStaffRole(decoded.role)) {
-      return NextResponse.json(
-        { success: false, error: "Admin access required" },
-        { status: 403 },
-      );
-    }
+    const auth = await authorizeStaff(request, ["franchisees.view"]);
+    if ("response" in auth) return auth.response;
 
     const status = request.nextUrl.searchParams.get("status");
     const validStatuses = ["PENDING", "APPROVED", "REJECTED"];

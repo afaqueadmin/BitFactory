@@ -1,7 +1,6 @@
-import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { prisma } from "@/lib/prisma";
-import { verifyJwtToken } from "@/lib/jwt";
 import { generatePDFFromHTML, renderInvoiceTemplate } from "@/lib/email";
 import { INVOICE_TYPE_LABELS } from "@/lib/constants/accounting";
 import { readFileSync } from "fs";
@@ -16,26 +15,11 @@ export async function POST(
 ) {
   try {
     const { customerId } = await params;
-    const token = request.cookies.get("token")?.value;
-
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const decoded = await verifyJwtToken(token);
-    const userId = decoded.userId;
-
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { role: true },
-    });
-
-    if (!user || !isStaffRole(user.role)) {
-      return NextResponse.json(
-        { error: "Only administrators can send emails" },
-        { status: 403 },
-      );
-    }
+    const auth = await authorizeStaff(request, [
+      "customer_statements.send_email",
+    ]);
+    if ("response" in auth) return auth.response;
+    const userId = auth.userId;
 
     const { emailTone, emailBody, customerName } = await request.json();
 

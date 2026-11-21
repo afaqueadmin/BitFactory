@@ -1,9 +1,8 @@
-import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { prisma } from "@/lib/prisma";
 import { sessionCutoffNow } from "@/lib/auth/sessionRevocation";
 import { canManageAccount } from "@/lib/auth/accountTiers";
-import { verifyJwtToken } from "@/lib/jwt";
 import { AuditAction } from "@prisma/client";
 import { logPoolCredentialChange } from "@/lib/audit/logPoolCredentialChange";
 import {
@@ -26,34 +25,10 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
-    const token = request.cookies.get("token")?.value;
-
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Verify token
-    let userId: string;
-    try {
-      const decoded = await verifyJwtToken(token);
-      userId = decoded.userId;
-    } catch (error) {
-      console.error("Token verification failed:", error);
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
-    }
-
-    // Check if user is admin
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { role: true },
-    });
-
-    if (!user || !isStaffRole(user.role)) {
-      return NextResponse.json(
-        { error: "Only administrators can update users" },
-        { status: 403 },
-      );
-    }
+    const auth = await authorizeStaff(request, ["customers.edit"]);
+    if ("response" in auth) return auth.response;
+    const userId = auth.userId;
+    const user = { id: auth.userId, role: auth.role };
 
     const body = await request.json();
 
@@ -184,10 +159,10 @@ export async function PUT(
       }
     }
 
-    // Only a SUPER_ADMIN may change a user's email. Same rule as every other
-    // email write (M-4): canonical form, unique case-insensitively.
+    // Needs customers.change_email (SUPER_ADMIN only). Same rule as every
+    // other email write (M-4): canonical form, unique case-insensitively.
     let emailUpdate: string | undefined = undefined;
-    if (user.role === "SUPER_ADMIN" && body.email) {
+    if (auth.permissions.has("customers.change_email") && body.email) {
       if (typeof body.email !== "string") {
         return NextResponse.json({ error: "Invalid email" }, { status: 400 });
       }
@@ -384,34 +359,10 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const token = request.cookies.get("token")?.value;
-
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Verify token
-    let userId: string;
-    try {
-      const decoded = await verifyJwtToken(token);
-      userId = decoded.userId;
-    } catch (error) {
-      console.error("Token verification failed:", error);
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
-    }
-
-    // Check if user is admin
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { role: true },
-    });
-
-    if (!user || !isStaffRole(user.role)) {
-      return NextResponse.json(
-        { error: "Only administrators can delete users" },
-        { status: 403 },
-      );
-    }
+    const auth = await authorizeStaff(request, ["customers.delete"]);
+    if ("response" in auth) return auth.response;
+    const userId = auth.userId;
+    const user = { id: auth.userId, role: auth.role };
 
     // Prevent admin from deleting themselves
     if (id === userId) {

@@ -1,8 +1,8 @@
-import { isStaffRole, staffActorLabel } from "@/lib/auth/staffRoles";
+import { staffActorLabel } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { prisma } from "@/lib/prisma";
 import { sessionCutoffNow } from "@/lib/auth/sessionRevocation";
-import { verifyJwtToken } from "@/lib/jwt";
 import { hash } from "bcrypt";
 import { AuditAction } from "@prisma/client";
 import { sendPasswordResetEmail } from "@/lib/email";
@@ -15,36 +15,14 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
-    const token = request.cookies.get("token")?.value;
-
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Verify token
-    let userId: string;
-    let loginId: string;
-    try {
-      const decoded = await verifyJwtToken(token);
-      userId = decoded.userId;
-      loginId = decoded.loginId;
-    } catch (error) {
-      console.error("Token verification failed:", error);
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
-    }
-
-    // Check if user is admin
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
+    const auth = await authorizeStaff(request, ["customers.reset_password"]);
+    if ("response" in auth) return auth.response;
+    const userId = auth.userId;
+    const loginId = auth.decoded.loginId;
+    const user = await prisma.user.findUniqueOrThrow({
+      where: { id: auth.userId },
       select: { role: true, email: true },
     });
-
-    if (!user || !isStaffRole(user.role)) {
-      return NextResponse.json(
-        { error: "Only administrators can change user passwords" },
-        { status: 403 },
-      );
-    }
 
     // A deleted account can't sign in, and must not be revived by a reset.
     const targetUser = await prisma.user.findFirst({

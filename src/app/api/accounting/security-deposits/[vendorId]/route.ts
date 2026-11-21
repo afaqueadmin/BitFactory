@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { prisma } from "@/lib/prisma";
-import { requireAccountingAdmin } from "@/lib/accounting/adminAuth";
 import { getVendorDepositBalance } from "@/lib/accounting/vendorDeposit";
 
 const adjustedSum = (rows: { amountUsd: unknown }[]) =>
@@ -16,7 +16,7 @@ export async function GET(
   { params }: { params: Promise<{ vendorId: string }> },
 ) {
   try {
-    const auth = await requireAccountingAdmin(request);
+    const auth = await authorizeStaff(request, ["security_deposits.view"]);
     if ("response" in auth) return auth.response;
     const { vendorId } = await params;
 

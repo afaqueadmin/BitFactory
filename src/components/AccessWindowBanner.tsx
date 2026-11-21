@@ -8,6 +8,7 @@
  * renews the session cookies when the end time changed. Renders nothing for
  * accounts without an hours limit (204).
  */
+import { dedupeInFlight } from "@/lib/dedupeInFlight";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
@@ -89,9 +90,16 @@ export default function AccessWindowBanner() {
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch("/api/user/access-window", {
-        credentials: "include",
-        cache: "no-store",
+      const res = await dedupeInFlight("access-window", async () => {
+        const r = await fetch("/api/user/access-window", {
+          credentials: "include",
+          cache: "no-store",
+        });
+        return {
+          status: r.status,
+          ok: r.ok,
+          body: r.ok && r.status !== 204 ? await r.json() : null,
+        };
       });
       if (res.status === 204) {
         setStopped(true);
@@ -102,7 +110,7 @@ export default function AccessWindowBanner() {
         return;
       }
       if (!res.ok) return;
-      const body: AccessWindow = await res.json();
+      const body: AccessWindow = res.body;
       setSkewMs(new Date(body.serverNow).getTime() - Date.now());
       setData(body);
       if (body.phase === "closed" && body.hoursEnabled) endSession();

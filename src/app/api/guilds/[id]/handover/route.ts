@@ -5,7 +5,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { requireStaff, jsonError } from "@/lib/guilds/routeAuth";
+import { jsonError } from "@/lib/guilds/routeAuth";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { GuildInputError } from "@/lib/guilds/accounts";
 import { handOverGuild } from "@/lib/guilds/handover";
 import { verifyStepUp } from "@/lib/auth/stepUp";
@@ -15,8 +16,8 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const auth = await requireStaff(request);
-  if ("error" in auth) return auth.error;
+  const auth = await authorizeStaff(request, ["guilds.handover"]);
+  if ("response" in auth) return auth.response;
 
   try {
     const { id } = await params;

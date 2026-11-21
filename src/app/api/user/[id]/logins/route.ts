@@ -18,13 +18,13 @@
  * (/api/secondary-login-requests). The primary login can't be removed here;
  * its email is changed with the account's email (PUT /api/user/[id]).
  */
-import { STAFF_ROLES, staffActorLabel } from "@/lib/auth/staffRoles";
+import { staffActorLabel } from "@/lib/auth/staffRoles";
+import { authorizeStaff } from "@/lib/auth/authorization";
+import type { Permission } from "@/lib/auth/permissions";
 import { NextRequest, NextResponse } from "next/server";
 import { AuditAction } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { verifyJwtToken } from "@/lib/jwt";
 import {
-  LOGIN_MANAGER_ROLES,
   MAX_LOGINS_PER_ACCOUNT,
   MULTI_LOGIN_ROLES,
 } from "@/lib/auth/loginIdentity";
@@ -36,34 +36,25 @@ import {
 
 export const runtime = "nodejs";
 
-type Actor = { id: string; role: string; email: string };
+type Actor = {
+  id: string;
+  role: string;
+  email: string;
+  permissions: ReadonlySet<Permission>;
+};
 
-/** The signed-in admin, with the role read from the database. */
+/** The signed-in staff member, with the role read from the database. */
 async function getActor(
   request: NextRequest,
-  allowedRoles: ReadonlySet<string>,
+  permission: Permission,
 ): Promise<Actor | NextResponse> {
-  const token = request.cookies.get("token")?.value;
-  if (!token) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-  let actorId: string;
-  try {
-    actorId = (await verifyJwtToken(token)).userId;
-  } catch {
-    return NextResponse.json({ error: "Invalid token" }, { status: 401 });
-  }
-  const actor = await prisma.user.findFirst({
-    where: { id: actorId, isDeleted: false },
+  const auth = await authorizeStaff(request, [permission]);
+  if ("response" in auth) return auth.response;
+  const actor = await prisma.user.findUniqueOrThrow({
+    where: { id: auth.userId },
     select: { id: true, role: true, email: true },
   });
-  if (!actor || !allowedRoles.has(actor.role)) {
-    return NextResponse.json(
-      { error: "You do not have permission to manage sign-in emails" },
-      { status: 403 },
-    );
-  }
-  return actor;
+  return { ...actor, permissions: auth.permissions };
 }
 
 function requestMeta(request: NextRequest) {
@@ -79,7 +70,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const actor = await getActor(request, STAFF_ROLES);
+    const actor = await getActor(request, "customers.view");
     if (actor instanceof NextResponse) return actor;
 
     const account = await prisma.user.findUnique({
@@ -116,7 +107,7 @@ export async function GET(
       })),
       // What the signed-in admin may do here, so the UI can match it.
       canManage:
-        LOGIN_MANAGER_ROLES.has(actor.role) &&
+        actor.permissions.has("customers.manage_signin_emails") &&
         MULTI_LOGIN_ROLES.has(account.role),
       maxLogins: MAX_LOGINS_PER_ACCOUNT,
     });
@@ -135,7 +126,7 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const actor = await getActor(request, LOGIN_MANAGER_ROLES);
+    const actor = await getActor(request, "customers.manage_signin_emails");
     if (actor instanceof NextResponse) return actor;
 
     const body = await request.json().catch(() => ({}));
@@ -170,7 +161,7 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
-    const actor = await getActor(request, LOGIN_MANAGER_ROLES);
+    const actor = await getActor(request, "customers.manage_signin_emails");
     if (actor instanceof NextResponse) return actor;
 
     const body = await request.json().catch(() => ({}));
@@ -225,7 +216,7 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const actor = await getActor(request, LOGIN_MANAGER_ROLES);
+    const actor = await getActor(request, "customers.manage_signin_emails");
     if (actor instanceof NextResponse) return actor;
 
     const loginId = new URL(request.url).searchParams.get("loginId");

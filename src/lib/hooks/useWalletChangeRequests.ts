@@ -77,6 +77,7 @@ export function useCreateWalletChangeRequest() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["wallet-change-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["badge-counts"] });
     },
   });
 }
@@ -113,6 +114,7 @@ export function useReviewWalletChangeRequest() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["wallet-change-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["badge-counts"] });
     },
   });
 
@@ -133,6 +135,7 @@ export function useReviewWalletChangeRequest() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["wallet-change-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["badge-counts"] });
     },
   });
 
@@ -155,6 +158,7 @@ export function useReviewWalletChangeRequest() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["wallet-change-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["badge-counts"] });
     },
   });
 

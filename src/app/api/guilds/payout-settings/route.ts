@@ -10,7 +10,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { AuditAction, GuildFeePayer, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { requireStaff, jsonError } from "@/lib/guilds/routeAuth";
+import { jsonError } from "@/lib/guilds/routeAuth";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { GuildInputError, parseWalletAddress } from "@/lib/guilds/accounts";
 import {
   AVAILABLE_PAYOUT_METHODS,
@@ -20,8 +21,8 @@ import {
 import { isTrezorPayoutEnabled } from "@/lib/guilds/trezor/network";
 
 export async function GET(request: NextRequest) {
-  const auth = await requireStaff(request);
-  if ("error" in auth) return auth.error;
+  const auth = await authorizeStaff(request, ["guilds.view"]);
+  if ("response" in auth) return auth.response;
   try {
     const settings = await getPayoutSettings();
     return NextResponse.json({
@@ -39,8 +40,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
-  const auth = await requireStaff(request);
-  if ("error" in auth) return auth.error;
+  const auth = await authorizeStaff(request, ["guilds.edit_payout_settings"]);
+  if ("response" in auth) return auth.response;
 
   try {
     const body = (await request.json().catch(() => ({}))) as Record<

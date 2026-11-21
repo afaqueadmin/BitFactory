@@ -6,26 +6,19 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { AuditAction } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import {
   parseRepairSiteSettingInput,
   REPAIR_SITE_LABELS,
 } from "@/lib/repairCharges";
-import {
-  requireRepairChargesUser,
-  serializeRepairSiteSetting,
-} from "@/lib/repairChargesServer";
+import { serializeRepairSiteSetting } from "@/lib/repairChargesServer";
 
 export async function PUT(request: NextRequest) {
   try {
-    const auth = await requireRepairChargesUser(request, { staffOnly: true });
-    if ("error" in auth) {
-      return NextResponse.json(
-        { success: false, error: auth.error },
-        { status: auth.status },
-      );
-    }
+    const auth = await authorizeStaff(request, ["repair_charges.edit"]);
+    if ("response" in auth) return auth.response;
 
     const body = await request.json().catch(() => ({}));
     const parsed = parseRepairSiteSettingInput(body as Record<string, unknown>);

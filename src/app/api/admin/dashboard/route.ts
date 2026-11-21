@@ -1,9 +1,8 @@
-import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { prisma } from "@/lib/prisma";
 import { BILLED_CUSTOMER_ROLES } from "@/lib/customerRoles";
 import { NON_BALANCE_PAYMENT_TYPES } from "@/lib/accounting/paymentTypes";
-import { verifyJwtToken } from "@/lib/jwt";
 import {
   WorkersResponse,
   SummaryResponse,
@@ -762,33 +761,9 @@ async function fetchBraiinsMiners(_request: NextRequest): Promise<{
 
 export async function GET(request: NextRequest) {
   try {
-    const token = request.cookies.get("token")?.value;
-
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Verify token and check if user is admin
-    let userId: string;
-    try {
-      const decoded = await verifyJwtToken(token);
-      userId = decoded.userId;
-    } catch (error) {
-      console.error("[Admin Dashboard] Token verification failed:", error);
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { id: true, role: true },
-    });
-
-    if (!user || !isStaffRole(user.role)) {
-      return NextResponse.json(
-        { error: "Only administrators can access dashboard stats" },
-        { status: 403 },
-      );
-    }
+    const auth = await authorizeStaff(request, ["dashboard.view"]);
+    if ("response" in auth) return auth.response;
+    const user = { id: auth.userId, role: auth.role };
 
     const warnings: string[] = [];
 

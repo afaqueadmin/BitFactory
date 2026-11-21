@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAccountingAdmin } from "@/lib/accounting/adminAuth";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import {
   MAX_PDF_BYTES,
   MAX_SHEET_BYTES,
@@ -24,7 +24,24 @@ import {
  */
 export async function POST(request: NextRequest) {
   try {
-    const auth = await requireAccountingAdmin(request);
+    const auth = await authorizeStaff(request, [
+      "farm_tariffs.create",
+      "farm_tariffs.edit",
+      "farm_tariffs.record_payment",
+      "hardware_purchases.create",
+      "hardware_purchases.edit",
+      "hardware_purchases.record_payment",
+      "security_deposits.record",
+      "bank_reconciliation.create",
+      "bank_reconciliation.edit",
+      "transfers.create",
+      "transfers.edit",
+      "capital_income.create",
+      "capital_income.edit",
+      "expenses.create",
+      "expenses.edit",
+      "expenses.record_payment",
+    ]);
     if ("response" in auth) return auth.response;
 
     const body: {

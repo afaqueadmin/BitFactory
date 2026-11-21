@@ -12,7 +12,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireStaff, jsonError } from "@/lib/guilds/routeAuth";
+import { jsonError } from "@/lib/guilds/routeAuth";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { verifyStepUp } from "@/lib/auth/stepUp";
 import {
   SettlementError,
@@ -27,8 +28,8 @@ import { payoutTxUrl } from "@/lib/guilds/walletNetworks";
 import { payoutNetwork } from "@/lib/guilds/trezor/network";
 
 export async function GET(request: NextRequest) {
-  const auth = await requireStaff(request);
-  if ("error" in auth) return auth.error;
+  const auth = await authorizeStaff(request, ["guilds.view"]);
+  if ("response" in auth) return auth.response;
 
   try {
     const monthParam = request.nextUrl.searchParams.get("rewardMonth");
@@ -136,8 +137,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const auth = await requireStaff(request);
-  if ("error" in auth) return auth.error;
+  const auth = await authorizeStaff(request, ["guilds.record_payout"]);
+  if ("response" in auth) return auth.response;
 
   try {
     const body = (await request.json().catch(() => ({}))) as {

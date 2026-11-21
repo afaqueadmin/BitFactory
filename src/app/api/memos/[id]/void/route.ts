@@ -4,7 +4,7 @@ import { AuditAction, Prisma } from "@prisma/client";
 import { generateMemoPDF, sendMemoVoidEmail } from "@/lib/email";
 import { InvoiceEmailService } from "@/services/invoiceEmailService";
 import { recordMemoEmailRun } from "@/lib/accounting/emailRunLog";
-import { requireAdmin } from "../route";
+import { authorizeStaff } from "@/lib/auth/authorization";
 
 // Thrown inside the void transaction when the void email fails, so the memo
 // stays ISSUED and its balance adjustment stays live.
@@ -67,8 +67,8 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const auth = await requireAdmin(request);
-    if ("error" in auth) return auth.error;
+    const auth = await authorizeStaff(request, ["memos.void"]);
+    if ("response" in auth) return auth.response;
 
     const { id } = await params;
     const { voidReason } = await request.json();
