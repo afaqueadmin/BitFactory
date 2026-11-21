@@ -430,6 +430,50 @@ const ROUTES: ParityRow[] = [
     permissions: ["company_payback.edit_settings"],
     today: "staff",
   },
+
+  // System: logs and DB Data Management (all view-only)
+  {
+    route: "admin/activity-log",
+    method: "GET",
+    permissions: ["activity_log.view"],
+    today: "staff",
+  },
+  {
+    route: "admin/audit-log",
+    method: "GET",
+    permissions: ["audit_log.view"],
+    today: "staff",
+  },
+  {
+    route: "pool-subaccounts",
+    method: "GET",
+    permissions: ["db_data.view"],
+    today: "staff",
+  },
+  {
+    route: "pool-subaccounts/[id]",
+    method: "GET",
+    permissions: ["db_data.view"],
+    today: "staff",
+  },
+  {
+    route: "pool-daily-snapshots",
+    method: "GET",
+    permissions: ["db_data.view"],
+    today: "staff",
+  },
+  {
+    route: "pool-worker-metrics",
+    method: "GET",
+    permissions: ["db_data.view"],
+    today: "staff",
+  },
+  {
+    route: "pool-transactions",
+    method: "GET",
+    permissions: ["db_data.view"],
+    today: "staff",
+  },
 ];
 
 const SYSTEM_ROLES = ["SUPER_ADMIN", "ADMIN", "ACCOUNTING"] as const;

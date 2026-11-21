@@ -359,7 +359,11 @@ export default function CustomerInvoiceDetailPage() {
           ) : (
             <>
               {process.env.NEXT_PUBLIC_PAY_WITH_BINANCE_ENABLED === "true" &&
-                ["afaque@gmail.com", "hamzanajeebmusic@gmail.com"] //@TODO: remove this condition when feature is ready
+                [
+                  "afaque@gmail.com",
+                  "hamzanajeebmusic@gmail.com",
+                  "shaheryarbackup@gmail.com",
+                ] //@TODO: remove this condition when feature is ready
                   .includes(invoice.user.email) &&
                 invoice.hasBinanceSubaccount && (
                   <PayWithBinanceButton
