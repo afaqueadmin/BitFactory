@@ -1,7 +1,9 @@
-import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { verifyJwtToken } from "@/lib/jwt";
+import {
+  getAuthorizationContext,
+  requirePermission,
+} from "@/lib/auth/authorization";
 import { pendingSimulationRequests } from "@/lib/simulation/convert";
 import { loadSimBalances } from "@/lib/simulation/ledgerStore";
 
@@ -17,29 +19,10 @@ export const runtime = "nodejs";
  */
 export async function GET(request: NextRequest) {
   try {
-    const token = request.cookies.get("token")?.value;
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    let actorId: string;
-    try {
-      actorId = (await verifyJwtToken(token)).userId;
-    } catch {
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
-    }
-
-    // Role from the database, not the token.
-    const actor = await prisma.user.findFirst({
-      where: { id: actorId, isDeleted: false },
-      select: { role: true },
-    });
-    if (!actor || !isStaffRole(actor.role)) {
-      return NextResponse.json(
-        { error: "Only administrators can view simulated accounts" },
-        { status: 403 },
-      );
-    }
+    const ctx = await getAuthorizationContext(request);
+    if ("response" in ctx) return ctx.response;
+    const denied = requirePermission(ctx, "simulated_accounts.view");
+    if (denied) return denied;
 
     const users = await prisma.user.findMany({
       where: { role: "SIMULATED" },

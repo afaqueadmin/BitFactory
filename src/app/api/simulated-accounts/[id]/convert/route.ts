@@ -1,8 +1,10 @@
-import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { AuditAction } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { verifyJwtToken } from "@/lib/jwt";
+import {
+  getAuthorizationContext,
+  requirePermission,
+} from "@/lib/auth/authorization";
 import { sessionCutoffNow } from "@/lib/auth/sessionRevocation";
 import { canManageAccount } from "@/lib/auth/accountTiers";
 
@@ -22,29 +24,11 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const token = request.cookies.get("token")?.value;
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    let actorId: string;
-    try {
-      actorId = (await verifyJwtToken(token)).userId;
-    } catch {
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
-    }
-
-    // Role from the database, not the token.
-    const actor = await prisma.user.findFirst({
-      where: { id: actorId, isDeleted: false },
-      select: { role: true },
-    });
-    if (!actor || !isStaffRole(actor.role)) {
-      return NextResponse.json(
-        { error: "Only administrators can convert simulated accounts" },
-        { status: 403 },
-      );
-    }
+    const ctx = await getAuthorizationContext(request);
+    if ("response" in ctx) return ctx.response;
+    const denied = requirePermission(ctx, "simulated_accounts.convert");
+    if (denied) return denied;
+    const actor = { role: ctx.role };
 
     const target = await prisma.user.findUnique({
       where: { id },
@@ -78,7 +62,7 @@ export async function POST(
           action: AuditAction.USER_UPDATED,
           entityType: "User",
           entityId: id,
-          userId: actorId,
+          userId: ctx.userId,
           description: `Simulated account ${label} converted to a customer`,
           changes: JSON.stringify({
             role: { from: "SIMULATED", to: "CLIENT" },
