@@ -9,10 +9,12 @@
  * - DELETE /api/pool-auth/[id] - Remove a client's credential for a pool
  */
 
-import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { verifyJwtToken } from "@/lib/jwt";
+import {
+  getAuthorizationContext,
+  requirePermission,
+} from "@/lib/auth/authorization";
 import { AuditAction } from "@prisma/client";
 import { logPoolCredentialChange } from "@/lib/audit/logPoolCredentialChange";
 import {
@@ -33,29 +35,6 @@ interface ApiResponse<T = unknown> {
   timestamp?: string;
 }
 
-async function verifyAdminAuth(request: NextRequest) {
-  const token = request.cookies.get("token")?.value;
-
-  if (!token) {
-    throw new Error("Unauthorized: No token provided");
-  }
-
-  try {
-    const decoded = await verifyJwtToken(token);
-
-    if (!isStaffRole(decoded.role)) {
-      throw new Error("Forbidden: Admin access required");
-    }
-
-    return { userId: decoded.userId, role: decoded.role };
-  } catch (error) {
-    if (error instanceof Error) {
-      throw error;
-    }
-    throw new Error("Invalid token");
-  }
-}
-
 /**
  * PUT /api/pool-auth/[id]
  *
@@ -66,22 +45,15 @@ async function verifyAdminAuth(request: NextRequest) {
 export async function PUT(
   request: NextRequest,
   context: { params: Promise<{ id: string }> },
-): Promise<NextResponse<ApiResponse>> {
+): Promise<NextResponse> {
   try {
     const { id } = await context.params;
 
-    let actorUserId: string;
-    try {
-      ({ userId: actorUserId } = await verifyAdminAuth(request));
-    } catch (authError) {
-      const errorMsg =
-        authError instanceof Error ? authError.message : "Authorization failed";
-      console.error(`[PoolAuth API] PUT: ${errorMsg}`);
-      return NextResponse.json<ApiResponse>(
-        { success: false, error: errorMsg },
-        { status: errorMsg.includes("Forbidden") ? 403 : 401 },
-      );
-    }
+    const ctx = await getAuthorizationContext(request);
+    if ("response" in ctx) return ctx.response;
+    const denied = requirePermission(ctx, "pools.manage_credentials");
+    if (denied) return denied;
+    const actorUserId = ctx.userId;
 
     const existing = await prisma.poolAuth.findUnique({
       where: { id },
@@ -180,22 +152,15 @@ export async function PUT(
 export async function DELETE(
   request: NextRequest,
   context: { params: Promise<{ id: string }> },
-): Promise<NextResponse<ApiResponse>> {
+): Promise<NextResponse> {
   try {
     const { id } = await context.params;
 
-    let actorUserId: string;
-    try {
-      ({ userId: actorUserId } = await verifyAdminAuth(request));
-    } catch (authError) {
-      const errorMsg =
-        authError instanceof Error ? authError.message : "Authorization failed";
-      console.error(`[PoolAuth API] DELETE: ${errorMsg}`);
-      return NextResponse.json<ApiResponse>(
-        { success: false, error: errorMsg },
-        { status: errorMsg.includes("Forbidden") ? 403 : 401 },
-      );
-    }
+    const ctx = await getAuthorizationContext(request);
+    if ("response" in ctx) return ctx.response;
+    const denied = requirePermission(ctx, "pools.manage_credentials");
+    if (denied) return denied;
+    const actorUserId = ctx.userId;
 
     const existing = await prisma.poolAuth.findUnique({
       where: { id },

@@ -9,10 +9,12 @@
  * - DELETE /api/pools/[id] - Delete a pool
  */
 
-import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { verifyJwtToken } from "@/lib/jwt";
+import {
+  getAuthorizationContext,
+  requirePermission,
+} from "@/lib/auth/authorization";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,29 +29,6 @@ interface ApiResponse<T = unknown> {
   timestamp?: string;
 }
 
-async function verifyAdminAuth(request: NextRequest) {
-  const token = request.cookies.get("token")?.value;
-
-  if (!token) {
-    throw new Error("Unauthorized: No token provided");
-  }
-
-  try {
-    const decoded = await verifyJwtToken(token);
-
-    if (!isStaffRole(decoded.role)) {
-      throw new Error("Forbidden: Admin access required");
-    }
-
-    return { userId: decoded.userId, role: decoded.role };
-  } catch (error) {
-    if (error instanceof Error) {
-      throw error;
-    }
-    throw new Error("Invalid token");
-  }
-}
-
 /**
  * PUT /api/pools/[id]
  *
@@ -60,21 +39,14 @@ async function verifyAdminAuth(request: NextRequest) {
 export async function PUT(
   request: NextRequest,
   context: { params: Promise<{ id: string }> },
-): Promise<NextResponse<ApiResponse>> {
+): Promise<NextResponse> {
   try {
     const { id } = await context.params;
 
-    try {
-      await verifyAdminAuth(request);
-    } catch (authError) {
-      const errorMsg =
-        authError instanceof Error ? authError.message : "Authorization failed";
-      console.error(`[Pool API] PUT: ${errorMsg}`);
-      return NextResponse.json<ApiResponse>(
-        { success: false, error: errorMsg },
-        { status: errorMsg.includes("Forbidden") ? 403 : 401 },
-      );
-    }
+    const ctx = await getAuthorizationContext(request);
+    if ("response" in ctx) return ctx.response;
+    const denied = requirePermission(ctx, "pools.edit");
+    if (denied) return denied;
 
     const existingPool = await prisma.pool.findUnique({ where: { id } });
     if (!existingPool) {
@@ -175,21 +147,14 @@ export async function PUT(
 export async function DELETE(
   request: NextRequest,
   context: { params: Promise<{ id: string }> },
-): Promise<NextResponse<ApiResponse>> {
+): Promise<NextResponse> {
   try {
     const { id } = await context.params;
 
-    try {
-      await verifyAdminAuth(request);
-    } catch (authError) {
-      const errorMsg =
-        authError instanceof Error ? authError.message : "Authorization failed";
-      console.error(`[Pool API] DELETE: ${errorMsg}`);
-      return NextResponse.json<ApiResponse>(
-        { success: false, error: errorMsg },
-        { status: errorMsg.includes("Forbidden") ? 403 : 401 },
-      );
-    }
+    const ctx = await getAuthorizationContext(request);
+    if ("response" in ctx) return ctx.response;
+    const denied = requirePermission(ctx, "pools.delete");
+    if (denied) return denied;
 
     const existingPool = await prisma.pool.findUnique({ where: { id } });
     if (!existingPool) {
