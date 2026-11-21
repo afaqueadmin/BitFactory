@@ -2,7 +2,14 @@ import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
-import { AuditAction } from "@prisma/client";
+import { AuditAction, InvoiceStatus } from "@prisma/client";
+import {
+  confirmBankEffectResponse,
+  customerBankEffect,
+  deleteInvoiceReconciliation,
+  deleteReconciliationFiles,
+  readConfirm,
+} from "@/lib/accounting/invoiceBankEffect";
 
 export async function GET(
   request: NextRequest,
@@ -81,9 +88,10 @@ export async function DELETE(
       select: { role: true },
     });
 
-    if (!user || !isStaffRole(user.role)) {
+    // Same effect as Mark Unpaid on a paid invoice, so the same SUPER_ADMIN rule.
+    if (user?.role !== "SUPER_ADMIN") {
       return NextResponse.json(
-        { error: "Only administrators can delete payments" },
+        { error: "Only a super admin can delete payments" },
         { status: 403 },
       );
     }
@@ -97,28 +105,86 @@ export async function DELETE(
       return NextResponse.json({ error: "Payment not found" }, { status: 404 });
     }
 
-    await prisma.costPayment.update({
-      where: { id },
-      data: { isDeleted: true },
-    });
+    // Deleting one payment (partial or full) marks a PAID invoice unpaid,
+    // which also deletes its Bank Reconciliation entry. When a bank
+    // statement changes, the body must carry { confirmBankEffect: true }
+    // (decided 2026-11-19). This route has no screen today.
+    const invoice = payment.invoice;
+    const unpaying = invoice?.status === InvoiceStatus.PAID;
+    if (!(await readConfirm(request)) && invoice) {
+      const effect = await customerBankEffect(prisma, invoice.id, {
+        includeMemo: true,
+        paymentId: id,
+        withReconciliation: unpaying,
+      });
+      if (effect.rows.length > 0) return confirmBankEffectResponse(effect);
+    }
 
-    // Log audit
-    const invoiceNumber = payment.invoice?.invoiceNumber || "N/A";
-    await prisma.auditLog.create({
-      data: {
-        action: AuditAction.PAYMENT_REMOVED,
-        entityType: "CostPayment",
-        entityId: id,
-        userId,
-        description: `Payment removed from invoice ${invoiceNumber}`,
-        changes: JSON.stringify({
-          amount: payment.amount.toString(),
-          invoiceId: payment.invoiceId,
-        }),
-      },
-    });
+    const invoiceNumber = invoice?.invoiceNumber || "N/A";
+    let fileKeys: string[] = [];
+    await prisma.$transaction(async (tx) => {
+      await tx.costPayment.update({
+        where: { id },
+        data: { isDeleted: true },
+      });
 
-    return NextResponse.json({ success: true, message: "Payment deleted" });
+      await tx.auditLog.create({
+        data: {
+          action: AuditAction.PAYMENT_REMOVED,
+          entityType: "CostPayment",
+          entityId: id,
+          userId,
+          description: `Payment removed from invoice ${invoiceNumber}`,
+          changes: JSON.stringify({
+            amount: payment.amount.toString(),
+            invoiceId: payment.invoiceId,
+            bankId: payment.bankId,
+          }),
+        },
+      });
+
+      if (invoice && unpaying) {
+        await tx.invoice.update({
+          where: { id: invoice.id },
+          data: {
+            status: InvoiceStatus.ISSUED,
+            paidDate: null,
+            updatedBy: userId,
+          },
+        });
+        await tx.auditLog.create({
+          data: {
+            action: AuditAction.INVOICE_UPDATED,
+            entityType: "Invoice",
+            entityId: invoice.id,
+            userId,
+            description: `Invoice ${invoiceNumber} marked as unpaid (a payment was deleted)`,
+            changes: JSON.stringify({
+              status: { from: InvoiceStatus.PAID, to: InvoiceStatus.ISSUED },
+              paidDate: {
+                from: invoice.paidDate?.toISOString() ?? null,
+                to: null,
+              },
+              removedPaymentIds: [id],
+            }),
+          },
+        });
+        fileKeys = await deleteInvoiceReconciliation(
+          tx,
+          invoice.id,
+          userId,
+          `a payment of invoice ${invoiceNumber} was deleted and the invoice marked as unpaid`,
+        );
+      }
+    });
+    await deleteReconciliationFiles(fileKeys);
+
+    return NextResponse.json({
+      success: true,
+      message: unpaying
+        ? `Payment deleted; invoice ${invoiceNumber} marked as unpaid`
+        : "Payment deleted",
+    });
   } catch (error) {
     console.error("Delete cost payment error:", error);
     return NextResponse.json(

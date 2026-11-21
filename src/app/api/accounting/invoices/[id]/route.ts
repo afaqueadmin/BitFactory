@@ -19,6 +19,13 @@ import { sendInvoiceCancellationEmail } from "@/lib/email";
 import { getGroupByUserId } from "@/lib/groupUtils";
 import { InvoiceEmailService } from "@/services/invoiceEmailService";
 import { recordSingleEmailRun } from "@/lib/accounting/emailRunLog";
+import { reconciliationEntryLabel } from "@/lib/accounting/bankReconciliation";
+import {
+  confirmBankEffectResponse,
+  customerBankEffect,
+  deleteInvoiceReconciliation,
+  deleteReconciliationFiles,
+} from "@/lib/accounting/invoiceBankEffect";
 import { accrueIncentivesForInvoice } from "@/lib/incentives/accrue";
 import { reverseIncentivesForInvoice } from "@/lib/incentives/reverse";
 import { assertFranchiseeOwnsCustomer } from "@/lib/franchiseeScope";
@@ -418,12 +425,47 @@ export async function PUT(
       );
     }
 
+    // Paid -> another status (the list pages' bulk status change) does what
+    // Mark Unpaid does: voids every payment, clears the paid date and
+    // deletes the Bank Reconciliation entry. So it is SUPER_ADMIN only, and
+    // the body must carry { confirmBankEffect: true } after the screen has
+    // shown what it removes (decided 2026-11-19).
+    const unpaying =
+      !!status &&
+      status !== InvoiceStatus.PAID &&
+      currentInvoice.status === InvoiceStatus.PAID;
+    if (unpaying) {
+      if (user.role !== "SUPER_ADMIN") {
+        return NextResponse.json(
+          {
+            error: `Invoice ${currentInvoice.invoiceNumber} is paid: only super administrators can change the status of a paid invoice, because it deletes its payment records`,
+          },
+          { status: 403 },
+        );
+      }
+      if (body.confirmBankEffect !== true) {
+        return confirmBankEffectResponse(
+          await customerBankEffect(prisma, id, {
+            includeMemo: true,
+            withReconciliation: true,
+          }),
+        );
+      }
+    }
+
     const updateData: Record<string, unknown> = { updatedBy: userId };
     const changes: Record<string, unknown> = {};
 
     if (status) {
       updateData.status = status;
       changes.status = { from: currentInvoice.status, to: status };
+      if (unpaying) {
+        updateData.paidDate = null;
+        changes.paidDate = {
+          from: currentInvoice.paidDate?.toISOString() ?? null,
+          to: null,
+        };
+      }
 
       // Auto-set issuedDate when changing to ISSUED
       if (status === "ISSUED" && !currentInvoice.issuedDate) {
@@ -435,7 +477,7 @@ export async function PUT(
       updateData.issuedDate = new Date(issuedDate);
       changes.issuedDate = issuedDate;
     }
-    if (paidDate) {
+    if (paidDate && !unpaying) {
       updateData.paidDate = new Date(paidDate);
       changes.paidDate = paidDate;
     }
@@ -444,18 +486,59 @@ export async function PUT(
       changes.dueDate = dueDate;
     }
 
-    const invoice = await prisma.invoice.update({
-      where: { id },
-      data: updateData,
-      include: {
-        user: { select: { id: true, email: true, name: true } },
-        createdByUser: { select: { id: true, email: true, name: true } },
-        updatedByUser: { select: { id: true, email: true, name: true } },
-        // Keep the payment accounts: this response replaces the cached
-        // invoice, and the Payments card would otherwise show "—".
-        costPayments: { include: costPaymentAccountInclude },
-      },
+    let fileKeys: string[] = [];
+    const invoice = await prisma.$transaction(async (tx) => {
+      if (unpaying) {
+        // Guard on status so a concurrent change isn't overwritten.
+        const { count } = await tx.invoice.updateMany({
+          where: { id, status: InvoiceStatus.PAID },
+          data: { status: InvoiceStatus.PAID },
+        });
+        if (count === 0) throw new StatusChangedError();
+        const payments = await tx.costPayment.findMany({
+          where: { invoiceId: id, isDeleted: false },
+          select: { id: true, amount: true },
+        });
+        await tx.costPayment.updateMany({
+          where: { id: { in: payments.map((p) => p.id) } },
+          data: { isDeleted: true },
+        });
+        // One PAYMENT_REMOVED entry per payment, as Mark Unpaid writes.
+        await tx.auditLog.createMany({
+          data: payments.map((p) => ({
+            action: AuditAction.PAYMENT_REMOVED,
+            entityType: "CostPayment",
+            entityId: p.id,
+            userId,
+            description: `Payment removed from invoice ${currentInvoice.invoiceNumber} (status changed from PAID to ${status})`,
+            changes: JSON.stringify({
+              amount: p.amount.toString(),
+              invoiceId: id,
+            }),
+          })),
+        });
+        changes.removedPaymentIds = payments.map((p) => p.id);
+        fileKeys = await deleteInvoiceReconciliation(
+          tx,
+          id,
+          userId,
+          `invoice ${currentInvoice.invoiceNumber} changed from PAID to ${status}`,
+        );
+      }
+      return tx.invoice.update({
+        where: { id },
+        data: updateData,
+        include: {
+          user: { select: { id: true, email: true, name: true } },
+          createdByUser: { select: { id: true, email: true, name: true } },
+          updatedByUser: { select: { id: true, email: true, name: true } },
+          // Keep the payment accounts: this response replaces the cached
+          // invoice, and the Payments card would otherwise show "—".
+          costPayments: { include: costPaymentAccountInclude },
+        },
+      });
     });
+    await deleteReconciliationFiles(fileKeys);
 
     // Log audit
     await prisma.auditLog.create({
@@ -484,6 +567,12 @@ export async function PUT(
 
     return NextResponse.json(invoice);
   } catch (error) {
+    if (error instanceof StatusChangedError) {
+      return NextResponse.json(
+        { error: "Invoice status changed, please reload and try again" },
+        { status: 409 },
+      );
+    }
     console.error("Update invoice error:", error);
     return NextResponse.json(
       { error: "Failed to update invoice" },
@@ -491,6 +580,9 @@ export async function PUT(
     );
   }
 }
+
+/** The invoice stopped being PAID while a status change was saving. */
+class StatusChangedError extends Error {}
 
 // POST: Cancel an ISSUED invoice
 // Only ISSUED invoices can be cancelled (DRAFT invoices should be deleted)
@@ -691,7 +783,10 @@ export async function DELETE(
 
     const invoice = await prisma.invoice.findUnique({
       where: { id },
-      include: { repairNote: { select: { minerId: true } } },
+      include: {
+        repairNote: { select: { minerId: true } },
+        bankReconciliation: { select: { entryNumber: true } },
+      },
     });
 
     if (!invoice) {
@@ -707,6 +802,16 @@ export async function DELETE(
           error: "Only DRAFT or CANCELLED invoices can be deleted",
         },
         { status: 400 },
+      );
+    }
+
+    // Its money is on a bank statement through Bank Reconciliation.
+    if (invoice.bankReconciliation) {
+      return NextResponse.json(
+        {
+          error: `This invoice has Bank Reconciliation entry ${reconciliationEntryLabel(invoice.bankReconciliation.entryNumber)}. Delete that entry first.`,
+        },
+        { status: 409 },
       );
     }
 

@@ -12,6 +12,22 @@ import {
   ConsolidatedRollback,
   undoConsolidatedPayment,
 } from "@/lib/accounting/consolidatedVendorPayment";
+import {
+  confirmBankEffectResponse,
+  vendorBankEffect,
+} from "@/lib/accounting/invoiceBankEffect";
+
+/** GET on the mark-unpaid routes: what it would remove (no change made). */
+export async function vendorUnpaidPreview(
+  kind: DepositInvoiceKind,
+  id: string,
+): Promise<NextResponse> {
+  const effect = await vendorBankEffect(prisma, kind, id);
+  if (!effect) {
+    return NextResponse.json({ error: CONFIG[kind].notFound }, { status: 404 });
+  }
+  return NextResponse.json({ success: true, data: effect });
+}
 
 const CONFIG = {
   farm: {
@@ -95,6 +111,8 @@ export async function markVendorSideUnpaid(
   kind: DepositInvoiceKind,
   id: string,
   userId: string,
+  /** The user saw and confirmed the bank statement rows it removes. */
+  confirmBankEffect: boolean,
 ): Promise<NextResponse> {
   const config = CONFIG[kind];
 
@@ -124,6 +142,15 @@ export async function markVendorSideUnpaid(
       },
       { status: 400 },
     );
+  }
+
+  // Its Credit rows leave the bank statements: refuse until confirmed
+  // (decided 2026-11-19). A deposit-only payment has no rows.
+  if (!confirmBankEffect) {
+    const effect = await vendorBankEffect(prisma, kind, id);
+    if (effect && effect.rows.length > 0) {
+      return confirmBankEffectResponse(effect);
+    }
   }
 
   const securityDeposit =

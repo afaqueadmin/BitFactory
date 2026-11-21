@@ -6,6 +6,8 @@
  */
 "use client";
 
+import { BankEffectNotice } from "@/components/accounting/common/BankEffectNotice";
+import { CONFIRM_BANK_EFFECT, useBankEffect } from "@/lib/hooks/useBankEffect";
 import { isStaffRole } from "@/lib/auth/staffRoles";
 import { useParams, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
@@ -119,6 +121,16 @@ export default function InvoiceDetailPage() {
     null,
   );
   const [unpaidLoading, setUnpaidLoading] = useState(false);
+  const cancelPaymentEffect = useBankEffect(
+    cancelPaymentDialogOpen && invoice
+      ? `/api/accounting/invoices/${invoice.id}/cancel-payment`
+      : null,
+  );
+  const unpaidEffect = useBankEffect(
+    unpaidDialogOpen && invoice
+      ? `/api/accounting/invoices/${invoice.id}/mark-unpaid`
+      : null,
+  );
   const [subAccountLoading, setSubAccountLoading] = useState(false);
   const [subAccountNetwork, setSubAccountNetwork] = useState<"TRX" | "ETH">(
     "TRX",
@@ -379,6 +391,8 @@ export default function InvoiceDetailPage() {
         {
           method: "POST",
           credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: CONFIRM_BANK_EFFECT,
         },
       );
 
@@ -411,6 +425,8 @@ export default function InvoiceDetailPage() {
         {
           method: "POST",
           credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: CONFIRM_BANK_EFFECT,
         },
       );
 
@@ -1597,6 +1613,11 @@ export default function InvoiceDetailPage() {
                 <li>Log the payment reversal in the audit trail</li>
               </ul>
             </Box>
+            <BankEffectNotice
+              effect={cancelPaymentEffect.data}
+              loading={cancelPaymentEffect.isLoading}
+              error={cancelPaymentEffect.error}
+            />
           </DialogContent>
           <DialogActions>
             <Button
@@ -1609,7 +1630,11 @@ export default function InvoiceDetailPage() {
               onClick={handleCancelPayment}
               variant="contained"
               color="error"
-              disabled={cancelPaymentLoading}
+              disabled={
+                cancelPaymentLoading ||
+                cancelPaymentEffect.isLoading ||
+                !!cancelPaymentEffect.error
+              }
             >
               {cancelPaymentLoading ? "Cancelling..." : "Cancel Payment"}
             </Button>
@@ -1635,6 +1660,11 @@ export default function InvoiceDetailPage() {
                 will be removed.
               </Typography>
             </Box>
+            <BankEffectNotice
+              effect={unpaidEffect.data}
+              loading={unpaidEffect.isLoading}
+              error={unpaidEffect.error}
+            />
           </DialogContent>
           <DialogActions>
             <Button
@@ -1647,7 +1677,9 @@ export default function InvoiceDetailPage() {
               onClick={handleMarkUnpaid}
               variant="contained"
               color="warning"
-              disabled={unpaidLoading}
+              disabled={
+                unpaidLoading || unpaidEffect.isLoading || !!unpaidEffect.error
+              }
             >
               {unpaidLoading ? "Updating..." : "Mark as Unpaid"}
             </Button>

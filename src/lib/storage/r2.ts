@@ -34,6 +34,7 @@ export const PDF_PREFIXES = {
   "expense-attachment": "expense-attachments/",
   "expense-payment-receipt": "expense-payment-receipts/",
   "income-attachment": "income-attachments/",
+  "reconciliation-attachment": "reconciliation-attachments/",
 } as const;
 
 export type PdfPurpose = keyof typeof PDF_PREFIXES;
@@ -44,6 +45,7 @@ export const SHEET_PREFIXES = {
   "vendor-invoice-sheet": "vendor-invoice-sheets/",
   "expense-sheet": "expense-sheets/",
   "income-sheet": "income-sheets/",
+  "reconciliation-sheet": "reconciliation-sheets/",
 } as const;
 
 export type SheetPurpose = keyof typeof SHEET_PREFIXES;

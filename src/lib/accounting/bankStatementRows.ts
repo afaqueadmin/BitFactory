@@ -36,7 +36,8 @@ export type StatementSource =
   | "DEPOSIT_RETURN"
   | "TRANSFER"
   | "EXPENSE"
-  | "INCOME";
+  | "INCOME"
+  | "RECONCILIATION";
 
 export type StatementSide = "DEBIT" | "CREDIT";
 
@@ -46,7 +47,7 @@ export interface StatementLink {
 }
 
 export interface StatementRow {
-  /** Source-prefixed id: cp_, vp_, cvp_, dr_, bt_, ep_ or ci_. */
+  /** Source-prefixed id: cp_, vp_, cvp_, dr_, bt_, ep_, ci_ or br_. */
   id: string;
   source: StatementSource;
   /** The bank the money went into or came out of. */

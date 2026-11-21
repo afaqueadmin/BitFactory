@@ -22,6 +22,7 @@ import {
 import { transferStatementRows } from "@/lib/accounting/bankTransfer";
 import { expenseStatementRows } from "@/lib/accounting/expense";
 import { incomeStatementRows } from "@/lib/accounting/capitalIncome";
+import { reconciliationStatementRows } from "@/lib/accounting/bankReconciliation";
 
 /**
  * Bank balances and statements, read from the tables that save a bank
@@ -29,7 +30,8 @@ import { incomeStatementRows } from "@/lib/accounting/capitalIncome";
  * the USD value saved with each payment.
  *
  * Left out on purpose: voided customer payments (isDeleted), zero-amount
- * "Mark as Paid" rows, deposit ADJUSTMENTs (no cash, no bank). The
+ * "Mark as Paid" rows, deposit ADJUSTMENTs (no cash, no bank). An invoice
+ * with neither gets on a statement through a Bank Reconciliation entry. The
  * deprecated single-currency payment columns on vendor invoices are not
  * read: those payments were backfilled into VendorPaymentPart.
  */
@@ -63,6 +65,7 @@ export async function getBankBalances(
     transfersIn,
     expensePayments,
     incomes,
+    reconciliations,
   ] = await Promise.all([
     // Customer payments are positive; a negative one would be money out.
     prisma.costPayment.groupBy({
@@ -117,6 +120,12 @@ export async function getBankBalances(
       where: filter ? { bankId: filter } : undefined,
       _sum: { amountUsd: true, feeUsd: true },
     }),
+    // Bank Reconciliation: the invoice's money in, its fee out.
+    prisma.accountingBankReconciliation.groupBy({
+      by: ["bankId"],
+      where: filter ? { bankId: filter } : undefined,
+      _sum: { amountUsd: true, feeUsd: true },
+    }),
   ]);
 
   const map = new Map<string, BankBalance>();
@@ -152,6 +161,10 @@ export async function getBankBalances(
     add(r.bankId, r._sum.feeUsd ?? ZERO, "C");
   }
   for (const r of incomes) {
+    add(r.bankId, r._sum.amountUsd ?? ZERO, "D");
+    add(r.bankId, r._sum.feeUsd ?? ZERO, "C");
+  }
+  for (const r of reconciliations) {
     add(r.bankId, r._sum.amountUsd ?? ZERO, "D");
     add(r.bankId, r._sum.feeUsd ?? ZERO, "C");
   }
@@ -667,6 +680,33 @@ async function incomeRows(bankIds: string[]) {
   );
 }
 
+/** Bank Reconciliation into these banks: 1–2 rows each (bankReconciliation.ts). */
+async function reconciliationRows(bankIds: string[]) {
+  const entries = await prisma.accountingBankReconciliation.findMany({
+    where: { bankId: { in: bankIds } },
+    include: {
+      currency: { select: { code: true } },
+      invoice: {
+        select: {
+          id: true,
+          invoiceNumber: true,
+          invoiceType: true,
+          totalAmount: true,
+          user: { select: { name: true, email: true } },
+        },
+      },
+    },
+  });
+  return entries.flatMap((e) =>
+    reconciliationStatementRows({
+      ...e,
+      code: e.currency.code,
+      hasPdf: !!e.pdfKey,
+      clientName: customerName(e.invoice.user),
+    }),
+  );
+}
+
 export interface StatementRange {
   /** Instants: the route turns the viewer's calendar days into them. */
   from?: Date | null;
@@ -686,6 +726,7 @@ async function bankRows(bankIds: string[], tz: string) {
     transferRows(bankIds),
     expenseRows(bankIds, tz),
     incomeRows(bankIds),
+    reconciliationRows(bankIds),
   ]);
   return groups.flat();
 }
@@ -722,7 +763,9 @@ export interface UnbankedPayments {
  * Colocation, Hardware Sales, Hardware Repair, balance top-ups; most predate
  * the bank field) and deposit returns. Not memo applications, and not the
  * ELECTRICITY_CHARGES / ADJUSTMENT rows, which are internal ledger entries,
- * not money moving. Vendor payments always save a bank.
+ * not money moving. Vendor payments always save a bank. Payments of an
+ * invoice with a Bank Reconciliation entry are left out: the entry already
+ * puts that money on a statement.
  */
 export async function getUnbankedPayments({
   from,
@@ -743,15 +786,25 @@ export async function getUnbankedPayments({
         isDeleted: false,
         type: { in: ["PAYMENT", "HARDWARE_SALES", "HARDWARE_REPAIR"] },
         amount: { gt: 0 },
-        // Same date as the statement: paymentDate, else when recorded.
-        ...(range
-          ? {
-              OR: [
-                { paymentDate: range },
-                { paymentDate: null, createdAt: range },
-              ],
-            }
-          : {}),
+        AND: [
+          {
+            OR: [
+              { invoiceId: null },
+              { invoice: { is: { bankReconciliation: { is: null } } } },
+            ],
+          },
+          // Same date as the statement: paymentDate, else when recorded.
+          ...(range
+            ? [
+                {
+                  OR: [
+                    { paymentDate: range },
+                    { paymentDate: null, createdAt: range },
+                  ],
+                },
+              ]
+            : []),
+        ],
       },
       _count: { _all: true },
       _sum: { amount: true },

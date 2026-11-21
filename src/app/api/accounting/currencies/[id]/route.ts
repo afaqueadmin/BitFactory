@@ -43,6 +43,8 @@ export async function PUT(
             expensePayments: true,
             // Capital & Income received in it.
             incomes: true,
+            // Bank Reconciliation received in it.
+            reconciliations: true,
           },
         },
       },
@@ -80,6 +82,7 @@ export async function PUT(
           transfersIn,
           expensePayments,
           incomes,
+          reconciliations,
         } = existing._count;
         if (
           vendorInvoicePayments +
@@ -91,7 +94,8 @@ export async function PUT(
             transfersOut +
             transfersIn +
             expensePayments +
-            incomes >
+            incomes +
+            reconciliations >
           0
         ) {
           return NextResponse.json(
@@ -198,6 +202,8 @@ export async function DELETE(
             expensePayments: true,
             // Capital & Income received in it.
             incomes: true,
+            // Bank Reconciliation received in it.
+            reconciliations: true,
           },
         },
       },
@@ -221,6 +227,7 @@ export async function DELETE(
       transfersIn,
       expensePayments,
       incomes,
+      reconciliations,
     } = existing._count;
     if (
       banks > 0 ||
@@ -233,7 +240,8 @@ export async function DELETE(
         transfersOut +
         transfersIn +
         expensePayments +
-        incomes >
+        incomes +
+        reconciliations >
         0
     ) {
       return NextResponse.json(

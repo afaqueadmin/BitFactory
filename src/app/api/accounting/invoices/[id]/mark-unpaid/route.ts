@@ -2,12 +2,78 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
 import { InvoiceStatus, AuditAction } from "@prisma/client";
+import {
+  confirmBankEffectResponse,
+  customerBankEffect,
+  deleteInvoiceReconciliation,
+  deleteReconciliationFiles,
+  readConfirm,
+} from "@/lib/accounting/invoiceBankEffect";
+
+/** Signed-in SUPER_ADMIN: their userId, or the error response. */
+async function superAdmin(
+  request: NextRequest,
+): Promise<{ userId: string } | { response: NextResponse }> {
+  const token = request.cookies.get("token")?.value;
+  if (!token) {
+    return {
+      response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+    };
+  }
+  const { userId } = await verifyJwtToken(token);
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { role: true },
+  });
+  if (user?.role !== "SUPER_ADMIN") {
+    return {
+      response: NextResponse.json(
+        { error: "Only super administrators can mark invoices as unpaid" },
+        { status: 403 },
+      ),
+    };
+  }
+  return { userId };
+}
+
+/** Same effect as voiding every payment, plus the reconciliation entry. */
+const effectOf = (id: string) =>
+  customerBankEffect(prisma, id, {
+    includeMemo: true,
+    withReconciliation: true,
+  });
+
+/**
+ * GET /api/accounting/invoices/[id]/mark-unpaid
+ * What Mark Unpaid would remove from the bank statements (no change made).
+ * Also used before a bulk status change away from Paid, which does the same.
+ */
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    const auth = await superAdmin(request);
+    if ("response" in auth) return auth.response;
+    const { id } = await params;
+    return NextResponse.json({ success: true, data: await effectOf(id) });
+  } catch (error) {
+    console.error("Mark unpaid preview error:", error);
+    return NextResponse.json(
+      { error: "Failed to load the bank statement effect" },
+      { status: 500 },
+    );
+  }
+}
 
 /**
  * POST /api/accounting/invoices/[id]/mark-unpaid
  *
- * Reverts a PAID invoice back to ISSUED, clears its paid date and voids
- * (soft-deletes) every payment recorded against it. Restricted to SUPER_ADMIN.
+ * Reverts a PAID invoice back to ISSUED, clears its paid date, voids
+ * (soft-deletes) every payment recorded against it and deletes its Bank
+ * Reconciliation entry. When that changes a bank statement the body must
+ * carry { confirmBankEffect: true } (the screen shows the rows first).
+ * Restricted to SUPER_ADMIN.
  */
 export async function POST(
   request: NextRequest,
@@ -15,26 +81,10 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const token = request.cookies.get("token")?.value;
-
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const decoded = await verifyJwtToken(token);
-    const userId = decoded.userId;
-
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { role: true },
-    });
-
-    if (user?.role !== "SUPER_ADMIN") {
-      return NextResponse.json(
-        { error: "Only super administrators can mark invoices as unpaid" },
-        { status: 403 },
-      );
-    }
+    const auth = await superAdmin(request);
+    if ("response" in auth) return auth.response;
+    const { userId } = auth;
+    const confirmed = await readConfirm(request);
 
     const invoice = await prisma.invoice.findUnique({
       where: { id },
@@ -54,6 +104,12 @@ export async function POST(
       );
     }
 
+    if (!confirmed) {
+      const effect = await effectOf(id);
+      if (effect.rows.length > 0) return confirmBankEffectResponse(effect);
+    }
+
+    let fileKeys: string[] = [];
     const updated = await prisma.$transaction(async (tx) => {
       // Guard on status in the write itself so a concurrent change can't be overwritten
       const result = await tx.invoice.updateMany({
@@ -110,8 +166,16 @@ export async function POST(
         },
       });
 
+      fileKeys = await deleteInvoiceReconciliation(
+        tx,
+        id,
+        userId,
+        `invoice ${invoice.invoiceNumber} marked as unpaid`,
+      );
+
       return true;
     });
+    await deleteReconciliationFiles(fileKeys);
 
     if (!updated) {
       return NextResponse.json(
