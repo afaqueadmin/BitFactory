@@ -116,6 +116,14 @@ export async function POST(request: NextRequest) {
     if (user.role !== "SUPER_ADMIN" && isStaffRole(role)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
+    // shortcut: STAFF accounts are refused until RBAC stage 5 wires STAFF into
+    // staffRoles, the proxy, 2FA and Access Rules; remove this then.
+    if (role === "STAFF") {
+      return NextResponse.json(
+        { error: "STAFF accounts can't be created yet" },
+        { status: 400 },
+      );
+    }
 
     // franchiseeId is only applicable to CLIENT users (null = direct BitFactory
     // customer). Ignore it for any other role rather than silently accepting it.

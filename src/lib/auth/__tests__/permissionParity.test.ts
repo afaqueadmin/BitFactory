@@ -1,0 +1,70 @@
+import { describe, expect, it } from "vitest";
+import fs from "fs";
+import path from "path";
+import {
+  effectivePermissions,
+  isPermission,
+  type Permission,
+} from "../permissions";
+
+/**
+ * RBAC parity: one row per migrated admin API route and method. For every
+ * system role, "has the permission(s)" must equal "passes today's check", so
+ * migrating a route never changes anyone's access. Add the route's row in the
+ * same commit that moves it to requirePermission (migration plan, section 7).
+ *
+ * today: "staff" = any of SUPER_ADMIN, ADMIN, ACCOUNTING; "super_admin" = SA
+ * only. permissions: several = any one of them (requireAnyPermission).
+ * shared: the route also serves client-side accounts, so it keeps its role
+ * branch (isStaffRole) next to the permission check.
+ */
+interface ParityRow {
+  route: string; // relative to src/app/api, e.g. "spaces/[id]"
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+  permissions: Permission[];
+  today: "staff" | "super_admin";
+  shared?: boolean;
+}
+
+const ROUTES: ParityRow[] = [];
+
+const SYSTEM_ROLES = ["SUPER_ADMIN", "ADMIN", "ACCOUNTING"] as const;
+const OLD_STAFF_CHECKS =
+  /isStaffRole\(|requireAccountingAdmin|requireStaff\(|requireSimAdmin|requireRepairChargesUser|function requireAdmin|function requireSuperAdmin/;
+
+function passesToday(role: string, today: ParityRow["today"]) {
+  return today === "staff" || role === "SUPER_ADMIN";
+}
+
+describe("permission parity", () => {
+  it("names only catalogue permissions, one row per route and method", () => {
+    const keys = ROUTES.map((r) => `${r.method} ${r.route}`);
+    expect(new Set(keys).size).toBe(keys.length);
+    for (const r of ROUTES) {
+      expect(r.permissions.length).toBeGreaterThan(0);
+      for (const p of r.permissions) expect(isPermission(p)).toBe(true);
+    }
+  });
+
+  for (const row of ROUTES) {
+    it(`${row.method} ${row.route}: same access as today`, () => {
+      for (const role of SYSTEM_ROLES) {
+        const perms = effectivePermissions(role);
+        const allowed = row.permissions.some((p) => perms.has(p));
+        expect(allowed, role).toBe(passesToday(role, row.today));
+      }
+    });
+
+    it(`${row.method} ${row.route}: uses the permission check only`, () => {
+      const file = path.join(
+        __dirname,
+        "../../../app/api",
+        row.route,
+        "route.ts",
+      );
+      const source = fs.readFileSync(file, "utf8");
+      expect(source).toMatch(/require(Any)?Permission\(/);
+      if (!row.shared) expect(source).not.toMatch(OLD_STAFF_CHECKS);
+    });
+  }
+});

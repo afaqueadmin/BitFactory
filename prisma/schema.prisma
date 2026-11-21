@@ -87,6 +87,7 @@ model User {
   staffAccessWindows                      StaffAccessWindow[]
   staffHolidays                           StaffHoliday[]
   staffTimeRequests                       StaffTimeRequest[]
+  staffRoleAssignments                    StaffRoleAssignment[]
   twoFactorAuths                          TwoFactorAuth[]
   logins                                  UserLogin[]                     @relation("userLogins")
   loginsCreated                           UserLogin[]                     @relation("userLoginsCreated")
@@ -1070,6 +1071,49 @@ model WebAuthnCredential {
   @@index([userId])
   @@index([loginId])
   @@map("webauthn_credentials")
+}
+
+/// A role a SUPER_ADMIN builds from catalogue permissions (src/lib/auth/permissions.ts).
+/// System roles (SUPER_ADMIN, ADMIN, ACCOUNTING, STAFF) are not stored here: they
+/// stay in User.role and their permissions are defined in code.
+model StaffRole {
+  id          String                @id @default(cuid())
+  name        String                @unique
+  description String?
+  createdById String
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+  permissions StaffRolePermission[]
+  assignments StaffRoleAssignment[]
+
+  @@map("staff_roles")
+}
+
+/// One permission granted by a custom role. `permission` is a catalogue name
+/// such as "invoicing.view": a string, not an enum, so new permissions never
+/// need a migration. Unknown and SA-only names are ignored when read.
+model StaffRolePermission {
+  roleId     String
+  permission String
+  role       StaffRole @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permission])
+  @@map("staff_role_permissions")
+}
+
+/// A custom role given to a staff account. A role can't be deleted while it
+/// is assigned (onDelete: Restrict); its users must be reassigned first.
+model StaffRoleAssignment {
+  userId       String
+  roleId       String
+  assignedById String
+  assignedAt   DateTime  @default(now())
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role         StaffRole @relation(fields: [roleId], references: [id], onDelete: Restrict)
+
+  @@id([userId, roleId])
+  @@index([roleId])
+  @@map("staff_role_assignments")
 }
 
 // Staff access rules (office hours + device-bound passkeys) for ADMIN and
@@ -2926,6 +2970,10 @@ enum Role {
   /// View-only member of a Guild: sees the Guildmaster's (the guild's) data,
   /// can't change anything but their own login security.
   GUILDMEMBER
+  /// Staff account with no permissions of its own: everything comes from its
+  /// custom roles (StaffRoleAssignment, src/lib/auth/permissions.ts). Not yet
+  /// a staff role in src/lib/auth/staffRoles.ts - wired in with role management.
+  STAFF
 }
 
 enum Segment {
@@ -3202,6 +3250,12 @@ enum AuditAction {
   STAFF_ACCESS_EXCEPTION_SET
   STAFF_ACCESS_PASSKEY_REMOVED
   STAFF_HOLIDAY_UPDATED
+  STAFF_ROLE_CREATED
+  /// Name, description or permissions; changes = before/after.
+  STAFF_ROLE_UPDATED
+  STAFF_ROLE_DELETED
+  STAFF_ROLE_ASSIGNED
+  STAFF_ROLE_UNASSIGNED
 }
 
 enum NotificationType {

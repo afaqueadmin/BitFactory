@@ -9,8 +9,20 @@ import {
   type AccessDeniedCode,
 } from "@/lib/auth/staffAccess";
 
+import { loadPermissions } from "@/lib/auth/authorization";
+
 // Runtime config
 export const runtime = "nodejs";
+
+/** For hiding pages and buttons only; every API enforces its own permission. */
+async function permissionsOf(userId: string): Promise<string[]> {
+  try {
+    return [...((await loadPermissions(userId))?.permissions ?? [])];
+  } catch (error) {
+    console.error("Loading permissions failed:", error);
+    return []; // fail closed, without ending the session
+  }
+}
 
 function accessTimeOver(accessUntil: number | undefined): boolean {
   return typeof accessUntil === "number" && Date.now() >= accessUntil * 1000;
@@ -68,7 +80,11 @@ export async function GET(request: NextRequest) {
         if (login) {
           return NextResponse.json({
             isAuthenticated: true,
-            user: { ...login.user, loginEmail: login.email },
+            user: {
+              ...login.user,
+              loginEmail: login.email,
+              permissions: await permissionsOf(login.user.id),
+            },
           });
         }
       } catch (error) {
@@ -129,7 +145,7 @@ export async function GET(request: NextRequest) {
             // Create response with new tokens
             const response = NextResponse.json({
               isAuthenticated: true,
-              user,
+              user: { ...user, permissions: await permissionsOf(user.id) },
             });
 
             // Set new cookies

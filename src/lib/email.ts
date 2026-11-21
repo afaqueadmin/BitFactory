@@ -1241,6 +1241,7 @@ export const sendPoolCronSummaryEmail = async (params: {
     from:
       `BitFactory Admin <${process.env.SMTP_FROM}>` || "noreply@bitfactory.com",
     to: process.env.SMTP_USER,
+    cc: process.env.CC_DEV_EMAIL,
     subject: `${errors.length > 0 ? "⚠️ " : pending.length > 0 ? "⏳ " : ""}Cron run: ${cronName} - BitFactory`,
     html: `
       <h1>${cronName}</h1>
