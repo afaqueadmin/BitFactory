@@ -697,6 +697,61 @@ const ROUTES: ParityRow[] = [
     permissions: ["guild_requests.approve", "guild_requests.reject"],
     today: "staff",
   },
+  // Simulated Accounts
+  {
+    route: "simulated-accounts",
+    method: "GET",
+    permissions: ["simulated_accounts.view"],
+    today: "staff",
+  },
+  {
+    route: "simulated-accounts/requests/[id]",
+    method: "POST",
+    permissions: ["simulated_accounts.review_requests"],
+    today: "staff",
+  },
+  {
+    route: "simulated-accounts/[id]/status",
+    method: "POST",
+    permissions: ["simulated_accounts.edit_status"],
+    today: "staff",
+  },
+  {
+    route: "simulated-accounts/[id]/convert",
+    method: "POST",
+    permissions: ["simulated_accounts.convert"],
+    today: "staff",
+  },
+  {
+    route: "simulated-accounts/[id]/entries",
+    method: "GET",
+    permissions: ["simulated_accounts.view"],
+    today: "staff",
+  },
+  {
+    route: "simulated-accounts/[id]/entries",
+    method: "POST",
+    permissions: ["simulated_accounts.manage_ledger"],
+    today: "staff",
+  },
+  {
+    route: "simulated-accounts/[id]/entries/[entryId]",
+    method: "DELETE",
+    permissions: ["simulated_accounts.manage_ledger"],
+    today: "staff",
+  },
+  {
+    route: "simulated-accounts/settings",
+    method: "GET",
+    permissions: ["simulated_accounts.view"],
+    today: "staff",
+  },
+  {
+    route: "simulated-accounts/settings",
+    method: "PUT",
+    permissions: ["simulated_accounts.edit_settings"],
+    today: "staff",
+  },
 ];
 
 const SYSTEM_ROLES = ["SUPER_ADMIN", "ADMIN", "ACCOUNTING"] as const;
