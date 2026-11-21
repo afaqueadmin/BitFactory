@@ -26,7 +26,10 @@ export async function getUserBinanceSubaccount(
   if (!binanceSubaccount) {
     console.log("general getUserBinanceSubaccount");
     binanceSubaccount = prisma.binanceSubaccount.findFirst({
-      where: { binanceSubaccountEmail: "hamzanajeebmusic@gmail.com", coin }, //general account linked to hamzanajeebmusic@gmail.com
+      where: {
+        binanceSubaccountEmail: process.env.BINANCE_GENERAL_ACCOUNT_EMAIL,
+        coin,
+      }, //general account linked to hamzanajeebmusic@gmail.com
       orderBy: { updatedAt: "desc" },
     });
   }
