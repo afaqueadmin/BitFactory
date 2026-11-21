@@ -7,6 +7,8 @@ import {
 import { waitForDatabase } from "@/lib/services/cronRetry";
 import { sendPoolCronSummaryEmail } from "@/lib/email";
 
+export const maxDuration = 300;
+
 // Scheduled for 06:00 UTC, not right at midnight — moved back repeatedly
 // based on live evidence of how late Luxor finalizes the just-ended day:
 //   2026-08-20: still empty at 00:21 UTC (~20 min after midnight)

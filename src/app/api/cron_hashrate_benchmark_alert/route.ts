@@ -6,6 +6,8 @@ import {
   sendHashrateBenchmarkAlertEmail,
 } from "@/lib/email";
 
+export const maxDuration = 300;
+
 /**
  * GET /api/cron_hashrate_benchmark_alert
  *

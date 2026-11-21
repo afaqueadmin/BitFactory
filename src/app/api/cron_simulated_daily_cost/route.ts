@@ -14,6 +14,8 @@ import {
   sendCronSuccessEmailToDeveloper,
 } from "@/lib/email";
 
+export const maxDuration = 300;
+
 const CRON_NAME = "cron_simulated_daily_cost";
 
 /**

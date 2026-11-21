@@ -23,7 +23,7 @@ import {
 } from "@mui/material";
 import { ReactNode, useState } from "react";
 import {
-  EMPTY_PAYMENT_ACCOUNT,
+  bankPaymentAccount,
   formatCurrencyAmount,
   parseExchangeRate,
   PaymentAccountFields,
@@ -35,7 +35,10 @@ import {
 } from "@/components/accounting/common/PdfUploadField";
 import { CurrencyDisplay } from "@/components/accounting/common/CurrencyDisplay";
 import { dayLabel } from "@/components/accounting/bankStatement/StatementParts";
-import { useAccountingBanks } from "@/lib/hooks/usePaymentAccounts";
+import {
+  AccountingBank,
+  useAccountingBanks,
+} from "@/lib/hooks/usePaymentAccounts";
 import {
   Expense,
   ExpensePayment,
@@ -90,11 +93,14 @@ function Summary({
 export function ExpensePaymentDialog({
   expense,
   payment,
+  defaultBank,
   onClose,
 }: {
   expense: Expense;
   /** Edit this payment; absent = record a new one. */
   payment?: ExpensePayment;
+  /** New payment: pre-fill the paying bank (from its statement page). */
+  defaultBank?: AccountingBank;
   onClose: () => void;
 }) {
   const save = useSaveExpensePayment();
@@ -110,7 +116,7 @@ export function ExpensePaymentDialog({
           currencyCode: payment.currencyCode,
           exchangeRate: payment.exchangeRate,
         }
-      : EMPTY_PAYMENT_ACCOUNT,
+      : bankPaymentAccount(defaultBank),
   );
   const [amount, setAmount] = useState(payment?.amount ?? "");
   const [fee, setFee] = useState(zeroBlank(payment?.fee ?? ""));

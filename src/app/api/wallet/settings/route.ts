@@ -13,6 +13,7 @@ import { simRoute } from "@/lib/simulation/context";
 import { authenticateWalletRequest } from "@/lib/walletTarget";
 import { loadSimPoolLedger } from "@/lib/simulation/data";
 import { simWalletSettings } from "@/lib/simulation/views";
+import { maskPaymentSettingsBody } from "@/lib/walletMasking";
 
 // Route segment config
 export const runtime = "nodejs";
@@ -85,6 +86,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       );
     }
     const userId = target.userId;
+    // Cached unmasked per customer; masked per response for non-staff.
+    const present = <T>(body: T): T =>
+      target.callerIsStaff ? body : maskPaymentSettingsBody(body);
 
     // 2.5. Simulated accounts: monthly payouts, no wallet address configured.
     const sim = await simRoute(target, async (ctx) => {
@@ -166,7 +170,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json(
         {
           success: true,
-          ...(cachedData as object),
+          ...(present(cachedData) as object),
           timestamp: new Date().toISOString(),
         } as WalletFetchResponse,
         {
@@ -210,7 +214,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
             return NextResponse.json(
               {
                 success: true,
-                data: staleData,
+                data: present(staleData),
                 timestamp: new Date().toISOString(),
               } as WalletFetchResponse,
               {
@@ -346,7 +350,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json(
       {
         success: true,
-        ...responseBody,
+        ...present(responseBody),
         timestamp: new Date().toISOString(),
       } as WalletFetchResponse,
       {
@@ -435,8 +439,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
+    // GET keys end with the subaccounts in view, so clear every key for
+    // this customer + currency.
+    const escape = (v: string) => v.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const cacheKey = `wallet_${targetUserId}_${currency}`;
-    walletCache.invalidate(cacheKey);
+    walletCache.invalidatePattern(new RegExp(`^${escape(cacheKey)}(_|$)`));
 
     console.log(
       `[Wallet API] Admin ${userId} invalidated cache for ${cacheKey}`,

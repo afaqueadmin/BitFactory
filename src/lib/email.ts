@@ -1,5 +1,6 @@
 import nodemailer from "nodemailer";
 import { withEmailSafety } from "@/lib/emailSafety";
+import { maskWalletAddress } from "@/lib/walletCrypto";
 import { readFileSync } from "fs";
 import { join } from "path";
 import puppeteerCore from "puppeteer-core";
@@ -564,7 +565,7 @@ export const sendWalletChangeRequestSubmittedEmail = async (
     html: `
       <h1>Wallet Change Request Received</h1>
       <p>We've received a request to change your payout wallet address to:</p>
-      <p><strong>${requestedAddress}</strong></p>
+      <p><strong>${escapeHtml(maskWalletAddress(requestedAddress))}</strong></p>
       <p>This change will not take effect until an administrator reviews and approves it.</p>
       <p>If you did not request this, please contact our support team immediately.</p>
       <br>
@@ -597,8 +598,8 @@ export const sendWalletChangeRequestApprovedEmail = async (
     html: `
       <h1>Wallet Change Approved</h1>
       <p>Your wallet change request has been approved by an administrator:</p>
-      <p><strong>Previous:</strong> ${oldAddress || "Not configured"}</p>
-      <p><strong>New:</strong> ${newAddress}</p>
+      <p><strong>Previous:</strong> ${oldAddress ? escapeHtml(maskWalletAddress(oldAddress)) : "Not configured"}</p>
+      <p><strong>New:</strong> ${escapeHtml(maskWalletAddress(newAddress))}</p>
       <p>For your security, payouts are frozen for 24 hours from approval, until ${freezeEnds.toUTCString()}. Our team updates the payout address on your behalf during this window.</p>
       <p><strong>If you did not request this, please contact our support team immediately.</strong></p>
       <br>
@@ -2599,7 +2600,7 @@ export const sendGuildShareSentEmail = (params: {
      ${
        params.paidBtc > 0
          ? `<p><strong>Sent:</strong> ${params.paidBtc.toFixed(8)} BTC<br>
-            <strong>To:</strong> ${escapeHtml(params.walletAddress || "-")}
+            <strong>To:</strong> ${escapeHtml(maskWalletAddress(params.walletAddress) || "-")}
             ${params.txUrl ? `<br><a href="${escapeHtml(params.txUrl)}">View the transaction</a>` : ""}</p>`
          : ""
      }
@@ -2610,3 +2611,75 @@ export const sendGuildShareSentEmail = (params: {
      }`,
     "guild share sent",
   );
+
+/**
+ * Daily wallet check (cron_wallet_address_check): every subaccount where
+ * Luxor's payout address differs from our record. Recipients come ONLY from
+ * the WALLET_ALERT_EMAILS env var (set on Vercel) - never from the database,
+ * so someone who gets into the app or DB can't silence it. Addresses are
+ * masked. Sent while any mismatch is open, so it keeps reminding.
+ */
+export const sendWalletMismatchAlertEmail = async (params: {
+  checkedAt: string;
+  checked: number;
+  newMismatches: WalletMismatchAlertRow[];
+  openMismatches: WalletMismatchAlertRow[];
+  errors: WalletMismatchAlertRow[];
+  noRecord: WalletMismatchAlertRow[];
+}) => {
+  const to = (process.env.WALLET_ALERT_EMAILS || "")
+    .split(",")
+    .map((e) => e.trim())
+    .filter(Boolean);
+  if (to.length === 0) {
+    console.error(
+      "[Wallet Check] WALLET_ALERT_EMAILS is not set - mismatch alert not emailed",
+    );
+    return { success: false, error: "No recipients" };
+  }
+  const row = (r: WalletMismatchAlertRow) =>
+    `<li><strong>${escapeHtml(r.subaccountName)}</strong>${r.customerName ? ` (${escapeHtml(r.customerName)})` : ""}: our record ${escapeHtml(r.expected ?? "(none)")}, Luxor ${escapeHtml(r.luxor ?? "(none)")}${r.newMismatch ? ' <strong style="color:#c62828;">NEW</strong>' : ""}</li>`;
+  const plain = (r: WalletMismatchAlertRow) =>
+    `<li>${escapeHtml(r.subaccountName)}${r.error ? `: ${escapeHtml(r.error)}` : ""}</li>`;
+  const open = params.openMismatches;
+
+  try {
+    await transporter.sendMail({
+      from:
+        `BitFactory Admin <${process.env.SMTP_FROM}>` ||
+        "noreply@bitfactory.com",
+      to: to.join(", "),
+      subject: `${open.length > 0 ? `⚠️ ${open.length} wallet mismatch(es)` : "Wallet check"}${params.newMismatches.length ? ` (${params.newMismatches.length} new)` : ""} - BitFactory`,
+      html: `
+        <h1>Client wallet check</h1>
+        <p>Ran at ${escapeHtml(params.checkedAt)} over ${params.checked} Luxor subaccount(s), comparing the payout address on Luxor with our record.</p>
+        ${
+          open.length > 0
+            ? `<h3 style="color:#c62828;">Luxor doesn't match our record</h3><ul>${open.map(row).join("")}</ul>
+               <p>Review each one in the Wallets module (Mismatch Alerts): either correct Luxor and choose “Luxor has been updated”, or accept Luxor's address. A wallet just approved through a change request shows here until Luxor is updated by hand.</p>`
+            : `<p>Every checked subaccount matches our record.</p>`
+        }
+        ${params.errors.length ? `<h3>Couldn't check</h3><ul>${params.errors.map(plain).join("")}</ul>` : ""}
+        ${params.noRecord.length ? `<h3>No wallet record yet</h3><ul>${params.noRecord.map(plain).join("")}</ul>` : ""}
+        <br>
+        <p>Best regards,</p>
+        <p>The BitFactory Team</p>
+      `,
+    });
+    return { success: true };
+  } catch (error) {
+    console.error("Error sending wallet mismatch alert email:", error);
+    return { success: false, error };
+  }
+};
+
+export interface WalletMismatchAlertRow {
+  subaccountName: string;
+  customerName: string | null;
+  /** Masked. */
+  expected: string | null;
+  /** Masked. */
+  luxor: string | null;
+  newMismatch: boolean;
+  error?: string;
+}

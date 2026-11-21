@@ -18,6 +18,7 @@ import {
   TextField,
 } from "@mui/material";
 import {
+  AccountingBank,
   useAccountingBanks,
   useAccountingEntities,
 } from "@/lib/hooks/usePaymentAccounts";
@@ -41,6 +42,26 @@ export const EMPTY_PAYMENT_ACCOUNT: PaymentAccountValue = {
 
 /** Currency whose rate is fixed at 1 (amounts are already in USD). */
 const BASE_CURRENCY = "USD";
+
+/**
+ * The fields pre-filled with one bank (opened from its statement page): its
+ * entity and bank, plus its currency when it has exactly one active one.
+ * A USD currency gets the rate 1, as picking it in the select would.
+ */
+export function bankPaymentAccount(
+  bank: AccountingBank | undefined,
+): PaymentAccountValue {
+  if (!bank) return EMPTY_PAYMENT_ACCOUNT;
+  const currencies = bank.currencies.filter((c) => c.currency.isActive);
+  const only = currencies.length === 1 ? currencies[0].currency : null;
+  return {
+    entityId: bank.entityId,
+    bankId: bank.id,
+    currencyId: only?.id ?? "",
+    currencyCode: only?.code ?? "",
+    exchangeRate: only?.code === BASE_CURRENCY ? "1" : "",
+  };
+}
 
 /** Parsed exchange rate, or null when missing or not a positive number. */
 export function parseExchangeRate(value: PaymentAccountValue): number | null {

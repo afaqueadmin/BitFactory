@@ -83,6 +83,10 @@ model User {
   poolAuths                               PoolAuth[]
   poolSubaccounts                         PoolSubaccount[]
   webauthnCredentials                     WebAuthnCredential[]
+  staffAccessRule                         StaffAccessRule?
+  staffAccessWindows                      StaffAccessWindow[]
+  staffHolidays                           StaffHoliday[]
+  staffTimeRequests                       StaffTimeRequest[]
   twoFactorAuths                          TwoFactorAuth[]
   logins                                  UserLogin[]                     @relation("userLogins")
   loginsCreated                           UserLogin[]                     @relation("userLoginsCreated")
@@ -126,6 +130,9 @@ model User {
   expenseHeadsCreated                     AccountingExpenseHead[]         @relation("expenseHeadsCreated")
   expensesCreated                         AccountingExpense[]             @relation("expensesCreated")
   expensePaymentsCreated                  AccountingExpensePayment[]      @relation("expensePaymentsCreated")
+  incomeHeadsCreated                      AccountingIncomeHead[]          @relation("incomeHeadsCreated")
+  incomesCreated                          AccountingIncome[]              @relation("incomesCreated")
+  bankReconciliationsCreated              AccountingBankReconciliation[]  @relation("bankReconciliationsCreated")
   binanceSubaccounts                      BinanceSubaccount[]             @relation("binanceSubaccounts")
   binanceSubaccountsCreated               BinanceSubaccount[]             @relation("binanceSubaccountsCreated")
   binanceSubaccountsUpdated               BinanceSubaccount[]             @relation("binanceSubaccountsUpdated")
@@ -148,6 +155,8 @@ model User {
   guildPayoutBatchesCreated               GuildPayoutBatch[]              @relation("guildPayoutBatchesCreated")
   guildPayoutSettingsUpdated              GuildPayoutSettings[]           @relation("guildPayoutSettingsUpdated")
   guildDistributionLines                  GuildDistributionLine[]         @relation("guildDistributionLines")
+  clientWalletHistoryActions              ClientWalletHistory[]           @relation("clientWalletHistoryActor")
+  clientWalletMismatchesResolved          ClientWalletMismatch[]          @relation("clientWalletMismatchResolvedBy")
 
   @@index([isDeleted])
   @@index([franchiseeId])
@@ -249,8 +258,12 @@ model WalletChangeRequest {
   /// a second login. Null on rows from before this was recorded.
   requestedByEmail     String?
   requestedBySecondary Boolean       @default(false)
+  /// Encrypted (src/lib/walletCrypto.ts); *Hash is its lookup hash.
   currentAddress       String?
+  currentAddressHash   String?
+  /// Encrypted (src/lib/walletCrypto.ts).
   requestedAddress     String
+  requestedAddressHash String?
   reason               String?       @db.Text
   status               RequestStatus @default(PENDING)
   rejectionReason      String?
@@ -437,7 +450,10 @@ model Guild {
   /// The guild's own receiving address - set as its Luxor subaccount's
   /// payout address. Typed in by an admin for now; derived from the payout
   /// wallet (payoutAddressIndex) once multisig payouts are live.
+  /// Encrypted (src/lib/walletCrypto.ts). Still @unique in the DB, which is
+  /// harmless on ciphertext; payoutAddressHash is the real uniqueness check.
   payoutAddress        String?                    @unique
+  payoutAddressHash    String?                    @unique
   payoutAddressIndex   Int?                       @unique
   /// How this guild is paid; null = GuildPayoutSettings.defaultPayoutMethod.
   /// Lets a new method be trialled on one guild.
@@ -470,7 +486,9 @@ model GuildMembership {
   rewardPercent      Decimal                        @db.Decimal(7, 4)
   /// Where this person's share is sent. Saved here, not on Luxor - Luxor
   /// pays the whole guild reward to a Higgs wallet.
+  /// Encrypted (src/lib/walletCrypto.ts).
   walletAddress      String?
+  walletAddressHash  String?
   /// Which chain walletAddress is on (src/lib/guilds/walletNetworks.ts).
   /// Only "BTC" today; a string so another chain needs no schema change.
   walletNetwork      String                         @default("BTC")
@@ -508,8 +526,11 @@ model GuildWalletChangeRequest {
   requestedByEmail     String?
   requestedBySecondary Boolean         @default(false)
   network              String          @default("BTC")
+  /// Encrypted (src/lib/walletCrypto.ts), as is requestedAddress.
   currentAddress       String?
+  currentAddressHash   String?
   requestedAddress     String
+  requestedAddressHash String?
   reason               String?         @db.Text
   status               RequestStatus   @default(PENDING)
   rejectionReason      String?
@@ -593,7 +614,9 @@ model GuildMemberChangeRequest {
   newEmail             String?
   newPhoneNumber       String?
   newPercent           Decimal?                       @db.Decimal(7, 4)
+  /// Encrypted (src/lib/walletCrypto.ts).
   newWalletAddress     String?
+  newWalletAddressHash String?
   newWalletNetwork     String                         @default("BTC")
   /// ADD: the membership created on approval.
   createdMembershipId  String?                        @unique
@@ -787,30 +810,32 @@ model GuildDistribution {
 }
 
 model GuildDistributionLine {
-  id              String            @id @default(cuid())
-  distributionId  String
-  distribution    GuildDistribution @relation(fields: [distributionId], references: [id], onDelete: Cascade)
-  membershipId    String
-  membership      GuildMembership   @relation(fields: [membershipId], references: [id], onDelete: Restrict)
-  userId          String
-  user            User              @relation("guildDistributionLines", fields: [userId], references: [id])
-  nameSnapshot    String
-  isGuildmaster   Boolean
-  percentSnapshot Decimal           @db.Decimal(7, 4)
-  walletSnapshot  String?
-  networkSnapshot String            @default("BTC")
+  id                 String            @id @default(cuid())
+  distributionId     String
+  distribution       GuildDistribution @relation(fields: [distributionId], references: [id], onDelete: Cascade)
+  membershipId       String
+  membership         GuildMembership   @relation(fields: [membershipId], references: [id], onDelete: Restrict)
+  userId             String
+  user               User              @relation("guildDistributionLines", fields: [userId], references: [id])
+  nameSnapshot       String
+  isGuildmaster      Boolean
+  percentSnapshot    Decimal           @db.Decimal(7, 4)
+  /// Encrypted (src/lib/walletCrypto.ts).
+  walletSnapshot     String?
+  walletSnapshotHash String?
+  networkSnapshot    String            @default("BTC")
   /// This month's share of the reward.
-  btcAmount       Decimal           @db.Decimal(20, 8)
+  btcAmount          Decimal           @db.Decimal(20, 8)
   /// Carried from earlier months, added to this month's share.
-  carriedInBtc    Decimal           @default(0) @db.Decimal(20, 8)
+  carriedInBtc       Decimal           @default(0) @db.Decimal(20, 8)
   /// Actually sent this month (share + carried in, or 0 if carried).
-  paidBtc         Decimal           @default(0) @db.Decimal(20, 8)
+  paidBtc            Decimal           @default(0) @db.Decimal(20, 8)
   /// Carried to next month.
-  carriedOutBtc   Decimal           @default(0) @db.Decimal(20, 8)
+  carriedOutBtc      Decimal           @default(0) @db.Decimal(20, 8)
   /// Why it was carried (below the minimum, no wallet, wallet freeze).
-  carryReason     String?
+  carryReason        String?
   /// This member's output in the payout transaction (multisig mode).
-  payoutVout      Int?
+  payoutVout         Int?
 
   @@unique([distributionId, membershipId])
   @@index([userId])
@@ -889,6 +914,15 @@ model WebAuthnCredential {
   transports String[] @default([])
   aaguid     String?
 
+  /// What the authenticator reported, saved at registration and refreshed on
+  /// every sign-in (src/lib/auth/staffAccess.ts). Null = not used since these
+  /// columns were added. "singleDevice" | "multiDevice" (synced passkey).
+  deviceType String?
+  backedUp   Boolean?
+  /// Browser-reported: "platform" (built into the device) | "cross-platform"
+  /// (USB/NFC key, phone).
+  attachment String?
+
   credentialName String?
   createdAt      DateTime  @default(now())
   lastUsedAt     DateTime?
@@ -896,6 +930,93 @@ model WebAuthnCredential {
   @@index([userId])
   @@index([loginId])
   @@map("webauthn_credentials")
+}
+
+// Staff access rules (office hours + device-bound passkeys) for ADMIN and
+// ACCOUNTING accounts, set by a SUPER_ADMIN on the Access Rules page. Logic in
+// src/lib/auth/staffAccess.ts; times are in the office time zone (Asia/Karachi).
+// One row per restricted account; no row = no restriction.
+model StaffAccessRule {
+  id                        String    @id @default(cuid())
+  userId                    String    @unique
+  user                      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  hoursEnabled              Boolean   @default(false)
+  /// { mon: { start: "10:00", end: "18:00" } | null, tue: ..., sun: ... }
+  weeklyHours               Json
+  graceMinutes              Int       @default(0)
+  requireDeviceBoundPasskey Boolean   @default(false)
+  /// Emergency exception: sign-in without a built-in passkey is allowed
+  /// until this moment (password + 2FA still apply). Null or past = off.
+  passkeyExemptUntil        DateTime?
+  passkeyExemptNote         String?
+  updatedById               String
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
+
+  @@map("staff_access_rules")
+}
+
+enum StaffAccessWindowKind {
+  /// Allowed hours set in advance (hours exception); also applies on holidays.
+  ONE_OFF
+  /// Time added to a running day by a SUPER_ADMIN (live extra time).
+  EXTRA_TIME
+}
+
+model StaffAccessWindow {
+  id          String                @id @default(cuid())
+  userId      String
+  user        User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  startsAt    DateTime
+  endsAt      DateTime
+  kind        StaffAccessWindowKind
+  note        String?
+  createdById String
+  createdAt   DateTime              @default(now())
+
+  @@index([userId, endsAt])
+  @@map("staff_access_windows")
+}
+
+/// A day off. userId null = office-wide holiday; otherwise that account only.
+/// Office-wide dates are unique through the partial index
+/// "staff_holidays_office_date_key" (raw SQL in the migration).
+model StaffHoliday {
+  id          String   @id @default(cuid())
+  /// Office calendar day (Asia/Karachi), stored as a date.
+  date        DateTime @db.Date
+  name        String
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdById String
+  createdAt   DateTime @default(now())
+
+  @@unique([date, userId])
+  @@index([date])
+  @@map("staff_holidays")
+}
+
+enum StaffTimeRequestStatus {
+  PENDING
+  APPROVED
+  DECLINED
+}
+
+model StaffTimeRequest {
+  id               String                 @id @default(cuid())
+  userId           String
+  user             User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  minutesRequested Int
+  note             String?
+  status           StaffTimeRequestStatus @default(PENDING)
+  minutesGranted   Int?
+  decidedById      String?
+  createdAt        DateTime               @default(now())
+  decidedAt        DateTime?
+
+  @@index([status])
+  @@index([userId])
+  @@map("staff_time_requests")
 }
 
 // One row per login that has ever engaged with 2FA (created lazily on first
@@ -1195,12 +1316,15 @@ model PoolSubaccount {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
-  pool           Pool                          @relation(fields: [poolId], references: [id], onDelete: Cascade)
-  user           User?                         @relation(fields: [userId], references: [id])
-  poolAuth       PoolAuth?                     @relation(fields: [poolAuthId], references: [id])
-  dailySnapshots PoolSubaccountDailySnapshot[]
-  workerMetrics  PoolWorkerDailyMetric[]
-  transactions   PoolTransaction[]
+  pool             Pool                          @relation(fields: [poolId], references: [id], onDelete: Cascade)
+  user             User?                         @relation(fields: [userId], references: [id])
+  poolAuth         PoolAuth?                     @relation(fields: [poolAuthId], references: [id])
+  dailySnapshots   PoolSubaccountDailySnapshot[]
+  workerMetrics    PoolWorkerDailyMetric[]
+  transactions     PoolTransaction[]
+  clientWallet     ClientWallet?
+  walletHistory    ClientWalletHistory[]
+  walletMismatches ClientWalletMismatch[]
 
   @@unique([poolId, subaccountName])
   @@index([userId])
@@ -1277,7 +1401,10 @@ model PoolTransaction {
   category              String? // Luxor transaction_category / Braiins payout kind
   amount                Decimal  @db.Decimal(20, 8)
   usdEquivalent         Decimal? @db.Decimal(20, 2)
+  /// The payout address - encrypted (src/lib/walletCrypto.ts) once
+  /// scripts/encrypt-wallet-addresses.js has run; addressHash groups by it.
   addressName           String?
+  addressHash           String?
   status                String? // Braiins payout status: queued/confirmed/failed
   occurredAt            DateTime
 
@@ -1291,6 +1418,7 @@ model PoolTransaction {
   @@index([poolId])
   @@index([externalTransactionId])
   @@index([occurredAt])
+  @@index([addressHash])
   @@map("pool_transactions")
 }
 
@@ -1372,6 +1500,115 @@ model WalletPaymentEmail {
   @@unique([userId, payoutDate])
   @@index([payoutDate])
   @@map("wallet_payment_emails")
+}
+
+// ============================================================================
+// Client wallets: our own record of each Luxor subaccount's payout address.
+// Luxor stays the place payouts are configured (by an admin, by hand); this
+// is what we expect Luxor to hold. cron_wallet_address_check compares the
+// two daily and opens a ClientWalletMismatch when they differ. Addresses are
+// encrypted (src/lib/walletCrypto.ts); *Hash columns are lookup hashes.
+// ============================================================================
+
+enum ClientWalletSource {
+  /// First fetched from Luxor by scripts/wallet-initial-sync.js.
+  INITIAL_SYNC
+  /// Seen on past Luxor payments (pool_transactions) before our record began.
+  PAYOUT_HISTORY
+  /// An approved WalletChangeRequest.
+  CHANGE_REQUEST
+  /// An admin accepted the address found on Luxor during a mismatch.
+  LUXOR_ACCEPTED
+}
+
+enum ClientWalletCheckStatus {
+  MATCH
+  MISMATCH
+  /// Luxor has no payout address for the subaccount.
+  LUXOR_EMPTY
+  /// Luxor could not be reached or returned an error.
+  ERROR
+}
+
+enum ClientWalletMismatchStatus {
+  OPEN
+  /// Luxor was corrected to our address (re-fetched and confirmed).
+  RESOLVED_FIXED
+  /// Luxor's address was accepted as correct; our record now matches it.
+  RESOLVED_ACCEPTED
+}
+
+/// The current expected payout address for one Luxor subaccount.
+model ClientWallet {
+  id                    String                   @id @default(cuid())
+  poolSubaccountId      String                   @unique
+  poolSubaccount        PoolSubaccount           @relation(fields: [poolSubaccountId], references: [id], onDelete: Cascade)
+  /// Encrypted. Null when Luxor had no address at the initial sync.
+  address               String?
+  addressHash           String?
+  source                ClientWalletSource
+  effectiveFrom         DateTime
+  walletChangeRequestId String?
+  lastCheckedAt         DateTime?
+  lastCheckStatus       ClientWalletCheckStatus?
+  lastCheckError        String?
+  createdAt             DateTime                 @default(now())
+  updatedAt             DateTime                 @updatedAt
+
+  @@index([addressHash])
+  @@map("client_wallets")
+}
+
+/// Every address a subaccount has had. The open row (validTo null) is the
+/// current one. PAYOUT_HISTORY rows are dated by the first payout seen.
+model ClientWalletHistory {
+  id                    String             @id @default(cuid())
+  poolSubaccountId      String
+  poolSubaccount        PoolSubaccount     @relation(fields: [poolSubaccountId], references: [id], onDelete: Cascade)
+  /// Encrypted.
+  address               String?
+  addressHash           String?
+  source                ClientWalletSource
+  validFrom             DateTime
+  validTo               DateTime?
+  walletChangeRequestId String?
+  mismatchId            String?
+  note                  String?            @db.Text
+  actorId               String?
+  actor                 User?              @relation("clientWalletHistoryActor", fields: [actorId], references: [id])
+  createdAt             DateTime           @default(now())
+
+  @@index([poolSubaccountId, validFrom])
+  @@index([addressHash])
+  @@map("client_wallet_history")
+}
+
+/// Luxor holds a different address than our record. At most one OPEN row per
+/// subaccount (partial unique index client_wallet_mismatches_open_key, which
+/// Prisma cannot model).
+model ClientWalletMismatch {
+  id                  String                     @id @default(cuid())
+  poolSubaccountId    String
+  poolSubaccount      PoolSubaccount             @relation(fields: [poolSubaccountId], references: [id], onDelete: Cascade)
+  /// Encrypted: what we expected (our record) and what Luxor had.
+  expectedAddress     String?
+  expectedAddressHash String?
+  luxorAddress        String?
+  luxorAddressHash    String?
+  status              ClientWalletMismatchStatus @default(OPEN)
+  detectedAt          DateTime                   @default(now())
+  lastSeenAt          DateTime                   @default(now())
+  emailedAt           DateTime?
+  resolvedAt          DateTime?
+  resolvedById        String?
+  resolvedBy          User?                      @relation("clientWalletMismatchResolvedBy", fields: [resolvedById], references: [id])
+  resolutionNote      String?                    @db.Text
+  createdAt           DateTime                   @default(now())
+  updatedAt           DateTime                   @updatedAt
+
+  @@index([status])
+  @@index([poolSubaccountId])
+  @@map("client_wallet_mismatches")
 }
 
 model CostPayment {
@@ -1581,26 +1818,26 @@ model GroupSubaccount {
 }
 
 model Invoice {
-  id                       String                @id @default(cuid())
-  invoiceNumber            String                @unique
+  id                       String                        @id @default(cuid())
+  invoiceNumber            String                        @unique
   userId                   String
   hardwareId               String?
   totalMiners              Int
-  unitPrice                Decimal               @db.Decimal(10, 2)
-  totalAmount              Decimal               @db.Decimal(12, 2)
+  unitPrice                Decimal                       @db.Decimal(10, 2)
+  totalAmount              Decimal                       @db.Decimal(12, 2)
   status                   InvoiceStatus
-  invoiceType              InvoiceType           @default(ELECTRICITY_CHARGES)
+  invoiceType              InvoiceType                   @default(ELECTRICITY_CHARGES)
   invoiceGeneratedDate     DateTime
   issuedDate               DateTime?
   dueDate                  DateTime
   billingMonth             DateTime? // Format: First day of month (e.g., 2026-04-01 for April 2026)
-  machineHostingLocation   String[]              @default([])
+  machineHostingLocation   String[]                      @default([])
   paidDate                 DateTime?
   createdBy                String
   updatedBy                String?
-  createdAt                DateTime              @default(now())
-  updatedAt                DateTime              @updatedAt
-  btcpayInvoiceId          String?               @unique
+  createdAt                DateTime                      @default(now())
+  updatedAt                DateTime                      @updatedAt
+  btcpayInvoiceId          String?                       @unique
   btcpayStatus             BtcpayStatus?
   btcpayCheckoutUrl        String?
   btcpayCreatedAt          DateTime?
@@ -1608,32 +1845,33 @@ model Invoice {
   // Binance USDT payment: the deposit id / Pay transactionId that paid this
   // invoice (unique, so one transfer can't pay two invoices), and when the
   // customer opened the pay modal (only transfers after it can match).
-  binanceTxId              String?               @unique
+  binanceTxId              String?                       @unique
   binanceCheckoutStartedAt DateTime?
   // Set when a Binance deposit over the total + tolerance moves the invoice
   // to PROCESSING: what was actually received and when. Accounts records the
   // payment by hand from these; they are not a payment themselves.
-  binanceReceivedAmount    Decimal?              @db.Decimal(18, 8)
+  binanceReceivedAmount    Decimal?                      @db.Decimal(18, 8)
   binanceReceivedAt        DateTime?
   // HARDWARE_REPAIR invoices: the one miner being repaired, and a flat
   // discount taken off the line-item subtotal (totalAmount is after it).
   // Other invoice types leave minerId null and discountAmount 0.
   minerId                  String?
-  discountAmount           Decimal               @default(0) @db.Decimal(12, 2)
-  miner                    Miner?                @relation("minerRepairInvoices", fields: [minerId], references: [id], onDelete: SetNull)
-  repairNote               MinerRepairNote?      @relation("invoiceRepairNote")
-  notifications            InvoiceNotification[] @relation("invoiceNotifications")
-  costPayments             CostPayment[]         @relation("invoiceCostPayments")
+  discountAmount           Decimal                       @default(0) @db.Decimal(12, 2)
+  miner                    Miner?                        @relation("minerRepairInvoices", fields: [minerId], references: [id], onDelete: SetNull)
+  repairNote               MinerRepairNote?              @relation("invoiceRepairNote")
+  notifications            InvoiceNotification[]         @relation("invoiceNotifications")
+  costPayments             CostPayment[]                 @relation("invoiceCostPayments")
   tickets                  SupportTicket[]
   confirmoPayment          ConfirmoPayment?
-  emailSendResults         EmailSendResult[]     @relation("emailSendResults")
+  emailSendResults         EmailSendResult[]             @relation("emailSendResults")
   lineItems                InvoiceLineItem[]
-  memos                    Memo[]                @relation("invoiceMemos")
-  createdByUser            User                  @relation("invoicesCreated", fields: [createdBy], references: [id])
-  updatedByUser            User?                 @relation("invoicesUpdated", fields: [updatedBy], references: [id])
-  user                     User                  @relation("invoices", fields: [userId], references: [id])
-  hardware                 Hardware?             @relation(fields: [hardwareId], references: [id])
-  incentiveEntries         IncentiveEntry[]      @relation("invoiceIncentiveEntries")
+  memos                    Memo[]                        @relation("invoiceMemos")
+  createdByUser            User                          @relation("invoicesCreated", fields: [createdBy], references: [id])
+  updatedByUser            User?                         @relation("invoicesUpdated", fields: [updatedBy], references: [id])
+  user                     User                          @relation("invoices", fields: [userId], references: [id])
+  hardware                 Hardware?                     @relation(fields: [hardwareId], references: [id])
+  incentiveEntries         IncentiveEntry[]              @relation("invoiceIncentiveEntries")
+  bankReconciliation       AccountingBankReconciliation?
 
   @@index([userId])
   @@index([status])
@@ -2052,25 +2290,27 @@ model AccountingEntity {
 }
 
 model AccountingBank {
-  id                       String                      @id @default(cuid())
+  id                       String                         @id @default(cuid())
   entityId                 String
   name                     String
-  isActive                 Boolean                     @default(true)
+  isActive                 Boolean                        @default(true)
   createdBy                String
-  createdAt                DateTime                    @default(now())
-  updatedAt                DateTime                    @updatedAt
-  entity                   AccountingEntity            @relation(fields: [entityId], references: [id])
-  createdByUser            User                        @relation("accountingBanksCreated", fields: [createdBy], references: [id])
+  createdAt                DateTime                       @default(now())
+  updatedAt                DateTime                       @updatedAt
+  entity                   AccountingEntity               @relation(fields: [entityId], references: [id])
+  createdByUser            User                           @relation("accountingBanksCreated", fields: [createdBy], references: [id])
   currencies               AccountingBankCurrency[]
-  vendorInvoicePayments    VendorInvoice[]             @relation("vendorInvoicePaymentBank")
-  hardwarePurchasePayments HardwarePurchaseInvoice[]   @relation("hardwarePurchasePaymentBank")
+  vendorInvoicePayments    VendorInvoice[]                @relation("vendorInvoicePaymentBank")
+  hardwarePurchasePayments HardwarePurchaseInvoice[]      @relation("hardwarePurchasePaymentBank")
   costPayments             CostPayment[]
   vendorPaymentParts       VendorPaymentPart[]
   consolidatedPayments     VendorConsolidatedPayment[]
   depositReturns           VendorDepositMovement[]
-  transfersOut             AccountingBankTransfer[]    @relation("bankTransfersFrom")
-  transfersIn              AccountingBankTransfer[]    @relation("bankTransfersTo")
+  transfersOut             AccountingBankTransfer[]       @relation("bankTransfersFrom")
+  transfersIn              AccountingBankTransfer[]       @relation("bankTransfersTo")
   expensePayments          AccountingExpensePayment[]
+  incomes                  AccountingIncome[]
+  reconciliations          AccountingBankReconciliation[]
 
   @@unique([entityId, name])
   @@index([createdBy])
@@ -2078,22 +2318,24 @@ model AccountingBank {
 }
 
 model AccountingCurrency {
-  id                       String                      @id @default(cuid())
-  code                     String                      @unique
+  id                       String                         @id @default(cuid())
+  code                     String                         @unique
   name                     String
-  isActive                 Boolean                     @default(true)
-  createdAt                DateTime                    @default(now())
-  updatedAt                DateTime                    @updatedAt
+  isActive                 Boolean                        @default(true)
+  createdAt                DateTime                       @default(now())
+  updatedAt                DateTime                       @updatedAt
   banks                    AccountingBankCurrency[]
-  vendorInvoicePayments    VendorInvoice[]             @relation("vendorInvoicePaymentCurrency")
-  hardwarePurchasePayments HardwarePurchaseInvoice[]   @relation("hardwarePurchasePaymentCurrency")
+  vendorInvoicePayments    VendorInvoice[]                @relation("vendorInvoicePaymentCurrency")
+  hardwarePurchasePayments HardwarePurchaseInvoice[]      @relation("hardwarePurchasePaymentCurrency")
   costPayments             CostPayment[]
   vendorPaymentParts       VendorPaymentPart[]
   consolidatedPayments     VendorConsolidatedPayment[]
   depositReturns           VendorDepositMovement[]
-  transfersOut             AccountingBankTransfer[]    @relation("bankTransferFromCurrency")
-  transfersIn              AccountingBankTransfer[]    @relation("bankTransferToCurrency")
+  transfersOut             AccountingBankTransfer[]       @relation("bankTransferFromCurrency")
+  transfersIn              AccountingBankTransfer[]       @relation("bankTransferToCurrency")
   expensePayments          AccountingExpensePayment[]
+  incomes                  AccountingIncome[]
+  reconciliations          AccountingBankReconciliation[]
 
   @@map("accounting_currencies")
 }
@@ -2226,6 +2468,109 @@ model AccountingExpensePayment {
   @@index([date])
   @@index([createdBy])
   @@map("accounting_expense_payments")
+}
+
+/// A kind of Capital & Income (Initial Deposit, Equity, Loan, ...). A head
+/// used by an entry can't be deleted, only deactivated.
+model AccountingIncomeHead {
+  id            String             @id @default(cuid())
+  name          String             @unique
+  isActive      Boolean            @default(true)
+  createdBy     String
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  createdByUser User               @relation("incomeHeadsCreated", fields: [createdBy], references: [id])
+  entries       AccountingIncome[]
+
+  @@index([createdBy])
+  @@map("accounting_income_heads")
+}
+
+/// Capital & Income: money added to one of our banks without an invoice
+/// (initial deposit, equity, loan, ...). Always a Debit of amountUsd on the
+/// bank, plus its own "Capital & Income Fee" Credit row of feeUsd when the
+/// bank charged a fee. Amount and fee are typed in the bank's currency; the
+/// rate is 1 USD = X currency. The entity comes from the bank (a bank used
+/// by entries can't change entity).
+model AccountingIncome {
+  id            String               @id @default(cuid())
+  /// Running number shown as CAP-0001 (Entry #). Never reused.
+  entryNumber   Int                  @unique @default(autoincrement())
+  date          DateTime             @db.Date
+  headId        String
+  bankId        String
+  currencyId    String
+  exchangeRate  Decimal              @db.Decimal(18, 8)
+  /// Received, in the bank's currency, before the fee.
+  amount        Decimal              @db.Decimal(18, 2)
+  /// Charged by the bank, in the bank's currency.
+  fee           Decimal              @default(0) @db.Decimal(18, 2)
+  amountUsd     Decimal              @db.Decimal(12, 2)
+  feeUsd        Decimal              @default(0) @db.Decimal(12, 2)
+  /// Who the money came from (shareholder, lender, ...), free text.
+  receivedFrom  String?
+  narration     String?
+  pdfKey        String?
+  pdfName       String?
+  sheetKey      String?
+  sheetName     String?
+  createdBy     String
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+  head          AccountingIncomeHead @relation(fields: [headId], references: [id], onDelete: Restrict)
+  bank          AccountingBank       @relation(fields: [bankId], references: [id], onDelete: Restrict)
+  currency      AccountingCurrency   @relation(fields: [currencyId], references: [id], onDelete: Restrict)
+  createdByUser User                 @relation("incomesCreated", fields: [createdBy], references: [id])
+
+  @@index([headId])
+  @@index([bankId])
+  @@index([currencyId])
+  @@index([date])
+  @@index([createdBy])
+  @@map("accounting_incomes")
+}
+
+/// Bank Reconciliation: which bank received the money of one PAID customer
+/// invoice that is on no bank statement (paid before the bank field existed,
+/// or marked as paid with no amount). Always a Debit of amountUsd (may be 0)
+/// on the bank, plus its own fee Credit row of feeUsd. The invoice and its
+/// payments are not changed. One entry per invoice. Amount and fee are typed
+/// in the bank's currency; the rate is 1 USD = X currency. The entity comes
+/// from the bank.
+model AccountingBankReconciliation {
+  id            String             @id @default(cuid())
+  /// Running number shown as REC-0001 (Entry #). Never reused.
+  entryNumber   Int                @unique @default(autoincrement())
+  /// The day the money reached the bank.
+  date          DateTime           @db.Date
+  invoiceId     String             @unique
+  bankId        String
+  currencyId    String
+  exchangeRate  Decimal            @db.Decimal(18, 8)
+  /// Received, in the bank's currency, before the fee. May be 0.
+  amount        Decimal            @db.Decimal(18, 2)
+  /// Charged by the bank, in the bank's currency.
+  fee           Decimal            @default(0) @db.Decimal(18, 2)
+  amountUsd     Decimal            @db.Decimal(12, 2)
+  feeUsd        Decimal            @default(0) @db.Decimal(12, 2)
+  narration     String?
+  pdfKey        String?
+  pdfName       String?
+  sheetKey      String?
+  sheetName     String?
+  createdBy     String
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  invoice       Invoice            @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+  bank          AccountingBank     @relation(fields: [bankId], references: [id], onDelete: Restrict)
+  currency      AccountingCurrency @relation(fields: [currencyId], references: [id], onDelete: Restrict)
+  createdByUser User               @relation("bankReconciliationsCreated", fields: [createdBy], references: [id])
+
+  @@index([bankId])
+  @@index([currencyId])
+  @@index([date])
+  @@index([createdBy])
+  @@map("accounting_bank_reconciliations")
 }
 
 model AccountingBankCurrency {
@@ -2619,6 +2964,15 @@ enum AuditAction {
   EXPENSE_PAYMENT_RECORDED
   EXPENSE_PAYMENT_UPDATED
   EXPENSE_PAYMENT_DELETED
+  INCOME_HEAD_CREATED
+  INCOME_HEAD_UPDATED
+  INCOME_HEAD_DELETED
+  INCOME_RECORDED
+  INCOME_UPDATED
+  INCOME_DELETED
+  BANK_RECONCILIATION_RECORDED
+  BANK_RECONCILIATION_UPDATED
+  BANK_RECONCILIATION_DELETED
   FRANCHISE_CREATED
   FRANCHISE_UPDATED
   FRANCHISE_DELETED
@@ -2686,6 +3040,18 @@ enum AuditAction {
   REPAIR_CHARGE_UPDATED
   REPAIR_CHARGE_DELETED
   REPAIR_SITE_SETTING_UPDATED
+  CLIENT_WALLET_SYNCED
+  CLIENT_WALLET_UPDATED
+  CLIENT_WALLET_MISMATCH_DETECTED
+  CLIENT_WALLET_MISMATCH_ACCEPTED
+  CLIENT_WALLET_MISMATCH_FIXED
+  CLIENT_WALLET_RECHECKED
+  CLIENT_WALLET_HISTORY_VIEWED
+  STAFF_ACCESS_RULE_UPDATED
+  STAFF_ACCESS_TIME_ADDED
+  STAFF_ACCESS_EXCEPTION_SET
+  STAFF_ACCESS_PASSKEY_REMOVED
+  STAFF_HOLIDAY_UPDATED
 }
 
 enum NotificationType {

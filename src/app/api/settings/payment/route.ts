@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyJwtToken } from "@/lib/jwt";
 import { prisma } from "@/lib/prisma";
+import { isStaffRole } from "@/lib/auth/staffRoles";
 
 // GET /api/settings/payment - Fetch payment settings
 export async function GET(request: NextRequest) {
@@ -22,7 +23,7 @@ export async function GET(request: NextRequest) {
       select: { role: true },
     });
 
-    if (user?.role !== "ADMIN" && user?.role !== "ACCOUNTING") {
+    if (!isStaffRole(user?.role)) {
       return NextResponse.json(
         { error: "Admin access required" },
         { status: 403 },
@@ -70,7 +71,7 @@ export async function PUT(request: NextRequest) {
       select: { role: true },
     });
 
-    if (user?.role !== "ADMIN" && user?.role !== "ACCOUNTING") {
+    if (!isStaffRole(user?.role)) {
       return NextResponse.json(
         { error: "Admin access required" },
         { status: 403 },

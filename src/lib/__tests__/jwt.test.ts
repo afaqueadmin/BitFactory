@@ -14,6 +14,7 @@ vi.mock("@/lib/auth/tokenBlacklist", () => ({
 }));
 
 import {
+  decodeSessionClaims,
   generateTokens,
   signEnrollmentToken,
   signJwtToken,
@@ -139,6 +140,43 @@ describe("JWT secret handling", () => {
       const refresh = await verifyJwtToken(withMfa.refreshToken);
       expect(refresh.mfa).toBe(true);
       expect(refresh.type).toBe("refresh");
+    });
+
+    it("carries staff access claims only when set", async () => {
+      const plain = await generateTokens(subject("user-7", "ACCOUNTING"));
+      const p = await verifyJwtToken(plain.accessToken);
+      expect(p.accessUntil).toBeUndefined();
+      expect(p.dbp).toBeUndefined();
+      expect(p.pxe).toBeUndefined();
+
+      const restricted = await generateTokens(subject("user-7", "ACCOUNTING"), {
+        accessUntil: 1_900_000_000,
+        dbp: true,
+      });
+      const access = await verifyJwtToken(restricted.accessToken);
+      expect(access.accessUntil).toBe(1_900_000_000);
+      expect(access.dbp).toBe(true);
+      const refresh = await verifyJwtToken(restricted.refreshToken);
+      expect(refresh.accessUntil).toBe(1_900_000_000);
+      expect(refresh.dbp).toBe(true);
+    });
+
+    it("decodeSessionClaims skips the revocation lookup and refuses non-sessions", async () => {
+      const { accessToken } = await generateTokens(subject("user-8", "ADMIN"), {
+        accessUntil: 1_900_000_000,
+        pxe: true,
+      });
+      isTokenBlacklisted.mockClear();
+      isTokenRevokedForUser.mockClear();
+      const claims = await decodeSessionClaims(accessToken);
+      expect(claims?.accessUntil).toBe(1_900_000_000);
+      expect(claims?.pxe).toBe(true);
+      expect(isTokenBlacklisted).not.toHaveBeenCalled();
+      expect(isTokenRevokedForUser).not.toHaveBeenCalled();
+
+      const enroll = await signEnrollmentToken(subject("user-8", "ADMIN"));
+      expect(await decodeSessionClaims(enroll)).toBeNull();
+      expect(await decodeSessionClaims("not-a-token")).toBeNull();
     });
 
     it("never accepts a 2FA-enrollment token as a session", async () => {

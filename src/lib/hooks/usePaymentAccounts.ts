@@ -45,7 +45,9 @@ export interface BankStatementRow {
     | "CONSOLIDATED"
     | "DEPOSIT_RETURN"
     | "TRANSFER"
-    | "EXPENSE";
+    | "EXPENSE"
+    | "INCOME"
+    | "RECONCILIATION";
   bankId: string;
   date: string;
   invoices: { number: string; href: string }[];
@@ -113,7 +115,7 @@ export interface AccountingVendor {
   };
 }
 
-/** A kind of expense (Finance Settings -> Expense Heads). */
+/** A kind of expense (Expenses -> Heads tab). */
 export interface ExpenseHead {
   id: string;
   name: string;
@@ -127,7 +129,27 @@ export interface ExpenseHead {
   amountPaidUsd?: string;
 }
 
-type Kind = "entities" | "banks" | "currencies" | "vendors" | "expense-heads";
+/** A kind of Capital & Income (Capital & Income -> Heads tab). */
+export interface IncomeHead {
+  id: string;
+  name: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  _count: { entries: number };
+  /** USD, 2 dp. Only on the full list (not with activeOnly). */
+  receivedUsd?: string;
+  /** Σ bank fees in USD. */
+  feesUsd?: string;
+}
+
+type Kind =
+  | "entities"
+  | "banks"
+  | "currencies"
+  | "vendors"
+  | "expense-heads"
+  | "capital-income-heads";
 
 const ROOT_KEY = "paymentAccounts";
 
@@ -175,6 +197,15 @@ export function useExpenseHeads(activeOnly = false) {
   return useQuery({
     queryKey: [ROOT_KEY, "expense-heads", activeOnly],
     queryFn: () => request<ExpenseHead[]>(listUrl("expense-heads", activeOnly)),
+  });
+}
+
+/** Capital & Income heads (activeOnly: for the Add entry form). */
+export function useIncomeHeads(activeOnly = false) {
+  return useQuery({
+    queryKey: [ROOT_KEY, "capital-income-heads", activeOnly],
+    queryFn: () =>
+      request<IncomeHead[]>(listUrl("capital-income-heads", activeOnly)),
   });
 }
 

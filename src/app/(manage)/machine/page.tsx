@@ -642,11 +642,14 @@ export default function MachinePage() {
   };
 
   const filtered = getSortedFilteredMiners();
-  const totalHashRate = filtered.reduce(
+  // Nameplate (hardware spec) totals of running miners only - records still
+  // in deployment aren't drawing power or hashing yet.
+  const autoMiners = filtered.filter((m) => m.status === "AUTO");
+  const totalHashRate = autoMiners.reduce(
     (sum, m) => sum + parseFloat(String(m.hardware?.hashRate || 0)),
     0,
   );
-  const totalPower = filtered.reduce(
+  const totalPower = autoMiners.reduce(
     (sum, m) => sum + (m.hardware?.powerUsage || 0),
     0,
   );
@@ -909,25 +912,26 @@ export default function MachinePage() {
           >
             <AdminValueCard
               daylight
-              title="Total Miners"
+              title="Miner Records"
               value={filtered.length}
+              subtitle="all statuses"
             />
             <AdminValueCard
               daylight
-              title="Active Miners"
-              value={filtered.filter((m) => m.status === "AUTO").length}
+              title="Running (AUTO)"
+              value={autoMiners.length}
             />
             <AdminValueCard
               daylight
-              title="Total Hash Rate"
+              title="Nameplate Hash Rate"
               value={totalHashRate.toFixed(2)}
-              subtitle="TH/s"
+              subtitle="TH/s, running miners"
             />
             <AdminValueCard
               daylight
-              title="Total Power Usage"
+              title="Nameplate Power"
               value={totalPower.toFixed(2)}
-              subtitle="kW"
+              subtitle="kW, running miners"
             />
           </Box>
 

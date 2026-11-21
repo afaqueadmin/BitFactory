@@ -6,23 +6,18 @@
  * subaccount can have a genuinely different payout address (Luxor scopes
  * payment settings per subaccount, not account-wide), so these can't be
  * combined the way the earnings/revenue totals above them are.
+ *
+ * The address arrives already masked (first 6 … last 6) for everyone but
+ * staff - /api/wallet/settings cuts it on the server - and there is
+ * deliberately no copy button.
  */
 
-import React, { useState } from "react";
-import {
-  Box,
-  Typography,
-  Paper,
-  Button,
-  IconButton,
-  Tooltip,
-} from "@mui/material";
-import ContentCopyIcon from "@mui/icons-material/ContentCopy";
-import CheckIcon from "@mui/icons-material/Check";
+import React from "react";
+import { Box, Typography, Paper, Button } from "@mui/material";
 import { LuxorPaymentSettings } from "@/lib/types/wallet";
 import { WalletChangeRequestItem } from "@/lib/hooks/useWalletChangeRequests";
 import { PaymentFrequencyChangeRequestItem } from "@/lib/hooks/usePaymentFrequencyChangeRequests";
-import { RADIUS_CARD, focusRing, useDaylight } from "@/lib/daylight";
+import { RADIUS_CARD, useDaylight } from "@/lib/daylight";
 
 const toProperCase = (text: string): string => {
   if (!text) return "";
@@ -69,7 +64,6 @@ export default function WalletSubaccountCards({
   daylight = false,
   readOnly = false,
 }: WalletSubaccountCardsProps) {
-  const [copiedAddress, setCopiedAddress] = useState(false);
   const { d, fonts } = useDaylight();
 
   // Shared by the wallet address and payment frequency cards' "Request
@@ -119,15 +113,6 @@ export default function WalletSubaccountCards({
       current.revenue_allocation > prev.revenue_allocation ? current : prev,
     );
     return primary.external_address;
-  };
-
-  const handleCopyAddress = () => {
-    const address = primaryAddress();
-    if (address && address !== "Not configured") {
-      navigator.clipboard.writeText(address);
-      setCopiedAddress(true);
-      setTimeout(() => setCopiedAddress(false), 2000);
-    }
   };
 
   let payoutDate: Date | null = null;
@@ -199,44 +184,6 @@ export default function WalletSubaccountCards({
           >
             Wallet Address
           </Typography>
-          {!readOnly && primaryAddress() !== "Not configured" && (
-            <Tooltip title={copiedAddress ? "Copied!" : "Copy Address"}>
-              <IconButton
-                size="small"
-                onClick={handleCopyAddress}
-                sx={
-                  daylight
-                    ? {
-                        color: d.action,
-                        p: 0.5,
-                        backgroundColor: d.surface,
-                        border: `1px solid ${d.borderSky}`,
-                        "&:hover": { backgroundColor: d.hover },
-                        "&:focus-visible": focusRing(d.action),
-                      }
-                    : {
-                        color: "white",
-                        p: 0.5,
-                        backgroundColor: "rgba(255,255,255,0.15)",
-                        "&:hover": {
-                          backgroundColor: "rgba(255,255,255,0.25)",
-                        },
-                      }
-                }
-              >
-                {copiedAddress ? (
-                  <CheckIcon
-                    sx={{
-                      fontSize: 16,
-                      color: daylight ? d.success : undefined,
-                    }}
-                  />
-                ) : (
-                  <ContentCopyIcon sx={{ fontSize: 16 }} />
-                )}
-              </IconButton>
-            </Tooltip>
-          )}
         </Box>
 
         <Typography

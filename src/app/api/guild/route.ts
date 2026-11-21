@@ -13,6 +13,7 @@ import { requireSession, jsonError } from "@/lib/guilds/routeAuth";
 import { getGuildMembership } from "@/lib/guildScope";
 import { isGuildRole } from "@/lib/customerRoles";
 import { payoutTxUrl } from "@/lib/guilds/walletNetworks";
+import { maskWalletAddress } from "@/lib/walletCrypto";
 
 export async function GET(request: NextRequest) {
   const auth = await requireSession(request);
@@ -124,7 +125,8 @@ export async function GET(request: NextRequest) {
         isGuildmaster,
         myMembershipId: me.id,
         myWallet: {
-          address: me.walletAddress,
+          // Guild members only ever see masked addresses.
+          address: maskWalletAddress(me.walletAddress),
           network: me.walletNetwork,
           carriedBtc: Number(me.carriedBtc),
           updatedAt: me.walletUpdatedAt,
@@ -145,7 +147,7 @@ export async function GET(request: NextRequest) {
           paidBtc: Number(l.paidBtc),
           carriedOutBtc: Number(l.carriedOutBtc),
           carryReason: l.carryReason,
-          wallet: l.walletSnapshot,
+          wallet: maskWalletAddress(l.walletSnapshot),
           // Only a real transaction gets a link; a manual reference doesn't.
           txUrl:
             Number(l.paidBtc) > 0 && l.distribution.status === "SETTLED"
@@ -155,7 +157,10 @@ export async function GET(request: NextRequest) {
           guildPayoutBtc: Number(l.distribution.luxorPayoutBtc),
           hostingBtc: Number(l.distribution.companyBtc),
         })),
-        walletRequests,
+        walletRequests: walletRequests.map((r) => ({
+          ...r,
+          requestedAddress: maskWalletAddress(r.requestedAddress),
+        })),
         splitRequests,
         memberRequests: memberRequests.map((r) => ({
           id: r.id,

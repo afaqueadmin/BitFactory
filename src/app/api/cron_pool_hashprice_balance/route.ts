@@ -3,6 +3,8 @@ import { upsertTodayHashpriceAndBalance } from "@/lib/services/poolHashpriceBala
 import { waitForDatabase } from "@/lib/services/cronRetry";
 import { sendPoolCronSummaryEmail } from "@/lib/email";
 
+export const maxDuration = 300;
+
 /**
  * GET /api/cron_pool_hashprice_balance
  *

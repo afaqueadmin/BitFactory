@@ -50,7 +50,10 @@ export async function withRetry<T>(
   }
 }
 
-const DB_RETRY_DELAYS_MS = [5000, 10000, 20000];
+// ~110s of waiting in total: 35s was not enough on 2026-11-20, when the prod
+// DB was unreachable for ~46s and cron_hashrate_benchmark_alert gave up.
+// Every cron calling this sets maxDuration = 300 so the wait can't time out.
+const DB_RETRY_DELAYS_MS = [5000, 10000, 20000, 30000, 45000];
 
 /**
  * Pings the database, retrying only on a connection failure
@@ -101,4 +104,7 @@ export const EXCLUDED_SUBACCOUNTS = new Set([
   "higgs_test",
   "higgs_test2",
   "higgs_test3",
+  // Guild test subaccount: not under our Luxor key (403), so it has no
+  // wallet record and would alert every day.
+  "guild-test-01",
 ]);

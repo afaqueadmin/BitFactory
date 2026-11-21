@@ -209,7 +209,13 @@ export function TableState({
  * surface the API's error message (e.g. a 409 "in use") in the dialog.
  */
 export function useRecordEditor<T extends { id: string }>(
-  kind: "entities" | "banks" | "currencies" | "vendors" | "expense-heads",
+  kind:
+    | "entities"
+    | "banks"
+    | "currencies"
+    | "vendors"
+    | "expense-heads"
+    | "capital-income-heads",
 ) {
   const mutation = useSavePaymentAccount(kind);
   const [editing, setEditing] = useState<T | "new" | null>(null);

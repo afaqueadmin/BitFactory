@@ -22,7 +22,6 @@ import {
   SupportAgent as SupportIcon,
   TrendingDown as HashrateAlertsIcon,
   AccountBalanceWallet as WalletRequestsIcon,
-  EventRepeat as PaymentFrequencyRequestsIcon,
   SystemUpdateAlt as FirmwareRequestsIcon,
   ContactMail as SecondaryLoginRequestsIcon,
   Group as CustomersIcon,
@@ -59,13 +58,17 @@ import {
   PriceCheck as PricingIcon,
   PictureAsPdf as PdfSettingsIcon,
   AccountBalance as PaymentAccountsIcon,
+  Payment as BanksIcon,
   LocalShipping as VendorsIcon,
   RequestPage as ExpensesIcon,
-  Category as ExpenseHeadsIcon,
+  SyncAlt as TransfersIcon,
+  AddCard as CapitalIncomeIcon,
+  FactCheck as BankReconciliationIcon,
   Timeline as CustomerPaybackIcon,
   Factory as CompanyPaybackIcon,
   History as ActivityLogIcon,
   FactCheck as AuditLogIcon,
+  ManageAccounts as AccessRulesIcon,
   Dataset as DbDataIcon,
   ListAlt as SubaccountRecordsIcon,
   ShowChart as DailySnapshotsIcon,
@@ -92,18 +95,20 @@ import {
   useSecondaryLoginRequests,
   useHashrateAlerts,
 } from "@/lib/hooks";
+import { useWalletMismatchCount } from "@/lib/hooks/useWalletMismatchCount";
 import { useSimulationRequestCount } from "@/lib/hooks/useSimulationRequestCount";
+import { useStaffTimeRequestCount } from "@/lib/hooks/useStaffTimeRequestCount";
 import { useAdminNav } from "@/lib/contexts/admin-nav-context";
 import { focusRing, useDaylight } from "@/lib/daylight";
 
 type BadgeKey =
   | "tickets"
-  | "wallet"
-  | "frequency"
+  | "wallets"
   | "firmware"
   | "logins"
   | "alerts"
-  | "simulation";
+  | "simulation"
+  | "access";
 
 interface SidebarItem {
   title: string;
@@ -149,16 +154,13 @@ const sidebarSections: SidebarSection[] = [
         badgeKey: "alerts",
       },
       {
-        title: "Wallet Requests",
+        // Client wallets: records, Luxor mismatch alerts, wallet / guild
+        // wallet / payment frequency requests (badge sums all of them).
+        title: "Wallets",
         icon: <WalletRequestsIcon />,
-        path: "/wallet-requests",
-        badgeKey: "wallet",
-      },
-      {
-        title: "Payment Frequency Requests",
-        icon: <PaymentFrequencyRequestsIcon />,
-        path: "/payment-frequency-requests",
-        badgeKey: "frequency",
+        path: "/wallets",
+        activeMatch: [/^\/wallet-requests/, /^\/payment-frequency-requests/],
+        badgeKey: "wallets",
       },
       {
         title: "Firmware Change Requests",
@@ -230,6 +232,12 @@ const sidebarSections: SidebarSection[] = [
         ],
       },
       { title: "Pools", icon: <PoolsIcon />, path: "/pools" },
+      {
+        // Luxor/Braiins pool payouts and charges per customer.
+        title: "Transaction History",
+        icon: <TransactionHistoryIcon />,
+        path: "/accounting/client-transaction-history",
+      },
       { title: "Locations", icon: <LocationsIcon />, path: "/space" },
       { title: "Hardware Models", icon: <HardwareIcon />, path: "/hardware" },
     ],
@@ -265,6 +273,11 @@ const sidebarSections: SidebarSection[] = [
             title: "Recurring Invoices",
             icon: <RecurringIcon />,
             path: "/accounting/recurring",
+          },
+          {
+            title: "Email Reports",
+            icon: <EmailReportsIcon />,
+            path: "/accounting/email-report",
           },
         ],
       },
@@ -307,9 +320,39 @@ const sidebarSections: SidebarSection[] = [
         ],
       },
       {
-        title: "Expenses",
-        icon: <ExpensesIcon />,
-        path: "/accounting/expenses",
+        // Everything that moves money in or out of our banks.
+        title: "Banking",
+        icon: <PaymentAccountsIcon />,
+        items: [
+          {
+            // Banks / Entities / Currencies tabs, plus bank statements
+            // under /payment-accounts/banks/[id] and /statement.
+            title: "Banks",
+            icon: <BanksIcon />,
+            path: "/accounting/payment-accounts",
+          },
+          {
+            title: "Transfers",
+            icon: <TransfersIcon />,
+            path: "/accounting/transfers",
+          },
+          {
+            // Heads are a tab on this page (and on Capital & Income).
+            title: "Expenses",
+            icon: <ExpensesIcon />,
+            path: "/accounting/expenses",
+          },
+          {
+            title: "Capital & Income",
+            icon: <CapitalIncomeIcon />,
+            path: "/accounting/capital-income",
+          },
+          {
+            title: "Bank Reconciliation",
+            icon: <BankReconciliationIcon />,
+            path: "/accounting/bank-reconciliation",
+          },
+        ],
       },
       {
         title: "Customer Statements",
@@ -317,19 +360,9 @@ const sidebarSections: SidebarSection[] = [
         path: "/accounting/statements",
       },
       {
-        title: "Transaction History",
-        icon: <TransactionHistoryIcon />,
-        path: "/accounting/client-transaction-history",
-      },
-      {
         title: "Incentive Payouts",
         icon: <IncentivesIcon />,
         path: "/incentives/payouts",
-      },
-      {
-        title: "Email Reports",
-        icon: <EmailReportsIcon />,
-        path: "/accounting/email-report",
       },
       {
         title: "Finance Settings",
@@ -351,19 +384,9 @@ const sidebarSections: SidebarSection[] = [
             path: "/accounting/pdf-invoice-settings",
           },
           {
-            title: "Entities, Banks & Currencies",
-            icon: <PaymentAccountsIcon />,
-            path: "/accounting/payment-accounts",
-          },
-          {
             title: "Vendors",
             icon: <VendorsIcon />,
             path: "/accounting/vendors",
-          },
-          {
-            title: "Expense Heads",
-            icon: <ExpenseHeadsIcon />,
-            path: "/accounting/expense-heads",
           },
         ],
       },
@@ -382,6 +405,22 @@ const sidebarSections: SidebarSection[] = [
         icon: <CompanyPaybackIcon />,
         path: "/admin/payback-analysis-company",
       },
+      {
+        title: "Payback Settings",
+        icon: <SettingsIcon />,
+        items: [
+          {
+            title: "Customer Payback",
+            icon: <CustomerPaybackSettingsIcon />,
+            path: "/admin/payback-analysis-settings",
+          },
+          {
+            title: "Company Payback",
+            icon: <CompanyPaybackSettingsIcon />,
+            path: "/admin/payback-analysis-company-settings",
+          },
+        ],
+      },
     ],
   },
   {
@@ -393,6 +432,14 @@ const sidebarSections: SidebarSection[] = [
         path: "/activity-log",
       },
       { title: "Audit Log", icon: <AuditLogIcon />, path: "/audit-log" },
+      {
+        // Office hours + office-passkey rules for admin/accounting accounts.
+        title: "Access Rules (Incomplete - In Progress)",
+        icon: <AccessRulesIcon />,
+        path: "/access-rules",
+        roles: ["SUPER_ADMIN"],
+        badgeKey: "access",
+      },
       {
         title: "DB Data Management",
         icon: <DbDataIcon />,
@@ -416,22 +463,6 @@ const sidebarSections: SidebarSection[] = [
             title: "Pool Transactions",
             icon: <PoolTransactionsIcon />,
             path: "/db-data-management/pool-transactions",
-          },
-        ],
-      },
-      {
-        title: "Payback Settings",
-        icon: <SettingsIcon />,
-        items: [
-          {
-            title: "Customer Payback",
-            icon: <CustomerPaybackSettingsIcon />,
-            path: "/admin/payback-analysis-settings",
-          },
-          {
-            title: "Company Payback",
-            icon: <CompanyPaybackSettingsIcon />,
-            path: "/admin/payback-analysis-company-settings",
           },
         ],
       },
@@ -498,16 +529,23 @@ export default function AdminSidebar() {
     acknowledged: false,
   });
   const pendingSimulationRequests = useSimulationRequestCount();
+  const pendingTimeRequests = useStaffTimeRequestCount(
+    user?.role === "SUPER_ADMIN",
+  );
+  const openWalletMismatches = useWalletMismatchCount();
   const { d, fonts } = useDaylight();
 
   const badgeCounts: Record<BadgeKey, number> = {
     tickets: openTickets.length,
-    wallet: pendingWalletRequests.length,
-    frequency: pendingFrequencyRequests.length,
+    wallets:
+      pendingWalletRequests.length +
+      pendingFrequencyRequests.length +
+      openWalletMismatches,
     firmware: pendingFirmwareRequests.length,
     logins: pendingLoginRequests.length,
     alerts: pendingHashrateAlerts.length,
     simulation: pendingSimulationRequests,
+    access: pendingTimeRequests,
   };
 
   // A group shows the total of its children so counts aren't hidden when

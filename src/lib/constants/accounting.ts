@@ -304,6 +304,15 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   [AuditAction.EXPENSE_PAYMENT_RECORDED]: "Expense Payment Recorded",
   [AuditAction.EXPENSE_PAYMENT_UPDATED]: "Expense Payment Updated",
   [AuditAction.EXPENSE_PAYMENT_DELETED]: "Expense Payment Deleted",
+  [AuditAction.INCOME_HEAD_CREATED]: "Capital & Income Head Created",
+  [AuditAction.INCOME_HEAD_UPDATED]: "Capital & Income Head Updated",
+  [AuditAction.INCOME_HEAD_DELETED]: "Capital & Income Head Deleted",
+  [AuditAction.INCOME_RECORDED]: "Capital & Income Added",
+  [AuditAction.INCOME_UPDATED]: "Capital & Income Updated",
+  [AuditAction.INCOME_DELETED]: "Capital & Income Deleted",
+  [AuditAction.BANK_RECONCILIATION_RECORDED]: "Bank Reconciliation Added",
+  [AuditAction.BANK_RECONCILIATION_UPDATED]: "Bank Reconciliation Updated",
+  [AuditAction.BANK_RECONCILIATION_DELETED]: "Bank Reconciliation Deleted",
   [AuditAction.FRANCHISE_CREATED]: "Franchise Created",
   [AuditAction.FRANCHISE_UPDATED]: "Franchise Updated",
   [AuditAction.FRANCHISE_DELETED]: "Franchise Deleted",
@@ -370,6 +379,21 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   [AuditAction.REPAIR_CHARGE_UPDATED]: "Repair Charge Updated",
   [AuditAction.REPAIR_CHARGE_DELETED]: "Repair Charge Deleted",
   [AuditAction.REPAIR_SITE_SETTING_UPDATED]: "Repair Site Settings Updated",
+  [AuditAction.CLIENT_WALLET_SYNCED]: "Client Wallet Synced From Luxor",
+  [AuditAction.CLIENT_WALLET_UPDATED]: "Client Wallet Record Updated",
+  [AuditAction.CLIENT_WALLET_MISMATCH_DETECTED]:
+    "Client Wallet Mismatch Detected",
+  [AuditAction.CLIENT_WALLET_MISMATCH_ACCEPTED]:
+    "Client Wallet Mismatch - Luxor Address Accepted",
+  [AuditAction.CLIENT_WALLET_MISMATCH_FIXED]:
+    "Client Wallet Mismatch - Luxor Updated",
+  [AuditAction.CLIENT_WALLET_RECHECKED]: "Client Wallet Re-checked",
+  [AuditAction.CLIENT_WALLET_HISTORY_VIEWED]: "Client Wallet History Viewed",
+  [AuditAction.STAFF_ACCESS_RULE_UPDATED]: "Staff Access Rules Updated",
+  [AuditAction.STAFF_ACCESS_TIME_ADDED]: "Staff Extra Time Added",
+  [AuditAction.STAFF_ACCESS_EXCEPTION_SET]: "Staff Access Exception",
+  [AuditAction.STAFF_ACCESS_PASSKEY_REMOVED]: "Staff Passkey Removed",
+  [AuditAction.STAFF_HOLIDAY_UPDATED]: "Staff Holiday Updated",
 };
 
 // ============================================================================

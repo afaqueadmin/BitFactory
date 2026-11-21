@@ -54,6 +54,11 @@
       "path": "/api/cron_guild_distribution",
       "schedule": "0 7 * * *",
       "requestMethod": "GET"
+    },
+    "wallet-address-check": {
+      "path": "/api/cron_wallet_address_check",
+      "schedule": "15 8 * * *",
+      "requestMethod": "GET"
     }
   },
   "$schema": "https://openapi.vercel.sh/vercel.json",

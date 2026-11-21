@@ -4,6 +4,7 @@ import AdminHeader from "@/components/admin/AdminHeader";
 import AdminSidebar from "@/components/admin/AdminSidebar";
 import PasskeySetupPrompt from "@/components/PasskeySetupPrompt";
 import TwoFactorReminder from "@/components/TwoFactorReminder";
+import AccessWindowBanner from "@/components/AccessWindowBanner";
 import { Box } from "@mui/material";
 import { AdminNavProvider } from "@/lib/contexts/admin-nav-context";
 
@@ -31,6 +32,7 @@ export default function ManageLayout({
         <AdminHeader />
         <PasskeySetupPrompt />
         <TwoFactorReminder />
+        <AccessWindowBanner />
         <Box sx={{ display: "flex", flex: 1, minHeight: 0 }}>
           <AdminSidebar />
           <Box

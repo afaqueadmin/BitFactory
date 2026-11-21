@@ -18,6 +18,11 @@ import {
   getClientIp,
 } from "@/lib/rateLimit";
 import { findLoginByEmail, recordLogin } from "@/lib/auth/loginIdentity";
+import {
+  accessDeniedResponse,
+  reportBlock,
+  restrictionClaims,
+} from "@/lib/auth/staffAccessServer";
 
 // Add runtime config for Node.js runtime
 export const runtime = "nodejs";
@@ -115,6 +120,17 @@ export async function POST(request: NextRequest) {
     const user = login.user;
     const subject = { userId: user.id, loginId: login.id, role: user.role };
 
+    // Staff access rules: refused here (password proven, so this tells a
+    // guesser nothing) rather than after a 2FA code is typed for nothing.
+    // The 2FA routes check again, since time passes in between.
+    const restriction = await restrictionClaims(user.id, user.role, {
+      viaBuiltInPasskey: false,
+    });
+    if (!restriction.ok) {
+      await reportBlock(user, login.id, restriction.code, request.headers);
+      return accessDeniedResponse(restriction.code);
+    }
+
     // Require 2FA only when this specific login has 2FA enabled. The pending
     // token proves the password step to /api/auth/2fa/validate (C-3).
     if (login.twoFactorAuth?.enabled) {
@@ -152,7 +168,10 @@ export async function POST(request: NextRequest) {
     });
 
     // Generate tokens with role
-    const { accessToken, refreshToken } = await generateTokens(subject);
+    const { accessToken, refreshToken } = await generateTokens(
+      subject,
+      restriction.claims,
+    );
 
     const redirectUrl = redirectPathForRole(user.role);
 
