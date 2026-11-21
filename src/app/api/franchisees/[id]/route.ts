@@ -9,10 +9,9 @@
  * Authorization: Super Admin only
  */
 
-import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { prisma } from "@/lib/prisma";
-import { verifyJwtToken } from "@/lib/jwt";
 import { AuditAction, Prisma } from "@prisma/client";
 import { logPoolCredentialChange } from "@/lib/audit/logPoolCredentialChange";
 import {
@@ -60,18 +59,6 @@ function withLuxorSubaccounts(
   };
 }
 
-async function getAuthenticatedUser(request: NextRequest) {
-  try {
-    const token = request.cookies.get("token")?.value;
-    if (!token) {
-      return null;
-    }
-    return await verifyJwtToken(token);
-  } catch {
-    return null;
-  }
-}
-
 /**
  * GET /api/franchisees/[id]
  * Fetch a single franchise's details, including owner and creator info
@@ -85,24 +72,8 @@ export async function GET(
   try {
     const { id } = await params;
 
-    const user = await getAuthenticatedUser(request);
-
-    if (!user) {
-      return NextResponse.json(
-        { success: false, error: "Unauthorized" } as ApiResponse,
-        { status: 401 },
-      );
-    }
-
-    if (!isStaffRole(user.role)) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Forbidden: Only Admin/Super Admin can view franchisees",
-        } as ApiResponse,
-        { status: 403 },
-      );
-    }
+    const user = await authorizeStaff(request, ["franchisees.view"]);
+    if ("response" in user) return user.response;
 
     const franchise = await prisma.franchise.findUnique({
       where: { id },
@@ -156,24 +127,8 @@ export async function PUT(
   try {
     const { id } = await params;
 
-    const user = await getAuthenticatedUser(request);
-
-    if (!user) {
-      return NextResponse.json(
-        { success: false, error: "Unauthorized" } as ApiResponse,
-        { status: 401 },
-      );
-    }
-
-    if (!isStaffRole(user.role)) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Forbidden: Only Admin/Super Admin can edit franchisees",
-        } as ApiResponse,
-        { status: 403 },
-      );
-    }
+    const user = await authorizeStaff(request, ["franchisees.edit"]);
+    if ("response" in user) return user.response;
 
     const existingFranchise = await prisma.franchise.findUnique({
       where: { id },
@@ -389,24 +344,8 @@ export async function DELETE(
   try {
     const { id } = await params;
 
-    const user = await getAuthenticatedUser(request);
-
-    if (!user) {
-      return NextResponse.json(
-        { success: false, error: "Unauthorized" } as ApiResponse,
-        { status: 401 },
-      );
-    }
-
-    if (user.role !== "SUPER_ADMIN") {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Forbidden: Only Super Admin can delete franchisees",
-        } as ApiResponse,
-        { status: 403 },
-      );
-    }
+    const user = await authorizeStaff(request, ["franchisees.delete"]);
+    if ("response" in user) return user.response;
 
     const existingFranchise = await prisma.franchise.findUnique({
       where: { id },

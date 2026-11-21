@@ -1,7 +1,6 @@
-import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { prisma } from "@/lib/prisma";
-import { verifyJwtToken } from "@/lib/jwt";
 import { Decimal } from "@prisma/client/runtime/library";
 import { AuditAction, Prisma } from "@prisma/client";
 import {
@@ -44,26 +43,9 @@ interface CreateHardwarePurchaseRequest {
 
 export async function POST(request: NextRequest) {
   try {
-    const token = request.cookies.get("token")?.value;
-
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const decoded = await verifyJwtToken(token);
-    const userId = decoded.userId;
-
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { role: true },
-    });
-
-    if (!user || !isStaffRole(user.role)) {
-      return NextResponse.json(
-        { error: "Only administrators can create hardware purchase invoices" },
-        { status: 403 },
-      );
-    }
+    const auth = await authorizeStaff(request, ["hardware_purchases.create"]);
+    if ("response" in auth) return auth.response;
+    const userId = auth.userId;
 
     const body: CreateHardwarePurchaseRequest = await request.json();
 
@@ -189,32 +171,8 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    const token = request.cookies.get("token")?.value;
-
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    let decoded;
-    try {
-      decoded = await verifyJwtToken(token);
-    } catch {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const userId = decoded.userId;
-
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { role: true },
-    });
-
-    if (!user || !isStaffRole(user.role)) {
-      return NextResponse.json(
-        { error: "Only administrators can access hardware purchase invoices" },
-        { status: 403 },
-      );
-    }
+    const auth = await authorizeStaff(request, ["hardware_purchases.view"]);
+    if ("response" in auth) return auth.response;
 
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get("page") || "1");

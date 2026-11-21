@@ -9,7 +9,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { AuditAction } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { requireStaff, jsonError } from "@/lib/guilds/routeAuth";
+import { jsonError } from "@/lib/guilds/routeAuth";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { GuildInputError } from "@/lib/guilds/accounts";
 import { isFullSplit } from "@/lib/guilds/distribution";
 import { parseSplitBody } from "@/lib/guilds/adminSplit";
@@ -21,8 +22,8 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string; membershipId: string }> },
 ) {
-  const auth = await requireStaff(request);
-  if ("error" in auth) return auth.error;
+  const auth = await authorizeStaff(request, ["guilds.edit"]);
+  if ("response" in auth) return auth.response;
 
   try {
     const { id, membershipId } = await params;

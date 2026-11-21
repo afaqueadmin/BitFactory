@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { AuditAction } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { requireAccountingAdmin } from "@/lib/accounting/adminAuth";
 import {
   auditTransfer,
   parseTransferRequest,
@@ -12,7 +12,7 @@ import { transferInclude, transferJson } from "./shared";
 /** Every internal bank transfer, newest first. */
 export async function GET(request: NextRequest) {
   try {
-    const auth = await requireAccountingAdmin(request);
+    const auth = await authorizeStaff(request, ["transfers.view"]);
     if ("response" in auth) return auth.response;
 
     const transfers = await prisma.accountingBankTransfer.findMany({
@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const auth = await requireAccountingAdmin(request);
+    const auth = await authorizeStaff(request, ["transfers.create"]);
     if ("response" in auth) return auth.response;
     const { userId } = auth;
 

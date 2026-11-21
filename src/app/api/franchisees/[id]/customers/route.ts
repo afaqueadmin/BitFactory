@@ -9,27 +9,14 @@
  * Authorization: Admin/Super Admin only
  */
 
-import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { prisma } from "@/lib/prisma";
-import { verifyJwtToken } from "@/lib/jwt";
 
 interface ApiResponse<T = Record<string, unknown>> {
   success: boolean;
   data?: T;
   error?: string;
-}
-
-async function getAuthenticatedUser(request: NextRequest) {
-  try {
-    const token = request.cookies.get("token")?.value;
-    if (!token) {
-      return null;
-    }
-    return await verifyJwtToken(token);
-  } catch {
-    return null;
-  }
 }
 
 export async function GET(
@@ -39,25 +26,8 @@ export async function GET(
   try {
     const { id } = await params;
 
-    const user = await getAuthenticatedUser(request);
-
-    if (!user) {
-      return NextResponse.json(
-        { success: false, error: "Unauthorized" } as ApiResponse,
-        { status: 401 },
-      );
-    }
-
-    if (!isStaffRole(user.role)) {
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            "Forbidden: Only Admin/Super Admin can view franchise customers",
-        } as ApiResponse,
-        { status: 403 },
-      );
-    }
+    const user = await authorizeStaff(request, ["franchisees.view"]);
+    if ("response" in user) return user.response;
 
     const franchise = await prisma.franchise.findUnique({
       where: { id },

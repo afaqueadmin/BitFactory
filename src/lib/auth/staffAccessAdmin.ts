@@ -1,10 +1,9 @@
 /**
- * Shared guards for the SUPER_ADMIN staff access routes
+ * Shared pieces for the staff access routes
  * (src/app/api/admin/staff-access/**). Node runtime only.
  */
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { verifyJwtToken } from "@/lib/jwt";
 import { canManageAccount } from "@/lib/auth/accountTiers";
 import { RESTRICTABLE_ROLES } from "@/lib/auth/staffAccessServer";
 
@@ -13,26 +12,17 @@ export type StaffAccessActor = { id: string; email: string; role: string };
 const fail = (error: string, status: number) =>
   NextResponse.json({ error }, { status });
 
-/** The signed-in SUPER_ADMIN (role read from the database), or a reply. */
-export async function requireSuperAdmin(
-  request: NextRequest,
-): Promise<StaffAccessActor | NextResponse> {
-  const token = request.cookies.get("token")?.value;
-  if (!token) return fail("Unauthorized", 401);
-  let userId: string;
-  try {
-    userId = (await verifyJwtToken(token)).userId;
-  } catch {
-    return fail("Invalid token", 401);
-  }
-  const actor = await prisma.user.findFirst({
-    where: { id: userId, isDeleted: false },
+/**
+ * The signed-in staff member, after the route has checked access_rules.*
+ * (authorizeStaff), with the role read from the database.
+ */
+export async function staffAccessActor(
+  userId: string,
+): Promise<StaffAccessActor> {
+  return prisma.user.findUniqueOrThrow({
+    where: { id: userId },
     select: { id: true, email: true, role: true },
   });
-  if (!actor || actor.role !== "SUPER_ADMIN") {
-    return fail("Only a super admin can manage access rules", 403);
-  }
-  return actor;
 }
 
 export type StaffAccessTarget = {

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { Decimal } from "@prisma/client/runtime/library";
 import { prisma } from "@/lib/prisma";
-import { requireAccountingAdmin } from "@/lib/accounting/adminAuth";
 import { buildExpenseReport, ReportCell } from "@/lib/accounting/expense";
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -23,7 +23,7 @@ const recordJson = (r: Record<string, ReportCell>) =>
  */
 export async function GET(request: NextRequest) {
   try {
-    const auth = await requireAccountingAdmin(request);
+    const auth = await authorizeStaff(request, ["expenses.view"]);
     if ("response" in auth) return auth.response;
 
     const params = new URL(request.url).searchParams;

@@ -1,7 +1,6 @@
-import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { generateInvoicePDF } from "@/lib/email";
-import { verifyJwtToken } from "@/lib/jwt";
 
 /**
  * Test endpoint to preview invoice PDF with sample data
@@ -9,22 +8,8 @@ import { verifyJwtToken } from "@/lib/jwt";
  * Admins only (N-16: was open to anyone, signed in or not).
  */
 export async function GET(request: NextRequest) {
-  const token = request.cookies.get("token")?.value;
-  let role: string | null = null;
-  try {
-    if (token) ({ role } = await verifyJwtToken(token));
-  } catch {
-    role = null;
-  }
-  if (!role) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-  if (!isStaffRole(role)) {
-    return NextResponse.json(
-      { error: "Admin access required" },
-      { status: 403 },
-    );
-  }
+  const auth = await authorizeStaff(request, ["invoicing.view"]);
+  if ("response" in auth) return auth.response;
 
   try {
     console.log("[Preview PDF] Generating sample invoice PDF...");

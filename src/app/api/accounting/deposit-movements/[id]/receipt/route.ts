@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { prisma } from "@/lib/prisma";
-import { requireAccountingAdmin } from "@/lib/accounting/adminAuth";
 import { presignDownload } from "@/lib/storage/r2";
 
 /** Opens a security deposit return's receipt PDF. */
@@ -9,7 +9,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const auth = await requireAccountingAdmin(request);
+    const auth = await authorizeStaff(request, ["security_deposits.view"]);
     if ("response" in auth) return auth.response;
     const { id } = await params;
 

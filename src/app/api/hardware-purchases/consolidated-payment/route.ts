@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAccountingAdmin } from "@/lib/accounting/adminAuth";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import {
   consolidationCandidates,
   recordConsolidatedPayment,
@@ -17,7 +17,9 @@ import {
  */
 export async function GET(request: NextRequest) {
   try {
-    const auth = await requireAccountingAdmin(request);
+    const auth = await authorizeStaff(request, [
+      "hardware_purchases.record_payment",
+    ]);
     if ("response" in auth) return auth.response;
     const vendorId = request.nextUrl.searchParams.get("vendorId");
     if (!vendorId) {
@@ -38,7 +40,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const auth = await requireAccountingAdmin(request);
+    const auth = await authorizeStaff(request, [
+      "hardware_purchases.record_payment",
+    ]);
     if ("response" in auth) return auth.response;
     const body: RecordConsolidatedPaymentRequest = await request.json();
     return await recordConsolidatedPayment("hardware", auth.userId, body);

@@ -8,13 +8,14 @@
  * DELETE /api/admin/staff-access/holidays?id=<holidayId>
  */
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { AuditAction } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import {
   label,
   loadTarget,
   requestMeta,
-  requireSuperAdmin,
+  staffAccessActor,
 } from "@/lib/auth/staffAccessAdmin";
 
 export const runtime = "nodejs";
@@ -22,8 +23,9 @@ export const runtime = "nodejs";
 const YMD = /^\d{4}-\d{2}-\d{2}$/;
 
 export async function POST(request: NextRequest) {
-  const actor = await requireSuperAdmin(request);
-  if (actor instanceof NextResponse) return actor;
+  const auth = await authorizeStaff(request, ["access_rules.manage"]);
+  if ("response" in auth) return auth.response;
+  const actor = await staffAccessActor(auth.userId);
 
   try {
     const body = await request.json().catch(() => ({}));
@@ -100,8 +102,9 @@ export async function POST(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const actor = await requireSuperAdmin(request);
-  if (actor instanceof NextResponse) return actor;
+  const auth = await authorizeStaff(request, ["access_rules.manage"]);
+  if ("response" in auth) return auth.response;
+  const actor = await staffAccessActor(auth.userId);
 
   try {
     const id = new URL(request.url).searchParams.get("id");

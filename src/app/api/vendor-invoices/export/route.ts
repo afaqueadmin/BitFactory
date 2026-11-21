@@ -1,7 +1,6 @@
-import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { prisma } from "@/lib/prisma";
-import { verifyJwtToken } from "@/lib/jwt";
 import { generatePDFFromHTML } from "@/lib/email";
 import { INVOICE_STATUS_LABELS } from "@/lib/constants/accounting";
 import {
@@ -32,31 +31,8 @@ const COLUMNS = [
 
 export async function GET(request: NextRequest) {
   try {
-    const token = request.cookies.get("token")?.value;
-
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    let userId: string;
-    try {
-      const decoded = await verifyJwtToken(token);
-      userId = decoded.userId;
-    } catch {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { role: true },
-    });
-
-    if (!user || !isStaffRole(user.role)) {
-      return NextResponse.json(
-        { error: "Only administrators can export vendor invoices" },
-        { status: 403 },
-      );
-    }
+    const auth = await authorizeStaff(request, ["farm_tariffs.view"]);
+    if ("response" in auth) return auth.response;
 
     const { searchParams } = new URL(request.url);
     const format = searchParams.get("format");

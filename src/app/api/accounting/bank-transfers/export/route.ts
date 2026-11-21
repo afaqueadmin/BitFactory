@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { Decimal } from "@prisma/client/runtime/library";
 import { prisma } from "@/lib/prisma";
-import { requireAccountingAdmin } from "@/lib/accounting/adminAuth";
 import { generatePDFFromHTML } from "@/lib/email";
 import {
   parseTransferListQuery,
@@ -40,7 +40,7 @@ const COLUMNS = [
  */
 export async function GET(request: NextRequest) {
   try {
-    const auth = await requireAccountingAdmin(request);
+    const auth = await authorizeStaff(request, ["transfers.view"]);
     if ("response" in auth) return auth.response;
 
     const { searchParams } = new URL(request.url);

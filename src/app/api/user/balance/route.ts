@@ -1,5 +1,6 @@
 import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
+import { requireStaffPermission } from "@/lib/auth/authorization";
 import { prisma } from "@/lib/prisma";
 import { NON_BALANCE_PAYMENT_TYPES } from "@/lib/accounting/paymentTypes";
 import { verifyJwtToken } from "@/lib/jwt";
@@ -40,6 +41,13 @@ export async function GET(request: NextRequest) {
 
     const url = new URL(request.url);
     const customerId = url.searchParams.get("customerId");
+    if (customerId && isStaffRole(userRole)) {
+      const denied = await requireStaffPermission(request, [
+        "customers.view",
+        "credit_adjustments.view",
+      ]);
+      if (denied) return denied;
+    }
     if (customerId) {
       if (userRole === "FRANCHISEE") {
         const owned = await prisma.user.findFirst({

@@ -7,6 +7,7 @@
  * login's email gets the usual "passkey removed" alert.
  */
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { AuditAction } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { sessionCutoffNow } from "@/lib/auth/sessionRevocation";
@@ -15,7 +16,7 @@ import {
   label,
   loadTarget,
   requestMeta,
-  requireSuperAdmin,
+  staffAccessActor,
 } from "@/lib/auth/staffAccessAdmin";
 
 export const runtime = "nodejs";
@@ -24,8 +25,9 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ userId: string; credentialId: string }> },
 ) {
-  const actor = await requireSuperAdmin(request);
-  if (actor instanceof NextResponse) return actor;
+  const auth = await authorizeStaff(request, ["access_rules.manage"]);
+  if ("response" in auth) return auth.response;
+  const actor = await staffAccessActor(auth.userId);
   const { userId, credentialId } = await params;
   const target = await loadTarget(actor, userId);
   if (target instanceof NextResponse) return target;

@@ -9,10 +9,9 @@
  * Authorization: Admin/Super Admin only
  */
 
-import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { prisma } from "@/lib/prisma";
-import { verifyJwtToken } from "@/lib/jwt";
 import { AuditAction } from "@prisma/client";
 import { logPoolCredentialChange } from "@/lib/audit/logPoolCredentialChange";
 import { hash } from "bcrypt";
@@ -35,44 +34,14 @@ interface ApiResponse<T = Record<string, unknown>> {
   message?: string;
 }
 
-async function getAuthenticatedUser(request: NextRequest) {
-  try {
-    const token = request.cookies.get("token")?.value;
-    if (!token) {
-      console.warn("[Franchisees API] No token in cookies");
-      return null;
-    }
-    return await verifyJwtToken(token);
-  } catch (error) {
-    console.error("[Franchisees API] Token verification error:", error);
-    return null;
-  }
-}
-
 /**
  * GET /api/franchisees
  * List all franchises with franchisee (owner) and creator info
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
-    const user = await getAuthenticatedUser(request);
-
-    if (!user) {
-      return NextResponse.json(
-        { success: false, error: "Unauthorized" } as ApiResponse,
-        { status: 401 },
-      );
-    }
-
-    if (!isStaffRole(user.role)) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Forbidden: Only Admin/Super Admin can view franchisees",
-        } as ApiResponse,
-        { status: 403 },
-      );
-    }
+    const user = await authorizeStaff(request, ["franchisees.view"]);
+    if ("response" in user) return user.response;
 
     const franchises = await prisma.franchise.findMany({
       where: { deletedAt: null },
@@ -145,24 +114,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
-    const authUser = await getAuthenticatedUser(request);
-
-    if (!authUser) {
-      return NextResponse.json(
-        { success: false, error: "Unauthorized" } as ApiResponse,
-        { status: 401 },
-      );
-    }
-
-    if (!isStaffRole(authUser.role)) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Forbidden: Only Admin/Super Admin can create franchisees",
-        } as ApiResponse,
-        { status: 403 },
-      );
-    }
+    const authUser = await authorizeStaff(request, ["franchisees.create"]);
+    if ("response" in authUser) return authUser.response;
 
     const body = await request.json();
     const {

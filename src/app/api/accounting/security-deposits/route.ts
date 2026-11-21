@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { Decimal } from "@prisma/client/runtime/library";
 import { prisma } from "@/lib/prisma";
-import { requireAccountingAdmin } from "@/lib/accounting/adminAuth";
 import {
   computeDepositBalance,
   DepositBalance,
@@ -23,7 +23,7 @@ const toNumbers = (b: DepositBalance) => ({
  */
 export async function GET(request: NextRequest) {
   try {
-    const auth = await requireAccountingAdmin(request);
+    const auth = await authorizeStaff(request, ["security_deposits.view"]);
     if ("response" in auth) return auth.response;
 
     const balances = await getDepositBalances();

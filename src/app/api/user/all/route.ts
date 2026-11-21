@@ -2,6 +2,7 @@ import { isStaffRole } from "@/lib/auth/staffRoles";
 import { prisma } from "@/lib/prisma";
 import { NON_BALANCE_PAYMENT_TYPES } from "@/lib/accounting/paymentTypes";
 import { NextRequest, NextResponse } from "next/server";
+import { requireStaffPermission } from "@/lib/auth/authorization";
 import { verifyJwtToken } from "@/lib/jwt";
 import { franchiseeUserFilter } from "@/lib/franchiseeScope";
 
@@ -50,6 +51,16 @@ export async function GET(request: NextRequest) {
         { error: "Only administrators can view all users" },
         { status: 403 },
       );
+    }
+    if (!user || isStaffRole(user.role)) {
+      const denied = await requireStaffPermission(request, [
+        "customers.view",
+        "activity_log.view",
+        "audit_log.view",
+        "miners.view",
+        "pools.view",
+      ]);
+      if (denied) return denied;
     }
     const { searchParams } = request.nextUrl;
     const includeDeleted = searchParams.get("isDeleted") === "true";

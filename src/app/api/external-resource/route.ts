@@ -1,22 +1,17 @@
-import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { prisma } from "@/lib/prisma";
-import { verifyJwtToken } from "@/lib/jwt";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   try {
-    const token = request.cookies.get("token")?.value;
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const decoded = await verifyJwtToken(token);
-    if (!isStaffRole(decoded.role)) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+    const auth = await authorizeStaff(request, [
+      "external_resources.view",
+      "miners.view",
+    ]);
+    if ("response" in auth) return auth.response;
 
     const { searchParams } = new URL(request.url);
     const key = searchParams.get("key");
@@ -41,15 +36,8 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const token = request.cookies.get("token")?.value;
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const decoded = await verifyJwtToken(token);
-    if (!isStaffRole(decoded.role)) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+    const auth = await authorizeStaff(request, ["external_resources.edit"]);
+    if ("response" in auth) return auth.response;
 
     const body = await request.json();
     const { key, url, label } = body;

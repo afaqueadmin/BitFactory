@@ -1,34 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyJwtToken } from "@/lib/jwt";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { prisma } from "@/lib/prisma";
-import { isStaffRole } from "@/lib/auth/staffRoles";
 
 // GET /api/settings/payment - Fetch payment settings
 export async function GET(request: NextRequest) {
   try {
     // Check authentication
-    const token = request.cookies.get("token")?.value;
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const decoded = await verifyJwtToken(token);
-    if (!decoded?.userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Check if user is admin
-    const user = await prisma.user.findUnique({
-      where: { id: decoded.userId },
-      select: { role: true },
-    });
-
-    if (!isStaffRole(user?.role)) {
-      return NextResponse.json(
-        { error: "Admin access required" },
-        { status: 403 },
-      );
-    }
+    const auth = await authorizeStaff(request, [
+      "payment_settings.view",
+      "invoicing.create",
+      "invoicing.edit",
+    ]);
+    if ("response" in auth) return auth.response;
 
     // Fetch payment settings
     const settings = await prisma.paymentDetails.findFirst();
@@ -55,28 +38,9 @@ export async function GET(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     // Check authentication
-    const token = request.cookies.get("token")?.value;
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const decoded = await verifyJwtToken(token);
-    if (!decoded?.userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Check if user is admin
-    const user = await prisma.user.findUnique({
-      where: { id: decoded.userId },
-      select: { role: true },
-    });
-
-    if (!isStaffRole(user?.role)) {
-      return NextResponse.json(
-        { error: "Admin access required" },
-        { status: 403 },
-      );
-    }
+    const auth = await authorizeStaff(request, ["payment_settings.edit"]);
+    if ("response" in auth) return auth.response;
+    const decoded = auth.decoded;
 
     // Parse request body
     const body = await request.json();

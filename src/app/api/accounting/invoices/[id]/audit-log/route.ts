@@ -1,7 +1,6 @@
-import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { prisma } from "@/lib/prisma";
-import { verifyJwtToken } from "@/lib/jwt";
 
 export async function GET(
   request: NextRequest,
@@ -9,31 +8,8 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const token = request.cookies.get("token")?.value;
-
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    let userId: string;
-    try {
-      ({ userId } = await verifyJwtToken(token));
-    } catch {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Admin-only: entries hold internal details such as the payment
-    // account and exchange rate, which customers don't see (§2c P2-4).
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { role: true },
-    });
-    if (!user || !isStaffRole(user.role)) {
-      return NextResponse.json(
-        { error: "Only administrators can view invoice audit logs" },
-        { status: 403 },
-      );
-    }
+    const auth = await authorizeStaff(request, ["invoicing.view"]);
+    if ("response" in auth) return auth.response;
 
     // Fetch audit logs for this invoice
     const auditLogs = await prisma.auditLog.findMany({

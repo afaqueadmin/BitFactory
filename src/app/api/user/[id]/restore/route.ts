@@ -8,11 +8,10 @@
  * Same tier rules as deletion: an ADMIN or ACCOUNTING user can restore CLIENT
  * and FRANCHISEE accounts, a SUPER_ADMIN also ADMIN and ACCOUNTING accounts.
  */
-import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { AuditAction } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { verifyJwtToken } from "@/lib/jwt";
 import { canManageAccount } from "@/lib/auth/accountTiers";
 import { isReleasedEmail } from "@/lib/auth/emailIdentity";
 
@@ -24,29 +23,10 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const token = request.cookies.get("token")?.value;
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    let actorId: string;
-    try {
-      actorId = (await verifyJwtToken(token)).userId;
-    } catch {
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
-    }
-
-    // Role from the database, not the token.
-    const actor = await prisma.user.findFirst({
-      where: { id: actorId, isDeleted: false },
-      select: { role: true },
-    });
-    if (!actor || !isStaffRole(actor.role)) {
-      return NextResponse.json(
-        { error: "Only administrators can restore users" },
-        { status: 403 },
-      );
-    }
+    const auth = await authorizeStaff(request, ["customers.restore"]);
+    if ("response" in auth) return auth.response;
+    const actorId = auth.userId;
+    const actor = { id: auth.userId, role: auth.role };
 
     const target = await prisma.user.findUnique({
       where: { id },

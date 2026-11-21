@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAccountingAdmin } from "@/lib/accounting/adminAuth";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { generatePDFFromHTML } from "@/lib/email";
 import {
   buildCsv,
@@ -39,7 +39,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const auth = await requireAccountingAdmin(request);
+    const auth = await authorizeStaff(request, ["banks.view"]);
     if ("response" in auth) return auth.response;
 
     const { searchParams } = new URL(request.url);

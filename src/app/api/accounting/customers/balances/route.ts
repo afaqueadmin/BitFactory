@@ -1,8 +1,7 @@
-import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { prisma } from "@/lib/prisma";
 import { NON_BALANCE_PAYMENT_TYPES } from "@/lib/accounting/paymentTypes";
-import { verifyJwtToken } from "@/lib/jwt";
 
 /**
  * GET /api/accounting/customers/balances
@@ -12,24 +11,12 @@ import { verifyJwtToken } from "@/lib/jwt";
  */
 export async function GET(request: NextRequest) {
   try {
-    const token = request.cookies.get("token")?.value;
-
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const decoded = await verifyJwtToken(token);
-    const user = await prisma.user.findUnique({
-      where: { id: decoded.userId },
-      select: { role: true },
-    });
-
-    if (!user || !isStaffRole(user.role)) {
-      return NextResponse.json(
-        { error: "Only administrators can access customer balances" },
-        { status: 403 },
-      );
-    }
+    const auth = await authorizeStaff(request, [
+      "invoicing.view",
+      "invoicing.create",
+      "invoicing.edit",
+    ]);
+    if ("response" in auth) return auth.response;
 
     const balancesByCustomer = await prisma.costPayment.groupBy({
       by: ["userId"],

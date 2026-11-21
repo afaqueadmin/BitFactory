@@ -1,29 +1,12 @@
-import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { prisma } from "@/lib/prisma";
-import { verifyJwtToken } from "@/lib/jwt";
 import { AuditAction } from "@prisma/client";
 
 export async function GET(request: NextRequest) {
   try {
-    const token = request.cookies.get("token")?.value;
-
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const decoded = await verifyJwtToken(token);
-    const user = await prisma.user.findUnique({
-      where: { id: decoded.userId },
-      select: { role: true },
-    });
-
-    if (!user || !isStaffRole(user.role)) {
-      return NextResponse.json(
-        { error: "Only administrators can access incentive payouts" },
-        { status: 403 },
-      );
-    }
+    const auth = await authorizeStaff(request, ["incentive_payouts.view"]);
+    if ("response" in auth) return auth.response;
 
     const { searchParams } = new URL(request.url);
     const franchiseId = searchParams.get("franchiseId");
@@ -56,26 +39,9 @@ export async function GET(request: NextRequest) {
 // for that franchise in range — the same endpoint covers both flows.
 export async function POST(request: NextRequest) {
   try {
-    const token = request.cookies.get("token")?.value;
-
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const decoded = await verifyJwtToken(token);
-    const userId = decoded.userId;
-
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { role: true },
-    });
-
-    if (!user || !isStaffRole(user.role)) {
-      return NextResponse.json(
-        { error: "Only administrators can create incentive payouts" },
-        { status: 403 },
-      );
-    }
+    const auth = await authorizeStaff(request, ["incentive_payouts.record"]);
+    if ("response" in auth) return auth.response;
+    const userId = auth.userId;
 
     const body = await request.json();
     const { franchiseId, entryIds, periodFrom, periodTo, notes, paidDate } =

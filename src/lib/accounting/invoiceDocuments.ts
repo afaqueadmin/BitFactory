@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { AuditAction } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { requireAccountingAdmin } from "@/lib/accounting/adminAuth";
 import {
   cleanFileName,
   deleteObject,
@@ -11,6 +10,8 @@ import {
 } from "@/lib/storage/r2";
 
 /**
+ * Callers check the permission first (the route files).
+ *
  * The documents attached to a vendor-side invoice (Hardware Purchases and
  * Farm Tariffs share this): the required invoice PDF, an optional Excel/CSV
  * sheet, and the payment receipt PDF. Backs
@@ -89,15 +90,11 @@ async function deleteOldObject(key: string | null) {
 }
 
 export async function openInvoiceDocument(
-  request: NextRequest,
   type: InvoiceType,
   id: string,
   kind: string,
 ): Promise<NextResponse> {
   try {
-    const auth = await requireAccountingAdmin(request);
-    if ("response" in auth) return auth.response;
-
     if (kind !== "invoice" && kind !== "sheet" && kind !== "receipt") {
       return NextResponse.json({ error: "Unknown document" }, { status: 404 });
     }
@@ -157,13 +154,12 @@ export async function openInvoiceDocument(
 
 export async function replaceInvoiceDocument(
   request: NextRequest,
+  userId: string,
   type: InvoiceType,
   id: string,
   kind: string,
 ): Promise<NextResponse> {
   try {
-    const auth = await requireAccountingAdmin(request);
-    if ("response" in auth) return auth.response;
     const config = CONFIG[type];
 
     if (kind !== "invoice" && kind !== "sheet") {
@@ -205,7 +201,7 @@ export async function replaceInvoiceDocument(
     }
 
     await updateInvoice(type, id, {
-      updatedBy: auth.userId,
+      updatedBy: userId,
       ...(kind === "invoice"
         ? { invoicePdfKey: verified.key, invoicePdfName: fileName }
         : { invoiceSheetKey: verified.key, invoiceSheetName: fileName }),
@@ -217,7 +213,7 @@ export async function replaceInvoiceDocument(
         action: config.updatedAction,
         entityType: config.entityType,
         entityId: id,
-        userId: auth.userId,
+        userId: userId,
         description: `${config.label} ${invoice.invoiceNumber}: ${what} ${oldKey ? "replaced" : "attached"}`,
         changes: JSON.stringify({
           document: kind,
@@ -243,14 +239,12 @@ export async function replaceInvoiceDocument(
 }
 
 export async function removeInvoiceSheet(
-  request: NextRequest,
+  userId: string,
   type: InvoiceType,
   id: string,
   kind: string,
 ): Promise<NextResponse> {
   try {
-    const auth = await requireAccountingAdmin(request);
-    if ("response" in auth) return auth.response;
     const config = CONFIG[type];
 
     // The invoice PDF is required, so only the sheet can be removed.
@@ -281,7 +275,7 @@ export async function removeInvoiceSheet(
     }
 
     await updateInvoice(type, id, {
-      updatedBy: auth.userId,
+      updatedBy: userId,
       invoiceSheetKey: null,
       invoiceSheetName: null,
     });
@@ -291,7 +285,7 @@ export async function removeInvoiceSheet(
         action: config.updatedAction,
         entityType: config.entityType,
         entityId: id,
-        userId: auth.userId,
+        userId: userId,
         description: `${config.label} ${invoice.invoiceNumber}: Excel/CSV sheet removed`,
         changes: JSON.stringify({
           document: "sheet",

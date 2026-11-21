@@ -10,11 +10,11 @@
  * act on CLIENT and FRANCHISEE accounts, a SUPER_ADMIN also on ADMIN and
  * ACCOUNTING accounts.
  */
-import { isStaffRole, staffActorLabel } from "@/lib/auth/staffRoles";
+import { staffActorLabel } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { AuditAction } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { verifyJwtToken } from "@/lib/jwt";
 import { sessionCutoffNow } from "@/lib/auth/sessionRevocation";
 import { canManageAccount } from "@/lib/auth/accountTiers";
 
@@ -26,29 +26,13 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const token = request.cookies.get("token")?.value;
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    let actorId: string;
-    try {
-      actorId = (await verifyJwtToken(token)).userId;
-    } catch {
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
-    }
-
-    // Role from the database, not the token.
-    const actor = await prisma.user.findFirst({
-      where: { id: actorId, isDeleted: false },
+    const auth = await authorizeStaff(request, ["customers.sign_out"]);
+    if ("response" in auth) return auth.response;
+    const actorId = auth.userId;
+    const actor = await prisma.user.findUniqueOrThrow({
+      where: { id: auth.userId },
       select: { role: true, email: true },
     });
-    if (!actor || !isStaffRole(actor.role)) {
-      return NextResponse.json(
-        { error: "Only administrators can sign users out" },
-        { status: 403 },
-      );
-    }
 
     const target = await prisma.user.findUnique({
       where: { id },

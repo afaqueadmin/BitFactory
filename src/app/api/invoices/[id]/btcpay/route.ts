@@ -1,6 +1,7 @@
 // app/api/invoices/[id]/btcpay/route.ts
 import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
+import { requireStaffPermission } from "@/lib/auth/authorization";
 import { prisma } from "@/lib/prisma";
 import { createBtcpayInvoice, isBtcpayEnabled } from "@/lib/btcpay";
 import { InvoiceStatus } from "@prisma/client";
@@ -44,6 +45,12 @@ export async function POST(
   const isCustomersFranchisee =
     currentUser.role === "FRANCHISEE" &&
     (await assertFranchiseeOwnsCustomer(currentUser.userId, invoice.userId));
+  if (isAdmin && !isOwner && !isCustomersFranchisee) {
+    const denied = await requireStaffPermission(req, [
+      "invoicing.record_payment",
+    ]);
+    if (denied) return denied;
+  }
 
   if (!isOwner && !isAdmin && !isCustomersFranchisee) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });

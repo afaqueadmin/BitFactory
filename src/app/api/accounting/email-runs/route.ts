@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import {
   EmailRunKind,
   EmailRunSource,
@@ -6,7 +7,6 @@ import {
   Prisma,
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { requireAccountingAdmin } from "@/lib/accounting/adminAuth";
 
 const KINDS = Object.values(EmailRunKind) as string[];
 const SOURCES = Object.values(EmailRunSource) as string[];
@@ -29,7 +29,7 @@ function parseDate(value: string | null): Date | null {
  */
 export async function GET(request: NextRequest) {
   try {
-    const auth = await requireAccountingAdmin(request);
+    const auth = await authorizeStaff(request, ["email_reports.view"]);
     if ("response" in auth) return auth.response;
 
     const params = request.nextUrl.searchParams;

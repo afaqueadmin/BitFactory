@@ -1,5 +1,9 @@
 import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
+import {
+  authorizeStaff,
+  requireStaffPermission,
+} from "@/lib/auth/authorization";
 import { prisma } from "@/lib/prisma";
 import { verifyJwtToken } from "@/lib/jwt";
 import { isCustomerRole } from "@/lib/customerRoles";
@@ -62,6 +66,10 @@ export async function GET(request: NextRequest) {
     }
 
     const isAdmin = isStaffRole(userRole);
+    if (isAdmin) {
+      const denied = await requireStaffPermission(request, ["memos.view"]);
+      if (denied) return denied;
+    }
     // Simulated accounts are self-scoped like clients (and simply have no memos).
     const isClient = isCustomerRole(userRole);
 
@@ -227,29 +235,9 @@ const OPPOSITE_CATEGORY: Record<
 
 export async function POST(request: NextRequest) {
   try {
-    const token = request.cookies.get("token")?.value;
-
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    let adminUserId: string;
-    let userRole: string;
-    try {
-      const decoded = await verifyJwtToken(token);
-      adminUserId = decoded.userId;
-      userRole = decoded.role;
-    } catch (error) {
-      console.error("[Memos] Token verification failed:", error);
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
-    }
-
-    if (!isStaffRole(userRole)) {
-      return NextResponse.json(
-        { error: "Only administrators can create memos" },
-        { status: 403 },
-      );
-    }
+    const auth = await authorizeStaff(request, ["memos.create"]);
+    if ("response" in auth) return auth.response;
+    const adminUserId = auth.userId;
 
     const body = await request.json();
     const {

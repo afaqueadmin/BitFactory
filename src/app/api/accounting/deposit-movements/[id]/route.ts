@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { AuditAction } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { requireAccountingAdmin } from "@/lib/accounting/adminAuth";
 import { lockVendor } from "@/lib/accounting/vendorDeposit";
 import { deleteObject } from "@/lib/storage/r2";
 
@@ -18,7 +18,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const auth = await requireAccountingAdmin(request);
+    const auth = await authorizeStaff(request, ["security_deposits.delete"]);
     if ("response" in auth) return auth.response;
     const { userId } = auth;
     const { id } = await params;

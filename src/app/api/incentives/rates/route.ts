@@ -1,31 +1,12 @@
-import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { prisma } from "@/lib/prisma";
-import { verifyJwtToken } from "@/lib/jwt";
 import { AuditAction, IncentiveType, IncentiveRateBasis } from "@prisma/client";
 
 export async function GET(request: NextRequest) {
   try {
-    const token = request.cookies.get("token")?.value;
-
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const decoded = await verifyJwtToken(token);
-    const userId = decoded.userId;
-
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { role: true },
-    });
-
-    if (!user || !isStaffRole(user.role)) {
-      return NextResponse.json(
-        { error: "Only administrators can access incentive rates" },
-        { status: 403 },
-      );
-    }
+    const auth = await authorizeStaff(request, ["franchisees.view"]);
+    if ("response" in auth) return auth.response;
 
     const { searchParams } = new URL(request.url);
     const franchiseId = searchParams.get("franchiseId");
@@ -57,26 +38,11 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const token = request.cookies.get("token")?.value;
-
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const decoded = await verifyJwtToken(token);
-    const userId = decoded.userId;
-
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { role: true },
-    });
-
-    if (!user || !isStaffRole(user.role)) {
-      return NextResponse.json(
-        { error: "Only administrators can create incentive rates" },
-        { status: 403 },
-      );
-    }
+    const auth = await authorizeStaff(request, [
+      "franchisees.manage_incentive_rates",
+    ]);
+    if ("response" in auth) return auth.response;
+    const userId = auth.userId;
 
     const body = await request.json();
     const {

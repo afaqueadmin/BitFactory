@@ -1,5 +1,6 @@
 import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
+import { requireStaffPermission } from "@/lib/auth/authorization";
 import { prisma } from "@/lib/prisma";
 import { NON_BALANCE_PAYMENT_TYPES } from "@/lib/accounting/paymentTypes";
 import { verifyJwtToken } from "@/lib/jwt";
@@ -28,6 +29,10 @@ export async function GET(request: NextRequest) {
     // Check if user is admin, super admin, or franchisee
     if (!isStaffRole(userRole) && userRole !== "FRANCHISEE") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    if (isStaffRole(userRole)) {
+      const denied = await requireStaffPermission(request, ["dashboard.view"]);
+      if (denied) return denied;
     }
 
     // Query cost_payments table and aggregate by userId

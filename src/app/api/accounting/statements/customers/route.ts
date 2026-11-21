@@ -1,5 +1,6 @@
 import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
+import { requireStaffPermission } from "@/lib/auth/authorization";
 import { prisma } from "@/lib/prisma";
 import { BILLED_CUSTOMER_ROLES } from "@/lib/customerRoles";
 import { verifyJwtToken } from "@/lib/jwt";
@@ -26,6 +27,12 @@ export async function GET(request: NextRequest) {
         { error: "Only administrators can access statements" },
         { status: 403 },
       );
+    }
+    if (isStaffRole(user.role)) {
+      const denied = await requireStaffPermission(request, [
+        "customer_statements.view",
+      ]);
+      if (denied) return denied;
     }
 
     const { searchParams } = new URL(request.url);

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { AuditAction } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { requireAccountingAdmin } from "@/lib/accounting/adminAuth";
 import {
   auditIncome,
   IncomeRequest,
@@ -13,7 +13,7 @@ import { incomeInclude, incomeJson } from "./shared";
 /** Every Capital & Income entry, newest first. */
 export async function GET(request: NextRequest) {
   try {
-    const auth = await requireAccountingAdmin(request);
+    const auth = await authorizeStaff(request, ["capital_income.view"]);
     if ("response" in auth) return auth.response;
 
     const entries = await prisma.accountingIncome.findMany({
@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
 /** Adds an entry: money received into one bank (a Debit on its statement). */
 export async function POST(request: NextRequest) {
   try {
-    const auth = await requireAccountingAdmin(request);
+    const auth = await authorizeStaff(request, ["capital_income.create"]);
     if ("response" in auth) return auth.response;
     const { userId } = auth;
 
