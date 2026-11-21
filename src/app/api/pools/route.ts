@@ -12,33 +12,11 @@
 import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { verifyJwtToken } from "@/lib/jwt";
-
-/**
- * Helper: Verify admin authorization
- */
-async function verifyAdminAuth(request: NextRequest) {
-  const token = request.cookies.get("token")?.value;
-
-  if (!token) {
-    throw new Error("Unauthorized: No token provided");
-  }
-
-  try {
-    const decoded = await verifyJwtToken(token);
-
-    if (!isStaffRole(decoded.role)) {
-      throw new Error("Forbidden: Admin access required");
-    }
-
-    return { userId: decoded.userId, role: decoded.role };
-  } catch (error) {
-    if (error instanceof Error) {
-      throw error;
-    }
-    throw new Error("Invalid token");
-  }
-}
+import {
+  getAuthorizationContext,
+  requireAnyPermission,
+  requirePermission,
+} from "@/lib/auth/authorization";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -80,32 +58,22 @@ export interface Pool {
  * - 401: Unauthorized
  * - 500: Server error
  */
-export async function GET(
-  request: NextRequest,
-): Promise<NextResponse<ApiResponse>> {
+export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
     console.log("[Pools API] GET: Starting");
 
-    // Verify user is authenticated
-    const token = request.cookies.get("token")?.value;
-
-    if (!token) {
-      console.error("[Pools API] GET: No token provided");
-      return NextResponse.json<ApiResponse>(
-        { success: false, error: "Unauthorized: No token provided" },
-        { status: 401 },
-      );
-    }
-
-    try {
-      await verifyJwtToken(token);
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : "Invalid token";
-      console.error(`[Pools API] GET: ${errorMsg}`);
-      return NextResponse.json<ApiResponse>(
-        { success: false, error: errorMsg },
-        { status: 401 },
-      );
+    // Shared: any signed-in account may read the pool list (the franchise
+    // miners page uses it). Staff need one of the screens that show it.
+    const ctx = await getAuthorizationContext(request);
+    if ("response" in ctx) return ctx.response;
+    if (isStaffRole(ctx.role)) {
+      const denied = requireAnyPermission(ctx, [
+        "pools.view",
+        "miners.view", // pool picker on /machine
+        "pool_workers.view", // /workers
+        "customers.view", // pool credentials on /customers/[id]
+      ]);
+      if (denied) return denied;
     }
 
     // Fetch all pools
@@ -165,21 +133,12 @@ export async function GET(
  * - 409: Pool name already exists
  * - 500: Server error
  */
-export async function POST(
-  request: NextRequest,
-): Promise<NextResponse<ApiResponse>> {
+export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
-    try {
-      await verifyAdminAuth(request);
-    } catch (authError) {
-      const errorMsg =
-        authError instanceof Error ? authError.message : "Authorization failed";
-      console.error(`[Pools API] POST: ${errorMsg}`);
-      return NextResponse.json<ApiResponse>(
-        { success: false, error: errorMsg },
-        { status: errorMsg.includes("Forbidden") ? 403 : 401 },
-      );
-    }
+    const ctx = await getAuthorizationContext(request);
+    if ("response" in ctx) return ctx.response;
+    const denied = requirePermission(ctx, "pools.create");
+    if (denied) return denied;
 
     const body = await request.json();
     const { name, apiUrl, description } = body;

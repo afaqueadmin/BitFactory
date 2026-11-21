@@ -103,6 +103,71 @@ const ROUTES: ParityRow[] = [
     permissions: ["hardware_models.procure"],
     today: "staff",
   },
+
+  // Pools. GET pools stays open to any signed-in account (franchise portal);
+  // only its staff branch checks a permission.
+  {
+    route: "pools",
+    method: "GET",
+    permissions: [
+      "pools.view",
+      "miners.view",
+      "pool_workers.view",
+      "customers.view",
+    ],
+    today: "staff",
+    shared: true,
+  },
+  {
+    route: "pools",
+    method: "POST",
+    permissions: ["pools.create"],
+    today: "staff",
+    shared: true, // same file as the shared GET
+  },
+  {
+    route: "pools/[id]",
+    method: "PUT",
+    permissions: ["pools.edit"],
+    today: "staff",
+  },
+  {
+    route: "pools/[id]",
+    method: "DELETE",
+    permissions: ["pools.delete"],
+    today: "staff",
+  },
+  {
+    route: "pool-auth",
+    method: "GET",
+    permissions: [
+      "pools.view",
+      "pools.manage_credentials",
+      "pool_workers.view",
+      "customers.view",
+      "customers.edit",
+      "franchisees.edit",
+    ],
+    today: "staff",
+  },
+  {
+    route: "pool-auth",
+    method: "POST",
+    permissions: ["pools.manage_credentials"],
+    today: "staff",
+  },
+  {
+    route: "pool-auth/[id]",
+    method: "PUT",
+    permissions: ["pools.manage_credentials"],
+    today: "staff",
+  },
+  {
+    route: "pool-auth/[id]",
+    method: "DELETE",
+    permissions: ["pools.manage_credentials"],
+    today: "staff",
+  },
 ];
 
 const SYSTEM_ROLES = ["SUPER_ADMIN", "ADMIN", "ACCOUNTING"] as const;
