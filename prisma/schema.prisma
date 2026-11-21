@@ -137,6 +137,7 @@ model User {
   binanceSubaccounts                      BinanceSubaccount[]             @relation("binanceSubaccounts")
   binanceSubaccountsCreated               BinanceSubaccount[]             @relation("binanceSubaccountsCreated")
   binanceSubaccountsUpdated               BinanceSubaccount[]             @relation("binanceSubaccountsUpdated")
+  binanceSubaccountsLocked                BinanceSubaccount[]             @relation("binanceSubaccountsLocked")
   simulatedCostPayments                   SimulatedCostPayment[]          @relation("simulatedCostPayments")
   simulatedCostPaymentsCreated            SimulatedCostPayment[]          @relation("simulatedCostPaymentsCreated")
   walletPaymentEmails                     WalletPaymentEmail[]
@@ -3496,11 +3497,17 @@ model BinanceSubaccount {
   updatedAt              DateTime @updatedAt
   createdBy              String
   updatedBy              String?
+  /// Exclusive 5-minute checkout lock: set when a payer opens "Pay with
+  /// Binance", cleared on payment, close, timeout or by the unlock cron.
+  lockedAt               DateTime?
+  lockedBy               String?
   user                   User     @relation("binanceSubaccounts", fields: [userId], references: [id])
   createdByUser          User     @relation("binanceSubaccountsCreated", fields: [createdBy], references: [id])
   updatedByUser          User?    @relation("binanceSubaccountsUpdated", fields: [updatedBy], references: [id])
+  lockedByUser           User?    @relation("binanceSubaccountsLocked", fields: [lockedBy], references: [id], onDelete: SetNull)
 
   @@unique([binanceSubaccountEmail, coin])
+  @@index([lockedAt])
   @@index([userId])
   @@index([createdBy])
   @@index([updatedBy])
