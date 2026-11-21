@@ -12,7 +12,7 @@
  * A note is required for both, and both are audit-logged.
  */
 import { NextRequest, NextResponse } from "next/server";
-import { requireStaff } from "@/lib/guilds/routeAuth";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { requestMeta } from "@/lib/guilds/audit";
 import { verifyStepUp } from "@/lib/auth/stepUp";
 import {
@@ -25,8 +25,8 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string; action: string }> },
 ) {
-  const auth = await requireStaff(request);
-  if ("error" in auth) return auth.error;
+  const auth = await authorizeStaff(request, ["wallets.resolve_mismatch"]);
+  if ("response" in auth) return auth.response;
 
   try {
     const { id, action } = await params;

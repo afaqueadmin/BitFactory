@@ -29,6 +29,7 @@
 
 import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
+import { requireStaffPermission } from "@/lib/auth/authorization";
 import { AuditAction } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { rejectReadOnly } from "@/lib/guildScope";
@@ -57,6 +58,10 @@ export async function POST(
         { success: false, error: auth.error },
         { status: auth.status },
       );
+    }
+    if (isStaffRole(auth.decoded.role)) {
+      const denied = await requireStaffPermission(request, ["tickets.reply"]);
+      if (denied) return denied;
     }
     const readOnly = rejectReadOnly(auth.decoded.role);
     if (readOnly) return readOnly;

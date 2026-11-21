@@ -8,14 +8,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma, RequestStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { requireStaff, jsonError } from "@/lib/guilds/routeAuth";
+import { jsonError } from "@/lib/guilds/routeAuth";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { OPEN_REQUEST } from "@/lib/guilds/requests";
 
 const userSelect = { select: { id: true, name: true, email: true } };
 
 export async function GET(request: NextRequest) {
-  const auth = await requireStaff(request);
-  if ("error" in auth) return auth.error;
+  const auth = await authorizeStaff(request, ["guild_requests.view"]);
+  if ("response" in auth) return auth.response;
 
   try {
     const statusParam = request.nextUrl.searchParams.get("status");

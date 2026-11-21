@@ -11,40 +11,22 @@
  *   enforces this too.
  */
 
-import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeStaff } from "@/lib/auth/authorization";
 import { AuditAction, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { verifyJwtToken } from "@/lib/jwt";
 import { isUniqueViolation } from "@/lib/accounting/adminAuth";
 import { MAX_FIRMWARE_NAME_LENGTH } from "@/lib/constants/firmware";
-
-async function requireAdmin(request: NextRequest) {
-  const token = request.cookies.get("token")?.value;
-  if (!token) return { error: "Unauthorized", status: 401 as const };
-  try {
-    const decoded = await verifyJwtToken(token);
-    if (!isStaffRole(decoded.role)) {
-      return { error: "Admin access required", status: 403 as const };
-    }
-    return { decoded };
-  } catch {
-    return { error: "Invalid token", status: 401 as const };
-  }
-}
 
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const auth = await requireAdmin(request);
-    if ("error" in auth) {
-      return NextResponse.json(
-        { success: false, error: auth.error },
-        { status: auth.status },
-      );
-    }
+    const auth = await authorizeStaff(request, [
+      "firmware_requests.manage_options",
+    ]);
+    if ("response" in auth) return auth.response;
 
     const { id } = await params;
     const existing = await prisma.firmwareOption.findUnique({ where: { id } });
@@ -131,13 +113,10 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const auth = await requireAdmin(request);
-    if ("error" in auth) {
-      return NextResponse.json(
-        { success: false, error: auth.error },
-        { status: auth.status },
-      );
-    }
+    const auth = await authorizeStaff(request, [
+      "firmware_requests.manage_options",
+    ]);
+    if ("response" in auth) return auth.response;
 
     const { id } = await params;
     const existing = await prisma.firmwareOption.findUnique({

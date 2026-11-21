@@ -23,6 +23,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { isStaffRole } from "@/lib/auth/staffRoles";
+import { requireStaffPermission } from "@/lib/auth/authorization";
 import { AuditAction, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { rejectReadOnly } from "@/lib/guildScope";
@@ -65,6 +67,10 @@ export async function GET(
         { success: false, error: auth.error },
         { status: auth.status },
       );
+    }
+    if (isStaffRole(auth.decoded.role)) {
+      const denied = await requireStaffPermission(request, ["tickets.view"]);
+      if (denied) return denied;
     }
 
     const { id } = await params;
@@ -139,6 +145,10 @@ export async function PATCH(
         { success: false, error: auth.error },
         { status: auth.status },
       );
+    }
+    if (isStaffRole(auth.decoded.role)) {
+      const denied = await requireStaffPermission(request, ["tickets.edit"]);
+      if (denied) return denied;
     }
     const readOnly = rejectReadOnly(auth.decoded.role);
     if (readOnly) return readOnly;
