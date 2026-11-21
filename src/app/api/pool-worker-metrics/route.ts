@@ -10,11 +10,13 @@
  * - GET /api/pool-worker-metrics?page=&pageSize=&poolSubaccountId=&workerName=&startDate=&endDate=
  */
 
-import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { verifyJwtToken } from "@/lib/jwt";
+import {
+  getAuthorizationContext,
+  requirePermission,
+} from "@/lib/auth/authorization";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,17 +33,6 @@ interface ApiResponse<T = unknown> {
     totalPages: number;
   };
   error?: string;
-}
-
-async function verifyAdminAuth(request: NextRequest) {
-  const token = request.cookies.get("token")?.value;
-  if (!token) throw new Error("Unauthorized: No token provided");
-
-  const decoded = await verifyJwtToken(token);
-  if (!isStaffRole(decoded.role)) {
-    throw new Error("Forbidden: Admin access required");
-  }
-  return { userId: decoded.userId, role: decoded.role };
 }
 
 const workerMetricSelect = {
@@ -69,7 +60,10 @@ const workerMetricSelect = {
 
 export async function GET(request: NextRequest) {
   try {
-    await verifyAdminAuth(request);
+    const ctx = await getAuthorizationContext(request);
+    if ("response" in ctx) return ctx.response;
+    const denied = requirePermission(ctx, "db_data.view");
+    if (denied) return denied;
 
     const searchParams = request.nextUrl.searchParams;
     const page = Math.max(
