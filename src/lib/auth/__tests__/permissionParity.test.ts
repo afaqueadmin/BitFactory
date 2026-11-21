@@ -299,6 +299,22 @@ const ROUTES: ParityRow[] = [
     permissions: ["pool_workers.view"],
     today: "staff",
   },
+
+  // Transaction History. The main route also serves franchisees (own
+  // customers only); the debug route has no screen.
+  {
+    route: "admin/client-transaction-history",
+    method: "GET",
+    permissions: ["transaction_history.view"],
+    today: "staff",
+    shared: true,
+  },
+  {
+    route: "admin/client-transaction-history-debug",
+    method: "GET",
+    permissions: ["transaction_history.view"],
+    today: "staff",
+  },
 ];
 
 const SYSTEM_ROLES = ["SUPER_ADMIN", "ADMIN", "ACCOUNTING"] as const;
