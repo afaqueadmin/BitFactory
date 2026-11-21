@@ -3,6 +3,7 @@ import QRCode from "qrcode";
 import { InvoiceStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 // import { binanceRequest } from "@/lib/binance";
+import { acquireLock, releaseLock } from "@/lib/binanceSubaccountLock";
 import { getInvoiceForPayer } from "@/lib/accounting/invoicePayerAccess";
 import {
   getUserBinanceSubaccount,
@@ -72,7 +73,7 @@ export async function POST(
   const { id: invoiceId } = await params;
   const access = await getInvoiceForPayer(req, invoiceId);
   if ("error" in access) return access.error;
-  const { invoice } = access;
+  const { invoice, userId } = access;
 
   if (
     invoice.status === InvoiceStatus.PAID ||
@@ -115,6 +116,18 @@ export async function POST(
     );
   }
 
+  // One payer at a time per subaccount (max 5 minutes).
+  const lock = await acquireLock(sub!.id, userId);
+  if (!lock.ok) {
+    return NextResponse.json(
+      {
+        code: "SUBACCOUNT_LOCKED",
+        error: "This payment address is in use. Please come back later.",
+      },
+      { status: 423 },
+    );
+  }
+
   // Keep an existing start time so reopening checkout doesn't drop a
   // payment that is already on its way.
   const startedAt = invoice.binanceCheckoutStartedAt;
@@ -128,6 +141,8 @@ export async function POST(
   return NextResponse.json({
     amount: invoice.totalAmount.toFixed(2),
     currency: "USDT",
+    lockedAt: lock.lockedAt.toISOString(),
+    expiresAt: lock.expiresAt.toISOString(),
     networks: await Promise.all(
       networks.map(async (n) => ({
         network: SUBACCOUNT_NETWORK_LABELS[n.network],
@@ -136,6 +151,21 @@ export async function POST(
       })),
     ),
   });
+}
+
+/** DELETE → the payer closed checkout: release their subaccount lock. */
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const { id: invoiceId } = await params;
+  const access = await getInvoiceForPayer(req, invoiceId);
+  if ("error" in access) return access.error;
+  const { invoice, userId } = access;
+
+  const sub = await getUserBinanceSubaccount(invoice.userId, "USDT");
+  if (sub) await releaseLock(sub.id, userId);
+  return NextResponse.json({ released: true });
 }
 
 // const ALLOWED_NETWORKS = ["ETH", "TRX"] as const;

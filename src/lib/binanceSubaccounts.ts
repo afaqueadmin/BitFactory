@@ -18,18 +18,20 @@ export async function getUserBinanceSubaccount(
   userId: string,
   coin = "USDT",
 ): Promise<BinanceSubaccount | null> {
-  // @TODO: remove this test 'if' block
-  if (userId === "cmjnwo7mb0002jr04uqew5d9r") {
-    //hamzanajeebmusic@gmail.com
-    return prisma.binanceSubaccount.findFirst({
-      where: { userId: "cmiojv0w50002l7044kq7e915", coin }, // afaque@gmail.com
-      orderBy: { updatedAt: "desc" },
-    });
-  }
-  return prisma.binanceSubaccount.findFirst({
+  let binanceSubaccount = prisma.binanceSubaccount.findFirst({
     where: { userId, coin },
     orderBy: { updatedAt: "desc" },
   });
+
+  if (!binanceSubaccount) {
+    console.log("general getUserBinanceSubaccount");
+    binanceSubaccount = prisma.binanceSubaccount.findFirst({
+      where: { binanceSubaccountEmail: "hamzanajeebmusic@gmail.com", coin }, //general account linked to hamzanajeebmusic@gmail.com
+      orderBy: { updatedAt: "desc" },
+    });
+  }
+
+  return binanceSubaccount;
 }
 
 /** The stored deposit address for a network, or null if it isn't set. */

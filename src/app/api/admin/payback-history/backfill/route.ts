@@ -1,6 +1,8 @@
-import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
-import { verifyJwtToken } from "@/lib/jwt";
+import {
+  getAuthorizationContext,
+  requirePermission,
+} from "@/lib/auth/authorization";
 import {
   toUtcDateOnly,
   upsertSnapshotForDate,
@@ -27,26 +29,10 @@ interface BackfillDayResult {
  */
 export async function POST(request: NextRequest) {
   try {
-    const token = request.cookies.get("token")?.value;
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    let userRole: string;
-    try {
-      const decoded = await verifyJwtToken(token);
-      userRole = decoded.role;
-    } catch (error) {
-      console.error(
-        "[Payback History Backfill] Token verification failed:",
-        error,
-      );
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
-    }
-
-    if (!isStaffRole(userRole)) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+    const ctx = await getAuthorizationContext(request);
+    if ("response" in ctx) return ctx.response;
+    const denied = requirePermission(ctx, "company_payback.edit_settings");
+    if (denied) return denied;
 
     const daysParam = request.nextUrl.searchParams.get("days");
     const parsedDays = daysParam
