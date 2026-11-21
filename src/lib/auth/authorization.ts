@@ -98,6 +98,20 @@ export function requireAnyPermission(
   return permissions.some((p) => ctx.permissions.has(p)) ? null : forbidden();
 }
 
+/**
+ * For shared routes (they also serve client-side accounts): the check for the
+ * staff branch only, after the route's own session and ownership logic has
+ * decided the caller is staff. Allowed with any one of the permissions.
+ */
+export async function requireStaffPermission(
+  request: NextRequest,
+  permissions: readonly Permission[],
+): Promise<NextResponse | null> {
+  const ctx = await getAuthorizationContext(request);
+  if ("response" in ctx) return ctx.response;
+  return requireAnyPermission(ctx, permissions);
+}
+
 function unauthorized() {
   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 }

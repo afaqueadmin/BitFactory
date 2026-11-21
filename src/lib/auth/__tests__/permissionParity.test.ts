@@ -26,7 +26,296 @@ interface ParityRow {
   shared?: boolean;
 }
 
-const ROUTES: ParityRow[] = [];
+// Note: routes that read the role from the token today (spaces) read it from
+// the database after migration - same answer for every live account.
+const ROUTES: ParityRow[] = [
+  // Locations (pilot)
+  {
+    route: "spaces",
+    method: "GET",
+    permissions: [
+      "locations.view",
+      "miners.view",
+      "invoicing.create",
+      "invoicing.edit",
+    ],
+    today: "staff",
+  },
+  {
+    route: "spaces",
+    method: "POST",
+    permissions: ["locations.create"],
+    today: "staff",
+  },
+  {
+    route: "spaces/[id]",
+    method: "PUT",
+    permissions: ["locations.edit"],
+    today: "staff",
+  },
+  {
+    route: "spaces/[id]",
+    method: "DELETE",
+    permissions: ["locations.delete"],
+    today: "staff",
+  },
+
+  // Hardware Models. Both GETs had no check and procure only needed a
+  // session; staff keep their access, clients and visitors lose it.
+  {
+    route: "hardware",
+    method: "GET",
+    permissions: [
+      "hardware_models.view",
+      "miners.view",
+      "invoicing.create",
+      "invoicing.edit",
+    ],
+    today: "staff",
+  },
+  {
+    route: "hardware",
+    method: "POST",
+    permissions: ["hardware_models.create"],
+    today: "staff",
+  },
+  {
+    route: "hardware/[id]",
+    method: "GET",
+    permissions: ["hardware_models.view"],
+    today: "staff",
+  },
+  {
+    route: "hardware/[id]",
+    method: "PUT",
+    permissions: ["hardware_models.edit"],
+    today: "staff",
+  },
+  {
+    route: "hardware/[id]",
+    method: "DELETE",
+    permissions: ["hardware_models.delete"],
+    today: "staff",
+  },
+  {
+    route: "hardware/procure",
+    method: "POST",
+    permissions: ["hardware_models.procure"],
+    today: "staff",
+  },
+
+  // Pools. GET pools stays open to any signed-in account (franchise portal);
+  // only its staff branch checks a permission.
+  {
+    route: "pools",
+    method: "GET",
+    permissions: [
+      "pools.view",
+      "miners.view",
+      "pool_workers.view",
+      "customers.view",
+    ],
+    today: "staff",
+    shared: true,
+  },
+  {
+    route: "pools",
+    method: "POST",
+    permissions: ["pools.create"],
+    today: "staff",
+    shared: true, // same file as the shared GET
+  },
+  {
+    route: "pools/[id]",
+    method: "PUT",
+    permissions: ["pools.edit"],
+    today: "staff",
+  },
+  {
+    route: "pools/[id]",
+    method: "DELETE",
+    permissions: ["pools.delete"],
+    today: "staff",
+  },
+  {
+    route: "pool-auth",
+    method: "GET",
+    permissions: [
+      "pools.view",
+      "pools.manage_credentials",
+      "pool_workers.view",
+      "customers.view",
+      "customers.edit",
+      "franchisees.edit",
+    ],
+    today: "staff",
+  },
+  {
+    route: "pool-auth",
+    method: "POST",
+    permissions: ["pools.manage_credentials"],
+    today: "staff",
+  },
+  {
+    route: "pool-auth/[id]",
+    method: "PUT",
+    permissions: ["pools.manage_credentials"],
+    today: "staff",
+  },
+  {
+    route: "pool-auth/[id]",
+    method: "DELETE",
+    permissions: ["pools.manage_credentials"],
+    today: "staff",
+  },
+
+  // Miners. GET machine also serves franchisees (own customers' miners);
+  // the shared reads keep their client / franchisee / guild branches.
+  {
+    route: "machine",
+    method: "GET",
+    permissions: ["miners.view", "farm_tariffs.create"],
+    today: "staff",
+  },
+  {
+    route: "machine",
+    method: "POST",
+    permissions: ["miners.create"],
+    today: "staff",
+  },
+  {
+    route: "machine/[id]",
+    method: "PUT",
+    permissions: ["miners.edit"],
+    today: "staff",
+  },
+  {
+    route: "machine/[id]",
+    method: "DELETE",
+    permissions: ["miners.delete"],
+    today: "staff",
+  },
+  {
+    route: "machine/bulk-edit",
+    method: "POST",
+    permissions: ["miners.edit"],
+    today: "staff",
+  },
+  {
+    route: "machine/bulk-delete",
+    method: "POST",
+    permissions: ["miners.bulk_delete"],
+    today: "staff",
+  },
+  {
+    route: "machine/[id]/restarts",
+    method: "POST",
+    permissions: ["miners.log_restart", "hashrate_alerts.acknowledge"],
+    today: "staff",
+  },
+  {
+    route: "machine/[id]/repair-notes",
+    method: "GET",
+    permissions: ["miners.view", "customers.view"],
+    today: "staff",
+    shared: true,
+  },
+  {
+    route: "miners/[id]/pool-history",
+    method: "GET",
+    permissions: ["miners.view"],
+    today: "staff",
+  },
+  {
+    route: "miners/[id]/hashrate-history",
+    method: "GET",
+    permissions: ["miners.view", "customers.view"],
+    today: "staff",
+    shared: true,
+  },
+  {
+    route: "miners/hashrate-history",
+    method: "GET",
+    permissions: ["miners.view", "customers.view"],
+    today: "staff",
+    shared: true,
+  },
+  {
+    route: "miners/daily-costs",
+    method: "GET",
+    permissions: ["miners.view", "customers.view"],
+    today: "staff",
+    shared: true,
+  },
+  {
+    route: "miners/user",
+    method: "GET",
+    permissions: ["miners.view", "customers.view"],
+    today: "staff",
+    shared: true,
+  },
+
+  // Pool Workers. The luxor proxy serves every account type; only its staff
+  // branch checks a permission. workers/stats is own-data only (unchanged).
+  {
+    route: "luxor",
+    method: "GET",
+    permissions: [
+      "subaccounts.view",
+      "pool_workers.view",
+      "dashboard.view",
+      "miners.view",
+      "customers.view",
+      "customers.create",
+      "customers.edit",
+      "franchisees.create",
+      "franchisees.edit",
+      "franchisees.approve_customer_requests",
+    ],
+    today: "staff",
+    shared: true,
+  },
+  {
+    route: "braiins-workers",
+    method: "GET",
+    permissions: ["pool_workers.view"],
+    today: "staff",
+  },
+  {
+    route: "braiins-customers",
+    method: "GET",
+    permissions: ["pool_workers.view"],
+    today: "staff",
+  },
+  {
+    route: "braiins-workers/all",
+    method: "GET",
+    permissions: ["pool_workers.view"],
+    today: "staff",
+  },
+  {
+    route: "braiins-miners/all",
+    method: "GET",
+    permissions: ["pool_workers.view"],
+    today: "staff",
+  },
+
+  // Transaction History. The main route also serves franchisees (own
+  // customers only); the debug route has no screen.
+  {
+    route: "admin/client-transaction-history",
+    method: "GET",
+    permissions: ["transaction_history.view"],
+    today: "staff",
+    shared: true,
+  },
+  {
+    route: "admin/client-transaction-history-debug",
+    method: "GET",
+    permissions: ["transaction_history.view"],
+    today: "staff",
+  },
+];
 
 const SYSTEM_ROLES = ["SUPER_ADMIN", "ADMIN", "ACCOUNTING"] as const;
 const OLD_STAFF_CHECKS =
@@ -63,7 +352,7 @@ describe("permission parity", () => {
         "route.ts",
       );
       const source = fs.readFileSync(file, "utf8");
-      expect(source).toMatch(/require(Any)?Permission\(/);
+      expect(source).toMatch(/require(Any|Staff)?Permission\(/);
       if (!row.shared) expect(source).not.toMatch(OLD_STAFF_CHECKS);
     });
   }

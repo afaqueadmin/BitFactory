@@ -1,6 +1,8 @@
-import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
-import { verifyJwtToken } from "@/lib/jwt";
+import {
+  getAuthorizationContext,
+  requirePermission,
+} from "@/lib/auth/authorization";
 import { prisma } from "@/lib/prisma";
 import { createLuxorClient } from "@/lib/luxor";
 
@@ -15,25 +17,10 @@ import { createLuxorClient } from "@/lib/luxor";
  */
 export async function GET(request: NextRequest) {
   try {
-    const token = request.cookies.get("token")?.value;
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    let decoded;
-    try {
-      decoded = await verifyJwtToken(token);
-    } catch (_error) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const userRole = decoded.role;
-    if (!isStaffRole(userRole)) {
-      return NextResponse.json(
-        { error: "Only administrators can access this endpoint" },
-        { status: 403 },
-      );
-    }
+    const ctx = await getAuthorizationContext(request);
+    if ("response" in ctx) return ctx.response;
+    const denied = requirePermission(ctx, "transaction_history.view");
+    if (denied) return denied;
 
     const url = new URL(request.url);
     const startDateParam = url.searchParams.get("start_date") || "2020-01-01";

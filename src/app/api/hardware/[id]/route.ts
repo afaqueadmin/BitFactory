@@ -1,7 +1,9 @@
-import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { verifyJwtToken } from "@/lib/jwt";
+import {
+  getAuthorizationContext,
+  requirePermission,
+} from "@/lib/auth/authorization";
 import { AuditAction } from "@prisma/client";
 
 interface ApiResponse<T = unknown> {
@@ -17,6 +19,12 @@ export async function GET(
 ) {
   try {
     const { id } = await context.params;
+
+    // Was open to anyone. No screen calls it today.
+    const ctx = await getAuthorizationContext(request);
+    if ("response" in ctx) return ctx.response;
+    const denied = requirePermission(ctx, "hardware_models.view");
+    if (denied) return denied;
 
     if (!id) {
       return NextResponse.json<ApiResponse>(
@@ -56,39 +64,11 @@ export async function PUT(
 ) {
   try {
     const { id } = await context.params;
-    const token = request.cookies.get("token")?.value;
-
-    if (!token) {
-      return NextResponse.json<ApiResponse>(
-        { success: false, error: "Unauthorized" },
-        { status: 401 },
-      );
-    }
-
-    // Verify token and check if admin
-    let userId: string;
-    try {
-      const decoded = await verifyJwtToken(token);
-      userId = decoded.userId;
-    } catch (error) {
-      console.error("Token verification failed:", error);
-      return NextResponse.json<ApiResponse>(
-        { success: false, error: "Invalid token" },
-        { status: 401 },
-      );
-    }
-
-    // Check if user is admin or super admin
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-    });
-
-    if (!user || !isStaffRole(user.role)) {
-      return NextResponse.json<ApiResponse>(
-        { success: false, error: "Admin access required" },
-        { status: 403 },
-      );
-    }
+    const ctx = await getAuthorizationContext(request);
+    if ("response" in ctx) return ctx.response;
+    const denied = requirePermission(ctx, "hardware_models.edit");
+    if (denied) return denied;
+    const userId = ctx.userId;
 
     if (!id) {
       return NextResponse.json<ApiResponse>(
@@ -220,39 +200,11 @@ export async function DELETE(
 ) {
   try {
     const { id } = await context.params;
-    const token = request.cookies.get("token")?.value;
-
-    if (!token) {
-      return NextResponse.json<ApiResponse>(
-        { success: false, error: "Unauthorized" },
-        { status: 401 },
-      );
-    }
-
-    // Verify token and check if admin
-    let userId: string;
-    try {
-      const decoded = await verifyJwtToken(token);
-      userId = decoded.userId;
-    } catch (error) {
-      console.error("Token verification failed:", error);
-      return NextResponse.json<ApiResponse>(
-        { success: false, error: "Invalid token" },
-        { status: 401 },
-      );
-    }
-
-    // Check if user is admin or super admin
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-    });
-
-    if (!user || !isStaffRole(user.role)) {
-      return NextResponse.json<ApiResponse>(
-        { success: false, error: "Admin access required" },
-        { status: 403 },
-      );
-    }
+    const ctx = await getAuthorizationContext(request);
+    if ("response" in ctx) return ctx.response;
+    const denied = requirePermission(ctx, "hardware_models.delete");
+    if (denied) return denied;
+    const userId = ctx.userId;
 
     if (!id) {
       return NextResponse.json<ApiResponse>(

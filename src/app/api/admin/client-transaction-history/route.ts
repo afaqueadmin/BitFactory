@@ -1,4 +1,5 @@
 import { isStaffRole } from "@/lib/auth/staffRoles";
+import { requireStaffPermission } from "@/lib/auth/authorization";
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { verifyJwtToken } from "@/lib/jwt";
@@ -110,6 +111,12 @@ export async function GET(request: NextRequest) {
         { error: "Only administrators can access this endpoint" },
         { status: 403 },
       );
+    }
+    if (isStaffRole(userRole)) {
+      const denied = await requireStaffPermission(request, [
+        "transaction_history.view",
+      ]);
+      if (denied) return denied;
     }
 
     console.log("[Client Transaction History API] Fetching all customers...");

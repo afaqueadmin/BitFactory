@@ -26,9 +26,11 @@
  * }
  */
 
-import { isStaffRole } from "@/lib/auth/staffRoles";
 import { NextRequest, NextResponse } from "next/server";
-import { verifyJwtToken } from "@/lib/jwt";
+import {
+  getAuthorizationContext,
+  requirePermission,
+} from "@/lib/auth/authorization";
 import { prisma } from "@/lib/prisma";
 
 interface BraiinsWorkerDetail {
@@ -60,59 +62,14 @@ interface WorkerWithMinerInfo extends BraiinsWorkerDetail {
   minerId: string;
 }
 
-async function extractUserFromToken(
-  request: NextRequest,
-): Promise<{ userId: string; role: string } | null> {
-  try {
-    const token = request.cookies.get("token")?.value;
-
-    if (!token) {
-      console.log("[Braiins Workers All] GET: No authorization token provided");
-      return null;
-    }
-
-    const decoded = await verifyJwtToken(token);
-    if (!decoded || typeof decoded === "string") {
-      console.log("[Braiins Workers All] GET: Invalid token");
-      return null;
-    }
-
-    return {
-      userId: decoded.userId,
-      role: decoded.role,
-    };
-  } catch (error) {
-    console.error(
-      "[Braiins Workers All] GET: Token verification failed:",
-      error,
-    );
-    return null;
-  }
-}
-
 export async function GET(request: NextRequest) {
   console.log("[Braiins Workers All] GET: Authenticating user...");
 
-  const userInfo = await extractUserFromToken(request);
-
-  if (!userInfo) {
-    console.log("[Braiins Workers All] GET: Authentication failed");
-    return NextResponse.json(
-      { success: false, error: "Unauthorized" },
-      { status: 401 },
-    );
-  }
-
-  // Verify admin role
-  if (!isStaffRole(userInfo.role)) {
-    console.log(
-      `[Braiins Workers All] GET: User ${userInfo.userId} is not admin`,
-    );
-    return NextResponse.json(
-      { success: false, error: "Admin access required" },
-      { status: 403 },
-    );
-  }
+  const ctx = await getAuthorizationContext(request);
+  if ("response" in ctx) return ctx.response;
+  const denied = requirePermission(ctx, "pool_workers.view");
+  if (denied) return denied;
+  const userInfo = { userId: ctx.userId };
 
   console.log(
     `[Braiins Workers All] GET: Admin authenticated: ${userInfo.userId}`,
