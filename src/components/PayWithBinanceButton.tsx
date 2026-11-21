@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
   Box,
@@ -22,7 +22,14 @@ import { useDaylight } from "@/lib/daylight";
 import { useQueryClient } from "@tanstack/react-query";
 
 const POLL_INTERVAL_MS = 10_000;
-const POLL_TIMEOUT_MS = 60 * 60 * 1000;
+const POLL_TIMEOUT_MS = 5 * 60 * 1000;
+
+function formatCountdown(ms: number) {
+  const total = Math.max(0, Math.ceil(ms / 1000));
+  const m = Math.floor(total / 60);
+  const sec = String(total % 60).padStart(2, "0");
+  return `${m}:${sec}`;
+}
 
 interface BinanceNetwork {
   network: string;
@@ -34,6 +41,7 @@ interface BinanceCheckout {
   amount: string;
   currency: string;
   networks: BinanceNetwork[];
+  expiresAt: string;
 }
 
 interface PayWithBinanceButtonProps {
@@ -55,9 +63,51 @@ export default function PayWithBinanceButton({
   const [processing, setProcessing] = useState(false);
   const [timedOut, setTimedOut] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
+  const [locked, setLocked] = useState(false);
+  const [remainingMs, setRemainingMs] = useState(0);
   const confettiFired = useRef(false);
 
   const open = !!checkout;
+
+  const releaseUrl = `/api/invoices/${encodeURIComponent(invoiceId)}/binance-subaccount`;
+
+  // Frees the subaccount lock, then closes the modal.
+  const closeAndRelease = useCallback(async () => {
+    setCheckout(null);
+    try {
+      await fetch(releaseUrl, { method: "DELETE", keepalive: true });
+    } catch {
+      // The unlock cron / 5 minute expiry frees it anyway.
+    }
+  }, [releaseUrl]);
+
+  // 5 minute countdown; at zero the modal closes and the lock is released.
+  const expiresAt = checkout?.expiresAt;
+  useEffect(() => {
+    if (!expiresAt) return;
+    const end = new Date(expiresAt).getTime();
+    const tick = () => {
+      const left = end - Date.now();
+      setRemainingMs(Math.max(0, left));
+      if (left <= 0) {
+        clearInterval(timer);
+        void closeAndRelease();
+      }
+    };
+    const timer = setInterval(tick, 1000);
+    tick();
+    return () => clearInterval(timer);
+  }, [expiresAt, closeAndRelease]);
+
+  // Closing the tab: best-effort release (cron covers the rest).
+  useEffect(() => {
+    if (!open) return;
+    const onHide = () => {
+      fetch(releaseUrl, { method: "DELETE", keepalive: true }).catch(() => {});
+    };
+    window.addEventListener("pagehide", onHide);
+    return () => window.removeEventListener("pagehide", onHide);
+  }, [open, releaseUrl]);
 
   useEffect(() => {
     if (!open || paid || processing) return;
@@ -126,6 +176,10 @@ export default function PayWithBinanceButton({
         { method: "POST" },
       );
       const data = await res.json().catch(() => ({}));
+      if (res.status === 423) {
+        setLocked(true);
+        return;
+      }
       if (!res.ok) throw new Error(data.error ?? "Failed to start payment");
       setPaid(false);
       setProcessing(false);
@@ -184,13 +238,19 @@ export default function PayWithBinanceButton({
         </Alert>
       )}
 
-      <Dialog
-        open={open}
-        onClose={() => setCheckout(null)}
-        maxWidth="md"
-        fullWidth
-      >
-        <DialogTitle>Pay with Binance (USDT)</DialogTitle>
+      <Dialog open={open} onClose={closeAndRelease} maxWidth="md" fullWidth>
+        <DialogTitle>
+          Pay with Binance (USDT)
+          {!paid && !processing && (
+            <Typography
+              component="span"
+              color="text.secondary"
+              sx={{ float: "right", fontVariantNumeric: "tabular-nums" }}
+            >
+              Time left: {formatCountdown(remainingMs)}
+            </Typography>
+          )}
+        </DialogTitle>
         <DialogContent>
           {paid ? (
             <Box sx={{ textAlign: "center", py: 6 }}>
@@ -322,9 +382,22 @@ export default function PayWithBinanceButton({
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setCheckout(null)}>
+          <Button onClick={closeAndRelease}>
             {paid || processing ? "Done" : "Close"}
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={locked} onClose={() => setLocked(false)}>
+        <DialogTitle>Come back later</DialogTitle>
+        <DialogContent>
+          <Typography>
+            This payment address is currently being used by another user. Please
+            try again in a few minutes.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setLocked(false)}>OK</Button>
         </DialogActions>
       </Dialog>
     </>

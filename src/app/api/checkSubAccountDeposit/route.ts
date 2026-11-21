@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { binanceRequest } from "@/lib/binance";
 import { getInvoiceForPayer } from "@/lib/accounting/invoicePayerAccess";
 import { getUserBinanceSubaccount } from "@/lib/binanceSubaccounts";
+import { clearLock } from "@/lib/binanceSubaccountLock";
 import { paymentTypeForInvoice } from "@/lib/accounting/paymentTypes";
 import {
   sendBinanceOverpaymentEmail,
@@ -93,17 +94,21 @@ export async function GET(req: NextRequest) {
     );
   }
   const email = sub.binanceSubaccountEmail;
+  console.log("sub.binanceSubaccountEmail:", email);
   if (!invoice.binanceCheckoutStartedAt) {
     return NextResponse.json({ paid: false, deposits: [] });
   }
 
   const startTime = invoice.binanceCheckoutStartedAt.getTime() - CLOCK_SKEW_MS;
 
+  const generalOrSubBinanceAccountUrl =
+    email === "hamzanajeebmusic@gmail.com" ? "hisrec" : "subHisrec";
+
   let deposits: SubAccountDeposit[];
   try {
     deposits = await binanceRequest<SubAccountDeposit[]>(
       "GET",
-      "/sapi/v1/capital/deposit/subHisrec",
+      `/sapi/v1/capital/deposit/${generalOrSubBinanceAccountUrl}`,
       { email, coin, network, startTime, limit: 500 },
     );
 
@@ -241,6 +246,9 @@ export async function GET(req: NextRequest) {
   if (overpayment) {
     processing = await markOverpaymentProcessing(invoice, overpayment, userId);
   }
+
+  // Deposit picked up (exact or over): free the subaccount for other payers.
+  if (paid || processing) await clearLock(sub.id);
 
   return NextResponse.json({
     paid,
